@@ -280,7 +280,7 @@ export function drawText(
     prev = code;
     if (code === TRADEMARK_CODE && font.glyphIndex(code) < 0) {
       const miniScale = scale * TRADEMARK_SCALE;
-      const miniLineTop = Math.round(capTop - (font.base - font.capHeight) * miniScale);
+      const miniLineTop = Math.round(capTop - (font.base - font.capHeight) * miniScale - px * 0.18);
       for (const letter of TRADEMARK_LETTERS) {
         const miniIndex = resolveGlyph(font, letter);
         if (miniIndex < 0) { pen += font.size * 0.5 * miniScale; continue; }
