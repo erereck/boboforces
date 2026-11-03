@@ -214,6 +214,20 @@ function resolveGlyph(font: MsdfFont, code: number): number {
   return index >= 0 ? index : font.glyphIndex(FALLBACK_CODE);
 }
 
+// O atlas latino não inclui ™: compor o símbolo com T e M menores, em sobrescrito.
+const TRADEMARK_CODE = 0x2122;
+const TRADEMARK_SCALE = 0.48;
+const TRADEMARK_LETTERS = [0x54, 0x4d] as const;
+
+function trademarkAdvance(font: MsdfFont): number {
+  let advance = 0;
+  for (const code of TRADEMARK_LETTERS) {
+    const index = resolveGlyph(font, code);
+    advance += index >= 0 ? (font.glyphData[index * FONT_GLYPH_STRIDE + 7] as number) : font.size * 0.5;
+  }
+  return advance * TRADEMARK_SCALE;
+}
+
 /** Largura do texto em px para fonte de `px` (em) e `tracking` em em. */
 export function measureText(font: MsdfFont, text: string, px: number, tracking = 0): number {
   const scale = px / font.size;
@@ -222,7 +236,9 @@ export function measureText(font: MsdfFont, text: string, px: number, tracking =
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
     const index = resolveGlyph(font, code);
-    const advance = index >= 0 ? (font.glyphData[index * FONT_GLYPH_STRIDE + 7] as number) : font.size * 0.5;
+    const advance = code === TRADEMARK_CODE && font.glyphIndex(code) < 0
+      ? trademarkAdvance(font)
+      : index >= 0 ? (font.glyphData[index * FONT_GLYPH_STRIDE + 7] as number) : font.size * 0.5;
     if (prev >= 0) width += font.kerning(prev, code) * scale + tracking * px;
     width += advance * scale;
     prev = code;
@@ -262,6 +278,28 @@ export function drawText(
     const index = resolveGlyph(font, code);
     if (prev >= 0) pen += font.kerning(prev, code) * scale + tracking * px;
     prev = code;
+    if (code === TRADEMARK_CODE && font.glyphIndex(code) < 0) {
+      const miniScale = scale * TRADEMARK_SCALE;
+      const miniLineTop = Math.round(capTop - (font.base - font.capHeight) * miniScale);
+      for (const letter of TRADEMARK_LETTERS) {
+        const miniIndex = resolveGlyph(font, letter);
+        if (miniIndex < 0) { pen += font.size * 0.5 * miniScale; continue; }
+        const mg = miniIndex * FONT_GLYPH_STRIDE;
+        const mw = data[mg + 3] as number;
+        const mh = data[mg + 4] as number;
+        if (mw > 0 && mh > 0) {
+          const mx = data[mg + 1] as number;
+          const my = data[mg + 2] as number;
+          pushGlyph(out, pen + (data[mg + 5] as number) * miniScale,
+            miniLineTop + (data[mg + 6] as number) * miniScale,
+            mw * miniScale, mh * miniScale,
+            mx * invW, my * invH, (mx + mw) * invW, (my + mh) * invH,
+            color, font.layer);
+        }
+        pen += (data[mg + 7] as number) * miniScale;
+      }
+      continue;
+    }
     if (index < 0) {
       pen += font.size * 0.5 * scale;
       continue;
