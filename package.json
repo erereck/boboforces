@@ -1,0 +1,42 @@
+{
+  "name": "boboforces-monorepo",
+  "private": true,
+  "version": "0.0.1",
+  "description": "BoboForces: FPS blocado pixel-art da EriLab (web com three.js; Switch homebrew via nx.js).",
+  "license": "UNLICENSED",
+  "author": "EriLab",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "typecheck": "node scripts/typecheck.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"**/*.{ts,mts,js,mjs,json,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,mts,js,mjs,json,css,html}\"",
+    "guard": "node tools/guard/src/index.ts",
+    "build": "npm run build -w @boboforces/web",
+    "build:switch": "npm run build -w @boboforces/switch",
+    "portcheck": "node tools/portcheck/src/index.ts",
+    "size-check": "node tools/size-check/src/index.ts",
+    "smoke:web": "node scripts/smoke-web.ts",
+    "balance": "node tools/balance/src/index.ts",
+    "texgen": "node tools/texgen/src/index.ts",
+    "fontbake": "node tools/fontbake/src/index.ts",
+    "check": "npm run typecheck && npm test && npm run format:check && npm run guard"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
+    "playwright-core": "1.64.1",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

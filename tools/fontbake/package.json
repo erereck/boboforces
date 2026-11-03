@@ -1,0 +1,23 @@
+{
+  "name": "@boboforces/fontbake",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Gera o atlas MSDF das fontes OFL e as métricas.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/fontbake",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/ui": "0.0.0",
+    "@boboforces/format": "0.0.0"
+  },
+  "devDependencies": {
+    "msdf-bmfont-xml": "2.8.0"
+  }
+}

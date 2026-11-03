@@ -1,0 +1,25 @@
+{
+  "name": "@boboforces/balance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Robô de balanceamento: duelos e partidas bot contra bot headless.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/balance",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "@boboforces/world": "0.0.0",
+    "@boboforces/sim": "0.0.0",
+    "@boboforces/ai": "0.0.0",
+    "@boboforces/input": "0.0.0"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@boboforces/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Árvore de UI, layout, foco, DrawList (sem GL), tokens escuros e tabela de textos pt-BR.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/ui",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/input": "0.0.0"
+  },
+  "devDependencies": {}
+}

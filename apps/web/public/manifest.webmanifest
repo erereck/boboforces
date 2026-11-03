@@ -1,0 +1,16 @@
+{
+  "name": "BoboForces",
+  "short_name": "BoboForces",
+  "description": "um jogo bobo da EriLab",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0d0b",
+  "theme_color": "#0a0d0b",
+  "categories": ["games"],
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

@@ -1,0 +1,251 @@
+import type { BlockId } from '@boboforces/world';
+import type { HitPart } from './config/metrics.ts';
+import type { EntityId } from './entity.ts';
+import type {
+  HitEvent,
+  ImpactEvent,
+  KillEvent,
+  MatchPhaseEvent,
+  MoveEvent,
+  ShotEvent,
+  SimEvent,
+  SpawnEvent,
+  WeaponEvent,
+} from './events.ts';
+import type { MatchPhase } from './view.ts';
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+/**
+ * Pool de um tipo de evento: os objetos são reaproveitados a cada tick (regra 11). Se um tick precisar de mais que o
+ * pico anterior, cria mais (só acontece até o pool "aquecer").
+ */
+class EventPool<T> {
+  private readonly items: T[] = [];
+  private used = 0;
+  private readonly create: () => T;
+
+  constructor(create: () => T, initial: number) {
+    this.create = create;
+    for (let i = 0; i < initial; i++) this.items.push(create());
+  }
+
+  acquire(): T {
+    if (this.used === this.items.length) this.items.push(this.create());
+    return this.items[this.used++]!;
+  }
+
+  reset(): void {
+    this.used = 0;
+  }
+}
+
+/**
+ * Fila de eventos de UM tick (passo 9 da ordem fixa). `clear()` no começo do `step` recicla os objetos: quem consome
+ * precisa drenar depois de cada `step` (ARCHITECTURE §7). A ordem de emissão é a ordem dos sistemas, determinística.
+ */
+export class EventQueue {
+  private readonly list: SimEvent[] = [];
+  private length = 0;
+
+  private readonly shots = new EventPool<Mutable<ShotEvent>>(
+    () => ({
+      type: 'shot',
+      tick: 0,
+      shooter: 0,
+      weapon: 0,
+      originX: 0,
+      originY: 0,
+      originZ: 0,
+      dirX: 0,
+      dirY: 0,
+      dirZ: 0,
+      distance: 0,
+    }),
+    64,
+  );
+  private readonly hits = new EventPool<Mutable<HitEvent>>(
+    () => ({ type: 'hit', tick: 0, shooter: 0, target: 0, part: 'torso', damage: 0, x: 0, y: 0, z: 0 }),
+    64,
+  );
+  private readonly kills = new EventPool<Mutable<KillEvent>>(
+    () => ({ type: 'kill', tick: 0, killer: 0, victim: 0, weapon: 0, headshot: false }),
+    16,
+  );
+  private readonly impacts = new EventPool<Mutable<ImpactEvent>>(
+    () => ({
+      type: 'impact',
+      tick: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      normalX: 0,
+      normalY: 0,
+      normalZ: 0,
+      cellX: 0,
+      cellY: 0,
+      cellZ: 0,
+      block: 0,
+    }),
+    64,
+  );
+  private readonly spawns = new EventPool<Mutable<SpawnEvent>>(() => ({ type: 'spawn', tick: 0, entity: 0 }), 16);
+  private readonly moves = new EventPool<Mutable<MoveEvent>>(
+    () => ({ type: 'move', tick: 0, entity: 0, move: 'jump', speed: 0 }),
+    32,
+  );
+  private readonly weapons = new EventPool<Mutable<WeaponEvent>>(
+    () => ({ type: 'weapon', tick: 0, entity: 0, weapon: 0, action: 'switch' }),
+    16,
+  );
+  private readonly phases = new EventPool<Mutable<MatchPhaseEvent>>(
+    () => ({ type: 'matchPhase', tick: 0, phase: 'playing' }),
+    2,
+  );
+
+  get size(): number {
+    return this.length;
+  }
+
+  clear(): void {
+    this.length = 0;
+    this.shots.reset();
+    this.hits.reset();
+    this.kills.reset();
+    this.impacts.reset();
+    this.spawns.reset();
+    this.moves.reset();
+    this.weapons.reset();
+    this.phases.reset();
+  }
+
+  /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
+  drain(out: SimEvent[]): void {
+    for (let i = 0; i < this.length; i++) out.push(this.list[i]!);
+    this.length = 0;
+  }
+
+  private push(e: SimEvent): void {
+    if (this.length < this.list.length) this.list[this.length] = e;
+    else this.list.push(e);
+    this.length++;
+  }
+
+  shot(
+    tick: number,
+    shooter: EntityId,
+    weapon: number,
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    distance: number,
+  ): void {
+    const e = this.shots.acquire();
+    e.tick = tick;
+    e.shooter = shooter;
+    e.weapon = weapon;
+    e.originX = ox;
+    e.originY = oy;
+    e.originZ = oz;
+    e.dirX = dx;
+    e.dirY = dy;
+    e.dirZ = dz;
+    e.distance = distance;
+    this.push(e);
+  }
+
+  hit(
+    tick: number,
+    shooter: EntityId,
+    target: EntityId,
+    part: HitPart,
+    damage: number,
+    x: number,
+    y: number,
+    z: number,
+  ): void {
+    const e = this.hits.acquire();
+    e.tick = tick;
+    e.shooter = shooter;
+    e.target = target;
+    e.part = part;
+    e.damage = damage;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    this.push(e);
+  }
+
+  kill(tick: number, killer: EntityId, victim: EntityId, weapon: number, headshot: boolean): void {
+    const e = this.kills.acquire();
+    e.tick = tick;
+    e.killer = killer;
+    e.victim = victim;
+    e.weapon = weapon;
+    e.headshot = headshot;
+    this.push(e);
+  }
+
+  impact(
+    tick: number,
+    x: number,
+    y: number,
+    z: number,
+    nx: number,
+    ny: number,
+    nz: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    block: BlockId,
+  ): void {
+    const e = this.impacts.acquire();
+    e.tick = tick;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    e.normalX = nx;
+    e.normalY = ny;
+    e.normalZ = nz;
+    e.cellX = cx;
+    e.cellY = cy;
+    e.cellZ = cz;
+    e.block = block;
+    this.push(e);
+  }
+
+  spawn(tick: number, entity: EntityId): void {
+    const e = this.spawns.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    this.push(e);
+  }
+
+  move(tick: number, entity: EntityId, move: MoveEvent['move'], speed: number): void {
+    const e = this.moves.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    e.move = move;
+    e.speed = speed;
+    this.push(e);
+  }
+
+  weapon(tick: number, entity: EntityId, weapon: number, action: WeaponEvent['action']): void {
+    const e = this.weapons.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    e.weapon = weapon;
+    e.action = action;
+    this.push(e);
+  }
+
+  matchPhase(tick: number, phase: MatchPhase): void {
+    const e = this.phases.acquire();
+    e.tick = tick;
+    e.phase = phase;
+    this.push(e);
+  }
+}

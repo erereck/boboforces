@@ -1,0 +1,103 @@
+/**
+ * Teclas físicas que o jogo entende, pelo `KeyboardEvent.code` (posição física, independe do layout ABNT/US).
+ * O adaptador da casca web converte `code` → índice com `keyIndex` e marca `RawInputState.keys[índice]`.
+ * A ordem é só interna (não vai para save nem rede: os bindings salvos guardam o `code` em texto).
+ */
+export const KEY_CODES = [
+  'Unknown',
+  'KeyA',
+  'KeyB',
+  'KeyC',
+  'KeyD',
+  'KeyE',
+  'KeyF',
+  'KeyG',
+  'KeyH',
+  'KeyI',
+  'KeyJ',
+  'KeyK',
+  'KeyL',
+  'KeyM',
+  'KeyN',
+  'KeyO',
+  'KeyP',
+  'KeyQ',
+  'KeyR',
+  'KeyS',
+  'KeyT',
+  'KeyU',
+  'KeyV',
+  'KeyW',
+  'KeyX',
+  'KeyY',
+  'KeyZ',
+  'Digit0',
+  'Digit1',
+  'Digit2',
+  'Digit3',
+  'Digit4',
+  'Digit5',
+  'Digit6',
+  'Digit7',
+  'Digit8',
+  'Digit9',
+  'F1',
+  'F2',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'F11',
+  'F12',
+  'Space',
+  'Enter',
+  'NumpadEnter',
+  'Escape',
+  'Tab',
+  'Backspace',
+  'Delete',
+  'ShiftLeft',
+  'ShiftRight',
+  'ControlLeft',
+  'ControlRight',
+  'AltLeft',
+  'AltRight',
+  'CapsLock',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  'Minus',
+  'Equal',
+  'BracketLeft',
+  'BracketRight',
+  'Backquote',
+  'Semicolon',
+  'Quote',
+  'Comma',
+  'Period',
+  'Slash',
+  'Backslash',
+  'IntlBackslash',
+  'IntlRo',
+] as const;
+
+export type KeyCode = (typeof KEY_CODES)[number];
+
+/** Quantidade de teclas (tamanho de `RawInputState.keys`). */
+export const KEY_COUNT = KEY_CODES.length;
+
+const indexByCode = new Map<string, number>(KEY_CODES.map((code, i) => [code, i]));
+
+/** `KeyboardEvent.code` → índice em `RawInputState.keys`; código desconhecido → 0 (`Unknown`). */
+export function keyIndex(code: string): number {
+  return indexByCode.get(code) ?? 0;
+}

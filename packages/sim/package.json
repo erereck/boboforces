@@ -1,0 +1,24 @@
+{
+  "name": "@boboforces/sim",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Simulação ECS-lite em typed arrays, passo fixo, movimento, armas, dano, eventos e métricas canônicas.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/sim",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "@boboforces/world": "0.0.0",
+    "@boboforces/nav": "0.0.0",
+    "@boboforces/input": "0.0.0"
+  },
+  "devDependencies": {}
+}

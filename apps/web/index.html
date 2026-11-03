@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0d0b" />
+    <meta name="description" content="BoboForces: um jogo bobo da EriLab." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <title>BoboForces</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!--
+      Casca web (decisão #3): este splash pinta antes de qualquer JS e também vira a página de aviso. Estados em
+      html[data-bf]: (nenhum) carregando; "es" navegador antigo; "webgl2" sem WebGL2; "error" falha ao carregar.
+      O boot (src/boot.ts) troca o splash pela canvas. Orçamento: HTML + splash ≤ 15 KB comprimido (tecnico.md §16.4).
+    -->
+    <script>
+      // Captura erros desde o primeiro byte (a diagnostics adota depois) e mostra o aviso se o jogo nem chegar a subir.
+      (function (w, d) {
+        var errs = (w.__bfErr = []);
+        function keep(text) {
+          if (!w.__bfCaptured && errs.length < 20) errs.push(String(text));
+        }
+        function fail(state) {
+          if (!w.__bfBooted) d.documentElement.setAttribute('data-bf', state);
+        }
+        w.addEventListener(
+          'error',
+          function (e) {
+            var t = e.target;
+            if (t && t !== w && t.tagName) {
+              if (t.tagName === 'SCRIPT' || (t.tagName === 'LINK' && /stylesheet|modulepreload/.test(t.rel))) {
+                keep('falha ao carregar ' + (t.src || t.href));
+                fail('error');
+              }
+              return;
+            }
+            var stack = e.error && e.error.stack ? '\n' + e.error.stack : '';
+            keep(e.message + ' @ ' + e.filename + ':' + e.lineno + ':' + e.colno + stack);
+            fail(/SyntaxError/.test(e.message) ? 'es' : 'error');
+          },
+          true,
+        );
+        w.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          keep('promessa rejeitada: ' + (r && r.stack ? r.stack : r));
+        });
+      })(window, document);
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0d0b;
+        --chapa: #121815;
+        --linha: #2a352e;
+        --tx: #e8ede6;
+        --tx2: #9da89f;
+        --acao: #f2b233;
+        --laranja: #ff7a1a;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--tx);
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        font:
+          15px/1.45 system-ui,
+          sans-serif;
+      }
+      #bf-game {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        outline: none;
+      }
+      #bf-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(40px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        box-sizing: border-box;
+        background: radial-gradient(ellipse at 50% 42%, #141b17 0, var(--bg) 70%);
+        text-align: center;
+        transition: opacity 0.18s ease-out;
+      }
+      #bf-splash.bf-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .bf-logo {
+        width: min(88vw, 640px);
+        height: auto;
+      }
+      .bf-bar {
+        width: min(72vw, 360px);
+        height: 10px;
+        border: 1px solid var(--linha);
+        background: var(--chapa);
+        overflow: hidden;
+      }
+      .bf-bar i {
+        display: block;
+        height: 100%;
+        width: calc(var(--bf-p, 0.06) * 100%);
+        min-width: 12px;
+        background: repeating-linear-gradient(-45deg, var(--laranja) 0 8px, #20261f 8px 16px);
+        background-size: 22.63px 100%;
+        transition: width 0.2s ease-out;
+        animation: bf-faixa 0.9s linear infinite;
+      }
+      @keyframes bf-faixa {
+        to {
+          background-position: 22.63px 0;
+        }
+      }
+      .bf-msg {
+        margin: 0;
+        color: var(--tx2);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .bf-warn {
+        display: none;
+        max-width: 34em;
+      }
+      .bf-warn h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      .bf-warn p {
+        margin: 0 0 6px;
+        color: var(--tx2);
+      }
+      .bf-warn button {
+        margin-top: 14px;
+        min-height: 44px;
+        padding: 10px 22px;
+        border: 0;
+        background: var(--acao);
+        color: var(--bg);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+      }
+      .bf-warn button:focus-visible {
+        outline: 2px solid var(--tx);
+        outline-offset: 3px;
+      }
+      .bf-foot {
+        position: absolute;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        margin: 0;
+        color: #5f6b62;
+        font-size: 12px;
+      }
+      html[data-bf] .bf-bar,
+      html[data-bf] .bf-msg {
+        display: none;
+      }
+      html[data-bf='es'] .bf-es,
+      html[data-bf='webgl2'] .bf-webgl2,
+      html[data-bf='error'] .bf-error {
+        display: block;
+      }
+      @media (max-height: 420px) {
+        #bf-splash {
+          gap: 14px;
+        }
+        .bf-logo {
+          width: min(70vw, 520px);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #bf-splash,
+        .bf-bar i {
+          transition: none;
+          animation: none;
+        }
+      }
+    </style>
+    <noscript>
+      <style>
+        .bf-bar,
+        .bf-msg {
+          display: none;
+        }
+        .bf-nojs {
+          display: block;
+        }
+      </style>
+    </noscript>
+  </head>
+  <body>
+    <main id="bf-splash">
+      <!-- Logotipo em blocos (decisão #43): placas de teste do Construto com a faixa laranja de segurança na base. -->
+      <svg class="bf-logo" viewBox="-0.5 -0.5 60.5 8.7" role="img" aria-label="BOBOFORCES">
+        <defs>
+          <pattern id="bf-pg" width="1" height="1" patternUnits="userSpaceOnUse">
+            <path fill="#c4cac0" d="M0 0h1v1H0z" />
+            <path fill="#eef1eb" d="M0 0h1v.125H.125V1H0z" />
+            <path fill="#7f887c" d="M1 0v1H0V.875h.875V0z" />
+            <path fill="#b0b7ac" d="M.25.375h.125v.125H.25zM.625.25h.125v.125H.625zM.5.625h.125v.125H.5z" />
+          </pattern>
+          <pattern id="bf-po" width="1" height="1" patternUnits="userSpaceOnUse">
+            <path fill="#f5812a" d="M0 0h1v1H0z" />
+            <path fill="#20261f" d="M0 .5.5 0h.25L0 .75zM.5 1 1 .5v.25L.75 1z" />
+            <path fill="#ffb36b" d="M0 0h1v.125H.125V1H0z" />
+            <path fill="#9c4a14" d="M1 0v1H0V.875h.875V0z" />
+          </pattern>
+          <path
+            id="bf-lg"
+            d="M0 0h4v1h-4zM7 0h3v1h-3zM12 0h4v1h-4zM19 0h3v1h-3zM24 0h5v1h-5zM31 0h3v1h-3zM36 0h4v1h-4zM43 0h4v1h-4zM48 0h5v1h-5zM55 0h4v1h-4zM0 1h1v2h-1zM4 1h1v2h-1zM6 1h1v5h-1zM10 1h1v5h-1zM12 1h1v2h-1zM16 1h1v2h-1zM18 1h1v5h-1zM22 1h1v5h-1zM24 1h1v2h-1zM30 1h1v5h-1zM34 1h1v5h-1zM36 1h1v2h-1zM40 1h1v2h-1zM42 1h1v5h-1zM48 1h1v2h-1zM54 1h1v2h-1zM0 3h4v1h-4zM12 3h4v1h-4zM24 3h4v1h-4zM36 3h4v1h-4zM48 3h4v1h-4zM55 3h3v1h-3zM0 4h1v2h-1zM4 4h1v2h-1zM12 4h1v2h-1zM16 4h1v2h-1zM24 4h1v2h-1zM36 4h1v2h-1zM38 4h1v1h-1zM48 4h1v2h-1zM58 4h1v2h-1zM39 5h1v1h-1z"
+          />
+          <path
+            id="bf-lo"
+            d="M0 6h4v1h-4zM7 6h3v1h-3zM12 6h4v1h-4zM19 6h3v1h-3zM24 6h1v1h-1zM31 6h3v1h-3zM36 6h1v1h-1zM40 6h1v1h-1zM43 6h4v1h-4zM48 6h5v1h-5zM54 6h4v1h-4z"
+          />
+        </defs>
+        <g fill="#000" fill-opacity=".5" transform="translate(.5 .6)">
+          <use href="#bf-lg" />
+          <use href="#bf-lo" />
+        </g>
+        <use href="#bf-lg" fill="#4a524b" x=".25" y=".25" />
+        <use href="#bf-lo" fill="#6e3511" x=".25" y=".25" />
+        <use href="#bf-lg" fill="url(#bf-pg)" />
+        <use href="#bf-lo" fill="url(#bf-po)" />
+      </svg>
+      <div class="bf-bar"><i></i></div>
+      <p class="bf-msg">Carregando</p>
+      <section class="bf-warn bf-es">
+        <h1>Este navegador é antigo demais para o BoboForces</h1>
+        <p>Atualize para uma versão recente do Chrome, Edge, Firefox ou Safari e abra o jogo de novo.</p>
+      </section>
+      <section class="bf-warn bf-webgl2">
+        <h1>O 3D não ligou neste navegador</h1>
+        <p>O BoboForces precisa de WebGL 2, que está desligado ou não existe aqui.</p>
+        <p>
+          Atualize o navegador, ative a aceleração de hardware nas configurações dele ou atualize o driver de vídeo.
+        </p>
+        <button type="button" onclick="location.reload()">Tentar de novo</button>
+      </section>
+      <section class="bf-warn bf-error">
+        <h1>Não deu para carregar o jogo</h1>
+        <p>Confira a conexão e tente de novo. Se continuar, atualize o navegador.</p>
+        <button type="button" onclick="location.reload()">Tentar de novo</button>
+      </section>
+      <section class="bf-warn bf-nojs">
+        <h1>O BoboForces precisa de JavaScript</h1>
+        <p>Ative o JavaScript nas configurações do navegador para jogar.</p>
+      </section>
+      <p class="bf-foot">um jogo bobo da EriLab · v%BF_VERSION%</p>
+    </main>
+    <!-- Sonda de sintaxe ES2022 (campo privado + bloco static): num navegador antigo este script nem compila. -->
+    <script>
+      class BfProbe {
+        #ok = 1;
+        static {
+          window.__bfEs = 1;
+        }
+      }
+    </script>
+    <script>
+      // Navegador mínimo (DECISOES, "Navegador mínimo"): ES2022 + WebGL2. O contexto de verdade é conferido no boot.
+      (function (w, d) {
+        var root = d.documentElement;
+        if (root.hasAttribute('data-bf')) return;
+        if (w.__bfEs !== 1 || !Array.prototype.at || !Object.hasOwn) root.setAttribute('data-bf', 'es');
+        else if (typeof w.WebGL2RenderingContext !== 'function') root.setAttribute('data-bf', 'webgl2');
+      })(window, document);
+    </script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

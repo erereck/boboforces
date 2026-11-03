@@ -1,0 +1,20 @@
+{
+  "name": "@boboforces/input",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Ações, InputFrame, estado bruto padronizado, perfis de controle e mapeador.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/input",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0"
+  },
+  "devDependencies": {}
+}

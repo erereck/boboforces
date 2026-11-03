@@ -1,0 +1,25 @@
+{
+  "name": "@boboforces/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Casca web: Vite, splash inline, platform-web e adaptadores de input (DOM só aqui).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "node ../../scripts/typecheck.ts apps/web",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/game": "0.0.0",
+    "@boboforces/input": "0.0.0",
+    "@boboforces/platform-api": "0.0.0",
+    "@boboforces/render": "0.0.0",
+    "@boboforces/shared": "0.0.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.5"
+  }
+}

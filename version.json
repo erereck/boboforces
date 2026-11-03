@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "codename": "Primeiro Bloco",
+  "releasedAt": null,
+  "formats": {
+    "save": 1,
+    "preset": 1,
+    "bot": 1,
+    "map": 1,
+    "protocol": 1
+  }
+}

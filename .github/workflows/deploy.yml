@@ -1,0 +1,76 @@
+# Publicação da web no GitHub Pages (decisão #40: erereck.github.io/boboforces).
+# Só vai ao ar o que passou no CI: este workflow roda quando o "CI" termina num push na main e só segue se ele passou
+# (inclui formatação, build do Switch, portcheck --strict e balanceamento, que antes ficavam de fora daqui). Constrói
+# de novo a partir do MESMO commit que o CI aprovou e publica apps/web/dist (Vite com base './').
+# À mão (workflow_dispatch) roda o portão inteiro antes de publicar.
+# Requisito único no GitHub: Settings › Pages › Source = "GitHub Actions".
+name: Deploy (GitHub Pages)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy por vez; o que estiver no meio termina (não cancela uma publicação pela metade).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build da web
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Portão completo (só no disparo manual; no automático o CI já passou neste commit)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm run check
+          npm run build:switch
+          npm run portcheck -- --no-build --strict
+          npm run balance
+
+      - name: Build web
+        run: npm run build
+
+      - name: Orçamento de download
+        run: npm run size-check
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: apps/web/dist
+
+  deploy:
+    name: Publicar no Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

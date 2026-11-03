@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 13" shape-rendering="crispEdges">
+  <!-- Provisório até o tools/logo (arte-ux.md §11.2): monograma "BF" em blocos, faixa laranja na base. -->
+  <rect width="13" height="13" rx="2" fill="#0a0d0b"/>
+  <g transform="translate(0 1)">
+    <path fill="#4a524b" transform="translate(.35 .35)" d="M1 2h4v1h-4zM7 2h5v1h-5zM1 3h1v2h-1zM5 3h1v2h-1zM7 3h1v2h-1zM1 5h4v1h-4zM7 5h4v1h-4zM1 6h1v2h-1zM5 6h1v2h-1zM7 6h1v2h-1zM1 8h4v1h-4zM7 8h1v1h-1z"/>
+    <path fill="#d3d8cf" d="M1 2h4v1h-4zM7 2h5v1h-5zM1 3h1v2h-1zM5 3h1v2h-1zM7 3h1v2h-1zM1 5h4v1h-4zM7 5h4v1h-4zM1 6h1v2h-1zM5 6h1v2h-1zM7 6h1v2h-1z"/>
+    <path fill="#ff7a1a" d="M1 8h4v1h-4zM7 8h1v1h-1z"/>
+  </g>
+</svg>

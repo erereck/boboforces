@@ -1,0 +1,19 @@
+// Globais da casca web. As constantes `__BF_*` vêm do `define` do vite.config.ts (lidas do version.json e do git);
+// nos testes do Vitest elas não existem, por isso todo uso passa por `typeof` (ver platform/build-info.ts).
+declare const __BF_VERSION__: string;
+declare const __BF_CODENAME__: string;
+declare const __BF_BUILD__: string;
+
+/** Marcadores que o script inline do index.html deixa no `window` antes de qualquer módulo rodar. */
+interface Window {
+  /** Erros capturados antes da platform-web existir (até 20). A diagnostics adota e zera. */
+  __bfErr?: string[] | undefined;
+  /** A diagnostics já assumiu a captura de erros: o script inline para de guardar. */
+  __bfCaptured?: boolean;
+  /** O boot terminou de criar a plataforma: dali em diante, erro de carga é com a integração (`boot.fail`). */
+  __bfBooted?: boolean;
+  /** 1 quando o navegador entendeu a sonda de sintaxe ES2022 (campo privado + bloco static). */
+  __bfEs?: number;
+  /** Gancho de depuração do `main.ts` (estado do jogo e estatísticas do render), lido pelo teste de fumaça. */
+  __bfDebug?: import('./main.ts').WebDebugHook;
+}

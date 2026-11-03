@@ -1,0 +1,21 @@
+{
+  "name": "@boboforces/format",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Formatos boboforces/<tipo>@<n>: receita de partida, validadores, migrações, IDs de conteúdo.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/format",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {}
+}

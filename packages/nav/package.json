@@ -1,0 +1,21 @@
+{
+  "name": "@boboforces/nav",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Navegação 2,5D (A*, flow field, pontos táticos). M1+.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/nav",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/world": "0.0.0"
+  },
+  "devDependencies": {}
+}

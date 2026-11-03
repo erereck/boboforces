@@ -1,0 +1,30 @@
+{
+  "name": "@boboforces/game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fluxo do jogo (boot, telas, partida), cola dos pacotes e LocalDriver.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/game",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "@boboforces/platform-api": "0.0.0",
+    "@boboforces/input": "0.0.0",
+    "@boboforces/world": "0.0.0",
+    "@boboforces/nav": "0.0.0",
+    "@boboforces/sim": "0.0.0",
+    "@boboforces/ai": "0.0.0",
+    "@boboforces/ui": "0.0.0",
+    "@boboforces/audio": "0.0.0",
+    "@boboforces/render": "0.0.0"
+  },
+  "devDependencies": {}
+}

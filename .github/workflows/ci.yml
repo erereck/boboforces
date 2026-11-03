@@ -1,0 +1,83 @@
+# CI do BoboForces (tecnico.md §20): todo push e todo PR.
+# Ordem: instalar, typecheck, testes, formatação, guardas, build web, orçamento de download, teste no navegador (Edge
+# headless em 1280×720 e 667×375, DECISOES "Testes de dispositivo"), build do Switch, portcheck (estrito: o boot
+# precisa chegar ao menu) e robô de balanceamento (ordem dos 5 níveis). O deploy do Pages só roda depois deste
+# workflow passar (deploy.yml, workflow_run).
+# O CI NUNCA gera NRO/NSP (decisão #33, uso pessoal): num repositório público, artefato de CI vira download público.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, testes, guardas, builds e portcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Testes
+        run: npm test
+
+      - name: Formatação (Prettier)
+        run: npm run format:check
+
+      - name: Guardas de portabilidade
+        run: npm run guard
+
+      - name: Build web
+        run: npm run build
+
+      - name: Orçamento de download
+        run: npm run size-check
+
+      # A imagem ubuntu-latest traz o Microsoft Edge; sem GPU, o WebGL2 sai pelo SwiftShader do navegador. Se o Edge
+      # faltar, o script cai para o Chrome da imagem e anota o desvio no relatório.
+      - name: Teste no navegador (Edge headless, 1280×720 e 667×375)
+        run: npm run smoke:web
+
+      - name: Prints e relatório do teste no navegador (só quando falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-web
+          path: local/m0/
+          if-no-files-found: ignore
+
+      - name: Build do Switch (só o bundle romfs/main.js)
+        run: npm run build:switch
+
+      - name: Portcheck (varredura do bundle + boot em node:vm até o menu)
+        run: npm run portcheck -- --no-build --strict
+
+      - name: Robô de balanceamento (ordem dos 5 níveis)
+        run: npm run balance
+
+      - name: Conferir que nenhum NRO/NSP foi gerado
+        run: |
+          found=$(find . -path ./node_modules -prune -o \( -name '*.nro' -o -name '*.nsp' \) -print)
+          if [ -n "$found" ]; then
+            echo "O CI não pode gerar NRO/NSP (decisão #33):"
+            echo "$found"
+            exit 1
+          fi

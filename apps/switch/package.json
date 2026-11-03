@@ -1,0 +1,40 @@
+{
+  "name": "@boboforces/switch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Casca do Switch (homebrew, uso pessoal): esbuild -> romfs/main.js, platform-switch, NRO/NSP locais.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "author": "EriLab",
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "nro": "node scripts/build.ts && node scripts/nro.ts",
+    "nsp": "node scripts/build.ts && node scripts/package-nsp.ts",
+    "verify:nro": "node scripts/verify-nro.ts",
+    "verify:nsp": "node scripts/verify-nsp.ts",
+    "icon": "node scripts/prepare-icon.ts",
+    "eden": "node scripts/prepare-eden.ts",
+    "typecheck": "node ../../scripts/typecheck.ts apps/switch",
+    "test": "vitest run"
+  },
+  "nacp": {
+    "title": "BoboForces",
+    "author": "EriLab",
+    "id": "01E1AB0B0B0F0000",
+    "startupUserAccount": 0,
+    "userAccountSaveDataSize": "0"
+  },
+  "dependencies": {
+    "@boboforces/game": "0.0.0",
+    "@boboforces/input": "0.0.0",
+    "@boboforces/platform-api": "0.0.0",
+    "@boboforces/render": "0.0.0",
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/ui": "0.0.0"
+  },
+  "devDependencies": {
+    "@nx.js/nro": "1.0.0-beta.7",
+    "@nx.js/nsp": "1.0.0-beta.7",
+    "@nx.js/runtime": "1.0.0-beta.7"
+  }
+}

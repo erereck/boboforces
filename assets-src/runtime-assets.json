@@ -1,0 +1,10 @@
+{
+  "$comment": "Assets que o jogo carrega em tempo de execução: caminho LÓGICO (platform.assets) → arquivo gerado em assets-src/. A web serve em <base>/assets/<lógico> (plugin do vite.config.ts) e o Switch copia para romfs:/assets/<lógico> (apps/switch/scripts/bundle.ts). Os lógicos ficam em packages/game/src/assets.ts.",
+  "files": {
+    "fonts/ui-fonts.json": "fonts/generated/ui-fonts.generated.json",
+    "fonts/ui-fonts.png": "fonts/generated/ui-fonts.generated.png",
+    "textures/blocos16.json": "textures/generated/blocos16.json",
+    "textures/blocos16.png": "textures/generated/blocos16.png"
+  },
+  "preload": ["fonts/ui-fonts.json", "fonts/ui-fonts.png"]
+}

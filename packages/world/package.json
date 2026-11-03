@@ -1,0 +1,22 @@
+{
+  "name": "@boboforces/world",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grade de blocos de 0,5 m, chunks 32³, registro de blocos, DDA, colisão e mesher (só arrays).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/world",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {}
+}

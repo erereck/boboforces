@@ -1,0 +1,39 @@
+{
+  "name": "blocos16",
+  "layerWidth": 16,
+  "layerHeight": 16,
+  "layers": [
+    {
+      "name": "concrete",
+      "kind": "opaque"
+    },
+    {
+      "name": "metal",
+      "kind": "opaque"
+    },
+    {
+      "name": "wood",
+      "kind": "opaque"
+    },
+    {
+      "name": "grass",
+      "kind": "opaque"
+    },
+    {
+      "name": "grass_side",
+      "kind": "opaque"
+    },
+    {
+      "name": "dirt",
+      "kind": "opaque"
+    },
+    {
+      "name": "brick",
+      "kind": "opaque"
+    },
+    {
+      "name": "test_floor",
+      "kind": "opaque"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@boboforces/platform-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Só tipos: Platform, GraphicsSurface, Storage, Assets, Files, TextInput, Lifecycle, Diagnostics, OnlineService.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/storage-contract.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts packages/platform-api",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/input": "0.0.0",
+    "@boboforces/shared": "0.0.0"
+  },
+  "devDependencies": {}
+}

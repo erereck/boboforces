@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+coverage/
+local/
+romfs/
+.cache/
+package-lock.json
+*.md
+*.generated.*

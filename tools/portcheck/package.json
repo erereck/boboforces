@@ -1,0 +1,18 @@
+{
+  "name": "@boboforces/portcheck",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build do Switch + varredura do bundle + boot em node:vm com globais falsos do nx.js.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/portcheck",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

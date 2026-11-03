@@ -1,0 +1,25 @@
+# Dependências e saídas
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+*.tsbuildinfo
+*.log
+
+# Switch: pacotes gerados e chaves (uso pessoal, decisão #33; chaves nunca entram no repo)
+*.nro
+*.nsp
+*.keys
+apps/switch/romfs/
+
+# PRIVADO (padrão do novelo): config do Eden, chaves, logs, capturas
+local/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/

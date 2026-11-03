@@ -1,0 +1,99 @@
+import { RNG_STATE_WORDS, type BitReader, type BitWriter, type StateHasher } from '@boboforces/shared';
+import { MAX_CONTROLLERS, MAX_TEAMS } from './constants.ts';
+import type { SimContext } from './context.ts';
+import type { StateArray } from './state.ts';
+import type { MatchPhase } from './view.ts';
+
+/**
+ * Snapshot simples (M0) e hash do estado. Os dois percorrem a MESMA lista (`SimState.fields`, na ordem fixa) até
+ * `count`, mais partida, RNGs e controladores. O snapshot é completo e sem perda (f64 como f64): ler um snapshot numa sim
+ * criada com a mesma receita e o mesmo mapa e seguir com os mesmos inputs dá o mesmo hash. Delta contra baseline e
+ * quantização para a rede ficam para o M5.
+ */
+
+const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
+// 2: `fireCooldownS` (f64, segundos) no lugar de `fireCooldownTicks` (i16).
+const SNAPSHOT_VERSION = 2;
+
+const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended'];
+
+const rngScratch = new Uint32Array(RNG_STATE_WORDS);
+
+export function hashState(ctx: SimContext, h: StateHasher): number {
+  const s = ctx.s;
+  h.reset();
+  h.u32(ctx.tick).u32(s.count);
+  h.u8(PHASES.indexOf(ctx.match.phase)).i32(ctx.match.ticksLeft).i32(ctx.match.winnerTeam);
+  for (let t = 0; t < MAX_TEAMS; t++) h.i32(ctx.match.teamScore[t]!);
+  ctx.rngSpawn.saveState(rngScratch);
+  h.bytes(rngScratch);
+  ctx.rngWeapons.saveState(rngScratch);
+  h.bytes(rngScratch);
+  for (const f of s.fields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  h.bytes(s.controllerEntity);
+  return h.digest();
+}
+
+function writeArray(w: BitWriter, a: StateArray, n: number): void {
+  if (a instanceof Float64Array) for (let i = 0; i < n; i++) w.writeF64(a[i]!);
+  else if (a instanceof Float32Array) for (let i = 0; i < n; i++) w.writeF32(a[i]!);
+  else if (a instanceof Uint8Array) for (let i = 0; i < n; i++) w.writeBits(a[i]!, 8);
+  else if (a instanceof Uint16Array) for (let i = 0; i < n; i++) w.writeBits(a[i]!, 16);
+  else if (a instanceof Int16Array) for (let i = 0; i < n; i++) w.writeBits(a[i]! & 0xffff, 16);
+  else for (let i = 0; i < n; i++) w.writeBits(a[i]! >>> 0, 32);
+}
+
+function readArray(r: BitReader, a: StateArray, n: number): void {
+  if (a instanceof Float64Array) for (let i = 0; i < n; i++) a[i] = r.readF64();
+  else if (a instanceof Float32Array) for (let i = 0; i < n; i++) a[i] = r.readF32();
+  else if (a instanceof Uint8Array) for (let i = 0; i < n; i++) a[i] = r.readBits(8);
+  else if (a instanceof Uint16Array) for (let i = 0; i < n; i++) a[i] = r.readBits(16);
+  else if (a instanceof Int16Array) for (let i = 0; i < n; i++) a[i] = r.readBits(16);
+  // Typed arrays convertem sozinhos: u32 → Int32Array vira o negativo certo.
+  else for (let i = 0; i < n; i++) a[i] = r.readBits(32);
+}
+
+export function writeState(ctx: SimContext, w: BitWriter): void {
+  const s = ctx.s;
+  w.writeU32(SNAPSHOT_MAGIC);
+  w.writeU8(SNAPSHOT_VERSION);
+  w.writeU32(ctx.tick);
+  w.writeU16(s.count);
+  w.writeU8(PHASES.indexOf(ctx.match.phase));
+  w.writeBits(ctx.match.ticksLeft >>> 0, 32);
+  w.writeBits(ctx.match.winnerTeam >>> 0, 32);
+  for (let t = 0; t < MAX_TEAMS; t++) w.writeBits(ctx.match.teamScore[t]! >>> 0, 32);
+  ctx.rngSpawn.saveState(rngScratch);
+  writeArray(w, rngScratch, RNG_STATE_WORDS);
+  ctx.rngWeapons.saveState(rngScratch);
+  writeArray(w, rngScratch, RNG_STATE_WORDS);
+  for (const f of s.fields) writeArray(w, f.array, s.count * f.stride);
+  writeArray(w, s.controllerEntity, MAX_CONTROLLERS);
+}
+
+/**
+ * Lê por cima do estado atual. M0: a sim precisa ter sido criada com a mesma receita e o mesmo mapa (o conjunto de
+ * entidades é o mesmo; o alocador de slots não viaja no snapshot).
+ */
+export function readState(ctx: SimContext, r: BitReader): void {
+  const s = ctx.s;
+  if (r.readU32() !== SNAPSHOT_MAGIC) throw new Error('snapshot: assinatura inválida');
+  const version = r.readU8();
+  if (version !== SNAPSHOT_VERSION) throw new Error(`snapshot: versão ${version} não suportada`);
+  const tick = r.readU32();
+  const count = r.readU16();
+  if (count !== s.count) throw new Error('snapshot: conjunto de entidades diferente (receita/mapa outros?)');
+  const phase = PHASES[r.readU8()];
+  if (phase === undefined) throw new Error('snapshot: fase inválida');
+  ctx.tick = tick;
+  ctx.match.phase = phase;
+  ctx.match.ticksLeft = r.readBits(32) | 0;
+  ctx.match.winnerTeam = r.readBits(32) | 0;
+  for (let t = 0; t < MAX_TEAMS; t++) ctx.match.teamScore[t] = r.readBits(32) | 0;
+  readArray(r, rngScratch, RNG_STATE_WORDS);
+  ctx.rngSpawn.loadState(rngScratch);
+  readArray(r, rngScratch, RNG_STATE_WORDS);
+  ctx.rngWeapons.loadState(rngScratch);
+  for (const f of s.fields) readArray(r, f.array, s.count * f.stride);
+  readArray(r, s.controllerEntity, MAX_CONTROLLERS);
+}
