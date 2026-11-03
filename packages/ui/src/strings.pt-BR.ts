@@ -12,7 +12,7 @@ export const STRINGS_PT_BR = {
 
   /** Logotipo provisório em texto MSDF (o logo em blocos chega com o tools/logo). Grafia do logo: caixa alta. */
   'title.logo': 'BOBOFORCES',
-  'title.credit': 'um jogo bobo da EriLab',
+  'title.credit': 'EriLab™ / Erick Luiz',
   'title.version': 'v{version} · {codename}',
 
   'settings.empty': 'Nada para ajustar por enquanto.',
