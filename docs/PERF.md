@@ -19,6 +19,7 @@ Golden: Bobo Warfare TDM, 8 bots, semente 42, 3.600 ticks.
 
 | Data | Build | Máquina | Bots | ms/tick sim (p50/p90) | ms/tick IA (p50/p90) | Hash golden | Observação |
 |---|---|---|---|---|---|---|---|
+| 02/11/2026 | 0.0.1 `b01de7b` publicado | 9,7 KB (index.html servido) | 339,0 KB | — | **432 ms (FCP)**: critério 2 do M0 ok | 1.789 ms / — | `smoke:web --url https://erereck.github.io/boboforces/` daqui (Edge 156 headless, perfil limpo, 1ª visita; HTML em 325 ms). No CI do GitHub (Edge 156 + SwiftShader, servidor local): splash 736 ms, menu 2.098 ms |
 | 02/11/2026 | 0.0.1 local (revisão do M0) | i5-12450H, Node 26.7 | 8 | — | — | `e3f37a6e` | 36.000 ticks depois do aquecimento em 314 ms (8,7 µs/tick sim + IA). **Alocação no laço quente (regra 11) ainda existe:** 16 GCs menores (total 3,5 ms, maior 0,65 ms) e heap +3,3 MB nesses 36.000 ticks; vem de doubles encaixotados em funções numéricas não inlinadas, não de arrays/closures no fonte. Acompanhar no F2 e no Teste Zero (pausa de GC ≤ 5 ms) antes de mexer (tecnico.md §16.3) |
 | 02/11/2026 | 0.0.1 local (revisão do M0) | i5-12450H, Node 26.7 | 8 | — | — | `a1a14dc9` (30 Hz) | mesma partida com `hz: 30`: 50 × 51 abates e 1.608 × 1.562 tiros em 60 s (60 × 30 Hz), 36 ms para 1.800 ticks |
 | 02/11/2026 | 0.0.1 local | i5-12450H, Node 26.7 | 8 | 0,004 / 0,010 | 0,006 / 0,013 | `f991a92c` | 3.600 ticks em ~49 ms (0,014 ms/tick com IA), 2ª execução (JIT aquecido) |

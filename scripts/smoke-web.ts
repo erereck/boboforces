@@ -8,7 +8,8 @@
 //   - Enter no JOGAR entra na cena de teste e a sim anda; P pausa;
 //   - uma segunda passada em 667×375 (celular em paisagem, tecnico.md §20): título, cena e zero erros.
 // Salva `titulo.png`, `cena-teste.png` e os prints de 667×375 em `local/m0/` (pasta privada, fora do git). Uso:
-// `npm run build` e depois `npm run smoke:web`. Sai com 1 se algo falhar.
+// `npm run build` e depois `npm run smoke:web` (ou `npm run smoke:web -- --url <site publicado>`). Sai com 1 se algo
+// falhar.
 //
 // No CI (`CI` definido; ubuntu-latest sem GPU) o Edge roda com o SwiftShader liberado, que é o WebGL2 por software do
 // próprio navegador. Se o Edge não estiver instalado, cai para o Chrome da imagem e registra o desvio no relatório.
@@ -33,7 +34,11 @@ declare global {
 
 const ROOT = resolve(import.meta.dirname, '..');
 const WEB = join(ROOT, 'apps', 'web');
-const OUT = join(ROOT, 'local', 'm0');
+// `--url <endereço>`: roda contra um site já publicado (o GitHub Pages, critério de pronto 2) em vez do build local,
+// com o navegador de perfil limpo (primeira visita). Prints e relatório vão para `local/m0/publicado/`.
+const urlFlag = process.argv.indexOf('--url');
+const remoteUrl = urlFlag >= 0 ? process.argv[urlFlag + 1] : undefined;
+const OUT = join(ROOT, 'local', 'm0', ...(remoteUrl ? ['publicado'] : []));
 const SPLASH_GOAL_MS = 1000;
 const SPLASH_CI_LIMIT_MS = 2500;
 const MAX_PROGRAMS = 7;
@@ -60,14 +65,16 @@ function freePort(): Promise<number> {
   });
 }
 
-const port = await freePort();
-const server = await preview({
-  root: WEB,
-  configFile: join(WEB, 'vite.config.ts'),
-  logLevel: 'warn',
-  preview: { host: '127.0.0.1', port, strictPort: true, open: false },
-});
-const url = `http://127.0.0.1:${port}/`;
+const port = remoteUrl ? 0 : await freePort();
+const server = remoteUrl
+  ? null
+  : await preview({
+      root: WEB,
+      configFile: join(WEB, 'vite.config.ts'),
+      logLevel: 'warn',
+      preview: { host: '127.0.0.1', port, strictPort: true, open: false },
+    });
+const url = remoteUrl ?? `http://127.0.0.1:${port}/`;
 const problems: string[] = [];
 const report: Record<string, unknown> = { url };
 const errors: string[] = [];
@@ -219,7 +226,7 @@ try {
   report['screenshots'] = [titlePath, scenePath, phoneTitlePath, phoneScenePath];
 } finally {
   await browser.close();
-  await new Promise<void>((done) => server.httpServer.close(() => done()));
+  if (server) await new Promise<void>((done) => server.httpServer.close(() => done()));
 }
 
 report['consoleErrors'] = errors;

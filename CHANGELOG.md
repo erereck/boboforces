@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M0 Fundação (integrado; falta o primeiro commit e a publicação, P-002)
+### M0 Fundação (publicado em erereck.github.io/boboforces, P-002)
 
 **Etapa 1: esqueleto e contratos**
 
@@ -107,3 +107,6 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   LICENSE de cada pacote npm que entrou no bundle (three, fflate) e a OFL da Barlow, linkado no `index.html`
   (`rel=license`); `.gitignore` ignora qualquer `*.keys`; README, README do Switch, PROMPTS, CREDITOS e DEPENDENCIAS
   atualizados (status do M0, Node 24+, dependências indiretas do nx.js usadas pelos scripts locais).
+- Publicado: commit `b01de7b` em `erereck/boboforces` (público), CI verde no primeiro push (Edge do runner, sem
+  fallback) e deploy do Pages ok. Splash na URL publicada em 432 ms (primeira visita): os 4 critérios de pronto do M0
+  estão cumpridos. `smoke:web` ganhou `--url` para medir um site publicado.
