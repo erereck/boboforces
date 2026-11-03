@@ -52,6 +52,18 @@ describe('medida e desenho de texto', () => {
     expect(measureText(display, '中', 20)).toBe(measureText(display, '?', 20));
   });
 
+  it('compõe ™ em duas letras pequenas em sobrescrito sem precisar refazer o atlas', () => {
+    const dl = createDrawList(16);
+    resetDrawList(dl, 1280, 720);
+    const width = drawText(dl, display, 'EriLab™', 100, 50, 20, 0xffffffff);
+    expect(width).toBeCloseTo(measureText(display, 'EriLab™', 20));
+    expect(dl.count).toBe(8); // 6 letras normais + T e M para o ™
+    const tmGlyph = 6 * DRAW_FLOATS_PER_COMMAND;
+    expect(dl.geom[tmGlyph + 2]).toBeCloseTo(10 * 0.48);
+    expect(dl.geom[tmGlyph + 3]).toBeCloseTo(20 * 0.48);
+    expect(dl.geom[tmGlyph + 1]).toBeLessThan(dl.geom[1]); // símbolo junto ao topo da letra E
+  });
+
   it('empilha um glifo por letra visível, com UV do atlas e topo das maiúsculas em capTop', () => {
     const dl = createDrawList(64);
     resetDrawList(dl, 1280, 720);
