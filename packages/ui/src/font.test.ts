@@ -61,7 +61,7 @@ describe('medida e desenho de texto', () => {
     const tmGlyph = 6 * DRAW_FLOATS_PER_COMMAND;
     expect(dl.geom[tmGlyph + 2]).toBeCloseTo(10 * 0.48);
     expect(dl.geom[tmGlyph + 3]).toBeCloseTo(20 * 0.48);
-    expect(dl.geom[tmGlyph + 1]).toBeLessThan(dl.geom[1]); // símbolo junto ao topo da letra E
+    expect(dl.geom[tmGlyph + 1]).toBeLessThan(dl.geom[1] as number); // símbolo junto ao topo da letra E
   });
 
   it('empilha um glifo por letra visível, com UV do atlas e topo das maiúsculas em capTop', () => {

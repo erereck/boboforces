@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createDrawList, DRAW_OP, resetDrawList, type DrawList } from './draw-list.ts';
 import { moveFocus } from './focus.ts';
-import { parseFontPack, type MsdfFont } from './font.ts';
+import { COMPOSED_CHARS, parseFontPack, type MsdfFont } from './font.ts';
 import { layoutTree, type LayoutResult } from './layout.ts';
 import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
@@ -62,7 +62,9 @@ describe('atlas em uso: fontes, licença e métricas', () => {
     const display = glyphCodes(fonts.display);
     const outHud = new Set<string>();
     const outDisplay = new Set<string>();
-    for (const text of Object.values(STRINGS_PT_BR)) {
+    for (const raw of Object.values(STRINGS_PT_BR)) {
+      // O ™ não está no atlas: o drawText o compõe com T e M, que precisam estar nas duas fontes.
+      const text = raw.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
       for (const ch of text) if (!hud.has(ch.charCodeAt(0))) outHud.add(ch);
       for (const ch of text.toUpperCase()) if (!display.has(ch.charCodeAt(0))) outDisplay.add(ch);
     }

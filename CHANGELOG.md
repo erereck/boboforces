@@ -256,10 +256,12 @@ números com data e método no `docs/PERF.md` §1e; contratos no `docs/ARCHITECT
   e `figure-paint-shirt` apagados): `FigureOutfit` (tecido liso, woodland, deserto, urbano, noturno ou com graxa;
   jaqueta, calça, colete, botas e luvas) no lugar do `FigureKit`, `figureOutfitFor` com o colete de time e o ícone ▲ ● ■
   ◆, braçadeira, luvas e joelheiras do time (38,1–39,0% da frente na cor do time); membros em colunas, bota de combate,
-  12 looks de farda e o roteiro `rodada4` com as perguntas R1–R4.
-- **Pendente:** tabela de jogo no Eden (250 ms; meta ≤ 75, plano B = tabela gerada no build), skins no Eden (226 ms; meta
-  180), console (Teste Zero), emote no `ActorBuffer` (M2) e escala do zumbi na hitbox (M3); decisões do Erick na rodada 3
-  (multiplicadores de headshot, mira visível × centro da caixa, número do peito × 38% de cor do time, teto do cabelo).
+  12 looks de farda e o roteiro `rodada4` com as perguntas R1–R4. Rodada 4 aprovada como está (#59).
+- **Crédito do menu (commits do Erick de 03/11, depois do M0):** "EriLab™ / Erick Luiz". As fontes do M1 não têm o ™: o
+  `drawText` o compõe com T e M a 0,48 em sobrescrito, escrevendo direto na lista como os outros glifos (sem alocação).
+  `COMPOSED_CHARS` diz aos testes de cobertura (ui e fontbake) que o ™ conta como "TM".
+- **Pendente:** tabela de jogo no Eden (259 ms; meta ≤ 75, plano B = tabela gerada no build), skins no Eden (237 ms; meta
+  180), console (Teste Zero), bench nos celulares, emote no `ActorBuffer` (M2) e escala do zumbi na hitbox (M3).
 
 ### M0 Fundação (publicado em erereck.github.io/boboforces, P-002)
 

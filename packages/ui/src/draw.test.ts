@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { drawTree } from './draw.ts';
 import { createDrawList, DRAW_FLOATS_PER_COMMAND, DRAW_OP, resetDrawList, type DrawList } from './draw-list.ts';
+import { COMPOSED_CHARS } from './font.ts';
 import { layoutTree } from './layout.ts';
 import { titleScreen } from './screens/title.ts';
 import { syntheticFontPack } from './test-fixtures.ts';
@@ -33,10 +34,12 @@ describe('drawTree', () => {
     expect(dl.overflow).toBe(0);
   });
 
-  it('um glifo por letra visível dos textos da tela', () => {
+  it('um glifo por letra visível dos textos da tela (o ™ composto conta as suas letras)', () => {
     const dl = draw('play');
     let visible = 0;
-    for (const t of layout.texts.values()) visible += t.text.replace(/\s/g, '').length;
+    for (const t of layout.texts.values()) {
+      visible += t.text.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch).replace(/\s/g, '').length;
+    }
     expect(commands(dl, DRAW_OP.glyph).length).toBe(visible);
   });
 
