@@ -1,4 +1,5 @@
 import { BUTTON } from '@boboforces/input';
+import { FIGURE_BONE, FIGURE_PART_CATEGORY, type FigurePart } from '@boboforces/format';
 import { clamp, DEG_TO_RAD, HALF_PI, TAU } from '@boboforces/shared';
 import { BLOCK_FLAG, cellBlock, createRayHit, raycastGrid } from '@boboforces/world';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
@@ -10,10 +11,10 @@ import {
   weaponDamageAt,
   type WeaponDef,
 } from '../config/weapons.ts';
-import { HIT_PARTS, hostile, PART_HEAD, type SimContext } from '../context.ts';
+import { HIT_PARTS, hostile, isBody, PART_HEAD, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
-import { createBoboHit, eyeHeightFor, rayVsBobo } from '../hitbox.ts';
+import { eyeHeightFor, figurePostureOf, weaponGrip } from '../hitbox.ts';
 
 /**
  * Passo 3: armas (tecnico.md §7.2). Recarga, troca, cadência e hitscan: DDA na grade até o primeiro bloco que para
@@ -23,14 +24,19 @@ import { createBoboHit, eyeHeightFor, rayVsBobo } from '../hitbox.ts';
  * Recuo: cada tiro sobe `recoilPitch` (e mexe um pouco o `recoilYaw`), somados à mira do InputFrame; parado de atirar,
  * volta ao centro. A `SimView` expõe os dois para a câmera e para a IA compensar (controle de recoil).
  *
- * M0: busca linear nos bobos (até 68), sem o hash espacial de 4 m; ele entra quando houver projéteis e props (M2).
+ * M1: zumbis também levam tiro; o acerto diz o osso do boneco (`bodyPart`, #56) e a direção, e o impacto diz a face
+ * (rampa inclusive) e a caixa de prop, para a cor dos cubinhos. Props entram pelo `colliders` do mapa. As hitboxes são
+ * as 12 caixas da tabela de jogo na postura (`figurePostureOf`) e no pitch do alvo, montadas uma vez por corpo por tick
+ * (`FigureHitCache` do contexto); o dano usa a categoria do osso (cabeça: multiplicador da arma; braço e perna 0,8).
+ *
+ * Busca linear nas entidades (até 4 + 64 + 64), sem o hash espacial de 4 m: medido no bench headless, não pesa (M2
+ * revê com projéteis).
  */
 
 const F = ENTITY_FLAG;
 /** Folga do "pronto para atirar" (s): a soma de frações de tick em float nunca chega a zero exato. */
 const FIRE_READY_EPS = 1e-6;
 const rayHit = createRayHit();
-const boboHit = createBoboHit();
 
 export function weaponSystem(ctx: SimContext): void {
   const s = ctx.s;
@@ -194,55 +200,57 @@ function fire(ctx: SimContext, e: number, def: WeaponDef, fl: number): void {
   );
 
   // 1) Cenário: até onde a bala vai.
-  raycastGrid(ctx.grid, ctx.blocks, ox, oy, oz, dx, dy, dz, def.rangeM, BLOCK_FLAG.blocksBullets, rayHit);
+  raycastGrid(
+    ctx.grid,
+    ctx.blocks,
+    ox,
+    oy,
+    oz,
+    dx,
+    dy,
+    dz,
+    def.rangeM,
+    BLOCK_FLAG.blocksBullets,
+    rayHit,
+    ctx.colliders,
+  );
   const wallT = rayHit.hit ? rayHit.distance : def.rangeM;
 
-  // 2) Hitboxes dos inimigos antes disso.
-  let bestT = wallT;
+  // 2) Hitboxes dos inimigos antes disso (só entrada menor que a do melhor até aqui: a parede, depois o corpo).
+  const figures = ctx.figures;
+  figures.beginRay(ox, oy, oz, dx, dy, dz, wallT);
   let bestTarget = -1;
-  let bestPart = 0;
+  let bestBodyPart: FigurePart = FIGURE_BONE.torso;
   for (let j = 0; j < s.count; j++) {
-    if (s.alive[j] === 0 || s.kind[j] !== ENTITY_KIND.bobo || !hostile(ctx, e, j)) continue;
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || !hostile(ctx, e, j)) continue;
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
-    const j3 = j * 3;
-    const t = rayVsBobo(
-      s.position[j3]!,
-      s.position[j3 + 1]!,
-      s.position[j3 + 2]!,
-      s.yaw[j]!,
-      (fj & F.crouching) !== 0,
-      ox,
-      oy,
-      oz,
-      dx,
-      dy,
-      dz,
-      bestT,
-      boboHit,
-    );
-    if (t < bestT) {
-      bestT = t;
+    const bone = figures.testEntity(s, j, figurePostureOf(fj, weaponGrip(s.weapon[j]!), s.kind[j]!), ctx.tick);
+    if (bone >= 0) {
       bestTarget = j;
-      bestPart = boboHit.part;
+      bestBodyPart = bone as FigurePart;
     }
   }
+  const bestT = figures.bestT();
+  const bestPart = FIGURE_PART_CATEGORY[bestBodyPart]!;
 
   const shooter = s.idOf(e);
   if (bestTarget >= 0) {
     const part = HIT_PARTS[bestPart]!;
     const base = weaponDamageAt(def, bestT);
     const mult = bestPart === PART_HEAD ? def.headMultiplier : PART_DAMAGE_MULTIPLIER[part as 'torso' | 'arm' | 'leg'];
-    ctx.damage.push(
+    const i = ctx.damage.push(
       bestTarget,
       shooter,
       base * mult,
       bestPart,
+      bestBodyPart,
       s.weapon[e]!,
       ox + dx * bestT,
       oy + dy * bestT,
       oz + dz * bestT,
     );
+    ctx.damage.setDirection(i, dx, dy, dz, def.killForce);
   } else if (rayHit.hit) {
     ctx.events.impact(
       ctx.tick,
@@ -255,7 +263,9 @@ function fire(ctx: SimContext, e: number, def: WeaponDef, fl: number): void {
       rayHit.cellX,
       rayHit.cellY,
       rayHit.cellZ,
-      cellBlock(rayHit.cell),
+      rayHit.prop >= 0 ? 0 : cellBlock(rayHit.cell),
+      rayHit.face,
+      rayHit.prop,
     );
   }
   ctx.events.shot(ctx.tick, shooter, s.weapon[e]!, ox, oy, oz, dx, dy, dz, bestT);

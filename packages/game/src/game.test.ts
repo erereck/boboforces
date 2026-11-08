@@ -2,19 +2,86 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeadlessMatch } from '@boboforces/ai';
-import { builtinBotRef, ISSUE_CODES, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { createRawInputState, keyIndex, type RawInputState } from '@boboforces/input';
+import {
+  builtinBotRef,
+  createFigureGameTable,
+  decodeMap,
+  FIGURE_BOT_ROTATION,
+  FIGURE_GRIP,
+  FIGURE_LOOK_DEFAULT,
+  FIGURE_MODE,
+  FIGURE_POSTURE_INFO,
+  FIGURE_PRESETS,
+  FIGURE_SKIN_BYTES,
+  FIGURE_SKIN_LAYERS,
+  FIGURE_STANCE,
+  figurePosture,
+  ISSUE_CODES,
+  MATCH_RECIPE_FORMAT,
+  normalizeFigureLook,
+  PLATFORM_PROFILES,
+  SKIN_LAYER_RESERVE,
+  type FigureGameTable,
+  type FigureLook,
+  type MatchRecipe,
+} from '@boboforces/format';
+import {
+  createRawInputState,
+  DEFAULT_TOUCH_LAYOUT,
+  keyIndex,
+  placeTouchButton,
+  type RawInputState,
+  type TouchButtonRect,
+} from '@boboforces/input';
 import type { Platform, PlatformId } from '@boboforces/platform-api';
+import { ACTOR_KIND, NO_FIGURE, type ActorBuffer } from '@boboforces/render/data';
 import { hashToHex } from '@boboforces/shared';
-import { entityIndex, ENTITY_FLAG } from '@boboforces/sim';
-import { STRINGS_PT_BR } from '@boboforces/ui';
+import {
+  entityIndex,
+  ENTITY_FLAG,
+  ENTITY_KIND,
+  expandRecipe,
+  figurePostureOf,
+  WEAPON_SLOTS,
+  weaponGrip,
+  type Sim,
+} from '@boboforces/sim';
+import {
+  BUTTON,
+  layoutTree,
+  LOADING_STEPS,
+  measureText,
+  MIN_TEXT,
+  MIN_TOUCH_TARGET,
+  moveFocus,
+  parseFontPack,
+  STRINGS_PT_BR,
+  uiScale,
+  type StringKey,
+  type TestScreenModel,
+} from '@boboforces/ui';
 import { buildTestArena } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { GAME_ASSETS, loadGameAssets, parseBlockManifest } from './assets.ts';
+import { GAME_ASSETS, loadGameAssets } from './assets.ts';
+import { BENCH_DEFAULTS, type BenchConfig, type TestItem } from './bench/types.ts';
 import { verticalFov } from './camera.ts';
-import { MENU_READY_MARKER, startGame } from './game.ts';
+import { MENU_READY_MARKER, startGame, type GameDeps, type GameHandle } from './game.ts';
 import { createLocalDriver } from './local-driver.ts';
-import { createRenderBlocks, TEST_BLOCK_TEXTURES } from './world.ts';
+import { createNullRenderer } from './null-renderer.ts';
+import { pauseScreen } from './pause.ts';
+import type { SceneBundle, SceneRequest } from './scene-api.ts';
+import { createConstrutoLoader } from './scene/load.ts';
+import { SCENE_MODULE } from './scene/index.ts';
+import {
+  createSceneFigures,
+  FIGURE_DEFAULT_LOOK,
+  figureSetKey,
+  planFigureSkins,
+  type FigureSkinSet,
+  type SceneFigures,
+  type SceneFiguresInput,
+} from './scene/figures.ts';
+import { profileFor, sceneRecipe } from './scene/match.ts';
 
 // --- Plataforma falsa: relógio e frames manuais, input controlado pelo teste, assets lidos de assets-src/ pela
 // --- mesma tabela (`runtime-assets.json`) que a web e o Switch usam.
@@ -170,17 +237,22 @@ function createFakePlatform(opts: { id?: PlatformId; brokenAssets?: boolean } = 
   return platform;
 }
 
-/** Deixa as promessas do carregamento (assets) andarem. */
+/** Deixa as promessas do carregamento (assets, cena) andarem. */
 async function settle(): Promise<void> {
   for (let i = 0; i < 5; i++) await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
 
-async function bootToTitle(id: PlatformId = 'web') {
+/** A cena vem direto (como no Switch: um arquivo só). */
+const loadScene = (): Promise<SceneBundle> => Promise.resolve({ module: SCENE_MODULE });
+
+async function bootToTitle(id: PlatformId = 'web', extra: { testItems?: readonly TestItem[] } = {}) {
   const platform = createFakePlatform({ id });
   const events: string[] = [];
   const game = startGame({
     platform,
     createRenderer: null,
+    loadScene,
+    ...extra,
     hooks: {
       onMenuReady: () => events.push('menuReady'),
       onError: (e) => events.push(`error ${String(e)}`),
@@ -194,8 +266,17 @@ async function bootToTitle(id: PlatformId = 'web') {
   return { platform, game, events };
 }
 
+/** Frames + promessas até a cena ficar pronta (o loading roda dentro dos frames). */
+async function untilRunning(platform: FakePlatform, game: GameHandle): Promise<void> {
+  for (let i = 0; i < 200 && game.scene?.phase !== 'running'; i++) {
+    platform.pump(1);
+    await settle();
+  }
+  expect(game.scene?.phase).toBe('running');
+}
+
 describe('startGame (NullRenderer)', () => {
-  it('carrega os assets, chega ao título e grava o marcador do menu uma vez', async () => {
+  it('carrega as fontes, chega ao título e grava o marcador do menu uma vez', async () => {
     const { platform, game, events } = await bootToTitle();
     expect(game.screen).toBe('title');
     expect(game.renderer.stats.programs).toBe(0);
@@ -208,56 +289,456 @@ describe('startGame (NullRenderer)', () => {
     expect(platform.framesPending).toBe(0);
   });
 
-  it('Enter no JOGAR entra na cena de teste: o jogador e 4 bots andam e o pointer lock é pedido', async () => {
+  it('JOGAR abre o Construto (loading por etapas), bots andam, os prints respondem, pausa e volta', async () => {
     const { platform, game, events } = await bootToTitle();
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
+    expect(game.debug).toBeNull();
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.startsWith('[cena] loading ') && l.includes(' (chegada '))).toBe(true);
     expect(events).toContain('lock');
+    const debug = game.debug!;
+    expect(debug.cameras).toEqual(expect.arrayContaining(['print:dia', 'print:leitura-50m', 'bench:volta']));
+    expect(debug.setCamera('nao-existe')).toBe(false);
     const match = game.match!;
     const sim = match.sim;
     const view = sim.view();
+    // TDM 6 × 6: o jogador (controlador 0) e 11 bots N0.
+    expect(match.director.botCount).toBe(11);
     const bots = [4, 5, 6, 7].map((c) => entityIndex(sim.controllerEntity(c)));
     const start = bots.map((e) => [view.position[e * 3]!, view.position[e * 3 + 2]!] as const);
     const tick0 = sim.tick;
-    // Anda para a frente segurando W por 2 s.
     platform.rawNext.keys[keyIndex('KeyW')] = 1;
-    platform.pump(120);
+    platform.pump(180);
     platform.rawNext.keys[keyIndex('KeyW')] = 0;
-    expect(sim.tick - tick0).toBeGreaterThanOrEqual(115);
+    expect(sim.tick - tick0).toBeGreaterThanOrEqual(170);
     const moved = bots.filter((e, i) => {
       const [x, z] = start[i]!;
       return Math.hypot(view.position[e * 3]! - x, view.position[e * 3 + 2]! - z) > 1;
     });
-    expect(moved.length).toBeGreaterThanOrEqual(3);
-    const me = entityIndex(game.scene!.playerEntity);
+    expect(moved.length).toBeGreaterThanOrEqual(2);
+    const me = entityIndex(sim.controllerEntity(0));
     expect(view.flags[me]! & ENTITY_FLAG.dead).toBe(0);
-    game.dispose();
-  });
 
-  it('pausa pelo ciclo de vida congela a sim; Enter continua; P + baixo + Enter volta ao título', async () => {
-    const { platform, game, events } = await bootToTitle();
-    platform.tap('Enter');
-    const sim = game.match!.sim;
+    // Prints: chaves de depuração, congelar e o "pronto".
+    expect(debug.setCamera('print:dia')).toBe(true);
+    debug.setTimeOfDay('night');
+    debug.setMipFilter('off');
+    debug.setFrozen(true);
+    const ready = debug.whenReady(2);
+    platform.pump(3);
+    await ready;
+    expect(debug.readyForPrint).toBe(true);
+    const frozenTick = sim.tick;
     platform.pump(10);
+    expect(sim.tick).toBe(frozenTick);
+    // Folha das fontes em uso (#54): o atlas real de sempre, sem carga à parte; liga sem vistas 3D e desliga.
+    debug.showFontSpecimen(true);
+    const sheet = debug.whenReady(2);
+    platform.pump(3);
+    await sheet;
+    expect(debug.readyForPrint).toBe(true);
+    expect(game.renderer.stats.viewports).toBe(0);
+    debug.showFontSpecimen(false);
+    platform.pump(1);
+    expect(game.renderer.stats.viewports).toBe(1);
+    debug.setFrozen(false);
+    debug.setCamera(null);
+
+    // Pausa pelo ciclo de vida congela a sim; Enter continua; P + baixo + Enter volta ao título.
     platform.firePause();
     expect(game.paused).toBe(true);
     platform.pump(1);
     expect(events.at(-1)).toBe('unlock');
-    const frozen = sim.tick;
-    platform.pump(60);
-    expect(sim.tick).toBe(frozen);
+    const paused = sim.tick;
+    platform.pump(30);
+    expect(sim.tick).toBe(paused);
     platform.tap('Enter');
     expect(game.paused).toBe(false);
     platform.pump(10);
-    expect(sim.tick).toBeGreaterThan(frozen);
-
+    expect(sim.tick).toBeGreaterThan(paused);
     platform.tap('KeyP');
     expect(game.paused).toBe(true);
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.scene).toBeNull();
-    expect(events.at(-1)).toBe('unlock');
+    expect(game.debug).toBeNull();
+    game.dispose();
+  }, 120_000);
+
+  it('bench (GameDeps.bench): 2 vistas seguindo bots, relatório no formato e sondas [t0] do jogo', async () => {
+    const platform = createFakePlatform();
+    const reports: string[] = [];
+    const bench: BenchConfig = { ...BENCH_DEFAULTS, views: 2, bots: 4, durationS: 1, warmupS: 0, viewDistanceM: 50 };
+    const game = startGame({
+      platform,
+      createRenderer: null,
+      loadScene,
+      bench,
+      benchWarnings: ['parâmetro desconhecido: foo'],
+      hooks: { onBenchReport: (text) => reports.push(text) },
+    });
+    platform.pump(2);
+    await settle();
+    await untilRunning(platform, game);
+    expect(game.match!.director.botCount).toBe(6);
+    for (let i = 0; i < 120 && reports.length === 0; i++) platform.pump(1);
+    expect(reports).toHaveLength(1);
+    const lines = reports[0]!.split('\n');
+    expect(lines[0]).toBe('BoboForces bench 2');
+    expect(lines.at(-1)).toBe('fim');
+    expect(lines.some((l) => /\bvistas=2\b/.test(l))).toBe(true);
+    expect(lines.filter((l) => /^vista\d /.test(l))).toHaveLength(2);
+    expect(lines).toContain('erros=0');
+    expect(lines).toContain('aviso "parâmetro desconhecido: foo"');
+    expect(lines.some((l) => l.startsWith('loading_ms total='))).toBe(true);
+    for (const item of [10, 11, 12, 13, 14, 15, 16]) {
+      expect(platform.logLines.some((l) => l.startsWith(`[t0] item=${item} `))).toBe(true);
+    }
+    game.dispose();
+  }, 120_000);
+
+  // --- verificação do M1: sondas sem medição, erros do three, bots limitados, thermal, clarão e manequins ---
+
+  /** Bench com relatório e o log: `t0(n)` devolve a linha `[t0] item=n`. */
+  async function runBench(bench: BenchConfig, createRenderer: GameDeps['createRenderer'] = null) {
+    const platform = createFakePlatform();
+    const reports: string[] = [];
+    const game = startGame({
+      platform,
+      createRenderer,
+      loadScene,
+      bench,
+      hooks: { onBenchReport: (text) => reports.push(text) },
+    });
+    platform.pump(2);
+    await settle();
+    await untilRunning(platform, game);
+    const t0 = (item: number): string => platform.logLines.find((l) => l.startsWith(`[t0] item=${item} `)) ?? '';
+    return { platform, game, reports, t0 };
+  }
+
+  it('bench interrompido no aquecimento: sem amostra as sondas saem `pulado`, nunca `ok` com zeros', async () => {
+    const { platform, game, reports, t0 } = await runBench({ ...BENCH_DEFAULTS, views: 1, bots: 2, warmupS: 10 });
+    platform.pump(30);
+    platform.tap('Escape');
+    expect(reports).toHaveLength(1);
+    expect(t0(10)).toMatch(/status=pulado motivo=sem_amostras interrompido=1 segundos_medidos=0$/);
+    expect(t0(12)).toMatch(/status=pulado motivo=sem_amostras/);
+    expect(t0(14)).toMatch(/status=pulado motivo=heap_desconhecido/); // a plataforma falsa não mede heap
+    // O item 15 mede o começo da partida (aquecimento incluído), então tem amostra mesmo interrompido.
+    expect(t0(15)).toMatch(
+      /status=ok primeiro_frame_ms=[\d.]+ max_inicio_ms=[\d.]+ travadas_inicio=0 frames_inicio=3\d /,
+    );
+    expect(t0(16)).toMatch(/status=pulado motivo=sem_amostras/);
+    game.dispose();
+  }, 120_000);
+
+  it('bench: erro do three vai para erros=, bots limitados pelo motor e teto de detritos do perfil no relatório', async () => {
+    let budget = -1;
+    const factory: GameDeps['createRenderer'] = () => {
+      const r = createNullRenderer();
+      (r.info.warnings as string[]).push('error: THREE.WebGLProgram: Shader Error 1282', 'warn: aviso qualquer');
+      r.setDebrisBudget = (n) => void (budget = n);
+      return r;
+    };
+    const { platform, game, reports, t0 } = await runBench(
+      { ...BENCH_DEFAULTS, views: 4, bots: 64, durationS: 1, warmupS: 0 },
+      factory,
+    );
+    expect(game.match!.director.botCount).toBe(64);
+    for (let i = 0; i < 200 && reports.length === 0; i++) platform.pump(1);
+    const lines = reports[0]!.split('\n');
+    expect(lines).toContain('erros=1');
+    expect(lines).toContain('erro "three: error: THREE.WebGLProgram: Shader Error 1282"');
+    expect(lines).toContain('aviso "three: warn: aviso qualquer"');
+    // 4 jogadores locais (bots) + 60 extras = 64; o relatório diz os extras de verdade, o [t0] o total da partida.
+    expect(lines[3]).toMatch(/ bots=64 .* bots_efetivos=60 manequins=6 detritos=500$/);
+    expect(t0(12)).toMatch(/ bots=64 /);
+    expect(budget).toBe(500); // pcSplit (PC com 4 vistas)
+    game.dispose();
+  }, 120_000);
+
+  it('item 16 (thermal) compara o 1º minuto com os ÚLTIMOS 60 s por tempo, não com as últimas 14.400 amostras', async () => {
+    const { platform, game, reports, t0 } = await runBench({
+      ...BENCH_DEFAULTS,
+      views: 1,
+      bots: 0,
+      durationS: 200,
+      warmupS: 0,
+    });
+    // 150 s a 40 ms e o fim a 60 ms (queda de clock nos últimos 50 s): antes o p50_fim cobria a rodada inteira.
+    platform.pump(3750, 40);
+    for (let i = 0; i < 2000 && reports.length === 0; i++) platform.pump(1, 60);
+    expect(reports).toHaveLength(1);
+    expect(t0(16)).toMatch(/status=falha p50_inicio=40\.00 p50_fim=60\.00 segundos_fim=6\d segundos=20\d$/);
+    // Picos distribuídos: no máximo uma linha por janela (duração ÷ 20).
+    const peaks = platform.logLines.filter((l) => l.startsWith('[bench] pico '));
+    expect(peaks.length).toBeGreaterThan(0);
+    expect(peaks.length).toBeLessThanOrEqual(21);
+    // O heap no pico e na amostra de 1 s separa coleta do V8 de espera do GL (`-` = plataforma sem memória).
+    expect(peaks[0]).toMatch(/^\[bench\] pico t=\d+ frame_ms=\d+ cpu_ms=.* heap_mb=\S+ heap_1s_mb=\S+$/);
+    game.dispose();
+  }, 120_000);
+
+  it('clarão de tiro por vista (arte-ux §1.8) e manequins de print só com a câmera deles', async () => {
+    const flashes: number[][] = [];
+    let actorCount = -1;
+    let buffer: ActorBuffer | null = null;
+    const factory: GameDeps['createRenderer'] = () => {
+      const r = createNullRenderer();
+      const render = r.renderViews.bind(r);
+      r.renderViews = (views) => {
+        flashes.push(views.map((v) => v.flash));
+        render(views);
+      };
+      const setActors = r.setActors.bind(r);
+      r.setActors = (a) => {
+        actorCount = a.count;
+        buffer = a;
+        setActors(a);
+      };
+      return r;
+    };
+    const { platform, game } = await runBench(
+      { ...BENCH_DEFAULTS, views: 2, bots: 6, durationS: 600, warmupS: 0 },
+      factory,
+    );
+    platform.pump(900);
+    // Algum tiro clareou uma vista e não a outra (antes era um uniform só para as duas).
+    expect(flashes.some((f) => f.length === 2 && Math.abs(f[0]! - f[1]!) > 0.2)).toBe(true);
+    const debug = game.debug!;
+    debug.setFrozen(true);
+    platform.pump(2);
+    const base = actorCount;
+    debug.setCamera('print:leitura-30m');
+    platform.pump(1);
+    expect(actorCount).toBe(base + 2);
+    debug.setCamera('print:densidade-1m');
+    platform.pump(1);
+    expect(actorCount).toBe(base + 1);
+    // Régua de métricas (#53): `altura:em-pe`, `altura:agachado` e (#56) `altura:deslizando` só com a `print:altura`.
+    debug.setCamera('print:altura');
+    platform.pump(1);
+    expect(actorCount).toBe(base + 3);
+    // O deslize é a postura `slide` de verdade (sem arma: 17), não o em pé de antes.
+    const slide = figurePosture(FIGURE_STANCE.slide, FIGURE_GRIP.none, FIGURE_MODE.base, false);
+    const b = buffer! as ActorBuffer;
+    const mannequinPostures: number[] = [];
+    for (let i = 0; i < b.count; i++) if (b.kind[i] === ACTOR_KIND.mannequin) mannequinPostures.push(b.posture[i]!);
+    expect(mannequinPostures).toContain(slide);
+    // Fila (#56, `MANNEQUIN_KIND.line`): os 8 `linha:*` só com as `print:linha-*`; o close só com a `print:close-1m`.
+    debug.setCamera('print:linha-frente');
+    platform.pump(1);
+    expect(actorCount).toBe(base + 8);
+    debug.setCamera('print:close-1m');
+    platform.pump(1);
+    expect(actorCount).toBe(base + 2);
+    debug.setCamera('print:dia');
+    platform.pump(1);
+    expect(actorCount).toBe(base);
+    debug.setCamera(null);
+    platform.pump(1);
+    expect(actorCount).toBe(base);
+    game.dispose();
+  }, 120_000);
+
+  it('E.12: em 600 ticks, ActorBuffer.posture = figurePostureOf da sim e a empunhadura = WeaponDef.grip', async () => {
+    let sim: Sim | null = null;
+    let checked = 0;
+    let zombies = 0;
+    const seen = new Set<number>();
+    const problems: string[] = [];
+    const factory: GameDeps['createRenderer'] = () => {
+      const r = createNullRenderer();
+      const setActors = r.setActors.bind(r);
+      r.setActors = (a) => {
+        const s = sim;
+        if (s) {
+          const v = s.view();
+          for (let i = 0; i < a.count; i++) {
+            if (a.kind[i] === ACTOR_KIND.mannequin || a.entity[i] === 0) continue;
+            const e = entityIndex(a.entity[i]!);
+            const expected = figurePostureOf(v.flags[e]!, weaponGrip(v.weapon[e]!), v.kind[e]!);
+            if (a.posture[i] !== expected) problems.push(`tick ${s.tick}: ${a.posture[i]} ≠ ${expected}`);
+            const zombie = v.kind[e] === ENTITY_KIND.zombie;
+            const grip = zombie ? FIGURE_GRIP.none : (WEAPON_SLOTS[v.weapon[e]!]?.grip ?? FIGURE_GRIP.none);
+            if (FIGURE_POSTURE_INFO[a.posture[i]! * 3 + 1] !== grip) problems.push(`tick ${s.tick}: empunhadura`);
+            if (a.figure[i] === NO_FIGURE) problems.push(`tick ${s.tick}: sem gabarito`);
+            if (zombie) zombies++;
+            seen.add(a.posture[i]!);
+            checked++;
+          }
+        }
+        setActors(a);
+      };
+      return r;
+    };
+    const { platform, game } = await runBench(
+      { ...BENCH_DEFAULTS, views: 1, bots: 8, zombies: 2, durationS: 600, warmupS: 0 },
+      factory,
+    );
+    sim = game.match!.sim;
+    const tick0 = sim.tick;
+    for (let i = 0; i < 700 && sim.tick - tick0 < 600; i++) platform.pump(1);
+    expect(sim.tick - tick0).toBeGreaterThanOrEqual(600);
+    expect(problems.slice(0, 5)).toEqual([]);
+    expect(checked).toBeGreaterThan(600 * 5);
+    expect(zombies).toBeGreaterThan(0);
+    // A partida passa por mais de uma postura (em pé, correndo, ADS, zumbi…), não só pela de repouso.
+    expect(seen.size).toBeGreaterThan(2);
+    game.dispose();
+  }, 120_000);
+
+  it('gancho dos prints da rodada 3: setMannequins (looks sob demanda) e setFigureClip (dt fixo)', async () => {
+    let buffer: ActorBuffer | null = null;
+    const clock: number[] = [];
+    let setFiguresCalls = 0;
+    let templates = 0;
+    const factory: GameDeps['createRenderer'] = () => {
+      const r = createNullRenderer();
+      r.setActors = (a) => void (buffer = a);
+      r.setEnvironment = (env) => void clock.push(env.timeS);
+      r.setFigures = (t) => {
+        setFiguresCalls++;
+        templates = t?.count ?? 0;
+      };
+      return r;
+    };
+    const { platform, game } = await runBench(
+      { ...BENCH_DEFAULTS, views: 1, bots: 2, durationS: 600, warmupS: 0, prints: true },
+      factory,
+    );
+    const debug = game.debug!;
+    debug.setFrozen(true);
+    platform.pump(2);
+    const actorsOf = (pick: (a: ActorBuffer, i: number) => boolean): number[] => {
+      const a = buffer!;
+      const out: number[] = [];
+      for (let i = 0; i < a.count; i++) if (pick(a, i)) out.push(i);
+      return out;
+    };
+    // Com o pedido de prints, a fila veste o visual n no manequim n (8 skins diferentes); sem ele, o mapa (recruta).
+    debug.setCamera('print:linha-frente');
+    platform.pump(1);
+    // A fila fica em x = 74,5 (a vitrine também aparece: é de sempre).
+    const line = actorsOf((a, i) => a.kind[i] === ACTOR_KIND.mannequin && Math.abs(a.position[i * 3]! - 74.5) < 0.01);
+    expect(line).toHaveLength(8);
+    expect(new Set(line.map((i) => buffer!.skin[i])).size).toBe(8);
+
+    expect(debug.setMannequins([{ name: 'nao-existe' }])).toBe(false);
+    expect(debug.setMannequins([{ name: 'altura:em-pe', look: 'skin:nao-existe' }])).toBe(false);
+    debug.setCamera('print:altura');
+    const before = setFiguresCalls;
+    const templatesBefore = templates;
+    expect(
+      debug.setMannequins([
+        { name: 'altura:em-pe', look: 'skin:classico', team: -1, pose: 'crouch', weapon: 'rifle', pitch: 0.6 },
+        { name: 'altura:agachado', look: 'skin:classico', team: -1, pose: 'crouch', weapon: 'rifle', hairStyle: 31 },
+      ]),
+    ).toBe(true);
+    // Afro gigante por cima do Clássico: look fora da cena, gabarito novo (sob demanda na web) e repassado ao render.
+    expect(setFiguresCalls).toBe(before + 1);
+    expect(templates).toBe(templatesBefore + 1);
+    platform.pump(1);
+    const crouchRifle = figurePosture(FIGURE_STANCE.crouch, FIGURE_GRIP.rifle, FIGURE_MODE.base, false);
+    const aimed = actorsOf((a, i) => Math.abs(a.pitch[i]! - 0.6) < 1e-6);
+    expect(aimed).toHaveLength(1);
+    // Mira ≠ 0: entidade sintética (o rig zera o pitch da entidade 0), ainda manequim para o render.
+    expect(buffer!.entity[aimed[0]!]).not.toBe(0);
+    expect(buffer!.kind[aimed[0]!]).toBe(ACTOR_KIND.mannequin);
+    expect(buffer!.posture[aimed[0]!]).toBe(crouchRifle);
+    expect(debug.setMannequins([])).toBe(true);
+
+    // Clipe com dt fixo: 30 passos de preparo + o quadro 9 + o passo 0 (boneco novo).
+    debug.setCamera('print:linha-3-4');
+    expect(debug.setFigureClip({ mannequin: 'nao', clip: 'start', frame: 9, dtS: 1 / 60 })).toBe(false);
+    expect(debug.setFigureClip({ mannequin: 'linha:4', clip: 'nao' as 'start', frame: 9, dtS: 1 / 60 })).toBe(false);
+    clock.length = 0;
+    expect(debug.setFigureClip({ mannequin: 'linha:4', clip: 'start', frame: 9, dtS: 1 / 60 })).toBe(true);
+    let resolved = false;
+    const ready = debug.whenReady(1).then(() => void (resolved = true));
+    platform.pump(10);
+    await settle();
+    expect(resolved).toBe(false);
+    expect(debug.readyForPrint).toBe(false);
+    platform.pump(40);
+    await ready;
+    const steps = clock.slice(1).map((t, i) => t - clock[i]!);
+    const moving = steps.filter((d) => d > 0);
+    expect(moving).toHaveLength(30 + 9);
+    for (const d of moving) expect(d).toBeCloseTo(1 / 60, 9);
+    const clipActor = actorsOf((a, i) => a.entity[i]! >>> 16 === 0xfffc);
+    expect(clipActor).toHaveLength(1);
+    const k = clipActor[0]! * 3;
+    // Quadro 9 do arranque: já correndo a 6,8 m/s (aceleração de 60 m/s²), parado no lugar.
+    expect(Math.hypot(buffer!.velocity[k]!, buffer!.velocity[k + 2]!)).toBeCloseTo(6.8, 6);
+    expect(buffer!.kind[clipActor[0]!]).toBe(ACTOR_KIND.bobo);
+    // Depois do clipe a cena fica parada (o relógio do render não anda mais).
+    const end = clock.at(-1)!;
+    platform.pump(5);
+    expect(clock.at(-1)).toBe(end);
+    expect(debug.setFigureClip(null)).toBe(true);
+    game.dispose();
+  }, 120_000);
+
+  it('a tela de loading lista as etapas na ordem em que o loader roda (luz antes da malha)', async () => {
+    const platform = createFakePlatform();
+    let clock = 0;
+    const host = {
+      platform: { ...platform, now: () => (clock += 0.05) },
+      renderer: createNullRenderer(),
+      fonts: null,
+      uiAtlas: null,
+      log: () => {},
+      benchReport: () => {},
+    };
+    const loader = createConstrutoLoader(host);
+    const seen: number[] = [];
+    for (let i = 0; i < 20000; i++) {
+      const done = loader.step(1);
+      await settle();
+      if (seen.at(-1) !== loader.model.current) seen.push(loader.model.current);
+      if (done) break;
+    }
+    // O índice da etapa em andamento só cresce: nenhuma etapa "Na fila" fica acima da que está rodando.
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThan(seen[i - 1]!);
+    expect(seen.map((s) => LOADING_STEPS[s])).toEqual(expect.arrayContaining(['light', 'mesh']));
+    // Leitura e decodificação dos assets separadas para o log do Teste Zero.
+    const ad = loader.assetsDetail;
+    expect(ad.files).toBeGreaterThan(10);
+    expect(ad.readMs).toBeGreaterThan(0);
+    expect(ad.readMs).toBeLessThanOrEqual(loader.times.assets);
+    expect(ad.decodeMs).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('itens de teste do título: a tela da casca abre, desenha e volta no voltar', async () => {
+    let updates = 0;
+    let disposed = 0;
+    const item: TestItem = {
+      id: 'audio',
+      labelKey: 'test.audio',
+      start: () => ({
+        update: () => void updates++,
+        describe: (out: TestScreenModel) => {
+          out.titleKey = 'test.audio.title';
+          out.lineCount = 0;
+        },
+        finished: false,
+        dispose: () => void disposed++,
+      }),
+    };
+    const { platform, game } = await bootToTitle('switch', { testItems: [item] });
+    // No Switch o item fica na coluna de testes, à direita do menu.
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('test');
+    platform.pump(3);
+    expect(updates).toBeGreaterThan(0);
+    platform.tap('Escape');
+    expect(game.screen).toBe('title');
+    expect(disposed).toBe(1);
     game.dispose();
   });
 
@@ -285,34 +766,367 @@ describe('startGame (NullRenderer)', () => {
   });
 });
 
-describe('assets do M0', () => {
+describe('orçamento de skins do boneco (E.16, #56): 2 camadas por skin, 32 na reserva', () => {
+  const MAP = decodeMap(readRuntimeAsset('maps/construto.bfmap'));
+  const MANNEQUINS = MAP.markers.mannequins;
+  let table: FigureGameTable | null = null;
+  const tableOnce = (): FigureGameTable => (table ??= createFigureGameTable());
+  const CAPACITY = SKIN_LAYER_RESERVE / FIGURE_SKIN_LAYERS;
+
+  /** Receita do bench (TDM só de bots) com `views` jogadores locais e `bots` extras no perfil dado. */
+  function benchRecipe(profileId: keyof typeof PLATFORM_PROFILES, views: 1 | 2 | 3 | 4, bots: number) {
+    const bench: BenchConfig = { ...BENCH_DEFAULTS, views, bots, profile: profileId };
+    const request: SceneRequest = {
+      kind: 'bench',
+      bench,
+      benchWarnings: [],
+      seed: 1,
+      convention: undefined as unknown as SceneRequest['convention'],
+      device: null,
+      gamepad: 0,
+    };
+    const profile = profileFor('switch', views, bench);
+    return { profile, recipe: sceneRecipe(request, profile).recipe };
+  }
+
+  /** Pinta o plano e devolve as escritas (1ª camada, bytes e texels opacos). */
+  function paint(input: SceneFiguresInput) {
+    const figures = createSceneFigures(input);
+    const writes: { first: number; bytes: number; opaque: number }[] = [];
+    figures.paintSkins((first, rgba) => {
+      let opaque = 0;
+      for (let i = 3; i < rgba.length; i += 4) if (rgba[i]! === 255) opaque++;
+      writes.push({ first, bytes: rgba.length, opaque });
+    }, 1000);
+    return { figures, writes };
+  }
+
+  /** Conjunto efetivo (look e time) que uma skin veste. */
+  function setOf(figures: SceneFigures, skin: number): FigureSkinSet | null {
+    const k = figures.setSkins.indexOf(skin);
+    return k >= 0 ? figures.plan.sets[k]! : null;
+  }
+
+  it('switch34p TDM com 16 bots + 4 jogadores locais: 10 skins (3 looks × 3 times + zumbi), 0 estouro', () => {
+    const { profile, recipe } = benchRecipe('switch34p', 4, 16);
+    expect(profile.id).toBe('switch34p');
+    const { figures, writes } = paint({
+      profile,
+      teamCount: recipe.teams.length,
+      mannequins: MANNEQUINS,
+      prints: false,
+      capacity: CAPACITY,
+      onDemand: false,
+      table: tableOnce(),
+    });
+    expect(CAPACITY).toBe(32);
+    expect(writes).toHaveLength(10);
+    expect(figures.plan.overflow).toEqual([]);
+    expect(figures.cache!.stats).toMatchObject({ used: 10, composed: 10, overflows: 0 });
+    // Skins seguidas na reserva, 2 camadas cada, pintadas (cabeça e tronco opacos).
+    expect(writes.map((w) => w.first)).toEqual(Array.from({ length: 10 }, (_, i) => 1000 + i * FIGURE_SKIN_LAYERS));
+    for (const w of writes) {
+      expect(w.bytes).toBe(FIGURE_SKIN_BYTES);
+      expect(w.opaque).toBeGreaterThan(1000);
+    }
+    // Cada controlador da receita veste a rotação no PRÓPRIO time.
+    for (const slot of expandRecipe(recipe, 0)) {
+      const p = slot.controller % figures.botLooks;
+      const set = setOf(figures, figures.botSkin(p, slot.team));
+      expect(set, `controlador ${slot.controller}`).toEqual({ look: FIGURE_BOT_ROTATION[p], team: slot.team });
+    }
+    expect(setOf(figures, figures.zombieSkin)).toEqual({ look: 'zombie', team: -1 });
+    figures.dispose();
+  });
+
+  it('pc: 19 skins (6 looks × 3 times + zumbi); com o pedido de prints a fila inteira cabe (31)', () => {
+    const { profile, recipe } = benchRecipe('pc', 1, 12);
+    const base = {
+      profile,
+      teamCount: recipe.teams.length,
+      mannequins: MANNEQUINS,
+      capacity: CAPACITY,
+      onDemand: false,
+      table: tableOnce(),
+    };
+    const pc = paint({ ...base, prints: false });
+    expect(pc.writes).toHaveLength(19);
+    expect(pc.figures.plan.overflow).toEqual([]);
+    pc.figures.dispose();
+    const prints = paint({ ...base, prints: true });
+    expect(prints.writes).toHaveLength(31);
+    expect(prints.figures.plan.overflow).toEqual([]);
+    prints.figures.dispose();
+  });
+
+  it('forçando 40 conjuntos: o excedente veste o look padrão do PRÓPRIO time e nenhum bobo veste outro time', () => {
+    const rotation = Array.from({ length: 13 }, (_, k): readonly [string, FigureLook] => [
+      `teste${k}`,
+      normalizeFigureLook({ ...FIGURE_LOOK_DEFAULT, hairStyle: k + 2 }),
+    ]);
+    const { profile, recipe } = benchRecipe('switch34p', 4, 16);
+    const { figures, writes } = paint({
+      profile,
+      teamCount: recipe.teams.length,
+      mannequins: [],
+      prints: false,
+      capacity: CAPACITY,
+      onDemand: false,
+      table: tableOnce(),
+      rotation,
+    });
+    // 13 looks × 3 times + zumbi = 40 pedidos; reserva de 32 = 29 conjuntos + o padrão de cada um dos 3 times.
+    expect(writes).toHaveLength(32);
+    expect(figures.cache!.stats.overflows).toBe(0);
+    expect(figures.plan.overflow).toHaveLength(11);
+    let defaults = 0;
+    for (let p = 0; p < rotation.length; p++) {
+      for (const team of [-1, 0, 1]) {
+        const set = setOf(figures, figures.botSkin(p, team))!;
+        expect(set.team, `look ${p} time ${team}`).toBe(team);
+        const key = figureSetKey(rotation[p]![0], team);
+        if (figures.plan.overflow.includes(key)) {
+          expect(set.look).toBe(FIGURE_DEFAULT_LOOK);
+          defaults++;
+        } else {
+          expect(set.look).toBe(rotation[p]![0]);
+        }
+      }
+    }
+    expect(defaults).toBe(11);
+    // O zumbi vem primeiro no pedido: nunca estoura.
+    expect(setOf(figures, figures.zombieSkin)).toEqual({ look: 'zombie', team: -1 });
+    figures.dispose();
+  });
+
+  it('o plano é puro: dentro da reserva fica como pediu; reserva menor que os times lança', () => {
+    const plan = planFigureSkins(
+      [
+        { look: 'a', team: 0 },
+        { look: 'a', team: 0 },
+        { look: 'b', team: 1 },
+      ],
+      2,
+    );
+    expect(plan.sets).toEqual([
+      { look: 'a', team: 0 },
+      { look: 'b', team: 1 },
+    ]);
+    expect(plan.overflow).toEqual([]);
+    const many = [0, 1, 2].map((team) => ({ look: 'x', team }));
+    expect(() => planFigureSkins([...many, { look: 'y', team: 0 }], 2)).toThrow(/não cabem/);
+  });
+
+  it('o cache solta o pintor no fim da partida (opção release do skin-cache)', () => {
+    const { profile, recipe } = benchRecipe('switch34p', 4, 16);
+    const { figures } = paint({
+      profile,
+      teamCount: recipe.teams.length,
+      mannequins: [],
+      prints: false,
+      capacity: CAPACITY,
+      onDemand: false,
+      table: tableOnce(),
+    });
+    const cache = figures.cache!;
+    figures.dispose();
+    expect(figures.cache).toBeNull();
+    expect(() => cache.acquire({ look: FIGURE_LOOK_DEFAULT, team: -1, teamColors: [] })).toThrow(/dispose/);
+  });
+});
+
+describe('textos do game com o atlas real (#54)', () => {
+  const fonts = parseFontPack(JSON.parse(new TextDecoder().decode(readRuntimeAsset('fonts/ui-fonts.json')))).fonts;
+
+  interface Target {
+    readonly name: string;
+    readonly w: number;
+    readonly h: number;
+    readonly minTextPx: number;
+    readonly minTarget: number;
+  }
+  const TARGETS: readonly Target[] = [
+    { name: 'web 1280×720', w: 1280, h: 720, minTextPx: MIN_TEXT.phone, minTarget: 0 },
+    { name: 'web 640×360', w: 640, h: 360, minTextPx: MIN_TEXT.phone, minTarget: 0 },
+    { name: 'celular 1334×750', w: 1334, h: 750, minTextPx: MIN_TEXT.phone * 2, minTarget: MIN_TOUCH_TARGET * 2 },
+    { name: 'web 1920×1080', w: 1920, h: 1080, minTextPx: MIN_TEXT.phone, minTarget: 0 },
+    { name: 'web 4:3 1024×768', w: 1024, h: 768, minTextPx: MIN_TEXT.phone, minTarget: 0 },
+    { name: 'Switch 1280×720', w: 1280, h: 720, minTextPx: MIN_TEXT.tv, minTarget: 0 },
+  ];
+
+  it('pausa: título e botões cabem (texto ≤ largura − 2·padX·escala) e o D-pad alcança os dois botões', () => {
+    for (const t of TARGETS) {
+      const layout = layoutTree(pauseScreen.build(null), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+        fonts,
+        minTextPx: t.minTextPx,
+        minTarget: t.minTarget,
+      });
+      const c = layout.content;
+      for (const node of layout.order) {
+        const r = layout.rects.get(node)!;
+        const text = layout.texts.get(node);
+        if (!text) continue;
+        expect(text.px, `${t.name}: ${text.text}`).toBeGreaterThanOrEqual(t.minTextPx);
+        if (node.kind === 'button') {
+          const room = r.w - 2 * BUTTON.padX * layout.scale;
+          expect(text.width, `${t.name}: "${text.text}" em ${room.toFixed(1)} px`).toBeLessThanOrEqual(room);
+          expect(text.height).toBeLessThanOrEqual(r.h);
+          expect(r.h).toBeGreaterThanOrEqual(t.minTarget);
+        } else {
+          expect(r.x, t.name).toBeGreaterThanOrEqual(c.x - 0.5);
+          expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
+        }
+      }
+      expect(moveFocus(layout, 'resume', 'down'), t.name).toBe('quit');
+      expect(moveFocus(layout, 'quit', 'up'), t.name).toBe('resume');
+    }
+  });
+
+  it('texto do bench na tela e rótulos dos botões de toque cabem (sem "?" nem estouro)', () => {
+    const hud = fonts.hud;
+    const glyphs = new Set<number>();
+    for (let i = 0; i < hud.glyphData.length; i += 8) glyphs.add(hud.glyphData[i]!);
+    // Bench: Switch (piso da TV) e web (piso do celular), como o `drawBenchStatus` desenha.
+    const benchTexts = [
+      ['test.bench.warmup', 'test.bench.running', 'test.bench.done', 'test.bench.hint'],
+      ['test.bench.warmup', 'test.bench.running', 'bench.webDone'],
+    ] as const;
+    for (const [i, t] of [TARGETS[5]!, TARGETS[1]!].entries()) {
+      const px = Math.max(Math.round(16 * uiScale(t.w, t.h)), t.minTextPx);
+      for (const key of benchTexts[i]!) {
+        const text = STRINGS_PT_BR[key];
+        for (const ch of text) expect(glyphs.has(ch.charCodeAt(0)), `${key}: ${ch}`).toBe(true);
+        expect(measureText(hud, text, px, 0.04) + px, `${t.name}: ${key}`).toBeLessThanOrEqual(t.w);
+      }
+    }
+    // Toque: o rótulo em caixa alta cabe na corda do círculo à meia altura de maiúscula (DPR 1 e 2).
+    const rect: TouchButtonRect = { control: 'fire', x: 0, y: 0, radius: 0 };
+    for (const dpr of [1, 2]) {
+      const labelPx = Math.max(13 * dpr, MIN_TEXT.phone * dpr * 0.75);
+      for (let b = 0; b < DEFAULT_TOUCH_LAYOUT.buttons.length; b++) {
+        const { control, radius } = placeTouchButton(DEFAULT_TOUCH_LAYOUT, b, 667 * dpr, 375 * dpr, dpr, rect);
+        const label = STRINGS_PT_BR[`touch.${control}` as StringKey].toUpperCase();
+        const half = (hud.capHeight * labelPx) / hud.size / 2;
+        const chord = 2 * Math.sqrt(radius * radius - half * half);
+        expect(measureText(hud, label, labelPx, 0.04), `DPR ${dpr}: ${label}`).toBeLessThanOrEqual(chord);
+      }
+    }
+  });
+});
+
+describe('assets do boot', () => {
   it('a tabela runtime-assets cobre os caminhos lógicos do jogo e o preload é subconjunto', () => {
     for (const path of Object.values(GAME_ASSETS)) expect(RUNTIME.files[path], path).toBeTypeOf('string');
     for (const path of RUNTIME.preload) expect(RUNTIME.files[path], path).toBeTypeOf('string');
   });
 
-  it('decodifica atlas e blocos e monta as faces pelo nome da camada', async () => {
+  it('decodifica o atlas da UI', async () => {
     const assets = await loadGameAssets({
       loadBytes: async (p) => readRuntimeAsset(p),
       loadText: async (p) => new TextDecoder().decode(readRuntimeAsset(p)),
     });
     expect(assets.uiAtlas.pixels.length).toBe(assets.uiAtlas.width * assets.uiAtlas.height * assets.uiAtlas.layers * 4);
-    expect(assets.blockTextures.layers).toBe(assets.blockLayers.size);
-    const missing: string[] = [];
-    const blocks = createRenderBlocks(assets.blockLayers, missing);
-    expect(missing).toEqual([]);
-    const concrete = blocks.byKey('concrete')!;
-    expect(concrete.faces[2]).toBe(assets.blockLayers.get(TEST_BLOCK_TEXTURES['concrete']![2]));
-    // Mesmos ids da grade (o registro da sim e o do mesher precisam bater).
-    expect(concrete.id).toBe(buildTestArena().blocks.byKey('concrete')!.id);
+  });
+});
+
+describe('ganchos de print e fallback do boneco (revisão do passo 5, #56)', () => {
+  const MAP = decodeMap(readRuntimeAsset('maps/construto.bfmap'));
+  const table = createFigureGameTable();
+
+  async function benchWithActors(prints: boolean) {
+    let buffer: ActorBuffer | null = null;
+    const createRenderer: GameDeps['createRenderer'] = () => {
+      const r = createNullRenderer();
+      r.setActors = (a) => void (buffer = a);
+      return r;
+    };
+    const platform = createFakePlatform();
+    const bench: BenchConfig = { ...BENCH_DEFAULTS, views: 1, bots: 2, durationS: 600, warmupS: 0, prints };
+    const game = startGame({ platform, createRenderer, loadScene, bench });
+    platform.pump(2);
+    await settle();
+    await untilRunning(platform, game);
+    return { platform, game, actors: () => buffer! as ActorBuffer };
+  }
+
+  it('look fora do plano e sem vaga veste o recruta do time, nunca o zumbi', () => {
+    for (const [profile, prints, onDemand] of [
+      [PLATFORM_PROFILES.switch34p, false, false],
+      [PLATFORM_PROFILES.pc, true, true],
+    ] as const) {
+      const f = createSceneFigures({
+        profile,
+        teamCount: 2,
+        mannequins: MAP.markers.mannequins,
+        prints,
+        capacity: SKIN_LAYER_RESERVE / FIGURE_SKIN_LAYERS,
+        onDemand,
+        table,
+      });
+      f.paintSkins(() => {}, 1000);
+      for (const team of [-1, 0, 1]) {
+        // Duas aparências fora do plano seguidas: com prints a 1ª pega a última vaga e a 2ª cai no fallback.
+        for (const id of ['sardento', 'bandana'] as const) {
+          const slot = f.resolve(id, FIGURE_PRESETS[id], team);
+          expect(slot).not.toBeNull();
+          expect(slot!.look).not.toBe('zombie');
+          if (slot!.team !== team) expect(slot!.team).toBe(-1);
+        }
+      }
+      f.dispose();
+    }
   });
 
-  it('manifesto de blocos inválido é recusado com mensagem', () => {
-    expect(() => parseBlockManifest({ layers: [] })).toThrow(/layerWidth/);
-    expect(() =>
-      parseBlockManifest({ layerWidth: 16, layerHeight: 16, layers: [{ name: 'a' }, { name: 'a' }] }),
-    ).toThrow(/repetida/);
-  });
+  it('setMannequins recusa pose, arma, time e números inválidos sem mudar nada', async () => {
+    const { platform, game } = await benchWithActors(false);
+    const debug = game.debug!;
+    debug.setFrozen(true);
+    debug.setCamera('print:altura');
+    const bad = [
+      { name: 'altura:em-pe', pose: 'voando' as 'stand' },
+      { name: 'altura:em-pe', weapon: 'bazuca' },
+      { name: 'altura:em-pe', team: 7 },
+      { name: 'altura:em-pe', turnDeg: Number.NaN },
+      { name: 'altura:em-pe', pitch: Number.POSITIVE_INFINITY },
+      { name: 'altura:em-pe', expression: 9 },
+    ];
+    for (const o of bad) expect(debug.setMannequins([o])).toBe(false);
+    expect(debug.setMannequins([{ name: 'altura:em-pe', pose: 'crouch', weapon: 'rifle', team: 0 }])).toBe(true);
+    platform.pump(1);
+    game.dispose();
+  }, 60_000);
+
+  it('clipe de andar nas 3 câmeras da fila: a velocidade vai para a frente do corpo', async () => {
+    const { platform, game, actors } = await benchWithActors(true);
+    const debug = game.debug!;
+    debug.setFrozen(true);
+    for (const camera of ['print:linha-frente', 'print:linha-3-4', 'print:linha-costas'] as const) {
+      debug.setCamera(camera);
+      expect(
+        debug.setMannequins([
+          { name: 'linha:4', look: 'skin:classico', team: 0, pose: 'stand', weapon: 'rifle', pitch: 0 },
+        ]),
+      ).toBe(true);
+      expect(debug.setFigureClip({ mannequin: 'linha:4', clip: 'walk', frame: 30, dtS: 1 / 60 })).toBe(true);
+      for (let i = 0; i < 80 && !debug.readyForPrint; i++) {
+        platform.pump(1);
+        await settle();
+      }
+      const a = actors();
+      let k = -1;
+      for (let i = 0; i < a.count; i++) if (a.entity[i]! >>> 16 === 0xfffc) k = i;
+      expect(k, camera).toBeGreaterThanOrEqual(0);
+      const yaw = a.yaw[k]!;
+      const vx = a.velocity[k * 3]!;
+      const vz = a.velocity[k * 3 + 2]!;
+      // As contas do rig: frente = (−sen yaw, −cos yaw); direita = (cos yaw, −sen yaw).
+      const forward = -vx * Math.sin(yaw) - vz * Math.cos(yaw);
+      const side = vx * Math.cos(yaw) - vz * Math.sin(yaw);
+      expect(forward, camera).toBeGreaterThan(0.5);
+      expect(Math.abs(Math.atan2(side, forward)), camera).toBeLessThan(0.02);
+    }
+    game.dispose();
+  }, 120_000);
 });
 
 describe('LocalDriver', () => {

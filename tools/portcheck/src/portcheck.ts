@@ -5,6 +5,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { bootBundle, type BootReport } from './boot.ts';
+import { checkRomfs, formatRomfs, type RomfsReport } from './romfs.ts';
 import { BUNDLE_RULE_HELP, scanBundle, type BundleFinding } from './scan.ts';
 import { parseSourceMap, type SourceMapLookup } from './sourcemap.ts';
 
@@ -12,6 +13,7 @@ export { bootBundle, MENU_READY_MARKER, APPLET_NOTICE, type BootReport, type Boo
 export { scanBundle, BUNDLE_RULE_HELP, type BundleFinding, type BundleRule } from './scan.ts';
 export { parseSourceMap, decodeVlq } from './sourcemap.ts';
 export { NXJS_GLOBALS } from './fake-nx.ts';
+export { checkRomfs, formatRomfs, placeholderReason, ROMFS_BUDGET_BYTES, type RomfsReport } from './romfs.ts';
 
 export interface MappedFinding extends BundleFinding {
   /** `packages/x/src/y.ts:12:3` quando o source map resolve; senão a posição no bundle. */
@@ -22,6 +24,16 @@ export interface PortcheckResult {
   readonly findings: MappedFinding[];
   readonly boot: BootReport;
   readonly mainBytes: number;
+  /** M1: assets do runtime-assets.json no RomFS, provisórios e orçamento de tamanho. */
+  readonly romfs: RomfsReport;
+}
+
+/** Caminhos lógicos do `assets-src/runtime-assets.json` (`files`). */
+export function readLogicalAssets(rootDir: string): string[] {
+  const path = join(rootDir, 'assets-src', 'runtime-assets.json');
+  if (!existsSync(path)) return [];
+  const table = JSON.parse(readFileSync(path, 'utf8')) as { files?: Record<string, string> };
+  return Object.keys(table.files ?? {}).sort();
 }
 
 function listFiles(dir: string, out: string[] = []): string[] {
@@ -86,10 +98,12 @@ export async function runPortcheck(opts: PortcheckOptions): Promise<PortcheckRes
   });
 
   const filename = 'romfs:/main.js';
+  const romfs = readRomfs(opts.romfsDir);
+  const romfsReport = checkRomfs(romfs, readLogicalAssets(opts.rootDir));
   const boot = await bootBundle({
     code,
     filename,
-    romfs: readRomfs(opts.romfsDir),
+    romfs,
     ...(opts.maxFrames === undefined ? {} : { maxFrames: opts.maxFrames }),
   });
   const mapText = (t: string): string => mapStack(t, filename, lookup, pretty);
@@ -100,7 +114,7 @@ export async function runPortcheck(opts: PortcheckOptions): Promise<PortcheckRes
     bootError: boot.bootError === null ? null : mapText(boot.bootError),
     runtimeLog: mapText(boot.runtimeLog),
   };
-  return { findings, boot: mapped, mainBytes: Buffer.byteLength(code) };
+  return { findings, boot: mapped, mainBytes: Buffer.byteLength(code), romfs: romfsReport };
 }
 
 /** Relatório legível (pt-BR) para o terminal e o CI. */
@@ -108,6 +122,7 @@ export function formatResult(result: PortcheckResult): string {
   const lines: string[] = [];
   const { boot, findings } = result;
   lines.push(`Bundle: ${(result.mainBytes / 1024).toFixed(0)} KB`);
+  lines.push(...formatRomfs(result.romfs));
   if (findings.length) {
     lines.push(`Varredura: ${findings.length} identificador(es) proibido(s) no bundle`);
     for (const f of findings) lines.push(`  ${f.where}  [${f.rule}] ${f.what}: ${BUNDLE_RULE_HELP[f.rule]}`);

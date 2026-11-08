@@ -15,7 +15,7 @@
 
 ## 0. Princípios da frente [PROPOSTA]
 1. **Primeiro legível, depois bonito.** Numa viewport de 640×360, o jogador sabe em menos de 0,5 s quem é aliado, quem é inimigo e o que está atirando nele.
-2. **Pixel consistente por família.** Cenário, props e armas têm 32 px/m; bobos têm 16 px/m. Nenhuma textura estica; peça nova respeita a densidade da sua família.
+2. **Pixel consistente por família.** Cenário, props, armas e bobos têm 32 px/m (os bobos desde o port #56: 1 px do boneco = 5,47 cm, pintado direto a 2 texels por px (36,6 texels/m) em 2 camadas, e o rosto a 16 × 16 px na própria skin; antes, na #51, pintura a 16 px/m ampliada no loading). Nenhuma textura estica; peça nova respeita a densidade da sua família.
 3. **Bloco é a base, não a prisão.** O mundo é de blocos de 0,5 m; peças fora da grade entram quando ficam mais leves ou mais bonitas [DECIDIDO #7, #45].
 4. **Sem pós-processamento.** Nada de EffectComposer, bloom ou SSAO: render target float falha em silêncio sem extensões [C]. O capricho sai da textura, da luz por vértice e de sprites aditivos.
 5. **A mesma UI em todo lugar.** Menus, Laboratório e HUD são desenhados pelo jogo em WebGL [DECIDIDO #3].
@@ -39,11 +39,11 @@ Regras do pilar [PROPOSTA]:
 | Família | Densidade | Tamanho da textura | Observação |
 |---|---|---|---|
 | Cenário (blocos e formas do catálogo: laje, degrau, rampas, painel fino, cerca, cruz) | **32 px/m** | **16×16 px por face de bloco de 0,5 m** | filtro nearest; UV em unidades de mundo, então rampa e cerca têm o mesmo pixel do bloco |
-| Bobos e bobos-zumbi | **16 px/m** (1 px = 6,25 cm) | **skin 64×64** [PADRÃO] | pixel do boneco é 2× o do cenário: lê melhor numa vista de 640×360; a confirmar no print de densidade (M1) [PROPOSTA] |
+| Bobos e bobos-zumbi | **~36,6 texels/m** [DECIDIDO #51; #56] (2 texels por px do boneco; 1 px = 5,47 cm; família dos 32 px/m) | pintura direta em **2 camadas 64×64** por skin (`paintFigureSkin`) | o pixel do boneco passou a ser o da farda em pixel art Nearest (#58), sem Scale2x nem grão (o `expandSkin` e a pintura 64×64 de 4 camadas, #51, saíram no port); rosto 16×16 na própria skin |
 | Armas (mundo e viewmodel) | **32 px/m** [PROPOSTA] | 64×64 por arma | o mesmo modelo serve em 1ª pessoa e na mão dos outros |
 | Props fora da grade (cilindros, barris, jipe, holofote, árvores low-poly), acessórios 3D e props dinâmicos (pickups, caixa misteriosa, armas na parede) | 32 px/m [PROPOSTA] | camadas 64×64 por modelo | no array `modelos64` (ver 1.6); material do cenário que um prop usa entra como tile 64×64 do mesmo material |
 
-A densidade e a quantidade de peças fora da grade são **aprovadas pelo Erick por prints na cena-vitrine (M1)** [DECIDIDO #6]. Se o print pedir, a primeira alavanca é a densidade dos bonecos (skin 64×64 com cabeça de 8 px), não a do cenário.
+A densidade e a quantidade de peças fora da grade são **aprovadas pelo Erick por prints na cena-vitrine (M1)** [DECIDIDO #6]. Se o print pedir, a primeira alavanca é a densidade dos bonecos (skin 64×64 com cabeça de 8 px), não a do cenário. **Resultado dos prints (03/11/2026):** os bonecos dobraram para 32 px/m (#51) e o mapa leva a dose dobro de peças fora da grade (#52); o cenário ficou como estava.
 
 ### 1.3 Regras de pixel-art [PROPOSTA]
 **Paleta**
@@ -59,7 +59,7 @@ A densidade e a quantidade de peças fora da grade são **aprovadas pelo Erick p
 **Contorno**
 - Cenário não tem contorno preto: com 32 px/m, contorno escuro em toda borda vira ruído em 640×360.
 - Skins e armas têm **contorno interno de 1 px** no tom mais escuro da rampa, só onde uma peça de roupa ou de arma termina (gola, cinto, bota, ferrolho). Não contornar a borda da caixa inteira, que já é separada pela luz.
-- O contorno de time é outra coisa: um casco desenhado pelo motor (ver 2.6).
+- O contorno de time (um casco desenhado pelo motor) saiu no print de leitura [DECIDIDO #50]: a leitura vem do colete de time, dos marcadores (2.7) e da luz.
 
 **Ruído e dithering**
 - Nada de xadrez de dithering: em 640×360 vira moiré. Textura de material usa **manchas de 2 a 3 px**.
@@ -95,9 +95,9 @@ As medidas de movimento e corpo vêm da tabela única de config, que manda sobre
 
 | Métrica | Metros | Blocos de 0,5 m |
 |---|---|---|
-| Bobo em pé / agachado (AABB 0,6 × altura × 0,6) | 1,5 / 0,95 | 3 / ~2 |
-| Olho em pé / agachado (câmera) | 1,3 / 0,8 | — |
-| Cabeça do bobo | ~0,5 | 1 |
+| Bobo em pé / agachado (AABB 0,6 × altura × 0,6) [#53, #55] | 1,75 / 0,95 | 3½ (o vão livre pede 4) / ~2 |
+| Olho em pé / agachado (câmera) [#53, #55] | 1,55 / 0,8 | — |
+| Cabeça do bobo (cubo de 8 px do FutBobo) | 0,4375 | ~1 |
 | Degrau que o bobo sobe sem pular | 0,5 | 1 |
 | Altura alcançada no pulo padrão | 1,0 | 2 |
 | Cobertura baixa (esconde agachado) | 1,0 | 2 |
@@ -110,16 +110,19 @@ As medidas de movimento e corpo vêm da tabela única de config, que manda sobre
 
 Com 0,5 m, a cobertura alta "de verdade" é 2,0 m (4 blocos); 1,75 m só existe com meio-bloco. Cada mapa declara sua maior linha de visão [PADRÃO].
 
+**Bobo de 1,75 m (#53 e #55; port em 07/11/2026):** a altura não é múltiplo da célula (3½). O `mapc` conta o nó "em pé" com `ceil(1,75 / 0,5)` = 4 células livres e avisa "visto sem ver" quando um nó jogável fica ao lado de parede com topo entre o olho (1,55 m) e o maior topo de hitbox em pé (1,81 m): o bobo aparece por cima sem ver nada. É aviso, não erro: no Construto são **10 nós** (eram 25 com o bobo A de 1,625 m); as 5 aberturas (3 seteiras da cabine, a janela da guarita e a do 1º andar do prédio 1) subiram de 1,5 para 2,0 m e a pendência da lona de 1,5 m fechou. Aviso novo: cobertura alta com topo em [1,75; 1,81) m, 8 nós (parapeito de 1,75 m em x 26–32, z 49,5–50), decisão de mapa do Erick. Regra de mapa [PROPOSTA]: muro de 1,5 m só onde não se luta. A régua `print:altura` (fora da área jogável, ao sul do perímetro) mostra porta 1,0 × 2,0 m, muro de 1,5 m e cobertura de 1,0 m com os manequins `altura:em-pe` e `altura:agachado`.
+
 ### 1.6 Texturas na GPU [PADRÃO]
 - **Dois `TEXTURE_2D_ARRAY`** (núcleo do WebGL2), com índice de camada por vértice ou por instância (mesmos nomes em `tecnico.md` 6.1):
   - `blocos16`: camadas de 16×16 px para blocos e formas do catálogo. Até 256 camadas (o mínimo garantido de `MAX_ARRAY_TEXTURE_LAYERS`).
-  - `modelos64`: camadas de 64×64 px para skins de bobo e zumbi, armas, acessórios 3D, props fora da grade, props dinâmicos e a folha de rostos. Até 128 camadas (~2,7 MB com mips), subindo se o Teste Zero deixar [T0].
-- **Filtro:** `NEAREST` na ampliação; na redução, `NEAREST_MIPMAP_LINEAR` com mipmaps gerados no build [PROPOSTA]. Sem mipmap, chão e parede cintilam ao longe; com ele, borram um pouco, e a fog esconde. A escolha final sai dos prints da cena-vitrine.
+  - `modelos64`: camadas de 64×64 px para skins de bobo e zumbi, armas, acessórios 3D, props fora da grade, props dinâmicos (a folha de rostos saiu no port: o rosto é pintado na skin). Até 128 camadas (~2,7 MB com mips), subindo se o Teste Zero deixar [T0]. Cada skin de bobo ocupa **2 camadas seguidas** (camada 0 = cabeça, expressões e paleta; camada 1 = tronco, listras e reserva do capacete; port #56); a reserva do fim do array tem 64 camadas = 32 skins (o M1 usa 10 no Switch e 19 no PC), e o array fica com 88 de 128 camadas.
+- **Filtro:** `NEAREST` na ampliação; na redução, `NEAREST_MIPMAP_LINEAR` com mipmaps gerados no build [DECIDIDO #50]. Sem mipmap, chão e parede cintilam ao longe; com ele, borram um pouco, e a fog esconde. Aprovado no print 5.
+- **Mips da skin:** o nível 1 de cada camada é a pintura 64×64 original reempacotada por quadrante (cópia sem filtro: a mesma densidade de 16 px/m de antes); os níveis 2..6 saem do nível 1 com cobertura de alfa.
 - **Mipmap de cutout** (folha, cerca, camada externa da skin): o gerador preserva a cobertura do alfa em cada nível, para a cerca não sumir de longe.
 - **Greedy meshing por textura:** o mesher funde faces com a mesma camada, a mesma orientação e a mesma luz nos 4 vértices (AO, sol, céu, emissivo). O vértice não guarda UV: o **UV é calculado no shader a partir da posição de mundo** (`tecnico.md` 6.2), com `REPEAT` dentro da camada, sem `fract()` e sem costura de mipmap. Vale igual para quads fundidos e para as faces inclinadas das rampas.
 - **Variantes no shader:** a camada final é `base + hash(célula) % nVariantes`, calculada no fragment shader pela posição de mundo (recuada meio texel pela normal). Uma parede de grama com 3 variantes continua sendo **um quad só**. Materiais marcados também podem girar ou espelhar o UV por célula.
 - **Ruído de cor** de ±3% de valor por célula, também no shader, nunca no bake [PADRÃO].
-- **Plano B**, se o Teste Zero reprovar o array no nx.js [TZ]: atlas com padding de 2 px por tile, `fract()` no UV e `textureGrad` com as derivadas do UV contínuo, para não aparecer costura.
+- **Plano B**, se o Teste Zero reprovar o array no nx.js [TZ]: atlas com padding de 2 px por tile, `fract()` no UV e `textureGrad` com as derivadas do UV contínuo, para não aparecer costura. No atlas, `blocos16` leva 2 níveis de mip e `modelos64` 3 (o 3º coube no padding de 4 px).
 - Imagens em **PNG** [PADRÃO]; nada de textura comprimida (sem extensões no Switch [C]).
 
 ### 1.7 Os 10 ingredientes do "blocado bonitão" [PROPOSTA]
@@ -164,7 +167,7 @@ Quase tudo é calculado no loading ou no shader, então custa quase nada por fra
 | Switch 2P | **70 m** | 30 m |
 | Switch 3–4P | **50 m** | 25 m |
 
-Conta de legibilidade: com FOV vertical de ~59° numa viewport de 360 px de altura, um bobo de 1,5 m ocupa ~16 px a 30 m e ~10 px a 50 m. Por isso o teto do 3–4P é 50 m, e além de 35 m inimigos em linha de visão ganham marcador (ver 2.7). Corredores de sniper respeitam o teto do perfil mais restrito em que o mapa roda [PADRÃO].
+Conta de legibilidade: com FOV vertical de ~59° numa viewport de 360 px de altura, um bobo de 1,75 m (#55) ocupa ~18 px a 30 m e ~11 px a 50 m (conta; era ~17 e ~10 px com 1,625 m). Por isso o teto do 3–4P é 50 m, e além de 35 m inimigos em linha de visão ganham marcador (ver 2.7). Corredores de sniper respeitam o teto do perfil mais restrito em que o mapa roda [PADRÃO].
 
 ### 1.10 Programas de shader: no máximo 7 [PADRÃO]
 | # | Programa | Textura | Usado em |
@@ -172,7 +175,7 @@ Conta de legibilidade: com FOV vertical de ~59° numa viewport de 360 px de altu
 | 1 | Blocos opacos | `blocos16` | malha opaca dos chunks: blocos e formas do catálogo (laje, degrau, rampas, poste + travessa) |
 | 2 | Blocos cutout (alpha test) | `blocos16` | folhas, cercas, grades, vegetação em cruz |
 | 3 | Translúcido | `blocos16` | vidro e água em camada separada, ordenada de trás para frente; parede da zona do Royale |
-| 4 | Instanciado | `modelos64` | partes e rosto dos bobos (com alpha test da camada externa), acessórios, armas no mundo e viewmodel, pickups, **props fora da grade** (estáticos, por tipo e grupo espacial) e **cubinhos de detrito** (cor sólida por instância, sem amostrar textura); casco de contorno por flag, se aprovado no M1 (2.6) |
+| 4 | Instanciado | `modelos64` | caixas dos bonecos (R4c, 1 draw por vista; alpha test na reserva do capacete), acessórios, armas no mundo e viewmodel, pickups, **props fora da grade** (estáticos, por tipo e grupo espacial) e **cubinhos de detrito** (cor sólida por instância, sem amostrar textura); sem casco de contorno (#50) |
 | 5 | Partículas | atlas de sprites | clarão, traçante, fumaça, decals (marca de tiro, tinta, respingo) e sombra-blob |
 | 6 | Céu | — | domo, sol/lua, estrelas, nuvens |
 | 7 | UI | atlas MSDF + sprites | menus, Laboratório, HUD |
@@ -214,40 +217,61 @@ Servem só como direção; nada é copiado.
 
 ## 2. Os bobos
 
-### 2.1 Forma e proporção [DECIDIDO #18]
-**Cabeçudo, com ~3 cabeças de altura**, 1,5 m no total, feito de **caixas rígidas** com skin pixel-art [DECIDIDO #5, #7]. Medidas em pixels de skin (1 px = 6,25 cm) [PROPOSTA]:
+### 2.1 Forma e proporção [DECIDIDO #18, #55, #56]
+O bobo é o **boneco do FutBobo** [DECIDIDO #56], com **1,75 m** no total (altura B, #55; antes o bobo A de 1,625 m e, antes dele, 1,5 m). É **cabeçudo, 4 cabeças**: a escala é uniforme, **1 px = 7/128 m (5,47 cm)**, 32 px = 1,75 m, cabeça de 8 px = **0,4375 m**, ombro a ombro 16 px = 0,875 m (a mesma largura do bobo A). Esqueleto de **12 ossos** com uma caixa primária por osso, mais as mãos, e 14 caixas no corpo (cabelo e acessórios entram por cima). Quadril 12 px + tronco 12 px + cabeça 8 px = 32 px. Os detalhes abaixo são **decisões menores revisáveis** (o Erick decide na rodada 3 de prints).
 
-| Parte | Caixa interna (L × A × P, px) | Metros | Camada externa |
+| Osso (caixa) | Caixa (L × A × P, px) | Metros | Observação |
 |---|---|---|---|
-| Cabeça | 8 × 8 × 8 | 0,5 × 0,5 × 0,5 | 9 × 9 × 9 (cabelo, chapéu de pano, capacete justo) |
-| Tronco | 8 × 9 × 5 | 0,5 × 0,56 × 0,31 | 9 × 10 × 6 (jaqueta, colete, colete de time) |
-| Braço (×2) | 3 × 8 × 3 | 0,19 × 0,5 × 0,19 | 4 × 9 × 4 (manga, luva, braçadeira) |
-| Perna (×2) | 4 × 7 × 4 | 0,25 × 0,44 × 0,25 | 5 × 8 × 5 (calça larga, bota) |
+| Cabeça | 8 × 8 × 8 | 0,4375 × 0,4375 × 0,4375 | rosto na face da frente (2.3); cabelo e acessórios em caixas à parte (2.2) |
+| Tronco | 8 × 12 × 4 | 0,4375 × 0,656 × 0,219 | farda em pixel art: jaqueta, cinto e colete (2.2) |
+| Braço (×2), manga | 4 × 5,2 × 4 | 0,219 × 0,284 × 0,219 | |
+| Antebraço (×2) | 3,6 × 5 × 3,6 | 0,197 × 0,273 × 0,197 | mais a mão 3,8 × 2,2 × 3,8 (0,208 × 0,120 × 0,208) |
+| Coxa (×2) | 4,25 × 5,6 × 4,3 | 0,232 × 0,306 × 0,235 | |
+| Canela (×2) | 3,75 × 4,9 × 3,75 | 0,205 × 0,268 × 0,205 | |
+| Chuteira (×2) | 4,05 × 2,7 × 5,25 | 0,221 × 0,148 × 0,287 | a sola desceu 0,1 px em relação ao FutBobo (o boneco flutuava 5,5 mm) |
 
-- Pernas (0,44) + tronco (0,56) + cabeça (0,5) = **1,5 m**; o olho fica a **1,3 m**, pouco acima do meio da cabeça.
-- **Forma das caixas de tronco e membros: a decidir no M1** por print (GDD 9.1). A `gameplay.md` 3.1 propõe outra divisão (tronco 0,45 × 0,5 × 0,28 m, membros de 0,5 m). Só a altura de 1,5 m e a cabeça de 0,5 m são fixas.
-- A camada externa é **meio pixel maior por lado**, como no Minecraft, e usa alfa: onde a skin é transparente, aparece a camada de dentro.
-- **Hitboxes** = as caixas internas das partes; iguais para bots e humanos. AABB de movimento 0,6 × 1,5 × 0,6 m (0,95 agachado) [PADRÃO].
-- **Headshot:** a cabeça de 0,5 m é um alvo grande. Multiplicador padrão **1,5x**, sniper **2,0x**, escopeta **1,25x**, calibrados pelo robô de balanceamento [PADRÃO].
-- **Agachado em 0,95 m:** com pernas rígidas, a pose precisa caber: pernas dobradas para a frente quase na horizontal, tronco inclinado ~35° e afundado entre elas (caixas podem se sobrepor), cabeça baixa. Validar com print de perfil ao lado de uma cobertura de 1,0 m na cena-vitrine [PROPOSTA].
+- O **olho** fica a **1,55 m** (corpo − 0,2 m), dentro das linhas 7 e 8 do rosto pintado (1,504–1,559 m). Em pé, em repouso, o boneco mede 17,9 px de lado a lado com os braços ao longo do corpo (±0,49 m).
+- **Hitboxes:** **12 caixas orientadas, uma por osso** (o antebraço e a mão viram uma caixa só, 3,8 × 6,8 × 3,8 px), lidas da mesma tabela de pose que o render usa: o que se vê é o que se acerta, por construção. A tabela tem 22 posturas (em pé, agachado, deslizando e o zumbi, cada uma por empunhadura e modo) × 5 pitches; a sim interpola e reortonormaliza. Categorias: cabeça, tronco, braço (4 caixas) e perna (6 caixas). Iguais para bots e humanos. AABB de movimento 0,6 × 1,75 × 0,6 m (0,95 agachado) [PADRÃO].
+  - **Topo da hitbox** (varredura medida): em pé 1,80375 m (teto 1,81, `FIGURE_MAX_TOP_M`); agachado **0,95978 m** e deslizando 0,94875 m, ambos abaixo do teto de **0,97 m** (`FIGURE_CROUCH_TOP_M`). O texto antigo "nenhum tiro horizontal acima de 0,95 m acerta o agachado" vira 0,97 m, e a cobertura baixa de 1,0 m deixa 3 cm de folga.
+  - **Cabeça presa ao olho:** o tronco não leva o pitch da mira; em pé a cabeça gira no máximo 0,6 rad e o pescoço desliza até 1,5 px para compensar; agachado e deslizando a cabeça **só levanta** (pitch em [0; +0,1] rad, o lado que não sobe a quina de trás), e os braços e a arma levam o resto. Medido: o centro da cabeça fica a 0,759 px do eixo do olho em pé e 0,000 px agachado; no deslize 6,47 px e no zumbi 6,84 px, aceitos e relatados (o deslize dura 0,7 s e o zumbi não tem câmera).
+  - **Braço através de muro e lona:** as hitboxes de braço (D e E) são cortadas a 0,75 m do eixo da entidade no plano horizontal (a AABB crescida de 0,45 m). A arma e a mão podem aparecer do outro lado de um muro fino ou de uma lona, mas ali não levam tiro. No Construto, o braço visual atravessa barreira em 1.256 nós de navegação; com o corte, só 15 (14 da cerca de tábua e 1 quina de rampa).
+  - **Headshot:** os multiplicadores ficam (padrão **1,5x**, sniper **2,0x**, escopeta **1,25x**; braço e perna 0,8x), calibrados pelo robô de balanceamento. Com a cabeça de 0,4375 m, o headshot do nível Normal cai 13 pontos e o TTK sobe 20–30% contra o bobo A (números no `gameplay.md` §3.1); a pergunta G3 da rodada 3 mostra o balance.
+- **Agachado P4f** (a pose escolhida, fechada no FK do FutBobo): pernas a −2,0944 rad no quadril e 2,7053 no joelho, pé plano (−0,6109), tronco inclinado 0,65 rad, pescoço afundado 4 px, braços ao longo do tronco (#55). Topo da cabeça em 0,940 m (o cabelo é cortado no teto de 0,99 m, 2.2), meia faixa z de 0,286 m (folga de 1,4 cm na AABB de ±0,30) e centro da cabeça a 0,722 m, que é o olho agachado. Prova: print de perfil `print:altura`, com o manequim agachado atrás da cobertura de 1,0 m; há também o deslize e a vista `print:altura-45`.
+- **Deslize "carrinho"** (postura própria): tronco deitado para trás, uma perna esticada à frente; topo 0,928 m; a faixa z vai a ±0,654 m (os pés passam da AABB, como em todo deslize de FPS) e o centro da cabeça fica 0,414 m atrás do eixo do olho.
+- **Diferenças conscientes em relação ao FutBobo** (sem pergunta; seguem junto dos prints como registro; decisões menores revisáveis):
+  1. farda em pixel art Nearest (#58), no lugar do uniforme de futebol em vetor linear do FutBobo (a maior mudança visual);
+  2. sem sombra projetada da cabeça no peito, sem especular nem metal: ouro e braçadeira são tom de paleta;
+  3. sola 0,1 px maior;
+  4. membros lisos, por amostra de paleta, como no FutBobo;
+  5. molas dentro do envelope (2.5), giro preguiçoso só nas pernas e até 0,35 rad;
+  6. cabeça presa ao olho;
+  7. meia taxa de pose além de 20 m no Switch;
+  8. comemorações e tiques só no M2;
+  9. recarga: o braço E sai da hitbox, como antes.
 
-### 2.2 Skin 64×64 [PADRÃO]
-- Layout no espírito do Minecraft, adaptado às caixas do bobo [PROPOSTA]:
+### 2.2 Skin: pintor de 2 camadas, pixel art [PADRÃO, #51; port #56; farda #58]
+- A skin de cada bobo é **pintada em runtime** (JS puro, sem canvas) por `paintFigureSkin`, direto em **2 camadas 64×64 seguidas** de `modelos64` (2 texels por px do boneco = 36,6 texels/m na cabeça e no tronco, na família dos 32 px/m do cenário). Cada aparência ocupa 32 KB (nível 0) + 8 KB (nível 1, caixa 2×2); a reserva de 64 camadas cabe **32 skins** (eram 16). Tudo no loading; no Switch, TODA aparência da partida é pintada no loading.
 
-| Faixa da skin (linhas) | Conteúdo |
-|---|---|
-| 0–15 | cabeça (32×16, cruz de 6 faces) + camada externa da cabeça (32×16) |
-| 16–29 | tronco (26×14) + camada externa do tronco (26×14) + 12 px livres |
-| 30–40 | perna D, perna E (16×11 cada), braço D, braço E (12×11 cada) |
-| 41–51 | camadas externas das pernas e dos braços |
-| 52–63 | reservado (marcas de time, remendos de zumbi, testes) |
+| Camada | Região (u, v, w, h) | Conteúdo |
+|---|---|---|
+| 0 | paleta (0, 0, 16, 16) | 16 amostras 4×4: cabelo, sombra do cabelo, barba, acessório, sombra do acessório, ouro, pele, mão (a luva, ou pele −10 de mão nua), manga, calça, colete, sombra do colete, bota, cabelo-base, gosma e curativo de zumbi |
+| 0 | cruz da cabeça 16³, canto (0, 0) | topo, base, direita, frente, esquerda e costas da cabeça |
+| 0 | expressões, (16·(e mod 4), 32 + 16·⌊e/4⌋), 16 × 16 | as 8 expressões (2.3); a frente da cruz leva a expressão 0 |
+| 1 | tronco, cruz 16 × 24 × 8 em (0, 0, 48, 32) | jaqueta no tecido do look, colete, cinto e cós da calça, em pixel art 16 × 24 |
+| 1 | canela (48, 0, 4, 10), bota (52, 0, 12, 12) | joelheira, calça e a barra presa na bota; bota de combate (mini-cruz) |
+| 1 | colunas da farda (48–60, 12) | manga (braçadeira), antebraço (punho da luva) e coxa; o zumbi pinta nelas a roupa rasgada, com a barra de pele no fim |
+| 1 | reserva do capacete (0, 32, 64, 32) | cruz de uma casca 16³, para a rodada 3 |
 
-- O rosto **não** fica na skin: vem da folha de rostos (ver 2.3), para trocar expressão sem recompor a skin.
-- A skin de cada bobo é **composta em runtime** (JS puro, sem canvas) a partir das partes escolhidas e enviada para uma camada de `modelos64`. Cada bobo diferente na partida ocupa 1 camada (16 KB).
+- **Membros** leem colunas de 4 texels (uma cor por linha nas 4 faces, lisas como os membros do FutBobo); **mão, cabelo e acessórios** leem amostras da paleta; só a cabeça, o tronco e a bota têm pintura de verdade. Todo canto de região é par e as colunas são alinhadas a 4: o mip fica limpo até o nível 2.
+- **Farda [DECIDIDO #58, #59]:** saiu o uniforme de futebol (camisa, estampas, gola em V, escudo, números, meião e chuteira). O look veste uma **farda** (`FigureOutfit`: tecido, jaqueta, calça, colete, botas e luvas; colete e luvas aceitam "sem"): jaqueta no tronco, **lisa ou camuflada** (woodland, deserto, urbano cinza, noturno, e o liso com graxa do mecânico), com os tons das manchas tirados da cor principal e as máscaras por hash (sem `Math.random`); gola mais escura, fecho no meio e as lapelas dos bolsos do peito; **cinto** com fivela; mangas compridas e calça no tom principal (o camuflado vai **só no tronco**, #59); a **barra da calça presa na bota**; **bota de combate** preta ou marrom, sola mais escura e o cadarço numa linha (sem a biqueira). O **colete do look** (sem time) é uma placa menor, com 2 porta-carregadores e uma tira de velcro, e o camuflado aparece em volta; as **joelheiras** são do colete. Os 12 looks prontos: recruta woodland, mecânico de macacão cinza-oliva com graxa (sem colete, mão nua), piloto de macacão de voo verde-sálvia (sem colete, luva de couro), zumbi de woodland velho, e os 8 visuais do FutBobo com o rosto e o cabelo do teste e fardas variadas (urbano, deserto, liso oliva, woodland, noturno, deserto claro, urbano claro, liso areia). Grão desligado.
+- **Cabeça:** igual à do FutBobo texel a texel (conferido em 2.311 aparências, 8,28 milhões de texels).
+- **Cabelo e acessórios** são caixas na cabeça (0 a 28; os 34 cortes do FutBobo, faixa, tiara, bandana, boné, barba longa e brincos) e **nunca são hitbox** (a aba do boné entra numa parede encostada, como em todo FPS). **Teto de jogo por recorte:** a caixa de cabelo é cortada no teto de 1,99 m em pé e 0,99 m agachado ou deslizando (recorte na matriz da caixa; a que fica toda acima do teto some). Em pé só o afro gigante e o moicano espetado são cortados; agachado, os 26 cortes que passam de 1,0 m ficam com o topo plano a 0,99 m [PROPOSTA; pergunta G5, com o print dos 3 cabelos agachados].
+- **Cor de time** (`figureOutfitFor`): com time, o **colete de time** cobre o tronco (placa de frente e de costas nas linhas 2..18, alças, faixa lateral, 3 porta-carregadores e o cinto de guarnição) na cor do time, com o **ícone ▲ ● ■ ◆** (times 0..3) de 5 × 5 na tinta legível num painel 7 × 7 mais escuro, no peito e nas costas; **braçadeira** na manga, **luvas** (também na 1ª pessoa) e **joelheiras** do time; jaqueta, calça e botas continuam as do look. A cor do time cobre **38,1–39,0% da frente** (■ 38,1%, ● 38,4%, ▲ e ◆ 39,0%; projeção do protótipo de pintura, 1.356 t, os 12 looks nos 4 times), acima dos 35% desta seção; na projeção de verdade, com o cabelo, fica em 32,8–38,2% (a barba longa cobre o painel e o afro aumenta a silhueta). **Trava de cor:** acessório, jaqueta, calça, colete, luvas ou botas do look a menos de 92 (redmean) da cor de um time da partida vira `#141414` ou `#f4f4f2`.
+- Bots com a mesma aparência e o mesmo time dividem a skin. Estouro da reserva: o excedente veste o look padrão do próprio time, nunca o de outro.
 
 ### 2.3 Rosto e expressões [PROPOSTA]
-- O rosto é um **quad instanciado** de 8×8 px rente à frente da cabeça (a 7ª parte do bobo, ver 2.6), lido de uma **folha de rostos** de 64×64: 8 estilos de rosto (linhas) × 8 expressões (colunas). Uma camada só para todos os bobos. Estilo e expressão são atributos de instância que deslocam a UV no vertex shader, só com conta, sem ler textura no vertex shader [PADRÃO: Render de personagens].
-- Expressões: neutro, mirando, bravo, assustado, dor, comemorando, dormindo, morto (olhos em X).
+- O rosto é a **face da frente do cubo da cabeça**, pintada em **16 × 16 px** na camada 0 da skin (o texel do rosto é o da skin, não 2× como na folha 8 × 8 do bobo A). O vertex shader desloca a UV da face da frente para a célula da expressão, só com conta, sem ler textura no vertex shader [PADRÃO: Render de personagens]. Trocar de expressão não recompõe a skin nem sobe dados; a expressão vai na 4ª linha da matriz da instância.
+- As **8 expressões** (a ordem de `FACE_EXPRESSIONS`, nomes do FutBobo entre parênteses): neutro (normal), mirando (mirando), bravo (grit), assustado (surpreso), dor (triste), comemorando (grito), dormindo (piscada) e morto. "Mirando" e "morto" vêm das expressões extras do FutBobo, como estão. O rig pisca (0,13 s a cada 1,8 a 5,4 s) só com a expressão neutra; os manequins não piscam.
 - **A expressão mostra a personalidade do bot sem nenhum texto** (bots não falam [DECIDIDO #34]): o covarde fica assustado ao recarregar ou fugir, o lunático passa a partida bravo, o camper aparece dormindo quando ninguém passa.
 
 ### 2.4 Customização [DECIDIDO #16, #17]
@@ -257,13 +281,13 @@ Tudo liberado desde o início, sem progressão, sem cosmético por desafio e sem
 |---|---|
 | Skin pronta (atalho que preenche tudo) | 12 skins: recruta, sargento, piloto, mecânico, socorrista (sem cruz vermelha), cozinheiro de quartel, espião de terno, astronauta, apicultor, mergulhador, pijama, robô de papelão |
 | Tom de pele | 8 tons + 4 cores fantasia (verde, azul, roxo, cinza-pedra) |
-| Rosto (estilo) | 8 estilos da folha de rostos |
-| Cabelo (camada externa da cabeça) | 8 cortes, com cor livre na rampa de cabelo |
+| Rosto (estilo) | 8 estilos de rosto pintados na camada 0 da skin |
+| Cabelo (caixas na cabeça) | 34 cortes do FutBobo, com cor livre na rampa de cabelo |
 | Chapéu | 8 de camada externa (boné, gorro, bandana, capacete justo…) + 4 acessórios 3D de caixa (capacete com viseira, chapéu de aba, boina alta, antena) |
 | Roupa (tronco, braços, pernas) | 6 peças × padrão (liso, listras, xadrez, camuflado, bolinhas) × 2 cores |
 | Acessório de costas (3D) | 4: mochila, rádio, tanque de oxigênio, capa |
 
-- **Cor de time por cima da customização** (modos com time): o tronco ganha um **colete de time** na camada externa (cor do time + ícone ▲ ● ■ ◆ no peito e nas costas), braçadeiras na cor do time e uma faixa no chapéu. A customização nunca cobre essas zonas. Meta: a cor do time ocupa pelo menos 35% da silhueta vista de frente [PROPOSTA].
+- **Cor de time por cima da customização** (modos com time, #58): o **colete de time** com o ícone ▲ ● ■ ◆, a braçadeira, as luvas e as joelheiras na cor do time, por cima da farda do look (2.2). A customização nunca cobre essas zonas. Meta: a cor do time ocupa pelo menos 35% da silhueta vista de frente (medido: 38,1–39,0%) [PROPOSTA].
 - Fora de time (FFA), cada bobo usa as próprias cores; o marcador de inimigo resolve a leitura.
 - **Bots usam o mesmo editor** (eixo "visual" do Laboratório, ao lado dos 4 eixos: inteligência, habilidade, personalidade e regras). Se ninguém mexer, a aparência sai do hash do nome: "Jorge the Immortal" é sempre o mesmo bigodudo. Nomes de bots de fábrica são bobos em inglês [DECIDIDO #15].
 - Em **3ª pessoa** [DECIDIDO #12] o jogador vê o próprio bobo inteiro, então a customização aparece também para quem a fez.
@@ -274,26 +298,30 @@ Tudo liberado desde o início, sem progressão, sem cosmético por desafio e sem
 | Andar / correr | seno nas pernas e nos braços, com frequência ligada à velocidade |
 | Deslizar [DECIDIDO #8] | tronco inclinado para trás, uma perna à frente, poeira de cubinhos |
 | Pulo / pulo duplo / wall jump (regras de partida) | squash curto na decolagem e no pouso; no pulo duplo, pernas encolhem; no wall jump, braço estica para a parede |
-| Mirar | tronco e braços giram com o pitch; a cabeça acompanha |
-| Agachar | pose de 2.1, com transição de 120 ms |
+| Mirar | a cabeça fica presa ao olho: o tronco não leva o pitch, a cabeça gira até 0,6 rad em pé (0,1 agachada) e os braços e a arma levam o resto |
+| Agachar | postura P4f de 2.1, com transição de 120 ms (a sim troca no tick e o render mistura) |
 | Recarregar | o braço desce e o pente sai como peça separada |
 | Levar dano | tranco de 80 ms, piscada branca de 1 frame e expressão "dor" |
 | Morrer | ver 4.6: as partes se soltam e quicam; somem em 4 s |
 | Nascer | as partes caem do alto e se encaixam em 0,4 s |
-| Emotes (depois do MVP) | 4 poses fixas, usadas também como emote no online |
+| Emotes (depois do MVP) | as 42 comemorações e os 7 tiques do FutBobo (M2, com o contrato de emote no `ActorBuffer`); 4 poses fixas no online |
+
+Por cima da pose base entram as camadas do FutBobo (respiração, passada, molas, freada, achatamento, tranco de dano e piscada), dentro de um **envelope medido**: cabeça e tronco ficam a no máximo **1 px da pose base em regime** (média de 0,3 s) e **2 px no pico** (até 0,3 s), para a pose continuar sendo a hitbox. Os ganhos finais ficaram abaixo dos iniciais do plano (o envelope manda): mola de arranque ±0,072 rad (FutBobo ±0,3), balanço lateral ±0,036 (±0,25), inclinação na curva ±0,04, achatamento −9%..+7%, coice do tiro 1,6. Passa a 30, 60 e 144 Hz (pior regime 0,98 px a 240 Hz; pico 1,86 px, "arrancar e parar"). Medido no centro das caixas: nas quinas da cabeça o pico vai a 2,2 px e o regime a 1,2 px. Giro preguiçoso: a raiz segue o yaw da sim e as pernas atrasam até 0,35 rad. Recarga: `reloadNeckX` 0,17 (era 0,35) e a respiração some durante ela, para a cabeça ficar a 0,68 px da base. Arma de 3ª pessoa: o cano fica na mira em todo pitch (a orientação vem da moldura da mira); a mão E pode ficar até 1,53 px fora da telha com o motor ligado e 1,63 px no deslize com a sniper (aceito e relatado).
 
 ### 2.6 Render dos bobos [PADRÃO]
-- **Um `InstancedMesh` por parte rígida** (cabeça, tronco, 2 braços, 2 pernas, rosto): ~7 draw calls para todos os bobos de uma viewport, mais 1 por tipo de acessório 3D visível. Não depende de leitura de textura no vertex shader.
-- Cada parte é uma caixa interna + uma caixa externa (24 triângulos). **Bobo completo ≈ 150 triângulos**, até ~250 com acessórios [PROPOSTA]. Não há LOD de malha: além da distância do perfil (tabela de 1.12), um atributo de instância colapsa a camada externa e os acessórios deixam de ser desenhados.
-- Atributos por instância: matriz, camada da skin, luz amostrada, cor de contorno, flash de dano, expressão.
-- **Contorno de time** [PROPOSTA, decidir no M1]: casco invertido no mesmo programa instanciado (faces de trás, vértice empurrado pela normal em espaço de tela), com espessura constante de **1 px de tela (2 px no 3–4P)**. Aliado na cor do time, inimigo na cor de inimigo escolhida (ver 8). **Fica fora do orçamento base**: custa ~7 draw calls por viewport a mais, e o print de leitura + a medição do M1 decidem se entra e se fica ligado por padrão. Se entrar e o Teste Zero apertar, o casco é desenhado só para inimigos.
+- **Um `InstancedMesh` para todos os bonecos (R4c):** **1 draw por vista** para bonecos, zumbis e manequins (eram ~7), mais 1 por modelo de arma e por tipo de acessório 3D visível, no programa 4: um cubo unitário instanciado, **uma instância por caixa** (14 do corpo + 0 a 28 de cabelo; média de 17,75 nos 8 visuais do teste). Não depende de leitura de textura no vertex shader e não cria programa, atributo nem uniform.
+- Cada caixa tem 24 vértices e 12 triângulos: **boneco completo ≈ 213 triângulos** em média (conta), sem a arma. Não há LOD de malha. O **LOD do rig** (2.5) alterna a taxa de pose além de `figureNearM` (20 m no Switch e no celular, com meia taxa; 40 m no PC) e congela o que está fora das vistas. A camada externa de capacete (reserva da rodada 3) some além da distância do perfil.
+- Atributos por instância: matriz do osso (3 × 4, px → mundo), a 4ª linha (céu, sol, emissivo, expressão + flash) todo quadro; camada, UV da caixa, centro, tamanho e giro da ponta do cabelo só em evento.
+- **Sombra:** o blob do programa 5, 0,875 m × escala; não há a sombra projetada da cabeça no peito.
+- **Desmonte:** 6 grupos de ossos (cabeça com cabelo, tronco, braços e pernas) viram corpos Verlet, com a dobra do cotovelo e do joelho; os cubinhos do acerto usam o texel da caixa atingida.
+- **Sem contorno de time** [DECIDIDO #50]: o casco invertido (faces de trás, 1 px de tela, 2 px no 3–4P) foi medido e mostrado no print de leitura e saiu inteiro do motor (geometria, desvio no shader e uniforms só dele). Os bonecos ficam em 1 `InstancedMesh` (fora a sombra).
 
 ### 2.7 Legibilidade em tela pequena [PROPOSTA]
 | Elemento | Regra |
 |---|---|
 | Aliado | chevron e nome sobre a cabeça, sempre visíveis (inclusive através de parede), na cor do time |
 | Inimigo | chevron só com linha de visão; além de 35 m no 3–4P, ou de 60 m em tela cheia, vira um ponto de 6 px sobre a cabeça |
-| Contorno | casco de 2.6, na cor do time ou de inimigo, se aprovado no M1 |
+| Contorno | não há (#50): o colete de time (≥ 35% da frente) e os marcadores fazem a leitura |
 | Humano ou bot | plaquinha com ícone de controle (humano) ou de chip (bot), mais o ícone da personalidade |
 | Jogador local (tela dividida) | anel no chão e borda da viewport na cor do jogador: P1 ▲, P2 ●, P3 ■, P4 ◆ (cores em 6.2) |
 | Bobos-zumbi | silhueta e paleta próprias (ver 2.8), sem depender da cor de time |
@@ -301,12 +329,13 @@ Tudo liberado desde o início, sem progressão, sem cosmético por desafio e sem
 "Marcadores de inimigo: sempre / com visão / nunca" é regra da partida; quem quer suar desliga.
 
 ### 2.8 Bobos-zumbi [DECIDIDO #31]
-Mesmo estilo e mesmas caixas dos bobos, **curvados, esverdeados e engraçados**, nunca assustadores.
-- **Pose:** tronco inclinado 20° para a frente, braços esticados à frente, passo arrastado com a cabeça balançando.
-- **Skin:** pele verde-acinzentada (rampa própria, fora das cores de time), roupas desbotadas com rasgos na camada externa, **remendos e curativos coloridos** no lugar de feridas. Sem vísceras, sem osso exposto.
-- **Rostos próprios** na folha de rostos: olho em espiral, olho caído, língua de fora, boca de "uuuh".
+Mesmo boneco do FutBobo (as mesmas 14 caixas e a mesma tabela de pose, na postura 21), **curvado, esverdeado e engraçado**, nunca assustador.
+- **Pose:** postura própria da tabela: tronco inclinado 0,35 rad (20°) para a frente, braços esticados à frente (−1,47 rad), pescoço −0,2; passada a 60% e cabeça balançando (`neckZ` 0,15·sen(fase)). A hitbox segue a curvatura.
+- **Skin:** pele verde-acinzentada `0x8fae74` (rampa própria, fora das cores de time), branco do olho `#dcbc5a`, farda (woodland velho) 35% desbotada para `#8a8a86`, com a barra da jaqueta em dente e furos por hash no tronco (manga, antebraço e coxa rasgados nas colunas da farda, com a barra de pele no fim), mão nua, **remendos e curativos coloridos** no lugar de feridas. Sem vísceras, sem osso exposto.
+- **Rostos próprios**, as 8 expressões pintadas na própria skin (camada 0): olho em espiral, olho caído, língua de fora, boca de "uuuh", costurado e dentes (lógica de `faces.ts` do FutBobo). No M1 só existe o `common`, com 1 estilo.
 - **Tipos** [PROPOSTA; nomes em inglês bobo, #15, como em `gameplay.md` 7.4]: **comum**; **Sprinter** (skin de agasalho, anda curvado e rápido); **Chonker** (escala uniforme 1,3x, capacete de obra, barriga de gosma verde); **Spitter** (skin e pose próprias: bochechas cheias, inclinado para trás ao cuspir o projétil lento); chefão **Mega Bobo** (escala 1,8x, com placa de "chefe" pendurada). A escala é uniforme, então o pixel cresce junto e continua quadrado.
 - Ao morrer, o zumbi desmonta como os bobos (ver 4.6).
+- **Pendência do M3 (#53, #55):** o Chonker de escala 1,3x sobre o boneco de 1,75 m fica com 2,28 m visuais (conta; era 2,11 m sobre o bobo A e 1,95 m antes), acima da porta de 2,0 m (1,1x ainda dá 1,93 m). Rever a escala ou a porta dos mapas de Zombies. A escala é uniforme na raiz do render e da tabela, mas a hitbox do Chonker e do Mega ainda não escala (pedido de contrato aberto, M3).
 
 ---
 
@@ -429,10 +458,16 @@ Um canto de ~32×32 m do Construto que contém **todas as famílias de arte** de
 
 **Prints para o Erick aprovar** (sempre da mesma câmera fixa):
 1. Dia, Entardecer e Noite, em 1280×720.
-2. **Densidade de textura:** bobo e parede de perto (1 m e 3 m) com skin 64×64 e com uma skin de teste de densidade dobrada, para confirmar o pixel do boneco 2× maior que o do cenário.
-3. **Peças fora da grade:** a mesma vista em três versões: só blocos, com a quantidade proposta e com o dobro. O Erick escolhe a dose.
-4. **Leitura:** bobos a 5, 15, 30 e 50 m numa viewport de 640×360, com e sem contorno de time, também em escala de cinza.
-5. **Filtro:** `NEAREST_MIPMAP_LINEAR` contra `LINEAR_MIPMAP_LINEAR` no chão ao longe.
+2. **Densidade de textura:** bobo e parede de perto (1 m e 3 m) com skin 64×64 e com uma skin de teste de densidade dobrada, para confirmar o pixel do boneco 2× maior que o do cenário. **Escolhida a dobrada (#51)**; o print agora reconfirma o grão do `expandSkin`.
+3. **Peças fora da grade:** a mesma vista em três versões: só blocos, com a quantidade proposta e com o dobro. **Escolhido o dobro (#52)**: as 33 props do Construto colidem, param bala, tapam a visão dos bots, entram na navegação e acendem luz. A chave `propDose` ficou só visual, para A/B de custo no bench; o conjunto saiu dos prints.
+4. **Leitura:** bobos a 5, 15, 30 e 50 m numa viewport de 640×360, com e sem contorno de time, também em escala de cinza. **Sem contorno (#50)**; bobos um pouco mais altos (#53). Fica a leitura em cor e cinza, mais uma a 50 m com o atlas do plano B.
+5. **Filtro:** `NEAREST_MIPMAP_LINEAR` contra `LINEAR_MIPMAP_LINEAR` no chão ao longe. **Aprovado o `NEAREST_MIPMAP_LINEAR` (#50)**; as três luzes também.
+6. **Fontes (#54):** a folha das fontes em uso e o HUD visível, em 1280×720 e 640×360.
+7. **Altura (novo, #53):** a régua `print:altura` de perfil (porta, muro de 1,5 m, cobertura de 1,0 m, um manequim em pé e um agachado), em 1280×720 e 640×360, com as variantes A (1,625 m, o bobo antigo), B (1,75 m, a escolhida #55, no código) e o "antes" (1,5 m). Depois do port a régua ganhou o manequim `altura:deslizando` e a vista `print:altura-45`. As faces da frente das paredes e a face de fora da cabeça dos manequins ficam no mesmo plano, sem paralaxe, e o fundo é liso.
+8. **Título:** a tela de título da web em 1280×720 e 640×360 e a do Switch (com os 9 itens de teste) em 1280×720.
+9. **Números de setor (novo, revisão):** na altura do olho, o 9 da passagem leste do muro meio | sul visto do sul e o 6 logo ao norte visto do norte (girado 180°), mais o 4 e o 5 lado a lado, em 1280×720. O marcador fica no chão e é lido de qualquer lado: o 6 e o 9 levam um sublinhado que marca o lado de baixo do número [PROPOSTA, para o Erick conferir].
+
+Os números seguem os do roteiro (`apps/web/scripts/prints-plan.ts`) e os nomes dos arquivos (`6-fontes-*`, `7-altura-*`, `8-titulo-*`); o 3 (doses) e o 5 (mip) ficam aposentados para os nomes continuarem comparáveis entre rodadas.
 
 **Aceite:** prints aprovados; PC com GPU integrada a 60 FPS; Android de entrada (4 GB) a pelo menos 30 FPS; a mesma cena no Switch real com 4 viewports e bots burros a pelo menos 30 FPS, com memória medida [DECIDIDO #23].
 
@@ -533,9 +568,12 @@ Linha do futbobo (editorial escuro, sério, estilo militar), com **tokens própr
 
 Laranja contra azul é o par mais seguro para daltonismo vermelho-verde; C e D sempre aparecem com ícone e com o padrão no colete. Os modos daltônicos (ver 8) trocam esses hex sem mexer em malha: a cor do time vem de uniform e da skin composta.
 
-**Tipografia** [PADRÃO]
-- Duas fontes OFL, até 120 KB no total, aprovadas por print: uma display pesada para títulos e uma condensada para números do HUD.
-- Candidatas [PROPOSTA]: display **Russo One** ou **Chakra Petch Bold**; HUD **Saira Condensed** ou **Barlow Condensed SemiBold**.
+**Tipografia** [DECIDIDO #54]
+- Duas fontes OFL, até 120 KB no total, aprovadas por print: **Russo One** (display: títulos e botões, só caixa alta) e **Saira Condensed SemiBold** (HUD, rótulos e textos de leitura).
+- No jogo vai só o atlas MSDF `fonts/ui-fonts.{png,json}`, com nomes derivados SEM o Reserved Font Name: **"BoboForces Display"** (Russo One 1.001 a 22 px, 118 glifos: ASCII sem minúsculas, À–Þ, ¡ª«°·º»¿, NBSP e os extras) e **"BoboForces HUD"** (Saira Condensed SemiBold 0.072 a 20 px, Latin-1 + extras, 200 glifos, camada em 7 bits por canal). Altura de maiúscula e de x vêm do OS/2; a linha é base + a descida medida nos glifos entregues. O fontbake reprova nome derivado que contenha um RFN (name ID 0 e cabeçalho do `OFL.txt`).
+- **Teto de 120 KB, como lido [decisão menor revisável, não está na DECISOES]:** bytes BAIXADOS do atlas, PNG cru + JSON em gzip, o critério do `size-check` (sub-orçamento "Fontes" dentro do menu), com o JSON medido no gzip nível 4, um limite de cima do que o GitHub Pages serve (ele não serve gzip -9: +4,8% no JSON das fontes do M0). Medido: 111.895 + 7.710 = **119.605 B** (folga calibrada de 395 B; kerning a partir de 0,25 px). Os TTF de origem (135,2 KB) não vão no build. Reserva se apertar: HUD em 6 bits por canal (−5,9 KB).
+- A tela de comparação das candidatas virou a **folha das fontes em uso** (`drawFontSpecimen`, gancho `showFontSpecimen`): origem de cada fonte, logo, título com acentos, botões, HUD de amostra, texto corrido e algarismos.
+- No título do Switch, com mais de 4 itens de teste, a coluna vira uma grade de 2 colunas (330 px, botões de 48 px) embaixo à direita, acima da versão; os rótulos usam as chaves curtas `test.item.*`. O nome do mapa no loading encolhe para caber, sem descer do piso de leitura.
 
 **Movimento** [PROPOSTA]
 - Entradas curtas e secas: 120 a 180 ms, ease-out, deslizando 8 px. Nada de mola de brinquedo.
@@ -757,7 +795,7 @@ Os botões são definidos pela **posição** no controle, não pela letra.
 | Área | Opções |
 |---|---|
 | Daltonismo | Padrão, Protanopia, Deuteranopia e Tritanopia: cada modo troca as cores de time (uniform e skin composta), sem custo de desempenho. Cor de inimigo escolhível entre 6. Times sempre com ícone (▲ ● ■ ◆) e colete com padrão. |
-| Contorno | se o casco for aprovado no M1 (2.6): contorno de time/inimigo ligado ou desligado; espessura 1 ou 2 px |
+| Contorno | não há: o casco de contorno saiu no M1 (#50, ver 2.6) |
 | Mira assistida | Desligada, Leve, Média ou Forte: a mira desacelera 25%, 40% ou 60% perto do alvo e puxa de leve; no Forte, trava ao mirar. O host do online pode limitar. |
 | Câmera | 1ª ou 3ª pessoa [DECIDIDO #12]; FOV (PC 70–110, padrão 90; celular e Switch 70–100, padrão 80); FOV do viewmodel; tremor 0–100%; balanço ao andar; esconder viewmodel |
 | Sensibilidade | separada para mouse, controle, toque e giroscópio; multiplicador de ADS; inverter Y |
@@ -881,7 +919,7 @@ Os bots não falam: sem voz, sem balão de texto, sem sílabas inventadas. A per
 
 **Pipeline** [PROPOSTA]
 1. **Fonte da verdade em texto**, em `assets-src/`: pixel-art como grade de caracteres com paleta, modelos como listas de caixas em TS e mapas como scripts TS (`tecnico.md` 15.1). Diff legível no git; nada de binário editado à mão.
-2. **Build** nas ferramentas de `tools/*` (`texgen`, `skingen`, `modelgen`, `mapc`): gera as folhas PNG das camadas dos arrays, os modelos em formato compacto e os mapas em RLE + deflate [PADRÃO]. A malha e a luz dos mapas são montadas no loading (5.7).
+2. **Build** nas ferramentas de `tools/*` (`texgen`, `modelgen`, `mapc`; o `skingen` virou a prévia do pintor de skins): gera as folhas PNG das camadas dos arrays, os modelos em formato compacto e os mapas em RLE + deflate [PADRÃO]. A malha e a luz dos mapas são montadas no loading (5.7).
 3. **Validador no `npm test`:** cor fora da paleta mestra; tamanho de camada (16×16 ou 64×64); densidade de texel (UV contra tamanho no mundo, ±5%); soquetes obrigatórios das armas; teto de triângulos; IDs de conteúdo estáveis.
 4. **Prints automáticos** da cena-vitrine (playwright-core no Edge, câmeras fixas, Dia/Entardecer/Noite, 1280×720 e 640×360), salvos por versão para comparar antes/depois.
 5. **Documentos:** este `docs/design/arte-ux.md`, mantido vivo, e `.interface-design/system.md` (criado no M0).
@@ -896,7 +934,7 @@ Valem para o pior caso: Switch 3–4P ou celular médio. A medição do Teste Ze
 | Item | Por viewport | Total |
 |---|---|---|
 | Draw calls (orçamento base, Switch 3–4P) | **até 45** (`tecnico.md` 16.3): mundo ~17 (opaco, cutout, translúcido), props instanciados ≤ 8, bobos 7 (6 partes + rosto), armas e acessórios no mundo ≤ 3, viewmodel 1, VFX ≤ 6 (inclui o pool de cubinhos), céu 2 | Switch até 200, mais a UI |
-| Contorno de time (extra condicional) | +~7 só se aprovado no M1 (2.6) e se a medição mostrar folga; senão, só inimigos ou desligado | — |
+| Contorno de time | não entrou (#50): 0 draw calls | — |
 | Triângulos visíveis | até 120 mil | até 500 mil |
 | Bobo / bobo-zumbi | ~150 triângulos (até ~250 com acessórios) | — |
 | Arma (mundo e viewmodel) | até 600 triângulos (a maioria abaixo de 300) | — |
@@ -905,7 +943,7 @@ Valem para o pior caso: Switch 3–4P ou celular médio. A medição do Teste Ze
 | Texturas na GPU | — | `blocos16` ~350 KB com mips; `modelos64` até ~2,7 MB com mips (128 camadas, sobe se o T0 deixar); MSDF, sprites e LUT ~2 MB; total < 8 MB |
 | Texturas no download (primeira partida) | — | texturas de blocos e skins até 150 KB em PNG (`tecnico.md` 16.4) |
 | Áudio | — | SFX até 1,5 MB; sons essenciais da primeira partida até 150 KB; música sob demanda |
-| Fontes | — | TTF até 120 KB no build [PADRÃO]; no jogo vai só o atlas MSDF |
+| Fontes | — | até 120 KB [PADRÃO], lidos como bytes baixados do atlas MSDF (PNG + JSON em gzip, o JSON no nível 4, calibrado pelo GitHub Pages; decisão menor revisável, 6.2): medido 119,6 KB. Os TTF não vão no build |
 | Carga inicial da web | — | menu interativo em até ~350 KB; primeira partida em até ~1 MB acumulado: Construto (`.bfmap`) até 300 KB + texturas de blocos e skins até 150 KB + sons essenciais até 150 KB (`tecnico.md` 16.4) |
 | Memória | — | GPU < 150 MB; heap JS < 200 MB |
 
@@ -928,12 +966,12 @@ Numeração única do projeto. Cada marco lista só a parte de arte, UX, áudio 
 
 ## 15. Riscos desta frente
 1. **Pixel-art gerada por script com cara genérica.** Mitigação: paleta mestra, regras de 1.3, cena-vitrine como primeiro entregável de arte e prints comparativos por versão.
-2. **Legibilidade no 3–4P** (bobos com 10 a 16 px). Mitigação: reserva de saturação, colete de time, contorno, marcadores e teto de visão de 50 m.
+2. **Legibilidade no 3–4P** (bobos com 10 a 16 px). Mitigação: reserva de saturação, colete, braçadeira e luvas na cor do time (#58), marcadores e teto de visão de 50 m (o contorno saiu, #50; os bobos cresceram para 1,625 m, #53, e para 1,75 m, #55).
 3. **Nearest com mipmap** pode cintilar ou borrar ao longe. Mitigação: A/B de filtro nos prints.
 4. **Texture array no nx.js** ainda não confirmado. Mitigação: atlas com padding e `textureGrad` (1.6).
 5. **Pixel do boneco 2× maior que o do cenário** pode destoar. Mitigação: print de densidade no M1; a alavanca é a skin, não o cenário.
 6. **Agachado de 0,95 m com pernas rígidas.** Mitigação: pose validada por print de perfil ao lado da cobertura de 1,0 m.
-7. **Alpha test** (cutout, camada externa, contorno) pode pesar no Maxwell com nouveau. Mitigação: medir no Teste Zero; desligar a camada externa a partir de 25 m; contorno só em inimigos se preciso.
+7. **Alpha test** (cutout, camada externa) pode pesar no Maxwell com nouveau. Mitigação: medir no Teste Zero; desligar a camada externa a partir de 25 m.
 8. **UI 100% WebGL:** na web, leitor de tela quase não funciona e digitar é chato. Mitigação: input DOM escondido na web e teclado na tela no Switch.
 9. **Áudio sem filtro e sem panner** no Switch. Mitigação: amostras de perto e de longe e indicador visual de som.
 
@@ -941,8 +979,8 @@ Numeração única do projeto. Cada marco lista só a parte de arte, UX, áudio 
 
 ## 16. Pendências
 Só o que continua aberto de verdade.
-1. **Prints da cena-vitrine (M1)** para o Erick aprovar: densidade de textura (cenário 32 px/m, bobos 16 px/m), dose de peças fora da grade, filtro de mipmap, contorno de time (entra ou não, fora do orçamento base), forma das caixas de tronco e membros, grade de luz de 2 m contra 1 m, paleta mestra e as três luzes.
-2. **Fontes:** escolher as duas OFL por print (candidatas em 6.2).
-3. **Teste Zero** [TZ]: `TEXTURE_2D_ARRAY` com `REPEAT` por camada; custo do alpha test e do casco de contorno; MSDF (e Canvas 2D como plano B); FBO multisample com blit para AA no Switch; compilação dos 7 programas no carregamento; teclado do sistema no nx.js; StereoPanner e MP3 no nx.js; memória da cena com 4 telas e 12 bots armados ou 24 zumbis.
+1. **Prints da cena-vitrine (M1)** para o Erick aprovar: densidade de textura (cenário 32 px/m, bobos 16 px/m), dose de peças fora da grade, filtro de mipmap, contorno de time (entra ou não, fora do orçamento base), forma das caixas de tronco e membros, grade de luz de 2 m contra 1 m, paleta mestra e as três luzes. **Feito (03/11/2026):** luzes e `NEAREST_MIPMAP_LINEAR` aprovados e sem contorno (#50), bobos a 32 px/m (#51), dose dobro (#52), bobos mais altos (#53, volta para um print de altura).
+2. **Fontes:** escolher as duas OFL por print. **Feito:** Russo One + Saira Condensed (#54, ver 6.2).
+3. **Teste Zero** [TZ]: `TEXTURE_2D_ARRAY` com `REPEAT` por camada; custo do alpha test; MSDF (e Canvas 2D como plano B); FBO multisample com blit para AA no Switch; compilação dos 7 programas no carregamento; teclado do sistema no nx.js; StereoPanner e MP3 no nx.js; memória da cena com 4 telas e 12 bots armados ou 24 zumbis.
 4. **TURN antes de abrir o online (M5)** [PADRÃO]: a escolha do provedor entra no texto do aviso de privacidade.
 5. **Nomes finais:** armas e bots de fábrica (tabela da frente de gameplay) e mapas do cardápio de 5.3.

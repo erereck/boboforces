@@ -1,8 +1,8 @@
 # BoboForces — sistema de interface
 
 > Fonte da verdade dos tokens de UI (decisão #22; `docs/design/arte-ux.md` §6.2; `tecnico.md` §9). Os valores viram
-> constantes em `packages/ui/src/tokens.ts`: mudou aqui, muda lá (e vice-versa). Status: M0, provisório até os prints
-> do M1. A base é o sistema do futbobo (editorial escuro, cor escassa, Barlow Condensed), com identidade própria:
+> constantes em `packages/ui/src/tokens.ts`: mudou aqui, muda lá (e vice-versa). Status: M1 (HUD, F2, loading e telas
+> de teste desenhados), com as escolhas dos prints do M1 (decisões #50–#54; fontes da #54). A base é o sistema do futbobo (editorial escuro, cor escassa, tipografia condensada), com identidade própria:
 > militar cartunesco, de brinquedo.
 
 ## Direção
@@ -70,11 +70,14 @@ combina com a direção).
 
 ## Tipografia
 
-- **Barlow Condensed** (OFL, provisória até o print do M1): **ExtraBold 800** como `display` (títulos, botões,
-  números grandes) e **SemiBold 600** como `hud` (leitura, rótulos, HUD). A escolha final entre as candidatas da
-  arte-ux §6.2 é por print.
-- Texto em **MSDF** gerado no build (`npm run fontbake`): um `TEXTURE_2D_ARRAY` com uma camada por fonte, Latin-1 +
-  Latin Extended-A + pontuação tipográfica, kerning simples por pares. Sem fonte de sistema, sem `FontFace`.
+- **Russo One** (OFL 1.1) como `display` (títulos e botões, só caixa alta) e **Saira Condensed SemiBold 600** como
+  `hud` (leitura, rótulos e os números do HUD), escolhidas no print (decisão #54, fecha a #46). No atlas os nomes são
+  derivados, sem o Reserved Font Name: "BoboForces Display" e "BoboForces HUD" (`assets-src/fonts/README.md`).
+- Texto em **MSDF** gerado no build (`npm run fontbake`): um `TEXTURE_2D_ARRAY` com uma camada por fonte (512×256,
+  faixa 4), kerning simples por pares. Glifos: display só em caixa alta (ASCII sem minúsculas, À–Þ, ¡ª«°·º»¿, NBSP e
+  extras: 118); hud com Latin-1 + extras (200), camada em 7 bits por canal. O Latin Extended-A saiu (o atlas passava
+  dos 120 KB). Altura de maiúscula e de x do OS/2; a linha = base + a descida medida nos glifos. Sem fonte de sistema,
+  sem `FontFace`. Teto: 120 KB baixados (PNG + JSON em gzip; medido 119,5 KB).
 - Caixa de texto = do **topo das maiúsculas** ao fim dos descendentes: alinha títulos e rótulos opticamente.
 - Escala (px de referência; o piso de 22 vem da TV em 720p):
 
@@ -84,7 +87,7 @@ combina com a direção).
 | `title` | display | 64 | 0,02 em | alta |
 | `heading` | display | 40 | 0,02 em | alta |
 | `button` | display | 30 | 0,06 em | alta |
-| `number` | display | 44 | 0 | — |
+| `number` | hud | 44 | 0 | — |
 | `body` | hud | 26 | 0 | — |
 | `label` | hud | 22 | 0,14 em | alta |
 | `caption` | hud | 22 | 0,02 em | — |
@@ -119,3 +122,46 @@ combina com a direção).
 - Forma dos retângulos (chanfro, contorno, faixa) vai na própria DrawList (`pushShape`) e é desenhada por SDF no
   programa de UI: retângulos, sprites e glifos num draw call por viewport (`packages/render/src/ui`).
 - Telas do M0: título (BOBOFORCES, JOGAR, Ajustes, rodapé) e Ajustes (placeholder com Voltar).
+
+## HUD (M1, `packages/ui/src/screens/hud.ts`)
+
+- **Referência de 640×360 POR VISTA** (uma vista cheia em 1280×720 tem escala 2). Medidas em `HUD_METRICS`; texto no
+  piso da vista (`minTextPx`: TV 22, 3–4P 16, portátil 18, celular 13) e números críticos no piso × 1,375 (22 no
+  3–4P, 30 na TV).
+- **Plaquinhas** `hudFundo` com o chanfro de 5 px de referência; nada de sombra. Números sempre na `hud` (condensada).
+- Alto à esquerda: ícone + `P1–P4` na cor do jogador (2–4P), `ABATES n` e `MORTES n` (as mortes saem se a plaquinha
+  passar de 36% da largura: o meio do alto é do placar). Embaixo à esquerda: `VIDA`, número e barra (`ok`; `perigo`
+  em ≤ 35%). Embaixo à direita: pente `/` reserva (pente vazio em `perigo`).
+- **3–4P compacto:** vida só com número e barra fina, munição só com o pente, sem mortes.
+- **Retícula** de 4 braços com sombra de 1 px, que abre com o spread; **hitmarker em X de "pixels"** (branco no
+  corpo, âmbar na cabeça). Morto: plaquinha "RENASCENDO…" com a contagem em âmbar.
+- **Dano direcional:** barra `perigo` na borda da área útil, na direção do tiro (ângulo positivo = à esquerda).
+- **2–4P:** borda de 3 px de referência na cor do jogador, por dentro da vista.
+- **Placar e tempo** (`drawHudShared`): 1P no alto ao centro; 2P cima/baixo e 4P no cruzamento central (as vistas
+  reservam folga na borda interna); 3P no 4º quadrante, em dobro sobre `bunker`. Times com ícone ▲ ● ■ ◆ e cor; o
+  relógio `m:ss` vem da tabela e fica `perigo` nos últimos 10 s.
+- **Ícones** ▲ ● ■ ◆ em "pixels" de 7×7 (`paintIcon`), a mesma linguagem blocada do jogo.
+
+## Painel F2, loading e telas de teste (M1)
+
+- **F2** (`drawDebugPanel`): canto superior esquerdo, `chapaTopo` a 92%, título âmbar, rótulos `textoBaixo`, valores
+  `texto` (números sem `Intl`, desconhecido = "—"); programas acima de 7 em `perigo`. 16 px de referência, piso de
+  12 px (é ferramenta).
+- **Loading** (`drawLoadingScreen`): composição à esquerda como os menus: rótulo CARREGANDO, nome do mapa em `title`,
+  barra total âmbar com a porcentagem e uma linha por etapa (concluída: ms em `ok`; em andamento: barra âmbar; na fila:
+  `textoBaixo`). Dica de 1 linha no rodapé.
+- **Testes do Switch** (`drawTestScreen`): título + fita âmbar; linhas com **selo de status** (OK `ok`, FALHA `perigo`,
+  AGUARDA `acao`, INFO neutro com borda), vaga `P1–P4` opcional, rótulo e dado técnico em `textoBaixo`; em até 3
+  colunas quando não cabem; dica no rodapé.
+- **Título com testes** (`TITLE_TESTS`): até 4 itens, coluna única de 330 px à direita; com mais (o Switch tem 9),
+  grade de 2 colunas de 330 px embaixo à direita, 44 px acima da versão, sem cruzar logo, botões nem rodapé. Botões
+  secundários de 48 de altura com as chaves curtas `test.item.*`; JOGAR segue com o foco inicial e o D-pad alcança
+  todos os itens.
+- **Loading:** o nome do mapa encolhe para caber na largura útil (`fitTextPx`), sem descer do piso de leitura.
+
+## Folha das fontes em uso (decisão #54)
+
+- `drawFontSpecimen(out, fonts, w, h)` (gancho dos prints `showFontSpecimen`), no lugar da comparação das candidatas
+  da #46: cabeçalho com a origem de cada fonte (chave `fontSpecimen.source`: "{name}: derivada de {source}
+  ({license})"), logotipo em texto, um título com acentos, os botões, um HUD de amostra (1P), texto corrido e os
+  algarismos. Usa o atlas `ui-fonts` de sempre; cabe de 640×360 a 1920×1080 (teste com o atlas real).

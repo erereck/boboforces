@@ -44,6 +44,20 @@ export interface PlatformProfile {
   readonly antialias: boolean;
   /** Alvo de FPS (o mínimo aceitável no Switch). */
   readonly targetFps: number;
+  /**
+   * M1: orçamento da IA por tick (unidades de trabalho, regra 10): raios de percepção e nós de A* (fatias de 200 por
+   * chamada). [PROPOSTA] até o Teste Zero: Switch e celular com 3/4 do PC (o QuickJS do nx.js interpreta o JS).
+   */
+  readonly aiRaysPerTick: number;
+  readonly aiPathNodesPerTick: number;
+  /**
+   * Boneco (#56; PLANO do porte §B6): até esta distância (m) de alguma vista, a animação roda inteira todo quadro (L0);
+   * além dela, em meia taxa quando `figureHalfRate` (L1). Fora de todas as vistas, só o deslocamento da raiz (L2).
+   */
+  readonly figureNearM: number;
+  readonly figureHalfRate: boolean;
+  /** Quantos looks de `FIGURE_BOT_ROTATION` os bots usam (§B15): cada look custa uma skin por time no loading. */
+  readonly figureBotLooks: number;
 }
 
 export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfile>> = {
@@ -64,6 +78,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 500,
     antialias: true,
     targetFps: 60,
+    aiRaysPerTick: 16,
+    aiPathNodesPerTick: 800,
+    figureNearM: 40,
+    figureHalfRate: false,
+    figureBotLooks: 6,
   },
   pcSplit: {
     id: 'pcSplit',
@@ -82,6 +101,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 500,
     antialias: true,
     targetFps: 60,
+    aiRaysPerTick: 16,
+    aiPathNodesPerTick: 800,
+    figureNearM: 40,
+    figureHalfRate: false,
+    figureBotLooks: 6,
   },
   mobile: {
     id: 'mobile',
@@ -100,6 +124,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 200,
     antialias: false,
     targetFps: 30,
+    aiRaysPerTick: 12,
+    aiPathNodesPerTick: 600,
+    figureNearM: 20,
+    figureHalfRate: true,
+    figureBotLooks: 3,
   },
   switch1p: {
     id: 'switch1p',
@@ -118,6 +147,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 200,
     antialias: false,
     targetFps: 30,
+    aiRaysPerTick: 12,
+    aiPathNodesPerTick: 600,
+    figureNearM: 20,
+    figureHalfRate: true,
+    figureBotLooks: 3,
   },
   switch2p: {
     id: 'switch2p',
@@ -136,6 +170,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 200,
     antialias: false,
     targetFps: 30,
+    aiRaysPerTick: 12,
+    aiPathNodesPerTick: 600,
+    figureNearM: 20,
+    figureHalfRate: true,
+    figureBotLooks: 3,
   },
   switch34p: {
     id: 'switch34p',
@@ -154,6 +193,11 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     maxDebris: 120,
     antialias: false,
     targetFps: 30,
+    aiRaysPerTick: 12,
+    aiPathNodesPerTick: 600,
+    figureNearM: 20,
+    figureHalfRate: true,
+    figureBotLooks: 3,
   },
 };
 
@@ -184,4 +228,36 @@ export function recipeLimitsFor(profile: PlatformProfile, options: RecipeLimitsO
     maxLocalHumans: profile.family === 'mobile' ? 1 : ENGINE_MAX_LOCAL_HUMANS,
     maxViewDistanceM: profile.maxViewDistanceM,
   };
+}
+
+/** Menor `figureNearM` aceito: abaixo disso a meia taxa apareceria no corpo a corpo. */
+const MIN_FIGURE_NEAR_M = 5;
+/** Tamanho de `FIGURE_BOT_ROTATION` (`model/figure-presets.ts`; o teste confere que é o mesmo). */
+const MAX_FIGURE_BOT_LOOKS = 11;
+
+/**
+ * Confere um perfil (regra 19): coerência das faixas e os tetos do motor. Devolve as mensagens (pt-BR, para log e
+ * teste; o jogador nunca as vê); vazio = ok.
+ */
+export function validatePlatformProfile(profile: PlatformProfile): readonly string[] {
+  const out: string[] = [];
+  const p = profile;
+  const int = (v: number, min: number, max: number): boolean => Number.isInteger(v) && v >= min && v <= max;
+  if (!(PLATFORM_PROFILE_IDS as readonly string[]).includes(p.id)) out.push(`perfil desconhecido: ${p.id}`);
+  if (!int(p.minViewports, 1, ENGINE_MAX_LOCAL_HUMANS) || !int(p.maxViewports, p.minViewports, ENGINE_MAX_LOCAL_HUMANS))
+    out.push(`${p.id}: vistas fora de 1..${ENGINE_MAX_LOCAL_HUMANS} ou mínimo acima do máximo`);
+  if (!int(p.maxBots, 0, ENGINE_MAX_BOTS) || !int(p.hostMaxBots, 0, p.maxBots))
+    out.push(`${p.id}: bots fora de 0..${ENGINE_MAX_BOTS} ou host acima do teto`);
+  if (!int(p.maxZombies, 0, ENGINE_MAX_ZOMBIES) || !int(p.hostMaxZombies, 0, p.maxZombies))
+    out.push(`${p.id}: zumbis fora de 0..${ENGINE_MAX_ZOMBIES} ou host acima do teto`);
+  if (!(Number.isFinite(p.maxViewDistanceM) && p.maxViewDistanceM > 0)) out.push(`${p.id}: alcance de visão inválido`);
+  if (!(p.minPixelRatio > 0 && p.minPixelRatio <= p.maxPixelRatio)) out.push(`${p.id}: faixa de DPR inválida`);
+  if (p.family === 'switch' && (p.fixedHeight !== 720 || p.antialias))
+    out.push(`${p.id}: o Switch roda em 720p sem MSAA (regra 6)`);
+  if (!(Number.isFinite(p.figureNearM) && p.figureNearM >= MIN_FIGURE_NEAR_M && p.figureNearM <= p.maxViewDistanceM))
+    out.push(`${p.id}: figureNearM fora de ${MIN_FIGURE_NEAR_M}..${p.maxViewDistanceM} m`);
+  if (typeof p.figureHalfRate !== 'boolean') out.push(`${p.id}: figureHalfRate precisa ser booleano`);
+  if (!int(p.figureBotLooks, 1, MAX_FIGURE_BOT_LOOKS))
+    out.push(`${p.id}: figureBotLooks fora de 1..${MAX_FIGURE_BOT_LOOKS}`);
+  return out;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONTENT_IDS, contentId, isKnownContentId, splitContentId } from './content-ids.ts';
-import { CURRENT_FORMAT_VERSION, formatId, parseFormatId } from './format-id.ts';
+import { CURRENT_FORMAT_VERSION, FORMAT_KINDS, formatId, parseFormatId, RETIRED_FORMAT_KINDS } from './format-id.ts';
 import { BOT_LEVELS, botLevelFromRef, builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { FORMAT_VERSIONS, GAME_CODENAME, GAME_VERSION } from './version.ts';
 
@@ -20,6 +20,13 @@ describe('ids de formato', () => {
     expect(parseFormatId('boboforces/nada@1')).toBeNull();
     expect(parseFormatId('novelo/1')).toBeNull();
     expect(parseFormatId(42)).toBeNull();
+  });
+
+  it('tipo aposentado não volta: fora dos tipos vivos e recusado na leitura (skinparts, #56)', () => {
+    for (const kind of RETIRED_FORMAT_KINDS) {
+      expect((FORMAT_KINDS as readonly string[]).includes(kind), kind).toBe(false);
+      expect(parseFormatId(`boboforces/${kind}@2`), kind).toBeNull();
+    }
   });
 });
 

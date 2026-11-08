@@ -52,6 +52,20 @@ Toda mudança de rumo deve ser anotada aqui.
 | 43 | Logo | **Só logotipo em blocos** (letras BOBOFORCES blocadas com textura pixel-art), sem mascote. |
 | 44 | Slogan | **Sem slogan.** |
 | 45 | Liberdade de estilo (02/11/2026) | "Voxel" é **referência de estilo, não limite**: o visual alvo é o de Block Strike / Pixel Gun 3D. O Claude pode tomar decisões fora disso **quando for mais otimizado ou visualmente mais agradável**, registrando a escolha aqui ou nos docs de design. |
+| 46 | Fontes candidatas (02/11/2026, início do M1) | Pode baixar do `google/fonts` as candidatas OFL **Russo One, Chakra Petch e Saira Condensed** (além da Barlow Condensed) para os prints de comparação. A escolha das 2 finais continua sendo do Erick, por print. |
+| 47 | Áudio do Teste Zero (02/11/2026) | Pode baixar sons **CC0 da Kenney** para o teste de áudio do Switch (MP3 do romfs, vozes, latência), com crédito no `CREDITOS.md`. |
+| 48 | Como rodar o Teste Zero (02/11/2026) | **Primeiro no Eden** (no PC do Erick, como referência), **depois no console pelo NRO** no hbmenu, aberto segurando R num jogo (modo aplicativo, sem chaves). |
+| 49 | Aparelhos de referência (02/11/2026) | PC: o notebook do Erick (**i5-12450H + RTX 2050**, 16 GB). Celulares: **Samsung Galaxy A36** e **Xiaomi Redmi Note 13** (este faz o papel de "Android de entrada"). Fecha a pendência 8 do GDD §9.1. |
+| 50 | Prints do M1: luz, contorno e filtro (03/11/2026) | **Aprovados:** Dia, Entardecer e Noite como estão; **sem contorno de time**; chão ao longe com **`NEAREST_MIPMAP_LINEAR`**. |
+| 51 | Densidade dos bobos (03/11/2026) | **Skin dobrada: 32 px/m**, a mesma densidade do cenário (antes 16 px/m, skin 64×64). Escolhida no print 2, que mostrava a skin de teste ampliada (Scale2x + grão). Atualiza a #6. |
+| 52 | Dose de props (03/11/2026) | **Dobro:** o mapa jogável leva todas as peças fora da grade do print 3 (as fixas, as da proposta e as do dobro), também na colisão, na navegação e na luz. |
+| 53 | Altura dos bobos (03/11/2026) | **Um pouco mais altos** (ajuste pedido no print de leitura): crescem na vertical e continuam cabeçudos. O valor exato é proposta do Claude e volta para um print novo. Atualiza a #18 (1,5 m, ~3 cabeças). |
+| 54 | Fontes (03/11/2026) | **Russo One** nos títulos e **Saira Condensed** no HUD e nos textos de leitura (OFL 1.1). Fecha a #46. |
+| 55 | Prints do M1, rodada 2 (04/11/2026) | **Altura B: 1,75 m**, com olho a 1,55 m; fecha o valor da #53. Agachado com os **braços ao longo do tronco**. Marcadores de setor com **sublinhado no 6 e no 9**. Aprovados como estão: leitura dos bobos, skin a 32 px/m, vitrine, fontes no jogo e telas de título. Aceito o **teto de 120 KB em gzip nível 4** para as fontes. |
+| 56 | Boneco do FutBobo (04/11/2026) | **O bobo passa a ser o boneco inteiro do FutBobo.** Pode ser modificado no que for preciso para ficar leve e rodar no Switch, desde que continue "bem parecido como está hoje". As expressões "mirando" e "morto" do teste ficam **como estão**. O capacete por cima ficou **sem escolha** e volta numa rodada de prints. Atualiza a #18 e a #51 no que o boneco mudar. |
+| 57 | Prints do M1, rodada 3 (07/11/2026) | Todos os padrões do port aceitos: **sem capacete**; a **proporção do FutBobo** (cabeça de 0,4375 m); **headshot mantido** (1,5 / 2,0 / 1,25) com a cabeça menor; agachado **P4f**; **cabelo recortado** no teto de 0,99 m agachado / 1,99 m em pé; **molas no envelope**; **cabeça presa ao olho**; visuais dos bots por perfil (3 no Switch, 6 no PC); sem grão na roupa; **zumbi do FutBobo**; deslize **"carrinho"**; andar de lado e de ré do FutBobo; antebraço como no FutBobo; braço armado com dano de braço (0,8×); comemorações e tiques no **M2**, com o contrato de emote. A resposta da camisa (G9) foi substituída pela #58. |
+| 58 | Roupa e personalização (07/11/2026) | **Sai o uniforme de futebol** (camisa de time, número, escudo e chuteira): os bobos vestem **roupas que fazem sentido numa guerra ou tiroteio**. Do FutBobo ficam **o esqueleto, as animações e o visual geral**; o resto pode mudar. **Personalização de personagem por jogador, salva para sempre**; os **bots podem ser bonecos genéricos**. |
+| 59 | Prints do M1, rodada 4 (08/11/2026) | **Farda aprovada como está** ("gostei demais do resultado"): jaqueta lisa ou camuflada, gola, cinto, botas de combate e os 12 looks; **colete de time com cor e ícone** ▲ ● ■ ◆ no peito e nas costas (sem time, a placa menor na cor do look); **luvas, braçadeira e joelheiras na cor do time**; **camuflado só no tronco**, mangas e calça no tom principal. Fecha a roupa da #58. |
 
 ## Decisões menores tomadas pelo Claude com os padrões (revisáveis pelo Erick)
 
@@ -69,7 +83,7 @@ Saíram da revisão de completude da Fase 1. Se discordar de alguma, é só dize
 | Tick da simulação | 60 Hz com dados em unidades por segundo e render interpolado. No Switch cai para 30 Hz se o Teste Zero exigir. |
 | Física e navegação | Colisão própria (AABB varrido + DDA na grade de blocos, mais caixas/rampas para peças fora da grade) e navegação em grade 2,5D com A* + flow field. Sem Rapier e sem WASM no caminho crítico. |
 | Métricas de gameplay | Uma tabela única em config manda sobre arte e técnica (altura do bobo cabeçudo, degrau automático, coberturas e portas como múltiplos da grade de 0,5 m). Headshot por arma, calibrado por robô de balanceamento. |
-| Texturas pixel-art | Blocos e skins em `TEXTURE_2D_ARRAY` (WebGL2 core) com nearest; atlas com padding como plano B se o Teste Zero reprovar no nx.js. Skins de bobo em 64×64 px. |
+| Texturas pixel-art | Blocos e skins em `TEXTURE_2D_ARRAY` (WebGL2 core) com nearest; atlas com padding como plano B se o Teste Zero reprovar no nx.js. Skins de bobo a 32 px/m (#51): pintadas em 64×64 e ampliadas no loading para 4 camadas 64×64. |
 | Tetos de bots | Por perfil de plataforma, em config. Começa conservador e sobe com as medições do Teste Zero. Capacidade do motor: 64 bots. |
 | Distância de visão | Regra da partida, igual para humanos e bots; o perfil da plataforma só define o teto. Mapas declaram a maior linha de visão. |
 | Texto da UI | Atlas MSDF gerado no build a partir de fonte OFL, sem depender de `FontFace`. Canvas 2D só como plano B, validado no Teste Zero. |
@@ -96,7 +110,7 @@ Saíram da revisão de completude da Fase 1. Se discordar de alguma, é só dize
 | Diretriz de conteúdo | Sem escolas, hospitais, lugares reais, bandeiras, exércitos ou marcas reais. |
 | Modos de festa | Economia do BoboStrike simplificada. Paintball com manchas de tinta em decal, com teto. Infection e Gun Game entram como presets. |
 | Música na partida | Desligada por padrão durante a partida; toca no menu, entre ondas e nos resultados. |
-| Fontes | Duas fontes OFL (uma display pesada e uma condensada para o HUD), até 120 KB no total, aprovadas por print. |
+| Fontes | Duas fontes OFL (uma display pesada e uma condensada para o HUD), até 120 KB no total, aprovadas por print: Russo One e Saira Condensed (#54). |
 | Grafia | BOBOFORCES no logo, BoboForces no texto, `boboforces` em URL e pastas. Title ID do Switch no padrão do MMM, fixado no M0. |
 | Anti-frustração | Morte abaixo do mapa, botão "destravar", bot parado há 8 s sem progresso é teleportado ao nó de navegação mais próximo, último zumbi corre até os jogadores e ganha marcador, limite de tempo nos rounds do BoboStrike. |
 | Switch: ciclo de vida | Pausa automática ao trocar dock/portátil, ao desconectar controle ou ao voltar do HOME. Slots reatribuídos na tela "aperte A". O + pausa; só se sai pelo menu. |

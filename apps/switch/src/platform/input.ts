@@ -8,7 +8,7 @@ import {
   type GamepadKind,
   type RawInputState,
 } from '@boboforces/input';
-import type { RawInputSource } from '@boboforces/platform-api';
+import type { ControllerInfo, RawInputSource } from '@boboforces/platform-api';
 import { NPAD_STYLE, type NxEvent, type NxGlobals, type NxGamepad } from './nx.ts';
 
 /**
@@ -34,13 +34,42 @@ export interface SwitchInputOptions {
 }
 
 export interface SwitchInput extends RawInputSource {
+  describeControllers(out: ControllerInfo[]): number;
   dispose(): void;
+}
+
+/** Controle completo para o jogo (decisão #32): par de Joy-Con, Pro Controller ou portátil. */
+export function isCompleteController(kind: GamepadKind): boolean {
+  return kind === 'switchPro' || kind === 'joyConPair' || kind === 'handheld';
+}
+
+/** `ControllerInfo` com campos graváveis: a casca reescreve os mesmos objetos a cada chamada (sem alocar). */
+interface MutableControllerInfo {
+  index: number;
+  id: string;
+  kind: GamepadKind;
+  styleSet: number;
+  deviceType: number;
+  complete: boolean;
+  canVibrate: boolean;
 }
 
 export function createSwitchInput(opts: SwitchInputOptions): SwitchInput {
   const { nx } = opts;
   const connected = new Uint8Array(MAX_GAMEPADS);
   const keys = new Uint8Array(KEY_COUNT);
+  const infos: MutableControllerInfo[] = [];
+  for (let i = 0; i < MAX_GAMEPADS; i++) {
+    infos.push({
+      index: i,
+      id: '',
+      kind: 'unknown',
+      styleSet: -1,
+      deviceType: -1,
+      complete: false,
+      canVibrate: false,
+    });
+  }
 
   const onKey = (event: NxEvent): void => {
     if (!event.code) return;
@@ -109,6 +138,31 @@ export function createSwitchInput(opts: SwitchInputOptions): SwitchInput {
       // 720p fixo: 1 px da tela = 1 px de layout (tecnico.md §6.10). Sem ponteiro absoluto no Switch.
       out.pixelRatio = 1;
       out.pointerInside = false;
+    },
+    describeControllers(out) {
+      let pads: readonly (NxGamepad | null)[] = [];
+      try {
+        pads = nx.navigator.getGamepads();
+      } catch {
+        return 0;
+      }
+      let n = 0;
+      for (let i = 0; i < MAX_GAMEPADS && i < pads.length; i++) {
+        const pad = pads[i];
+        if (!pad || !pad.connected) continue;
+        const info = infos[n]!;
+        info.index = i;
+        if (info.id !== pad.id) info.id = pad.id;
+        info.styleSet = pad.styleSet ?? -1;
+        info.deviceType = pad.deviceType ?? -1;
+        info.kind = gamepadKind(pad.styleSet ?? 0);
+        info.complete = isCompleteController(info.kind);
+        info.canVibrate = !!pad.vibrationActuator;
+        out[n] = info;
+        n++;
+      }
+      out.length = n;
+      return n;
     },
     vibrate(gamepadIndex, strong, weak, durationMs) {
       try {

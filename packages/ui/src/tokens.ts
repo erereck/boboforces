@@ -103,7 +103,8 @@ export const TYPE = {
   body: { font: 'hud', size: 26, tracking: 0, uppercase: false },
   label: { font: 'hud', size: 22, tracking: 0.14, uppercase: true },
   caption: { font: 'hud', size: 22, tracking: 0.02, uppercase: false },
-  number: { font: 'display', size: 44, tracking: 0, uppercase: false },
+  /** Números do HUD: na condensada de leitura (arte-ux.md §6.2: "condensada para números do HUD"). */
+  number: { font: 'hud', size: 44, tracking: 0, uppercase: false },
 } as const satisfies Readonly<Record<string, TypeStyle>>;
 
 export type TypeToken = keyof typeof TYPE;

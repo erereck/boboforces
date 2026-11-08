@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -21,7 +21,7 @@ describe('@boboforces/render/data', () => {
       seen.add(file);
       for (const spec of importsOf(file)) {
         expect(spec === 'three' || spec.startsWith('three/'), `${file} importa ${spec}`).toBe(false);
-        if (spec.startsWith('./')) queue.push(spec.slice(2));
+        if (spec.startsWith('.')) queue.push(posix.normalize(posix.join(posix.dirname(file), spec)));
       }
     }
     expect(seen.size).toBeGreaterThan(4);

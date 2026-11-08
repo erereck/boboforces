@@ -1,34 +1,37 @@
-// @boboforces/audio: mixer próprio sobre o subconjunto comum de Web Audio (AudioContext, BufferSource, Gain,
-// StereoPanner; regra 9) e síntese de efeitos em PCM. Fora do M0: entra no M2. O contexto chega opaco por
-// `platform.audio` (null = sem som, e o jogo tem que rodar assim).
-import type { AudioSurface } from '@boboforces/platform-api';
-import type { Disposable } from '@boboforces/shared';
-
-export type AudioBus = 'master' | 'sfx' | 'music' | 'ui';
-
-export interface PlayOptions {
-  readonly bus: AudioBus;
-  readonly volume?: number;
-  /** Posição no mundo (m); sem posição = som 2D (UI). */
-  readonly x?: number;
-  readonly y?: number;
-  readonly z?: number;
-  /** Prioridade para o teto de 24 vozes. */
-  readonly priority?: number;
-}
-
-export interface Mixer extends Disposable {
-  /** Ouvintes locais (1 a 4): cada som usa o mais próximo (tecnico.md §12). */
-  setListener(slot: number, x: number, y: number, z: number, yaw: number): void;
-  setListenerCount(count: number): void;
-  play(sound: string, options: PlayOptions): void;
-  setBusVolume(bus: AudioBus, volume: number): void;
-  setMono(mono: boolean): void;
-  suspend(): void;
-  resume(): void;
-}
-
-export function createMixer(surface: AudioSurface | null): Mixer {
-  void surface;
-  throw new Error('M2: áudio ainda não implementado');
-}
+// @boboforces/audio: mixer próprio sobre o subconjunto comum de Web Audio (Context, BufferSource, Gain, StereoPanner;
+// regra 9) e síntese de efeitos em PCM. Puro: o contexto chega opaco por `platform.audio` e vira `AudioContextLike`
+// (platform-api); `null` = sem som, e o jogo tem que rodar assim. M1: o mínimo para o item 19 do Teste Zero (MP3 do
+// romfs, 24 vozes, pan, sons sintetizados); o áudio de verdade (eventos da sim, música) é do M2.
+export {
+  createMixer,
+  AUDIO_BUSES,
+  MAX_VOICES,
+  MAX_LISTENERS,
+  SOUND_PRIORITY,
+  type AudioBus,
+  type Mixer,
+  type MixerStats,
+  type PlayOptions,
+  type SoundInfo,
+} from './mixer.ts';
+export {
+  distanceGain,
+  stereoPan,
+  nearestListener,
+  spatialize,
+  createListenerSet,
+  REF_DISTANCE_M,
+  MAX_DISTANCE_M,
+  ROLLOFF,
+  type ListenerSet,
+  type SpatialResult,
+} from './spatial.ts';
+export {
+  synthBeep,
+  synthNoiseBurst,
+  SYNTH_SOUNDS,
+  SYNTH_SAMPLE_RATE,
+  type BeepOptions,
+  type NoiseBurstOptions,
+  type SynthSoundName,
+} from './synth.ts';

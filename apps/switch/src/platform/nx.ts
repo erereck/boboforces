@@ -36,6 +36,8 @@ export interface NxGamepad {
   readonly axes: readonly number[];
   readonly buttons: readonly NxGamepadButton[];
   readonly styleSet?: number;
+  /** Bits `HidDeviceTypeBits` do libnx (M1: item 17 do T0). */
+  readonly deviceType?: number;
   readonly vibrationActuator?: {
     playEffect(
       type: 'dual-rumble',
@@ -107,9 +109,34 @@ export interface NxEvent {
   readonly code?: string;
 }
 
+/** `navigator.virtualKeyboard` do nx.js: o teclado do sistema (swkbd inline, desenhado por cima da tela). */
+export interface NxVirtualKeyboard {
+  value: string;
+  cursorIndex: number;
+  type?: number;
+  okButtonText?: string;
+  maxLength?: number;
+  minLength?: number;
+  enableReturn?: boolean;
+  readonly boundingRect: { readonly width: number; readonly height: number };
+  show(): void;
+  hide(): void;
+  /** Eventos: `change`, `cursormove`, `submit` e `geometrychange` (cancelar só esconde o teclado, sem evento próprio). */
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
+}
+
+export interface NxBattery {
+  readonly level: number;
+  readonly charging: boolean;
+}
+
 export interface NxNavigator {
   getGamepads(): readonly (NxGamepad | null)[];
   readonly userAgent?: string;
+  /** M1 (itens 18 e 20 do T0). */
+  readonly virtualKeyboard?: NxVirtualKeyboard;
+  getBattery?(): Promise<NxBattery>;
 }
 
 /** Os globais do nx.js que a casca lê. */
@@ -126,7 +153,24 @@ export interface NxGlobals {
   removeEventListener(type: string, listener: (event: NxEvent) => void): void;
   /** Ausente (ou falhando) quando não há áudio, como no boot do portcheck. */
   readonly AudioContext?: (new () => unknown) | undefined;
+  /**
+   * M1: o resto do runtime que só as SONDAS do Teste Zero tocam (itens 7, 8 e 21), lido sem tipo porque cada sonda
+   * confere se existe antes de usar. Nada do jogo depende disto.
+   */
+  readonly probes?: Readonly<Record<string, unknown>>;
 }
+
+/** Globais lidos só pelas sondas do T0 (podem faltar). */
+export const NX_PROBE_GLOBALS = [
+  'OffscreenCanvas',
+  'FontFace',
+  'fonts',
+  'Intl',
+  'DecompressionStream',
+  'CompressionStream',
+  'Response',
+  'console',
+] as const;
 
 type Fn = (...args: never[]) => unknown;
 
@@ -161,6 +205,7 @@ export function readNxGlobals(scope: object): NxGlobals {
     addEventListener: bind('addEventListener'),
     removeEventListener: bind('removeEventListener'),
     AudioContext: typeof audio === 'function' ? (audio as new () => unknown) : undefined,
+    probes: Object.fromEntries(NX_PROBE_GLOBALS.map((k) => [k, g[k]])),
   };
 }
 

@@ -1,0 +1,51 @@
+{
+  "$comment": "Sons do Teste Zero (item 19; decisão #47): origem CC0 da Kenney (kenney.nl) → MP3 mono 44,1 kHz 96 kbps por `npm run audioconv` (tools/audioconv). Originais e licenças em source/<pacote>/; saída em generated/<out>.mp3 com o nome lógico do runtime-assets.json. Crédito em docs/CREDITOS.md. `maxS`: corta o fim com fade de 20 ms; `peakDb`: normaliza o pico (dBFS).",
+  "packs": {
+    "kenney-impact-sounds": {
+      "title": "Impact Sounds (1.0)",
+      "author": "Kenney (www.kenney.nl)",
+      "url": "https://kenney.nl/assets/impact-sounds",
+      "license": "CC0 1.0 (Creative Commons Zero)",
+      "zipSha256": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+      "downloaded": "2026-11-03"
+    },
+    "kenney-sci-fi-sounds": {
+      "title": "Sci-Fi Sounds (1.0)",
+      "author": "Kenney (www.kenney.nl)",
+      "url": "https://kenney.nl/assets/sci-fi-sounds",
+      "license": "CC0 1.0 (Creative Commons Zero)",
+      "zipSha256": "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04",
+      "downloaded": "2026-11-03"
+    }
+  },
+  "sounds": [
+    {
+      "out": "t0-tiro",
+      "pack": "kenney-sci-fi-sounds",
+      "file": "explosionCrunch_000.ogg",
+      "maxS": 0.6,
+      "peakDb": -1
+    },
+    {
+      "out": "t0-impacto",
+      "pack": "kenney-impact-sounds",
+      "file": "impactMetal_medium_000.ogg",
+      "maxS": 0.5,
+      "peakDb": -3
+    },
+    {
+      "out": "t0-passo",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_concrete_000.ogg",
+      "maxS": 0.4,
+      "peakDb": -6
+    },
+    {
+      "out": "t0-ui",
+      "pack": "kenney-impact-sounds",
+      "file": "impactGeneric_light_000.ogg",
+      "maxS": 0.3,
+      "peakDb": -6
+    }
+  ]
+}

@@ -486,7 +486,8 @@ export function createFakeNx(opts: FakeNxOptions): FakeNx {
     maxTouchPoints: 0,
     getGamepads: () => [proController, null, null, null, null, null, null, null],
     vibrate: () => false,
-    getBattery: trapFunction('navigator.getBattery'),
+    // M1: as sondas tardias do Teste Zero leem a bateria (item 20); o boot sem GPU devolve um valor fixo.
+    getBattery: () => Promise.resolve({ level: 1, charging: true, chargingTime: 0, dischargingTime: Infinity }),
     virtualKeyboard: trapObject('navigator.virtualKeyboard'),
   };
 

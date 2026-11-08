@@ -1,47 +1,44 @@
 /**
- * fontbake: gera o atlas MSDF da UI a partir das fontes OFL de `assets-src/fonts/` (tecnico.md §9 e §15.1).
+ * fontbake: gera o atlas MSDF da UI a partir das fontes OFL de `assets-src/fonts/` (tecnico.md §9 e §15.1; decisão
+ * #54). Parâmetros em `spec.ts`.
  *
  * Saída em `assets-src/fonts/generated/`:
  * - `ui-fonts.generated.png`: tira vertical (RGB quando opaca), uma camada de 512×256 por fonte (vira um
- *   `TEXTURE_2D_ARRAY`). A `display` leva só caixa alta (`codepointsForRole`);
- * - `ui-fonts.generated.json`: métricas no formato `boboforces/ui-fonts@1` (lido por `parseFontPack` do `ui`).
+ *   `TEXTURE_2D_ARRAY`). A `display` leva só caixa alta (`codepointsForRole`); a camada do HUD sai em 7 bits;
+ * - `ui-fonts.generated.json`: métricas no formato `boboforces/ui-fonts@1` (lido por `parseFontPack` do `ui`), com o
+ *   nome derivado de cada fonte, `license` e `source`;
+ * - `ui-fonts.licencas.txt`: aviso de copyright e licença das fontes em uso (OFL 1.1, cláusula 2), que a casca junta
+ *   no `licencas.txt` do build.
  *
- * Uso (da raiz): `npm run fontbake`. Aceita TTF/OTF/WOFF direto e WOFF2 convertido aqui mesmo (só no build). Se
- * existir um `.ttf` com o mesmo nome do `.woff2`, o TTF ganha (é a fonte oficial do google/fonts).
+ * Uso (da raiz): `npm run fontbake` (ou `npm run fontbake -- ui`). Aceita TTF/OTF/WOFF direto e WOFF2 convertido aqui
+ * mesmo (só no build). O msdfgen é binário nativo: o SHA do PNG pode mudar entre máquinas.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { codepointsForRole, codepointsToString } from './charset.ts';
-import { buildFontPack, stringifyFontPack, toFontFile, type BmFontJson } from './pack.ts';
-import { decodePngRgba, encodePngRgba, stackVertical, type RgbaImage } from './png.ts';
-import { cmapCodepoints, fontName } from './sfnt.ts';
-import { isWoff2, woff2ToSfnt } from './woff2.ts';
+import { dirname, join, relative, resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import type { FontFile, FontRole } from '@boboforces/ui';
+import { codepointsForRole, codepointsToString } from './charset.ts';
+import {
+  assertDerivedName,
+  FONT_LICENSE,
+  LICENSE_FILE_NAME,
+  licenseFile,
+  licenseSection,
+  oflHeader,
+  resolveReservedNames,
+} from './license.ts';
+import { buildFontPack, stringifyFontPack, toFontFile, type BmFontJson } from './pack.ts';
+import { decodePngRgba, encodePngRgba, quantizeChannels, stackVertical, type RgbaImage } from './png.ts';
+import { cmapCodepoints, fontName, fontVerticalMetrics } from './sfnt.ts';
+import { ATLAS, FONT_BUDGET_BYTES, FONT_JSON_GZIP_LEVEL, FONTS, generatorOptions, type FontSpec } from './spec.ts';
+import { isWoff2, woff2ToSfnt } from './woff2.ts';
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const FONT_DIR = join(ROOT, 'assets-src', 'fonts');
 const OUT_DIR = join(FONT_DIR, 'generated');
 const OUT_NAME = 'ui-fonts.generated';
-
-/** Todas as camadas têm o mesmo tamanho (exigência do texture array). */
-const ATLAS = { width: 512, height: 256 } as const;
-
-interface FontSpec {
-  readonly role: FontRole;
-  /** Nome base em `assets-src/fonts/` (tenta `.ttf`, `.otf` e `.woff2`, nessa ordem). */
-  readonly file: string;
-  /** Tamanho (em) de geração em px do atlas. */
-  readonly size: number;
-  /** Faixa de distância em px: maior = contorno/sombra possíveis no shader, atlas mais cheio. */
-  readonly distanceRange: number;
-}
-
-/** Barlow Condensed provisória (PLANO_M0): ExtraBold para títulos e botões, SemiBold para leitura e HUD. */
-const FONTS: readonly FontSpec[] = [
-  { role: 'display', file: 'BarlowCondensed-ExtraBold', size: 28, distanceRange: 4 },
-  { role: 'hud', file: 'BarlowCondensed-SemiBold', size: 24, distanceRange: 4 },
-];
 
 type GenerateCallback = (
   error: Error | null,
@@ -72,25 +69,14 @@ function generate(sfnt: Uint8Array, spec: FontSpec, charset: string): Promise<{ 
     let settled = false;
     generateBMFont(
       Buffer.from(sfnt),
-      {
-        outputType: 'json',
-        filename: spec.role,
-        charset,
-        fontSize: spec.size,
-        distanceRange: spec.distanceRange,
-        fieldType: 'msdf',
-        textureSize: [ATLAS.width, ATLAS.height],
-        texturePadding: 2,
-        smartSize: false,
-        pot: true,
-      },
+      generatorOptions(spec, charset),
       (error, textures, font) => {
         if (settled) return;
         settled = true;
         if (error) return failWith(error);
         const first = textures[0];
         if (!first) return failWith(new Error('fontbake: o gerador não devolveu textura'));
-        if (textures.length > 1) return failWith(new Error(`fontbake: ${spec.role} não coube em uma página`));
+        if (textures.length > 1) return failWith(new Error(`fontbake: ${spec.file} não coube em uma página`));
         done({ png: first.texture, bm: JSON.parse(font.data) as BmFontJson });
       },
       quiet,
@@ -98,47 +84,112 @@ function generate(sfnt: Uint8Array, spec: FontSpec, charset: string): Promise<{ 
   });
 }
 
-async function bakeFont(spec: FontSpec, layer: number): Promise<{ file: FontFile; image: RgbaImage; source: string }> {
-  const source = findSource(spec.file);
-  const bytes = new Uint8Array(readFileSync(source));
+interface Baked {
+  readonly file: FontFile;
+  readonly image: RgbaImage;
+  readonly sourcePath: string;
+  readonly sourceBytes: number;
+  readonly sourceSha: string;
+  readonly reserved: readonly string[];
+  readonly licenseSection: string;
+}
+
+const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
+
+async function bakeFont(spec: FontSpec, layer: number): Promise<Baked> {
+  const sourcePath = findSource(spec.file);
+  const bytes = new Uint8Array(readFileSync(sourcePath));
   const sfnt = isWoff2(bytes) ? woff2ToSfnt(bytes) : bytes;
+
+  // Licença antes do trabalho pesado: o nome derivado não pode usar o RFN (name ID 0 e cabeçalho do OFL.txt).
+  const oflPath = join(dirname(sourcePath), 'OFL.txt');
+  if (!existsSync(oflPath)) throw new Error(`fontbake: falta o OFL.txt ao lado de ${relative(ROOT, sourcePath)}`);
+  const oflText = readFileSync(oflPath, 'utf8');
+  const copyright = fontName(sfnt, 0);
+  const origin = relative(ROOT, sourcePath);
+  const reserved = resolveReservedNames(`${copyright}\n${oflHeader(oflText)}`, spec.reservedNames, origin);
+  assertDerivedName(spec.name, reserved, origin);
+
   const covered = cmapCodepoints(sfnt);
   const wanted = codepointsForRole(spec.role);
   const present = wanted.filter((c) => covered.has(c));
   const missing = wanted.filter((c) => !covered.has(c));
   const { png, bm } = await generate(sfnt, spec, codepointsToString(present));
-  const image = decodePngRgba(new Uint8Array(png));
+  let image = decodePngRgba(new Uint8Array(png));
   if (image.width !== ATLAS.width || image.height !== ATLAS.height) {
     throw new Error(`fontbake: atlas ${image.width}×${image.height}, esperado ${ATLAS.width}×${ATLAS.height}`);
   }
+  if (spec.quantizeBits !== undefined) image = quantizeChannels(image, spec.quantizeBits);
   const version = fontName(sfnt, 5).replace(/^Version\s*/i, '');
-  const file = toFontFile(bm, { layer, name: fontName(sfnt, 4) || spec.file, version, missing });
-  return { file, image, source };
+  const source = `${fontName(sfnt, 4) || spec.file} ${version}`.trim();
+  const metrics = fontVerticalMetrics(sfnt);
+  const file = toFontFile(bm, {
+    layer,
+    name: spec.name,
+    version,
+    missing,
+    capHeightEm: metrics.capHeight,
+    xHeightEm: metrics.xHeight,
+    license: FONT_LICENSE,
+    source,
+  });
+  return {
+    file,
+    image,
+    sourcePath,
+    sourceBytes: bytes.length,
+    sourceSha: sha256(bytes),
+    reserved,
+    licenseSection: licenseSection({ derivedName: spec.name, source, oflText }),
+  };
 }
 
-const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
+const kb = (n: number) => `${(n / 1000).toFixed(1).replace('.', ',')} KB`;
 
-async function main(): Promise<void> {
+async function bakeUiFonts(): Promise<void> {
   const files = {} as Record<FontRole, FontFile>;
   const images: RgbaImage[] = [];
+  const sections: string[] = [];
   for (const [layer, spec] of FONTS.entries()) {
-    const { file, image, source } = await bakeFont(spec, layer);
+    const baked = await bakeFont(spec, layer);
+    const { file } = baked;
     files[spec.role] = file;
-    images.push(image);
-    const missingAscii = file.missing.filter((c) => c < 0x100);
+    images.push(baked.image);
+    sections.push(baked.licenseSection);
+    const alone = encodePngRgba(baked.image);
     console.log(
-      `${spec.role.padEnd(8)} ${file.name} ${file.version} (${source.slice(FONT_DIR.length + 1)}): ` +
-        `${file.glyphs.length / 8} glifos, ${file.kerning.length / 3} pares de kerning, ` +
-        `${file.missing.length} códigos ausentes${missingAscii.length ? ` (Latin-1: ${missingAscii.join(',')})` : ''}`,
+      `${spec.role.padEnd(8)} ${file.name} ← ${file.source ?? '?'} (${relative(FONT_DIR, baked.sourcePath)}, ` +
+        `${kb(baked.sourceBytes)}, sha256 ${baked.sourceSha.slice(0, 16)}…): ${spec.size} px, faixa ` +
+        `${spec.distanceRange}, ${spec.quantizeBits ?? 8} bits; ${file.glyphs.length / 8} glifos, ` +
+        `${file.kerning.length / 3} pares de kerning, ${file.missing.length} ausentes; maiúscula ` +
+        `${file.capHeight} px, linha ${file.lineHeight} px (base ${file.base}); RFN ` +
+        `${baked.reserved.length ? baked.reserved.map((r) => `"${r}"`).join(', ') : 'nenhum'}; camada sozinha ` +
+        `${kb(alone.length)}`,
     );
   }
   const pack = buildFontPack(files, { ...ATLAS, layers: images.length, image: `${OUT_NAME}.png` });
   const png = encodePngRgba(stackVertical(images));
   const json = stringifyFontPack(pack);
-  mkdirSync(dirname(join(OUT_DIR, 'x')), { recursive: true });
+  const licenses = licenseFile(sections);
+  mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(join(OUT_DIR, `${OUT_NAME}.png`), png);
   writeFileSync(join(OUT_DIR, `${OUT_NAME}.json`), json);
-  console.log(`atlas  ${ATLAS.width}×${ATLAS.height}×${images.length}: PNG ${kb(png.length)}, JSON ${kb(json.length)}`);
+  writeFileSync(join(OUT_DIR, LICENSE_FILE_NAME), licenses);
+  const jsonGzip = gzipSync(json, { level: FONT_JSON_GZIP_LEVEL }).length;
+  const total = png.length + jsonGzip;
+  console.log(
+    `atlas ui-fonts ${ATLAS.width}×${ATLAS.height}×${images.length}: PNG ${png.length} B, JSON ${json.length} B ` +
+      `(gzip -${FONT_JSON_GZIP_LEVEL} ${jsonGzip} B) → download ${total} B = ${kb(total)} de ${kb(FONT_BUDGET_BYTES)} ` +
+      `(${total <= FONT_BUDGET_BYTES ? `folga ${FONT_BUDGET_BYTES - total} B` : `ESTOURO de ${total - FONT_BUDGET_BYTES} B`})`,
+  );
+  console.log(`sha256 PNG ${sha256(png)}, JSON ${sha256(json)}; ${LICENSE_FILE_NAME} ${licenses.length} B`);
+  if (total > FONT_BUDGET_BYTES) {
+    throw new Error('fontbake: o atlas passou do teto de 120 KB (reserva medida: HUD em 6 bits)');
+  }
 }
 
-await main();
+const only = process.argv[2];
+if (only !== undefined && only !== 'ui') {
+  throw new Error(`fontbake: argumento ${only} desconhecido (só existe "ui"; as candidatas saíram com a decisão #54)`);
+}
+await bakeUiFonts();

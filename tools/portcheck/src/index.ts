@@ -3,8 +3,8 @@
 //   --no-build      usa o RomFS já gerado por `npm run build:switch` (apps/switch/romfs), como no CI
 //   --romfs <pasta> usa outra pasta de RomFS
 //   --frames <n>    teto de frames simulados (padrão 600 = 10 s)
-//   --strict        "pendente" (game ainda sem laço) também reprova
-// Sai com 1 se a varredura achar algo ou o boot falhar.
+//   --strict        "pendente" (game ainda sem laço) e asset provisório no RomFS também reprovam
+// Sai com 1 se a varredura achar algo, o boot falhar, faltar asset no RomFS ou o RomFS passar do orçamento.
 import { join, resolve } from 'node:path';
 import { buildSwitch } from '../../../apps/switch/scripts/bundle.ts';
 import { formatResult, runPortcheck } from './portcheck.ts';
@@ -34,14 +34,21 @@ const result = await runPortcheck({
 console.log(formatResult(result));
 
 const strict = args.includes('--strict');
+const { romfs } = result;
 const failed =
-  result.findings.length > 0 || result.boot.status === 'falha' || (strict && result.boot.status === 'pendente');
+  result.findings.length > 0 ||
+  result.boot.status === 'falha' ||
+  romfs.missing.length > 0 ||
+  romfs.overBudget ||
+  (strict && (result.boot.status === 'pendente' || romfs.placeholders.length > 0));
 if (failed) {
   console.log('\nportcheck: REPROVADO');
   process.exit(1);
 }
+const pending = [
+  ...(result.boot.status === 'pendente' ? ['o boot até o menu está PENDENTE (o game ainda é stub)'] : []),
+  ...(romfs.placeholders.length ? [`${romfs.placeholders.length} asset(s) provisório(s) no RomFS`] : []),
+];
 console.log(
-  result.boot.status === 'pendente'
-    ? '\nportcheck: ok, com o boot até o menu PENDENTE (o game ainda é stub; --strict reprova).'
-    : '\nportcheck: ok',
+  pending.length ? `\nportcheck: ok, com pendências (--strict reprova): ${pending.join('; ')}.` : '\nportcheck: ok',
 );

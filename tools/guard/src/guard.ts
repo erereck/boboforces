@@ -4,8 +4,10 @@
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { checkRuntimeAssets, RUNTIME_ASSETS_PATH } from './assets.ts';
 import { checkFile, type CheckContext, type Violation, type WorkspaceInfo } from './check.ts';
 
+export { checkRuntimeAssets, RUNTIME_ASSETS_PATH } from './assets.ts';
 export { checkFile, type CheckContext, type Violation, type WorkspaceInfo } from './check.ts';
 export { tokenize, type Comment, type LexResult, type Token, type TokenKind } from './lexer.ts';
 export { RULE_HELP, type RuleId } from './rules.ts';
@@ -82,7 +84,14 @@ export function runGuard(root: string): GuardResult {
     violations.push(...report.violations);
     suppressed += report.suppressed;
   }
-  return { files: files.length, violations, suppressed };
+  // M1: a tabela de assets em tempo de execução também passa pela regra 23.
+  const assets = join(root, RUNTIME_ASSETS_PATH);
+  let checked = files.length;
+  if (existsSync(assets)) {
+    violations.push(...checkRuntimeAssets(readFileSync(assets, 'utf8')));
+    checked++;
+  }
+  return { files: checked, violations, suppressed };
 }
 
 /** `arquivo:linha:coluna  [regra] mensagem`, um por linha. */

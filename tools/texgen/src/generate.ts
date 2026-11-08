@@ -1,99 +1,193 @@
-import { BLOCK_TEXTURES } from '../../../assets-src/textures/blocks16.ts';
-import { renderRecipe, type TextureKind, type TextureRecipe } from './paint.ts';
-import { encodePng, type RgbaImage } from './png.ts';
-import { BLOCK_LAYER_SIZE, MAX_BLOCK_LAYERS, validateTexture } from './validate.ts';
+import {
+  LAYER_MANIFEST_FORMAT,
+  mipChainOffsets,
+  parseLayerManifest,
+  TEXTURE_ARRAYS,
+  type LayerManifest,
+  type TextureArrayName,
+} from '@boboforces/format';
+import { buildMipChain } from './mips.ts';
+import {
+  frameLayerName,
+  renderRecipe,
+  variantLayerName,
+  type LayerRecipe,
+  type MaterialClass,
+  type TextureKind,
+} from './paint.ts';
+import type { RgbaImage } from './png.ts';
+import { validateTexture } from './validate.ts';
 
+/** Uma camada FÍSICA da tira (cada variante e cada quadro é uma). */
 export interface GeneratedLayer {
+  /** Nome no manifesto: `grass`, `grass_b`, `water#1`… */
   readonly name: string;
+  /** Nome da receita (a camada base do grupo). */
+  readonly base: string;
+  readonly variant: number;
+  readonly frame: number;
   readonly kind: TextureKind;
+  readonly material: MaterialClass;
+  /** Quadros do grupo (o manifesto repete no quadro 0; os seguintes levam 1). */
+  readonly frames: number;
   readonly image: RgbaImage;
 }
 
-/** Manifesto do texture array: camada (índice) → nome. É o que o jogo lê para montar o `BlockRegistry`. */
-export interface TextureArrayManifest {
-  readonly name: string;
-  readonly layerWidth: number;
-  readonly layerHeight: number;
-  readonly layers: readonly { readonly name: string; readonly kind: TextureKind }[];
+/** Grupo de camadas de uma receita: o que um `BlockDef` aponta pela face (`base` + variantes × quadros). */
+export interface LayerGroup {
+  readonly base: string;
+  /** Índice da primeira camada física na tira. */
+  readonly start: number;
+  readonly variants: number;
+  readonly frames: number;
+  readonly kind: TextureKind;
+  readonly material: MaterialClass;
 }
 
-export const BLOCK_ARRAY_NAME = 'blocos16';
+/** Uma tira de texture array gerada pelo texgen (`<base>.png`, `.mips.png`, `.json`). */
+export interface StripSpec {
+  readonly array: TextureArrayName;
+  /** Caminho sem extensão, relativo a `assets-src/textures/generated/` (ex.: `blocos16`). */
+  readonly file: string;
+  readonly recipes: readonly LayerRecipe[];
+}
 
-export function generateLayers(recipes: readonly TextureRecipe[] = BLOCK_TEXTURES): GeneratedLayer[] {
+const NAME_RE = /^[a-z][a-z0-9_]*$/;
+
+/** Expande as receitas em camadas físicas, na ordem: receita → variante → quadro. */
+export function generateLayers(recipes: readonly LayerRecipe[], size: number): GeneratedLayer[] {
   const names = new Set<string>();
-  return recipes.map((recipe) => {
-    if (names.has(recipe.name)) throw new Error(`texgen: camada repetida "${recipe.name}"`);
-    if (!/^[a-z][a-z0-9_]*$/.test(recipe.name)) throw new Error(`texgen: nome de camada inválido "${recipe.name}"`);
-    names.add(recipe.name);
-    return { name: recipe.name, kind: recipe.kind, image: renderRecipe(recipe, BLOCK_LAYER_SIZE) };
-  });
+  const out: GeneratedLayer[] = [];
+  for (const recipe of recipes) {
+    if (!NAME_RE.test(recipe.name)) throw new Error(`texgen: nome de camada inválido "${recipe.name}"`);
+    const variants = recipe.variants ?? 1;
+    const frames = recipe.frames ?? 1;
+    if (!Number.isInteger(variants) || variants < 1 || variants > 16) {
+      throw new Error(`texgen: "${recipe.name}" com variants fora de 1..16`);
+    }
+    if (!Number.isInteger(frames) || frames < 1 || frames > 16) {
+      throw new Error(`texgen: "${recipe.name}" com frames fora de 1..16`);
+    }
+    for (let v = 0; v < variants; v++) {
+      const variantName = variantLayerName(recipe.name, v);
+      for (let f = 0; f < frames; f++) {
+        const name = frameLayerName(variantName, f);
+        if (names.has(name)) throw new Error(`texgen: camada repetida "${name}"`);
+        names.add(name);
+        out.push({
+          name,
+          base: recipe.name,
+          variant: v,
+          frame: f,
+          kind: recipe.kind,
+          material: recipe.material,
+          frames,
+          image: renderRecipe(recipe, size, v, f),
+        });
+      }
+    }
+  }
+  return out;
 }
 
-export function validateLayers(layers: readonly GeneratedLayer[]): string[] {
-  const problems = layers.flatMap((l) => validateTexture(l.name, l.image, { size: BLOCK_LAYER_SIZE, kind: l.kind }));
-  if (layers.length > MAX_BLOCK_LAYERS)
-    problems.push(`${BLOCK_ARRAY_NAME}: ${layers.length} camadas (teto ${MAX_BLOCK_LAYERS})`);
+/** Grupos por nome base (para validar os blocos e montar a folha de contato). */
+export function layerGroups(layers: readonly GeneratedLayer[]): Map<string, LayerGroup> {
+  const groups = new Map<string, LayerGroup>();
+  layers.forEach((l, i) => {
+    const g = groups.get(l.base);
+    if (!g) {
+      groups.set(l.base, { base: l.base, start: i, variants: 1, frames: l.frames, kind: l.kind, material: l.material });
+    } else if (l.variant + 1 > g.variants) {
+      groups.set(l.base, { ...g, variants: l.variant + 1 });
+    }
+  });
+  return groups;
+}
+
+/** Problemas de todas as camadas de uma tira (vazio = ok). */
+export function validateLayers(layers: readonly GeneratedLayer[], array: TextureArrayName): string[] {
+  const spec = TEXTURE_ARRAYS[array];
+  const problems = layers.flatMap((l) =>
+    validateTexture(l.name, l.image, { size: spec.layerSize, kind: l.kind, material: l.material }),
+  );
+  if (layers.length > spec.maxLayers) problems.push(`${array}: ${layers.length} camadas (teto ${spec.maxLayers})`);
   return problems;
 }
 
-/** Tira vertical: camada i nas linhas [i·16, (i+1)·16). É o formato que o render sobe como `TEXTURE_2D_ARRAY`. */
-export function buildStrip(layers: readonly GeneratedLayer[]): RgbaImage {
-  const s = BLOCK_LAYER_SIZE;
-  const data = new Uint8Array(s * s * 4 * layers.length);
-  layers.forEach((l, i) => data.set(l.image.data, i * s * s * 4));
-  return { width: s, height: s * layers.length, data };
+/** Tira vertical do nível 0: camada i nas linhas [i·H, (i+1)·H). */
+export function buildStrip(layers: readonly GeneratedLayer[], size: number): RgbaImage {
+  const data = new Uint8Array(size * size * 4 * layers.length);
+  layers.forEach((l, i) => data.set(l.image.data, i * size * size * 4));
+  return { width: size, height: size * layers.length, data };
 }
 
-/** Folha de aprovação: cada camada repetida 3×3 (mostra a emenda) e ampliada 4×, lado a lado. Não vai para o jogo. */
-export function buildPreview(layers: readonly GeneratedLayer[], scale = 4, gap = 8): RgbaImage {
-  const s = BLOCK_LAYER_SIZE;
-  const tile = s * 3 * scale;
-  const cols = Math.min(4, layers.length);
-  const rows = Math.ceil(layers.length / cols);
-  const width = cols * tile + (cols + 1) * gap;
-  const height = rows * tile + (rows + 1) * gap;
-  const data = new Uint8Array(width * height * 4);
-  for (let i = 0; i < width * height; i++) data.set([0x0a, 0x0d, 0x0b, 0xff], i * 4);
-  layers.forEach((l, n) => {
-    const ox = gap + (n % cols) * (tile + gap);
-    const oy = gap + Math.floor(n / cols) * (tile + gap);
-    for (let y = 0; y < tile; y++) {
-      for (let x = 0; x < tile; x++) {
-        const src = ((Math.floor(y / scale) % s) * s + (Math.floor(x / scale) % s)) * 4;
-        data.set(l.image.data.subarray(src, src + 4), ((oy + y) * width + ox + x) * 4);
-      }
-    }
-  });
-  return { width, height, data };
-}
-
-export function buildManifest(layers: readonly GeneratedLayer[]): TextureArrayManifest {
-  return {
-    name: BLOCK_ARRAY_NAME,
-    layerWidth: BLOCK_LAYER_SIZE,
-    layerHeight: BLOCK_LAYER_SIZE,
-    layers: layers.map((l) => ({ name: l.name, kind: l.kind })),
-  };
+/** Mips de cada camada (níveis 1..n−1), na ordem da tira. */
+export function buildLayerMips(layers: readonly GeneratedLayer[], mipLevels: number): RgbaImage[][] {
+  return layers.map((l) => buildMipChain(l.image, l.kind, mipLevels));
 }
 
 /**
- * Tudo o que o texgen grava, por caminho relativo a `assets-src/textures/generated/`:
- * - `blocks/<nome>.png`: cada camada 16×16 (para revisar e para o diff no git);
- * - `blocos16.png` + `blocos16.json`: a tira vertical e o manifesto que o jogo carrega;
- * - `preview/blocos16.png`: folha de aprovação por print (não vai para o jogo).
- * Falha se alguma camada reprovar no validador.
+ * `.mips.png` do contrato `layers@1` (format/src/layers.ts): largura W/2; cada camada ocupa um bloco de H linhas e o
+ * nível k fica onde `mipChainOffsets` manda (sobra a última linha do bloco, transparente).
  */
-export function buildOutputs(recipes: readonly TextureRecipe[] = BLOCK_TEXTURES): Map<string, Uint8Array> {
-  const layers = generateLayers(recipes);
-  const problems = validateLayers(layers);
-  if (problems.length > 0) throw new Error(`texgen: validação reprovou:\n- ${problems.join('\n- ')}`);
-  const files = new Map<string, Uint8Array>();
-  for (const l of layers) files.set(`blocks/${l.name}.png`, encodePng(l.image));
-  files.set(`${BLOCK_ARRAY_NAME}.png`, encodePng(buildStrip(layers)));
-  files.set(
-    `${BLOCK_ARRAY_NAME}.json`,
-    new TextEncoder().encode(JSON.stringify(buildManifest(layers), null, 2) + '\n'),
-  );
-  files.set(`preview/${BLOCK_ARRAY_NAME}.png`, encodePng(buildPreview(layers)));
-  return files;
+export function buildMipsStrip(mips: readonly (readonly RgbaImage[])[], size: number, mipLevels: number): RgbaImage {
+  const width = size / 2;
+  const data = new Uint8Array(width * size * 4 * mips.length);
+  const rects = mipChainOffsets(size, mipLevels);
+  mips.forEach((chain, i) => {
+    rects.forEach((r, k) => {
+      const img = chain[k]!;
+      for (let row = 0; row < r.height; row++) {
+        const dst = ((i * size + r.y + row) * width + r.x) * 4;
+        data.set(img.data.subarray(row * r.width * 4, (row + 1) * r.width * 4), dst);
+      }
+    });
+  });
+  return { width, height: size * mips.length, data };
+}
+
+/** Manifesto `layers@1` da tira (validado pelo `parseLayerManifest` do contrato antes de sair). */
+export function buildManifest(layers: readonly GeneratedLayer[], array: TextureArrayName): LayerManifest {
+  const spec = TEXTURE_ARRAYS[array];
+  const manifest: LayerManifest = {
+    format: LAYER_MANIFEST_FORMAT,
+    array,
+    source: 'texgen',
+    layerWidth: spec.layerSize,
+    layerHeight: spec.layerSize,
+    mipLevels: spec.mipLevels,
+    layers: layers.map((l) => ({
+      name: l.name,
+      kind: l.kind,
+      frames: l.frame === 0 ? l.frames : 1,
+      cutout: l.kind === 'cutout',
+    })),
+  };
+  return parseLayerManifest(manifest);
+}
+
+/** Tudo de uma tira já pronto (camadas, mips e manifesto), depois do validador. */
+export interface BuiltStrip {
+  readonly spec: StripSpec;
+  readonly layers: readonly GeneratedLayer[];
+  readonly mips: readonly (readonly RgbaImage[])[];
+  readonly manifest: LayerManifest;
+  readonly level0: RgbaImage;
+  readonly mipsImage: RgbaImage;
+}
+
+export function buildStripAssets(spec: StripSpec): BuiltStrip {
+  const arraySpec = TEXTURE_ARRAYS[spec.array];
+  const layers = generateLayers(spec.recipes, arraySpec.layerSize);
+  const problems = validateLayers(layers, spec.array);
+  if (problems.length > 0) throw new Error(`texgen: validação reprovou (${spec.file}):\n- ${problems.join('\n- ')}`);
+  const mips = buildLayerMips(layers, arraySpec.mipLevels);
+  return {
+    spec,
+    layers,
+    mips,
+    manifest: buildManifest(layers, spec.array),
+    level0: buildStrip(layers, arraySpec.layerSize),
+    mipsImage: buildMipsStrip(mips, arraySpec.layerSize, arraySpec.mipLevels),
+  };
 }

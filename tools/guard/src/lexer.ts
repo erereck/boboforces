@@ -18,6 +18,8 @@ export interface Token {
 export interface Comment {
   readonly text: string;
   readonly line: number;
+  /** Coluna do `//` ou do `/*` (1-based): os marcadores do laço quente comparam posição com os tokens. */
+  readonly col: number;
 }
 
 export interface LexResult {
@@ -124,7 +126,7 @@ export function tokenize(source: string): LexResult {
     if ((c === '/' && source[i + 1] === '/') || (i === 0 && c === '#' && source[1] === '!')) {
       const end = source.indexOf('\n', i);
       const stop = end === -1 ? n : end;
-      comments.push({ text: source.slice(i + 2, stop), line });
+      comments.push({ text: source.slice(i + 2, stop), line, col });
       i = stop;
       continue;
     }
@@ -133,7 +135,7 @@ export function tokenize(source: string): LexResult {
       const end = source.indexOf('*/', i + 2);
       const stop = end === -1 ? n : end;
       for (let k = i; k < stop; k++) if (source[k] === '\n') newline(k);
-      comments.push({ text: source.slice(i + 2, stop), line: startLine });
+      comments.push({ text: source.slice(i + 2, stop), line: startLine, col });
       i = end === -1 ? n : end + 2;
       continue;
     }

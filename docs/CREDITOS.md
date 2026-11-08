@@ -1,10 +1,10 @@
 # BoboForces: créditos e licenças
 
-> **Status:** atualizado na integração do M0 (02/11/2026): three, fflate, nx.js e o gerador MSDF instalados com versão exata (ver `docs/DEPENDENCIAS.md`); a Barlow Condensed entrou como fonte **provisória** da UI; Trystero e áudio continuam planejados.
+> **Status:** atualizado no port do boneco do FutBobo (07/11/2026): entrada nova na §1 (pose, cabelo e pintura do boneco), sem dependência nova. Antes, nas escolhas dos prints do M1 (03/11/2026): fontes em uso Russo One + Saira Condensed (decisão #54; saem a Barlow provisória e a candidata Chakra Petch) e o `licencas.txt` também no romfs do Switch. Antes, na integração e nas medições do M1: fontes candidatas da #46 (só local) e os sons CC0 da Kenney do Teste Zero. Antes, na integração do M0 (02/11/2026): three, fflate, nx.js e o gerador MSDF instalados com versão exata (ver `docs/DEPENDENCIAS.md`); a Barlow Condensed entrou como fonte **provisória** da UI; Trystero e áudio continuam planejados.
 > - Cada entrada é conferida na versão fixada no M0: versão exata, sem `^`, registrada também em `docs/DEPENDENCIAS.md`.
 > - Uma dependência só entra se o build do Switch passar no `portcheck` (regra de ouro 22, [`GDD.md`](GDD.md) §6.12).
-> - O `licencas.txt` com os textos de licença exigidos (MIT e OFL pedem o aviso junto das cópias) é servido em `/boboforces/licencas.txt`. No M0 quem gera é o build da web (`apps/web/vite.config.ts`, plugin `licenseNotices`): cada pacote npm que entrou no bundle, com o LICENSE dele, mais a OFL da fonte; pacote sem arquivo de licença reprova o build.
-> - No M2, o `tools/credits` assume: reprova o CI se uma dependência de produção ou um asset externo não tiver entrada aqui, embute o `licencas.txt` no romfs do Switch e a tela Ajustes › Sobre › Créditos passa a lê-lo.
+> - O `licencas.txt` com os textos de licença exigidos (MIT e OFL pedem o aviso junto das cópias) é servido em `/boboforces/licencas.txt`. Quem gera hoje: na web, o build (`apps/web/vite.config.ts`, plugin `licenseNotices`); no Switch, desde 03/11/2026, o `apps/switch/scripts/licenses.ts` (embutido no romfs). Os dois levam cada pacote npm que entrou no bundle, com o LICENSE dele, mais o `assets-src/fonts/generated/ui-fonts.licencas.txt` do fontbake (as fontes em uso, ver §3); o do Switch leva também o runtime do nx.js (MIT, que o empacotador acrescenta ao NRO/NSP sem passar pelo bundle) e o aviso da Geist Mono 1.700 (OFL 1.1, © 2024 The Geist Project Authors) que vem no RomFS do runtime. Pacote sem arquivo de licença ou arquivo das fontes faltando reprova o build. Ainda falta (para o `tools/credits` do M2): os avisos das bibliotecas que o runtime do nx.js embute (pacotes npm do runtime JS, como web-streams-polyfill, kleur e color-rgba; nativas como mbedtls, zlib, libpng, freetype, harfbuzz e libjpeg), que não vêm no pacote npm dele; o cabeçalho do `licencas.txt` do Switch diz isso.
+> - No M2, o `tools/credits` assume: reprova o CI se uma dependência de produção ou um asset externo não tiver entrada aqui, gera o `licencas.txt` das duas cascas e a tela Ajustes › Sobre › Créditos passa a lê-lo.
 
 ## 1. O projeto
 
@@ -12,6 +12,7 @@
 
 - **Decisão #41:** repositório público, **sem licença aberta**. O código, os textos, as texturas, os modelos, as skins, os mapas, o logo e os sons sintetizados próprios têm todos os direitos reservados. Ver o código no GitHub não dá permissão para copiar, modificar ou redistribuir. Não existe arquivo `LICENSE` concedendo uso.
 - **Assets gerados pelo Claude:** blocos, texturas pixel-art, modelos de caixas, skins e mapas são gerados por script pelo Claude (Anthropic) a pedido do Erick (decisão #13). Fazem parte do projeto e têm os mesmos direitos.
+- **Boneco do FutBobo (EriLab):** pose, cabelo e pintura do boneco portados do FutBobo (EriLab). O FutBobo é do próprio Erick, então não é conteúdo de terceiros (regra 4 do `CLAUDE.md`) e os mesmos direitos reservados valem para o boneco (decisão #56). O port não trouxe dependência nem asset externo: a aparência é pintada em código no loading, o `portcheck` não mudou.
 - O projeto é desenvolvido com ajuda do Claude (Anthropic).
 - O jogo é gratuito e não comercial.
 
@@ -25,33 +26,51 @@
 | Trystero | MIT | só web | sinalização P2P por relays Nostr (online, M5) | a fixar no M5 | https://github.com/dmotz/trystero |
 | fflate | MIT | web, Switch e ferramentas | deflate/inflate de mapas, códigos, backups e PNG | 0.8.3 | https://github.com/101arrowz/fflate |
 
-## 3. Fontes (a escolher por print)
+## 3. Fontes (decisão #54)
 
-Duas fontes **SIL Open Font License 1.1** (OFL): uma display pesada para títulos e uma condensada para o HUD, até 120 KB no total. O jogo leva só o atlas MSDF gerado no build, com o aviso de copyright e a licença no `licencas.txt`.
+Duas fontes **SIL Open Font License 1.1** (OFL), escolhidas pelo Erick no print do M1: **Russo One** nos títulos e
+**Saira Condensed** no HUD e nos textos de leitura (fecha a #46). O jogo leva só o atlas MSDF gerado no build
+(`fonts/ui-fonts.{png,json}`), nunca os arquivos da fonte.
 
-| Papel | Candidatas | Licença | Escolhida |
-|---|---|---|---|
-| Display (títulos) | Russo One · Chakra Petch Bold | OFL 1.1 | a escolher |
-| HUD (números, condensada) | Saira Condensed · Barlow Condensed SemiBold | OFL 1.1 | a escolher |
+| Papel | Fonte de origem | Versão | Autor (copyright) | Licença | Reserved Font Name | Nome do derivado (atlas) | Link | Origem no repo |
+|---|---|---|---|---|---|---|---|---|
+| `display`: títulos e botões, só caixa alta | Russo One (Regular) | 1.001 | © 2011-2012 Jovanny Lemonad (jovanny.ru) | OFL 1.1 | "Russo" | **BoboForces Display** | https://github.com/google/fonts/tree/main/ofl/russoone | `assets-src/fonts/russo-one/` (TTF + `OFL.txt`) |
+| `hud`: leitura, rótulos e números do HUD | Saira Condensed SemiBold (600) | 0.072 | © 2016 The Saira Project Authors (omnibus.type@gmail.com) | OFL 1.1 | "Saira" | **BoboForces HUD** | https://github.com/google/fonts/tree/main/ofl/sairacondensed | `assets-src/fonts/saira-condensed/` (TTF + `OFL.txt`) |
 
-Ao escolher, registrar aqui: nome, versão, autor, link e cópia do `OFL.txt` da fonte. Nada de fontes da Microsoft (regra do novelo).
+- **O atlas é uma versão modificada** pela definição da OFL (subconjunto de glifos + campo de distância), então segue
+  sob OFL 1.1 e **não usa o Reserved Font Name** no nome principal: "BoboForces Display" e "BoboForces HUD" são nomes
+  fixos, e o `tools/fontbake` reprova a geração se o nome derivado contiver um RFN declarado no name ID 0 da fonte ou no
+  cabeçalho do `OFL.txt` (sem diferenciar caixa; aspas retas ou curvas, duplas ou simples). Se a fonte declara RFN num
+  formato que ele não lê (sem aspas), a guarda falha fechada até o nome vir à mão em `FontSpec.reservedNames`. O JSON do atlas leva só `license: "OFL-1.1"` e `source` ("Russo One
+  1.001", "Saira Condensed SemiBold 0.072"); o copyright fica no arquivo de licenças.
+- **Aviso e licença em cada cópia (cláusula 2):** o fontbake grava `assets-src/fonts/generated/ui-fonts.licencas.txt`
+  (uma seção por fonte em uso: "== BoboForces Display: atlas MSDF derivado de Russo One 1.001 (SIL OFL 1.1) ==" + o
+  `OFL.txt` da família na íntegra). A web (`apps/web/vite.config.ts`) e o Switch (`apps/switch/scripts/licenses.ts`)
+  juntam esse arquivo no `licencas.txt`, com a exceção OFL de `fonts/ui-fonts.*` no cabeçalho; o build reprova se ele
+  faltar.
+- **Crédito (cláusula 4):** dizer de onde veio ("derivada de Russo One 1.001") só aqui, no `licencas.txt`, no campo
+  `source` e na folha das fontes em uso (`drawFontSpecimen`, tela de depuração dos prints); nunca em divulgação.
+- Fonte dos arquivos: google/fonts, commit `2fe1e8c6`; SHA-256 e bytes no `assets-src/fonts/README.md`. Os TTF ficam
+  sem modificação (a OFL permite redistribuir junto da licença) e não vão no build.
+- Tamanho baixado do atlas: PNG 111.895 B + JSON 7.710 B em gzip -4 = **119.605 B**, sob o teto de 120 KB (lido como
+  bytes baixados, com o JSON medido pelo limite de cima do que o GitHub Pages serve; decisão menor revisável em
+  `arte-ux.md` §6.2/§13 e `tecnico.md` §9/§16.4).
+- Nada de fontes da Microsoft nem de sistema (regra do novelo).
 
-**Em uso no M0 (provisória, PLANO_M0):**
+**Saíram (03/11/2026):**
 
-| Fonte | Versão | Papel | Autor | Licença | Link | Origem no repo |
-|---|---|---|---|---|---|---|
-| Barlow Condensed ExtraBold (800) | 1.408 | `display`: títulos e botões (só caixa alta no atlas) | © 2017 The Barlow Project Authors | OFL 1.1, sem Reserved Font Name | https://github.com/jpt/barlow | `assets-src/fonts/BarlowCondensed-ExtraBold.woff2` |
-| Barlow Condensed SemiBold (600) | 1.408 | `hud`: leitura, rótulos e números do HUD | © 2017 The Barlow Project Authors | OFL 1.1, sem Reserved Font Name | https://github.com/jpt/barlow | `assets-src/fonts/BarlowCondensed-SemiBold.woff2` |
-
-- O texto completo da licença está em `assets-src/fonts/OFL.txt`; origem, SHA-256 e cobertura em `assets-src/fonts/README.md`.
-- O jogo leva só o atlas MSDF gerado (`ui-fonts.generated.png/json`, 134 KB + 7 KB comprimido), nunca os arquivos da
-  fonte. O aviso e a OFL vão no `licencas.txt` do site desde o M0.
+- **Barlow Condensed** ExtraBold e SemiBold 1.408 (© 2017 The Barlow Project Authors, OFL 1.1, sem RFN;
+  https://github.com/jpt/barlow), a dupla **provisória** do M0 (atlas de 134 KB + 7 KB). Os WOFF2 e o `OFL.txt` da
+  raiz de `assets-src/fonts/` saíram depois de o `licencas.txt` ler o arquivo novo; continuam no commit do M0.
+- **Chakra Petch** Bold e SemiBold 1.000 (© 2018 The Chakra Petch Project Authors, OFL 1.1), candidata da #46 não
+  escolhida, e o atlas local das candidatas (`fontes-candidatas.generated.*`, que nunca entrou no git nem no build).
 
 ## 4. Áudio
 
 | Item | Origem | Licença | Observação |
 |---|---|---|---|
 | Efeitos sonoros | Kenney (https://kenney.nl) e outros pacotes CC0 a escolher | CC0 1.0 | Crédito dado mesmo sem ser exigido (decisão #39). Registrar pacote, autor, link e arquivos usados. |
+| Sons do teste de áudio do Teste Zero (M1) | **Impact Sounds 1.0** (19/12/2019) e **Sci-Fi Sounds 1.0** (11/10/2020), criados e distribuídos por Kenney (www.kenney.nl) (decisão #47) | CC0 1.0 (http://creativecommons.org/publicdomain/zero/1.0/) | Arquivos usados: `kenney-sci-fi-sounds/explosionCrunch_000.ogg` → `t0-tiro.mp3`; `kenney-impact-sounds/impactMetal_medium_000.ogg` → `t0-impacto.mp3`; `kenney-impact-sounds/footstep_concrete_000.ogg` → `t0-passo.mp3`; `kenney-impact-sounds/impactGeneric_light_000.ogg` → `t0-ui.mp3`. Originais e o `License.txt` de cada pacote em `assets-src/audio/source/`; convertidos para MP3 mono (44,1 kHz, 96 kbps, 14,7 KB no total) pelo `tools/audioconv` (tabela em `assets-src/audio/sounds.json`). Só o teste de áudio do Teste Zero usa (web e NRO). |
 | Efeitos sintetizados em código | próprios | todos os direitos reservados | Gerados em JS no boot ou no build. |
 | Música provisória | CC0 a escolher | CC0 1.0 | Provisória, trocada depois (decisão #38). Registrar faixa, autor e link. |
 
@@ -68,6 +87,7 @@ Ao escolher, registrar aqui: nome, versão, autor, link e cópia do `OFL.txt` da
 | Prettier | MIT |
 | vite-plugin-pwa / Workbox | MIT |
 | msdf-bmfont-xml 2.8.0 (gerador do atlas MSDF do `tools/fontbake`) | MIT |
+| @breezystack/lamejs 1.2.7 (codificador MP3 do `tools/audioconv`, fork ESM do lamejs, porte em JS do LAME; https://github.com/shijinyu/lamejs) | LGPL-3.0 (só ferramenta local; não vai no jogo) |
 
 Licenças a conferir na versão fixada.
 

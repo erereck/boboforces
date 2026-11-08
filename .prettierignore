@@ -5,6 +5,7 @@ coverage/
 local/
 romfs/
 .cache/
+.vitest/
 package-lock.json
 *.md
 *.generated.*

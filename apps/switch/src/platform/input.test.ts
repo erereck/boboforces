@@ -1,6 +1,7 @@
 import { PAD_AXIS, PAD_BUTTON, createRawInputState, keyIndex } from '@boboforces/input';
 import { describe, expect, it } from 'vitest';
-import { createSwitchInput, gamepadKind } from './input.ts';
+import type { ControllerInfo } from '@boboforces/platform-api';
+import { createSwitchInput, gamepadKind, isCompleteController } from './input.ts';
 import { NPAD_STYLE } from './nx.ts';
 import { createFakeSwitch, pad } from './testing.ts';
 
@@ -66,5 +67,43 @@ describe('input do Switch', () => {
     fake.dispatch('keydown', { code: 'KeyW' });
     input.poll(raw);
     expect(raw.keys[keyIndex('KeyW')]).toBe(0);
+  });
+});
+
+describe('describeControllers (item 17 do T0)', () => {
+  it('descreve os conectados com styleSet, deviceType, completo e vibração, reaproveitando os objetos', () => {
+    const fake = createFakeSwitch();
+    fake.pads[0] = { ...pad(0, NPAD_STYLE.handheld), deviceType: 0x3 };
+    fake.pads[3] = pad(3, NPAD_STYLE.joyRight);
+    const input = createSwitchInput({ nx: fake.nx, onDisconnect: () => {} });
+    const out: ControllerInfo[] = [];
+    expect(input.describeControllers(out)).toBe(2);
+    expect(out).toEqual([
+      {
+        index: 0,
+        id: 'pad-0',
+        kind: 'handheld',
+        styleSet: NPAD_STYLE.handheld,
+        deviceType: 3,
+        complete: true,
+        canVibrate: false,
+      },
+      {
+        index: 3,
+        id: 'pad-3',
+        kind: 'joyConSingle',
+        styleSet: NPAD_STYLE.joyRight,
+        deviceType: -1,
+        complete: false,
+        canVibrate: false,
+      },
+    ]);
+    const first = out[0];
+    fake.pads[3] = null;
+    expect(input.describeControllers(out)).toBe(1);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toBe(first); // mesmo objeto: sem alocar por chamada
+    expect(isCompleteController('joyConPair')).toBe(true);
+    expect(isCompleteController('joyConSingle')).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
-import type { BlockRegistry, WorldGrid } from '@boboforces/world';
+import type { NavGrid } from '@boboforces/nav';
+import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 
 /**
  * Leitura do estado da sim para render, ui, audio, ai e input (tecnico.md §4.4: "o 3D só lê o estado").
@@ -54,6 +55,20 @@ export interface SimView {
   readonly world: WorldGrid;
   /** Registro de blocos do mapa (flags de "bloqueia visão/bala" para os raios da IA). */
   readonly blocks: BlockRegistry;
+  /** M1: caixas das props (`SimMap.colliders`; raios da IA), ou `null`. */
+  readonly colliders: StaticColliders | null;
+  /** M1: navegação do mapa (`SimMap.nav`), ou `null` (M0 e testes: a IA anda reto). */
+  readonly nav: NavGrid | null;
+  /**
+   * M1 (integração): área jogável em metros (`SimMap.playArea`; paredes invisíveis em X/Z), ou `null` = a grade
+   * inteira. A IA não escolhe destino fora dela.
+   */
+  readonly playArea: {
+    readonly minX: number;
+    readonly minZ: number;
+    readonly maxX: number;
+    readonly maxZ: number;
+  } | null;
 }
 
 export type MatchPhase = 'warmup' | 'playing' | 'ended';

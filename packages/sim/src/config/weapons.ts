@@ -1,3 +1,4 @@
+import { FIGURE_GRIP, type FigureGrip } from '@boboforces/format';
 import { HEADSHOT_MULTIPLIER } from './metrics.ts';
 
 /**
@@ -36,6 +37,17 @@ export interface WeaponDef {
   /** Depois de parar de atirar por este tempo, o recuo volta ao centro nesta velocidade (graus/s). */
   readonly recoilRecoverDelayS: number;
   readonly recoilRecoverDegPerS: number;
+  /**
+   * Força do tiro que mata (m/s, `KillEvent.force`): o render joga as partes do bobo que se desmonta nessa velocidade,
+   * na direção do tiro. Cosmético (não mexe em nada da sim).
+   */
+  readonly killForce: number;
+  /**
+   * Empunhadura do boneco (#56, PLANO do porte §B3): escolhe a postura da tabela de jogo (`figurePosture`), que dá a
+   * pose de 3ª pessoa e as hitboxes. Só existem pistola, fuzil e sniper; arma nova usa a mais parecida (escopeta e
+   * submetralhadora: fuzil, duas mãos com coronha no ombro).
+   */
+  readonly grip: FigureGrip;
 }
 
 /** Fuzil (`weapon:rifle`, "Rattler"): 28 no corpo, 1,5x na cabeça, 600/min, pente de 30, recarga de 2,2 s. */
@@ -60,6 +72,8 @@ export const WEAPON_RIFLE: WeaponDef = {
   recoilYawNoiseDeg: 0.15,
   recoilRecoverDelayS: 0.15,
   recoilRecoverDegPerS: 12,
+  killForce: 6,
+  grip: FIGURE_GRIP.rifle,
 };
 
 /** Arma de cada slot (índice = `InputFrame.weapon`). `null` = slot vazio. M0: só a primária. */

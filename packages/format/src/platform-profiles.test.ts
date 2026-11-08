@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { FIGURE_BOT_ROTATION } from './model/figure-presets.ts';
 import {
   ENGINE_MAX_BOTS,
   PLATFORM_PROFILE_IDS,
   PLATFORM_PROFILES,
   recipeLimitsFor,
   selectPlatformProfile,
+  validatePlatformProfile,
 } from './platform-profiles.ts';
 
 describe('perfis de plataforma (tecnico.md §16.1)', () => {
@@ -35,6 +37,33 @@ describe('perfis de plataforma (tecnico.md §16.1)', () => {
         expect(p.antialias).toBe(false);
       }
     }
+  });
+
+  it('boneco (PLANO do porte §B6 e §B15): LOD e looks dos bots por perfil', () => {
+    const row = (id: keyof typeof PLATFORM_PROFILES) => {
+      const p = PLATFORM_PROFILES[id];
+      return [p.figureNearM, p.figureHalfRate, p.figureBotLooks];
+    };
+    for (const id of ['switch1p', 'switch2p', 'switch34p', 'mobile'] as const) expect(row(id)).toEqual([20, true, 3]);
+    for (const id of ['pc', 'pcSplit'] as const) expect(row(id)).toEqual([40, false, 6]);
+  });
+
+  it('validador (regra 19): todo perfil passa, e faixas fora reprovam', () => {
+    for (const id of PLATFORM_PROFILE_IDS) expect(validatePlatformProfile(PLATFORM_PROFILES[id]), id).toEqual([]);
+    const pc = PLATFORM_PROFILES.pc;
+    const bad = (patch: Partial<typeof pc>) => validatePlatformProfile({ ...pc, ...patch }).length;
+    expect(bad({ figureNearM: 4 })).toBe(1);
+    expect(bad({ figureNearM: pc.maxViewDistanceM + 1 })).toBe(1);
+    expect(bad({ figureNearM: Number.NaN })).toBe(1);
+    expect(bad({ figureBotLooks: 0 })).toBe(1);
+    expect(bad({ figureBotLooks: 2.5 })).toBe(1);
+    // O teto é a rotação inteira: todos os looks dela passam, um a mais reprova.
+    expect(bad({ figureBotLooks: FIGURE_BOT_ROTATION.length })).toBe(0);
+    expect(bad({ figureBotLooks: FIGURE_BOT_ROTATION.length + 1 })).toBe(1);
+    expect(bad({ hostMaxBots: pc.maxBots + 1 })).toBe(1);
+    expect(bad({ maxBots: ENGINE_MAX_BOTS + 1 })).toBe(1);
+    expect(bad({ minViewports: 3, maxViewports: 2 })).toBe(1);
+    expect(validatePlatformProfile({ ...PLATFORM_PROFILES.switch1p, antialias: true })).toHaveLength(1);
   });
 
   it('escolhe o perfil pela família e pelos jogadores na tela', () => {

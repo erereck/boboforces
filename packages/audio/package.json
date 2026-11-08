@@ -2,12 +2,13 @@
   "name": "@boboforces/audio",
   "version": "0.0.0",
   "private": true,
-  "description": "Mixer sobre o subconjunto comum de Web Audio e síntese de efeitos (M2+).",
+  "description": "Mixer sobre o subconjunto comum de Web Audio (Context, BufferSource, Gain, StereoPanner) e síntese de efeitos em PCM.",
   "license": "UNLICENSED",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "typecheck": "node ../../scripts/typecheck.ts packages/audio",

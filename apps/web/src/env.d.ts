@@ -14,6 +14,9 @@ interface Window {
   __bfBooted?: boolean;
   /** 1 quando o navegador entendeu a sonda de sintaxe ES2022 (campo privado + bloco static). */
   __bfEs?: number;
-  /** Gancho de depuração do `main.ts` (estado do jogo e estatísticas do render), lido pelo teste de fumaça. */
-  __bfDebug?: import('./main.ts').WebDebugHook;
+  /**
+   * Gancho de depuração da casca (estado do jogo, estatísticas do render, gancho dos prints e relatório do bench), lido
+   * pelo teste de fumaça, pelos prints e pelo bench do PC.
+   */
+  __bfDebug?: import('./debug-hook.ts').WebDebugHook;
 }

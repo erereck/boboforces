@@ -35,7 +35,10 @@ export type RuleId =
   | 'import-node'
   | 'import-cross-workspace'
   | 'import-undeclared'
-  | 'import-render';
+  | 'import-render'
+  | 'import-tooling'
+  | 'asset-format'
+  | 'hot-loop';
 
 export const RULE_HELP: Readonly<Record<RuleId, string>> = {
   dom: 'API do navegador no código compartilhado: use a Platform (regras 1 a 3)',
@@ -62,8 +65,39 @@ export const RULE_HELP: Readonly<Record<RuleId, string>> = {
   'import-cross-workspace': 'import relativo para outro pacote: use @boboforces/<nome>',
   'import-undeclared': 'dependência não declarada no package.json do pacote (grafo em docs/ARCHITECTURE.md §2)',
   'import-render':
-    'game só importa @boboforces/render/data (sem three e sem DOM), até para tipos: sem GPU o three não pode carregar e o game compila sem a lib DOM',
+    'do código compartilhado, só o game enxerga o render, e só por @boboforces/render/data (sem three e sem DOM), até para tipos: sem GPU o three não pode carregar e o game compila sem a lib DOM; as cascas injetam o renderer',
+  'import-tooling':
+    'ferramenta de build/teste no código do jogo: tools/* e dependências de desenvolvimento (vite, vitest, playwright-core, esbuild, typescript, prettier, lamejs) rodam só na máquina e nunca entram no bundle (a lamejs é LGPL)',
+  'asset-format':
+    'asset em tempo de execução fora do formato: só PNG, MP3, JSON de manifesto e binários próprios (.bfmap, .bfmodel), com a mesma extensão no caminho lógico e no arquivo (regra 23)',
+  'hot-loop':
+    'laço quente (entre `// quente:` e `// fim-quente`) não aloca: sem `new`, literal de array ou objeto, arrow function, .map/.filter/.forEach/.slice/.concat, template string nem spread; use rascunhos e pools (regra 11)',
 };
+
+/**
+ * Marcadores do laço quente (regra 11; PLANO do porte, E.9): um comentário cujo texto COMEÇA com `quente:` abre a
+ * região e um que começa com `fim-quente` fecha. Vale em todo arquivo varrido (packages e cascas).
+ */
+export const HOT_LOOP_OPEN = /^\s*quente:/;
+export const HOT_LOOP_CLOSE = /^\s*fim-quente\b/;
+/** Métodos proibidos na região quente: devolvem array novo ou pedem closure por chamada. */
+export const HOT_LOOP_MEMBERS: ReadonlySet<string> = new Set(['map', 'filter', 'forEach', 'slice', 'concat']);
+/**
+ * Funções que o E.9 do porte põe no laço quente: onde houver `function <nome>` com corpo, o corpo tem de cruzar uma
+ * região quente. Sem isto, apagar os marcadores desligaria a regra sem aviso.
+ */
+export const HOT_LOOP_REQUIRED_FUNCTIONS: ReadonlySet<string> = new Set([
+  'figureFk',
+  'figureHitBoxes',
+  'figureGamePose',
+  'paintFigureSkin',
+  'rayVsBobo',
+]);
+/** Arquivos do E.9 que, quando existem, precisam de ao menos uma região quente (o motor e o passe de instâncias). */
+export const HOT_LOOP_REQUIRED_FILES: readonly RegExp[] = [
+  /^packages\/render\/src\/actors\/anim\/rig\.ts$/,
+  /^packages\/render\/src\/actors\/figure-instances\.ts$/,
+];
 
 /** Pacotes que precisam ser determinísticos (regra 10; `world` pela convenção do M0). */
 const DETERMINISTIC = new Set(['sim', 'ai', 'nav', 'format', 'world']);
@@ -318,6 +352,29 @@ export const NEW_RULES: readonly NewRule[] = [
  * VALORES daqui. O teste `render/src/data.test.ts` garante que nada nesse fecho importa three.
  */
 export const RENDER_DATA_SPECS: ReadonlySet<string> = new Set(['@boboforces/render/data']);
+
+/**
+ * Pacotes de desenvolvimento que nunca entram no código do jogo (`packages/*\/src`, `apps/*\/src`, sem testes): o
+ * bundle do Switch e o da web têm que ser autocontidos, e a `@breezystack/lamejs` (LGPL-3.0, só no `tools/audioconv`)
+ * não pode ser distribuída junto. Os workspaces de `tools/*` entram pela mesma regra (ver `check.ts`).
+ */
+export const TOOLING_PACKAGES: ReadonlySet<string> = set(
+  'vite',
+  'vitest',
+  'playwright',
+  'playwright-core',
+  'esbuild',
+  'typescript',
+  'prettier',
+  '@breezystack/lamejs',
+  'lamejs',
+);
+
+export const isToolingPackage = (pkg: string): boolean =>
+  TOOLING_PACKAGES.has(pkg) || pkg.startsWith('@vitest/') || pkg.startsWith('@vitejs/') || pkg.startsWith('@types/');
+
+/** Extensões aceitas nos assets em tempo de execução (regra 23; JSON só para manifestos). */
+export const RUNTIME_ASSET_EXTENSIONS: ReadonlySet<string> = set('.png', '.mp3', '.json', '.bfmap', '.bfmodel');
 
 /** Quem pode usar `import()` dinâmico. */
 export const allowsDynamicImport = (f: FileInfo): boolean => isApp(f, 'web');

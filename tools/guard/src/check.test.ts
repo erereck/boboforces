@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { checkRuntimeAssets } from './assets.ts';
 import { checkFile, type CheckContext, type WorkspaceInfo } from './check.ts';
 
 const ws = (dir: string, packageName: string, deps: string[] = []): WorkspaceInfo => ({
@@ -266,6 +267,274 @@ describe('imports', () => {
     ]);
     expect(check('packages/sim/src/x/a.ts', "import { b } from '../b.ts';")).toEqual([]);
     expect(check('packages/sim/src/a.ts', "import v from '../../../version.json' with { type: 'json' };")).toEqual([]);
+  });
+});
+
+describe('imports do M1', () => {
+  const m1: CheckContext = {
+    workspaces: [
+      ...ctx.workspaces,
+      ws('packages/world', '@boboforces/world', ['@boboforces/shared', '@boboforces/render', 'vite']),
+      ws('tools/audioconv', '@boboforces/audioconv', ['@breezystack/lamejs']),
+      ws('tools/mapc', '@boboforces/mapc', ['@boboforces/world']),
+    ],
+  };
+  const checkM1 = (rel: string, src: string): string[] =>
+    checkFile(rel, src, m1).violations.map((v) => `${v.rule}@${v.line}`);
+
+  it('render/data continua o único caminho do game ao render; os outros pacotes nem isso (até declarando)', () => {
+    expect(checkM1('packages/world/src/a.ts', "import type { Renderer } from '@boboforces/render/data';")).toEqual([
+      'import-render@1',
+    ]);
+    expect(checkM1('packages/world/src/a.ts', "import { createRenderer } from '@boboforces/render';")).toEqual([
+      'import-render@1',
+    ]);
+    expect(checkM1('packages/render/src/a.ts', "import { x } from '@boboforces/render/data';")).toEqual([]);
+    expect(checkM1('apps/web/src/a.ts', "import { createRenderer } from '@boboforces/render';")).toEqual([
+      'import-undeclared@1',
+    ]);
+    expect(checkM1('packages/game/src/a.ts', "import type { TextureMode } from '@boboforces/render/data';")).toEqual(
+      [],
+    );
+  });
+
+  it('ferramentas e dependências de desenvolvimento nunca no código do jogo (lamejs é LGPL)', () => {
+    expect(checkM1('packages/world/src/a.ts', "import { defineConfig } from 'vite';")).toEqual(['import-tooling@1']);
+    expect(checkM1('apps/web/src/a.ts', "import { Mp3Encoder } from '@breezystack/lamejs';")).toEqual([
+      'import-tooling@1',
+      'import-undeclared@1',
+    ]);
+    expect(checkM1('apps/switch/src/a.ts', "import { build } from 'esbuild';")).toEqual([
+      'import-tooling@1',
+      'import-undeclared@1',
+    ]);
+    expect(checkM1('packages/game/src/a.ts', "import { compileMap } from '@boboforces/mapc';")).toEqual([
+      'import-tooling@1',
+      'import-undeclared@1',
+    ]);
+    expect(checkM1('apps/web/src/a.ts', "import { chromium } from 'playwright-core';")).toEqual([
+      'import-tooling@1',
+      'import-undeclared@1',
+    ]);
+    // Testes, .d.ts e as ferramentas em si ficam fora da varredura (só packages/* e apps/*).
+    expect(checkM1('tools/audioconv/src/mp3.ts', "import { Mp3Encoder } from '@breezystack/lamejs';")).toEqual([]);
+  });
+});
+
+describe('assets em tempo de execução (regra 23)', () => {
+  const runtime = (files: Record<string, string>, preload: string[] = []): string =>
+    JSON.stringify({ files, preload }, null, 2);
+
+  it('aceita PNG, MP3, JSON e binários próprios com a mesma extensão dos dois lados', () => {
+    const src = runtime(
+      {
+        'fonts/ui-fonts.png': 'fonts/generated/ui-fonts.generated.png',
+        'textures/blocos16.mips.png': 'textures/generated/blocos16.mips.png',
+        'blocks/blocks.json': 'blocks/generated/blocks.json',
+        'maps/construto.bfmap': 'maps/generated/construto.bfmap',
+        'models/modelos.bfmodel': 'models/generated/modelos.bfmodel',
+        'audio/t0-tiro.mp3': 'audio/generated/t0-tiro.mp3',
+      },
+      ['fonts/ui-fonts.png'],
+    );
+    expect(checkRuntimeAssets(src)).toEqual([]);
+  });
+
+  it('recusa OGG, JPEG, textura comprimida, extensão trocada e preload fora de files, apontando a linha', () => {
+    const src = runtime(
+      {
+        'audio/tiro.ogg': 'audio/generated/tiro.ogg',
+        'textures/ceu.jpg': 'textures/ceu.jpg',
+        'textures/x.png': 'textures/x.ktx2',
+        'maps/a.bfmap': 'maps/a.json',
+        'blocks/blocks.json': 'blocks/blocks.json',
+      },
+      ['fonts/ui-fonts.png'],
+    );
+    const found = checkRuntimeAssets(src);
+    expect(found.map((v) => `${v.rule}@${v.line}`)).toEqual([
+      'asset-format@3',
+      'asset-format@4',
+      'asset-format@5',
+      'asset-format@6',
+      'asset-format@10',
+    ]);
+    expect(found[2]?.message).toContain("'textures/x.png' → 'textures/x.ktx2'");
+    expect(found[3]?.message).toContain('extensões diferentes');
+    expect(found[4]?.message).toContain("preload 'fonts/ui-fonts.png' não está em files");
+    expect(found.every((v) => v.file === 'assets-src/runtime-assets.json')).toBe(true);
+  });
+
+  it('JSON quebrado vira violação (não derruba o guard)', () => {
+    expect(checkRuntimeAssets('{ "files": ').map((v) => v.rule)).toEqual(['asset-format']);
+  });
+});
+
+describe('laço quente (regra 11; E.9 do porte)', () => {
+  const hot = (rel: string, body: string[]): string[] =>
+    check(
+      rel,
+      ['export function f(m: Float32Array, o: number): void {', '  // quente:', ...body, '  // fim-quente', '}'].join(
+        '\n',
+      ),
+    );
+
+  it('reprova as 7 construções proibidas entre os marcadores, com a linha de cada uma', () => {
+    const body = [
+      '  const v = new Float32Array(4);', // 3
+      '  const a = [1, 2];', // 4
+      '  const p = { x: 1 };', // 5
+      '  const g = (k: number) => k + 1;', // 6
+      '  list.map(h).filter(q).forEach(z); xs.slice(1).concat(ys);', // 7
+      '  const s = `id ${o} e ${m[o]}`;', // 8
+      '  call(...args);', // 9
+    ];
+    expect(hot('packages/render/src/actors/anim/a.ts', body)).toEqual([
+      'hot-loop@3',
+      'hot-loop@4',
+      'hot-loop@5',
+      'hot-loop@6',
+      'hot-loop@7',
+      'hot-loop@7',
+      'hot-loop@7',
+      'hot-loop@7',
+      'hot-loop@7',
+      'hot-loop@8',
+      'hot-loop@9',
+    ]);
+    const report = checkFile(
+      'packages/sim/src/a.ts',
+      ['// quente:', 'const s = `x`;', '// fim-quente'].join('\n'),
+      ctx,
+    );
+    expect(report.violations[0]?.message).toMatch(/^template string: laço quente/);
+  });
+
+  it('o código típico do laço quente passa: índices, contas, laços, ternário, blocos, case e tipos', () => {
+    const body = [
+      '  const c = -Math.cos(m[o]!);',
+      '  for (let k = 0; k < 4; k++) {',
+      '    m[o + k] = k > 1 ? (c < 0 ? 0 : c) : m[o + HF.r00]! * c;',
+      '  }',
+      '  switch (o) {',
+      '    case 1: {',
+      '      m[0] = 1;',
+      '      break;',
+      '    }',
+      '    default: {',
+      '      m[1] = 2;',
+      '    }',
+      '  }',
+      '  if (c > 0) { m[2] = c; } else { m[2] = -c; }',
+      '  const t: { x: number } = scratch;',
+      '  const u: number[] = list;',
+      '  out.set(m.subarray(0, 4), 8); m.fill(0); this.#buf[o] = `x`.length;',
+      '  const w = rows[o]![1]! + fn(o)[2]! + (m as Float32Array)[3]!;',
+      '  for (const k of list) total += k;',
+    ];
+    expect(hot('packages/format/src/model/a.ts', body)).toEqual(['hot-loop@19']);
+  });
+
+  it('região quente em volta de funções inteiras: as assinaturas (`: void {`, padrões) não são literais', () => {
+    const src = [
+      '// quente:',
+      'export function px(x: number, y: number, rgb: number, w = 1, h = 1): void {',
+      '  T[y * 64 + x] = rgb;',
+      '}',
+      'function ring(p: number): number | null {',
+      '  return p > 0 ? p : null;',
+      '}',
+      'function scratch(): Promise<void> {',
+      '  return done;',
+      '}',
+      'function bad(o = {}): void {',
+      '  m[0] = o.x;',
+      '}',
+      '// fim-quente',
+    ].join('\n');
+    expect(check('packages/format/src/model/a.ts', src)).toEqual(['hot-loop@11']);
+  });
+
+  it('desestruturação por array e ternário com objeto também alocam', () => {
+    expect(hot('packages/sim/src/a.ts', ['  const [a, b] = pair;', '  const r = ok ? m : { x: 0 };'])).toEqual([
+      'hot-loop@3',
+      'hot-loop@4',
+    ]);
+    expect(hot('packages/sim/src/a.ts', ['  return { a: 1 };'])).toEqual(['hot-loop@3']);
+    expect(hot('packages/sim/src/a.ts', ['  f(o, { a: 1 });', '  throw new Error(`x`);'])).toEqual([
+      'hot-loop@3',
+      'hot-loop@4',
+      'hot-loop@4',
+    ]);
+  });
+
+  it('fora dos marcadores vale tudo; o marcador no fim de uma linha só pega o que vem depois', () => {
+    const src = [
+      'const a = [1].map((x) => ({ x }));',
+      'function f() { const b = [2]; // quente:',
+      '  m[0] = 1;',
+      '  const c = { k: 1 }; // fim-quente',
+      '  return `${a}${b}`;',
+      '}',
+      '/** Um componente quente: o texto no meio de um comentário não é marcador. */',
+      'const d = new Map();',
+    ].join('\n');
+    expect(check('packages/game/src/a.ts', src)).toEqual(['hot-loop@4']);
+  });
+
+  it('marcadores órfãos reprovam: fim sem início, região sem fim e região dentro de região', () => {
+    expect(check('packages/sim/src/a.ts', 'x();\n// fim-quente')).toEqual(['hot-loop@2']);
+    expect(check('packages/sim/src/a.ts', '// quente: figureFk\nm[0] = 1;\nconst a = [];')).toEqual([
+      'hot-loop@1',
+      'hot-loop@3',
+    ]);
+    expect(check('packages/sim/src/a.ts', '// quente:\n// quente:\nm[0] = 1;\n// fim-quente')).toEqual(['hot-loop@2']);
+  });
+
+  it('as funções e arquivos do E.9 não podem perder os marcadores', () => {
+    // Corpo dentro da região (inteira ou em parte, mesmo com tipo de retorno literal): ok.
+    const inside = [
+      'export function figureFk(m: Float32Array): { ok: boolean } {',
+      '  const k = 1;',
+      '  // quente:',
+      '  m[0] = k;',
+      '  // fim-quente',
+      '  return ok;',
+      '}',
+    ].join('\n');
+    expect(check('packages/format/src/model/figure.ts', inside)).toEqual([]);
+    expect(
+      check('packages/sim/src/hitbox.ts', '// quente:\nfunction rayVsBobo(): void {\n  m[0] = 1;\n}\n// fim-quente'),
+    ).toEqual([]);
+    // Sem região no corpo (a região de outra função não vale), em qualquer arquivo: reprova no nome.
+    const outside = [
+      'function a(): void {',
+      '  // quente:',
+      '  m[0] = 1;',
+      '  // fim-quente',
+      '}',
+      'export function paintFigureSkin(r: number, out: Uint8Array): void {',
+      '  out[0] = r;',
+      '}',
+      'export function figureHitBoxes(t: number): void;',
+    ].join('\n');
+    expect(check('packages/format/src/model/x.ts', outside)).toEqual(['hot-loop@6']);
+    // Chamada não é declaração; arquivo do E.9 sem região nenhuma reprova na linha 1.
+    expect(check('packages/sim/src/a.ts', 'figureGamePose(t, 0, 0, out, 0);')).toEqual([]);
+    expect(check('packages/render/src/actors/anim/rig.ts', 'export const x = 1;')).toEqual(['hot-loop@1']);
+    expect(
+      check('packages/render/src/actors/figure-instances.ts', 'x();\n// quente:\nm[0] = 1;\n// fim-quente'),
+    ).toEqual([]);
+    expect(check('packages/render/src/actors/anim/motion-math.ts', 'export const x = 1;')).toEqual([]);
+  });
+
+  it('vale nas cascas também, e o guard-allow silencia a linha com motivo', () => {
+    expect(check('apps/web/src/a.ts', '// quente:\nconst a = [];\n// fim-quente')).toEqual(['hot-loop@2']);
+    const src =
+      '// quente:\nconst a = new Float32Array(4); // guard-allow: hot-loop rascunho criado uma vez\n// fim-quente';
+    const report = checkFile('packages/render/src/a.ts', src, ctx);
+    expect(report.violations).toEqual([]);
+    expect(report.suppressed).toBe(1);
   });
 });
 

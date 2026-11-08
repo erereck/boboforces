@@ -1,4 +1,4 @@
-import { MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import { createFigureGameTable, MATCH_RECIPE_FORMAT, type FigureGameTable, type MatchRecipe } from '@boboforces/format';
 import { BUTTON, createInputFrame, quantizeAxis, type InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter, pitchToI16, yawToU16 } from '@boboforces/shared';
 import {
@@ -14,9 +14,10 @@ import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
 import { MOVEMENT_BOBO } from './config/movement.ts';
 import { WEAPON_RIFLE } from './config/weapons.ts';
-import { MAX_CONTROLLERS, SIM_HZ } from './constants.ts';
+import { MAX_CONTROLLERS, MAX_CONTROLLERS_WITH_ZOMBIES, SIM_HZ } from './constants.ts';
 import { ENTITY_FLAG, NULL_ENTITY, entityIndex } from './entity.ts';
 import type { SimEvent } from './events.ts';
+import { aimPointWorld, boundFigureTable, type AimPoint } from './hitbox.ts';
 import { createInputFrames, createSimLoop } from './loop.ts';
 import { createSim, type Sim, type SimMap } from './sim.ts';
 
@@ -66,6 +67,13 @@ function pos(sim: Sim, controller: number): [number, number, number] {
   return [p[e * 3]!, p[e * 3 + 1]!, p[e * 3 + 2]!];
 }
 
+/** Centro da hitbox do tronco (ou da cabeça) do controlador, no mundo: o ponto que a IA mira. */
+function aimPointOf(sim: Sim, controller: number, head = false): AimPoint {
+  const p: AimPoint = { x: 0, y: 0, z: 0 };
+  aimPointWorld(sim.view(), entityIndex(sim.controllerEntity(controller)), head, p);
+  return p;
+}
+
 function flagsOf(sim: Sim, controller: number): number {
   return sim.view().flags[entityIndex(sim.controllerEntity(controller))]!;
 }
@@ -113,6 +121,29 @@ describe('criação e contrato', () => {
     expect(v.team[entityIndex(sim.controllerEntity(5))]).toBe(0);
     expect(v.team[entityIndex(sim.controllerEntity(6))]).toBe(1);
     expect(sim.controllerCount).toBe(7);
+  });
+
+  it('tabela de jogo do boneco: a do SimConfig, ou montada no createSim; ligada às funções livres e solta no dispose', () => {
+    // A tabela é da partida (PLANO do porte §B3): o mesmo objeto do SimConfig, sem montar outra.
+    const table = createFigureGameTable();
+    const given = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2, figureTable: table });
+    expect(boundFigureTable()).toBe(table);
+    // Sem ela, o createSim monta a sua na CRIAÇÃO (antes de qualquer step ou raio).
+    const own = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2 });
+    const built = boundFigureTable();
+    expect(built).not.toBe(table);
+    expect(built.boxes).toEqual(table.boxes);
+    // O dispose solta a ligação: a função livre volta para a tabela da sim viva anterior.
+    own.dispose();
+    expect(boundFigureTable()).toBe(table);
+    given.dispose();
+    let after: FigureGameTable | null = null;
+    try {
+      after = boundFigureTable();
+    } catch {
+      after = null; // nenhuma sim viva
+    }
+    expect(after).not.toBe(table);
   });
 });
 
@@ -272,8 +303,8 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     const sim = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2 });
     const f = frames();
     run(sim, f, Math.round(1.6 * SIM_HZ)); // passa a proteção de spawn (1,5 s)
-    const [tx, ty, tz] = pos(sim, 1);
-    aimAt(sim, f[0]!, 0, tx, ty + 0.75, tz);
+    const torso = aimPointOf(sim, 1);
+    aimAt(sim, f[0]!, 0, torso.x, torso.y, torso.z);
     f[0]!.buttons = BUTTON.fire | BUTTON.ads;
     const hits: number[] = [];
     let kill: SimEvent | undefined;
@@ -365,8 +396,8 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     const sim = createSim({ recipe: duelRecipe(), map, humans: 2 });
     const f = frames();
     run(sim, f, 100);
-    const [tx, ty, tz] = pos(sim, 1);
-    aimAt(sim, f[0]!, 0, tx, ty + 0.75, tz);
+    const torso = aimPointOf(sim, 1);
+    aimAt(sim, f[0]!, 0, torso.x, torso.y, torso.z);
     f[0]!.buttons = BUTTON.fire;
     let impacts = 0;
     let hits = 0;
@@ -482,7 +513,8 @@ describe('determinismo e snapshot', () => {
     expect(before).toBe(6);
     expect(after).toBe(6);
     expect(sim.tick).toBe(6);
-    expect(createInputFrames()).toHaveLength(MAX_CONTROLLERS);
+    expect(createInputFrames()).toHaveLength(MAX_CONTROLLERS_WITH_ZOMBIES);
+    expect(createInputFrames(MAX_CONTROLLERS)).toHaveLength(MAX_CONTROLLERS);
     expect(createInputFrame().weapon).toBe(0);
   });
 });

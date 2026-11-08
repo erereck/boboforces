@@ -11,7 +11,8 @@
   },
   "scripts": {
     "typecheck": "node ../../scripts/typecheck.ts tools/balance",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench:sim": "node src/bench-cli.ts"
   },
   "dependencies": {
     "@boboforces/shared": "0.0.0",

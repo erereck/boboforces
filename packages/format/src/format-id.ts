@@ -4,9 +4,28 @@ import { FORMAT_VERSIONS } from './version.ts';
  * Todo documento tem `format: "boboforces/<tipo>@<n>"` (tecnico.md §14.2), com cadeia de migrações e validador.
  * Versão maior que a conhecida é recusada; menor passa pelas migrações; campos desconhecidos são ignorados.
  */
-export const FORMAT_KINDS = ['settings', 'preset', 'bot', 'stats', 'backup', 'replay', 'map', 'model'] as const;
+export const FORMAT_KINDS = [
+  'settings',
+  'preset',
+  'bot',
+  'stats',
+  'backup',
+  'replay',
+  'map',
+  'model',
+  // M1: arquivos internos de build (não são documentos do jogador, mas levam o mesmo carimbo de versão)
+  'blocks',
+  'layers',
+] as const;
 
 export type FormatKind = (typeof FORMAT_KINDS)[number];
+
+/**
+ * Tipos aposentados: o nome nunca é reusado por outro formato (um arquivo velho nunca passa por um novo). `skinparts`
+ * (@1 e @2) era a biblioteca de partes da skin do bobo A (`skins/partes64.*`), aposentada pelo boneco do FutBobo (#56,
+ * passo 5 do porte): a skin é pintada no loading pelo `paintFigureSkin`.
+ */
+export const RETIRED_FORMAT_KINDS = ['skinparts'] as const;
 
 export type FormatId = `boboforces/${FormatKind}@${number}`;
 
@@ -20,6 +39,8 @@ export const CURRENT_FORMAT_VERSION: Readonly<Record<FormatKind, number>> = {
   bot: FORMAT_VERSIONS.bot,
   map: FORMAT_VERSIONS.map,
   model: 1,
+  blocks: 1,
+  layers: 1,
 };
 
 export function formatId(kind: FormatKind, version: number = CURRENT_FORMAT_VERSION[kind]): FormatId {

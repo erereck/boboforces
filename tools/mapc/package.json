@@ -1,0 +1,24 @@
+{
+  "name": "@boboforces/mapc",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compila os mapas escritos em TS (API box/ramp/fence/prop/spawn…) para .bfmap, com validações e navegação.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/mapc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "@boboforces/world": "0.0.0",
+    "@boboforces/nav": "0.0.0",
+    "@boboforces/sim": "0.0.0"
+  },
+  "devDependencies": {}
+}

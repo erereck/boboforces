@@ -14,6 +14,7 @@
     "verify:nsp": "node scripts/verify-nsp.ts",
     "icon": "node scripts/prepare-icon.ts",
     "eden": "node scripts/prepare-eden.ts",
+    "eden:run": "node scripts/run-eden.ts",
     "typecheck": "node ../../scripts/typecheck.ts apps/switch",
     "test": "vitest run"
   },
@@ -25,6 +26,7 @@
     "userAccountSaveDataSize": "0"
   },
   "dependencies": {
+    "@boboforces/audio": "0.0.0",
     "@boboforces/game": "0.0.0",
     "@boboforces/input": "0.0.0",
     "@boboforces/platform-api": "0.0.0",

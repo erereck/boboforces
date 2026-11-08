@@ -1,0 +1,21 @@
+{
+  "name": "@boboforces/modelgen",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Gera os modelos de caixas e low-poly (.bfmodel) e a tira de texturas deles (modelos64) a partir de assets-src/models.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/modelgen",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0"
+  },
+  "devDependencies": {}
+}

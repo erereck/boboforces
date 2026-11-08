@@ -3,6 +3,7 @@ import { createLogger, type Disposable, type Logger } from '@boboforces/shared';
 import { createWebInputSource, type WebInputSource } from '../input/index.ts';
 import { createWebAssets } from './assets.ts';
 import { createWebAudio, type WebAudio } from './audio.ts';
+import { withControllerInfo, type GetGamepads } from './controllers.ts';
 import { BUILD_INFO } from './build-info.ts';
 import { createWebDiagnostics, type WebDiagnostics } from './diagnostics.ts';
 import { computeFeatures, readFeatureEnv } from './features.ts';
@@ -133,7 +134,13 @@ export function createWebPlatform(target: HTMLCanvasElement | WebPlatformOptions
   const audio = createWebAudio(win);
   const guards = installShellGuards(win, features);
   const webInput = options.input ? null : createInput(canvas, log);
-  const input: RawInputSource & Partial<Disposable> = options.input ?? webInput ?? NULL_INPUT;
+  // M1: `describeControllers` (contrato) vem da casca, com os mesmos índices dos adaptadores de `src/input`. Fonte
+  // injetada pelos testes não é mexida se já tiver o seu.
+  const getGamepads: GetGamepads = () => (win.navigator.getGamepads ? win.navigator.getGamepads() : null);
+  const input: RawInputSource & Partial<Disposable> = withControllerInfo(
+    options.input ?? webInput ?? NULL_INPUT,
+    getGamepads,
+  );
   let disposed = false;
 
   return {

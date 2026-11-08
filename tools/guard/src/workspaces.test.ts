@@ -34,6 +34,27 @@ describe('projetos do Vitest', () => {
     expect(workspaces.length).toBeGreaterThan(15);
   });
 
+  it.each(workspaces)('%s: nome, scripts e tsconfig da convenção (o typecheck e o Vitest acham o workspace)', (ws) => {
+    const dir = ws.split('/')[1]!;
+    const pkg = JSON.parse(readFileSync(join(ROOT, ws, 'package.json'), 'utf8')) as {
+      name?: string;
+      version?: string;
+      type?: string;
+      scripts?: Record<string, string>;
+    };
+    expect(pkg.name).toBe(`@boboforces/${dir}`);
+    expect(pkg.version).toBe('0.0.0');
+    expect(pkg.type).toBe('module');
+    expect(pkg.scripts?.['test']).toBe('vitest run');
+    expect(pkg.scripts?.['typecheck']).toBe(`node ../../scripts/typecheck.ts ${ws}`);
+    // `scripts/typecheck.ts` checa todo `tsconfig*.json` da pasta: o principal precisa existir e cobrir `src`.
+    const tsconfig = readFileSync(join(ROOT, ws, 'tsconfig.json'), 'utf8');
+    expect(tsconfig).toMatch(/"include":\s*\[[^\]]*"src"/);
+    const config = readFileSync(join(ROOT, ws, 'vitest.config.ts'), 'utf8');
+    expect(config).toContain(`name: '${dir}'`);
+    expect(config).toContain("environment: 'node'");
+  });
+
   it.each(workspaces)('%s: include da convenção, pelo menos 1 *.test.ts em src/ e nenhum .spec', (ws) => {
     const config = readFileSync(join(ROOT, ws, 'vitest.config.ts'), 'utf8');
     expect(config).toContain(INCLUDE);

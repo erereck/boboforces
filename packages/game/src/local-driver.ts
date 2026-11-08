@@ -1,5 +1,5 @@
-import { createBotDirector, type BotDirector } from '@boboforces/ai';
-import type { MatchRecipe } from '@boboforces/format';
+import { createBotDirectorWithPaths, NAV_PATH_API, type AiBudget, type BotDirectorWithStats } from '@boboforces/ai';
+import type { FigureGameTable, MatchRecipe } from '@boboforces/format';
 import type { InputFrame } from '@boboforces/input';
 import type { Disposable } from '@boboforces/shared';
 import {
@@ -35,33 +35,68 @@ export interface LocalDriverConfig {
   readonly onEvents?: (events: readonly SimEvent[], sim: Sim) => void;
   /** Ticks por segundo (padrão `SIM_HZ`; o Switch pode cair para 30 depois do Teste Zero). */
   readonly hz?: number;
+  /** M1: zumbis do estresse (`SimConfig.zombies` e o mesmo número no diretor). */
+  readonly zombies?: number;
+  /** M1: orçamento da IA do perfil da plataforma (`aiBudgetFor`). */
+  readonly budget?: AiBudget;
+  /** M1: relógio para medir as fases (F2 e bench); ausente = sem medição. */
+  readonly now?: () => number;
+  /**
+   * #56: tabela de jogo do boneco montada no loading (`SimConfig.figureTable`): o MESMO objeto que o render recebe em
+   * `setFigures`. Ausente = a sim monta a dela na criação (testes).
+   */
+  readonly figureTable?: FigureGameTable;
 }
 
 export interface LocalDriver extends MatchDriver {
   readonly sim: Sim;
-  readonly director: BotDirector;
+  readonly director: BotDirectorWithStats;
   readonly loop: SimLoop;
+  /** ms gastos no último `update` na IA (`think`) e na sim (o resto do passo); 0 sem `now`. */
+  readonly lastAiMs: number;
+  readonly lastSimMs: number;
 }
 
 /**
  * Driver local (solo e tela dividida): passo fixo (60 Hz por padrão) com acumulador (no máximo 4 ticks por frame, frame
  * limitado a 0,1 s), IA antes de cada `step` (passo 0 da ordem fixa) e eventos drenados a cada tick. Pausar é só não
  * chamar `update` (solo e local pausam a sim, tecnico.md §4.2). Sem alocação por tick: os frames e as closures nascem
- * aqui.
+ * aqui. M1: a IA usa a navegação de verdade (`NAV_PATH_API` sobre `SimMap.nav`), o orçamento do perfil e os zumbis.
  */
 export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
   const { recipe, map, humans, writeHumanFrame, onEvents } = config;
-  const sim = createSim({ recipe, map, humans, ...(config.hz !== undefined ? { hz: config.hz } : {}) });
-  const director = createBotDirector({ recipe, humans, hz: sim.hz });
+  const zombies = config.zombies ?? 0;
+  const sim = createSim({
+    recipe,
+    map,
+    humans,
+    zombies,
+    ...(config.hz !== undefined ? { hz: config.hz } : {}),
+    ...(config.figureTable ? { figureTable: config.figureTable } : {}),
+  });
+  const director = createBotDirectorWithPaths(
+    { recipe, humans, hz: sim.hz, zombies, ...(config.budget ? { budget: config.budget } : {}) },
+    NAV_PATH_API,
+  );
   const frames = createInputFrames();
+  const now = config.now ?? null;
   let seq = 0;
+  let aiMs = 0;
+  let lastAiMs = 0;
+  let lastSimMs = 0;
   const loop = createSimLoop({
     sim,
     frames,
     beforeTick: (s, f) => {
       seq = (seq + 1) & 0xffff;
       for (let h = 0; h < humans; h++) writeHumanFrame(h, f[h]!, seq);
-      director.think(s.view(), f);
+      if (now) {
+        const t0 = now();
+        director.think(s.view(), f);
+        aiMs += now() - t0;
+      } else {
+        director.think(s.view(), f);
+      }
     },
     ...(onEvents ? { afterTick: (s: Sim, events: readonly SimEvent[]) => onEvents(events, s) } : {}),
   });
@@ -73,9 +108,22 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     get alpha(): number {
       return loop.alpha;
     },
+    get lastAiMs(): number {
+      return lastAiMs;
+    },
+    get lastSimMs(): number {
+      return lastSimMs;
+    },
     update(frameSeconds: number): number {
       if (disposed) return 0;
-      return loop.frame(frameSeconds);
+      if (!now) return loop.frame(frameSeconds);
+      aiMs = 0;
+      const t0 = now();
+      const ticks = loop.frame(frameSeconds);
+      const total = now() - t0;
+      lastAiMs = aiMs;
+      lastSimMs = Math.max(0, total - aiMs);
+      return ticks;
     },
     dispose(): void {
       if (disposed) return;

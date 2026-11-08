@@ -228,3 +228,26 @@ describe('caminhos', () => {
     expect(await files?.pick(['.bfbot'])).toBeNull();
   });
 });
+
+describe('linhas [t0] do ciclo de vida (itens 2, 19 e 20)', () => {
+  it('troca dock ↔ portátil grava drawing buffer e bateria; volta do HOME grava o vão', async () => {
+    const fake = createFakeSwitch({ gpu: true, battery: { level: 0.5, charging: true } });
+    const { shell } = shellOn(fake);
+    const frame = (now: number): void => {
+      shell.platform.requestFrame(() => {});
+      fake.frame(now);
+    };
+    frame(0);
+    fake.setOperationMode(0);
+    for (let i = 1; i <= 30; i++) frame(i * 16);
+    await new Promise((r) => setTimeout(r, 0));
+    frame(3000);
+    const log = fake.text(`${DIR}/runtime.log`) ?? '';
+    expect(log).toContain('[t0] item=20 nome=lifecycle status=info evento=modo de=dock para=portatil');
+    expect(log).toContain('[t0] item=2 nome=drawing-buffer status=info evento=troca_de_modo modo=portatil');
+    expect(log).toContain(
+      '[t0] item=20 nome=lifecycle status=info evento=troca_de_modo modo=portatil bateria=1 nivel=50',
+    );
+    expect(log).toMatch(/\[t0\] item=20 nome=lifecycle status=info evento=volta_home_ou_sleep vao_ms=\d+/);
+  });
+});

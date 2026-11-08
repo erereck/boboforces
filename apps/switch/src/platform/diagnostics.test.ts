@@ -65,3 +65,15 @@ describe('relatório da plataforma', () => {
     expect(report.extra['modoAplicativo']).toBe('não');
   });
 });
+
+describe('memória e log da sessão (M1)', () => {
+  it('memoryUsage lê o Switch.memoryUsage; recentLog devolve as últimas linhas sem carimbo', () => {
+    const { fake, diagnostics } = diagnosticsOn(true);
+    expect(diagnostics.memoryUsage()).toBeNull(); // o nx.js falso dos testes não tem memoryUsage
+    (fake.nx.Switch as { memoryUsage?: () => unknown }).memoryUsage = () => ({ usedHeapSize: 5, heapSizeLimit: 9 });
+    expect(diagnostics.memoryUsage()).toEqual({ usedHeapBytes: 5, heapLimitBytes: 9 });
+    for (let i = 0; i < 5; i++) diagnostics.appendLog(`linha ${i}`);
+    expect(diagnostics.recentLog(3)).toEqual(['linha 2', 'linha 3', 'linha 4']);
+    expect(diagnostics.recentLog(99)).toHaveLength(5);
+  });
+});

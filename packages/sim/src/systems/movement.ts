@@ -1,8 +1,19 @@
+import { FIGURE_BONE } from '@boboforces/format';
 import { BUTTON } from '@boboforces/input';
-import { boxIntersectsSolid, createAabb, createSweepResult, sweepAabb, type Aabb } from '@boboforces/world';
+import {
+  cellBlock,
+  cellFlipped,
+  CELLS_PER_METER,
+  createAabb,
+  createSweepResult,
+  SHAPE_ID,
+  sweepAabb,
+  type Aabb,
+} from '@boboforces/world';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { METRICS } from '../config/metrics.ts';
-import { PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
+import type { MovementProfile } from '../config/movement.ts';
+import { isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 
@@ -17,11 +28,18 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
  *
  * No chão, o bobo também GRUDA para descer degraus de até `METRICS.stepHeight` (escada de blocos sem ficar no ar,
  * sem dispersão de pulo nem evento de pouso). Sem alocação: caixa e resultados de rascunho no módulo.
+ *
+ * M1 (Construto): as formas do catálogo (laje, degrau, rampas, painel, poste) e as caixas das props entram pelas
+ * consultas do world (`sweepAabb` com `colliders`): rampa sobe e desce lisa (o "grudar" acima faz a descida), sem
+ * evento de degrau a cada tick; levantar do agachado é um teste varrido para cima (respeita laje e teto inclinado);
+ * a área jogável do mapa é parede invisível em X/Z. Zumbis andam pelo mesmo código, com o perfil deles.
  */
 
 const box: Aabb = createAabb();
 const sweep = createSweepResult();
 const drop = createSweepResult();
+const standProbe: Aabb = createAabb();
+const standSweep = createSweepResult();
 
 const F = ENTITY_FLAG;
 const MOVE_FLAGS = F.onGround | F.crouching | F.sprinting | F.sliding | F.ads;
@@ -30,6 +48,37 @@ const MOVE_FLAGS = F.onGround | F.crouching | F.sprinting | F.sliding | F.ads;
 const STOP_SPEED = 0.05;
 /** Sprint só com o direcional para a frente (fração do eixo). */
 const SPRINT_MIN_FORWARD = 0.3;
+/** Folga para achar a célula do piso sob os pés (a rampa pode estar na célula dos pés ou logo abaixo). */
+const FLOOR_PROBE = 0.02;
+
+/** Números do perfil já convertidos para o `hz` da partida (preenchidos no começo do passo, sem alocar). */
+class ProfileTicks {
+  profile: MovementProfile | null = null;
+  hz = 0;
+  jumpSpeed = 0;
+  coyoteMax = 0;
+  jumpBufferMax = 0;
+  sprintFireDelay = 0;
+  slideTotal = 0;
+  slideCooldown = 0;
+  airStep = 0;
+
+  update(p: MovementProfile, hz: number): void {
+    if (this.profile === p && this.hz === hz) return;
+    this.profile = p;
+    this.hz = hz;
+    this.jumpSpeed = Math.sqrt(2 * p.gravity * p.jump);
+    this.coyoteMax = secondsToTicks(p.coyoteS, hz);
+    this.jumpBufferMax = secondsToTicks(p.jumpBufferS, hz);
+    this.sprintFireDelay = secondsToTicks(p.sprintFireDelayS, hz);
+    this.slideTotal = p.slide ? Math.max(1, secondsToTicks(p.slide.durationS, hz)) : 0;
+    this.slideCooldown = p.slide ? secondsToTicks(p.slide.cooldownS, hz) : 0;
+    this.airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump));
+  }
+}
+
+const boboTicks = new ProfileTicks();
+const zombieTicks = new ProfileTicks();
 
 function setBox(b: Aabb, x: number, y: number, z: number, height: number): void {
   const hw = METRICS.aabbWidth / 2;
@@ -41,25 +90,38 @@ function setBox(b: Aabb, x: number, y: number, z: number, height: number): void 
   b.maxZ = z + hw;
 }
 
+/** O piso sob os pés é uma rampa em pé (forma inclinada)? Lá a altura muda a cada tick sem ser "degrau". */
+function onSlope(ctx: SimContext, x: number, y: number, z: number): boolean {
+  const cx = Math.floor(x * CELLS_PER_METER);
+  const cz = Math.floor(z * CELLS_PER_METER);
+  for (let k = 0; k < 2; k++) {
+    const cy = Math.floor((k === 0 ? y - FLOOR_PROBE : y + FLOOR_PROBE) * CELLS_PER_METER);
+    const cell = ctx.grid.get(cx, cy, cz);
+    if (cell === 0 || cellFlipped(cell)) continue;
+    const shape = ctx.blocks.shapes[cellBlock(cell)]!;
+    if (shape >= SHAPE_ID.ramp && shape <= SHAPE_ID.rampCornerOut) return true;
+  }
+  return false;
+}
+
 export function movementSystem(ctx: SimContext): void {
   const s = ctx.s;
-  const p = ctx.profile;
   const dt = ctx.dt;
-  const hz = ctx.hz;
-  const g = p.gravity;
-  const jumpSpeed = Math.sqrt(2 * g * p.jump);
-  const coyoteMax = secondsToTicks(p.coyoteS, hz);
-  const jumpBufferMax = secondsToTicks(p.jumpBufferS, hz);
-  const sprintFireDelay = secondsToTicks(p.sprintFireDelayS, hz);
-  const slide = p.slide;
-  const slideTotal = slide ? Math.max(1, secondsToTicks(slide.durationS, hz)) : 0;
-  const slideCooldown = slide ? secondsToTicks(slide.cooldownS, hz) : 0;
-  const airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump));
+  const colliders = ctx.colliders;
+  const area = ctx.playArea;
+  const hw = METRICS.aabbWidth / 2;
+  boboTicks.update(ctx.profile, ctx.hz);
+  zombieTicks.update(ctx.zombieProfile, ctx.hz);
 
   for (let e = 0; e < s.count; e++) {
-    if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    const kind = s.kind[e]!;
+    if (s.alive[e] === 0 || !isBody(kind)) continue;
     let fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) continue;
+    const pt = kind === ENTITY_KIND.zombie ? zombieTicks : boboTicks;
+    const p = pt.profile!;
+    const g = p.gravity;
+    const slide = p.slide;
     const btn = s.inButtons[e]!;
     const pressed = btn & ~s.prevButtons[e]!;
     const i3 = e * 3;
@@ -107,19 +169,21 @@ export function movementSystem(ctx: SimContext): void {
       hSpeed >= p.walk * 0.9
     ) {
       sliding = true;
-      s.slideTicks[e] = slideTotal;
+      s.slideTicks[e] = pt.slideTotal;
       s.slideDir[e * 2] = vx / hSpeed;
       s.slideDir[e * 2 + 1] = vz / hSpeed;
       ctx.events.move(ctx.tick, s.idOf(e), 'slide', slide.startSpeed);
     }
 
-    // --- Agachar (levanta só se couber em pé) ---
+    // --- Agachar (levanta só se couber em pé: caixa agachada varrida para cima, com formas e props) ---
     let crouching = (fl & F.crouching) !== 0;
     if ((btn & BUTTON.crouch) !== 0 || sliding) {
       crouching = true;
     } else if (crouching) {
-      setBox(box, x, y, z, METRICS.aabbHeight);
-      if (!boxIntersectsSolid(ctx.grid, ctx.blocks, box)) crouching = false;
+      setBox(standProbe, x, y, z, METRICS.aabbCrouchHeight);
+      const rise = METRICS.aabbHeight - METRICS.aabbCrouchHeight;
+      sweepAabb(ctx.grid, ctx.blocks, standProbe, 0, rise, 0, 0, standSweep, colliders);
+      if (!standSweep.hitY) crouching = false;
     }
 
     // --- Correr e mirar ---
@@ -127,18 +191,18 @@ export function movementSystem(ctx: SimContext): void {
     const sprinting =
       (btn & BUTTON.sprint) !== 0 && my > SPRINT_MIN_FORWARD && !crouching && !adsHeld && (wasOnGround || wasSprinting);
     const ads = adsHeld && !sprinting && !sliding;
-    if (sprinting) s.sprintFireDelayTicks[e] = sprintFireDelay;
+    if (sprinting) s.sprintFireDelayTicks[e] = pt.sprintFireDelay;
 
     // --- Velocidade no plano ---
     if (sliding && slide) {
       const left = --s.slideTicks[e]!;
-      const t = 1 - left / slideTotal;
+      const t = 1 - left / pt.slideTotal;
       const speed = slide.startSpeed + (p.crouch - slide.startSpeed) * t;
       vx = s.slideDir[e * 2]! * speed;
       vz = s.slideDir[e * 2 + 1]! * speed;
       if (left <= 0 || (btn & BUTTON.crouch) === 0) {
         sliding = false;
-        s.slideCooldownTicks[e] = slideCooldown;
+        s.slideCooldownTicks[e] = pt.slideCooldown;
       }
     } else {
       let target = crouching ? p.crouch : sprinting ? p.sprint : p.walk;
@@ -195,19 +259,19 @@ export function movementSystem(ctx: SimContext): void {
 
     // --- Pulo (buffer + coyote) ---
     let jumpBuffer = s.jumpBufferTicks[e]!;
-    if ((pressed & BUTTON.jump) !== 0) jumpBuffer = jumpBufferMax + 1;
+    if ((pressed & BUTTON.jump) !== 0) jumpBuffer = pt.jumpBufferMax + 1;
     let coyote = s.coyoteTicks[e]!;
     let jumped = false;
     if (jumpBuffer > 0 && (wasOnGround || coyote > 0)) {
-      vy = jumpSpeed;
+      vy = pt.jumpSpeed;
       jumpBuffer = 0;
       coyote = 0;
       jumped = true;
       if (sliding) {
         sliding = false;
-        s.slideCooldownTicks[e] = slideCooldown;
+        s.slideCooldownTicks[e] = pt.slideCooldown;
       }
-      ctx.events.move(ctx.tick, s.idOf(e), 'jump', jumpSpeed);
+      ctx.events.move(ctx.tick, s.idOf(e), 'jump', pt.jumpSpeed);
     }
     if (jumpBuffer > 0) jumpBuffer--;
 
@@ -218,22 +282,22 @@ export function movementSystem(ctx: SimContext): void {
     if (vy < -MATCH_DEFAULTS.terminalSpeed) vy = -MATCH_DEFAULTS.terminalSpeed;
     const fallSpeed = -vy;
     setBox(box, x, y, z, crouching ? METRICS.aabbCrouchHeight : METRICS.aabbHeight);
-    const stepHeight = wasOnGround && !jumped ? METRICS.stepHeight : airStep;
+    const stepHeight = wasOnGround && !jumped ? METRICS.stepHeight : pt.airStep;
     // Rampa linear até o alvo (média de início e fim) e depois velocidade constante; no atrito, a integral exata.
     const ramp = rampFrac * 0.5;
     const moveX = frictionTravel >= 0 ? vx0 * frictionTravel : (vx0 * ramp + vx * (1 - ramp)) * dt;
     const moveZ = frictionTravel >= 0 ? vz0 * frictionTravel : (vz0 * ramp + vz * (1 - ramp)) * dt;
-    sweepAabb(ctx.grid, ctx.blocks, box, moveX, dy, moveZ, stepHeight, sweep);
+    sweepAabb(ctx.grid, ctx.blocks, box, moveX, dy, moveZ, stepHeight, sweep, colliders);
     if (sweep.hitX) vx = 0;
     if (sweep.hitZ) vz = 0;
     if (sweep.hitY) vy = 0;
     let onGround = sweep.onGround;
-    // Descer degrau: estava no chão, não pulou e o chão sumiu; se houver chão até um degrau abaixo, gruda nele.
+    // Descer degrau (ou rampa): estava no chão, não pulou e o chão sumiu; se houver chão até um degrau abaixo, gruda.
     let stepDown = 0;
     if (wasOnGround && !jumped && !onGround && vy <= 0) {
       const minY = box.minY;
       const maxY = box.maxY;
-      sweepAabb(ctx.grid, ctx.blocks, box, 0, -METRICS.stepHeight, 0, 0, drop);
+      sweepAabb(ctx.grid, ctx.blocks, box, 0, -METRICS.stepHeight, 0, 0, drop, colliders);
       if (drop.onGround) {
         onGround = true;
         vy = 0;
@@ -247,17 +311,35 @@ export function movementSystem(ctx: SimContext): void {
     y = box.minY;
     z = (box.minZ + box.maxZ) / 2;
 
+    // Área jogável: parede invisível em X/Z (tecnico.md §4.5). Volta para dentro só no eixo que passou.
+    if (area !== null) {
+      if (x < area.minX + hw) {
+        x = area.minX + hw;
+        if (vx < 0) vx = 0;
+      } else if (x > area.maxX - hw) {
+        x = area.maxX - hw;
+        if (vx > 0) vx = 0;
+      }
+      if (z < area.minZ + hw) {
+        z = area.minZ + hw;
+        if (vz < 0) vz = 0;
+      } else if (z > area.maxZ - hw) {
+        z = area.maxZ - hw;
+        if (vz > 0) vz = 0;
+      }
+    }
+
     if (onGround && !wasOnGround) {
       const fall = s.airPeakY[e]! - y;
       ctx.events.move(ctx.tick, s.idOf(e), 'land', fallSpeed);
       if (p.fallDamage && fall > METRICS.safeFallHeight) {
         const dmg = (fall - METRICS.safeFallHeight) * MATCH_DEFAULTS.fallDamagePerM;
-        ctx.damage.push(e, NULL_ENTITY, dmg, PART_TORSO, WEAPON_NONE, x, y, z);
+        ctx.damage.push(e, NULL_ENTITY, dmg, PART_TORSO, FIGURE_BONE.footR, WEAPON_NONE, x, y, z);
       }
     }
     if (!onGround) {
       if (wasOnGround) {
-        coyote = jumped ? 0 : coyoteMax;
+        coyote = jumped ? 0 : pt.coyoteMax;
         s.airPeakY[e] = y;
       } else {
         if (coyote > 0) coyote--;
@@ -267,11 +349,12 @@ export function movementSystem(ctx: SimContext): void {
       coyote = 0;
       s.airPeakY[e] = y;
     }
-    if (sweep.stepped && wasOnGround) ctx.events.move(ctx.tick, s.idOf(e), 'step', sweep.dy);
-    else if (stepDown < 0) ctx.events.move(ctx.tick, s.idOf(e), 'step', stepDown);
+    // Degrau só quando a altura muda de uma vez (bloco, laje, degrau); na rampa a altura muda todo tick.
+    const stepDy = sweep.stepped && wasOnGround ? sweep.dy : stepDown;
+    if (stepDy !== 0 && !onSlope(ctx, x, y, z)) ctx.events.move(ctx.tick, s.idOf(e), 'step', stepDy);
 
     // Plano de morte (tecnico.md §4.5): dano letal sem atacante, passa pela proteção de spawn.
-    if (y < ctx.killPlaneY) ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, WEAPON_NONE, x, y, z);
+    if (y < ctx.killPlaneY) ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, FIGURE_BONE.torso, WEAPON_NONE, x, y, z);
 
     s.position[i3] = x;
     s.position[i3 + 1] = y;

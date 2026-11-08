@@ -1,7 +1,19 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join, posix } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { BUDGETS, LARGEST_EXCLUDED_EXTENSIONS, type Budget, type BudgetId } from './budgets.ts';
+import {
+  BUDGETS,
+  FONT_TEXT_GZIP_LEVEL,
+  LARGEST_EXCLUDED_EXTENSIONS,
+  MATCH_GROUPS,
+  ON_DEMAND_ASSETS,
+  ON_DEMAND_CODE,
+  RETIRED_ASSETS,
+  UI_FONT_FILES,
+  type Budget,
+  type BudgetId,
+  type MatchGroupId,
+} from './budgets.ts';
 
 const utf8 = new TextDecoder();
 
@@ -12,8 +24,13 @@ export interface FileSize {
   /** Caminho relativo ao dist, com `/`. */
   readonly path: string;
   readonly raw: number;
-  /** Bytes que trafegam: gzip nível 9 para texto, cru para binário. */
+  /** Bytes que trafegam: gzip nível 9 para texto (o JSON das fontes no nível de `FONT_TEXT_GZIP_LEVEL`), cru para binário. */
   readonly transfer: number;
+}
+
+export interface FileGroup {
+  readonly files: readonly FileSize[];
+  readonly total: number;
 }
 
 export interface DistReport {
@@ -22,6 +39,23 @@ export interface DistReport {
   readonly initial: readonly FileSize[];
   readonly html: number;
   readonly initialTotal: number;
+  /** O atlas de fontes da UI (`UI_FONT_FILES`: PNG cru + JSON em gzip -4), parte do menu (decisão #54). */
+  readonly fonts: FileGroup;
+  /**
+   * M1: o menu + os assets que a primeira partida no Construto baixa (tudo em `assets/` menos os chunks sob demanda e
+   * os de `ON_DEMAND_ASSETS`). Arquivos fora de `assets/` (ícone, manifest, licenças, `bench/`) não entram.
+   */
+  readonly firstMatch: readonly FileSize[];
+  readonly firstMatchTotal: number;
+  /** Partes da primeira partida além do menu (`other` = asset sem grupo, que conta no acumulado mesmo assim). */
+  readonly groups: Readonly<Record<MatchGroupId | 'other', FileGroup>>;
+  /**
+   * Assets aposentados pelo porte do boneco (`RETIRED_ASSETS`) que ainda estão no build: contam na primeira partida e
+   * no total, fora do sub-orçamento de texturas.
+   */
+  readonly retired: FileGroup;
+  /** Assets sob demanda (só contam no build inteiro). */
+  readonly onDemand: readonly FileSize[];
   readonly total: number;
   readonly largest: FileSize | null;
 }
@@ -30,6 +64,8 @@ export interface BudgetResult {
   readonly budget: Budget;
   readonly value: number;
   readonly ok: boolean;
+  /** Acima da meta (`Budget.goal`) mas dentro do teto: só aviso. */
+  readonly overGoal: boolean;
   /** Arquivo responsável (só no "maior arquivo"). */
   readonly file: string | null;
 }
@@ -40,7 +76,8 @@ export function isIgnored(path: string): boolean {
 }
 
 export function transferSize(path: string, bytes: Uint8Array): number {
-  return COMPRESSIBLE.has(extname(path).toLowerCase()) ? gzipSync(bytes, { level: 9 }).length : bytes.length;
+  if (!COMPRESSIBLE.has(extname(path).toLowerCase())) return bytes.length;
+  return gzipSync(bytes, { level: UI_FONT_FILES.test(path) ? FONT_TEXT_GZIP_LEVEL : 9 }).length;
 }
 
 function listFiles(dir: string, prefix = ''): string[] {
@@ -129,29 +166,90 @@ export function measureDist(dir: string): DistReport {
     if (LARGEST_EXCLUDED_EXTENSIONS.includes(extname(file.path).toLowerCase())) continue;
     if (!largest || file.transfer > largest.transfer) largest = file;
   }
+
+  const groups: Record<MatchGroupId | 'other', FileSize[]> = { construto: [], textures: [], sounds: [], other: [] };
+  const onDemand: FileSize[] = [];
+  const retired: FileSize[] = [];
+  for (const file of files) {
+    const kind = classifyFile(file.path, initial);
+    if (kind === 'onDemand') onDemand.push(file);
+    else if (kind === 'retired') retired.push(file);
+    else if (kind !== 'initial' && kind !== 'outside') groups[kind].push(file);
+  }
+  const sum = (list: readonly FileSize[]): number => list.reduce((acc, f) => acc + f.transfer, 0);
+  const firstMatch = [
+    ...initialFiles,
+    ...groups.construto,
+    ...groups.textures,
+    ...groups.sounds,
+    ...groups.other,
+    ...retired,
+  ];
+  const group = (list: FileSize[]): FileGroup => ({ files: list, total: sum(list) });
   return {
     files,
     initial: initialFiles,
     html: (byPath.get('index.html') as FileSize).transfer,
-    initialTotal: initialFiles.reduce((sum, f) => sum + f.transfer, 0),
-    total: files.reduce((sum, f) => sum + f.transfer, 0),
+    initialTotal: sum(initialFiles),
+    fonts: group(files.filter((f) => UI_FONT_FILES.test(f.path))),
+    firstMatch,
+    firstMatchTotal: sum(firstMatch),
+    groups: {
+      construto: group(groups.construto),
+      textures: group(groups.textures),
+      sounds: group(groups.sounds),
+      other: group(groups.other),
+    },
+    retired: group(retired),
+    onDemand,
+    total: sum(files),
     largest,
   };
+}
+
+/**
+ * Onde um arquivo do dist entra: na carga inicial (menu), num grupo da primeira partida (`other` quando nenhum casa:
+ * conservador; inclui o chunk preguiçoso da cena), sob demanda, aposentado pelo porte do boneco (`retired`: conta na
+ * partida, fora das texturas, até o passo 5 apagar) ou fora de tudo (fora de `assets/`, ou código sob demanda de
+ * `ON_DEMAND_CODE`: a casca do bench e o `net` lazy do M5).
+ */
+export function classifyFile(
+  path: string,
+  initial: ReadonlySet<string>,
+): 'initial' | MatchGroupId | 'other' | 'onDemand' | 'retired' | 'outside' {
+  if (initial.has(path)) return 'initial';
+  if (!path.startsWith('assets/')) return 'outside';
+  // Código preguiçoso (integração do M1): o da cena conta na primeira partida (`other`); o do bench e o do `net`
+  // ficam de fora.
+  if (/\.(?:m?js|css)$/.test(path)) return ON_DEMAND_CODE.some((re) => re.test(path)) ? 'outside' : 'other';
+  if (ON_DEMAND_ASSETS.some((re) => re.test(path))) return 'onDemand';
+  if (RETIRED_ASSETS.some((re) => re.test(path))) return 'retired';
+  return MATCH_GROUPS.find((g) => g.test.test(path))?.id ?? 'other';
 }
 
 export function checkBudgets(report: DistReport, budgets: readonly Budget[] = BUDGETS): BudgetResult[] {
   const values: Record<BudgetId, number> = {
     html: report.html,
     initial: report.initialTotal,
+    fonts: report.fonts.total,
+    firstMatch: report.firstMatchTotal,
+    construto: report.groups.construto.total,
+    textures: report.groups.textures.total,
+    sounds: report.groups.sounds.total,
     total: report.total,
     largest: report.largest?.transfer ?? 0,
   };
-  return budgets.map((budget) => ({
-    budget,
-    value: values[budget.id],
-    ok: values[budget.id] <= budget.limit,
-    file: budget.id === 'largest' ? (report.largest?.path ?? null) : null,
-  }));
+  return budgets.map((budget) => {
+    const value = values[budget.id];
+    const ok = value <= budget.limit;
+    return {
+      budget,
+      value,
+      ok,
+      overGoal: ok && budget.goal !== undefined && value > budget.goal,
+      file: budget.id === 'largest' ? (report.largest?.path ?? null) : null,
+    };
+  });
 }
 
 /** Bytes em pt-BR (vírgula decimal), sem `Intl`, para a saída do CI ficar igual em qualquer máquina. */
@@ -163,18 +261,51 @@ export function formatBytes(bytes: number): string {
 
 export function formatReport(report: DistReport, results: readonly BudgetResult[], verbose: boolean): string {
   const lines: string[] = [];
-  const width = Math.max(...results.map((r) => r.budget.label.length));
+  const label = (b: Budget): string => (b.parent ? `  ${b.label}` : b.label);
+  const width = Math.max(...results.map((r) => label(r.budget).length));
   for (const r of results) {
-    const status = (r.ok ? 'ok' : 'ESTOUROU').padEnd(8);
+    const status = (r.ok ? (r.overGoal ? 'meta!' : 'ok') : 'ESTOUROU').padEnd(8);
     const value = `${formatBytes(r.value)} / ${formatBytes(r.budget.limit)}`;
+    const goal = r.budget.goal !== undefined ? `  (meta ${formatBytes(r.budget.goal)})` : '';
     const file = r.file ? `  (${r.file})` : '';
-    lines.push(`  ${status} ${r.budget.label.padEnd(width)}  ${value.padStart(22)}${file}`);
+    lines.push(`  ${status} ${label(r.budget).padEnd(width)}  ${value.padStart(22)}${goal}${file}`);
+  }
+  for (const r of results.filter((x) => x.overGoal)) {
+    lines.push(
+      '',
+      `  Aviso: ${r.budget.label} acima da meta de ${formatBytes(r.budget.goal ?? 0)} (o teto de ` +
+        `${formatBytes(r.budget.limit)} é que reprova).`,
+    );
+  }
+  if (report.retired.files.length > 0) {
+    lines.push(
+      '',
+      '  Aviso: assets aposentados pelo porte do boneco (#56) ainda no build (contam na primeira partida, fora das' +
+        ' texturas; o passo 5 tira do runtime-assets.json):',
+    );
+    for (const f of report.retired.files) lines.push(`    ${formatBytes(f.transfer).padStart(10)}  ${f.path}`);
+  }
+  const list = (title: string, files: readonly FileSize[]): void => {
+    lines.push('', `  ${title}:`);
+    if (files.length === 0) lines.push('    (nenhum)');
+    for (const f of files) lines.push(`    ${formatBytes(f.transfer).padStart(10)}  ${f.path}`);
+  };
+  if (report.groups.other.files.length > 0) {
+    lines.push(
+      '',
+      '  Aviso: assets sem grupo (contam na primeira partida; se forem sob demanda, ponha em ON_DEMAND_ASSETS):',
+    );
+    for (const f of report.groups.other.files) lines.push(`    ${formatBytes(f.transfer).padStart(10)}  ${f.path}`);
   }
   if (verbose) {
-    lines.push('', '  Carga inicial:');
-    for (const f of report.initial) lines.push(`    ${formatBytes(f.transfer).padStart(10)}  ${f.path}`);
-    lines.push('', '  Todos os arquivos:');
-    for (const f of report.files) lines.push(`    ${formatBytes(f.transfer).padStart(10)}  ${f.path}`);
+    list('Carga inicial (menu)', report.initial);
+    list('Fontes (atlas MSDF)', report.fonts.files);
+    list('Primeira partida: Construto', report.groups.construto.files);
+    list('Primeira partida: texturas', report.groups.textures.files);
+    list('Primeira partida: sons', report.groups.sounds.files);
+    list('Aposentados pelo porte do boneco (#56)', report.retired.files);
+    list('Sob demanda', report.onDemand);
+    list('Todos os arquivos', report.files);
   }
   return lines.join('\n');
 }

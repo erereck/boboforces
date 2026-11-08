@@ -10,11 +10,11 @@
 | Mecanismo | O que pega | Onde |
 |---|---|---|
 | `tsconfig.src.json` dos pacotes puros (`shared`, `format`, `platform-api`, `input`, `world`, `nav`, `sim`, `ai`, `ui`) e do `game` com `"lib": ["ES2023"]` e `"types": []` | `window`, `document`, `localStorage`, `fetch`, `HTMLElement`, `console`, APIs do Node: viram erro de tipo (o `game` vê o render só por `@boboforces/render/data`, sem DOM) | `npm run typecheck` |
-| `tools/guard` (script próprio, sem ESLint) | globais e imports proibidos por pacote: three fora de `render`, `net` fora de `apps/web`, `@boboforces/render` no `game` (só `/data`), relógio e acaso em sim/ai/nav/format/world (lista branca: de `Math` só as funções puras por acesso direto; `Date`, `performance` e `crypto` nunca), `eval`/`new Function`/`.constructor(…)`/`setTimeout` com texto, `Worker`, `RTCPeerConnection`/`WebSocket`, `Intl`/`toLocale*`, `getExtension`, globais do navegador que o nx.js não tem (`addEventListener`, `location`, `screen`, `devicePixelRatio`, `URL`, `Blob`, `FontFace`…), `import.meta` fora das cascas, `import()` não literal, float/half-float e textura comprimida do three. Enxerga colchete (`obj['nome']`), cast (`(globalThis as any).x`), alias, desestruturação e `Reflect.get` da raiz global, com escopo por bloco | `npm run guard` |
+| `tools/guard` (script próprio, sem ESLint) | globais e imports proibidos por pacote: three fora de `render`, `net` fora de `apps/web`, `@boboforces/render` no `game` (só `/data`), relógio e acaso em sim/ai/nav/format/world (lista branca: de `Math` só as funções puras por acesso direto; `Date`, `performance` e `crypto` nunca), `eval`/`new Function`/`.constructor(…)`/`setTimeout` com texto, `Worker`, `RTCPeerConnection`/`WebSocket`, `Intl`/`toLocale*`, `getExtension`, globais do navegador que o nx.js não tem (`addEventListener`, `location`, `screen`, `devicePixelRatio`, `URL`, `Blob`, `FontFace`…), `import.meta` fora das cascas, `import()` não literal, float/half-float e textura comprimida do three, **e alocação no laço quente (regra 11): nas regiões entre `// quente:` e `// fim-quente` são proibidos `new`, literal de array ou objeto, arrow function, `.map`/`.filter`/`.forEach`/`.slice`/`.concat`, template string e spread; as funções `figureFk`, `figureHitBoxes`, `figureGamePose`, `paintFigureSkin` e `rayVsBobo` precisam de região quente no corpo, e `anim/rig.ts` e `figure-instances.ts` de ao menos uma (lista em `tools/guard/src/rules.ts`)**. Enxerga colchete (`obj['nome']`), cast (`(globalThis as any).x`), alias, desestruturação e `Reflect.get` da raiz global, com escopo por bloco | `npm run guard` |
 | `packages/render/src/render.test.ts` | todos os shaders exportados (sem lista fixa): nenhum vertex shader lê textura (`texture*`, `texelFetch*`, `sampler`), nenhum shader usa `#extension`/`#version`, e os materiais só usam shaders desses módulos | `npm test` |
 | `tools/portcheck` | build do `apps/switch`, varredura do bundle (rede, inclusive `fetch`; `RTCPeerConnection`, `trystero`, `WebSocket`, threads, `localStorage`, `eval`; também pela raiz global e por texto entre colchetes) e boot do `game` em `node:vm` com globais falsos do nx.js e `NullRenderer` | `npm run portcheck` |
 | `npm run smoke:web` (também no CI) | build de verdade no Edge headless, em 1280×720 e 667×375: splash, título, cena, pausa, programas ≤ 7, zero erros no console | CI |
-| Revisão | o que as ferramentas não enxergam (alocação no laço quente, fluxo só com D-pad, MSAA no framebuffer do Switch, timer query) | checklist de entrega |
+| Revisão | o que as ferramentas não enxergam (alocação FORA das regiões `// quente:`, fluxo só com D-pad, MSAA no framebuffer do Switch, timer query) | checklist de entrega |
 
 ## Plataforma
 
@@ -42,6 +42,10 @@
    - só `WebGLRenderer`.
    - `TEXTURE_2D_ARRAY` e atributos inteiros são núcleo do WebGL2 e permitidos, com o atlas de plano B pronto atrás de
      um `#define`.
+   - (integração do M1, achado no Eden) GLSL sem multiplicação, divisão ou resto de inteiro (o `IMUL` com registrador
+     não existe no recompilador do Eden: o hash de célula é só float), sem `return` no meio do `main` (a saída
+     antecipada derruba o app no Eden: use if/else) e sem índice dinâmico em array de uniform (seleção com índice
+     constante). O console deve aceitar tudo isso, mas o Eden é o primeiro passo do Teste Zero (decisão #48).
 7. **three.js só em `render`.** Nada de `TextureLoader`, `ImageLoader`, `FontLoader`, `CSS2D`/`CSS3DRenderer`,
    `OrbitControls` ou qualquer coisa que leia eventos do DOM.
 8. **No máximo 7 programas de shader.**
@@ -54,6 +58,17 @@
     pela convenção do M0). Usar o tick e o RNG com semente (`createRng` do `shared`, um fluxo por domínio com `fork`).
 11. **Sem alocação no laço quente:** nada de vetores, arrays ou closures novos por frame. Usar pools (`Pool`,
     `IndexAllocator`, `RingBuffer`) e objetos de rascunho.
+    - **O guard cobra** nas regiões marcadas com `// quente:` … `// fim-quente` (o texto do comentário COMEÇA com
+      `quente:` ou `fim-quente`): ali é proibido `new `, literal de array ou objeto, `=>`, `.map`/`.filter`/`.forEach`/
+      `.slice`/`.concat`, template string e spread. O código quente do boneco (FK, tabela de pose, hitbox, pintor,
+      motor de animação e instâncias) marca as suas regiões.
+    - **O guard exige as regiões:** `figureFk`, `figureHitBoxes`, `figureGamePose`, `paintFigureSkin` e `rayVsBobo`
+      têm de ter o corpo cruzando uma região quente, e `packages/render/src/actors/anim/rig.ts` e
+      `packages/render/src/actors/figure-instances.ts` têm de ter ao menos uma (`HOT_LOOP_REQUIRED_FUNCTIONS` e
+      `HOT_LOOP_REQUIRED_FILES`, em `tools/guard/src/rules.ts`). Apagar os marcadores desligaria a regra sem aviso,
+      por isso reprova. Função nova no laço quente entra nessa lista.
+    - Fora das regiões a regra segue por revisão. Número que entra em função não inlinada pode alocar ~16 B por
+      chamada do lado do chamador (HeapNumber): meça com `total_allocated_bytes` na bancada.
 
 ## Entrada, texto e tela
 

@@ -1,4 +1,4 @@
-import { pushGlyph, type DrawList } from './draw-list.ts';
+import { DRAW_FLOATS_PER_COMMAND, DRAW_OP, type DrawList } from './draw-list.ts';
 import type { FontRole } from './tokens.ts';
 
 /**
@@ -36,6 +36,12 @@ export interface FontFile {
   readonly kerning: readonly number[];
   /** Códigos pedidos que a fonte não tem (caem no `?`). */
   readonly missing: readonly number[];
+  /**
+   * Licença da fonte de origem (`OFL-1.1`) e uma origem curta (família e versão), para a folha das fontes (decisão
+   * #54). Opcionais: o pacote antigo não tem. O copyright vai no `ui-fonts.licencas.txt` gerado pelo fontbake.
+   */
+  readonly license?: string;
+  readonly source?: string;
 }
 
 export interface FontPackFile {
@@ -46,7 +52,12 @@ export interface FontPackFile {
 
 /** Fonte pronta para medir e desenhar. Consultas sem alocação. */
 export interface MsdfFont {
+  /** Nome derivado (sem o Reserved Font Name da origem; decisão #54). */
   readonly name: string;
+  /** Versão, licença e origem do `FontFile` (vazias quando o pacote não traz): a folha das fontes mostra. */
+  readonly version: string;
+  readonly license: string;
+  readonly source: string;
   readonly layer: number;
   readonly size: number;
   readonly distanceRange: number;
@@ -108,6 +119,9 @@ export function createMsdfFont(file: FontFile, atlasWidth: number, atlasHeight: 
   }
   return {
     name: file.name,
+    version: file.version,
+    license: file.license ?? '',
+    source: file.source ?? '',
     layer: file.layer,
     size: file.size,
     distanceRange: file.distanceRange,
@@ -129,7 +143,8 @@ export function createMsdfFont(file: FontFile, atlasWidth: number, atlasHeight: 
   };
 }
 
-function parseFontFile(value: unknown, role: string): FontFile {
+/** Valida uma fonte do JSON do `fontbake` (`role` só entra nas mensagens). Usado pelos pacotes de fontes. */
+export function parseFontFile(value: unknown, role: string): FontFile {
   if (typeof value !== 'object' || value === null) fail(`fonte ${role} ausente`);
   const f = value as Record<string, unknown>;
   const file: FontFile = {
@@ -145,6 +160,8 @@ function parseFontFile(value: unknown, role: string): FontFile {
     glyphs: numArray(f['glyphs'], FONT_GLYPH_STRIDE, `${role}.glyphs`),
     kerning: numArray(f['kerning'] ?? [], FONT_KERNING_STRIDE, `${role}.kerning`),
     missing: numArray(f['missing'] ?? [], 1, `${role}.missing`),
+    ...(typeof f['license'] === 'string' ? { license: f['license'] } : {}),
+    ...(typeof f['source'] === 'string' ? { source: f['source'] } : {}),
   };
   if (file.size <= 0 || file.distanceRange <= 0) fail(`${role}: tamanho ou faixa não positivos`);
   return file;
@@ -310,19 +327,103 @@ export function drawText(
     if (gw > 0 && gh > 0) {
       const gx = data[g + 1] as number;
       const gy = data[g + 2] as number;
-      pushGlyph(
-        out,
-        pen + (data[g + 5] as number) * scale,
-        lineTop + (data[g + 6] as number) * scale,
-        gw * scale,
-        gh * scale,
-        gx * invW,
-        gy * invH,
-        (gx + gw) * invW,
-        (gy + gh) * invH,
-        color,
-        font.layer,
-      );
+      // Escrita direta na lista (o mesmo que `pushGlyph`): sem chamada com 9 números quebrados por glifo, que no
+      // V8 vira objeto no heap quando a chamada não é embutida.
+      if (out.count < out.capacity) {
+        const c = out.count++;
+        const o = c * DRAW_FLOATS_PER_COMMAND;
+        const geom = out.geom;
+        geom[o] = pen + (data[g + 5] as number) * scale;
+        geom[o + 1] = lineTop + (data[g + 6] as number) * scale;
+        geom[o + 2] = gw * scale;
+        geom[o + 3] = gh * scale;
+        geom[o + 4] = gx * invW;
+        geom[o + 5] = gy * invH;
+        geom[o + 6] = (gx + gw) * invW;
+        geom[o + 7] = (gy + gh) * invH;
+        out.ops[c] = DRAW_OP.glyph;
+        out.colors[c] = color >>> 0;
+        out.textures[c] = font.layer;
+      } else {
+        out.overflow++;
+      }
+    }
+    pen += (data[g + 7] as number) * scale;
+  }
+  return pen - startX;
+}
+
+/** Como `measureText`, mas sobre códigos de caractere (`numberToCodes`, `stringToCodes`): sem string, sem alocação. */
+export function measureCodes(font: MsdfFont, codes: Uint16Array, length: number, px: number, tracking = 0): number {
+  const scale = px / font.size;
+  let width = 0;
+  let prev = -1;
+  for (let i = 0; i < length; i++) {
+    const code = codes[i] as number;
+    const index = resolveGlyph(font, code);
+    const advance = index >= 0 ? (font.glyphData[index * FONT_GLYPH_STRIDE + 7] as number) : font.size * 0.5;
+    if (prev >= 0) width += font.kerning(prev, code) * scale + tracking * px;
+    width += advance * scale;
+    prev = code;
+  }
+  return width;
+}
+
+/** Como `drawText`, mas sobre códigos de caractere. Devolve a largura desenhada. Sem alocação. */
+export function drawCodes(
+  out: DrawList,
+  font: MsdfFont,
+  codes: Uint16Array,
+  length: number,
+  x: number,
+  capTop: number,
+  px: number,
+  color: number,
+  tracking = 0,
+): number {
+  const scale = px / font.size;
+  const lineTop = Math.round(capTop - (font.base - font.capHeight) * scale);
+  const startX = Math.round(x);
+  const data = font.glyphData;
+  const invW = 1 / font.atlasWidth;
+  const invH = 1 / font.atlasHeight;
+  let pen = startX;
+  let prev = -1;
+  for (let i = 0; i < length; i++) {
+    const code = codes[i] as number;
+    const index = resolveGlyph(font, code);
+    if (prev >= 0) pen += font.kerning(prev, code) * scale + tracking * px;
+    prev = code;
+    if (index < 0) {
+      pen += font.size * 0.5 * scale;
+      continue;
+    }
+    const g = index * FONT_GLYPH_STRIDE;
+    const gw = data[g + 3] as number;
+    const gh = data[g + 4] as number;
+    if (gw > 0 && gh > 0) {
+      const gx = data[g + 1] as number;
+      const gy = data[g + 2] as number;
+      // Escrita direta na lista (o mesmo que `pushGlyph`): sem chamada com 9 números quebrados por glifo, que no
+      // V8 vira objeto no heap quando a chamada não é embutida.
+      if (out.count < out.capacity) {
+        const c = out.count++;
+        const o = c * DRAW_FLOATS_PER_COMMAND;
+        const geom = out.geom;
+        geom[o] = pen + (data[g + 5] as number) * scale;
+        geom[o + 1] = lineTop + (data[g + 6] as number) * scale;
+        geom[o + 2] = gw * scale;
+        geom[o + 3] = gh * scale;
+        geom[o + 4] = gx * invW;
+        geom[o + 5] = gy * invH;
+        geom[o + 6] = (gx + gw) * invW;
+        geom[o + 7] = (gy + gh) * invH;
+        out.ops[c] = DRAW_OP.glyph;
+        out.colors[c] = color >>> 0;
+        out.textures[c] = font.layer;
+      } else {
+        out.overflow++;
+      }
     }
     pen += (data[g + 7] as number) * scale;
   }

@@ -1,0 +1,20 @@
+{
+  "name": "@boboforces/audioconv",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Converte sons CC0 (OGG da Kenney) para MP3 mono: decodifica no Edge (playwright-core) e codifica com lamejs.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/audioconv",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@breezystack/lamejs": "1.2.7"
+  }
+}

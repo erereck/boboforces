@@ -16,6 +16,8 @@ export interface FrameSchedulerOptions {
   readonly beforeFrame: (nowMs: number) => void;
   /** Roda no fim de cada frame, depois dos callbacks (mesmo se um deles lançar). */
   readonly afterFrame?: () => void;
+  /** Roda quando um frame nativo é pedido (o ciclo de vida mede o vão a partir do pedido). */
+  readonly onNativeRequest?: () => void;
 }
 
 export function createFrameScheduler(opts: FrameSchedulerOptions): FrameScheduler {
@@ -59,6 +61,7 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
       count++;
       if (!nativePending) {
         nativePending = true;
+        opts.onNativeRequest?.();
         opts.requestAnimationFrame(onNativeFrame);
       }
       return handle;

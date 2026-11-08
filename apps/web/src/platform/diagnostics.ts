@@ -1,4 +1,4 @@
-import type { Diagnostics, PlatformFeatures, PlatformReport } from '@boboforces/platform-api';
+import type { Diagnostics, MemoryUsage, PlatformFeatures, PlatformReport } from '@boboforces/platform-api';
 import { RECENT_LOG_CAPACITY, RingBuffer, type Disposable } from '@boboforces/shared';
 import type { BuildInfo } from './build-info.ts';
 
@@ -113,6 +113,26 @@ export interface WebDiagnostics extends Diagnostics, Disposable {
   readonly errors: readonly string[];
   /** Copia as linhas do log em memória para `out` (painel F2). */
   readLog(out: string[]): number;
+  memoryUsage(): MemoryUsage | null;
+  recentLog(maxLines: number): readonly string[];
+}
+
+/** `performance.memory` (só Chromium, não padronizado): o resto dos navegadores não diz o heap. */
+interface ChromiumMemory {
+  readonly usedJSHeapSize?: number;
+  readonly jsHeapSizeLimit?: number;
+}
+
+/**
+ * Heap do JS para o F2, o bench e o item 14 do T0. Na web só o Chromium responde (`performance.memory`, em passos
+ * grossos de propósito, contra fingerprinting); Firefox e Safari dão `null` e o relatório escreve -1.
+ */
+export function readMemoryUsage(perf: { readonly memory?: ChromiumMemory } | undefined): MemoryUsage | null {
+  const memory = perf?.memory;
+  const used = memory?.usedJSHeapSize;
+  if (typeof used !== 'number' || !Number.isFinite(used) || used <= 0) return null;
+  const limit = memory?.jsHeapSizeLimit;
+  return { usedHeapBytes: used, heapLimitBytes: typeof limit === 'number' && limit > 0 ? limit : -1 };
 }
 
 /**
@@ -211,6 +231,14 @@ export function createWebDiagnostics(sources: DiagnosticsSources): WebDiagnostic
       out.length = 0;
       log.forEach((line) => out.push(line));
       return out.length;
+    },
+    memoryUsage() {
+      return readMemoryUsage((win as Window & { performance?: { memory?: ChromiumMemory } }).performance);
+    },
+    recentLog(maxLines) {
+      const all = log.toArray();
+      const n = Math.max(0, Math.floor(maxLines));
+      return n >= all.length ? all : all.slice(all.length - n);
     },
     dispose() {
       win.removeEventListener('error', onError, true);

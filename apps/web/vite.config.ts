@@ -1,14 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
 import runtimeAssets from '../../assets-src/runtime-assets.json' with { type: 'json' };
 import versionJson from '../../version.json' with { type: 'json' };
+import { composeLicenseNotices, UI_FONT_NOTICES_PATH, type PackageNotice } from './scripts/licenses.ts';
 
 // Casca web (tecnico.md §19.1).
 // - `base: './'`: funciona no GitHub Pages com subcaminho (/boboforces/) e num domínio próprio no futuro.
-// - Chunks manuais: `three` (só o render importa) e `core` (os pacotes do jogo); o chunk de entrada fica só com a casca.
+// - Chunks: `three` (só o render importa) num grupo fixo; o menu (casca + núcleo do jogo) no fecho estático e a cena
+//   (`src/scene.ts`: mundo, IA, renderer completo) num chunk carregado por `import()` ao entrar no Construto.
 //   `net` entra como import dinâmico no M5 e vira chunk próprio sozinho. O Vite põe `modulepreload` dos chunks iniciais
 //   no index.html; sem polyfill, porque todo navegador com ES2022 que importa já tem `modulepreload` ou ignora a dica.
 // - Servidor só em 127.0.0.1 (nada exposto na rede local sem querer).
@@ -49,7 +51,13 @@ const ASSET_TYPES: Readonly<Record<string, string>> = {
 
 /** Assets do jogo por caminho lógico (regra 3): a mesma tabela que o build do Switch copia para o RomFS. */
 function gameAssets(): Plugin {
-  const files: Readonly<Record<string, string>> = runtimeAssets.files;
+  // `local`: gerados só sob demanda na máquina do Erick; entram se existirem. O CI não gera, então o build publicado
+  // sai sem eles. Vazio desde a decisão #54 (o `{}` do JSON não dá tipo às entradas, daí a anotação).
+  const localTable: Readonly<Record<string, string>> = runtimeAssets.local;
+  const local: Readonly<Record<string, string>> = Object.fromEntries(
+    Object.entries(localTable).filter(([, file]) => existsSync(join(repoRoot, 'assets-src', file))),
+  );
+  const files: Readonly<Record<string, string>> = { ...runtimeAssets.files, ...local };
   const source = (logical: string): string => join(repoRoot, 'assets-src', files[logical] as string);
   const typeOf = (logical: string): string =>
     ASSET_TYPES[logical.slice(logical.lastIndexOf('.'))] ?? 'application/octet-stream';
@@ -84,9 +92,44 @@ function gameAssets(): Plugin {
 }
 
 /**
+ * `/bench/` (PLANO_M1: "o `/bench` da web", para o Erick abrir no celular): página mínima que redireciona para
+ * `../?bench&<parâmetros>`, preservando a query. Funciona no GitHub Pages (sem servidor) e no `vite preview`; no dev,
+ * um middleware faz o mesmo. Fica fora da carga inicial e da primeira partida (só conta no build inteiro).
+ */
+const BENCH_REDIRECT_HTML =
+  '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="robots" content="noindex">' +
+  '<title>BoboForces bench</title><script>var q=location.search.slice(1);' +
+  "location.replace('../?bench'+(q?'&'+q:'')+location.hash)</script>" +
+  '<noscript>Abra <a href="../?bench">../?bench</a>.</noscript></html>\n';
+
+function benchRedirect(): Plugin {
+  return {
+    name: 'boboforces:bench-redirect',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const match = /^\/bench\/?(?:\?([^#]*))?$/.exec(req.url ?? '');
+        if (!match) {
+          next();
+          return;
+        }
+        const query = match[1] ?? '';
+        res.statusCode = 302;
+        res.setHeader('Location', `/?bench${query ? `&${query}` : ''}`);
+        res.end();
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'bench/index.html', source: BENCH_REDIRECT_HTML });
+    },
+  };
+}
+
+/**
  * `licencas.txt` na raiz do site (CREDITOS.md; MIT e OFL pedem o aviso junto das cópias, e o minificador apaga os
- * cabeçalhos `@license`). Lista cada pacote npm que entrou de fato no bundle, com o LICENSE dele, mais a fonte da UI
- * (OFL). Pacote sem arquivo de licença reprova o build. Até o `tools/credits` (M2) este plugin é a fonte do arquivo.
+ * cabeçalhos `@license`). Lista cada pacote npm que entrou de fato no bundle, com o LICENSE dele, mais as fontes da UI
+ * em uso (decisão #54), lidas do arquivo que o fontbake gera; o cabeçalho abre a exceção OFL do atlas `fonts/ui-fonts.*`
+ * (`scripts/licenses.ts`). Pacote sem arquivo de licença, ou fonte sem aviso e licença, reprova o build. Até o
+ * `tools/credits` (M2) este plugin é a fonte do arquivo.
  */
 function licenseNotices(): Plugin {
   const packagePattern = /[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)[\\/]/;
@@ -101,7 +144,7 @@ function licenseNotices(): Plugin {
           if (name) names.add(name.replace('\\', '/'));
         }
       }
-      const sections = [...names].sort().map((name) => {
+      const packages = [...names].sort().map((name): PackageNotice => {
         const dir = join(repoRoot, 'node_modules', name);
         const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
           version: string;
@@ -109,15 +152,19 @@ function licenseNotices(): Plugin {
         };
         const file = readdirSync(dir).find((f) => /^licen[cs]e(\.(md|txt))?$/i.test(f));
         if (!file) throw new Error(`licencas.txt: ${name} não tem arquivo de licença`);
-        const text = readFileSync(join(dir, file), 'utf8').trim();
-        return `== ${name} ${pkg.version} (${pkg.license ?? 'ver texto'}) ==\n\n${text}`;
+        return {
+          name,
+          version: pkg.version,
+          license: pkg.license ?? null,
+          text: readFileSync(join(dir, file), 'utf8'),
+        };
       });
-      const ofl = readFileSync(join(repoRoot, 'assets-src', 'fonts', 'OFL.txt'), 'utf8').trim();
-      sections.push(`== Barlow Condensed (fonte da UI, convertida para atlas MSDF) ==\n\n${ofl}`);
-      const header =
-        'BoboForces © EriLab. Todos os direitos reservados.\n' +
-        'Este arquivo traz os avisos e as licenças do software e da fonte de terceiros distribuídos com o jogo.';
-      this.emitFile({ type: 'asset', fileName: 'licencas.txt', source: `${header}\n\n${sections.join('\n\n')}\n` });
+      const fontNotices = join(repoRoot, UI_FONT_NOTICES_PATH);
+      if (!existsSync(fontNotices)) {
+        throw new Error(`licencas.txt: falta ${UI_FONT_NOTICES_PATH} (rode "npm run fontbake")`);
+      }
+      const source = composeLicenseNotices(packages, readFileSync(fontNotices, 'utf8'));
+      this.emitFile({ type: 'asset', fileName: 'licencas.txt', source });
     },
     transformIndexHtml: (): HtmlTagDescriptor[] => [
       { tag: 'link', attrs: { rel: 'license', href: './licencas.txt' }, injectTo: 'head' },
@@ -127,7 +174,7 @@ function licenseNotices(): Plugin {
 
 export default defineConfig({
   base: './',
-  plugins: [versionInHtml(versionJson.version), gameAssets(), licenseNotices()],
+  plugins: [versionInHtml(versionJson.version), gameAssets(), benchRedirect(), licenseNotices()],
   define: {
     __BF_VERSION__: JSON.stringify(versionJson.version),
     __BF_CODENAME__: JSON.stringify(versionJson.codename),
@@ -145,15 +192,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     rolldownOptions: {
       output: {
+        // Só o three tem grupo fixo (cache longo). O resto se divide pelo grafo: o fecho estático do `main.ts` (menu)
+        // e o chunk da cena (`src/scene.ts`, por `import()`: mundo, IA, renderer completo). Um grupo "core" com todos
+        // os pacotes puxaria a cena para a carga inicial (integração do M1, tecnico.md §16.4).
         codeSplitting: {
-          groups: [
-            { name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/, priority: 2 },
-            {
-              name: 'core',
-              test: /[\\/]packages[\\/][^\\/]+[\\/]src[\\/]|[\\/]node_modules[\\/]fflate[\\/]/,
-              priority: 1,
-            },
-          ],
+          groups: [{ name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/, priority: 2 }],
         },
       },
     },

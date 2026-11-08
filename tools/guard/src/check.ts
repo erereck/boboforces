@@ -6,9 +6,14 @@
  * O que escapa daqui ainda passa pelo typecheck dos pacotes puros e pelo portcheck do bundle do Switch.
  */
 import { posix } from 'node:path';
-import { tokenize, type Token } from './lexer.ts';
+import { tokenize, type Comment, type Token } from './lexer.ts';
 import {
   CLOCK_GLOBALS,
+  HOT_LOOP_CLOSE,
+  HOT_LOOP_MEMBERS,
+  HOT_LOOP_OPEN,
+  HOT_LOOP_REQUIRED_FILES,
+  HOT_LOOP_REQUIRED_FUNCTIONS,
   IDENTIFIER_RULES,
   MATH_PURE_MEMBERS,
   NEW_RULES,
@@ -20,6 +25,7 @@ import {
   isForbiddenThreeSubpath,
   isPackage,
   isShared,
+  isToolingPackage,
   type FileInfo,
   type IdentifierRule,
   type RuleId,
@@ -591,6 +597,211 @@ function workspaceOf(rel: string, ctx: CheckContext): WorkspaceInfo | undefined 
   return ctx.workspaces.find((w) => rel === w.dir || rel.startsWith(`${w.dir}/`));
 }
 
+/** Pacote de um workspace de `tools/` (texgen, mapc, audioconv…): só Node, nunca no jogo. */
+function isToolWorkspace(pkg: string, ctx: CheckContext): boolean {
+  return ctx.workspaces.some((w) => w.dir.startsWith('tools/') && w.packageName === pkg);
+}
+
+// --- Laço quente (regra 11; PLANO do porte E.9) ---
+
+/** Uma ocorrência proibida (ou um marcador mal posto) dentro de uma região quente. */
+export interface HotLoopFinding {
+  readonly line: number;
+  readonly col: number;
+  readonly what: string;
+}
+
+/** Antes de `{`, esta pontuação põe a chave em posição de expressão: é literal de objeto (e não bloco). */
+const BRACE_AFTER_PUNCT = new Set(['=', '(', ',', '[', '?', '|', '&', '!', '+', '-', '*', '/', '%', '~', '^', '...']);
+/**
+ * Idem para palavras: `return {…}`, `throw {…}`, `x in {…}`… Sem `void`: em TS ele é o tipo de retorno de
+ * `function f(): void {` (o corpo), e o operador `void {…}` não aparece em código de verdade.
+ */
+const BRACE_AFTER_WORD = new Set(['return', 'yield', 'await', 'typeof', 'throw', 'in', 'of', 'delete']);
+
+/** Posição (linha, coluna) de `a` vem antes da de `b`? */
+const before = (aLine: number, aCol: number, bLine: number, bCol: number): boolean =>
+  aLine < bLine || (aLine === bLine && aCol < bCol);
+
+/** `[` em `i` abre um literal de array (ou uma desestruturação por iterador), e não um acesso por índice? */
+function opensArray(tokens: readonly Token[], i: number): boolean {
+  let p = tokens[i - 1];
+  // `a![k]`: a asserção não nula do TS não muda o acesso.
+  if (isPunct(p, '!') && (tokens[i - 2]?.kind === 'ident' || isCloser(tokens[i - 2]))) p = tokens[i - 2];
+  if (p === undefined) return true;
+  if (p.kind === 'ident') return NOT_AN_OBJECT.has(p.value);
+  if (p.kind === 'punct') return !(isPunct(p, ')') || isPunct(p, ']') || isPunct(p, '?.') || isPunct(p, '>'));
+  return false; // string, template, número, regex ou #privado: acesso
+}
+
+/**
+ * `:` em `k` seguido de `{`: é literal de objeto (ternário, valor de propriedade), salvo rótulo `case`/`default` (o
+ * `{` é bloco) e anotação de tipo de variável ou parâmetro (`const v: {…}`, `(p: {…})`).
+ */
+function colonOpensObject(tokens: readonly Token[], st: Structure, k: number): boolean {
+  const name = tokens[k - 1];
+  const head = tokens[k - 2];
+  if (isIdent(name, 'default')) return false;
+  if (
+    name?.kind === 'ident' &&
+    (isIdent(head, 'const') || isIdent(head, 'let') || isIdent(head, 'var') || isPunct(head, '(') || isPunct(head, ','))
+  ) {
+    return false;
+  }
+  for (let j = k - 1; j >= 0; j--) {
+    const t = tokens[j] as Token;
+    if (isCloser(t)) {
+      j = st.group[j] as number;
+      if (j < 0) break;
+      continue;
+    }
+    if (isPunct(t, ';') || isPunct(t, '{') || isPunct(t, '}') || isPunct(t, ':') || isPunct(t, '?')) break;
+    if (isIdent(t, 'case') && !isMemberDot(tokens[j - 1])) return false;
+  }
+  return true;
+}
+
+/** `{` em `i` abre um literal de objeto (posição de expressão), e não um bloco? */
+function opensObject(tokens: readonly Token[], st: Structure, i: number): boolean {
+  const p = tokens[i - 1];
+  if (p === undefined) return false;
+  if (p.kind === 'template') return true; // `${ {…} }`
+  if (p.kind === 'ident') return BRACE_AFTER_WORD.has(p.value);
+  if (p.kind !== 'punct') return false;
+  if (p.value === ':') return colonOpensObject(tokens, st, i - 1);
+  return BRACE_AFTER_PUNCT.has(p.value);
+}
+
+/** Início (em UTF-16) de cada linha do fonte, para achar o caractere de um token pela linha e coluna. */
+function lineStarts(source: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) if (source[i] === '\n') starts.push(i + 1);
+  return starts;
+}
+
+interface HotRegion {
+  readonly line: number;
+  readonly col: number;
+  endLine: number;
+  endCol: number;
+}
+
+/**
+ * Corpo `{…}` da declaração `function` no token `i` (índices do `{` e do `}`), ou `null` sem corpo (sobrecarga). Pula
+ * o tipo de retorno, inclusive um literal de tipo (`): { a: number } {`).
+ */
+function functionBody(tokens: readonly Token[], st: Structure, i: number): readonly [number, number] | null {
+  let k = i + 2;
+  while (k < tokens.length && !isPunct(tokens[k], '(')) k++;
+  k = (st.close[k] ?? tokens.length) + 1;
+  while (k < tokens.length) {
+    const t = tokens[k] as Token;
+    if (isPunct(t, ';') || isPunct(t, '}')) return null;
+    if (isPunct(t, '(') || isPunct(t, '[') || (isPunct(t, '{') && isPunct(tokens[k - 1], ':'))) {
+      k = (st.close[k] as number) + 1;
+      continue;
+    }
+    if (isPunct(t, '{')) return [k, st.close[k] as number];
+    k++;
+  }
+  return null;
+}
+
+/**
+ * Marcador obrigatório (E.9): cada função de `HOT_LOOP_REQUIRED_FUNCTIONS` declarada no arquivo tem de ter o corpo
+ * cruzando uma região quente, e os arquivos de `HOT_LOOP_REQUIRED_FILES` precisam de ao menos uma região.
+ */
+function missingHotRegions(
+  rel: string,
+  tokens: readonly Token[],
+  st: Structure,
+  regions: readonly HotRegion[],
+): HotLoopFinding[] {
+  const out: HotLoopFinding[] = [];
+  if (regions.length === 0 && HOT_LOOP_REQUIRED_FILES.some((re) => re.test(rel))) {
+    out.push({ line: 1, col: 1, what: 'arquivo do laço quente (E.9) sem nenhuma região `// quente:`' });
+  }
+  for (let i = 0; i < tokens.length; i++) {
+    const name = tokens[i + 1];
+    if (!isIdent(tokens[i], 'function') || name?.kind !== 'ident' || !HOT_LOOP_REQUIRED_FUNCTIONS.has(name.value)) {
+      continue;
+    }
+    const body = functionBody(tokens, st, i);
+    if (body === null) continue;
+    const a = tokens[body[0]] as Token;
+    const b = tokens[body[1]] as Token;
+    const covered = regions.some(
+      (r) => before(r.line, r.col, b.line, b.col) && before(a.line, a.col, r.endLine, r.endCol),
+    );
+    if (!covered) out.push({ line: name.line, col: name.col, what: `\`${name.value}\` (E.9) sem região quente` });
+  }
+  return out;
+}
+
+/**
+ * Regra do laço quente: entre `// quente:` e `// fim-quente` não pode haver `new`, literal de array ou objeto, arrow
+ * function, `.map/.filter/.forEach/.slice/.concat`, template string nem spread. Também reprova marcador órfão
+ * (`fim-quente` sem abertura, região sem fim, abertura dentro de outra região) e, com `rel`, função ou arquivo do E.9
+ * sem região (`missingHotRegions`). Heurístico como o resto do guard:
+ * `[`/`{` em posição de expressão contam como literal (a desestruturação por array também, porque usa o iterador).
+ */
+export function hotLoopFindings(
+  source: string,
+  tokens: readonly Token[],
+  comments: readonly Comment[],
+  st: Structure = analyzeStructure(tokens),
+  rel = '',
+): HotLoopFinding[] {
+  const out: HotLoopFinding[] = [];
+  const regions: HotRegion[] = [];
+  let open: (typeof regions)[number] | null = null;
+  for (const c of comments) {
+    if (HOT_LOOP_OPEN.test(c.text)) {
+      if (open) out.push({ line: c.line, col: c.col, what: '`// quente:` dentro de outra região quente' });
+      else {
+        open = { line: c.line, col: c.col, endLine: Number.MAX_SAFE_INTEGER, endCol: 0 };
+        regions.push(open);
+      }
+    } else if (HOT_LOOP_CLOSE.test(c.text)) {
+      if (!open) out.push({ line: c.line, col: c.col, what: '`// fim-quente` sem `// quente:` antes' });
+      else {
+        open.endLine = c.line;
+        open.endCol = c.col;
+        open = null;
+      }
+    }
+  }
+  if (open) out.push({ line: open.line, col: open.col, what: 'região quente sem `// fim-quente`' });
+  if (rel !== '') out.push(...missingHotRegions(rel, tokens, st, regions));
+  if (regions.length === 0) return out;
+
+  const starts = lineStarts(source);
+  let r = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i] as Token;
+    while (r < regions.length && !before(t.line, t.col, regions[r]!.endLine, regions[r]!.endCol)) r++;
+    if (r >= regions.length) break;
+    const region = regions[r]!;
+    if (!before(region.line, region.col, t.line, t.col)) continue;
+    const found = (what: string): void => {
+      out.push({ line: t.line, col: t.col, what });
+    };
+    if (t.kind === 'ident') {
+      if (t.value === 'new' && !isMemberDot(tokens[i - 1]) && !isMemberDot(tokens[i + 1])) found('`new`');
+      else if (HOT_LOOP_MEMBERS.has(t.value) && isMemberDot(tokens[i - 1])) found(`\`.${t.value}\``);
+    } else if (t.kind === 'template') {
+      // Só a cabeça do template (a parte depois de `}` é o mesmo literal).
+      if (source[(starts[t.line - 1] ?? 0) + t.col - 1] === '`') found('template string');
+    } else if (t.kind === 'punct') {
+      if (t.value === '=>') found('arrow function (`=>`)');
+      else if (t.value === '...') found('spread (`...`)');
+      else if (t.value === '[' && opensArray(tokens, i)) found('literal de array (ou desestruturação por iterador)');
+      else if (t.value === '{' && opensObject(tokens, st, i)) found('literal de objeto');
+    }
+  }
+  return out;
+}
+
 const SUPPRESS = /guard-allow:\s*([a-z-]+)\s+\S/;
 
 /** Aplica todas as regras a um arquivo. `rel` é relativo à raiz, com `/`. */
@@ -745,11 +956,21 @@ export function checkFile(rel: string, source: string, ctx: CheckContext): FileR
       if (!isPackage(file, 'net')) report('import-trystero', token, `'${spec}'`);
     }
     if (pkg === '@boboforces/net' && !isApp(file, 'web')) report('import-net', token, `'${spec}'`);
-    // O game só enxerga o render pelo subcaminho sem three e sem DOM, até para tipos (compila sem a lib DOM).
-    if (pkg === '@boboforces/render' && isPackage(file, 'game') && !RENDER_DATA_SPECS.has(spec)) {
-      report('import-render', token, `'${spec}'${imp.typeOnly ? ' (import type)' : ''}`);
+    // O game só enxerga o render pelo subcaminho sem three e sem DOM, até para tipos (compila sem a lib DOM). Os
+    // outros pacotes compartilhados nem isso: o renderer chega pronto, injetado pelas cascas (M1: continua assim).
+    if (pkg === '@boboforces/render' && shared && !isPackage(file, 'render')) {
+      if (!isPackage(file, 'game') || !RENDER_DATA_SPECS.has(spec)) {
+        report('import-render', token, `'${spec}'${imp.typeOnly ? ' (import type)' : ''}`);
+      }
     }
+    // Ferramentas e dependências de desenvolvimento ficam fora do bundle (M1: lamejs é LGPL; tools/* são Node).
+    if (isToolingPackage(pkg) || isToolWorkspace(pkg, ctx)) report('import-tooling', token, `'${spec}'`);
     if (ws && pkg !== ws.packageName && !ws.deps.has(pkg)) report('import-undeclared', token, `'${spec}'`);
+  }
+
+  // Laço quente (regra 11): vale em todo arquivo varrido.
+  for (const h of hotLoopFindings(source, tokens, lexed.comments, st, rel)) {
+    report('hot-loop', { kind: 'punct', value: '', line: h.line, col: h.col }, h.what);
   }
 
   // Supressões explícitas: `// guard-allow: <regra> <motivo>` no fim da linha ou sozinho na linha de cima.

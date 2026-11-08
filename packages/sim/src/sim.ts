@@ -1,4 +1,4 @@
-import type { MatchRecipe } from '@boboforces/format';
+import { createFigureGameTable, type FigureGameTable, type MatchRecipe } from '@boboforces/format';
 import { dequantizeAxis, type InputFrame } from '@boboforces/input';
 import {
   assert,
@@ -10,19 +10,31 @@ import {
   type BitWriter,
   type Disposable,
 } from '@boboforces/shared';
-import { BLOCK_SIZE, type BlockRegistry, type WorldGrid } from '@boboforces/world';
+import type { NavGrid } from '@boboforces/nav';
+import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } from '@boboforces/world';
 import { BASE_HP, METRICS } from './config/metrics.ts';
 import { MOVEMENT_BOBO } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
-import { MAX_CONTROLLERS, MAX_ENTITIES, MAX_TEAMS, secondsToTicks, SIM_HZ } from './constants.ts';
+import { ZOMBIE_RULES, MOVEMENT_ZOMBIE } from './config/zombie.ts';
+import {
+  MAX_CONTROLLERS_WITH_ZOMBIES,
+  MAX_ENTITIES,
+  MAX_TEAMS,
+  MAX_ZOMBIES,
+  secondsToTicks,
+  SIM_HZ,
+  ZOMBIE_CONTROLLER_BASE,
+} from './constants.ts';
 import { DamageQueue, type MatchState, type SimContext } from './context.ts';
-import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from './entity.ts';
+import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM, NULL_ENTITY, type EntityId } from './entity.ts';
 import { EventQueue } from './event-queue.ts';
+import { bindFigureTable, FigureHitCache, unbindFigureTable } from './hitbox.ts';
 import type { SimEvent } from './events.ts';
 import { expandRecipe, isFfaMode, isWarfareMode } from './recipe.ts';
 import { hashState, readState, writeState } from './snapshot.ts';
 import { SimState } from './state.ts';
 import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
+import { meleeSystem } from './systems/melee.ts';
 import { movementSystem } from './systems/movement.ts';
 import { weaponSystem } from './systems/weapons.ts';
 import type { MatchView, SimView } from './view.ts';
@@ -36,11 +48,22 @@ export interface SpawnPoint {
   readonly team: number;
 }
 
-/** O que a sim precisa do mapa (no M1 sai do `.bfmap`; no M0 os testes montam na mão). */
+/**
+ * O que a sim precisa do mapa. M1: sai do `.bfmap` (o `game` monta: grade, registro pela tabela do mapa, spawns dos
+ * marcadores, colisores das props e a grade de navegação); o M0 e os testes montam na mão (sem os opcionais).
+ */
 export interface SimMap {
   readonly grid: WorldGrid;
   readonly blocks: BlockRegistry;
   readonly spawns: readonly SpawnPoint[];
+  /** M1: caixas das props (colisão e raios); ausente = só a grade. */
+  readonly colliders?: StaticColliders;
+  /** M1: navegação (a IA usa; a sim só repassa na `SimView`). */
+  readonly nav?: NavGrid;
+  /** M1: plano de morte em metros (`playArea.killPlaneY` do mapa); ausente = `METRICS.killPlaneBelow` abaixo do bloco mais baixo. */
+  readonly killPlaneY?: number;
+  /** M1: área jogável (paredes invisíveis em X/Z, metros); ausente = a grade inteira. */
+  readonly playArea?: { readonly minX: number; readonly minZ: number; readonly maxX: number; readonly maxZ: number };
 }
 
 export interface SimConfig {
@@ -54,6 +77,20 @@ export interface SimConfig {
    * unidades/s e a física e a cadência são integradas sem depender do passo (`movement.test` e `sim.test` conferem).
    */
   readonly hz?: number;
+  /**
+   * M1: zumbis do teste de estresse (0..`MAX_ZOMBIES`, padrão 0). Entidades `ENTITY_KIND.zombie`, hostis a todos,
+   * nos controladores a partir de `ZOMBIE_CONTROLLER_BASE`, nascendo nos spawns de qualquer time. Não fazem parte da
+   * receita (`preset@1`): são parâmetro do bench.
+   */
+  readonly zombies?: number;
+  /**
+   * Tabela de jogo do boneco (#56, PLANO do porte §B3): o `game` monta UMA vez no loading e passa o mesmo objeto à sim
+   * e ao render (`Renderer.setFigures`). Ausente = o `createSim` monta a sua na criação (testes, golden, balance,
+   * mapc), nunca no 1º raio. A sim tira dela as 12 hitboxes (postura × pitch) e a mira da IA; liga a tabela às funções
+   * livres (`bindFigureTable`) e solta no `dispose` (regra 21). Quem cria muitas sims seguidas (o robô de
+   * balanceamento) passa a mesma tabela a todas.
+   */
+  readonly figureTable?: FigureGameTable;
 }
 
 /** Referência a um snapshot já confirmado (delta do online, M5). */
@@ -103,6 +140,25 @@ function lowestBlockY(grid: WorldGrid): number {
   return 0;
 }
 
+/**
+ * Spawns iniciais dos zumbis: os pontos (de qualquer time) ordenados do mais longe ao mais perto dos bobos já postos;
+ * o i-ésimo zumbi vai para o i-ésimo da metade mais longe (em rodízio). Só no construtor.
+ */
+function zombieSpawnOrder(spawns: readonly SpawnPoint[], s: SimState): number[] {
+  const score = spawns.map((sp) => {
+    let best = Infinity;
+    for (let j = 0; j < s.count; j++) {
+      if (s.alive[j] === 0 || s.kind[j] !== ENTITY_KIND.bobo) continue;
+      const dx = s.position[j * 3]! - sp.x;
+      const dz = s.position[j * 3 + 2]! - sp.z;
+      best = Math.min(best, dx * dx + dz * dz);
+    }
+    return best;
+  });
+  const order = spawns.map((_, i) => i).sort((a, b) => score[b]! - score[a]! || a - b);
+  return order.slice(0, Math.max(1, Math.ceil(order.length / 2)));
+}
+
 /** Spawn inicial: o k-ésimo membro do time vai para o k-ésimo ponto do time (sem empilhar ninguém no tick 0). */
 function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean, k: number): number {
   const own: number[] = [];
@@ -122,13 +178,17 @@ function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean,
  */
 export function createSim(config: SimConfig): Sim {
   const { recipe, map, humans } = config;
+  const zombies = config.zombies ?? 0;
   assert(map.spawns.length > 0, 'sim: o mapa precisa de pelo menos 1 spawn');
+  assert(Number.isInteger(zombies) && zombies >= 0 && zombies <= MAX_ZOMBIES, `sim: 0 a ${MAX_ZOMBIES} zumbis`);
   const slots = expandRecipe(recipe, humans);
   const root = createRng(recipe.seed);
   const s = new SimState();
   const events = new EventQueue();
   const hz = config.hz ?? SIM_HZ;
   assert(Number.isInteger(hz) && hz >= 10 && hz <= 240, `sim: hz inválido (${hz})`);
+  // Tabela de jogo do boneco: a da partida, ou montada aqui (na criação; nunca no 1º raio).
+  const figureTable = config.figureTable ?? createFigureGameTable();
   const timeLimitS = recipe.match?.timeLimitS ?? 0;
   const match: MatchState = {
     phase: 'playing',
@@ -143,9 +203,11 @@ export function createSim(config: SimConfig): Sim {
     match,
     grid: map.grid,
     blocks: map.blocks,
+    colliders: map.colliders ?? null,
     spawns: map.spawns,
-    // M0: só o perfil Bobo existe; os outros ids caem nele até o M2.
+    // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
     profile: MOVEMENT_BOBO,
+    zombieProfile: MOVEMENT_ZOMBIE,
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
     hz,
@@ -157,9 +219,14 @@ export function createSim(config: SimConfig): Sim {
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
     regenPerTick: MATCH_DEFAULTS.regenPerS / hz,
     scoreLimit: recipe.match?.scoreLimit ?? 0,
-    killPlaneY: lowestBlockY(map.grid) - METRICS.killPlaneBelow,
+    killPlaneY: map.killPlaneY ?? lowestBlockY(map.grid) - METRICS.killPlaneBelow,
+    playArea: map.playArea ?? null,
+    zombieHp: ZOMBIE_RULES.hp,
+    zombieRespawnTicks: Math.max(1, secondsToTicks(ZOMBIE_RULES.respawnS, hz)),
     rngSpawn: root.fork('spawn'),
     rngWeapons: root.fork('weapons'),
+    // Um slot de caixas por controlador (todo corpo de bobo ou zumbi tem um).
+    figures: new FigureHitCache(figureTable, MAX_CONTROLLERS_WITH_ZOMBIES),
   };
 
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -173,7 +240,19 @@ export function createSim(config: SimConfig): Sim {
     respawn(ctx, id & 0xffff, initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k));
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
+  if (zombies > 0) {
+    const order = zombieSpawnOrder(map.spawns, s);
+    for (let i = 0; i < zombies; i++) {
+      const controller = ZOMBIE_CONTROLLER_BASE + i;
+      const id = s.allocate(ENTITY_KIND.zombie, NO_TEAM, controller);
+      assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
+      s.controllerEntity[controller] = id;
+      respawn(ctx, id & 0xffff, order[i % order.length]!);
+      controllerCount = controller + 1;
+    }
+  }
   events.matchPhase(0, 'playing');
+  bindFigureTable(figureTable);
 
   const matchView: Mutable<MatchView> = {
     phase: match.phase,
@@ -209,6 +288,9 @@ export function createSim(config: SimConfig): Sim {
     match: matchView,
     world: map.grid,
     blocks: map.blocks,
+    colliders: map.colliders ?? null,
+    nav: map.nav ?? null,
+    playArea: map.playArea ?? null,
   };
   const syncView = (): void => {
     view.tick = ctx.tick;
@@ -225,7 +307,7 @@ export function createSim(config: SimConfig): Sim {
 
   /** Passo 1: aplica os InputFrames (mira absoluta; botões guardados para detectar bordas). */
   const applyInputs = (inputs: ReadonlyArray<Readonly<InputFrame> | null>): void => {
-    for (let c = 0; c < MAX_CONTROLLERS; c++) {
+    for (let c = 0; c < controllerCount; c++) {
       const id = s.controllerEntity[c]!;
       if (id === NULL_ENTITY) continue;
       const e = id & 0xffff;
@@ -271,6 +353,7 @@ export function createSim(config: SimConfig): Sim {
       applyInputs(inputs);
       movementSystem(ctx);
       weaponSystem(ctx);
+      meleeSystem(ctx);
       damageSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
@@ -282,7 +365,7 @@ export function createSim(config: SimConfig): Sim {
       events.drain(out);
     },
     controllerEntity(controller): EntityId {
-      if (controller < 0 || controller >= MAX_CONTROLLERS) return NULL_ENTITY;
+      if (controller < 0 || controller >= MAX_CONTROLLERS_WITH_ZOMBIES) return NULL_ENTITY;
       return s.controllerEntity[controller]!;
     },
     stateHash: () => hashState(ctx, hasher),
@@ -292,11 +375,17 @@ export function createSim(config: SimConfig): Sim {
     },
     readSnapshot(r): void {
       readState(ctx, r);
+      // O tick volta e as posições mudam: as caixas guardadas do tick não valem mais.
+      ctx.figures.invalidate();
       events.clear();
       keepEvents = false;
       syncView();
     },
     dispose(): void {
+      if (!disposed) {
+        unbindFigureTable(figureTable);
+        ctx.figures.release();
+      }
       disposed = true;
       events.clear();
     },

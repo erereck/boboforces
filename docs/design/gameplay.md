@@ -145,12 +145,12 @@ Esta tabela fica num arquivo de configuração e **manda sobre arte e técnica**
 
 | Medida | Valor | Em blocos (0,5 m) | Marca |
 |---|---|---|---|
-| Proporção | cabeçudo, ~3 cabeças | — | [DECIDIDO #18] |
-| Altura em pé | 1,5 m | 3 | [PADRÃO] |
-| Olho em pé | 1,3 m | — | [PADRÃO] |
+| Proporção | cabeçudo, 4 cabeças: o boneco do FutBobo em escala uniforme (1 px = 7/128 m; 32 px = 1,75 m; cabeça de 8 px) | — | [DECIDIDO #18, #55, #56] |
+| Altura em pé | 1,75 m (era 1,625 m e antes 1,5 m) | 3½; o vão livre pede 4 | [DECIDIDO #55; valor = variante B] |
+| Olho em pé | 1,55 m (corpo − 0,2 m; era 1,425 m e antes 1,3 m) | — | [PADRÃO] |
 | Agachado (altura / olho) | 0,95 m / 0,8 m | ~2 | [PADRÃO] |
-| Cabeça | ~0,5 m (cubo) | 1 | [PADRÃO] |
-| AABB de movimento | 0,6 × 1,5 × 0,6 m (0,95 agachado) | — | [PADRÃO] |
+| Cabeça | 0,4375 m (cubo de 8 px do FutBobo; era 0,5 m) | ~1 | [DECIDIDO #56] |
+| AABB de movimento | 0,6 × 1,75 × 0,6 m (0,95 agachado) | — | [PADRÃO] |
 | Degrau automático | 0,5 m | 1 | [PADRÃO] |
 | Pulo padrão (perfil Bobo) | 1,0 m | 2 | [PADRÃO] |
 | Cobertura baixa | 1,0 m (esconde o bobo agachado; em pé, atira por cima) | 2 | [PADRÃO] |
@@ -160,19 +160,38 @@ Esta tabela fica num arquivo de configuração e **manda sobre arte e técnica**
 | Pé-direito mínimo | 2,0 m; 3,0 m onde se espera pulo | 4; 6 | [PADRÃO] |
 | Andar de prédio | 3,0 m | 6 | [PADRÃO] |
 | Queda sem dano | até 5 m | 10 | [PADRÃO] |
-| Skin | pixel-art 64×64 com camada externa (chapéu, cabelo, roupa) | — | [PADRÃO] |
+| Skin | pixel art pintada direto em 2 camadas 64×64 (cabeça, expressões e paleta; tronco e listras), ~36,6 texels/m; cabelo e acessórios são caixas na cabeça | — | [PADRÃO, #51; #56] |
 
-**Hitboxes** (caixas rígidas do próprio modelo; "o que você vê é o que acerta"):
+**Hitboxes** (12 caixas orientadas, uma por osso, lidas da tabela de pose do boneco; "o que você vê é o que acerta"). Decisões menores do port do boneco do FutBobo, **revisáveis**: o Erick decide na rodada 3 de prints.
 
-| Parte | Tamanho (L × A × P) | Dano |
-|---|---|---|
-| Cabeça | 0,5 × 0,5 × 0,5 m | multiplicador da arma (5.1) |
-| Tronco | 0,45 × 0,5 × 0,28 m | 1,0x |
-| Braços (2) | 0,18 × 0,5 × 0,18 m | 0,8x |
-| Pernas (2) | 0,22 × 0,5 × 0,22 m | 0,8x |
+| Parte (osso) | Caixa (L × A × P, px) | Metros | Categoria e dano |
+|---|---|---|---|
+| Cabeça | 8 × 8 × 8 | 0,4375 × 0,4375 × 0,4375 | cabeça: multiplicador da arma (5.1) |
+| Tronco | 8 × 12 × 4 | 0,4375 × 0,656 × 0,219 | tronco 1,0x |
+| Braço D e E (manga) | 4 × 5,2 × 4 | 0,219 × 0,284 × 0,219 | braço 0,8x |
+| Antebraço + mão D e E (uma caixa só) | 3,8 × 6,8 × 3,8 | 0,208 × 0,372 × 0,208 | braço 0,8x |
+| Coxa D e E | 4,25 × 5,6 × 4,3 | 0,232 × 0,306 × 0,235 | perna 0,8x |
+| Canela D e E | 3,75 × 4,9 × 3,75 | 0,205 × 0,268 × 0,205 | perna 0,8x |
+| Chuteira D e E | 4,05 × 2,7 × 5,25 | 0,221 × 0,148 × 0,287 | perna 0,8x |
 
-- A camada externa da skin (chapéu, cabelo) **não aumenta a hitbox**, e acessórios têm limite de volume para não esconder a cabeça.
-- A forma final das caixas é aprovada na cena-vitrine (M1); a soma das alturas (1,5 m) e a cabeça de 0,5 m não mudam. A frente de arte propõe outra divisão (`arte-ux.md` 2.1: tronco 0,5 × 0,56 × 0,31 m, pernas de 0,44 m); o print do M1 escolhe.
+- A camada de cabelo e os acessórios (caixas na cabeça) **nunca são hitbox**, e têm limite de volume para não esconder a cabeça. O cabelo tem **teto de jogo por recorte**: 1,99 m em pé e 0,99 m agachado ou deslizando (em pé só o afro gigante e o moicano espetado passam do teto). A aba do boné pode entrar numa parede encostada, como em todo FPS.
+- **Uma tabela só:** as caixas são as do `arte-ux.md` 2.1 (`format/src/model/figure*.ts`; as do bobo A, `bobo.ts`, saíram). A tabela tem **22 posturas** (em pé 10, agachado 7, deslizando 4 e o zumbi) × **5 pitches** (−1,2; −0,6; 0; 0,6; 1,2); a sim interpola centros e R, reortonormaliza e soma a folga entre as amostras, e a **fase larga** (raio no plano e topo por postura) só descarta o que não pode acertar. A sim troca a postura no tick; o render mistura em 120 ms. Cada tiro lê a caixa da pose daquele tick (cache por entidade por tick); medido 0,18–0,39 µs por raio com JIT (meta ≤ 0,6).
+- **Cabeça presa ao olho:** o tronco não leva o pitch, a cabeça gira no máximo 0,6 rad em pé, o pescoço desliza até 1,5 px para compensar e braços e arma levam o resto. **Agachado e deslizando a cabeça só levanta** (pitch em [0; +0,1]): é o que faz o "agachado atrás da cobertura de 1,0 m não leva tiro além de 7 m" valer em todo pitch (alcance máximo de exposição 6,81 m com giro ±45° e atirador ±30°; medido 0 acerto em 7–30 m, 3 sementes × 10 mil tiros).
+- **Agachado P4f (#55):** topo da hitbox **0,97 m no máximo** (era 0,95) em qualquer pitch e empunhadura (medido 0,95978 m; 0,94013 m com o pitch para baixo; a fase larga mede 0,9698 e não conta). O texto "nenhum tiro horizontal acima de 0,95 m acerta o agachado" vira **0,97 m**; a cobertura baixa de 1,0 m deixa 3 cm de folga. Em pé o teto é 1,81 m (medido 1,80375 m, sniper em ADS com o pitch 0,47). Deslizando, topo 0,94875 m.
+- **Braço através de muro e lona:** as hitboxes de braço (manga e antebraço, D e E) são cortadas a **0,75 m do eixo** da entidade no plano horizontal (um quadrado alinhado ao mundo = a AABB crescida de 0,45 m; `ARM_HIT_CUT_M`). A arma e a mão aparecem do outro lado de um muro fino ou de uma lona, mas ali não levam tiro: com um muro de 1 bloco (0,5 m), 0 de 2.000 tiros acertam (sem o corte, 100%). O visual continua igual. O `mapc` mede os dois: o braço visual atravessa barreira em 1.256 nós do Construto (1.213 em pé com a sniper, 1.256 agachado), a hitbox em **15** (14 da cerca de tábua e 1 quina de rampa); a cabeça em pé (0,409 m do centro), o tronco agachado e as coxas também saem da AABB e passam pela cerca de 6,25 cm. O corte vale para o zumbi também.
+- **Fora da regra "visual ⊂ hitbox + 1 px", de propósito** (medido e relatado): passada das pernas, braço E na recarga, pernas no ar, transitórios do envelope de até 2 px e o giro preguiçoso das pernas (até 0,35 rad). Concordância entre a sim e o visual (raios): 99,53% nas amostras e 99,37% entre elas, 99,68% por categoria, 0 casos de cabeça visual sem acerto na sim; por osso o piso é 99,2% (a caixa única de antebraço + mão).
+- **Headshot:** os multiplicadores ficam (padrão 1,5x, sniper 2,0x, escopeta 1,25x; braço e perna 0,8x). Com a cabeça de 0,4375 m e a hitbox por osso, o robô de balanceamento (semente 42, 3.000 duelos por par) mede, **contra o bobo A**:
+
+| Nível | Precisão (A → agora) | Headshot (A → agora) | TTK (A → agora) |
+|---|---|---|---|
+| Pela vibe | 3,4% → 3,2% | 35,4% → 41,7% | 1,60 s → 2,72 s |
+| De boa | 7,9% → 7,2% | 46,4% → 39,0% | 2,13 s → 2,31 s |
+| Normal | 16,9% → 15,6% | 57,6% → 44,5% | 1,21 s → 1,57 s |
+| Suado | 31,0% → 28,6% | 55,7% → 46,4% | 0,52 s → 0,66 s |
+| Tryhard | 37,5% → 35,5% | 66,1% → 59,4% | 0,29 s → 0,35 s |
+
+  Os 5 níveis seguem em ordem e o par mais apertado (De boa × Pela vibe) é 84,4% (85,7% no bobo A). O headshot do Normal cai 13 pontos e o TTK sobe 20–30% (o plano previa −3 a −11 pontos e +8–16%); o Tryhard fica em 59,4% (o critério era 60%). A IA mira na parte VISÍVEL da caixa (teto de 2 miras desse tipo por tick), o que dá cabeça em 100% e tronco em 97,2% dos raios no ponto mirado, e custa 8,4 pontos de headshot ao Normal; mirando o centro da caixa o headshot do Normal seria 52,9% e o E.5 geométrico reprovaria. Pergunta G3 (multiplicadores) e a escolha mira visível × centro ficam com o Erick.
+- **Em aberto:** a escala do Chonker e do Mega na hitbox (M3); o emote no `ActorBuffer` (M2).
 - Escadas de blocos funcionam pelo degrau automático, com suavização da câmera. Rampas (peças fora da grade) de até 45° são andáveis.
 
 ### 3.2 Princípio

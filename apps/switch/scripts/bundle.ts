@@ -1,7 +1,7 @@
 /**
  * Build do Switch (tecnico.md §19.2), herdado do `build.mjs` do MMM: esbuild de `src/main.ts` para `<romfs>/main.js`
- * (ESM, ES2022, sourcemap) com `__PLATFORM__ = 'switch'` e `__ONLINE__ = false`, cópia dos assets e um manifesto com
- * sha256 de cada arquivo e o commit. Usado por `build.ts` (romfs do app) e pelo `tools/portcheck` (pasta própria),
+ * (ESM, ES2022, sourcemap) com `__PLATFORM__ = 'switch'` e `__ONLINE__ = false`, cópia dos assets, o `licencas.txt`
+ * da raiz (`licenses.ts`) e um manifesto com sha256 de cada arquivo e o commit. Usado por `build.ts` (romfs do app) e pelo `tools/portcheck` (pasta própria),
  * para os dois checarem exatamente o mesmo bundle.
  */
 import { execFileSync } from 'node:child_process';
@@ -10,6 +10,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { basename, dirname, join, relative, sep } from 'node:path';
 import { build } from 'esbuild';
 import type { BuildManifest } from '../src/platform/build-info.ts';
+import { buildLicenses, ROMFS_LICENSES_NAME } from './licenses.ts';
 import { APP_DIR, ROOT_DIR, readVersion } from './paths.ts';
 
 /** Constantes de compilação do Switch. O código compartilhado pode testar `__ONLINE__` para cortar rede do bundle. */
@@ -30,9 +31,13 @@ export const RUNTIME_ASSETS_TABLE = 'assets-src/runtime-assets.json';
 export function readRuntimeAssets(): Readonly<Record<string, string>> {
   const table = JSON.parse(readFileSync(join(ROOT_DIR, RUNTIME_ASSETS_TABLE), 'utf8')) as {
     files?: Record<string, string>;
+    local?: Record<string, string>;
   };
   if (!table.files) throw new Error(`${RUNTIME_ASSETS_TABLE} sem "files"`);
-  return table.files;
+  // `local`: assets gerados só sob demanda na máquina do Erick; o NRO local leva os que existirem. Vazio desde a
+  // decisão #54 (a chave fica no contrato da tabela).
+  const local = Object.entries(table.local ?? {}).filter(([, file]) => existsSync(join(ROOT_DIR, 'assets-src', file)));
+  return { ...table.files, ...Object.fromEntries(local) };
 }
 
 export interface SwitchBuildOptions {
@@ -45,6 +50,8 @@ export interface SwitchBuildResult {
   readonly mainPath: string;
   readonly mainBytes: number;
   readonly assetFiles: number;
+  /** Tamanho do `licencas.txt` da raiz do RomFS. */
+  readonly licensesBytes: number;
   readonly manifest: BuildManifest;
   readonly warnings: readonly string[];
 }
@@ -87,6 +94,8 @@ export async function buildSwitch(opts: SwitchBuildOptions): Promise<SwitchBuild
     define: SWITCH_DEFINE,
     legalComments: 'eof',
     logLevel: 'silent',
+    // Os pacotes npm que entraram no bundle, para o `licencas.txt`.
+    metafile: true,
   });
   const warnings = result.warnings.map((w) => `${w.location ? `${w.location.file}:${w.location.line} ` : ''}${w.text}`);
 
@@ -103,6 +112,8 @@ export async function buildSwitch(opts: SwitchBuildOptions): Promise<SwitchBuild
     cpSync(dir, join(opts.outDir, 'assets'), { recursive: true });
     assetFiles += listFiles(dir).length;
   }
+  const licenses = buildLicenses(Object.keys(result.metafile.inputs), process.cwd(), ROOT_DIR);
+  writeFileSync(join(opts.outDir, ROMFS_LICENSES_NAME), licenses);
 
   const { version, codename } = readVersion();
   const commit = git(['rev-parse', 'HEAD']);
@@ -123,5 +134,12 @@ export async function buildSwitch(opts: SwitchBuildOptions): Promise<SwitchBuild
     files,
   };
   writeFileSync(join(opts.outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { mainPath, mainBytes: readFileSync(mainPath).length, assetFiles, manifest, warnings };
+  return {
+    mainPath,
+    mainBytes: readFileSync(mainPath).length,
+    assetFiles,
+    licensesBytes: Buffer.byteLength(licenses),
+    manifest,
+    warnings,
+  };
 }

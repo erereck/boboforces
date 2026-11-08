@@ -1,10 +1,29 @@
 {
-  "$comment": "Assets que o jogo carrega em tempo de execução: caminho LÓGICO (platform.assets) → arquivo gerado em assets-src/. A web serve em <base>/assets/<lógico> (plugin do vite.config.ts) e o Switch copia para romfs:/assets/<lógico> (apps/switch/scripts/bundle.ts). Os lógicos ficam em packages/game/src/assets.ts.",
+  "$comment": "Assets que o jogo carrega em tempo de execução: caminho LÓGICO (platform.assets) → arquivo gerado em assets-src/. A web serve em <base>/assets/<lógico> (plugin do vite.config.ts) e o Switch copia para romfs:/assets/<lógico> (apps/switch/scripts/bundle.ts). Os lógicos ficam em packages/game/src/assets.ts (M0) e assets-m1.ts (M1). `arrays`: ordem das tiras de cada texture array (cada base = <base>.png, <base>.mips.png e <base>.json, manifesto layers@1); o runtime concatena nessa ordem e resolve as camadas por nome. `preload`: só o que o menu precisa. Arquivos com `placeholder` (ou versão 0 nos binários) são provisórios da etapa de contratos do M1: rode `npm run assets`. `local`: assets gerados só sob demanda na máquina do Erick (fora do git e do CI; o build e o NRO levam se existirem); vazio desde a escolha das fontes (decisão #54), a chave fica para os leitores (vite.config.ts, bundle do Switch, guard).",
   "files": {
     "fonts/ui-fonts.json": "fonts/generated/ui-fonts.generated.json",
     "fonts/ui-fonts.png": "fonts/generated/ui-fonts.generated.png",
     "textures/blocos16.json": "textures/generated/blocos16.json",
-    "textures/blocos16.png": "textures/generated/blocos16.png"
+    "textures/blocos16.png": "textures/generated/blocos16.png",
+    "textures/blocos16.mips.png": "textures/generated/blocos16.mips.png",
+    "textures/modelos64-materiais.json": "textures/generated/modelos64-materiais.json",
+    "textures/modelos64-materiais.png": "textures/generated/modelos64-materiais.png",
+    "textures/modelos64-materiais.mips.png": "textures/generated/modelos64-materiais.mips.png",
+    "blocks/blocks.json": "blocks/generated/blocks.json",
+    "models/modelos64-modelos.json": "models/generated/modelos64-modelos.json",
+    "models/modelos64-modelos.png": "models/generated/modelos64-modelos.png",
+    "models/modelos64-modelos.mips.png": "models/generated/modelos64-modelos.mips.png",
+    "models/modelos.bfmodel": "models/generated/modelos.bfmodel",
+    "maps/construto.bfmap": "maps/generated/construto.bfmap",
+    "audio/t0-tiro.mp3": "audio/generated/t0-tiro.mp3",
+    "audio/t0-impacto.mp3": "audio/generated/t0-impacto.mp3",
+    "audio/t0-passo.mp3": "audio/generated/t0-passo.mp3",
+    "audio/t0-ui.mp3": "audio/generated/t0-ui.mp3"
+  },
+  "local": {},
+  "arrays": {
+    "blocos16": ["textures/blocos16"],
+    "modelos64": ["textures/modelos64-materiais", "models/modelos64-modelos"]
   },
   "preload": ["fonts/ui-fonts.json", "fonts/ui-fonts.png"]
 }

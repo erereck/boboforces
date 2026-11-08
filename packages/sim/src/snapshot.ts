@@ -1,5 +1,5 @@
 import { RNG_STATE_WORDS, type BitReader, type BitWriter, type StateHasher } from '@boboforces/shared';
-import { MAX_CONTROLLERS, MAX_TEAMS } from './constants.ts';
+import { MAX_CONTROLLERS_WITH_ZOMBIES, MAX_TEAMS } from './constants.ts';
 import type { SimContext } from './context.ts';
 import type { StateArray } from './state.ts';
 import type { MatchPhase } from './view.ts';
@@ -13,7 +13,8 @@ import type { MatchPhase } from './view.ts';
 
 const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 2: `fireCooldownS` (f64, segundos) no lugar de `fireCooldownTicks` (i16).
-const SNAPSHOT_VERSION = 2;
+// 3 (M1): controladores dos zumbis (68..131) no fim da tabela de controladores.
+const SNAPSHOT_VERSION = 3;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended'];
 
@@ -68,7 +69,7 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
   ctx.rngWeapons.saveState(rngScratch);
   writeArray(w, rngScratch, RNG_STATE_WORDS);
   for (const f of s.fields) writeArray(w, f.array, s.count * f.stride);
-  writeArray(w, s.controllerEntity, MAX_CONTROLLERS);
+  writeArray(w, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
 }
 
 /**
@@ -95,5 +96,5 @@ export function readState(ctx: SimContext, r: BitReader): void {
   readArray(r, rngScratch, RNG_STATE_WORDS);
   ctx.rngWeapons.loadState(rngScratch);
   for (const f of s.fields) readArray(r, f.array, s.count * f.stride);
-  readArray(r, s.controllerEntity, MAX_CONTROLLERS);
+  readArray(r, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@boboforces/skingen",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prévia do pintor do boneco do FutBobo (#56): as 2 camadas da skin e os looks, gravados em local/skins/.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/figure-preview.ts"
+  },
+  "scripts": {
+    "typecheck": "node ../../scripts/typecheck.ts tools/skingen",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/format": "0.0.0"
+  },
+  "devDependencies": {}
+}

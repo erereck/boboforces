@@ -4,6 +4,7 @@ dist/
 build/
 coverage/
 .cache/
+.vitest/
 *.tsbuildinfo
 *.log
 

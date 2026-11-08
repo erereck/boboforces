@@ -7,7 +7,10 @@ pessoal** (decisão #33): NRO e NSP são gerados na máquina do Erick e **nunca*
   `version.json` da raiz. Os campos ficam no `nacp` do `package.json` desta pasta.
 - 100% offline (decisão #1): o bundle não tem nenhum código de rede, e o `portcheck` garante isso.
 - No M0, com GPU o jogo sobe até a tela de título (Sair fecha o app) e a cena de teste; sem GPU (aberto como applet)
-  aparece o aviso de abrir em modo aplicativo. O Teste Zero (M1) é o primeiro teste de verdade no console.
+  aparece o aviso de abrir em modo aplicativo.
+- **M1: NRO do Teste Zero.** O passo a passo para o Eden e o console está em `docs/TESTE_ZERO.md`. A casca grava as
+  sondas da plataforma em linhas `[t0] item=N …` no `runtime.log` e põe no título os presets do bench e as telas de
+  teste de controles, teclado e áudio.
 
 ## Requisitos
 
@@ -29,13 +32,19 @@ Da raiz (`-w @boboforces/switch`) ou de dentro de `apps/switch` (sem o `-w`):
 | `npm run nsp -w @boboforces/switch -- -k "C:\caminho\prod.keys"` | build + NSP instalável em `apps/switch/build/BoboForces-<versão>.nsp` |
 | `npm run verify:nsp -w @boboforces/switch -- -k "C:\caminho\prod.keys"` | abre o NSP e confere NCAs, hashes, runtime, RomFS, NACP e ícone |
 | `npm run icon -w @boboforces/switch -- <png quadrado>` | gera `icon.jpg` (JPEG 256×256) para o HOME e o homebrew menu |
-| `npm run eden -w @boboforces/switch` | cria `local/eden/eden-test.ini` (config de teste do Eden, sem tocar na sua) |
+| `npm run eden -w @boboforces/switch` | cria `local/eden/eden-test.ini` (config de teste do Eden, sem tocar na sua) e copia o NRO para o SD virtual do Eden; `-- --bench dock` grava o bench automático |
+| `npm run eden:run -w @boboforces/switch` | o mesmo + abre o NRO no `eden.exe`, espera as sondas no `runtime.log`, fecha e guarda a rodada em `local/eden/` |
 
 `apps/switch/romfs/` e `apps/switch/build/` são gerados e ficam fora do git, assim como `*.nro`, `*.nsp` e
 `prod.keys`. Sem `icon.jpg` o pacote usa o ícone padrão do nx.js (o logotipo em blocos entra depois).
 
 Os assets gerados em `build/assets/` (e a variante `build/assets-switch/`, que vence) vão para `romfs/assets/`.
 O jogo pede assets por caminho lógico (`maps/construto.bfmap`), que vira `romfs:/assets/maps/construto.bfmap`.
+
+O build também grava `romfs/licencas.txt` (`scripts/licenses.ts`), como o da web: cada pacote npm que entrou no
+`main.js`, com o LICENSE dele, e as licenças das fontes em uso geradas pelo fontbake
+(`assets-src/fonts/generated/ui-fonts.licencas.txt`; a OFL pede o aviso junto de cada cópia, mesmo no uso pessoal).
+Pacote sem arquivo de licença, ou o arquivo das fontes ausente, reprova o build (`npm run fontbake` gera).
 
 ## Instalar e abrir
 
@@ -57,7 +66,9 @@ O jogo pede assets por caminho lógico (`maps/construto.bfmap`), que vira `romfs
     quando algo der errado;
   - `exportar/`: relatórios e backups exportados pelo jogo (pasta própria, para um export nunca sobrescrever o save
     nem o log);
-  - `importar/`: para importar um backup, coloque o arquivo aqui; o jogo importa o mais recente.
+  - `importar/`: para importar um backup, coloque o arquivo aqui; o jogo importa o mais recente;
+  - `t0-sondas.txt`: marca das sondas de GL do Teste Zero (rodam uma vez por build e modo; apague para repetir);
+  - `bench.json`: bench automático na próxima abertura (vira `bench.usado.json`; formato em `docs/TESTE_ZERO.md`).
 
 ## Para quem mexe no código
 
@@ -68,6 +79,11 @@ O jogo pede assets por caminho lógico (`maps/construto.bfmap`), que vira `romfs
 - **Contrato com o game:** no primeiro frame do menu, o game grava `[boot] menu-ready` com
   `platform.diagnostics.appendLog(...)`. O portcheck espera por essa linha no `runtime.log` falso, e no console ela
   mede o tempo do boot ao menu (meta: até 4 s).
-- `scripts/` roda no Node com `.ts` direto: `bundle.ts` (build compartilhado com o portcheck), `stage.ts` (monta o
+- `src/t0/` (M1): sondas do Teste Zero (`boot.ts`, `gl-probes.ts` com WebGL2 puro antes do three, `env-probes.ts`,
+  `audio-probe.ts`), presets e itens do título (`items.ts`, rótulos curtos `test.item.*`), telas de teste
+  (`runners/`) e o bench automático.
+  `src/platform/` ganhou o teclado do sistema (`text-input.ts`), o áudio (`audio.ts`) e `describeControllers`.
+- `scripts/` roda no Node com `.ts` direto: `bundle.ts` (build compartilhado com o portcheck, com o `licencas.txt` de
+  `licenses.ts`), `stage.ts` (monta o
   package.json do NACP), `nro.ts`, `package-nsp.ts` (com o contorno do `buffer.slice` do MMM), `verify-*.ts`,
-  `prepare-icon.ts` e `prepare-eden.ts`.
+  `prepare-icon.ts`, `prepare-eden.ts`, `run-eden.ts` e `eden.ts` (caminhos do Eden; nunca lê chaves).

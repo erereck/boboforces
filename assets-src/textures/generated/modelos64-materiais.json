@@ -1,0 +1,64 @@
+{
+  "format": "boboforces/layers@1",
+  "array": "modelos64",
+  "source": "texgen",
+  "layerWidth": 64,
+  "layerHeight": 64,
+  "mipLevels": 7,
+  "layers": [
+    {
+      "name": "mat_white",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_concrete",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_metal",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_checker_plate",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_metal_roof",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_wood",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_canvas",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_log",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mat_leaves",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    }
+  ]
+}

@@ -1,12 +1,15 @@
 import { createInputFrame, type InputFrame } from '@boboforces/input';
-import { MAX_CONTROLLERS } from './constants.ts';
+import { MAX_CONTROLLERS_WITH_ZOMBIES } from './constants.ts';
 import type { SimEvent } from './events.ts';
 import { FixedStep } from './fixed-step.ts';
 import type { Sim } from './sim.ts';
 
-/** Um InputFrame por controlador possível (0..3 humanos, 4..67 bots), reaproveitados a cada tick. */
-export function createInputFrames(): InputFrame[] {
-  return Array.from({ length: MAX_CONTROLLERS }, createInputFrame);
+/**
+ * Um InputFrame por controlador possível (0..3 humanos, 4..67 bots, 68..131 zumbis do estresse), reaproveitados a cada
+ * tick. Cobre os zumbis sempre, para quem cria a partida com `zombies` não precisar dimensionar nada.
+ */
+export function createInputFrames(count: number = MAX_CONTROLLERS_WITH_ZOMBIES): InputFrame[] {
+  return Array.from({ length: count }, createInputFrame);
 }
 
 export interface SimLoopOptions {

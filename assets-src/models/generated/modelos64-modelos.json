@@ -1,0 +1,100 @@
+{
+  "format": "boboforces/layers@1",
+  "array": "modelos64",
+  "source": "modelgen",
+  "layerWidth": 64,
+  "layerHeight": 64,
+  "mipLevels": 7,
+  "layers": [
+    {
+      "name": "mdl_pistol",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_rifle",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_sniper",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_barrel",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_water_tank",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_jeep",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_floodlight",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_glow",
+      "kind": "emissive",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_pipe",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_column",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_tarp",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_generator",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_tree",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_sandbags",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_crate_large",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    }
+  ]
+}

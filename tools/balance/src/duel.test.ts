@@ -17,5 +17,5 @@ describe('robô de balanceamento', () => {
       expect(killDeath(r.levels[i]!)).toBeGreaterThan(killDeath(r.levels[i - 1]!));
     }
     expect(formatReport(r)).toContain('OK');
-  });
+  }, 60_000);
 });

@@ -2,7 +2,7 @@
  * nx.js falso e leve para os testes da casca (dados sintéticos, sem vm). O portcheck tem a versão completa, que roda
  * o bundle de verdade num realm separado.
  */
-import type { NxEvent, NxGamepad, NxGlobals, NxStats } from './nx.ts';
+import type { NxBattery, NxEvent, NxGamepad, NxGlobals, NxStats, NxVirtualKeyboard } from './nx.ts';
 
 export interface FakeSwitch {
   readonly nx: NxGlobals;
@@ -26,6 +26,72 @@ export interface FakeSwitch {
 export interface FakeSwitchOptions {
   readonly gpu?: boolean;
   readonly files?: Record<string, string>;
+  /** Arquivos binários (romfs:/… ou sdmc:/…). */
+  readonly bytes?: Record<string, Uint8Array>;
+  /** Contexto que `new AudioContext()` devolve (sem isto, o nx.js falso não tem áudio). */
+  readonly audioContext?: unknown;
+  readonly virtualKeyboard?: NxVirtualKeyboard;
+  readonly battery?: NxBattery;
+}
+
+/**
+ * Teclado do sistema falso com a MESMA ordem de eventos do nx.js 1.0.0-beta.7: `show` dispara `geometrychange`
+ * (visível); no OK, esconde (`geometrychange` com altura 0) e SÓ DEPOIS dispara `submit`; cancelar só esconde.
+ */
+export interface FakeKeyboard extends NxVirtualKeyboard {
+  typeText(text: string): void;
+  submit(): void;
+  cancel(): void;
+  readonly shown: number;
+}
+
+export function createFakeKeyboard(): FakeKeyboard {
+  const listeners = new Map<string, Set<() => void>>();
+  const emit = (type: string): void => {
+    for (const l of [...(listeners.get(type) ?? [])]) l();
+  };
+  const rect = { width: 0, height: 0 };
+  let shown = 0;
+  const kb: FakeKeyboard = {
+    value: '',
+    cursorIndex: 0,
+    boundingRect: rect,
+    get shown() {
+      return shown;
+    },
+    show() {
+      shown++;
+      rect.width = 1280;
+      rect.height = 300;
+      emit('geometrychange');
+    },
+    hide() {
+      rect.width = 0;
+      rect.height = 0;
+      emit('geometrychange');
+    },
+    addEventListener(type, l) {
+      const set = listeners.get(type) ?? new Set();
+      set.add(l);
+      listeners.set(type, set);
+    },
+    removeEventListener(type, l) {
+      listeners.get(type)?.delete(l);
+    },
+    typeText(text) {
+      kb.value += text;
+      kb.cursorIndex = kb.value.length;
+      emit('change');
+    },
+    submit() {
+      kb.hide();
+      emit('submit');
+    },
+    cancel() {
+      kb.hide();
+    },
+  };
+  return kb;
 }
 
 export function pad(index: number, styleSet: number, pressed: number[] = []): NxGamepad {
@@ -46,6 +112,7 @@ export function createFakeSwitch(opts: FakeSwitchOptions = {}): FakeSwitch {
   const enc = new TextEncoder();
   const files = new Map<string, Uint8Array>();
   for (const [path, text] of Object.entries(opts.files ?? {})) files.set(path, enc.encode(text));
+  for (const [path, bytes] of Object.entries(opts.bytes ?? {})) files.set(path, bytes);
   const mtimes = new Map<string, number>();
   const drawn: string[] = [];
   const pads: (NxGamepad | null)[] = [pad(0, 1)];
@@ -71,6 +138,8 @@ export function createFakeSwitch(opts: FakeSwitchOptions = {}): FakeSwitch {
   const glClears = { count: 0 };
   const noop = (): void => {};
   const gl = {
+    drawingBufferWidth: 1280,
+    drawingBufferHeight: 720,
     getParameter: (p: number) => (p === 0x1f01 ? 'NVIDIA Tegra X1 (falsa)' : p === 0x0d33 ? 16384 : null),
     bindFramebuffer: noop,
     viewport: noop,
@@ -136,7 +205,11 @@ export function createFakeSwitch(opts: FakeSwitchOptions = {}): FakeSwitch {
       appletType: () => (opts.gpu ? 0 : 2),
       operationMode: () => mode,
     },
-    navigator: { getGamepads: () => pads },
+    navigator: {
+      getGamepads: () => pads,
+      ...(opts.virtualKeyboard ? { virtualKeyboard: opts.virtualKeyboard } : {}),
+      ...(opts.battery ? { getBattery: () => Promise.resolve(opts.battery!) } : {}),
+    },
     performance: { now: () => clock },
     requestAnimationFrame: (cb) => {
       raf.push(cb);
@@ -158,7 +231,12 @@ export function createFakeSwitch(opts: FakeSwitchOptions = {}): FakeSwitch {
         type,
         (listeners.get(type) ?? []).filter((x) => x !== l),
       ),
-    AudioContext: undefined,
+    AudioContext: opts.audioContext
+      ? (function FakeAudioContext() {
+          return opts.audioContext;
+        } as unknown as new () => unknown)
+      : undefined,
+    probes: { Intl, DecompressionStream },
   };
 
   return {

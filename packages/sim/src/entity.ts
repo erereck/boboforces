@@ -26,6 +26,11 @@ export const ENTITY_KIND = {
   pickup: 3,
   door: 4,
   trigger: 5,
+  /**
+   * M1: bobo-zumbi do teste de estresse (corpo igual ao bobo, mesmas hitboxes; comportamento de perseguir e bater,
+   * sem arma). Controlado pela IA nos controladores a partir de `ZOMBIE_CONTROLLER_BASE`.
+   */
+  zombie: 6,
 } as const;
 
 export type EntityKind = (typeof ENTITY_KIND)[keyof typeof ENTITY_KIND];

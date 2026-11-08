@@ -59,6 +59,7 @@ registro. 23. Assets só PNG, MP3 e binários próprios (RLE + deflate).
 ```
 package.json · tsconfig.base.json · vitest.config.ts · version.json · CHANGELOG.md · CLAUDE.md
 scripts/typecheck.ts        tsc de cada pacote/app/tool em paralelo
+scripts/smoke-web.ts        teste de fumaça no Edge · prints.ts (prints do M1) · bench.ts (bench do PC)
 docs/                       DECISOES (manda) · GDD · PLANO_M0 · ARCHITECTURE · PORTABILIDADE · PERF · DEPENDENCIAS ·
                             CREDITOS · PROMPTS · design/ (gameplay, tecnico, arte-ux) · pesquisa/
 packages/shared             math, RNG, pools, ring buffer, bits, hash, assert, log (puro)
@@ -72,10 +73,14 @@ packages/ai                 bots (puro)
 packages/ui                 árvore de UI, DrawList, tema, strings.pt-BR (puro)
 packages/audio              mixer Web Audio (M2)
 packages/render             único com three (`@boboforces/render/data` é a parte sem three que o game importa)
-packages/game               fluxo, cola, LocalDriver, NullRenderer, cena de teste, HUD
+packages/game               fluxo, cola, LocalDriver, NullRenderer; a cena do Construto em ./scene (loading, partida,
+                            bench, prints)
 apps/web                    Vite, splash, platform-web, adaptadores de input (DOM só aqui)
 apps/switch                 esbuild → romfs/main.js, platform-switch, NRO/NSP (só local)
-tools/                      texgen · fontbake · balance · guard · portcheck · size-check
+tools/                      texgen · skingen · modelgen · mapc · audioconv · fontbake · balance · guard · portcheck ·
+                            size-check
+assets-src/                 fontes dos assets (textures, blocks, skins, models, maps, audio, fonts) e generated/;
+                            runtime-assets.json = caminho lógico → arquivo gerado + ordem das tiras dos texture arrays
 local/                      privado, fora do git
 ```
 
@@ -85,6 +90,9 @@ local/                      privado, fora do git
 - Um pacote: `node scripts/typecheck.ts packages/sim` e `npx vitest run --project sim` (ou
   `npm run typecheck -w @boboforces/sim` e `npm test -w @boboforces/sim`).
 - Builds: `npm run build` (web), `npm run build:switch`, `npm run portcheck`, `npm run size-check`, `npm run balance`.
+- Assets (M1): `npm run assets` (texgen → modelgen → mapc; prévia das skins do boneco: `npm run skingen:figuras`),
+  `npm run audioconv` (OGG → MP3), `npm run fontbake`. Prints e bench no Edge: `npm run build && npm run prints` /
+  `npm run bench`.
 - Navegador real: `npm run build && npm run smoke:web` (Edge headless; screenshots e relatório em `local/m0/`).
 
 ## Ao terminar uma tarefa, relate

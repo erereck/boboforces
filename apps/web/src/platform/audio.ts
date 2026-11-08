@@ -10,8 +10,11 @@ export interface WebAudio extends AudioSurface, Disposable {
 
 /**
  * O `AudioContext` da casca (tecnico.md §11.1 e §12). Nasce suspenso; o primeiro gesto do jogador chama `resume()` e
- * só então `unlocked` vira verdade e `onUnlock` dispara. Na volta para a aba, um contexto que já tinha sido liberado
- * e ficou suspenso é retomado (o iOS suspende ao esconder). Sem `AudioContext` no navegador, devolve `null`.
+ * só então `unlocked` vira verdade e `onUnlock` dispara. Na volta para a aba (`visibilitychange` e `pageshow` do
+ * bfcache), um contexto que já tinha sido liberado e ficou suspenso ou "interrupted" (iOS) é retomado. Sem
+ * `AudioContext` no navegador, devolve `null`. O `@boboforces/audio` só usa o subconjunto `AudioContextLike`
+ * (Context, BufferSource, Gain, StereoPanner, `createBuffer`, `decodeAudioData`; regra 9). O `onended` do contrato
+ * aceita o `(ev: Event) => any` do DOM desde a integração do M1 (`m1-pieces.test.ts` confere o tipo).
  */
 export function createWebAudio(win: Window): WebAudio | null {
   const Ctor = (win as Window & { AudioContext?: typeof AudioContext }).AudioContext;
@@ -48,6 +51,7 @@ export function createWebAudio(win: Window): WebAudio | null {
   if (!unlocked) for (const event of UNLOCK_EVENTS) win.addEventListener(event, onGesture, true);
   context.addEventListener('statechange', onStateChange);
   win.document.addEventListener('visibilitychange', onVisibility);
+  win.addEventListener('pageshow', onVisibility);
 
   return {
     context,
@@ -63,6 +67,7 @@ export function createWebAudio(win: Window): WebAudio | null {
       for (const event of UNLOCK_EVENTS) win.removeEventListener(event, onGesture, true);
       context.removeEventListener('statechange', onStateChange);
       win.document.removeEventListener('visibilitychange', onVisibility);
+      win.removeEventListener('pageshow', onVisibility);
       listeners.clear();
       void context.close().catch(() => {});
     },

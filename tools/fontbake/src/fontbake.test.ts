@@ -1,13 +1,28 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
-import { parseFontPack } from '@boboforces/ui';
+import { parseFontPack, STRINGS_PT_BR } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
-import { UI_CODEPOINTS } from './charset.ts';
-import { buildFontPack, MIN_KERNING, stringifyFontPack, toFontFile, type BmFontJson } from './pack.ts';
-import { decodePngRgba, encodePngRgba, stackVertical } from './png.ts';
-import { cmapCodepoints, fontName } from './sfnt.ts';
+import { codepointsForRole, DISPLAY_CODEPOINTS, HUD_CODEPOINTS, isLowercaseLetter } from './charset.ts';
+import {
+  assertDerivedName,
+  declaresReservedFontName,
+  FONT_LICENSE,
+  licenseFile,
+  licenseSection,
+  oflHeader,
+  reservedFontNames,
+  resolveReservedNames,
+} from './license.ts';
+import { buildFontPack, measuredDescent, MIN_KERNING, stringifyFontPack, toFontFile, type BmFontJson } from './pack.ts';
+import { decodePngRgba, encodePngRgba, quantizeChannels, stackVertical } from './png.ts';
+import { cmapCodepoints, fontName, fontVerticalMetrics } from './sfnt.ts';
+import { BUDGETS, FONT_TEXT_GZIP_LEVEL } from '../../size-check/src/budgets.ts';
+import { ATLAS, FONT_BUDGET_BYTES, FONT_JSON_GZIP_LEVEL, FONTS, generatorOptions, ROUND_DECIMAL } from './spec.ts';
 import { buildSfnt, woff2ToSfnt } from './woff2.ts';
 
-// Tudo aqui é SINTÉTICO: fontes de mentira montadas byte a byte (nada de fonte de terceiros em fixture).
+// Tudo aqui é SINTÉTICO: fontes de mentira montadas byte a byte e textos de licença inventados (nada de fonte de
+// terceiros em fixture). Só o último bloco lê as fontes reais de assets-src/fonts/, para provar a guarda do RFN.
 
 class Bytes {
   readonly out: number[] = [];
@@ -183,17 +198,244 @@ describe('PNG do atlas', () => {
   });
 });
 
+/** Tabela `name` com registros Windows/Unicode (3, 1, 0x409): id → texto. */
+function nameTable(records: ReadonlyMap<number, string>): Uint8Array {
+  const entries = [...records.entries()];
+  const t = new Bytes().u16(0, entries.length, 6 + entries.length * 12);
+  let offset = 0;
+  for (const [id, text] of entries) {
+    t.u16(3, 1, 0x409, id, text.length * 2, offset);
+    offset += text.length * 2;
+  }
+  for (const [, text] of entries) for (const ch of text) t.u16(ch.charCodeAt(0));
+  return t.bytes();
+}
+
+/** sfnt sintético com `head` (unitsPerEm), `OS/2` (versão, ascendente/descendente, altura-x e de maiúscula) e `name`. */
+function syntheticMetricsFont(os2Version: number, names: ReadonlyMap<number, string>): Uint8Array {
+  const head = new Uint8Array(54);
+  new DataView(head.buffer).setUint16(18, 2000); // unitsPerEm
+  const os2 = new Uint8Array(96);
+  const v = new DataView(os2.buffer);
+  v.setUint16(0, os2Version);
+  v.setInt16(68, 1800); // sTypoAscender
+  v.setInt16(70, -500); // sTypoDescender
+  v.setInt16(86, 1040); // sxHeight
+  v.setInt16(88, 1400); // sCapHeight
+  return buildSfnt(
+    0x00010000,
+    new Map([
+      ['head', head],
+      ['OS/2', os2],
+      ['name', nameTable(names)],
+    ]),
+  );
+}
+
+describe('métricas verticais (head e OS/2)', () => {
+  it('lê unitsPerEm, ascendente/descendente tipográficos e as alturas de maiúscula e x em em (OS/2 v2+)', () => {
+    const m = fontVerticalMetrics(syntheticMetricsFont(4, new Map()));
+    expect(m).toEqual({ unitsPerEm: 2000, typoAscender: 0.9, typoDescender: -0.25, xHeight: 0.52, capHeight: 0.7 });
+  });
+
+  it('OS/2 antigo (v1) não tem altura de maiúscula nem x: o pack mede o atlas', () => {
+    const m = fontVerticalMetrics(syntheticMetricsFont(1, new Map()));
+    expect(m.capHeight).toBeNull();
+    expect(m.xHeight).toBeNull();
+  });
+});
+
+describe('licença (OFL 1.1) e guarda do Reserved Font Name', () => {
+  it('lê o RFN do name ID 0 de uma fonte sintética em MINÚSCULAS e reprova o nome que o usa, sem diferenciar caixa', () => {
+    const font = syntheticMetricsFont(
+      4,
+      new Map([
+        [0, 'Copyright 2026 Autora Ficticia, with reserved font name "Plinto".'],
+        [4, 'Plinto Bold'],
+        [5, 'Version 2.010'],
+      ]),
+    );
+    expect(fontName(font, 0)).toContain('reserved font name');
+    const reserved = reservedFontNames(fontName(font, 0));
+    expect(reserved).toEqual(['Plinto']);
+    expect(() => assertDerivedName('BoboForces Display', reserved, 'plinto.ttf')).not.toThrow();
+    expect(() => assertDerivedName('Plinto HUD', reserved, 'plinto.ttf')).toThrow(/Reserved Font Name "Plinto"/);
+    expect(() => assertDerivedName('MEU PLINTO', reserved, 'plinto.ttf')).toThrow(/cláusula 3/);
+  });
+
+  it('aceita plural, aspas curvas e dois-pontos; ignora a definição do termo no corpo da licença', () => {
+    expect(reservedFontNames('Copyright 2026 Fulano, with Reserved Font Names "Alfa" and "Beta Sans"')).toEqual([
+      'Alfa',
+      'Beta Sans',
+    ]);
+    expect(reservedFontNames('with Reserved Font Name: “Gama”')).toEqual(['Gama']);
+    expect(reservedFontNames('"Reserved Font Name" refers to names declared above.\nDEFINITIONS')).toEqual([]);
+    expect(reservedFontNames('Copyright 2026 Sem Nome Reservado')).toEqual([]);
+  });
+
+  it('aceita aspas simples (retas e curvas) com o par casado, e o apóstrofo dentro de aspas duplas não corta o nome', () => {
+    const adobe = "Copyright 2026 Empresa Ficticia (http://exemplo.invalid/), with Reserved Font Name 'Source'.";
+    expect(reservedFontNames(adobe)).toEqual(['Source']);
+    expect(() => assertDerivedName('Source UI', resolveReservedNames(adobe), 'x.otf')).toThrow(/cláusula 3/);
+    expect(reservedFontNames('with Reserved Font Name ‘Plinto’.')).toEqual(['Plinto']);
+    expect(reservedFontNames('with Reserved Font Name "Bob\'s Sans".')).toEqual(["Bob's Sans"]);
+  });
+
+  it('falha fechada: declaração sem aspas lança, a menos que o RFN venha à mão; texto sem RFN passa', () => {
+    const bare = 'Copyright 2026 Fulano, with Reserved Font Name Plinto.';
+    expect(reservedFontNames(bare)).toEqual([]);
+    expect(declaresReservedFontName(bare)).toBe(true);
+    expect(() => resolveReservedNames(bare, [], 'plinto.ttf')).toThrow(/FontSpec\.reservedNames/);
+    // Lista vazia (ou só espaço) explícita não cala a guarda.
+    expect(() => resolveReservedNames(bare, [' '], 'plinto.ttf')).toThrow(/não lê/);
+    const reserved = resolveReservedNames(bare, ['Plinto'], 'plinto.ttf');
+    expect(reserved).toEqual(['Plinto']);
+    expect(() => assertDerivedName('Plinto HUD', reserved, 'plinto.ttf')).toThrow(/cláusula 3/);
+    // À mão soma aos extraídos, sem repetir.
+    expect(resolveReservedNames('with Reserved Font Name "Delta"', ['delta', 'Eco'])).toEqual(['Delta', 'Eco']);
+    // OFL.txt sem a frase "This Font Software is licensed" e sem RFN: a definição do termo e a cláusula 3 não contam.
+    const licenseOnly =
+      'Copyright 2026 Fulano.\n\nDEFINITIONS\n"Reserved Font Name" refers to any names specified as such after the ' +
+      'copyright statement(s).\n3) No Modified Version of the Font Software may use the Reserved Font Name(s) unless ' +
+      'explicit written permission is granted.\n';
+    expect(oflHeader(licenseOnly)).toBe(licenseOnly);
+    expect(declaresReservedFontName(licenseOnly)).toBe(false);
+    expect(resolveReservedNames(licenseOnly)).toEqual([]);
+  });
+
+  it('o cabeçalho do OFL.txt para antes do texto da licença', () => {
+    const ofl = 'Copyright 2026 Fulano, with Reserved Font Name "Delta".\n\nThis Font Software is licensed under X.\n';
+    expect(oflHeader(ofl)).toBe('Copyright 2026 Fulano, with Reserved Font Name "Delta".\n\n');
+    expect(reservedFontNames(oflHeader(ofl))).toEqual(['Delta']);
+  });
+
+  it('arquivo de licenças: uma seção por fonte em uso, com o nome derivado, a origem e o OFL.txt inteiro', () => {
+    const a = licenseSection({
+      derivedName: 'Derivada A',
+      source: 'Plinto 2.010',
+      oflText: 'Copyright A\r\nTexto A\r\n',
+    });
+    const b = licenseSection({ derivedName: 'Derivada B', source: 'Gama 1.0', oflText: 'Copyright B\nTexto B' });
+    const file = licenseFile([a, b]);
+    expect(file.match(/^== /gm)).toHaveLength(2);
+    expect(file).toContain(
+      '== Derivada A: atlas MSDF derivado de Plinto 2.010 (SIL OFL 1.1) ==\n\nCopyright A\nTexto A\n',
+    );
+    expect(file).toContain('== Derivada B: atlas MSDF derivado de Gama 1.0 (SIL OFL 1.1) ==\n\nCopyright B\nTexto B\n');
+    expect(file).not.toContain('\r');
+  });
+});
+
+describe('conjuntos de glifos (decisão #54)', () => {
+  const symbols = [0xa2, 0xa3, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xac, 0xae, 0xaf, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6];
+
+  it('HUD: ASCII + Latin-1 + pontuação, sem Latin Extended-A e sem controles (200 códigos)', () => {
+    expect(HUD_CODEPOINTS.length).toBe(200);
+    expect(new Set(HUD_CODEPOINTS).size).toBe(200);
+    expect(HUD_CODEPOINTS).toContain(0xe3); // ã
+    expect(HUD_CODEPOINTS).toContain(0xa9); // ©
+    expect(HUD_CODEPOINTS).toContain(0x2026); // …
+    expect(HUD_CODEPOINTS.some((c) => c >= 0x100 && c <= 0x17f)).toBe(false);
+    expect(HUD_CODEPOINTS.some((c) => c < 0x20 || (c >= 0x7f && c < 0xa0))).toBe(false);
+    expect(codepointsForRole('hud')).toBe(HUD_CODEPOINTS);
+  });
+
+  it('display: 118 códigos só em caixa alta, sem os símbolos de Latin-1, contidos no HUD', () => {
+    expect(DISPLAY_CODEPOINTS.length).toBe(118);
+    expect(new Set(DISPLAY_CODEPOINTS).size).toBe(118);
+    expect(DISPLAY_CODEPOINTS.filter(isLowercaseLetter)).toEqual([]);
+    for (const c of symbols) expect(DISPLAY_CODEPOINTS).not.toContain(c);
+    // Ã Ç É Õ · º —
+    for (const c of [0xc3, 0xc7, 0xc9, 0xd5, 0xb7, 0xba, 0x2014]) expect(DISPLAY_CODEPOINTS).toContain(c);
+    for (const c of DISPLAY_CODEPOINTS) expect(HUD_CODEPOINTS).toContain(c);
+    expect(codepointsForRole('display')).toBe(DISPLAY_CODEPOINTS);
+  });
+
+  it('a tabela pt-BR inteira cabe: todo caractere no HUD e a caixa alta de tudo na display', () => {
+    const hud = new Set(HUD_CODEPOINTS);
+    const display = new Set(DISPLAY_CODEPOINTS);
+    const outHud = new Set<string>();
+    const outDisplay = new Set<string>();
+    for (const text of Object.values(STRINGS_PT_BR)) {
+      for (const ch of text) if (!hud.has(ch.charCodeAt(0))) outHud.add(ch);
+      for (const ch of text.toUpperCase()) if (!display.has(ch.charCodeAt(0))) outDisplay.add(ch);
+    }
+    expect([...outHud]).toEqual([]);
+    expect([...outDisplay]).toEqual([]);
+  });
+});
+
+describe('parâmetros do atlas', () => {
+  it('display Russo One 22 px e HUD Saira Condensed 20 px, faixa 4, camada 512×256, nomes derivados fixos', () => {
+    expect(FONTS.map((f) => [f.role, f.file, f.size, f.distanceRange, f.name])).toEqual([
+      ['display', 'russo-one/RussoOne-Regular', 22, 4, 'BoboForces Display'],
+      ['hud', 'saira-condensed/SairaCondensed-SemiBold', 20, 4, 'BoboForces HUD'],
+    ]);
+    expect(ATLAS).toEqual({ width: 512, height: 256 });
+  });
+
+  it('só a camada do HUD é quantizada (7 bits); faixa par e ≥ 4; o gerador recebe roundDecimal 3', () => {
+    expect(FONTS.map((f) => f.quantizeBits)).toEqual([undefined, 7]);
+    for (const spec of FONTS) {
+      expect(spec.distanceRange % 2).toBe(0);
+      expect(spec.distanceRange).toBeGreaterThanOrEqual(4);
+      const options = generatorOptions(spec, 'AB');
+      expect(options).toMatchObject({ roundDecimal: 3, fieldType: 'msdf', textureSize: [512, 256], charset: 'AB' });
+      expect(options['fontSize']).toBe(spec.size);
+    }
+    expect(ROUND_DECIMAL).toBe(3);
+  });
+});
+
+describe('quantização dos canais', () => {
+  const ramp = () => {
+    const pixels = new Uint8Array(256 * 4);
+    for (let v = 0; v < 256; v++) pixels.set([v, 255 - v, (v * 7) & 0xff, 200], v * 4);
+    return { width: 256, height: 1, pixels };
+  };
+
+  it('7 bits: no máximo 128 níveis, erro ≤ 1, extremos preservados, alfa intacto; determinística e idempotente', () => {
+    const img = ramp();
+    const q = quantizeChannels(img, 7);
+    const levels = new Set<number>();
+    for (let v = 0; v < 256; v++) {
+      const out = q.pixels[v * 4]!;
+      levels.add(out);
+      expect(Math.abs(out - v)).toBeLessThanOrEqual(1);
+      expect(q.pixels[v * 4 + 3]).toBe(200);
+    }
+    expect(levels.size).toBe(128);
+    expect(q.pixels[0]).toBe(0);
+    expect(q.pixels[255 * 4]).toBe(255);
+    expect(Array.from(quantizeChannels(img, 7).pixels)).toEqual(Array.from(q.pixels));
+    expect(Array.from(quantizeChannels(q, 7).pixels)).toEqual(Array.from(q.pixels));
+    // A imagem de entrada não muda (o fontbake quantiza a camada do HUD antes de empilhar).
+    expect(Array.from(img.pixels)).toEqual(Array.from(ramp().pixels));
+  });
+
+  it('6 bits também é idempotente (reserva do teto); 8 bits devolve a mesma imagem; fora de 1..8 é erro', () => {
+    const q6 = quantizeChannels(ramp(), 6);
+    expect(Array.from(quantizeChannels(q6, 6).pixels)).toEqual(Array.from(q6.pixels));
+    const img = ramp();
+    expect(quantizeChannels(img, 8)).toBe(img);
+    expect(() => quantizeChannels(img, 0)).toThrow(/bits/);
+    expect(() => quantizeChannels(img, 9)).toThrow(/bits/);
+  });
+});
+
 describe('pacote de métricas', () => {
   const bm: BmFontJson = {
     pages: ['x.png'],
     info: { face: 'Sintética', size: 30 },
-    common: { lineHeight: 36, base: 30, scaleW: 512, scaleH: 256, pages: 1 },
+    common: { lineHeight: 40, base: 30, scaleW: 512, scaleH: 256, pages: 1 },
     distanceField: { fieldType: 'msdf', distanceRange: 4 },
     chars: [
       { id: 0x48, x: 0, y: 0, width: 16, height: 25, xoffset: -2, yoffset: 7, xadvance: 14.123, page: 0 },
       { id: 0x41, x: 20, y: 0, width: 16, height: 25, xoffset: -2, yoffset: 7, xadvance: 13.5, page: 0 },
       { id: 0x78, x: 40, y: 0, width: 14, height: 18, xoffset: -2, yoffset: 14, xadvance: 11, page: 0 },
-      { id: 0x20, x: 0, y: 0, width: 0, height: 0, xoffset: -2, yoffset: 28, xadvance: 6, page: 0 },
+      // "g": caixa de 14 a 38 com margem de 2 → a tinta desce até 36, 6 px abaixo da base.
+      { id: 0x67, x: 60, y: 0, width: 14, height: 24, xoffset: -2, yoffset: 14, xadvance: 11, page: 0 },
+      { id: 0x20, x: 0, y: 0, width: 0, height: 0, xoffset: -2, yoffset: 60, xadvance: 6, page: 0 },
     ],
     kernings: [
       { first: 0x41, second: 0x48, amount: -1.234 },
@@ -202,25 +444,58 @@ describe('pacote de métricas', () => {
     ],
   };
 
-  it('converte para números planos ordenados, mede maiúscula e altura-x e limpa o kerning', () => {
+  it('o teto das fontes é medido no mesmo nível de gzip do size-check (limite de cima do GitHub Pages)', () => {
+    expect(FONT_JSON_GZIP_LEVEL).toBe(FONT_TEXT_GZIP_LEVEL);
+    expect(FONT_BUDGET_BYTES).toBe(BUDGETS.find((b) => b.id === 'fonts')!.limit);
+  });
+
+  it('números planos ordenados, avanço fracionário (roundDecimal) e kerning limpo', () => {
     const file = toFontFile(bm, { layer: 1, name: 'Sintética', version: '1.0', missing: [0x100] });
-    expect(file.glyphs.length).toBe(4 * 8);
-    expect(file.glyphs.slice(0, 8)).toEqual([0x20, 0, 0, 0, 0, -2, 28, 6]);
+    expect(file.glyphs.length).toBe(5 * 8);
+    expect(file.glyphs.slice(0, 8)).toEqual([0x20, 0, 0, 0, 0, -2, 60, 6]);
     expect(file.glyphs[8 * 2 + 7]).toBe(14.12);
-    // pad = 2: topo do H = 7 + 2 = 9 → maiúscula = 30 − 9 = 21; topo do x = 16 → altura-x 14.
-    expect(file.capHeight).toBe(21);
-    expect(file.xHeight).toBe(14);
     expect(file.kerning).toEqual([0x41, 0x48, -1.23]);
     expect(file.missing).toEqual([0x100]);
   });
 
-  it('o JSON gerado é lido pelo parseFontPack do ui', () => {
+  it('sem OS/2: mede maiúscula e altura-x no atlas; com OS/2: usa as alturas exatas em em', () => {
+    // pad = 2: topo do H = 7 + 2 = 9 → maiúscula = 30 − 9 = 21; topo do x = 16 → altura-x 14.
+    const measured = toFontFile(bm, { layer: 0, name: 'S', version: '1', missing: [] });
+    expect(measured.capHeight).toBe(21);
+    expect(measured.xHeight).toBe(14);
+    const exact = toFontFile(bm, {
+      layer: 0,
+      name: 'S',
+      version: '1',
+      missing: [],
+      capHeightEm: 0.688,
+      xHeightEm: 0.51,
+    });
+    expect(exact.capHeight).toBe(20.64);
+    expect(exact.xHeight).toBe(15.3);
+  });
+
+  it('linha = base + descida medida nos glifos entregues (não a do hhea/OS/2 do gerador)', () => {
+    expect(measuredDescent(bm)).toBe(6);
+    const file = toFontFile(bm, { layer: 0, name: 'S', version: '1', missing: [] });
+    expect(file.base).toBe(30);
+    expect(file.lineHeight).toBe(36);
+    // Só maiúsculas sem descendente: a linha termina na base.
+    const caps = { ...bm, chars: bm.chars.filter((c) => c.id === 0x48 || c.id === 0x41) };
+    expect(toFontFile(caps, { layer: 0, name: 'S', version: '1', missing: [] }).lineHeight).toBe(30);
+  });
+
+  it('licença e origem vão no JSON (sem copyright) e o parseFontPack do ui lê o pacote', () => {
+    const meta = { version: '1', missing: [], license: FONT_LICENSE, source: 'Plinto 2.010' };
     const fonts = {
-      display: toFontFile(bm, { layer: 0, name: 'D', version: '1', missing: [] }),
-      hud: toFontFile(bm, { layer: 1, name: 'H', version: '1', missing: [] }),
+      display: toFontFile(bm, { ...meta, layer: 0, name: 'Derivada D' }),
+      hud: toFontFile(bm, { ...meta, layer: 1, name: 'Derivada H' }),
     };
     const json = stringifyFontPack(buildFontPack(fonts, { width: 512, height: 256, layers: 2, image: 'a.png' }));
-    const pack = parseFontPack(JSON.parse(json));
+    const raw = JSON.parse(json) as { fonts: Record<string, Record<string, unknown>> };
+    expect(raw.fonts['hud']).toMatchObject({ name: 'Derivada H', license: 'OFL-1.1', source: 'Plinto 2.010' });
+    expect(json).not.toMatch(/copyright/i);
+    const pack = parseFontPack(raw);
     expect(pack.fonts.hud.layer).toBe(1);
     expect(pack.fonts.display.kerning(0x41, 0x48)).toBe(-1.23);
     expect(pack.fonts.display.glyphIndex(0x78)).toBeGreaterThanOrEqual(0);
@@ -231,12 +506,26 @@ describe('pacote de métricas', () => {
       toFontFile({ ...bm, common: { ...bm.common, pages: 2 } }, { layer: 0, name: 'X', version: '', missing: [] }),
     ).toThrow(/páginas/);
   });
+});
 
-  it('conjunto de glifos: ASCII, Latin-1, Latin Extended-A e pontuação, sem controles', () => {
-    expect(UI_CODEPOINTS).toContain(0xe3); // ã
-    expect(UI_CODEPOINTS).toContain(0x17e); // ž
-    expect(UI_CODEPOINTS).toContain(0x2026); // …
-    expect(UI_CODEPOINTS.some((c) => c < 0x20 || (c >= 0x7f && c < 0xa0))).toBe(false);
-    expect(new Set(UI_CODEPOINTS).size).toBe(UI_CODEPOINTS.length);
-  });
+describe('fontes em uso (arquivos reais de assets-src/fonts)', () => {
+  const ROOT = resolve(import.meta.dirname, '..', '..', '..');
+  for (const spec of FONTS) {
+    const path = join(ROOT, 'assets-src', 'fonts', `${spec.file}.ttf`);
+    it.skipIf(!existsSync(path))(
+      `${spec.role}: o nome derivado passa na guarda do RFN lido da fonte e do OFL.txt`,
+      () => {
+        const font = new Uint8Array(readFileSync(path));
+        const ofl = readFileSync(join(path, '..', 'OFL.txt'), 'utf8');
+        const reserved = resolveReservedNames(`${fontName(font, 0)}\n${oflHeader(ofl)}`, spec.reservedNames, spec.file);
+        // As duas famílias declaram RFN (uma delas em minúsculas): a guarda não pode ficar vazia.
+        expect(reserved.length).toBeGreaterThan(0);
+        expect(() => assertDerivedName(spec.name, reserved, spec.file)).not.toThrow();
+        expect(() => assertDerivedName(`${reserved[0]!.toUpperCase()} UI`, reserved, spec.file)).toThrow(/cláusula 3/);
+        const metrics = fontVerticalMetrics(font);
+        expect(metrics.capHeight).not.toBeNull();
+        expect(metrics.xHeight).not.toBeNull();
+      },
+    );
+  }
 });

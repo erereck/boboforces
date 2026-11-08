@@ -1,4 +1,15 @@
-import { createDrawList, popClip, pushClip, pushGlyph, pushShape, pushSprite, resetDrawList } from '@boboforces/ui';
+import {
+  createDrawList,
+  createUiAtlas,
+  FONT_PACK_FORMAT,
+  parseFontPack,
+  popClip,
+  pushClip,
+  pushGlyph,
+  pushShape,
+  pushSprite,
+  resetDrawList,
+} from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { buildUiBatch, createUiBatch, UI_FLOATS_PER_VERTEX, UI_MODE, type UiAtlasInfo } from './ui-batch.ts';
 
@@ -76,5 +87,37 @@ describe('DrawList → lote de quads', () => {
     expect(batch.capacity).toBeGreaterThanOrEqual(40);
     expect(batch.grows).toBe(1);
     expect(vertex(batch, 39, 0)[0]).toBe(39);
+  });
+
+  it('atlas do ui-fonts: cada glifo usa a faixa MSDF da própria camada; as páginas de sprite vêm depois das fontes', () => {
+    const font = (layer: number, range: number) => ({
+      layer,
+      name: 'S',
+      size: 20,
+      distanceRange: range,
+      lineHeight: 24,
+      base: 18,
+      capHeight: 14,
+      xHeight: 10,
+      glyphs: [0x41, 0, 0, 10, 20, 0, 0, 12],
+    });
+    const pack = parseFontPack({
+      format: FONT_PACK_FORMAT,
+      atlas: { width: 512, height: 256, layers: 2, image: 'u.png' },
+      fonts: { display: font(0, 4), hud: font(1, 6) },
+    });
+    const image = createUiAtlas(pack, new Uint8Array(512 * 256 * 2 * 4));
+    expect(image.msdfRanges).toEqual([4, 6]);
+    expect(image.spriteBase).toBe(2);
+    const info: UiAtlasInfo = image;
+    const dl = createDrawList(8);
+    resetDrawList(dl, 1280, 720);
+    // Mesmo tamanho na tela (escala 1): a faixa em px de tela é a da camada.
+    pushGlyph(dl, 0, 0, 10, 20, 0, 0, 10 / 512, 20 / 256, 0xffffffff, 0);
+    pushGlyph(dl, 0, 0, 10, 20, 0, 0, 10 / 512, 20 / 256, 0xffffffff, 1);
+    const batch = createUiBatch();
+    expect(buildUiBatch(dl, info, batch)).toBe(2);
+    expect(vertex(batch, 0, 0).slice(4, 7)).toEqual([UI_MODE.glyph, 0, 4]);
+    expect(vertex(batch, 1, 0).slice(4, 7)).toEqual([UI_MODE.glyph, 1, 6]);
   });
 });

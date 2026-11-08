@@ -1,6 +1,7 @@
 /**
- * Leitura mínima de um sfnt (TTF/OTF) só de build: quais códigos a fonte cobre (`cmap` formatos 4 e 12) e os nomes
- * (`name`), para o fontbake pedir ao gerador só glifos que existem e registrar a versão da fonte.
+ * Leitura mínima de um sfnt (TTF/OTF) só de build: quais códigos a fonte cobre (`cmap` formatos 4 e 12), os nomes
+ * (`name`: versão, copyright e o Reserved Font Name) e as métricas verticais (`head` e `OS/2`), para o fontbake pedir
+ * ao gerador só glifos que existem, gravar medidas exatas e registrar a origem da fonte.
  */
 
 interface TableRecord {
@@ -113,4 +114,34 @@ export function fontName(font: Uint8Array, nameID: number): string {
     }
   }
   return fallback;
+}
+
+/** Métricas verticais em em (fração de `unitsPerEm`). Altura de maiúscula e altura-x só existem no OS/2 v2+. */
+export interface FontVerticalMetrics {
+  readonly unitsPerEm: number;
+  readonly capHeight: number | null;
+  readonly xHeight: number | null;
+  readonly typoAscender: number;
+  readonly typoDescender: number;
+}
+
+/** Lê `head.unitsPerEm` e o OS/2 (`sTypoAscender`, `sTypoDescender`, `sxHeight` e `sCapHeight`). */
+export function fontVerticalMetrics(font: Uint8Array): FontVerticalMetrics {
+  const view = viewOf(font);
+  const all = tables(view);
+  const head = all.get('head');
+  const os2 = all.get('OS/2');
+  if (!head || head.length < 20) throw new Error('sfnt: tabela head ausente');
+  if (!os2 || os2.length < 72) throw new Error('sfnt: tabela OS/2 ausente');
+  const upm = view.getUint16(head.offset + 18);
+  if (upm === 0) throw new Error('sfnt: unitsPerEm zero');
+  const em = (v: number) => v / upm;
+  const v2 = view.getUint16(os2.offset) >= 2 && os2.length >= 90;
+  return {
+    unitsPerEm: upm,
+    typoAscender: em(view.getInt16(os2.offset + 68)),
+    typoDescender: em(view.getInt16(os2.offset + 70)),
+    xHeight: v2 ? em(view.getInt16(os2.offset + 86)) : null,
+    capHeight: v2 ? em(view.getInt16(os2.offset + 88)) : null,
+  };
 }

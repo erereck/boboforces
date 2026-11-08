@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@boboforces/shared": "0.0.0",
-    "@boboforces/format": "0.0.0"
+    "@boboforces/format": "0.0.0",
+    "@boboforces/world": "0.0.0"
   },
   "devDependencies": {}
 }

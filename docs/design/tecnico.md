@@ -310,19 +310,20 @@ interface Sim {
 | Array | Tamanho da camada | Camadas | Conteúdo | Memória com mips |
 |---|---|---|---|---|
 | Blocos (`blocos16`) | 16×16 | até 256 (mínimo garantido de `MAX_ARRAY_TEXTURE_LAYERS`) | faces de bloco, formas do catálogo | ≈ 350 KB |
-| Modelos (`modelos64`) | 64×64 | até 128, subindo se o T0 deixar | armas, acessórios 3D, props fora da grade, partes de skin, skins compostas dos bobos, folha de rostos, camada branca dos detritos | ≈ 2,7 MB |
+| Modelos (`modelos64`) | 64×64 | até 128, subindo se o T0 deixar (M1: 26 + 64 reservadas = 90) | armas, acessórios 3D, props fora da grade, skins compostas dos bobos (4 camadas por skin, #51), folha de rostos, camada branca dos detritos | ≈ 2,7 MB |
 
 - Os nomes `blocos16` e `modelos64` são os mesmos da `arte-ux.md` 1.6.
 
-- **Filtro:** magnificação `NEAREST`; minificação `NEAREST_MIPMAP_LINEAR`, para o pixel-art não cintilar ao longe. Sem anisotropia (não existe sem extensão).
+- **Filtro:** magnificação `NEAREST`; minificação `NEAREST_MIPMAP_LINEAR` (aprovado no print 5, #50), para o pixel-art não cintilar ao longe. Sem anisotropia (não existe sem extensão).
 - **Repetição:** wrap `REPEAT` dentro da camada. É isso que deixa o greedy meshing juntar faces de vários blocos num quad só, com a textura repetindo a cada 0,5 m.
 - **Mips:** gerados pelo `tools/texgen` e enviados nível a nível. Nas camadas cutout, o mip preserva a cobertura do alfa, para a folhagem não sumir ao longe. Camadas opacas podem usar `generateMipmap` como atalho.
+- **Skins dos bobos (#51):** `writeModelLayer(primeira, rgba k × 16 KB, nível1?: k × 4 KB)` sobe k camadas seguidas num laço de `texSubImage3D` com profundidade 1 (o caminho provado no nx.js; 28 chamadas por skin: 4 camadas × 7 níveis). O nível 1 vem pronto (a pintura 64×64 reempacotada); os níveis 2..6 saem dele com cobertura de alfa (busca da cobertura por histograma, 2 leituras da camada em vez de 16). A cadeia inteira também fica na cópia da CPU (`SharedTextures.assets.*.data.levels`), de onde a cor do cubinho lê o nível 1.
 - **Decodificação:** as imagens chegam como PNG [PADRÃO] e são decodificadas pelo próprio jogo (decodificador PNG em `format`, sobre o inflate do fflate) direto para `Uint8Array`. Assim os arrays não dependem de `Image`, `ImageBitmap`, `OffscreenCanvas` nem `getImageData`.
 - **Texturas animadas** (água, telas, lava de brinquedo): o bloco declara N quadros em camadas seguidas e o shader soma `floor(tempo × fps) mod N` à camada.
 - **Plano B, se o Teste Zero reprovar o array no nx.js** [T0]:
   - atlas 2D com células de 16×16 e 4 px de padding (blocos) e de 64×64 (modelos);
   - repetição feita no shader com `fract()` e `textureGrad`, para o mip não quebrar na emenda;
-  - no máximo 2 níveis de mip;
+  - no máximo 2 níveis de mip nos blocos e 3 nos modelos (`ATLAS_MAX_MIP_LEVELS = { blocos16: 2, modelos64: 3 }`; o 3º nível do `modelos64` coube no padding de 4 px: 720×648 → 360×324 → 180×162, +114 KB);
   - a troca fica atrás de um `#define ATLAS` nos mesmos 7 programas.
 
 ### 6.2 Mesher: greedy meshing por textura [PADRÃO]
@@ -378,29 +379,37 @@ interface Sim {
 - Todos com `RawShaderMaterial`/`ShaderMaterial` e fog própria por uniform, para o cache de programas do three não criar variantes. O F2 e o e2e conferem `renderer.info.programs.length ≤ 7`.
 - **Compilados e aquecidos na tela de loading** (desenha 1 frame fora da tela), porque o Switch não tem `KHR_parallel_shader_compile`.
 - **Proibidos:** EffectComposer, render targets float/half-float, shadow map, texturas comprimidas, anisotropia, luzes dinâmicas do three e leitura de textura no vertex shader.
-- **Casco invertido para contorno de time:** fora do orçamento base, porque somaria ~7 draw calls por viewport; avaliado no M1 por print + medição (`arte-ux.md` 2.6). Se entrar, usa o próprio programa instanciado, sem programa novo. Sem ele, a separação vem da luz e do bevel de 1 px dos materiais modulares (`arte-ux.md` 1.3); materiais contínuos não têm borda, e as skins têm contorno interno só onde uma peça termina.
+- **Casco invertido para contorno de time:** avaliado no M1 por print + medição e **recusado** (#50); saiu do motor. Sem ele, a separação vem da luz e do bevel de 1 px dos materiais modulares (`arte-ux.md` 1.3); materiais contínuos não têm borda, e as skins têm contorno interno só onde uma peça termina.
 
 ### 6.6 Personagens, armas, props e detritos
 
-- **Bobo de caixas** [DECIDIDO #7, #18]: 6 partes rígidas (cabeça, tronco, 2 braços, 2 pernas), cada uma com uma caixa interna e uma externa (chapéu, cabelo, roupa) na mesma geometria, mais um **quad de rosto** rente à frente da cabeça (7ª parte).
-  - Cerca de 150 triângulos por bobo (6 partes × 2 caixas × 12, mais o quad do rosto), sem a arma.
-  - Layout da skin 64×64: o da `arte-ux.md` 2.2, só com camada interna e externa (o rosto não fica na skin). A forma final das caixas de tronco e membros é decidida no M1 por print (GDD 9.1); fixos só 1,5 m de altura e cabeça de 0,5 m (8×8×8 px).
-- **Um `InstancedMesh` por parte** [PADRÃO]: 7 draw calls para todos os bobos em cada viewport (6 partes + rosto), mais 1 por modelo de arma visível e 1 por tipo de acessório 3D visível.
-  - **Atributos por instância:** matriz, camada da skin no array de modelos, luz amostrada (céu, sol, emissivo), flash de dano, cor de contorno (só se o casco for aprovado no M1) e, no quad do rosto, estilo e expressão.
-  - **Rosto e expressões:** o quad do rosto lê a **folha de rostos** (uma camada 64×64 de `modelos64`: 8 estilos × 8 expressões). Estilo e expressão deslocam a UV no vertex shader, só com conta sobre o atributo, sem ler textura no vertex shader [PADRÃO: Render de personagens]. Trocar expressão não recompõe a skin.
+- **Boneco do FutBobo** [DECIDIDO #56; altura #55]: 12 ossos rígidos (cabeça, tronco, 2 braços, 2 antebraços, 2 coxas, 2 canelas, 2 pés), uma caixa primária por osso, mais as mãos (14 caixas do corpo) e de 0 a 28 caixas de cabelo e acessórios na cabeça (média de 17,75 caixas nos 8 visuais do teste; teto `FIGURE_MAX_BOXES` = 44). Substitui o bobo de caixas A (6 partes, 7 draws, #7/#18/#53), que saiu do código.
+  - **Escala uniforme:** 1 px = `FIGURE_PX_M` = 7/128 m; 32 px = 1,75 m, cabeça de 8 px = 0,4375 m (4 cabeças), ombro a ombro 0,875 m. Uma caixa é um cubo unitário esticado por instância, então a geometria não arredonda nada. Cada caixa tem 24 vértices e 12 triângulos: ~213 por bobo em média (conta), sem a arma.
+  - **Cinemática única:** `figureFk` (`format`), afim 3×4 com Euler XYZ em forma fechada e pivô duplo do corpo. É a ÚNICA FK: serve à sim (tabela de hitboxes), ao render, ao desmonte e aos testes. A pose é um `Float32Array(34)` (as 31 chaves do FutBobo + `neckSink`, `torsoSink`, `neckSlide`).
+  - **Pose de jogo em tabela** (`FigureGameTable`, montada UMA vez no loading e passada à sim e ao render): 22 posturas (em pé, agachado e deslizando × empunhadura × base/ADS/correndo, e o zumbi) × 5 pitches (−1,2; −0,6; 0; 0,6; 1,2). Dela saem as 12 hitboxes da sim e a pose base do render, então o que se vê é o que se acerta (§7.2). O render interpola ângulos; a sim interpola centros e R, reortonormaliza e soma a folga `slack` (e a barriga `bulge`) entre as amostras.
+  - **Camadas cosméticas por cima da pose base**, dentro de um envelope medido (cabeça e tronco a no máximo 1 px da base em regime e 2 px no pico): respiração, passada, molas, freada, achatamento, tranco de dano, recarga, recuo e piscada. Motor em `render/src/actors/anim` (puro, sem three, 1 vez por quadro, não por vista; estado por entidade em `EntityTable(256, 48)`).
+  - **LOD do rig** (perfil: `figureNearM`, `figureHalfRate`): L0 até `figureNearM` de alguma vista que o vê (tudo, todo quadro); L1 além disso, em quadros alternados (só o deslocamento da raiz no quadro pulado); L2 fora do frustum de todas as vistas (só o deslocamento da raiz; ao voltar, 1 quadro de L0). Switch e celular: 20 m e meia taxa; PC: 40 m e taxa cheia.
+- **R4c: um `InstancedMesh` para todos os bonecos** [PADRÃO]: **1 draw por vista** para bonecos, zumbis e manequins (7 antes, mais o blob de sombra), mais 1 por modelo de arma visível e 1 por tipo de acessório 3D visível. É o cubo unitário instanciado no programa 4, UMA instância por caixa, capacidade 72 × 44 = 3.168, `frustumCulled = false` e `boundingSphere` FIXA (centro 0, raio 1e6, atribuída na criação) para o three nunca chamar `computeBoundingSphere()`; vale também para o `instancedMesh()` de atores e fx.
+  - **Atributos por instância (os mesmos 4 `vec4` + `instanceMatrix`):** a matriz do osso (3×4 afim, px → mundo, já com a raiz) e a **4ª linha** (céu, sol, emissivo, `2e + flash`, escrita por `writeFigureRow4` todo quadro) vão todo quadro; `iLayer` (1ª camada da skin + camada da caixa, `u0 + 64·v0`, `w + 64·h + 4096·d`, slot), `iLight` (centro da caixa no osso e flags), `iPart` (tamanho) e `iColor` (cos/sen do giro próprio da ponta do cabelo) só em evento (ator entra, sai ou muda gabarito, skin ou slot). **Nenhum programa, atributo ou uniform novo:** 7 programas e os mesmos 12 de 16 atributos; o programa 4 segue com 2 uniforms próprios (`uHideSlot`, `uOuterMaxDist`, agora pelo bit `outer` da caixa). Sem contorno de time (#50).
+  - **Vertex shader:** a flag `BF_V_BOX` (o bit livre desde a #50) liga o ramo da caixa; a UV vem da cruz da caixa (`u0`, `v0`, `w`, `h`, `d` em texels) e o rosto é a face da frente do cubo com a flag `face`, com a UV deslocada para a célula da expressão (só conta em float). Restrições do Eden respeitadas: só `int(x + 0,5)`, `&` e soma de bits disjuntos (sem `|` e sem multiplicação inteira), `floor((x + 0,5)/n)`, sem `return` antecipado, sem leitura de textura no vertex shader e sem índice dinâmico. O fragment shader não mudou. Props, armas, viewmodel e cubinhos seguem o caminho de antes (4ª linha 0 0 0 1).
+  - **Buffers (`actors/figure-instances.ts`):** prefixo estático para os manequins (escrito no 1º quadro e refeito só se o hash da linha do manequim mudar; a chave é a ordem entre os manequins, não o índice no `ActorBuffer`), depois uma faixa estável por ator; compactação só em evento (`copyWithin` das matrizes junto com os dados). Upload: 1 `bufferSubData` de matrizes por quadro, de `fimDoPrefixo` a `count`; os dados só no quadro de evento. O rig grava as 12 matrizes primárias direto nas instâncias; as mãos e o cabelo são cópias do antebraço e da cabeça (o cabelo com o recorte do teto de jogo).
+  - **Expressão:** `ActorBuffer.expression` (0..7, a ordem de `FACE_EXPRESSIONS`) escolhida pelo `game` (mirando no ADS, dor com flash > 0,3, bravo ao atirar, morto no desmonte); a piscada é do rig (0,13 s a cada 1,8 a 5,4 s, só com a expressão neutra; os manequins não piscam) e não sobe dados.
   - **Nada de textura de ossos:** a técnica de malha única com matrizes numa textura de dados está descartada.
-- **Skins compostas no loading:** base + cabelo + chapéu + roupa com padrão e cores + cor do time, montadas em JS sobre `Uint8Array` e enviadas para uma camada do array de modelos (`texSubImage3D`). O rosto fica fora da skin.
-  - Bots com a mesma aparência dividem a camada. Zumbis usam poucas skins.
-  - Teto: 64 camadas de skin na web e no Switch, a confirmar [T0].
-- **Animação procedural:** seno no andar, rotação com a mira, recuo, agachar, squash no pouso.
-- **As matrizes de instância são atualizadas uma vez por frame, não por viewport.** Com 64 bots × 7 partes × 64 B, são cerca de 29 KB por frame.
-- **Esconder o próprio corpo em 1ª pessoa:** antes de desenhar a viewport do jogador *i*, as instâncias dele recebem escala zero (7 uploads pequenos) e voltam depois. Em 3ª pessoa nada é escondido.
+- **Skins pintadas no loading, 2 camadas** [PADRÃO]: `paintFigureSkin` (puro, no `format`) escreve a aparência (`FigureLook` + time) em 2 camadas 64×64 seguidas do array de modelos, com o nível 1 (caixa 2×2): **camada 0** = cruz da cabeça 16³, as 8 expressões (células 16×16) e a paleta de 16 amostras 4×4 (cabelo, sombra do cabelo, barba, acessório e sombra, ouro, pele, mão ou luva, manga, calça, colete e sombra, bota, base do cabelo, gosma e curativo de zumbi); **camada 1** = tronco (farda em pixel art 16×24, Nearest, `figure-paint-outfit.ts`: jaqueta lisa ou camuflada, gola, fecho, cinto, colete com porta-carregadores e o ícone do time 5×5 num painel 7×7, #58), bota, as colunas de 4 texels dos membros (canela, manga, antebraço e coxa, as mesmas do zumbi) e a reserva do capacete. Cabelo, mão e acessórios leem amostras da paleta (cor lisa, como no FutBobo). Todo canto de região é par e as colunas são alinhadas a 4: o mip fica limpo até o nível 2. O rascunho de CPU é de 32 KB + 8 KB (antes 64 + 16).
+  - Bots com a mesma aparência e time dividem a skin (`createFigureSkinCache`: `slots`, `acquire` devolve a primeira camada, `release(primeira)`, `dispose()` e a opção `release` que chama `disposeFigurePaint`). A chave é `figureSkinKey`, calculada no loading, nunca por quadro.
+  - Reserva: `SKIN_LAYER_RESERVE` = 64 camadas = **32 skins** de 2 camadas (o M1 usa 10 no Switch: 3 looks × sem time/A/B + zumbi; 19 no PC; 31 com a fila dos prints). Estouro: o excedente veste o look padrão do PRÓPRIO time e o relatório traz um aviso. No M2 a reserva vem do perfil (≥ jogadores + bots), teto 256 camadas [T0].
+  - **Cor do time (#58):** com time, o colete grande (placa da frente e das costas, alças, porta-carregadores e cinto do equipamento), a braçadeira, as luvas e as joelheiras vão na cor do time, com o ícone ▲ ● ■ ◆ no peito e nas costas na tinta legível; jaqueta, calça, luvas, bota, colete do look ou acessório a menos de 92 (redmean) de um time da partida viram `#141414` ou `#f4f4f2` (`figureOutfitFor`). A cor do time cobre **38,1–39,0%** da frente no teste de cobertura (meta de arte 35%; na projeção com o cabelo, a barba longa e o afro ficam em 32,8–34,0%). A chave da skin (`fig2`) inclui o índice do time.
+  - **Cabelo:** `figureHairBoxes` (34 cortes, faixa, tiara, bandana, boné, barba e brincos) vira caixas no osso da cabeça; o teto de jogo é um RECORTE na matriz da caixa (1,99 m em pé, 0,99 m agachado ou deslizando) e o cabelo nunca é hitbox (`arte-ux.md` §2).
+  - No Switch, TODA aparência da partida é pintada no loading: pintar no meio da partida custa um quadro a 30 fps. Pintar uma skin leva 0,36–0,44 ms sem JIT (antes 3,7–4,4 ms; medido no PC, `PERF.md`).
+- **Animação:** tabela de pose + camadas do FutBobo no envelope (seno na passada, rotação com a mira, recuo, recarga, agachar, achatamento no pouso); 12 matrizes por ator, em 1 passada por quadro.
+- **As matrizes de instância são atualizadas uma vez por frame, não por viewport.** São 18,2 KB por quadro com 16 bonecos e 72,7 KB com 64 (matrizes de 64 B × ~17,75 caixas), numa faixa só.
+- **Esconder o próprio corpo em 1ª pessoa:** pelo uniform `uHideSlot` do programa 4 (a regra de `FrameViews.owner`: o slot do dono da vista; 255 na câmera livre e em 3ª pessoa, onde nada é escondido). Sem escrita por vista.
 - **Armas:** modelos de caixas com textura a 32 px/m, sem marcas reais [DECIDIDO #10]. **Um modelo só** serve ao viewmodel e à 3ª pessoa: até 600 triângulos, a maioria abaixo de 300 (GDD 5.5, `arte-ux.md` 3.2).
 - **Props fora da grade (estáticos):** `InstancedMesh` por tipo, dividido em grupos espaciais de 32 m para o culling funcionar, com textura nas camadas de `modelos64`. Meta de até 15 draw calls de props por viewport, 8 no Switch 3–4P [T0].
-- **Morte cartunesca** [DECIDIDO #9]: as 6 partes viram corpos Verlet contra a grade (o bobo "se desmonta") e somem em 4 s, mais cubinhos e confete.
-  - **Detritos:** pool de cubinhos no programa instanciado, com **cor sólida por instância** que a CPU lê no texel atingido (bloco, skin ou prop) no ponto do acerto. O cubinho não amostra textura: usa a camada branca de `modelos64` multiplicada pela cor. Mesmo pipeline da `arte-ux.md` 4.1. Tamanho do pool por perfil (seção 16.1).
+- **Morte cartunesca** [DECIDIDO #9]: as 6 grupos de ossos (cabeça com cabelo, tronco, braço D e E, perna D e E, por `FIGURE_BONE_GROUP`) viram corpos Verlet contra a grade (o bobo "se desmonta", com a dobra do cotovelo e do joelho) e somem em 4 s, mais cubinhos e confete. Cada cadáver nasce das 12 matrizes do último quadro do ator e usa a mesma malha do cubo na `InstancedMesh` do fx (1 draw, capacidade 16 × 44).
+  - **Detritos:** pool de cubinhos no programa instanciado, com **cor sólida por instância** que a CPU lê no texel atingido (bloco, skin ou prop) no ponto do acerto (skin: `HitEvent.bodyPart` dá o osso, a caixa atingida dá o texel `(camada, u0, v0, w, h, d)` no nível 1 da cópia da CPU; caixa de paleta devolve a amostra; na morte, 8 cubinhos com o texel do meio da frente do tronco). O cubinho não amostra textura: usa a camada branca de `modelos64` multiplicada pela cor. Mesmo pipeline da `arte-ux.md` 4.1. Tamanho do pool por perfil (seção 16.1).
   - **Opção de sangue** nas configurações: cubinhos e manchas vermelhas, pelos mesmos pools.
-- **Bobos-zumbi** [DECIDIDO #31]: o mesmo boneco com skins esverdeadas e pose curvada nas matrizes das partes.
+- **Bobos-zumbi** [DECIDIDO #31]: o mesmo boneco (postura 21 da tabela, curvada, braços à frente), com `FigureLook.zombie` (pele `0x8fae74`, roupa desbotada, rasgos por hash, 8 expressões pintadas na própria skin) e escala uniforme na raiz. No M1 só existe o `common` (1 skin). A hitbox segue a curvatura; a escala do Chonker/Mega na hitbox fica para o M3.
 
 ### 6.7 Câmera, ADS e viewmodel
 
@@ -476,17 +485,19 @@ const renderer = new WebGLRenderer({ canvas: canvas as any, context: gl, antiali
 
 | Métrica | Valor | Em células de 0,5 m |
 |---|---|---|
-| Altura do bobo (cabeçudo, ~3 cabeças) [DECIDIDO #18] | 1,5 m | 3 |
-| Altura do olho | 1,3 m | — |
+| Altura do bobo [DECIDIDO #18, #55, #56] | 1,75 m (era 1,625 e antes 1,5) | 3½ (vão livre: 4) |
+| Altura do olho | 1,55 m (era 1,425 e antes 1,3) | — |
 | Agachado / olho agachado | 0,95 m / 0,8 m | ~2 |
-| Cabeça | ~0,5 m | 1 |
-| AABB de movimento | 0,6 × 1,5 × 0,6 m (0,95 m agachado) | — |
+| Cabeça (cubo de 8 px do FutBobo; 4 cabeças) | 0,4375 m | ~1 |
+| AABB de movimento | 0,6 × 1,75 × 0,6 m (0,95 m agachado) | — |
 | Degrau automático | 0,5 m | 1 |
 | Pulo padrão | 1,0 m | 2 |
 | Cobertura baixa (esconde agachado) | 1,0 m | 2 |
 | Cobertura alta (esconde em pé) | ≥ 1,75 m | 4 |
 | Porta | 1,0 × 2,0 m | 2 × 4 |
 | Corredor mínimo | 1,0 m | 2 |
+
+- **Regras amarradas em teste (`sim/src/contracts.test.ts`, #53, #55 e #56):** corpo ≤ cobertura alta; porta e pé-direito ≥ corpo + 0,25 m; olho = corpo − 0,2 m, dentro da cabeça e entre 1,0 e 2,0 m (faixa das aberturas do Construto, todas a 2,0 m desde o porte); quadril 12 px + tronco 12 + cabeça 8 = 32 px = `bodyHeight` (o topo do repouso no FK confere em 1e−6 m); `headSize` = cabeça de 8 px; o topo da hitbox agachada (`FIGURE_CROUCH_TOP_M`, 0,97 m) fica abaixo da cobertura baixa e acima do olho agachado. O `mapc` conta o nó em pé com `ceil(aabbHeight / 0,5)` = 4 células e avisa "visto sem ver" (parede com topo entre o olho e o topo da cabeça ao lado de nó jogável).
 
 ### 7.2 Movimento e tiro
 
@@ -500,10 +511,10 @@ const renderer = new WebGLRenderer({ canvas: canvas as any, context: gl, antiali
   - Regras como gravidade lunar multiplicam esses valores.
 - **Hitscan:**
   1. DDA na grade até o primeiro sólido que bloqueia bala (testando a forma dentro da célula e os colisores de props), o que define a distância máxima;
-  2. raio contra as hitboxes das entidades: cabeça, tronco e membros, como caixas orientadas pelo yaw.
+  2. raio contra as hitboxes das entidades (#56): **12 caixas orientadas, uma por osso**, da tabela de jogo do `format` por postura × pitch (`figureHitBoxes`: interpola centros e R, reortonormaliza e soma a folga), no frame do yaw da entidade; o raio entra no espaço de cada caixa pela transposta de R (sem alocar), com as caixas da pose em cache por entidade por tick. A fase larga usa raio e topo por postura (`broad`, conferida pela HITBOX e nunca pela fase larga: o topo largo agachado é 0,9698 m). As caixas de BRAÇO são cortadas a 0,75 m do eixo da entidade no plano (`ARM_HIT_CUT_M`; a AABB crescida de 0,45 m): a arma pode aparecer do outro lado de um muro fino, mas não leva tiro por lá. Custo do raio com a pose em cache: 0,18–0,39 µs com JIT (meta ≤ 0,6 µs).
   - As entidades ficam num hash espacial uniforme de 4 m.
   - No MVP, todo bloco sólido bloqueia bala, sem penetração.
-- **Headshot** (dado por arma, calibrado pelo robô de balanceamento): padrão **1,5x**; sniper **2,0x**; escopeta **1,25x**. A cabeça de 0,5 m é um alvo grande, por isso o padrão é menor que o de FPS comum. [DECIDIDO #18, PADRÃO]
+- **Headshot** (dado por arma, calibrado pelo robô de balanceamento): padrão **1,5x**; sniper **2,0x**; escopeta **1,25x**. A cabeça de 0,4375 m (cubo de 8 px do boneco do FutBobo; era 0,5 m) segue um alvo grande, por isso o padrão é menor que o de FPS comum; os multiplicadores ficam e os números do balance do port estão no gameplay.md §3.1. [DECIDIDO #18, PADRÃO]
 - **Projéteis** (granada e foguete no MVP; paintball no M6+):
   - balística própria por tick;
   - segmento varrido com DDA + teste de hitbox;
@@ -524,7 +535,7 @@ const renderer = new WebGLRenderer({ canvas: canvas as any, context: gl, antiali
 ### 8.1 Navegação [PADRÃO]
 
 - **Grade 2,5D sobre a grade de 0,5 m.**
-  - Cada coluna pode ter vários "spans" andáveis: piso sólido (ou rampa, laje, degrau) embaixo e 1,5 m livres em cima (0,95 m para spans só agachado).
+  - Cada coluna pode ter vários "spans" andáveis: piso sólido (ou rampa, laje, degrau) embaixo e a altura da AABB livre em cima: `ceil(1,75 / 0,5)` = 4 células (1,625 desde a #53; 1,75 desde a #55) (0,95 m para spans só agachado).
   - **Nós nos cantos da grade:** cada nó representa um quadrado de 2×2 células (1,0 × 1,0 m). Um bobo de 0,6 m cabe nele, e uma porta de 1,0 m tem exatamente um nó no meio.
   - Conexões: degrau de até 0,5 m andando; até 1,0 m com pulo; queda de até 3 m.
   - Props marcam como bloqueados os nós que ocupam.
@@ -591,8 +602,8 @@ const renderer = new WebGLRenderer({ canvas: canvas as any, context: gl, antiali
   - foco espacial automático (o vizinho mais próximo na direção), com exceções declaradas;
   - a saída é uma `DrawList`, que o `render` desenha em 1 ou 2 draw calls por viewport.
 - **Texto MSDF** [PADRÃO]:
-  - atlas gerado no build (`tools/fontbake`) com Latin-1 + Latin Extended-A, que cobre o pt-BR;
-  - duas fontes OFL (uma display pesada e uma condensada para o HUD), até 120 KB de fonte no total, aprovadas por print;
+  - atlas gerado no build (`tools/fontbake`), `fonts/ui-fonts.{png,json}`: display só em caixa alta (ASCII sem minúsculas, À–Þ, ¡ª«°·º»¿, NBSP e extras: 118 glifos) e HUD com Latin-1 + extras (200 glifos), que cobrem o pt-BR. O Latin Extended-A saiu na #54 (com ele o atlas passava do teto); a tabela pt-BR inteira é conferida contra o atlas real em teste (`ui/src/fonts-in-use.test.ts`, `game.test.ts`);
+  - duas fontes OFL, até 120 KB no total, aprovadas por print: **Russo One** (display) e **Saira Condensed SemiBold** (HUD) [DECIDIDO #54], com os nomes derivados "BoboForces Display" e "BoboForces HUD" (sem o Reserved Font Name; o fontbake reprova se aparecer). O teto é lido como bytes BAIXADOS do atlas: PNG cru + JSON em gzip, o critério do `size-check`, com o JSON no nível 4 (limite de cima do que o GitHub Pages serve) [decisão menor revisável; medido 119.605 B]. Faixa MSDF 4, camada 512×256, `roundDecimal: 3`, a camada do HUD em 7 bits por canal;
   - sem `FontFace` e sem fontes de sistema; nada de fontes da Microsoft (regra do novelo);
   - Canvas 2D com `OffscreenCanvas` só como plano B, validado no Teste Zero [T0].
 - **Widgets:**
@@ -928,7 +939,7 @@ O Claude gera todos os assets por script (blocos, texturas pixel-art, modelos de
 | Ferramenta | Entrada | Saída |
 |---|---|---|
 | `tools/texgen` | Scripts TS de textura: paletas, ruído com semente, pixel-art escrita como texto ASCII para as peças-chave | PNGs em tira vertical (16×16·N e 64×64·M), mips, manifesto `camada → nome` |
-| `tools/skingen` | Biblioteca de partes de skin (rostos, cabelos, chapéus, padrões, roupas de time, skins de zumbi) | PNG das partes no layout 64×64 + tabela de regiões. A composição final de cada bobo acontece no jogo |
+| `tools/skingen` | Prévia do pintor de skins do `format` (`npm run skingen:figuras`): as 2 camadas a 4×, frente e costas dos 12 looks e do zumbi (o gerador de partes do bobo A saiu no port; a pintura acontece no loading do jogo) | 14 folhas PNG em `local/skins/` (privado), nada no runtime |
 | `tools/modelgen` | Modelos em TS como listas de caixas (origem, tamanho e UV em texels, pivô) ou primitivas low-poly paramétricas (cilindro de N lados, árvore, barril) | `.bfmodel` |
 | `tools/mapc` | Mapas escritos como scripts TS com uma API de construção (`box`, `ramp`, `fence`, `prop`, `spawn`, `door`…) | `.bfmap` com grade, props, marcadores, navegação e pontos táticos |
 | `tools/mapview` | `.bfmap` | Visualizador e editor interno no navegador (marcadores, nós de IA, câmeras), só em desenvolvimento |
@@ -1025,9 +1036,10 @@ Os tetos começam conservadores e **sobem com as medições**; cada mudança é 
 | Heap JS | < 200 MB |
 | Memória total no celular | < 300 MB |
 
-- **Custo de personagens é baixo:** 40 bobos × (~150 do corpo + até 600 da arma, a maioria abaixo de 300) ≈ 18 a 30 mil triângulos, pouco perto do teto de 400 mil por viewport no PC.
-- **Draw calls no Switch 3–4P (≤ 45 por viewport, orçamento base):** mundo ~17, props instanciados ≤ 8, bobos 7, armas e acessórios no mundo ≤ 3, viewmodel 1, VFX ≤ 6 (inclui o pool de cubinhos), céu 2. O casco de contorno fica fora dessa conta (6.5).
-- **Zero alocação por frame** nos laços quentes.
+- **Custo de personagens é baixo:** 40 bonecos × (~213 do corpo, média de 17,75 caixas × 12 triângulos, + até 600 da arma, a maioria abaixo de 300) ≈ 20 a 33 mil triângulos, pouco perto do teto de 400 mil por viewport no PC. Vértices por vista (corpo): 6.816 com 16 bonecos e 27.264 com 64 (média); pior caso com 16 bonecos, 16.128.
+- **Draw calls no Switch 3–4P (≤ 45 por viewport, orçamento base):** mundo ~17, props instanciados ≤ 8, bonecos 1 (R4c; eram 7) mais o blob de sombra, armas e acessórios no mundo ≤ 3, viewmodel 1, VFX ≤ 6 (inclui o pool de cubinhos e o desmonte), céu 2. Sem casco de contorno (#50). Meta do port no Eden 3–4P: ~28 draws por vista (teto 45); medido 25,6–32 (`PERF.md`).
+- **Zero alocação por frame** nos laços quentes. O `guard` cobra isso nas regiões `// quente:` … `// fim-quente` (regra 11 do `PORTABILIDADE.md`) e exige essas regiões em `figureFk`, `figureHitBoxes`, `figureGamePose`, `paintFigureSkin`, `rayVsBobo`, `anim/rig.ts` e `figure-instances.ts`.
+- **Eden: instanciamento adiado.** O emulador desenha a instância 0 de um draw instanciado na hora e ADIA as N−1 restantes até o draw seguinte, quando já estão com o estado dele (bonecos truncados, fantasmas). Nenhuma opção da config do Eden corrige (testadas: `vertex_input_dynamic_state`, `dyna_state`, `gpu_accuracy`, `disable_buffer_reorder`, GPU assíncrona, backend OpenGL). Contorno "F": logo depois de cada draw instanciado com 2 ou mais instâncias, o mesmo draw sem instâncias com 1 primitiva (`applyInstancingFix`, em `apps/switch/src/t0/gl-probes.ts`), ligado SÓ por detecção a cada boot (`apps/switch/src/main.ts`). No console a detecção deve dar "normal" e o contorno não liga: falta testar [T0].
 - **Pausa de GC de no máximo 5 ms,** medida no F2 numa sessão de 20 minutos.
 
 ### 16.4 Download e tempo (web)
@@ -1045,6 +1057,7 @@ Os tetos começam conservadores e **sobem com as medições**; cada mudança é 
   - do boot ao menu em até 4 s;
   - romfs até 60 MB (o runtime sozinho dá cerca de 56 MB no NRO, como no MMM).
 - **O CI reprova o build se o orçamento de download estourar.**
+- **Fontes dentro do menu (#54):** sub-orçamento "Fontes ≤ 120 KB" no `size-check`, contando o atlas como ele é baixado: PNG cru (já comprimido) + JSON em gzip [decisão menor revisável; os TTF de origem não vão no build]. O gzip -9 do resto do size-check é aproximação: o GitHub Pages serve gzip de outro compressor (sem Brotli; de −0,1% a +4,8% do zlib -9 nos textos do M0, o pior no JSON das fontes), então o JSON das fontes, de folga justa, é medido no nível 4, que fica acima do servido. Medido em 03/11/2026: 111.895 + 7.710 = 119.605 B (folga de 395 B, kerning a partir de 0,25 px). Reserva se apertar: HUD em 6 bits por canal (−5,9 KB).
 
 ---
 
@@ -1248,7 +1261,7 @@ Proibido no código compartilhado. Fica em `docs/PORTABILIDADE.md` e no `CLAUDE.
 | Música provisória | CC0 [DECIDIDO #38] | web e Switch |
 | Vite, esbuild, Vitest, playwright-core, ESLint, Prettier, vite-plugin-pwa | MIT/Apache-2.0 | só ferramentas |
 
-- **Avisos obrigatórios distribuídos junto:** MIT e OFL pedem o texto da licença nas cópias. O `tools/credits` gera `licencas.txt` (servido em `/boboforces/licencas.txt` e embutido no romfs), e a tela Ajustes › Sobre › Créditos lê esse arquivo.
+- **Avisos obrigatórios distribuídos junto:** MIT e OFL pedem o texto da licença nas cópias. Hoje (M1): o `vite.config.ts` da web e o `apps/switch/scripts/licenses.ts` montam o `licencas.txt` (servido em `/boboforces/licencas.txt` e embutido no romfs) com os pacotes npm que entram no bundle e o `assets-src/fonts/generated/ui-fonts.licencas.txt` do fontbake (uma seção por fonte em uso + o `OFL.txt` da família), com a exceção OFL do atlas `fonts/ui-fonts.*` no cabeçalho; o build reprova se faltar. No M2 o `tools/credits` assume o arquivo e a tela Ajustes › Sobre › Créditos lê ele.
 - **CI:** o `tools/credits` falha se uma dependência de produção ou um asset externo não tiver entrada em `CREDITOS.md`.
 - **Marcas:** armas sem marcas reais [DECIDIDO #10]; glifos de botão genéricos, sem logos de Nintendo, Xbox ou PlayStation [PADRÃO]; nenhum asset com marca, bandeira ou exército real [DECIDIDO #19].
 
@@ -1259,7 +1272,7 @@ Proibido no código compartilhado. Fica em `docs/PORTABILIDADE.md` e no `CLAUDE.
 | Marco | Conteúdo técnico | Critério de saída |
 |---|---|---|
 | **M0 Fundação** (P) | Monorepo, tsconfig, guardas de lint e lib, CI, `version.json`, CHANGELOG, `CLAUDE.md`, `CREDITOS.md`/`DEPENDENCIAS.md`; `platform-api`; sim headless (passo fixo, RNG, ECS-lite, InputFrame, colisão AABB + DDA, perfil de movimento Bobo); robô de balanceamento rodando duelos de fuzil; input abstrato (teclado/mouse, gamepad, toque → ações); render base (three com shim, 1 chunk texturizado com texture array, câmera); UI WebGL base (MSDF, foco, 1 tela, tokens escuros); gerador de texturas com paleta e validador (base do `texgen`); deploy no Pages com splash; `apps/switch` stub com esbuild + teste em vm | CI verde; a URL publicada abre o splash em menos de 1 s; a sim roda 3.600 ticks headless com hash estável; o bundle do Switch passa no `portcheck` |
-| **M1 Cena-vitrine + Teste Zero** (M) | `world` completo (formas, chunks, mesher por textura, AO, luz em canais); `texgen`, `skingen`, `modelgen`, `mapc`; Construto como cena-vitrine (blocos, peças fora da grade, props); bobos de caixas com skins e armas; bots burros (A* + hitscan); 1 a 4 viewports; HUD MSDF mínimo; F2. A **mesma cena** vira `/bench` na web e NSP de teste no Switch real | Prints aprovados pelo Erick (densidade de textura e peças fora da grade); critérios do Teste Zero (seção 24) |
+| **M1 Cena-vitrine + Teste Zero** (M) | `world` completo (formas, chunks, mesher por textura, AO, luz em canais); `texgen`, `skingen`, `modelgen`, `mapc`; Construto como cena-vitrine (blocos, peças fora da grade, props); bonecos do FutBobo (12 ossos, pose e hitboxes por tabela, skins de 2 camadas) com armas; bots burros (A* + hitscan); 1 a 4 viewports; HUD MSDF mínimo; F2. A **mesma cena** vira `/bench` na web e NSP de teste no Switch real | Prints aprovados pelo Erick (densidade de textura e peças fora da grade); critérios do Teste Zero (seção 24) |
 | **M2 MVP web solo** (G) | Movimento arcade e perfis; 8 armas (pistola, SMG, fuzil, escopeta, sniper, lança-foguetes, faca, granada); hitscan + foguete e granada; Bobo Warfare TDM e FFA; Bobo Training; Surpreenda-me simples; Laboratório núcleo forte (5 níveis + sliders dos 4 eixos + salvar bots); Construto + 1 arena pequena; menus WebGL; Partida Rápida; settings, presets, estatísticas; teclado/mouse, gamepad e toque; LOD de IA; service worker e Novidades; Copiar relatório; backup; qualidade na primeira abertura | Orçamentos da 16.4 cumpridos; golden e balance no CI (5 níveis em ordem); PC de referência a 60 fps com 40 bots; Android de entrada a 30 fps com 12 bots; checkpoint Switch com o MVP num NSP (1 a 2 h de jogo) |
 | **M3 Sofá** (M/G) | Entrada local de 1 a 4; tela dividida na web com controles; áudio pelo ouvinte mais próximo + mono; Bobo Zombies estilo CoD (ondas, pontos, armas na parede, barricadas, portas, caixa misteriosa, reviver, chefões); flow field; colisores dinâmicos; mapa de Zombies. É o ensaio do Switch no PC | 4 gamepads no PC dentro do orçamento; checkpoint Switch com 4 controles reais e Zombies a 30 fps |
 | **M4 Port do Switch** (M) | `platform-switch` completo; save no SD com backup; NACP, ícone e title ID; menus sem online; ciclo de vida (dock/portátil, HOME/sleep, reconexão, bateria); `runtime.log`; verify; Eden + hardware; Teste Zero 2 com o jogo inteiro. 100% offline, uso pessoal | 4 jogadores em Bobo Zombies a 30 fps por 20 min na dock e no portátil, sem crash e com heap estável; NSP instalado no console do Erick |

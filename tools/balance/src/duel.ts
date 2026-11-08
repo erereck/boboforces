@@ -1,5 +1,13 @@
 import { createHeadlessMatch } from '@boboforces/ai';
-import { BOT_LEVELS, builtinBotRef, MATCH_RECIPE_FORMAT, type BotLevel, type MatchRecipe } from '@boboforces/format';
+import {
+  BOT_LEVELS,
+  builtinBotRef,
+  createFigureGameTable,
+  MATCH_RECIPE_FORMAT,
+  type BotLevel,
+  type FigureGameTable,
+  type MatchRecipe,
+} from '@boboforces/format';
 import { BOT_CONTROLLER_BASE, SIM_HZ, type SimMap } from '@boboforces/sim';
 import { cellCenter, createTestBlocks, createWorldGrid, fillBox, makeCell, type MapSpawn } from '@boboforces/world';
 
@@ -20,6 +28,11 @@ export interface DuelOptions {
   readonly maxRoundS?: number;
   /** Níveis em ordem crescente (padrão: os 5). */
   readonly levels?: readonly BotLevel[];
+  /**
+   * Tabela de jogo do boneco (#56): montada UMA vez e passada a todas as rodadas (cada uma é uma sim nova; sem ela, o
+   * `createSim` montaria a sua em cada duelo). Padrão: `createFigureGameTable()` no começo do `runDuels`.
+   */
+  readonly figureTable?: FigureGameTable;
 }
 
 export interface LevelStats {
@@ -84,7 +97,14 @@ interface RoundResult {
   hits: [number, number];
 }
 
-function runRound(a: BotLevel, b: BotLevel, map: SimMap, seed: number, maxTicks: number): RoundResult {
+function runRound(
+  a: BotLevel,
+  b: BotLevel,
+  map: SimMap,
+  seed: number,
+  maxTicks: number,
+  figureTable: FigureGameTable,
+): RoundResult {
   const recipe: MatchRecipe = {
     format: MATCH_RECIPE_FORMAT,
     mode: 'warfare.tdm',
@@ -101,6 +121,7 @@ function runRound(a: BotLevel, b: BotLevel, map: SimMap, seed: number, maxTicks:
     recipe,
     map,
     humans: 0,
+    figureTable,
     onEvents: (events) => {
       for (const ev of events) {
         if (ev.type === 'shot') {
@@ -154,6 +175,7 @@ export function runDuels(options: DuelOptions): DuelReport {
   const distances = options.distances ?? DEFAULT_DISTANCES;
   const maxTicks = Math.round((options.maxRoundS ?? 15) * SIM_HZ);
   const maps = distances.map(buildDuelMap);
+  const figureTable = options.figureTable ?? createFigureGameTable();
   const stats = levels.map(newLevelStats);
   const pairs: PairStats[] = [];
   let rounds = 0;
@@ -167,7 +189,7 @@ export function runDuels(options: DuelOptions): DuelReport {
         const swap = r % 2 === 1;
         const map = maps[Math.floor(r / 2) % maps.length]!;
         const seed = (options.seed * 1_000_003 + (i * 16 + j) * 100_003 + r) >>> 0;
-        const res = runRound(swap ? high : low, swap ? low : high, map, seed, maxTicks);
+        const res = runRound(swap ? high : low, swap ? low : high, map, seed, maxTicks, figureTable);
         rounds++;
         const sideLow = swap ? 1 : 0;
         const sLow = stats[i]!;

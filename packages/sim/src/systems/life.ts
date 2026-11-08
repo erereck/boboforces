@@ -1,12 +1,15 @@
+import type { FigurePart } from '@boboforces/format';
 import { MAX_TEAMS } from '../constants.ts';
 import { WEAPON_SLOTS } from '../config/weapons.ts';
-import { HIT_PARTS, hostile, PART_HEAD, type SimContext } from '../context.ts';
+import { HIT_PARTS, hostile, isBody, PART_HEAD, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
 
 /**
  * Passos 5 a 7: dano e morte, regras do modo (tempo e placar) e spawns (respawn, proteção, regeneração).
  * Spawn: entre os pontos do time (ou de qualquer time, `team = -1`), sorteia um dos 3 mais longe dos inimigos vivos
- * (gameplay.md §5.3, versão simples do M0: sem checar linha de visão).
+ * (gameplay.md §5.3, versão simples: sem checar linha de visão). Os pontos vêm dos marcadores do mapa
+ * (`simMapFromMarkers`). Zumbis (M1, estresse) usam qualquer ponto, o mais longe dos bobos, sem proteção nem
+ * regeneração, e abates de zumbi não contam no placar dos times.
  */
 
 const F = ENTITY_FLAG;
@@ -25,20 +28,29 @@ export function damageSystem(ctx: SimContext): void {
     if (ctx.match.phase === 'ended' && attacker !== NULL_ENTITY) amount = 0;
     const id = s.idOf(t);
     const part = q.part[i]!;
+    const bodyPart = q.bodyPart[i]! as FigurePart;
     if (amount > 0) {
       s.health[t] = s.health[t]! - amount;
       s.lastDamageTick[t] = ctx.tick;
       s.lastAttacker[t] = attacker;
     }
-    const p3 = i * 3;
-    ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, amount, q.point[p3]!, q.point[p3 + 1]!, q.point[p3 + 2]!);
-    if (s.health[t]! <= 0) kill(ctx, t, attacker, q.weapon[i]!, part === PART_HEAD);
+    ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, bodyPart, amount, q.point, q.dir, i);
+    if (s.health[t]! <= 0) kill(ctx, t, attacker, q.weapon[i]!, part === PART_HEAD, bodyPart, i);
   }
   q.count = 0;
 }
 
-function kill(ctx: SimContext, t: number, killer: EntityId, weapon: number, headshot: boolean): void {
+function kill(
+  ctx: SimContext,
+  t: number,
+  killer: EntityId,
+  weapon: number,
+  headshot: boolean,
+  bodyPart: FigurePart,
+  item: number,
+): void {
   const s = ctx.s;
+  const q = ctx.damage;
   s.health[t] = 0;
   s.flags[t] = (s.flags[t]! & F.onGround) | F.dead;
   const t3 = t * 3;
@@ -46,7 +58,8 @@ function kill(ctx: SimContext, t: number, killer: EntityId, weapon: number, head
   s.velocity[t3 + 2] = 0;
   // +1: o spawnSystem roda no MESMO tick (passo 7) e já desconta um. Assim o bobo fica morto exatamente
   // `respawnTicks` ticks (no mínimo 1, mesmo com `respawnS = 0`), e a IA e o render enxergam a morte.
-  s.respawnTicks[t] = ctx.respawnTicks + 1;
+  const zombie = s.kind[t] === ENTITY_KIND.zombie;
+  s.respawnTicks[t] = (zombie ? ctx.zombieRespawnTicks : ctx.respawnTicks) + 1;
   s.reloadTicks[t] = 0;
   s.slideTicks[t] = 0;
   s.recoilPitch[t] = 0;
@@ -56,13 +69,14 @@ function kill(ctx: SimContext, t: number, killer: EntityId, weapon: number, head
     const k = killer & 0xffff;
     if (hostile(ctx, k, t)) {
       s.kills[k] = s.kills[k]! + 1;
-      if (!ctx.ffa) {
+      // Placar dos times: só bobo matando bobo (o zumbi do estresse fica fora do TDM).
+      if (!ctx.ffa && !zombie && s.kind[k] === ENTITY_KIND.bobo) {
         const team = s.team[k]!;
         if (team < MAX_TEAMS) ctx.match.teamScore[team] = ctx.match.teamScore[team]! + 1;
       }
     }
   }
-  ctx.events.kill(ctx.tick, killer, s.idOf(t), weapon, headshot);
+  ctx.events.kill(ctx.tick, killer, s.idOf(t), weapon, headshot, bodyPart, q.dir, q.force[item]!, item);
 }
 
 /** Passo 6: relógio e limite de placar. Partida terminada não tem mais dano de arma nem respawn. */
@@ -119,11 +133,11 @@ function winner(ctx: SimContext): number {
   return tie ? -1 : best;
 }
 
-/** Passo 7: respawn, fim da proteção de spawn e regeneração. */
+/** Passo 7: respawn, fim da proteção de spawn e regeneração (só bobos nos modos `warfare.*`). */
 export function spawnSystem(ctx: SimContext): void {
   const s = ctx.s;
   for (let e = 0; e < s.count; e++) {
-    if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    if (s.alive[e] === 0 || !isBody(s.kind[e]!)) continue;
     const fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) {
       if (s.respawnTicks[e]! > 0) s.respawnTicks[e]!--;
@@ -131,19 +145,25 @@ export function spawnSystem(ctx: SimContext): void {
       continue;
     }
     if (s.spawnProtectTicks[e]! > 0 && --s.spawnProtectTicks[e]! === 0) s.flags[e] = fl & ~F.spawnProtected;
-    if (ctx.warfare && s.health[e]! < ctx.maxHp && ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks) {
+    if (
+      ctx.warfare &&
+      s.kind[e] === ENTITY_KIND.bobo &&
+      s.health[e]! < ctx.maxHp &&
+      ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks
+    ) {
       s.health[e] = Math.min(ctx.maxHp, s.health[e]! + ctx.regenPerTick);
     }
   }
 }
 
 /**
- * Melhor ponto para renascer: candidatos do time (ou `-1`), nota = menor distância² até um inimigo vivo, sorteio entre
- * os 3 melhores (`rng.spawn`). Sem candidatos, qualquer ponto.
+ * Melhor ponto para renascer: candidatos do time (ou `-1`; zumbi: todos), nota = menor distância² até um inimigo vivo,
+ * sorteio entre os 3 melhores (`rng.spawn`). Sem candidatos, qualquer ponto.
  */
-function pickSpawn(ctx: SimContext, e: number): number {
+export function pickSpawn(ctx: SimContext, e: number): number {
   const s = ctx.s;
   const spawns = ctx.spawns;
+  const anyTeam = ctx.ffa || s.kind[e] === ENTITY_KIND.zombie;
   let b0 = -1;
   let b1 = -1;
   let b2 = -1;
@@ -153,10 +173,10 @@ function pickSpawn(ctx: SimContext, e: number): number {
   for (let pass = 0; pass < 2 && b0 < 0; pass++) {
     for (let i = 0; i < spawns.length; i++) {
       const sp = spawns[i]!;
-      if (pass === 0 && !ctx.ffa && sp.team !== -1 && sp.team !== s.team[e]) continue;
+      if (pass === 0 && !anyTeam && sp.team !== -1 && sp.team !== s.team[e]) continue;
       let score = Infinity;
       for (let j = 0; j < s.count; j++) {
-        if (s.alive[j] === 0 || s.kind[j] !== ENTITY_KIND.bobo || (s.flags[j]! & F.dead) !== 0) continue;
+        if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
         if (!hostile(ctx, e, j)) continue;
         const dx = s.position[j * 3]! - sp.x;
         const dz = s.position[j * 3 + 2]! - sp.z;
@@ -186,10 +206,11 @@ function pickSpawn(ctx: SimContext, e: number): number {
   return k === 0 ? b0 : k === 1 ? b1 : b2;
 }
 
-/** Põe o bobo `e` vivo no spawn `index`, com vida, munição e proteção cheias. */
+/** Põe o bobo (ou zumbi) `e` vivo no spawn `index`, com vida, munição e proteção cheias. */
 export function respawn(ctx: SimContext, e: number, index: number): void {
   const s = ctx.s;
   const sp = ctx.spawns[index]!;
+  const zombie = s.kind[e] === ENTITY_KIND.zombie;
   const e3 = e * 3;
   s.position[e3] = sp.x;
   s.position[e3 + 1] = sp.y;
@@ -204,9 +225,10 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.prevYaw[e] = sp.yaw;
   s.pitch[e] = 0;
   s.prevPitch[e] = 0;
-  s.health[e] = ctx.maxHp;
-  s.weapon[e] = 0;
-  const def = WEAPON_SLOTS[0];
+  s.health[e] = zombie ? ctx.zombieHp : ctx.maxHp;
+  // Zumbi não tem arma (o render não desenha nenhuma; o golpe é o `meleeSystem`).
+  const def = zombie ? null : WEAPON_SLOTS[0];
+  s.weapon[e] = zombie ? WEAPON_NONE : 0;
   s.ammoClip[e] = def ? def.clipSize : 0;
   s.ammoReserve[e] = def ? def.reserve : 0;
   s.recoilPitch[e] = 0;
@@ -221,9 +243,10 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.switchTicks[e] = 0;
   s.sprintFireDelayTicks[e] = 0;
   s.respawnTicks[e] = 0;
-  s.spawnProtectTicks[e] = ctx.spawnProtectTicks;
+  const protect = zombie ? 0 : ctx.spawnProtectTicks;
+  s.spawnProtectTicks[e] = protect;
   s.lastDamageTick[e] = -1_000_000;
   s.lastAttacker[e] = NULL_ENTITY;
-  s.flags[e] = F.onGround | (ctx.spawnProtectTicks > 0 ? F.spawnProtected : 0);
+  s.flags[e] = F.onGround | (protect > 0 ? F.spawnProtected : 0);
   ctx.events.spawn(ctx.tick, s.idOf(e));
 }

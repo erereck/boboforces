@@ -1,7 +1,9 @@
 # CI do BoboForces (tecnico.md §20): todo push e todo PR.
-# Ordem: instalar, typecheck, testes, formatação, guardas, build web, orçamento de download, teste no navegador (Edge
-# headless em 1280×720 e 667×375, DECISOES "Testes de dispositivo"), build do Switch, portcheck (estrito: o boot
-# precisa chegar ao menu) e robô de balanceamento (ordem dos 5 níveis). O deploy do Pages só roda depois deste
+# Ordem: instalar, typecheck, testes, formatação, guardas, geradores de assets em dia (M1: texgen, skingen, modelgen e
+# mapc com --check), build web, orçamento de download, teste no navegador (Edge headless em 1280×720 e 667×375,
+# DECISOES "Testes de dispositivo"; M1: abre o Construto, confere as câmeras nomeadas e roda o bench de 4 vistas), build
+# do Switch, portcheck (estrito: o boot precisa chegar ao menu, sem asset provisório) e robô de balanceamento (ordem dos
+# 5 níveis). O deploy do Pages só roda depois deste
 # workflow passar (deploy.yml, workflow_run).
 # O CI NUNCA gera NRO/NSP (decisão #33, uso pessoal): num repositório público, artefato de CI vira download público.
 name: CI
@@ -21,7 +23,7 @@ jobs:
   check:
     name: Typecheck, testes, guardas, builds e portcheck
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -45,6 +47,10 @@ jobs:
       - name: Guardas de portabilidade
         run: npm run guard
 
+      # M1: os arquivos gerados (texturas, skins, modelos, Construto) estão em dia com as fontes em assets-src/.
+      - name: Geradores de assets em dia (texgen, skingen, modelgen, mapc)
+        run: npm run assets:check
+
       - name: Build web
         run: npm run build
 
@@ -53,7 +59,7 @@ jobs:
 
       # A imagem ubuntu-latest traz o Microsoft Edge; sem GPU, o WebGL2 sai pelo SwiftShader do navegador. Se o Edge
       # faltar, o script cai para o Chrome da imagem e anota o desvio no relatório.
-      - name: Teste no navegador (Edge headless, 1280×720 e 667×375)
+      - name: Teste no navegador (Edge headless; título, Construto, bench de 4 vistas, 667×375)
         run: npm run smoke:web
 
       - name: Prints e relatório do teste no navegador (só quando falha)
@@ -61,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-web
-          path: local/m0/
+          path: local/m1/smoke/
           if-no-files-found: ignore
 
       - name: Build do Switch (só o bundle romfs/main.js)

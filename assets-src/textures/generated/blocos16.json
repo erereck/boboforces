@@ -1,39 +1,412 @@
 {
-  "name": "blocos16",
+  "format": "boboforces/layers@1",
+  "array": "blocos16",
+  "source": "texgen",
   "layerWidth": 16,
   "layerHeight": 16,
+  "mipLevels": 5,
   "layers": [
     {
       "name": "concrete",
-      "kind": "opaque"
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     },
     {
-      "name": "metal",
-      "kind": "opaque"
+      "name": "concrete_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     },
     {
-      "name": "wood",
-      "kind": "opaque"
+      "name": "concrete_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     },
     {
-      "name": "grass",
-      "kind": "opaque"
+      "name": "concrete_d",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     },
     {
-      "name": "grass_side",
-      "kind": "opaque"
-    },
-    {
-      "name": "dirt",
-      "kind": "opaque"
-    },
-    {
-      "name": "brick",
-      "kind": "opaque"
+      "name": "concrete_stripe",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     },
     {
       "name": "test_floor",
-      "kind": "opaque"
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "test_floor_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "test_floor_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "test_floor_stripe",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "test_floor_stripe_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_1",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_2",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_3",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_4",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_5",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_6",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_7",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_8",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sector_marker_9",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "test_wall",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "anti_slip",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "cinder_block",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "brick",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "metal",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "checker_plate",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "metal_roof",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "railing",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "fence_wire",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "grate",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "crate",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "crate_top",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "canvas",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "wood",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "fence_wood",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "log",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "log_top",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass_side",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass_side_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "grass_side_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "dirt",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "dirt_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "dirt_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "leaves",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "leaves_b",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "tall_grass",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "tall_grass_b",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "tall_grass_c",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "flowers",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "flowers_b",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "flowers_c",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "bush",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "bush_b",
+      "kind": "cutout",
+      "frames": 1,
+      "cutout": true
+    },
+    {
+      "name": "light_panel",
+      "kind": "emissive",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "lamp",
+      "kind": "emissive",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "led_strip",
+      "kind": "emissive",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "exit_sign",
+      "kind": "emissive",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "danger_sign_a",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "danger_sign_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "glass",
+      "kind": "translucent",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "water",
+      "kind": "translucent",
+      "frames": 4,
+      "cutout": false
+    },
+    {
+      "name": "water#1",
+      "kind": "translucent",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "water#2",
+      "kind": "translucent",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "water#3",
+      "kind": "translucent",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "missing",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

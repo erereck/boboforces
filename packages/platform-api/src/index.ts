@@ -2,8 +2,10 @@
 // apps/web e apps/switch implementam `Platform`; o resto do jogo nunca toca em globais do navegador ou do nx.js
 // (tecnico.md §1.4 e §21). Nada de tipos DOM aqui: canvas, contexto GL e AudioContext são `unknown` e só o pacote que
 // os usa (render, audio) faz o cast.
-import type { RawInputState } from '@boboforces/input';
+import type { GamepadKind, RawInputState } from '@boboforces/input';
 import type { Unsubscribe } from '@boboforces/shared';
+
+export type * from './audio.ts';
 
 export type PlatformId = 'web' | 'switch';
 
@@ -148,10 +150,46 @@ export interface PlatformReport {
   readonly extra: Readonly<Record<string, string>>;
 }
 
+/** M1: memória do processo JS (F2, bench, item 14 do T0), em bytes. */
+export interface MemoryUsage {
+  readonly usedHeapBytes: number;
+  /** Teto do heap (Switch: `heapSizeLimit`; web: `jsHeapSizeLimit` quando existir), ou -1. */
+  readonly heapLimitBytes: number;
+}
+
 export interface Diagnostics {
   collectReport(): Promise<PlatformReport>;
   /** Linha para o log persistente (Switch: `runtime.log` com rotação em 1 MB; web: memória). */
   appendLog(line: string): void;
+  /**
+   * M1 (opcional até as cascas implementarem): heap agora. Web: `performance.memory` (Chromium) ou `null`;
+   * Switch: `Switch.memoryUsage()`. Barato: o F2 chama 1x por segundo.
+   */
+  memoryUsage?(): MemoryUsage | null;
+  /**
+   * M1 (opcional): linhas do log desde o boot (web: o buffer em memória; Switch: o `runtime.log` da sessão), para o
+   * relatório do bench e o "Copiar relatório".
+   */
+  recentLog?(maxLines: number): readonly string[];
+}
+
+/**
+ * M1: descritor de um controle conectado, como a casca o vê (item 17 do T0: 4 controles completos, pares de Joy-Con e
+ * Pro Controllers, Joy-Con avulso recusado). Nada de nome de marca na UI: `kind` escolhe os glifos genéricos.
+ */
+export interface ControllerInfo {
+  /** Índice do controle no `RawInputState.gamepads`. */
+  readonly index: number;
+  /** Identificador bruto (texto da Gamepad API ou do nx.js). Só diagnóstico (`[t0]`), nunca na UI. */
+  readonly id: string;
+  readonly kind: GamepadKind;
+  /** Switch: `Gamepad.styleSet` (bits `HidNpadStyleTag` do libnx); -1 fora do Switch. */
+  readonly styleSet: number;
+  /** Switch: `deviceType` (bits `HidDeviceTypeBits`) quando o nx.js expuser; -1 senão. */
+  readonly deviceType: number;
+  /** Controle completo (par de Joy-Con, Pro, portátil, ou padrão na web); `false` = Joy-Con avulso (decisão #32). */
+  readonly complete: boolean;
+  readonly canVibrate: boolean;
 }
 
 /**
@@ -169,11 +207,17 @@ export interface RawInputSource {
   poll(out: RawInputState): void;
   /** Vibração por controle (`vibrationActuator`); intensidades em [0, 1]. Sem suporte, não faz nada. */
   vibrate(gamepadIndex: number, strong: number, weak: number, durationMs: number): void;
+  /**
+   * M1 (opcional até as cascas implementarem): descreve os controles conectados em `out` (sem alocar no frame: o
+   * array é do chamador e é reescrito) e devolve quantos. Tela "aperte A" do T0 e glifos.
+   */
+  describeControllers?(out: ControllerInfo[]): number;
 }
 
 /**
  * Áudio: o `AudioContext` criado pela casca (web: liberado no primeiro gesto; Switch: o do nx.js). Opaco: só `audio`
- * faz o cast e usa o subconjunto comum (Context, BufferSource, Gain, StereoPanner; regra 9).
+ * faz o cast, para `AudioContextLike` (M1, `audio.ts`: o subconjunto comum Context, BufferSource, Gain,
+ * StereoPanner, `createBuffer` e `decodeAudioData` de MP3; regra 9).
  */
 export interface AudioSurface {
   readonly context: unknown;

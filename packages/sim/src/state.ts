@@ -1,5 +1,5 @@
 import { IndexAllocator } from '@boboforces/shared';
-import { MAX_CONTROLLERS, MAX_ENTITIES } from './constants.ts';
+import { MAX_CONTROLLERS_WITH_ZOMBIES, MAX_ENTITIES } from './constants.ts';
 import { makeEntityId, NO_CONTROLLER, NO_TEAM, NULL_ENTITY, type EntityId } from './entity.ts';
 
 /** Array de estado da sim (todos os typed arrays que entram em snapshot e hash). */
@@ -65,7 +65,8 @@ export class SimState {
   /** Arma. */
   /**
    * Tempo até o próximo tiro, em SEGUNDOS (não em ticks): atirando sem parar, o resto do tick passa para o tiro
-   * seguinte e a cadência média fica igual à da arma em qualquer `SIM_HZ`.
+   * seguinte e a cadência média fica igual à da arma em qualquer `SIM_HZ`. No zumbi (sem arma) é o tempo até o
+   * próximo golpe.
    */
   readonly fireCooldownS = new Float64Array(MAX_ENTITIES);
   readonly reloadTicks = new Int16Array(MAX_ENTITIES);
@@ -78,8 +79,8 @@ export class SimState {
   readonly lastDamageTick = new Int32Array(MAX_ENTITIES).fill(-1_000_000);
   readonly lastAttacker = new Uint32Array(MAX_ENTITIES);
 
-  /** Controlador → entidade (EntityId com geração), `NULL_ENTITY` se não houver. */
-  readonly controllerEntity = new Uint32Array(MAX_CONTROLLERS);
+  /** Controlador → entidade (EntityId com geração), `NULL_ENTITY` se não houver. Cobre humanos, bots e zumbis. */
+  readonly controllerEntity = new Uint32Array(MAX_CONTROLLERS_WITH_ZOMBIES);
 
   readonly fields: readonly StateField[];
 

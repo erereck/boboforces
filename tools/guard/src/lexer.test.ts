@@ -12,6 +12,11 @@ describe('tokenize', () => {
     expect(tokens.filter((t) => t.kind === 'ident').map((t) => t.value)).toEqual(['const', 'a', 'b']);
     expect(tokens.filter((t) => t.kind === 'string').map((t) => t.value)).toEqual(['document', 'localStorage']);
     expect(comments.map((c) => c.text.trim())).toEqual(['fetch()', 'window']);
+    // Linha e coluna do começo do comentário (os marcadores do laço quente comparam posição com os tokens).
+    expect(comments.map((c) => [c.line, c.col])).toEqual([
+      [1, 1],
+      [2, 23],
+    ]);
   });
 
   it('conta linhas e colunas, inclusive depois de comentários e templates de várias linhas', () => {

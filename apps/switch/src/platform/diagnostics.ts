@@ -1,4 +1,4 @@
-import type { Diagnostics, PlatformReport } from '@boboforces/platform-api';
+import type { Diagnostics, MemoryUsage, PlatformReport } from '@boboforces/platform-api';
 import { APPLET_TYPE, OPERATION_MODE, type NxFs, type NxSwitch } from './nx.ts';
 
 /**
@@ -7,6 +7,8 @@ import { APPLET_TYPE, OPERATION_MODE, type NxFs, type NxSwitch } from './nx.ts';
  * Nada sai do aparelho: o jogador copia o arquivo se quiser mandar.
  */
 export const LOG_ROTATE_BYTES = 1024 * 1024;
+/** Linhas da sessão guardadas na memória para `recentLog` (relatório do bench, "Copiar relatório"). */
+export const RECENT_LOG_LINES = 512;
 
 /** Só o que o relatório lê do contexto WebGL2 (que a casca recebe opaco). Sem `getExtension` (regra 6). */
 interface GlInfo {
@@ -51,6 +53,8 @@ export interface SwitchDiagnosticsOptions {
 
 export interface SwitchDiagnostics extends Diagnostics {
   readonly logPath: string;
+  memoryUsage(): MemoryUsage | null;
+  recentLog(maxLines: number): readonly string[];
 }
 
 const encoder = new TextEncoder();
@@ -70,9 +74,14 @@ export function createSwitchDiagnostics(opts: SwitchDiagnosticsOptions): SwitchD
   const limit = opts.rotateBytes ?? LOG_ROTATE_BYTES;
   let size = -1; // desconhecido até a primeira escrita
   let broken = false;
+  // Anel das linhas da sessão (sem carimbo), mesmo quando o SD falha.
+  const recent: string[] = new Array<string>(RECENT_LOG_LINES).fill('');
+  let recentCount = 0;
 
   const appendLog = (line: string): void => {
     opts.echo?.(line);
+    recent[recentCount % RECENT_LOG_LINES] = line;
+    recentCount++;
     if (broken) return;
     try {
       const text = `${opts.timestamp()} ${line.replace(/\r?\n/g, '\n  ')}\n`;
@@ -129,5 +138,17 @@ export function createSwitchDiagnostics(opts: SwitchDiagnosticsOptions): SwitchD
     });
   };
 
-  return { logPath, appendLog, collectReport };
+  const memoryUsage = (): MemoryUsage | null => {
+    const m = safe(() => sw.memoryUsage?.() ?? null, null);
+    return m ? { usedHeapBytes: m.usedHeapSize, heapLimitBytes: m.heapSizeLimit } : null;
+  };
+
+  const recentLog = (maxLines: number): readonly string[] => {
+    const n = Math.max(0, Math.min(maxLines, recentCount, RECENT_LOG_LINES));
+    const out: string[] = [];
+    for (let i = recentCount - n; i < recentCount; i++) out.push(recent[i % RECENT_LOG_LINES]!);
+    return out;
+  };
+
+  return { logPath, appendLog, collectReport, memoryUsage, recentLog };
 }

@@ -1,8 +1,10 @@
+import { FIGURE_BONE, type FigurePart } from '@boboforces/format';
 import type { BlockId } from '@boboforces/world';
 import type { HitPart } from './config/metrics.ts';
 import type { EntityId } from './entity.ts';
 import type {
   HitEvent,
+  MeleeEvent,
   ImpactEvent,
   KillEvent,
   MatchPhaseEvent,
@@ -65,11 +67,37 @@ export class EventQueue {
     64,
   );
   private readonly hits = new EventPool<Mutable<HitEvent>>(
-    () => ({ type: 'hit', tick: 0, shooter: 0, target: 0, part: 'torso', damage: 0, x: 0, y: 0, z: 0 }),
+    () => ({
+      type: 'hit',
+      tick: 0,
+      shooter: 0,
+      target: 0,
+      part: 'torso',
+      bodyPart: FIGURE_BONE.torso,
+      damage: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      dirX: 0,
+      dirY: 0,
+      dirZ: 0,
+    }),
     64,
   );
   private readonly kills = new EventPool<Mutable<KillEvent>>(
-    () => ({ type: 'kill', tick: 0, killer: 0, victim: 0, weapon: 0, headshot: false }),
+    () => ({
+      type: 'kill',
+      tick: 0,
+      killer: 0,
+      victim: 0,
+      weapon: 0,
+      headshot: false,
+      bodyPart: FIGURE_BONE.torso,
+      dirX: 0,
+      dirY: 0,
+      dirZ: 0,
+      force: 0,
+    }),
     16,
   );
   private readonly impacts = new EventPool<Mutable<ImpactEvent>>(
@@ -86,6 +114,8 @@ export class EventQueue {
       cellY: 0,
       cellZ: 0,
       block: 0,
+      face: -1,
+      prop: -1,
     }),
     64,
   );
@@ -96,6 +126,10 @@ export class EventQueue {
   );
   private readonly weapons = new EventPool<Mutable<WeaponEvent>>(
     () => ({ type: 'weapon', tick: 0, entity: 0, weapon: 0, action: 'switch' }),
+    16,
+  );
+  private readonly melees = new EventPool<Mutable<MeleeEvent>>(
+    () => ({ type: 'melee', tick: 0, attacker: 0, target: 0 }),
     16,
   );
   private readonly phases = new EventPool<Mutable<MatchPhaseEvent>>(
@@ -116,6 +150,7 @@ export class EventQueue {
     this.spawns.reset();
     this.moves.reset();
     this.weapons.reset();
+    this.melees.reset();
     this.phases.reset();
   }
 
@@ -157,38 +192,66 @@ export class EventQueue {
     this.push(e);
   }
 
+  /** Acerto: ponto e direção do golpe vêm da fila de dano (`DamageQueue`, item `i`). */
   hit(
     tick: number,
     shooter: EntityId,
     target: EntityId,
     part: HitPart,
+    bodyPart: FigurePart,
     damage: number,
-    x: number,
-    y: number,
-    z: number,
+    point: Float64Array,
+    dir: Float64Array,
+    i: number,
   ): void {
     const e = this.hits.acquire();
+    const i3 = i * 3;
     e.tick = tick;
     e.shooter = shooter;
     e.target = target;
     e.part = part;
+    e.bodyPart = bodyPart;
     e.damage = damage;
-    e.x = x;
-    e.y = y;
-    e.z = z;
+    e.x = point[i3]!;
+    e.y = point[i3 + 1]!;
+    e.z = point[i3 + 2]!;
+    e.dirX = dir[i3]!;
+    e.dirY = dir[i3 + 1]!;
+    e.dirZ = dir[i3 + 2]!;
     this.push(e);
   }
 
-  kill(tick: number, killer: EntityId, victim: EntityId, weapon: number, headshot: boolean): void {
+  /** Morte: a direção (unitária, zero em queda e plano de morte) e a força vêm do golpe final (item `i` da fila). */
+  kill(
+    tick: number,
+    killer: EntityId,
+    victim: EntityId,
+    weapon: number,
+    headshot: boolean,
+    bodyPart: FigurePart,
+    dir: Float64Array,
+    force: number,
+    i: number,
+  ): void {
     const e = this.kills.acquire();
+    const i3 = i * 3;
     e.tick = tick;
     e.killer = killer;
     e.victim = victim;
     e.weapon = weapon;
     e.headshot = headshot;
+    e.bodyPart = bodyPart;
+    e.dirX = dir[i3]!;
+    e.dirY = dir[i3 + 1]!;
+    e.dirZ = dir[i3 + 2]!;
+    e.force = force;
     this.push(e);
   }
 
+  /**
+   * Impacto no cenário. `face` = índice na `NORMAL_TABLE` do world (0..5 eixos; rampas e cruz a partir do 6; -1 em
+   * prop ou origem dentro do sólido); `prop` = caixa de prop em `StaticColliders` (-1 = bloco da grade).
+   */
   impact(
     tick: number,
     x: number,
@@ -201,6 +264,8 @@ export class EventQueue {
     cy: number,
     cz: number,
     block: BlockId,
+    face: number,
+    prop: number,
   ): void {
     const e = this.impacts.acquire();
     e.tick = tick;
@@ -214,6 +279,8 @@ export class EventQueue {
     e.cellY = cy;
     e.cellZ = cz;
     e.block = block;
+    e.face = face;
+    e.prop = prop;
     this.push(e);
   }
 
@@ -239,6 +306,14 @@ export class EventQueue {
     e.entity = entity;
     e.weapon = weapon;
     e.action = action;
+    this.push(e);
+  }
+
+  melee(tick: number, attacker: EntityId, target: EntityId): void {
+    const e = this.melees.acquire();
+    e.tick = tick;
+    e.attacker = attacker;
+    e.target = target;
     this.push(e);
   }
 
