@@ -96,9 +96,14 @@ import {
   layoutHudScreen,
   measureText,
   MIN_TEXT,
+  numberWidth,
+  paintNumber,
+  paintText,
   pushRect,
   resetDrawList,
   t,
+  templateParts,
+  textWidth,
   withAlpha,
   type DrawList,
   type HudModel,
@@ -1794,21 +1799,56 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     done: platform.id === 'switch' ? t('test.bench.done') : t('bench.webDone'),
     // No Switch o B interrompe (na web é o Esc; a tela de relatório da web tem as teclas dela).
     hint: platform.id === 'switch' ? t('test.bench.hint') : '',
+    // " · faltam {minutes}:{seconds}" ao lado de "Aquecendo"/"Medindo": quem roda no celular sabe quanto falta.
+    left: templateParts('test.bench.timeLeft', ['minutes', 'seconds']),
   };
+  /** Largura do " · faltam m:ss" (sem string por frame, como o relógio do HUD). */
+  function benchLeftWidth(font: UiFonts['hud'], total: number, px: number): number {
+    const p = benchTexts.left;
+    return (
+      textWidth(font, p[0] as string, px, 0.04) +
+      numberWidth(font, Math.floor(total / 60), 0, px, 1, 0.04) +
+      textWidth(font, p[1] as string, px, 0.04) +
+      numberWidth(font, total % 60, 0, px, 2, 0.04) +
+      textWidth(font, p[2] as string, px, 0.04)
+    );
+  }
+  function paintBenchLeft(
+    out: DrawList,
+    font: UiFonts['hud'],
+    total: number,
+    x: number,
+    capTop: number,
+    px: number,
+  ): void {
+    const p = benchTexts.left;
+    const c = COLORS.texto;
+    let pen = x;
+    pen += paintText(out, font, p[0] as string, pen, capTop, px, c, 0.04);
+    pen += paintNumber(out, font, Math.floor(total / 60), 0, pen, capTop, px, c, 0, 1, 0.04);
+    pen += paintText(out, font, p[1] as string, pen, capTop, px, c, 0.04);
+    pen += paintNumber(out, font, total % 60, 0, pen, capTop, px, c, 0, 2, 0.04);
+    paintText(out, font, p[2] as string, pen, capTop, px, c, 0.04);
+  }
   function drawBenchStatus(out: DrawList, fonts: UiFonts | null, ui: UiFrame): void {
     const b = benchState;
     const font = fonts?.hud;
-    if (!b || !font || !hudVisible || fontSpecimen) return;
+    if (!b || !font || !hudVisible || fontSpecimen || !bench) return;
     const text =
       b.phase === 'warmup' ? benchTexts.warmup : b.phase === 'measure' ? benchTexts.running : benchTexts.done;
+    // Segundos que faltam na fase (aquecimento ou medição); −1 no relatório pronto.
+    const left =
+      b.phase === 'done' ? -1 : Math.max(0, Math.ceil((b.phase === 'warmup' ? bench.warmupS : bench.durationS) - b.t));
     const px = Math.max(Math.round(16 * ui.scale), ui.options.minTextPx ?? 12);
-    const w = measureText(font, text, px, 0.04) + px;
+    const labelW = measureText(font, text, px, 0.04);
+    const w = labelW + (left >= 0 ? benchLeftWidth(font, left, px) : 0) + px;
     const h = Math.round(px * 1.8);
     const x = Math.round((ui.width - w) / 2);
     // 1–2 vistas: no alto, no meio; 3–4: no cruzamento central (longe da HUD de cada vista).
     const y = viewCount >= 3 ? Math.round((ui.height - h) / 2) : Math.round(px * 0.8);
     pushRect(out, x, y, w, h, withAlpha(COLORS.bunker, 0.85));
     drawText(out, font, text, x + px / 2, y + px * 0.45, px, b.phase === 'done' ? COLORS.acao : COLORS.texto, 0.04);
+    if (left >= 0) paintBenchLeft(out, font, left, Math.ceil(x + px / 2 + labelW), y + px * 0.45, px);
     if (b.phase === 'done' || benchTexts.hint === '') return;
     const hw = measureText(font, benchTexts.hint, px, 0.04) + px;
     const hx = Math.round((ui.width - hw) / 2);

@@ -260,6 +260,8 @@ números com data e método no `docs/PERF.md` §1e; contratos no `docs/ARCHITECT
 - **Crédito do menu (commits do Erick de 03/11, depois do M0):** "EriLab™ / Erick Luiz". As fontes do M1 não têm o ™: o
   `drawText` o compõe com T e M a 0,48 em sobrescrito, escrevendo direto na lista como os outros glifos (sem alocação).
   `COMPOSED_CHARS` diz aos testes de cobertura (ui e fontbake) que o ™ conta como "TM".
+- **Relógio do bench:** "Aquecendo" e "Medindo" mostram quanto falta da fase (" · faltam m:ss", `test.bench.timeLeft`),
+  desenhado sem string por frame como o relógio do HUD; vale na web e no Switch. Pedido do Erick ao rodar no celular.
 - **Pendente:** tabela de jogo no Eden (259 ms; meta ≤ 75, plano B = tabela gerada no build), skins no Eden (237 ms; meta
   180), console (Teste Zero), bench nos celulares, emote no `ActorBuffer` (M2) e escala do zumbi na hitbox (M3).
 

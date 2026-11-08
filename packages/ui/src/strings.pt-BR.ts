@@ -143,6 +143,8 @@ export const STRINGS_PT_BR = {
   'test.bench.hint': 'B interrompe o bench.',
   'test.bench.warmup': 'Aquecendo',
   'test.bench.running': 'Medindo',
+  /** Ao lado de "Aquecendo"/"Medindo": quanto falta da fase (o relógio do bench). */
+  'test.bench.timeLeft': ' · faltam {minutes}:{seconds}',
   'test.bench.done': 'Relatório gravado no runtime.log · B volta',
   /** Bench na web: o relatório pronto (sem UI em DOM; a casca copia no toque ou no C e baixa no B). */
   'bench.webDone': 'Relatório pronto: toque ou C copia, B baixa .txt',
