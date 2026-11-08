@@ -159,9 +159,21 @@ async function checkF2(page: Page): Promise<string | null> {
 /** P pausa a sim (o tick para) e a foto da pausa sai (`report[key]`). Devolve o problema, ou `null`. */
 async function checkPause(page: Page, file: string, key: string): Promise<string | null> {
   await page.keyboard.press('KeyP');
-  await page.waitForTimeout(200);
+  // Espera o jogo ler a tecla (por estado, não por tempo): no CI sem GPU o Construto roda a ~2 fps, e um quadro de
+  // 500 ms passava dos 200 ms fixos de antes. Se não pausar no prazo, a checagem abaixo reprova.
+  await page
+    .waitForFunction(() => (window as unknown as PageWindow).__bfDebug?.paused === true, undefined, {
+      timeout: 10_000,
+    })
+    .catch(() => undefined);
   const paused = await snapshot(page);
+  // Congelada de verdade: o tick não anda nem em 300 ms nem em 2 quadros desenhados (o que vier depois).
   await page.waitForTimeout(300);
+  await page
+    .waitForFunction((f) => ((window as unknown as PageWindow).__bfDebug?.frames ?? 0) >= f + 2, paused.frames, {
+      timeout: 10_000,
+    })
+    .catch(() => undefined);
   const stillPaused = await snapshot(page);
   report[key] = { paused: paused.paused, frozen: stillPaused.simTick === paused.simTick };
   await shot(page, file);
