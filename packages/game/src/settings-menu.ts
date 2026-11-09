@@ -1,6 +1,7 @@
 import {
   AIM_ASSIST_NAMES,
   CONTROL_DEVICES,
+  QUALITY_NAMES,
   type ControlDevice,
   type DeviceControls,
   type SettingsDocument,
@@ -222,6 +223,22 @@ const VIDEO_ROWS: readonly OptionDef[] = [
     labelKey: 'settings.row.fps',
     value: (doc) => t(doc.video.fpsCap === 30 ? 'settings.fps.30' : 'settings.fps.60'),
     step: (doc) => ({ ...doc, video: { ...doc.video, fpsCap: doc.video.fpsCap === 30 ? 60 : 30 } }),
+  },
+  // M2 (fase 8b): a qualidade (arte-ux.md §1.12). A Automática mostra o nível que a escolha da 1ª abertura deu.
+  {
+    id: 'quality',
+    labelKey: 'settings.row.quality',
+    value: (doc) =>
+      doc.video.quality !== 'auto'
+        ? t(`settings.quality.${doc.video.quality}`)
+        : doc.video.autoQuality === 'none'
+          ? t('settings.quality.auto')
+          : t('settings.quality.autoIs', { level: t(`settings.quality.${doc.video.autoQuality}`) }),
+    step: (doc, _dev, d) => {
+      const i = QUALITY_NAMES.indexOf(doc.video.quality);
+      const next = QUALITY_NAMES[Math.max(0, Math.min(QUALITY_NAMES.length - 1, i + d))]!;
+      return { ...doc, video: { ...doc.video, quality: next } };
+    },
   },
 ];
 

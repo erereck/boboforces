@@ -68,6 +68,7 @@ describe('settings@1', () => {
     expect(r.value.controls.keyboardMouse.bindings).toEqual({ tabPrev: ['key:KeyZ', 'key:KeyX'] });
     expect(r.value.video).toEqual({
       quality: 'auto',
+      autoQuality: 'none',
       uiScale: 1.2,
       fovDeg: 60,
       view: 'first',

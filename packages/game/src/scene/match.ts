@@ -31,6 +31,11 @@ import {
   type SettingsDocument,
   resolveBot,
   SETTINGS_RANGES,
+  effectiveQuality,
+  lowerQuality,
+  QUALITY_PROBE,
+  qualityKnobs,
+  shouldLowerQuality,
 } from '@boboforces/format';
 import {
   createGamepadProfile,
@@ -872,7 +877,46 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   if (bench && !bench.viewmodel) debugState.hideViewmodel = true;
   renderer.setDebug(debugState);
   // Teto de detritos do perfil da cena (o renderer nasce antes, no boot, com o padrão).
-  renderer.setDebrisBudget(profile.maxDebris);
+  // M2 (fase 8b): os detritos da qualidade (o bench mede com o teto do perfil, comparável ao M1).
+  renderer.setDebrisBudget(
+    bench
+      ? profile.maxDebris
+      : qualityKnobs(profile, effectiveQuality(host.settings.current.video, profile.family)).maxDebris,
+  );
+  /**
+   * M2 (fase 8b): reavaliação da qualidade automática (tecnico.md §17.2 e §17.3). Nos primeiros `QUALITY_PROBE.windowS`
+   * de partida depois da contagem, conta os quadros lentos (acima de 1,5× o alvo do perfil, ou do limite de 30 quadros);
+   * com mais de 10% lentos, baixa um nível para as próximas partidas. Só com a Automática e fora do Switch (720p fixo).
+   */
+  const qualityProbe = {
+    active:
+      request.kind === 'play' &&
+      platform.id !== 'switch' &&
+      host.settings.current.video.quality === 'auto' &&
+      effectiveQuality(host.settings.current.video, profile.family) !== 'low',
+    t: 0,
+    frames: 0,
+    slow: 0,
+    slowS: QUALITY_PROBE.slowFactor / Math.min(profile.targetFps, host.settings.current.video.fpsCap),
+  };
+  function probeQuality(dt: number): void {
+    if (!qualityProbe.active || sim.view().match.phase !== 'playing') return;
+    qualityProbe.t += dt;
+    qualityProbe.frames++;
+    if (dt > qualityProbe.slowS) qualityProbe.slow++;
+    if (qualityProbe.t < QUALITY_PROBE.windowS) return;
+    qualityProbe.active = false;
+    const doc = host.settings.current;
+    const from = effectiveQuality(doc.video, profile.family);
+    const counts = `${qualityProbe.slow}/${qualityProbe.frames} quadros lentos`;
+    if (doc.video.quality !== 'auto' || !shouldLowerQuality(qualityProbe.frames, qualityProbe.slow)) {
+      host.log(`[partida] qualidade ${from} aguenta (${counts})`);
+      return;
+    }
+    const to = lowerQuality(from);
+    host.settings.save({ ...doc, video: { ...doc.video, autoQuality: to } });
+    host.log(`[partida] qualidade automática: ${from} → ${to} (${counts})`);
+  }
 
   const actors: ActorBuffer = createActorBuffer(192);
   const fx = createFxQueue(512);
@@ -3360,6 +3404,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         lastTicks = driver.update(dt);
         trace('sim e IA');
         timeS += dt;
+        probeQuality(dt);
         decay(dt);
         if (!resultShown && endedAt < 0) updateTips(dt);
         if (overrideRoute) routeTime += dt;

@@ -66,6 +66,13 @@ export const STRINGS_PT_BR = {
   'settings.row.musicInMatch': 'Música na partida',
   'settings.row.soundIndicator': 'Indicador de som',
   'settings.fps.60': '60 por segundo',
+  /** M2 (fase 8b): a qualidade (arte-ux.md §1.12). */
+  'settings.row.quality': 'Qualidade',
+  'settings.quality.auto': 'Automática',
+  'settings.quality.autoIs': 'Automática: {level}',
+  'settings.quality.low': 'Leve',
+  'settings.quality.medium': 'Média',
+  'settings.quality.high': 'Alta',
   'settings.fps.30': '30 por segundo',
   'settings.default': 'Padrão',
   'settings.degrees': '{n}°',

@@ -2024,3 +2024,36 @@ pela tela "aperte A" (`input/local-players.ts`, que segue sem uso).
   do nome deles.
 - O humano 0 continua com o Meu Bobo. No teste do sofá, os jogadores 2–4 vestem o look de "Jogador N".
 - Só cosmético: o golden e o balance não mudam.
+
+### 12.51 Fase 8b: a qualidade na primeira abertura (09/11/2026)
+
+- **`format/quality.ts`:** `QUALITY_TABLE` (arte-ux.md §1.12 sem a escala dinâmica, que fica para a rodada de
+  otimização da #60):
+
+  | Nível | Teto do DPR | Escala | Detritos |
+  |---|---|---|---|
+  | Alta | o do perfil | 1 | 500 |
+  | Média | 1,5 | 1 | 200 |
+  | Leve | 1 | 0,85 | 200 |
+
+  - `qualityKnobs(perfil, nível)` nunca passa do perfil; no Switch a resolução não muda (720p fixo).
+  - `guessQuality`: software ou GPU da `WEAK_GPU_PATTERNS` (versão 1: Mali G31–G68, Adreno até a 612, PowerVR, Intel
+    HD/GMA) dá Leve. Poucos núcleos ou pouca memória (celular ≤ 4, PC ≤ 2) também dá Leve. No celular, o resto fica
+    Média. No PC, a integrada (Intel sem Arc, Radeon Graphics, Vega) fica Média e a dedicada fica Alta.
+  - `effectiveQuality`: o escolhido pelo jogador; senão o automático; senão o padrão da família.
+- **`settings@1`** ganhou `video.autoQuality` (`none`, `low`, `medium` ou `high`). O campo é aditivo: save sem
+  ele abre como `none` e sem aviso, então não precisou de migração.
+- **Contrato:** `GraphicsSurface.setResolution?(maxPixelRatio, renderScale)` (opcional). A web refaz o drawing
+  buffer e avisa o `onResize`; o Switch não implementa.
+- **`game`:**
+  - `pickAutoQuality` roda no 1º frame do menu se ainda não houve escolha, lendo o `collectReport` (GPU, `cores`,
+    `deviceMemoryGb`).
+  - `applyQuality` aplica a resolução sempre que o save muda. O bench fica fora: mede com a resolução que pediu.
+- **Partida:**
+  - Os detritos vêm de `qualityKnobs`; o bench continua no teto do perfil.
+  - A sonda (`QUALITY_PROBE`) conta os quadros dos primeiros 10 s depois da contagem. Quadro lento é acima de 1,5×
+    o alvo do perfil (ou do limite de 30 quadros). Com mais de 10% lentos, baixa `autoQuality` um nível.
+  - A sonda roda em toda partida da Automática fora do Switch (tecnico.md §17.3).
+- **Medido no Edge headless (Intel UHD):** a Automática deu Média; o Leve levou o buffer de 1280×720 para 1088×612;
+  numa partida, 0 de 601 quadros lentos, então a Média se manteve (`local/m2/capturar-qualidade.ts` e
+  `conferir-sonda-qualidade.ts`).

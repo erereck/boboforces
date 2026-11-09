@@ -45,6 +45,11 @@ export interface GraphicsSurface {
   readonly safeArea: SafeAreaInsets;
   /** Chamado quando o drawing buffer muda de tamanho (janela, rotação, dock/portátil). */
   onResize(listener: (width: number, height: number, pixelRatio: number) => void): Unsubscribe;
+  /**
+   * M2 (fase 8b, opcional): a resolução da qualidade escolhida (teto do DPR e escala de render, arte-ux.md §1.12). Web:
+   * refaz o drawing buffer e avisa o `onResize`. Ausente no Switch (720p fixo).
+   */
+  setResolution?(maxPixelRatio: number, renderScale: number): void;
 }
 
 /**

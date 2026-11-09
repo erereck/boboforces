@@ -477,6 +477,11 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Fase 8a, visual dos bots pelo nome:** o look de cada bot na rotação sai do hash do nome. O mesmo bot veste o mesmo
   look em qualquer partida; bots repetidos (o mesmo bot de fábrica várias vezes) seguem a rotação e não saem iguais. 3
   testes novos.
+- **Fase 8b, qualidade na primeira abertura:** linha "Qualidade" na aba Vídeo (Automática, Leve, Média, Alta).
+  - Muda a resolução na hora e os detritos na próxima partida (arte-ux.md §1.12).
+  - A Automática lê o aparelho uma vez (GPU, núcleos, memória e uma lista de GPUs fracas) e guarda o nível no save.
+  - Na partida, se mais de 10% dos quadros dos primeiros 10 s passam do alvo, ela baixa um nível para as próximas.
+  - No Switch só os detritos mudam (720p fixo). 8 testes novos.
 - **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
   em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
   - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.

@@ -279,6 +279,11 @@ export function createWebGraphics(canvas: HTMLCanvasElement, options: WebGraphic
       maxPixelRatio = Math.max(0.5, next);
       apply();
     },
+    setResolution(nextMax, nextScale) {
+      maxPixelRatio = Math.max(0.5, nextMax);
+      renderScale = Math.min(1, Math.max(0.25, nextScale));
+      apply();
+    },
     dispose() {
       observer.disconnect();
       safeProbe?.remove();

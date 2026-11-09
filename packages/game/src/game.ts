@@ -2,8 +2,11 @@ import {
   BOT_RANGES,
   BUILTIN_BOTS,
   DEBUT_PRESET,
+  effectiveQuality,
   GAME_CODENAME,
   GAME_VERSION,
+  guessQuality,
+  qualityKnobs,
   selectPlatformProfile,
   withPresetLevel,
   type BackupDocument,
@@ -11,6 +14,7 @@ import {
   type BotLevel,
   type ControlDevice,
   type MatchRecipe,
+  type QualityLevel,
   type SettingsDocument,
   parseLoopManifest,
 } from '@boboforces/format';
@@ -272,6 +276,44 @@ export function startGame(deps: GameDeps): GameHandle {
   // M2 (fase 7c): os volumes dos Ajustes valem na hora (o `step` compara a referência do documento salvo) e os
   // menus tocam pelo mixer.
   let audioApplied: SettingsDocument | null = null;
+  /**
+   * M2 (fase 8b): a qualidade aplicada na resolução da casca (arte-ux.md §1.12). Muda na hora com os Ajustes; os
+   * detritos valem na próxima partida. O bench mede com a resolução que pediu (fica fora).
+   */
+  let qualityApplied: QualityLevel | null = null;
+  function applyQuality(): void {
+    if (deps.bench) return;
+    const family = platform.features.profileHint;
+    const level = effectiveQuality(save.settings.video, family);
+    if (level === qualityApplied) return;
+    qualityApplied = level;
+    const knobs = qualityKnobs(selectPlatformProfile(family, 1), level);
+    if (!platform.graphics.setResolution) return;
+    platform.graphics.setResolution(knobs.maxPixelRatio, knobs.renderScale);
+    log(`[game] qualidade ${level}: dpr até ${knobs.maxPixelRatio}, escala ${knobs.renderScale}`);
+  }
+  /**
+   * M2 (fase 8b): a escolha automática da primeira abertura (tecnico.md §17.2): lê o aparelho uma vez e guarda o nível.
+   * Depois que o jogador escolhe a qualidade, não roda mais.
+   */
+  function pickAutoQuality(): void {
+    const video = save.settings.video;
+    if (deps.bench || video.quality !== 'auto' || video.autoQuality !== 'none') return;
+    platform.diagnostics.collectReport().then(
+      (report) => {
+        if (disposed || save.settings.video.autoQuality !== 'none') return;
+        const level = guessQuality({
+          family: platform.features.profileHint,
+          gpu: report.gpu,
+          cores: Number(report.extra['cores']) || 0,
+          memoryGb: Number(report.extra['deviceMemoryGb']) || 0,
+        });
+        save.setSettings({ ...save.settings, video: { ...save.settings.video, autoQuality: level } });
+        log(`[game] qualidade automática: ${level} (gpu "${report.gpu}")`);
+      },
+      (error: unknown) => log(`[game] qualidade automática: sem leitura do aparelho (${String(error)})`),
+    );
+  }
   setMenuSoundSink((sound) => playUiSound(mixer, MENU_SOUNDS[sound]));
   function startSoundFiles(): Promise<void> {
     soundFiles ??= loadSoundFiles(mixer, platform.assets, (id, error) =>
@@ -1152,6 +1194,7 @@ export function startGame(deps: GameDeps): GameHandle {
     if (save.settings !== audioApplied) {
       audioApplied = save.settings;
       applyAudioSettings(mixer, audioApplied.audio);
+      applyQuality();
     }
     updateMusic();
     platform.input.poll(raw);
@@ -1468,6 +1511,7 @@ export function startGame(deps: GameDeps): GameHandle {
     log(`${MENU_READY_MARKER} ${Math.round(platform.now() - bootAt)} ms`);
     hooks.onMenuReady?.();
     void startSoundFiles();
+    pickAutoQuality();
     // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
     // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
     // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.

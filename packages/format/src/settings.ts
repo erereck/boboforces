@@ -17,6 +17,12 @@ export type AimAssistName = (typeof AIM_ASSIST_NAMES)[number];
 /** Qualidade gráfica (arte-ux.md §1.12): `auto` = a escolhida na primeira abertura pelo perfil do aparelho. */
 export const QUALITY_NAMES = ['auto', 'low', 'medium', 'high'] as const;
 export type QualityName = (typeof QUALITY_NAMES)[number];
+/**
+ * M2 (fase 8b): o nível que a escolha automática deu neste aparelho (tecnico.md §17.2); `none` = ainda não escolheu.
+ * Fica guardado: a escolha roda uma vez (e a primeira partida pode baixar um nível).
+ */
+export const AUTO_QUALITY_NAMES = ['none', 'low', 'medium', 'high'] as const;
+export type AutoQualityName = (typeof AUTO_QUALITY_NAMES)[number];
 
 /** Os três tipos de dispositivo com controles próprios. */
 export const CONTROL_DEVICES = ['keyboardMouse', 'gamepad', 'touch'] as const;
@@ -56,6 +62,7 @@ export type Shoulder = (typeof SHOULDERS)[number];
 
 export interface VideoSettings {
   readonly quality: QualityName;
+  readonly autoQuality: AutoQualityName;
   /** Tamanho da UI (multiplica a escala da referência 1280×720). */
   readonly uiScale: number;
   /** Campo de visão horizontal em graus; `0` = o padrão da plataforma. */
@@ -142,7 +149,7 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     gamepad: deviceDefaults('medium'),
     touch: deviceDefaults('medium'),
   },
-  video: { quality: 'auto', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right', fpsCap: 60 },
+  video: { quality: 'auto', autoQuality: 'none', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right', fpsCap: 60 },
   audio: { master: 9, sfx: 10, music: 7, ui: 8, mono: false, musicInMatch: false, soundIndicator: false },
   accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
 };
@@ -244,6 +251,7 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
     },
     video: {
       quality: r.pick(v, 'quality', 'video.quality', D.video.quality, QUALITY_NAMES),
+      autoQuality: r.pick(v, 'autoQuality', 'video.autoQuality', D.video.autoQuality, AUTO_QUALITY_NAMES),
       uiScale: r.num(v, 'uiScale', 'video.uiScale', D.video.uiScale, R.uiScale.min, R.uiScale.max),
       fovDeg: fov === 0 ? 0 : Math.max(fov, R.fovDeg.min),
       view: r.pick(v, 'view', 'video.view', D.video.view, VIEW_MODES),

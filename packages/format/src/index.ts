@@ -11,6 +11,8 @@ export * from './bot.ts';
 // M2 (fase 4b): os documentos do jogador.
 export * from './doc-read.ts';
 export * from './settings.ts';
+// M2 (fase 8b): níveis de qualidade e a escolha da primeira abertura.
+export * from './quality.ts';
 export * from './stats.ts';
 // M2 (fase 6c): o Meu Bobo.
 export * from './bobo.ts';

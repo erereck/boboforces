@@ -203,6 +203,15 @@ normal. Scripts em `local/m2/` (`tempo-sintese.ts`, `capturar-som.ts`).
 | 7a/7b | JIT / jitless | sintetizar os 19 sons (487 mil amostras) | **~100 ms / 614 ms** | depois de trocar as exponenciais por amostra por multiplicação; o loading fatia um som por vez dentro do orçamento do frame. No Switch, se passar de ~1 s, os sintetizados vão pré-renderizados em MP3 no romfs |
 | 7b | Edge 156 headless (Intel UHD), `npm run dev`, JOGAR no Construto, 25 s sem mexer | sons tocados / pico de vozes / roubados / perdidos / desconhecidos | **260 / 18 de 24 / 0 / 0 / 0** | frame p50 16,7 ms, CPU 3,1 ms (painel F2, "Vozes 0 / 18") |
 
+## 1g. Qualidade na primeira abertura (fase 8b; 09/11/2026, 0.0.1 local, i5-12450H)
+
+Lista de GPUs fracas na **versão 1** (`format/quality.ts`, `WEAK_GPU_PATTERNS`). Mudou a lista, a tabela ou o limite
+da sonda, registra aqui.
+
+| Onde | Leitura | Automática | Sonda na 1ª partida | Observação |
+|---|---|---|---|---|
+| Edge headless (`npm run dev`), 1280×720, DPR 1 | Intel UHD (ANGLE D3D11) | **Média** | 0 de 601 quadros acima de 25 ms em 10 s: fica | Leve = buffer 1088×612 (0,85); Média e Alta = 1280×720 com DPR 1 |
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

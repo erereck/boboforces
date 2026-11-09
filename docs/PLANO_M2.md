@@ -318,7 +318,7 @@ o service worker (tecnico.md §19.1). Entram antes do portão final.
 
 - **8a. Visual dos bots pelo nome.** Pronta em 09/11 (`ARCHITECTURE.md` §12.50). O look da rotação sai do hash do nome do bot, não do índice do controlador: o mesmo
   bot veste o mesmo look em qualquer partida.
-- **8b. Qualidade.** Linha "Qualidade" na aba Vídeo (Automática, Leve, Média, Alta), aplicada na escala de resolução,
+- **8b. Qualidade.** Pronta em 09/11 (`ARCHITECTURE.md` §12.51). Linha "Qualidade" na aba Vídeo (Automática, Leve, Média, Alta), aplicada na escala de resolução,
   nos detritos e, no Leve, na visão. A Automática lê o aparelho (GPU, núcleos, memória, tela) e a lista de GPUs fracas,
   e escolhe uma vez; a escolha fica no save e não volta a rodar depois que o jogador mexe.
 - **8c. Service worker** escrito à mão (sem dependência nova): escopo próprio, precache da casca e cache-first nos
