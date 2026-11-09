@@ -80,6 +80,12 @@ export interface PlayerRules {
   readonly spawnProtectionS?: number;
   readonly gravity?: number;
   readonly fallDamage?: boolean;
+  /**
+   * M2 (fase 6a): o perfil Personalizado (gameplay.md §3.4): velocidade (andar, correr, agachar, deslize) e altura do
+   * pulo, multiplicadores. Só valem com `movement: 'custom'`.
+   */
+  readonly speed?: number;
+  readonly jump?: number;
 }
 
 /** Munição da partida (gameplay.md §4.5): normal, reserva infinita ou pente infinito. */
@@ -154,6 +160,8 @@ export const RECIPE_RANGES = {
   respawnS: { min: 0, max: 15 },
   spawnProtectionS: { min: 0, max: 5 },
   gravity: { min: 0.25, max: 2 },
+  speed: { min: 0.5, max: 2 },
+  jump: { min: 0.5, max: 3 },
   damageMul: { min: 0.25, max: 5 },
   maxTeams: ENGINE_MAX_TEAMS,
   maxBotEntriesPerTeam: 16,
@@ -176,7 +184,17 @@ const TOP_KEYS = [
   'embeddedBots',
 ] as const;
 const MATCH_KEYS = ['timeLimitS', 'scoreLimit', 'viewDistanceM'] as const;
-const PLAYER_KEYS = ['movement', 'hp', 'respawnS', 'regen', 'spawnProtectionS', 'gravity', 'fallDamage'] as const;
+const PLAYER_KEYS = [
+  'movement',
+  'hp',
+  'respawnS',
+  'regen',
+  'spawnProtectionS',
+  'gravity',
+  'fallDamage',
+  'speed',
+  'jump',
+] as const;
 const WEAPON_KEYS = [
   'damageMul',
   'headshotOnly',
@@ -352,6 +370,9 @@ function readPlayers(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   readRange(ctx, value, 'spawnProtectionS', 'players', RECIPE_RANGES.spawnProtectionS, out);
   readRange(ctx, value, 'gravity', 'players', RECIPE_RANGES.gravity, out);
   readFlag(ctx, value, 'fallDamage', 'players', out);
+  // M2 (fase 6a).
+  readRange(ctx, value, 'speed', 'players', RECIPE_RANGES.speed, out);
+  readRange(ctx, value, 'jump', 'players', RECIPE_RANGES.jump, out);
   return Object.assign(out, unknownFields(value, PLAYER_KEYS));
 }
 

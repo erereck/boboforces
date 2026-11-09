@@ -1738,3 +1738,30 @@ mudanças de contrato ficam registradas aqui.
   - o resultado é o melhor dos locais (nos times é o mesmo para todos; no FFA, vitória se algum local venceu);
   - os **recordes são do melhor jogador**: `MatchRecord.bestKills` (o maior número de abates de um local) e
     `bestStreak`. Somar os abates de 2 jogadores num recorde de "abates numa partida" inflaria o número.
+
+### 12.39 Fase 6a: perfis de movimento (09/11/2026)
+
+- **`sim/config/movement.ts`:**
+  - `MOVEMENT_TACTICAL` com os números da tabela (gameplay.md §3.3): andar 4,0, correr 5,5, agachado 2,0 m/s, pulo de
+    0,8 m, escalada até 1,0 m, sem deslizar;
+  - campos novos do perfil: `moveSpreadMul` (a "penalidade de precisão em movimento": multiplica a dispersão andando e
+    no ar) e `landingKeep` (a fração da velocidade que sobra no pouso: "aterrissar freia");
+  - `resolveMovementProfile(players)` troca o `matchProfile` da sim: Tático ou Bobo como base (o Arcade, do M6+, joga
+    como Bobo); o Personalizado é o Bobo com `speed` (andar, correr, agachar, aceleração e deslize) e `jump`
+    multiplicados; a gravidade e o dano de queda (fase 4e) valem para todos os perfis;
+  - `MIN_JUMP_HEIGHT` = 0,55 m: com a borda de 0,5 m no ar, todo perfil alcança 1,0 m (§3.6), mesmo o Tático com
+    gravidade 2×.
+- **Escolhas (revisáveis):** no Tático, aceleração 45 m/s², controle no ar 0,2, voltar a atirar depois de correr em
+  0,2 s, pouso com 60% da velocidade e dispersão em movimento ×1,4. As faixas do Personalizado são as do §3.4
+  (velocidade 0,5–2×, pulo 0,5–3×).
+- **Correção na escalada (vale para o Bobo):** "pulo + borda = altura de escalada" exato nunca subia, porque o ápice da
+  parábola quase nunca cai num tick. O Bobo não subia os 1,5 m do design e o Tático não subia 1,0 m. A borda no ar
+  ganhou 5 cm de folga (`MANTLE_SLACK`). O golden não mudou.
+- **Formato:** `players.speed` e `players.jump` no `preset@1` (campos novos e opcionais, sem migração), limitados às
+  faixas. Só valem com `movement: 'custom'`.
+- **Partida personalizada:** a aba Jogadores começa com Movimento (Bobo, Tático, Personalizado); no Personalizado
+  aparecem Velocidade e Pulo logo abaixo.
+- **Correção:** o `t` arredonda número quebrado a 1 casa, e a Gravidade e o Dano mostravam ×0,25 como "×0,3". O `mult`
+  da Partida personalizada agora escreve até 2 casas.
+- **Bots:** a navegação liga saltos de até 1,0 m (`BOBO_NAV_METRICS`), que todo perfil alcança; os bots usam o mesmo
+  perfil da partida (a sim aplica) e, no Tático, não deslizam.

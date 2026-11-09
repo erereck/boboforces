@@ -1294,11 +1294,13 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     platform.tap('ArrowLeft');
     platform.tap('Enter');
     expect(game.screen).toBe('custom');
-    // E (próxima aba): Jogadores (5 linhas). Do COMEÇAR: esquerda (Salvar), esquerda (Voltar), esquerda (a última linha,
-    // Dano de queda); cima 4 vezes (Vida) e direita: 150. De volta: baixo 5 vezes (até o Voltar) e direita 2 (COMEÇAR).
+    // E (próxima aba): Jogadores (6 linhas desde a fase 6a: Movimento em cima). Do COMEÇAR: esquerda (Salvar), esquerda
+    // (Voltar), esquerda (uma linha); cima até a aba e baixo 2 (Movimento, Vida); direita: 150. De volta: baixo 5 vezes
+    // (até o Voltar) e direita 2 (COMEÇAR).
     platform.tap('KeyE');
     for (let k = 0; k < 3; k++) platform.tap('ArrowLeft');
-    for (let k = 0; k < 4; k++) platform.tap('ArrowUp');
+    for (let k = 0; k < 8; k++) platform.tap('ArrowUp');
+    for (let k = 0; k < 2; k++) platform.tap('ArrowDown');
     platform.tap('ArrowRight');
     for (let k = 0; k < 5; k++) platform.tap('ArrowDown');
     for (let k = 0; k < 2; k++) platform.tap('ArrowRight');

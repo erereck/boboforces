@@ -42,6 +42,24 @@ describe('Partida personalizada', () => {
     expect(checked.ok && checked.warnings).toEqual([]);
   });
 
+  it('M2 (fase 6a): o perfil de movimento; velocidade e pulo só aparecem no Personalizado', () => {
+    const ids = (r: MatchRecipe): string[] => customRows('players', r).map((x) => x.id);
+    expect(value('players', DEBUT_PRESET, 'movement')).toBe('Bobo');
+    expect(ids(DEBUT_PRESET).slice(0, 2)).toEqual(['movement', 'hp']);
+    let r = stepCustom('players', DEBUT_PRESET, 'movement', 1, PC);
+    expect(value('players', r, 'movement')).toBe('Tático');
+    r = stepCustom('players', r, 'movement', 1, PC);
+    expect(ids(r).slice(0, 4)).toEqual(['movement', 'speed', 'jump', 'hp']);
+    r = stepCustom('players', r, 'speed', 1, PC);
+    r = stepCustom('players', r, 'jump', -1, PC);
+    expect(r.players).toEqual({ movement: 'custom', speed: 1.25, jump: 0.75 });
+    expect([value('players', r, 'speed'), value('players', r, 'jump')]).toEqual(['×1,25', '×0,75']);
+    const checked = validateMatchRecipe(r, { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 });
+    expect(checked.ok && checked.warnings).toEqual([]);
+    // Volta ao Bobo dando a volta.
+    expect(stepCustom('players', r, 'movement', 1, PC).players?.movement).toBe('bobo');
+  });
+
   it('bots: troca o bot de cada time e para no teto do aparelho; TDM ↔ FFA mantém a quantidade', () => {
     let r = stepCustom('bots', DEBUT_PRESET, 'bot1', 4, PHONE);
     expect(r.teams[1]!.bots[0]!.ref).toBe('builtin:jorge-the-immortal');

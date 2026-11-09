@@ -340,9 +340,12 @@ function aimSpread(ctx: SimContext, e: number, def: WeaponDef, fl: number): numb
   const vx = s.velocity[i3]!;
   const vz = s.velocity[i3 + 2]!;
   let mul: number;
-  if ((fl & F.onGround) === 0) mul = SPREAD_STATE_MULTIPLIER.air;
+  // M2 (fase 6a): o perfil pesa a dispersão andando e no ar (o Tático erra mais em movimento).
+  const moving = ctx.profile.moveSpreadMul ?? 1;
+  if ((fl & F.onGround) === 0) mul = SPREAD_STATE_MULTIPLIER.air * moving;
   else if ((fl & F.crouching) !== 0) mul = SPREAD_STATE_MULTIPLIER.crouching;
-  else if (vx * vx + vz * vz > SPREAD_WALKING_SPEED * SPREAD_WALKING_SPEED) mul = SPREAD_STATE_MULTIPLIER.walking;
+  else if (vx * vx + vz * vz > SPREAD_WALKING_SPEED * SPREAD_WALKING_SPEED)
+    mul = SPREAD_STATE_MULTIPLIER.walking * moving;
   else mul = SPREAD_STATE_MULTIPLIER.still;
   const ads = s.adsAmount[e]!;
   mul *= 1 + (def.adsSpreadMul - 1) * ads;

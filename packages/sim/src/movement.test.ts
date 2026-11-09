@@ -1,9 +1,9 @@
-import { MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import { MATCH_RECIPE_FORMAT, type MatchRecipe, type PlayerRules } from '@boboforces/format';
 import { BUTTON, quantizeAxis } from '@boboforces/input';
 import { yawToU16 } from '@boboforces/shared';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell, type WorldGrid } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { MOVEMENT_BOBO } from './config/movement.ts';
+import { MIN_JUMP_HEIGHT, MOVEMENT_BOBO, MOVEMENT_TACTICAL, resolveMovementProfile } from './config/movement.ts';
 import { SIM_HZ } from './constants.ts';
 import { ENTITY_FLAG, entityIndex } from './entity.ts';
 import type { SimEvent } from './events.ts';
@@ -21,6 +21,7 @@ function setup(
   hz = SIM_HZ,
   build?: (grid: WorldGrid) => void,
   spawn = { x: 20, y: 0.5, z: 95, yaw: 0, team: 0 },
+  players?: PlayerRules,
 ): {
   step: () => void;
   speed: () => number;
@@ -39,6 +40,7 @@ function setup(
     map: 'test',
     seed: 1,
     teams: [{ humans: 1, bots: [] }],
+    ...(players ? { players } : {}),
   };
   const sim = createSim({ recipe, map: { grid, blocks, spawns: [spawn] }, humans: 1, hz });
   const frames = createInputFrames();
@@ -190,5 +192,72 @@ describe('calibração do perfil Bobo', () => {
     const air = ticksUntil(a.step, () => a.y() <= 0.5) + 1;
     expect(air / SIM_HZ).toBeGreaterThanOrEqual(0.6);
     expect(air / SIM_HZ).toBeLessThanOrEqual(0.65);
+  });
+});
+
+describe('perfis Tático e Personalizado (M2, fase 6a)', () => {
+  it('sem regra é o Bobo; o Tático tem os números da tabela; o Personalizado multiplica velocidade e pulo', () => {
+    expect(resolveMovementProfile(undefined)).toBe(MOVEMENT_BOBO);
+    expect(resolveMovementProfile({ movement: 'tactical' })).toBe(MOVEMENT_TACTICAL);
+    expect(MOVEMENT_TACTICAL).toMatchObject({ walk: 4, sprint: 5.5, crouch: 2, jump: 0.8, mantleHeight: 1 });
+    expect(MOVEMENT_TACTICAL.slide).toBeUndefined();
+    // Velocidade e pulo só valem no Personalizado.
+    expect(resolveMovementProfile({ movement: 'bobo', speed: 2, jump: 3 })).toBe(MOVEMENT_BOBO);
+    const c = resolveMovementProfile({ movement: 'custom', speed: 2, jump: 2 });
+    expect([c.id, c.walk, c.sprint, c.jump, c.slide?.startSpeed]).toEqual(['custom', 9.6, 13.6, 2, 16]);
+    // Pulo baixo com gravidade alta não passa do mínimo (o mapa continua atravessável).
+    expect(resolveMovementProfile({ movement: 'tactical', gravity: 2 }).jump).toBe(MIN_JUMP_HEIGHT);
+    expect(resolveMovementProfile({ movement: 'custom', jump: 0.5, gravity: 2 }).jump).toBe(MIN_JUMP_HEIGHT);
+  });
+
+  /** Anda para -Z até um patamar de `up` m (frente em z = 88 m), pula encostado e diz se subiu. */
+  function climbs(up: number, players: PlayerRules): boolean {
+    const top = 0.5 + up;
+    const a = setup(
+      SIM_HZ,
+      (grid) => fillBox(grid, 0, 1, 0, 79, Math.round(up / 0.5), 175, concrete),
+      { x: 20, y: 0.5, z: 92, yaw: 0, team: 0 },
+      players,
+    );
+    a.step();
+    // Encosta no patamar, aperta o pulo (o pulo sai no aperto) e segue empurrando.
+    a.frame.moveY = quantizeAxis(1);
+    for (let i = 0; i < SIM_HZ * 1.5; i++) a.step();
+    a.frame.buttons = BUTTON.jump;
+    a.step();
+    a.frame.buttons = 0;
+    for (let i = 0; i < SIM_HZ * 1.5; i++) a.step();
+    return a.y() >= top - 1e-6 && a.z() < 87.5;
+  }
+
+  it('o Tático escala 1,0 m (todo mapa atravessável) e não 1,5 m; o Bobo escala 1,5 m', () => {
+    expect(climbs(1, { movement: 'tactical' })).toBe(true);
+    expect(climbs(1.5, { movement: 'tactical' })).toBe(false);
+    expect(climbs(1.5, { movement: 'bobo' })).toBe(true);
+    // Pulo mínimo (gravidade 2×) ainda escala 1,0 m.
+    expect(climbs(1, { movement: 'tactical', gravity: 2 })).toBe(true);
+  });
+
+  it('o Tático freia no pouso; o Bobo não', () => {
+    const landing = (players: PlayerRules): number => {
+      const a = setup(SIM_HZ, undefined, undefined, players);
+      a.frame.moveY = quantizeAxis(1);
+      for (let i = 0; i < 30; i++) a.step();
+      a.frame.buttons = BUTTON.jump;
+      a.step();
+      a.frame.buttons = 0;
+      a.frame.moveY = 0;
+      let before = 0;
+      for (let i = 0; i < SIM_HZ; i++) {
+        const air = !a.onGround();
+        const v = a.speed();
+        a.step();
+        if (air && a.onGround()) return a.speed() / before;
+        before = v;
+      }
+      return NaN;
+    };
+    expect(landing({ movement: 'tactical' })).toBeLessThan(0.65);
+    expect(landing({ movement: 'bobo' })).toBeGreaterThan(0.9);
   });
 });

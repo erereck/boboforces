@@ -252,6 +252,37 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
   - a contagem estendida da 1ª partida (gameplay.md §2.5), com Pular.
 - **5g. Prints para o Erick.** A rodada 9 saiu em 09/11, antes da 5f (versão 10 da página, junto com a 8; perguntas
   E1–E6); a calibração entra na rodada seguinte: Oficina, Laboratório, Ringue, Bobo Training, Testar e calibração.
+  Respondidas em 09/11 (#68, #69).
+
+## Fase 6 em detalhe: Meu Bobo, 3ª pessoa, perfis de movimento e toque
+
+Escrito em 09/11/2026, com as rodadas 8 e 9 respondidas. Ordem: primeiro o que é só número e regra (perfis), depois a
+câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de tudo o resto para mapear os botões.
+
+- **6a. Perfis de movimento** (gameplay.md §3.3–§3.6). Pronta em 09/11 (`ARCHITECTURE.md` §12.39).
+  - Tático na sim, com os números da tabela; o Arcade continua fora (M6+);
+  - Personalizado: velocidade 0,5–2×, pulo 0,5–3×, mais a gravidade e o dano de queda que já existem;
+  - a aba Jogadores da Partida personalizada ganha o perfil;
+  - a navegação e os bots leem a altura de pulo e de escalada do perfil da partida.
+- **6b. 3ª pessoa** (gameplay.md §3.5; tecnico.md §9).
+  - câmera de ombro, com troca de ombro e colisão contra o cenário;
+  - o tiro sai do olho, mirando no ponto que o raio da câmera acerta;
+  - o próprio bobo aparece inteiro, com a arma na mão e sem viewmodel;
+  - nos Ajustes: 1ª ou 3ª pessoa e o ombro; na receita: a regra "Câmera permitida" (1ª e 3ª, ou só 1ª).
+- **6c. Meu Bobo** (#17, #58, #62; GDD §4.7.2; arte-ux.md §2.4).
+  - o look do jogador salvo para sempre num documento versionado;
+  - o editor numa cena própria: o bobo girando num pedestal, com as abas ao lado;
+  - abas: Pronto (os looks da farda e as fantasias), Rosto, Cabelo, Chapéu e Roupa, mais "Aleatório";
+  - o jogador 1 entra na partida com o seu look (com o colete do time por cima).
+- **6d. Fantasias** (#62). As skins prontas extras, com a lista final por print (proposta: astronauta, pijama e robô de
+  papelão, mais as do banco de ideias que couberem).
+- **6e. Toque completo** (arte-ux.md §7.3).
+  - trocar de arma tocando no ícone dela;
+  - atirar sozinho, layout canhoto e o limitador de 30/60 FPS nos Ajustes;
+  - o "fantasma dos dedos" nas primeiras partidas no celular;
+  - os botões que faltam (faca, 3ª pessoa).
+- **6f. Prints para o Erick.** Rodada 10: a calibração (5f) e a fase 6 (perfis, 3ª pessoa, Meu Bobo, fantasias e
+  toque).
 
 ## Escolhas do Claude neste plano (revisáveis)
 

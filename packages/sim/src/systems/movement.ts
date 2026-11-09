@@ -20,7 +20,7 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 /**
  * Passo 2: movimento e colisão (tecnico.md §7.2, gameplay.md §3.3). Perfil de movimento como dado; AABB varrida eixo a
  * eixo contra a grade, degrau automático de 0,5 m no chão. No ar, o degrau vira "mantle": sobe até
- * `mantleHeight - jump` (0,5 m no Bobo), então pulo + borda alcança os 1,5 m do perfil.
+ * `mantleHeight - jump` (0,5 m no Bobo), então pulo + borda alcança os 1,5 m do perfil (mais 5 cm de folga, fase 6a).
  *
  * Integração exata, para a sensação não depender do `SIM_HZ` (o Switch pode rodar a 30 Hz sem rebalancear): altura pela
  * parábola (`y += v·dt - g·dt²/2`), atrito exponencial (`v·e^(-f·t)`, andando a integral dele) e, no resto, a média
@@ -51,6 +51,12 @@ const SPRINT_MIN_FORWARD = 0.3;
 /** Folga para achar a célula do piso sob os pés (a rampa pode estar na célula dos pés ou logo abaixo). */
 const FLOOR_PROBE = 0.02;
 
+/**
+ * M2 (fase 6a): folga da escalada no ar. O ápice da parábola quase nunca cai num tick, então "pulo + borda = altura de
+ * escalada" exato não sobe (o Tático: 0,8 + 0,2 = 1,0 m). No Bobo a borda já está no teto de 0,5 m: nada muda.
+ */
+const MANTLE_SLACK = 0.05;
+
 /** Números do perfil já convertidos para o `hz` da partida (preenchidos no começo do passo, sem alocar). */
 class ProfileTicks {
   profile: MovementProfile | null = null;
@@ -73,7 +79,7 @@ class ProfileTicks {
     this.sprintFireDelay = secondsToTicks(p.sprintFireDelayS, hz);
     this.slideTotal = p.slide ? Math.max(1, secondsToTicks(p.slide.durationS, hz)) : 0;
     this.slideCooldown = p.slide ? secondsToTicks(p.slide.cooldownS, hz) : 0;
-    this.airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump));
+    this.airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump) + MANTLE_SLACK);
   }
 }
 
@@ -333,6 +339,11 @@ export function movementSystem(ctx: SimContext): void {
     if (onGround && !wasOnGround) {
       const fall = s.airPeakY[e]! - y;
       ctx.events.move(ctx.tick, s.idOf(e), 'land', fallSpeed);
+      // M2 (fase 6a): o Tático freia no pouso (sem bhop).
+      if (p.landingKeep !== undefined) {
+        vx *= p.landingKeep;
+        vz *= p.landingKeep;
+      }
       if (p.fallDamage && fall > METRICS.safeFallHeight) {
         const dmg = (fall - METRICS.safeFallHeight) * MATCH_DEFAULTS.fallDamagePerM;
         ctx.damage.push(e, NULL_ENTITY, dmg, PART_TORSO, FIGURE_BONE.footR, WEAPON_NONE, x, y, z);

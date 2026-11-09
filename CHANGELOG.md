@@ -387,6 +387,16 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - Em **tela dividida**, as estatísticas somam todos os jogadores locais. O recorde de abates e o de sequência
     continuam sendo do melhor jogador da partida.
   - 2 testes novos.
+- **Fase 6a, perfis de movimento:**
+  - **Tático** (estilo CS): andar a 4,0 m/s e correr a 5,5 m/s, pulo de 0,8 m, escala até 1,0 m e não desliza.
+    Aterrissar freia e a mira erra mais andando ou no ar.
+  - **Personalizado:** o Bobo com velocidade de 0,5× a 2× e pulo de 0,5× a 3×, mais a gravidade e o dano de queda que
+    já existiam.
+  - Na Partida personalizada, a aba Jogadores começa com a linha **Movimento**.
+  - **Correções:**
+    - a escalada no ar não alcançava a altura do perfil: o Bobo não subia 1,5 m nem o Tático 1,0 m;
+    - Gravidade e Dano mostravam ×0,25 como "×0,3".
+  - 4 testes novos; golden igual.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

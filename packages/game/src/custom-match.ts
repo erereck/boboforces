@@ -11,7 +11,7 @@ import {
   type WeaponRules,
   type HudRules,
 } from '@boboforces/format';
-import { t, type StringKey } from '@boboforces/ui';
+import { formatDecimal, t, type StringKey } from '@boboforces/ui';
 import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
 
 /**
@@ -200,8 +200,20 @@ const RESPAWNS = [0, 1, 2, 3, 5, 8, 10, 15];
 const PROTECTIONS = [0, 0.5, 1, 1.5, 2, 3, 5];
 const DAMAGES = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5];
 const GRAVITIES = [0.25, 0.5, 0.75, 1, 1.5, 2];
+/** M2 (fase 6a): os perfis do M2 (o Arcade é do M6+) e os passos do Personalizado. */
+const MOVEMENTS = ['bobo', 'tactical', 'custom'] as const;
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const JUMPS = [0.5, 0.75, 1, 1.5, 2, 3];
 
-const mult = (v: number): string => t('custom.mult', { n: v });
+/**
+ * "×0,25", "×1,5", "×2": até 2 casas, sem zero sobrando. O `t` arredonda número quebrado a 1 casa, e o ×0,25 da
+ * gravidade e do dano aparecia como ×0,3 (fase 6a).
+ */
+const mult = (v: number): string => {
+  const two = formatDecimal(v, 2);
+  const text = Number.isInteger(v) ? String(v) : two.endsWith('0') ? two.slice(0, -1) : two;
+  return t('custom.mult', { n: text });
+};
 
 const MATCH_ROWS: readonly RowDef[] = [
   {
@@ -260,6 +272,38 @@ const MATCH_ROWS: readonly RowDef[] = [
     },
   },
 ];
+
+/** M2 (fase 6a): o perfil de movimento; com o Personalizado, a velocidade e o pulo logo abaixo. */
+const MOVEMENT_ROW: RowDef = {
+  id: 'movement',
+  labelKey: 'custom.row.movement',
+  value: (r) => t(`movement.${movementOf(r)}` as StringKey),
+  step: (r, d) => {
+    const i = cycleIndex(MOVEMENTS.length, MOVEMENTS.indexOf(movementOf(r)), d);
+    return withPlayers(r, { movement: MOVEMENTS[i]! });
+  },
+};
+
+const CUSTOM_MOVEMENT_ROWS: readonly RowDef[] = [
+  {
+    id: 'speed',
+    labelKey: 'custom.row.speed',
+    value: (r) => mult(players(r).speed ?? 1),
+    step: (r, d) => withPlayers(r, { speed: stepList(SPEEDS, players(r).speed ?? 1, d) }),
+  },
+  {
+    id: 'jump',
+    labelKey: 'custom.row.jump',
+    value: (r) => mult(players(r).jump ?? 1),
+    step: (r, d) => withPlayers(r, { jump: stepList(JUMPS, players(r).jump ?? 1, d) }),
+  },
+];
+
+/** O perfil do M2 da receita (o Arcade, que só chega no M6+, aparece como Bobo, que é como a sim joga). */
+function movementOf(r: MatchRecipe): (typeof MOVEMENTS)[number] {
+  const m = players(r).movement;
+  return m === 'tactical' || m === 'custom' ? m : 'bobo';
+}
 
 const PLAYER_ROWS: readonly RowDef[] = [
   {
@@ -452,7 +496,9 @@ export function customRows(tab: CustomTab, r: MatchRecipe): readonly RowDef[] {
     case 'match':
       return MATCH_ROWS;
     case 'players':
-      return PLAYER_ROWS;
+      return movementOf(r) === 'custom'
+        ? [MOVEMENT_ROW, ...CUSTOM_MOVEMENT_ROWS, ...PLAYER_ROWS]
+        : [MOVEMENT_ROW, ...PLAYER_ROWS];
     case 'weapons':
       return WEAPON_ROWS;
     case 'bots':

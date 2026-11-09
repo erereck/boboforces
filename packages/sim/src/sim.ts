@@ -19,7 +19,7 @@ import {
 import type { NavGrid } from '@boboforces/nav';
 import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } from '@boboforces/world';
 import { BASE_HP, METRICS } from './config/metrics.ts';
-import { MOVEMENT_BOBO, type MovementProfile } from './config/movement.ts';
+import { resolveMovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
 import { ZOMBIE_RULES, MOVEMENT_ZOMBIE } from './config/zombie.ts';
@@ -236,22 +236,6 @@ function matchModsOf(recipe: MatchRecipe): MatchMods {
 }
 
 /**
- * M2 (fase 4e): o perfil de movimento com a gravidade e o dano de queda da receita. A gravidade menor mantém a
- * velocidade do pulo (o pulo sobe mais e demora mais no ar), por isso a altura do pulo divide pelo mesmo fator.
- */
-function matchProfile(recipe: MatchRecipe): MovementProfile {
-  const g = recipe.players?.gravity ?? 1;
-  const fall = recipe.players?.fallDamage;
-  if (g === 1 && fall === undefined) return MOVEMENT_BOBO;
-  return {
-    ...MOVEMENT_BOBO,
-    gravity: MOVEMENT_BOBO.gravity * g,
-    jump: MOVEMENT_BOBO.jump / g,
-    fallDamage: fall ?? MOVEMENT_BOBO.fallDamage,
-  };
-}
-
-/**
  * M2 (fase 4e): munição e armas permitidas da partida valem para todos (humanos e bots). Com regra do bot também, a
  * munição fica a mais generosa e as armas, a interseção (se não sobrar nenhuma, valem as da partida).
  */
@@ -355,7 +339,7 @@ export function createSim(config: SimConfig): Sim {
     colliders: map.colliders ?? null,
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
-    profile: matchProfile(recipe),
+    profile: resolveMovementProfile(recipe.players),
     zombieProfile: MOVEMENT_ZOMBIE,
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),

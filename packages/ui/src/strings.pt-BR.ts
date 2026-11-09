@@ -265,6 +265,13 @@ export const STRINGS_PT_BR = {
   'custom.row.respawn': 'Renascer',
   'custom.row.protection': 'Proteção',
   'custom.row.fall': 'Dano de queda',
+  /** M2 (fase 6a): o perfil de movimento (gameplay.md §3.3) e os multiplicadores do Personalizado. */
+  'custom.row.movement': 'Movimento',
+  'custom.row.speed': 'Velocidade',
+  'custom.row.jump': 'Pulo',
+  'movement.bobo': 'Bobo',
+  'movement.tactical': 'Tático',
+  'movement.custom': 'Personalizado',
   'custom.row.allowed': 'Armas',
   'custom.row.ammo': 'Munição',
   'custom.row.damage': 'Dano',

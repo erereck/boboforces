@@ -66,4 +66,12 @@ describe('regras da receita (fase 4e)', () => {
     expect(codes).toContain('content.missingWeapon');
     for (const c of codes) expect(ISSUE_CODES as readonly string[]).toContain(c);
   });
+
+  it('M2 (fase 6a): perfil de movimento e os multiplicadores do Personalizado, limitados às faixas', () => {
+    const ok = validateMatchRecipe(recipe({ players: { movement: 'custom', speed: 1.5, jump: 2 } }), LIMITS);
+    expect(ok.ok && ok.warnings).toEqual([]);
+    expect(ok.ok && ok.value.players).toEqual({ movement: 'custom', speed: 1.5, jump: 2 });
+    const clamped = validateMatchRecipe(recipe({ players: { movement: 'tactical', speed: 9, jump: 0.1 } }), LIMITS);
+    expect(clamped.ok && clamped.value.players).toEqual({ movement: 'tactical', speed: 2, jump: 0.5 });
+  });
 });
