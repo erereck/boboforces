@@ -39,6 +39,8 @@ import {
   MAIN_MENU_ACTION,
   mainMenuScreen,
   LAB_ACTION,
+  LAB_INTRO_ACTION,
+  labIntroScreen,
   labScreen,
   MODES_ACTION,
   WORKSHOP_ACTION,
@@ -186,6 +188,7 @@ export type GameScreen =
   | 'news'
   | 'workshop'
   | 'lab'
+  | 'labIntro'
   | 'quick'
   | 'modes'
   | 'custom'
@@ -327,6 +330,8 @@ export function startGame(deps: GameDeps): GameHandle {
   let labTyping: TextInputSession | null = null;
   let labTypingFrom = '';
   let labHold = false;
+  /** Testando o bot no Bobo Training (a volta da cena cai no Laboratório). */
+  let labTesting = false;
   const allBotNames = (): Set<string> => new Set([...save.bots, ...factoryBots].map(botDisplayName));
   function rebuildLab(): void {
     labMenu.setRoot(
@@ -400,6 +405,11 @@ export function startGame(deps: GameDeps): GameHandle {
         closeLab();
         return;
       }
+    } else if (a === LAB_ACTION.test) {
+      // O bot vai embutido no treino (sem salvar), junto dos alvos; na volta, o editor continua de onde estava.
+      labTesting = true;
+      playTraining(trainingPreset([{ ref: `embedded:${labDoc.id}`, count: 1 }], [labDoc]));
+      return;
     } else if (a === LAB_ACTION.save) {
       if (save.saveBot(labDoc)) {
         workshopSelected = labDoc.id;
@@ -909,13 +919,56 @@ export function startGame(deps: GameDeps): GameHandle {
   }
 
   function leaveScene(): void {
+    // M2 (fase 5e): o Testar do Laboratório volta para o editor, com os números do treino.
+    const report = labTesting ? (scene?.trainingReport() ?? null) : null;
     scene?.dispose();
     scene = null;
     pendingScene = null;
+    if (labTesting) {
+      labTesting = false;
+      const none = t('result.noAccuracy');
+      labNote =
+        report === null
+          ? ''
+          : t('lab.tested', {
+              accuracy: report.botAccuracy >= 0 ? t('settings.percent', { n: report.botAccuracy }) : none,
+              kills: report.kills,
+              deaths: report.deaths,
+              ttk: report.ttkS >= 0 ? t('lab.seconds', { n: Math.round(report.ttkS * 10) / 10 }) : none,
+            });
+      rebuildLab();
+      screen = 'lab';
+      return;
+    }
     screen = 'title';
     refreshTitle();
     // De volta da partida, o foco é o JOGAR (revanche em 1 interação, arte-ux.md §6.4).
     titleMenu.focus('play');
+  }
+
+  /**
+   * M2 (fase 5e): o card "Conheça o Laboratório", uma vez, ao sair da 1ª partida terminada (só pelo Sair: De novo e
+   * as outras emendam outra partida). Fica marcado como visto já ao abrir.
+   */
+  const labIntroMenu = createMenuController();
+  const LAB_INTRO_SEEN = 'labCard';
+  function maybeLabIntro(): void {
+    if (screen !== 'title' || save.stats.totals.matches !== 1) return;
+    if (save.stats.onboarding.tipsSeen.includes(LAB_INTRO_SEEN)) return;
+    save.setStats(markTipSeen(save.stats, LAB_INTRO_SEEN));
+    const jorge = factoryBots.find((b) => b.id === 'jorge-the-immortal')!;
+    labIntroMenu.setRoot(labIntroScreen.build({ name: botDisplayName(jorge), lines: botCardLines(jorge) }));
+    screen = 'labIntro';
+  }
+
+  /** M2 (fase 5e): o Nêmesis do resultado vai para a Oficina (cópia, com o nome dele ou "… 2"). */
+  function saveNemesis(): void {
+    const doc = scene?.nemesisBot() ?? null;
+    if (doc === null) return;
+    const ids = new Set([...save.bots.map((b) => b.id), ...factoryBots.map((b) => b.id)]);
+    const names = allBotNames();
+    const base = botDisplayName(doc);
+    save.saveBot({ ...doc, id: newBotId(botRng, ids), name: names.has(base) ? copyName(base, names) : base });
   }
 
   /** M2 (fase 4c): joga um preset: ele vira o último (o do JOGAR) e a partida começa com semente nova. */
@@ -1030,6 +1083,23 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'labIntro': {
+        const nav = labIntroMenu.update(menuInput, raw, u);
+        const a = nav.activated;
+        if (nav.back || a === LAB_INTRO_ACTION.later) screen = 'title';
+        else if (a === LAB_INTRO_ACTION.open) openWorkshop();
+        else if (a === LAB_INTRO_ACTION.test) {
+          // Testar o Jorge: o treino com ele; na volta, o título.
+          screen = 'title';
+          playTraining(trainingPreset([{ ref: 'builtin:jorge-the-immortal', count: 1 }]));
+        }
+        if (screen === 'labIntro') {
+          labIntroMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
@@ -1223,8 +1293,10 @@ export function startGame(deps: GameDeps): GameHandle {
         }
       }
       const signal = scene !== null ? scene.frame(dt, raw, menuInput, u, list, intervalMs) : 'none';
-      if (signal === 'quit') leaveScene();
-      else if (signal === 'again' || signal === 'easier' || signal === 'harder') {
+      if (signal === 'quit') {
+        leaveScene();
+        maybeLabIntro();
+      } else if (signal === 'again' || signal === 'easier' || signal === 'harder') {
         // M2 (fase 2e): De novo / Mais fácil / Mais difícil: a mesma partida com semente nova, um passo de nível.
         const level = scene!.level;
         const next = signal === 'easier' ? stepLevel(level, -1) : signal === 'harder' ? stepLevel(level, 1) : level;
@@ -1238,6 +1310,12 @@ export function startGame(deps: GameDeps): GameHandle {
         leaveScene();
         openCustom(preset, 'title');
       } else if (signal === 'save') saveCustomPreset(playingPreset ?? currentPreset());
+      else if (signal === 'nemesis') saveNemesis();
+      else if (signal === 'lab') {
+        // M2 (fase 5e): Abrir Laboratório (no Tryhard): sai da partida para a Oficina.
+        leaveScene();
+        openWorkshop();
+      }
     }
     syncPointerLock();
     frames++;

@@ -25,7 +25,9 @@ import {
   type PlatformProfile,
   type PropDoseView,
   type TimeOfDay,
+  type BotDocument,
   type BotLevel,
+  resolveBot,
 } from '@boboforces/format';
 import {
   createGamepadProfile,
@@ -176,7 +178,7 @@ import {
   settingsRows,
   stepSettings,
 } from '../settings-menu.ts';
-import type { SceneHost, SceneRequest, SceneSignal } from '../scene-api.ts';
+import type { SceneHost, SceneRequest, SceneSignal, TrainingReport } from '../scene-api.ts';
 import {
   beginDeath,
   controllerNames,
@@ -483,6 +485,9 @@ export interface ConstrutoMatch {
   /** M2 (fase 2e): nível rápido dos bots adversários agora. */
   readonly level: BotLevel;
   pause(): void;
+  /** M2 (fase 5e): ver `Scene.trainingReport` e `Scene.nemesisBot`. */
+  trainingReport(): TrainingReport | null;
+  nemesisBot(): BotDocument | null;
   frame(
     dt: number,
     raw: Readonly<RawInputState>,
@@ -683,6 +688,40 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   const trainingNow: TrainingNumbers = { accuracy: -1, headPct: -1, ttkS: -1, kills: 0 };
   let lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+  /** M2 (fase 5e): os números do treino para o Testar (a precisão é a dos bots que não são Alvo). */
+  function trainingReport(): TrainingReport | null {
+    if (!training) return null;
+    const v = sim.view();
+    const h = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    trainingNumbers(matchStats, v, h, sim.hz, trainingNow);
+    let shots = 0;
+    let hits = 0;
+    for (const slot of expandRecipe(recipe, humans)) {
+      if (slot.bot === null || resolveBot(recipe, slot.bot).personality.preset === 'dummy') continue;
+      const e = entityIndex(sim.controllerEntity(slot.controller));
+      if (e < 0 || e >= matchStats.capacity) continue;
+      shots += matchStats.shots[e]!;
+      hits += Math.min(matchStats.hits[e]!, matchStats.shots[e]!);
+    }
+    return {
+      botAccuracy: shots > 0 ? Math.round((hits * 100) / shots) : -1,
+      kills: h >= 0 ? v.kills[h]! : 0,
+      deaths: h >= 0 ? v.deaths[h]! : 0,
+      ttkS: trainingNow.ttkS,
+    };
+  }
+  /** M2 (fase 5e): o Nêmesis do resultado (índice da entidade; -1 = nenhum) e o documento do bot dele. */
+  let resultNemesis = -1;
+  function nemesisBot(): BotDocument | null {
+    if (resultNemesis < 0) return null;
+    for (const slot of expandRecipe(recipe, humans)) {
+      if (slot.bot !== null && entityIndex(sim.controllerEntity(slot.controller)) === resultNemesis) {
+        return resolveBot(recipe, slot.bot);
+      }
+    }
+    return null;
+  }
+
   function refreshTrainingLine(): void {
     const h = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
     trainingNumbers(matchStats, sim.view(), h, sim.hz, trainingNow);
@@ -1697,6 +1736,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
     const sum = summarizeMatch(matchStats, v, human, ffa);
+    resultNemesis = sum.nemesis;
     // M2 (fase 4g): a partida vai para o `stats@1` (os números do jogador 1; o bench não tem humano).
     const breaks =
       record && human >= 0 && !benchState
@@ -1738,6 +1778,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       other: sum.otherScore,
       mvp: nm(sum.mvp),
       nemesis: nm(sum.nemesis),
+      ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
       nemesisKills: sum.nemesisKills,
       victim: nm(sum.victim),
       victimKills: sum.victimKills,
@@ -2871,6 +2912,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return currentLevel;
     },
     pause,
+    trainingReport,
+    nemesisBot,
     frame(dt, raw, menu, ui, list, rawFrameMs): SceneSignal {
       if (disposed) return 'none';
       const t0 = now();
@@ -2894,7 +2937,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           else if (a === RESULT_ACTION.harder) signal = 'harder';
           else if (a === RESULT_ACTION.quit) signal = 'quit';
           else if (a === RESULT_ACTION.changeRules) signal = 'rules';
-          else if (a === RESULT_ACTION.savePreset && resultData !== null && !resultData.presetSaved) {
+          // M2 (fase 5e): Abrir Laboratório (no Tryhard) e Salvar na Oficina (o Nêmesis; quem salva é o `game`).
+          else if (a === RESULT_ACTION.lab) signal = 'lab';
+          else if (a === RESULT_ACTION.saveWorkshop && resultData !== null && !resultData.nemesisSaved) {
+            signal = 'nemesis';
+            resultData = { ...resultData, nemesisSaved: true };
+            resultMenu.setRoot(resultScreen.build(resultData));
+          } else if (a === RESULT_ACTION.savePreset && resultData !== null && !resultData.presetSaved) {
             // M2 (fase 4e): quem salva é o `game` (o save é dele); aqui o botão vira "Preset salvo".
             signal = 'save';
             resultData = { ...resultData, presetSaved: true };

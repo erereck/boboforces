@@ -358,6 +358,14 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     seu até o seu abate.
   - **Fica para depois:** a skin de treino dos alvos (arte).
   - 2 testes novos; golden igual.
+- **Fase 5e, pontes do Laboratório:**
+  - **Testar** (no Laboratório, entre Voltar e Salvar) abre o Bobo Training com o bot, sem salvar. Ao sair, você volta
+    ao editor com "Testado: o bot acertou 18% · você 5/2 · TTK médio 0,9 s".
+  - **Salvar na Oficina** (resultado): o Nêmesis vai para os seus bots, e o botão vira "Salvo na Oficina".
+  - **Abrir Laboratório:** no Tryhard, "Mais difícil" vira "Abrir Laboratório" e leva à Oficina.
+  - **Conheça o Laboratório:** ao sair da 1ª partida terminada, uma vez, aparece um card com o Jorge the Immortal, os 4
+    eixos e as opções Testar, Abrir Laboratório e Agora não.
+  - 3 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

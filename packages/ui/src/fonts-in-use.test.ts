@@ -19,6 +19,7 @@ import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { rotateScreen } from './screens/rotate.ts';
 import { workshopScreen } from './screens/workshop.ts';
 import { labScreen } from './screens/lab.ts';
+import { labIntroScreen } from './screens/lab-intro.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
 import { customMatchScreen } from './screens/custom-match.ts';
@@ -418,6 +419,16 @@ describe('estouro de texto com o atlas real', () => {
   it('menus da fase 4 (menu principal, Novidades, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
     const screens: UiNode[] = [
       mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'settings', 'news'] }),
+      // M2 (fase 5e): o card Conheça o Laboratório (o Jorge, com as regras).
+      labIntroScreen.build({
+        name: 'Jorge the Immortal',
+        lines: [
+          'Habilidade: Pela vibe',
+          'Inteligência N0 · Kamikaze',
+          'Reação 900 ms · erro 6° · cabeça 5%',
+          'Regras: 500 de vida · só escopeta',
+        ],
+      }),
       // M2 (fase 4g): Novidades com os 5 itens e o aviso de migração.
       newsScreen.build({
         version: '0.0.1',

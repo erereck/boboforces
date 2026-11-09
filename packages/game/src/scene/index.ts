@@ -183,6 +183,12 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
     get level() {
       return match?.level ?? request.level ?? 'normal';
     },
+    trainingReport() {
+      return match?.trainingReport() ?? null;
+    },
+    nemesisBot() {
+      return match?.nemesisBot() ?? null;
+    },
     pause(): void {
       if (match) match.pause();
       else pausedBeforeLoad = true;

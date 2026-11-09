@@ -241,7 +241,7 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
   - bots do Laboratório em loop, de 1 a N;
   - alvos fixos e móveis (bonecos de caixas com a skin de treino);
   - a HUD mostra a precisão, o TTK médio e a % de cabeça.
-- **5e. Pontes:**
+- **5e. Pontes.** Pronta em 09/11 (`ARCHITECTURE.md` §12.36).
   - **Testar:** do Laboratório para o Bobo Training em até 2 s; na volta, a precisão do bot, o seu K/D e o TTK médio;
   - **Nêmesis:** "Salvar na Oficina" no resultado;
   - **Conheça o Laboratório:** o card no fim da 1ª partida;

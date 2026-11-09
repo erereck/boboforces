@@ -8,6 +8,8 @@ export const RESULT_ACTION = {
   changeRules: 'changeRules',
   savePreset: 'savePreset',
   saveWorkshop: 'saveWorkshop',
+  /** M2 (fase 5e): no Tryhard, "Mais difícil" vira "Abrir Laboratório" (gameplay.md §6.6). */
+  lab: 'lab',
   quit: 'quit',
 } as const;
 
@@ -38,6 +40,10 @@ export interface ResultScreenData {
   readonly focusEasier: boolean;
   /** M2 (fase 4e): o preset desta partida já foi salvo (o botão vira "Preset salvo", desligado). */
   readonly presetSaved?: boolean;
+  /** M2 (fase 5e): o Nêmesis já foi salvo na Oficina (o botão vira "Salvo na Oficina", desligado). */
+  readonly nemesisSaved?: boolean;
+  /** M2 (fase 5e): no Tryhard, "Mais difícil" vira "Abrir Laboratório". */
+  readonly openLab?: boolean;
   /** M2 (fase 4g): o recorde que a partida bateu (o título dos números vira "Recorde!", em âmbar). */
   readonly record?: 'kills' | 'streak' | 'both';
 }
@@ -74,7 +80,12 @@ export const resultScreen: Screen<ResultScreenData> = {
               gap: 12,
               children: [
                 line('nemesis', 'result.nemesis', { name: d.nemesis, n: d.nemesisKills }),
-                button('saveWorkshop', 'result.saveWorkshop', RESULT_ACTION.saveWorkshop, { disabled: true }),
+                button(
+                  'saveWorkshop',
+                  d.nemesisSaved ? 'result.nemesisSaved' : 'result.saveWorkshop',
+                  RESULT_ACTION.saveWorkshop,
+                  { disabled: d.nemesisSaved === true },
+                ),
               ],
             } as UiNode,
           ]
@@ -148,7 +159,9 @@ export const resultScreen: Screen<ResultScreenData> = {
                   disabled: !d.canEasier,
                   autofocus: d.focusEasier && d.canEasier,
                 }),
-                button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }),
+                d.openLab
+                  ? button('harder', 'result.openLab', RESULT_ACTION.lab)
+                  : button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }),
               ],
             },
             {

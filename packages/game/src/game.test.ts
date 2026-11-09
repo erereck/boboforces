@@ -1477,8 +1477,9 @@ describe('Laboratório (M2, fase 5b)', () => {
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    // Baixo cai na fileira do canto; direita para no Salvar (o último).
+    // Baixo cai na fileira do canto (Voltar); direita duas vezes (Testar, Salvar).
     platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
     platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(game.screen).toBe('workshop');
@@ -1555,6 +1556,73 @@ describe('Bobo Training (M2, fase 5d)', () => {
     }
     expect(bots).toBe(4);
     expect(v.match.phase).not.toBe('ended');
+    game.dispose();
+  }, 120_000);
+});
+
+describe('Pontes do Laboratório (M2, fase 5e)', () => {
+  it('Testar abre o Bobo Training com o bot (sem salvar) e Sair volta ao Laboratório', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Laboratório → Jorge (6º de fábrica) → Editar.
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    // Da aba (o foco inicial), baixo cai na 1ª linha; mais baixo, no Voltar (o da esquerda do canto); direita: Testar.
+    for (let i = 0; i < 20; i++) platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    const sim = game.match!.sim;
+    // Você, os 4 alvos e o bot testado (embutido).
+    platform.pump(30);
+    let bobos = 0;
+    for (let i = 0; i < sim.view().count; i++) if (sim.view().kind[i] === ENTITY_KIND.bobo) bobos++;
+    expect(bobos).toBe(6);
+    // Pausa → Sair (o último item).
+    platform.tap('KeyP');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    expect(game.save.bots).toHaveLength(0);
+    game.dispose();
+  }, 120_000);
+});
+
+describe('Conheça o Laboratório (M2, fase 5e)', () => {
+  it('sair da partida com 1 terminada mostra o card uma vez; Agora não volta ao título e não mostra de novo', async () => {
+    const stats = {
+      ...EMPTY_STATS,
+      totals: { ...EMPTY_STATS.totals, matches: 1 },
+      onboarding: { tipsSeen: [], seenNews: GAME_VERSION },
+    };
+    const { platform, game } = await bootToTitle('web', {}, { stats: JSON.stringify(stats) });
+    expect(game.screen).toBe('title');
+    const quitMatch = async (): Promise<void> => {
+      platform.tap('Enter');
+      await untilRunning(platform, game);
+      platform.tap('KeyP');
+      for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+      platform.tap('Enter');
+    };
+    await quitMatch();
+    expect(game.screen).toBe('labIntro');
+    expect(game.save.stats.onboarding.tipsSeen).toContain('labCard');
+    // Agora não (o 3º botão).
+    platform.tap('ArrowRight');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('title');
+    await quitMatch();
+    expect(game.screen).toBe('title');
     game.dispose();
   }, 120_000);
 });

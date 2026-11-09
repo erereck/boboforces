@@ -1686,3 +1686,20 @@ mudanças de contrato ficam registradas aqui.
 - **Fica para depois:** a skin de treino dos alvos (bonecos de caixas, gameplay.md §7) e a estação "Calibrar mira"
   (5f).
 - **Tamanho:** o menu foi a 332,6 KB (+0,4 KB).
+
+### 12.36 Fase 5e: pontes do Laboratório (09/11/2026)
+
+- **Contrato (integração):**
+  - `SceneSignal` ganha `nemesis` (Salvar na Oficina) e `lab` (Abrir Laboratório);
+  - `Scene.trainingReport()` devolve um `TrainingReport`: a precisão dos bots que não são Alvo, seus abates e mortes,
+    e o TTK médio;
+  - `Scene.nemesisBot()` devolve o `bot@1` de quem mais te matou, achado pelo controlador na receita.
+- **Resultado:** `ResultScreenData.nemesisSaved` e `openLab` (no Tryhard o "Mais difícil" vira `RESULT_ACTION.lab`).
+- **game:**
+  - o Testar usa `labTesting`: o `leaveScene` lê o relatório antes do `dispose` e volta ao editor com o aviso;
+  - `saveNemesis` grava uma cópia com id novo, com o nome dele ou "… 2";
+  - `maybeLabIntro` só roda pelo Sair (De novo e as outras emendam outra partida). Ele marca `labCard` em
+    `tipsSeen` ao abrir.
+- **ui:** `labIntroScreen`; o Laboratório tem Voltar · Testar · Salvar.
+- **Fica para depois:** no Pela vibe, o "Mais fácil" oferecendo "alvos maiores" e +1 aliado (gameplay.md §6.6).
+- **Tamanho:** o menu foi a 333,2 KB (+0,6 KB).

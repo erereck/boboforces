@@ -1,4 +1,4 @@
-import type { BotLevel, MatchRecipe, SettingsDocument, StatsDocument } from '@boboforces/format';
+import type { BotDocument, BotLevel, MatchRecipe, SettingsDocument, StatsDocument } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -106,7 +106,18 @@ export interface SceneHost {
  * fácil / Mais difícil) recarregam o JOGAR com o nível de `Scene.level` (um passo abaixo ou acima).
  */
 /** M2 (fase 4e): `rules` = Mudar regras (abre a Partida personalizada com o preset); `save` = Salvar preset. */
-export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder' | 'rules' | 'save';
+/** M2 (fase 5e): `nemesis` = Salvar na Oficina (o Nêmesis do resultado); `lab` = Abrir Laboratório (no Tryhard). */
+export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder' | 'rules' | 'save' | 'nemesis' | 'lab';
+
+/** M2 (fase 5e): o que o Testar do Laboratório mostra na volta do Bobo Training. */
+export interface TrainingReport {
+  /** Precisão dos bots testados (os que não são Alvo), em %; -1 sem tiro. */
+  readonly botAccuracy: number;
+  readonly kills: number;
+  readonly deaths: number;
+  /** TTK médio (s); -1 sem abate. */
+  readonly ttkS: number;
+}
 
 /** A cena viva: carrega por etapas dentro dos próprios frames, depois roda a partida. */
 export interface Scene extends Disposable {
@@ -122,6 +133,10 @@ export interface Scene extends Disposable {
   readonly level: BotLevel;
   /** Pausa vinda da plataforma (pointer lock perdido, aba oculta, HOME). */
   pause(): void;
+  /** M2 (fase 5e): os números do Bobo Training (`null` fora dele ou antes de a partida existir). */
+  trainingReport(): TrainingReport | null;
+  /** M2 (fase 5e): o bot Nêmesis do resultado (quem mais te matou), para salvar na Oficina; `null` se não há. */
+  nemesisBot(): BotDocument | null;
   /**
    * 1x por frame, depois do poll e do `menu.update`: loading (uma fatia), ou sim + render + HUD. Desenha a UI em
    * `list` (já zerada) e chama `drawUi`. `quit` = voltar ao título.

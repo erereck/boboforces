@@ -7,7 +7,7 @@ import { buildTabbed, type TabbedRow } from './tabbed.ts';
  * Habilidade, Inteligência, Personalidade, Regras e Nome; embaixo do título, o resumo do bot (ou o aviso); no canto,
  * Voltar e Salvar. As linhas vêm montadas do `game`.
  */
-export const LAB_ACTION = { back: 'back', save: 'save' } as const;
+export const LAB_ACTION = { back: 'back', test: 'test', save: 'save' } as const;
 
 export interface LabScreenState {
   readonly tabs: readonly StringKey[];
@@ -29,6 +29,8 @@ export const labScreen: Screen<LabScreenState> = {
       note: state.note,
       buttons: [
         { id: LAB_ACTION.back, labelKey: 'menu.back', variant: 'secondary' },
+        // M2 (fase 5e): Testar abre o Bobo Training com o bot (sem salvar); na volta, os números.
+        { id: LAB_ACTION.test, labelKey: 'lab.test', variant: 'secondary' },
         { id: LAB_ACTION.save, labelKey: 'lab.save', variant: 'primary' },
       ],
     });
