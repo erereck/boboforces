@@ -466,6 +466,9 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Explosões:** a música abaixa 6 dB.
   - **A faixa do menu ainda não entrou:** espera o OK do download.
   - 4 testes novos.
+- **Rodada 11 de prints:** os 52 sons para ouvir, a aba Áudio, o indicador de som e o F2 com as vozes. São as
+  perguntas G1–G6, publicadas na versão 12 da página das rodadas junto com a rodada 10. A G6 é o OK do download da
+  música do menu.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

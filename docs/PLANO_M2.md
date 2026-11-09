@@ -305,7 +305,9 @@ GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan,
   em volta da retícula (tiros e passos até 20 m).
 - **7d. Música do menu.** Tocador pronto em 09/11 (`ARCHITECTURE.md` §12.47); a faixa espera o OK. Tocador em loop com fade e a música 6 dB mais baixa nas explosões; carrega depois do menu
   (`assets/music/`, sob demanda). A faixa CC0 espera o OK do Erick (nome, origem e tamanho).
-- **7e. Rodada 11.** Página para ouvir os sons, mais os prints da aba Áudio e do indicador.
+- **7e. Rodada 11.** Página para ouvir os sons, mais os prints da aba Áudio e do indicador. Publicada em 09/11 como
+  versão 12 da página das rodadas, junto com a rodada 10 ainda sem resposta (perguntas G1–G6;
+  `local/m2/montar-pagina-r11.mjs`). A G6 é o OK do download da música do menu.
 
 ## Escolhas do Claude neste plano (revisáveis)
 
