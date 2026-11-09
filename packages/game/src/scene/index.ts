@@ -45,22 +45,23 @@ const NO_VIEWS: readonly ViewDesc[] = [];
  */
 export function createConstrutoScene(host: SceneHost, request: SceneRequest): Scene {
   const { platform, renderer } = host;
-  const loader = createConstrutoLoader(host);
+  const views = request.kind === 'bench' && request.bench ? request.bench.views : 1;
+  const profile = profileFor(platform.features.profileHint, views, request.bench);
+  const recipe = sceneRecipe(request, profile);
+  // M2 (fase 5c): o mapa da receita (Construto ou Ringue).
+  const loader = createConstrutoLoader(host, recipe.recipe.map);
   const loading: LoadingModel = loader.model;
   let phase: 'loading' | 'running' | 'error' = 'loading';
   let post: 'none' | 'figures' | 'skins' | 'shaders' = 'none';
   let match: ConstrutoMatch | null = null;
   let disposed = false;
   let pausedBeforeLoad = false;
-  const views = request.kind === 'bench' && request.bench ? request.bench.views : 1;
-  const profile = profileFor(platform.features.profileHint, views, request.bench);
-  const recipe = sceneRecipe(request, profile);
   const times: LoadingTimes = loader.times;
   const startedAt = platform.now();
   /** Bonecos da partida (#56): da etapa "figuras" até o fim da partida (a partida é a dona depois de criada). */
   let figures: SceneFigures | null = null;
   host.log(
-    `[cena] Construto (${request.kind}) perfil=${profile.id} vistas=${views} textura=${renderer.info.textureMode}` +
+    `[cena] ${recipe.recipe.map} (${request.kind}) perfil=${profile.id} vistas=${views} textura=${renderer.info.textureMode}` +
       ` atributos=${renderer.info.vertexAttributes}`,
   );
   if (

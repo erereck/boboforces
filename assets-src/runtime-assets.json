@@ -15,6 +15,7 @@
     "models/modelos64-modelos.mips.png": "models/generated/modelos64-modelos.mips.png",
     "models/modelos.bfmodel": "models/generated/modelos.bfmodel",
     "maps/construto.bfmap": "maps/generated/construto.bfmap",
+    "maps/ringue.bfmap": "maps/generated/ringue.bfmap",
     "audio/t0-tiro.mp3": "audio/generated/t0-tiro.mp3",
     "audio/t0-impacto.mp3": "audio/generated/t0-impacto.mp3",
     "audio/t0-passo.mp3": "audio/generated/t0-passo.mp3",

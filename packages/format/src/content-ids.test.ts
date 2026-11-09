@@ -28,6 +28,7 @@ const LOCKED_IDS = [
   'mode:chaos',
   'mode:training',
   'map:construto',
+  'map:ringue',
   'weapon:pistol',
   'weapon:smg',
   'weapon:rifle',
@@ -176,7 +177,7 @@ describe('registro de IDs de conteúdo', () => {
   });
 
   it('lista os IDs locais de um tipo, na ordem do registro', () => {
-    expect(contentIdsOfKind('map')).toEqual(['construto']);
+    expect(contentIdsOfKind('map')).toEqual(['construto', 'ringue']);
     expect(contentIdsOfKind('bot')[0]).toBe('vibe-bob');
     expect(contentIdsOfKind('prop')).toEqual([]);
   });

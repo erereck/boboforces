@@ -52,6 +52,7 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'mode:training',
   // Mapas
   'map:construto',
+  'map:ringue',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

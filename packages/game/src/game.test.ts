@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHeadlessMatch } from '@boboforces/ai';
 import {
   builtinBotRef,
+  DEBUT_PRESET,
   DEFAULT_SETTINGS,
   EMPTY_STATS,
   createFigureGameTable,
@@ -1499,4 +1500,26 @@ describe('Laboratório (M2, fase 5b)', () => {
     expect(game.save.bots[0]).toEqual(bot);
     game.dispose();
   }, 60_000);
+});
+
+describe('Ringue (M2, fase 5c)', () => {
+  it('JOGAR com um preset no Ringue carrega o mapa e a partida roda (X1)', async () => {
+    const { platform, game } = await bootToTitle();
+    game.save.pushRecent({
+      ...DEBUT_PRESET,
+      map: 'ringue',
+      teams: [{ humans: 'all', bots: [] }, { bots: [{ ref: builtinBotRef('chill'), count: 1 }] }],
+    });
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] ringue (play)'))).toBe(true);
+    const sim = game.match!.sim;
+    platform.pump(120);
+    // O jogador nasce no oeste (x < 12), dentro da área jogável do Ringue.
+    const e = entityIndex(sim.controllerEntity(0));
+    const x = sim.view().position[e * 3]!;
+    expect(x).toBeGreaterThan(6);
+    expect(x).toBeLessThan(42);
+    game.dispose();
+  }, 120_000);
 });

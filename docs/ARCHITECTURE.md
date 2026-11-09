@@ -1631,3 +1631,30 @@ mudanças de contrato ficam registradas aqui.
   tenha saído da Oficina).
 - `syncEmbedded`: o escolhido entra em `embeddedBots` e os que nenhum time usa saem (sem bloco vazio no preset).
 - O nome do embutido aparece pelo documento, na linha e na partida (`controllerNames` já lia assim).
+
+### 12.34 Fase 5c: Ringue (09/11/2026)
+
+- **`assets-src/maps/ringue.ts`:**
+  - grade de 48×20×48 m, área jogável de 6 a 42 m (36×36);
+  - `meta.modes` = `warfare.tdm` e `training`;
+  - 6 nascimentos por time e 16 sem time (para o treino);
+  - câmeras `print:ringue` (de cima) e `print:baias`;
+  - `.bfmap` de 2,4 KB (o do Construto tem 10,2 KB).
+- **Escolhas (revisáveis):**
+  - FFA fica fora: com 16 nascimentos numa arena de 36 m, a regra "nenhum nascimento vê outro" do `mapc` não fecha
+    (o GDD §8.5 lista X1, Bobo Training e Testar);
+  - teto de 7 bots (8 bobos);
+  - a travessia de TDM é de 5,4 s, abaixo dos 12–18 s do GDD §4.6.3: fica só o aviso do `mapc`, porque é arena de
+    duelo.
+- **mapc:**
+  - `MAP_IDS` ganha `ringue`;
+  - os marcadores obrigatórios dos prints (câmeras, manequins, rota do bench) valem só para o Construto
+    (`requirePrintMarkers: id === 'construto'`), que é o contrato do M1.
+- **format:** `map:ringue` registrado e travado.
+- **game:**
+  - `MAP_ASSETS`;
+  - o loader recebe o id do mapa (o nome "Construto" ficou do M1; ele carrega qualquer `map@1`);
+  - `maps.ts`: `MAP_MODES`, conferido no teste com o `.bfmap` compilado, `mapsForMode`, `mapForMode`, `mapBotCap`
+    e `mapName`;
+  - a Partida Rápida e a personalizada usam esse módulo (`fitMap` corta os bots no teto do mapa).
+- **Tamanho:** o menu foi a 332,2 KB (+0,5 KB).

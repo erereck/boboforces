@@ -23,6 +23,8 @@ export const GAME_ASSETS_M1 = {
   models: 'models/modelos.bfmodel',
   /** O Construto (`map@1`; frente mapa-nav). */
   construto: 'maps/construto.bfmap',
+  /** M2 (fase 5c): o Ringue, arena pequena de treino. */
+  ringue: 'maps/ringue.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -38,3 +40,9 @@ export function textureStripPaths(base: string): {
 } {
   return { png: `${base}.png`, mips: `${base}.mips.png`, json: `${base}.json` };
 }
+
+/** M2 (fase 5c): os mapas que a cena carrega, pelo id da receita (`map`); id desconhecido cai no Construto. */
+export const MAP_ASSETS: Readonly<Record<string, string>> = {
+  construto: GAME_ASSETS_M1.construto,
+  ringue: GAME_ASSETS_M1.ringue,
+};

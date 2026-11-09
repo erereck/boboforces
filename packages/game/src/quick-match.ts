@@ -1,3 +1,4 @@
+import { MENU_MAPS, mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
 import {
   BOT_LEVELS,
   builtinBotRef,
@@ -19,8 +20,8 @@ import { t } from '@boboforces/ui';
 export const QUICK_MODES = ['warfare.tdm', 'warfare.ffa'] as const;
 export type QuickMode = (typeof QUICK_MODES)[number];
 
-/** Mapas da Partida Rápida (o Ringue entra na fase 5). */
-export const QUICK_MAPS = ['construto'] as const;
+/** Mapas da Partida Rápida (M2, fase 5c: o Ringue só no TDM; `maps.ts`). */
+export const QUICK_MAPS = MENU_MAPS;
 
 /** Durações em minutos; 0 = sem limite de tempo (só a meta de abates). */
 export const QUICK_MINUTES = [3, 5, 10, 15, 20, 0] as const;
@@ -71,9 +72,9 @@ export function quickFromPreset(recipe: MatchRecipe, maxBots: number): QuickSett
   );
   return {
     mode,
-    map: (QUICK_MAPS as readonly string[]).includes(recipe.map) ? recipe.map : QUICK_MAPS[0],
+    map: mapForMode(recipe.map, mode),
     level: presetLevel(recipe) ?? 'normal',
-    size: clampSize(mode, size, maxBots),
+    size: clampSize(mode, size, mapBotCap(mapForMode(recipe.map, mode), maxBots)),
     minutes,
   };
 }
@@ -124,16 +125,20 @@ export function stepQuick(q: QuickSettings, option: QuickOption, delta: number, 
       const mode = cycle(QUICK_MODES, q.mode, delta);
       // Mesma quantidade de bobos ao trocar: 4 contra 4 (7 bots) vira 7 bots no FFA, e volta.
       const size = mode === 'warfare.ffa' ? q.size * 2 - 1 : Math.ceil((q.size + 1) / 2);
-      return { ...q, mode, size: clampSize(mode, size, maxBots) };
+      // O mapa precisa ter o modo (o Ringue não tem FFA); o tamanho cabe no mapa.
+      const map = mapForMode(q.map, mode);
+      return { ...q, mode, map, size: clampSize(mode, size, mapBotCap(map, maxBots)) };
     }
-    case 'map':
-      return { ...q, map: cycle(QUICK_MAPS, q.map as (typeof QUICK_MAPS)[number], delta) };
+    case 'map': {
+      const map = cycle(mapsForMode(q.mode), q.map as MenuMap, delta);
+      return { ...q, map, size: clampSize(q.mode, q.size, mapBotCap(map, maxBots)) };
+    }
     case 'level': {
       const i = BOT_LEVELS.indexOf(q.level) + delta;
       return { ...q, level: BOT_LEVELS[Math.max(0, Math.min(BOT_LEVELS.length - 1, i))]! };
     }
     case 'size':
-      return { ...q, size: clampSize(q.mode, q.size + delta, maxBots) };
+      return { ...q, size: clampSize(q.mode, q.size + delta, mapBotCap(q.map, maxBots)) };
     case 'minutes':
       return { ...q, minutes: cycle(QUICK_MINUTES, q.minutes as (typeof QUICK_MINUTES)[number], delta) };
   }
@@ -145,7 +150,7 @@ export function quickValue(q: QuickSettings, option: QuickOption): string {
     case 'mode':
       return t(q.mode === 'warfare.tdm' ? 'mode.short.warfare.tdm' : 'mode.short.warfare.ffa');
     case 'map':
-      return t('map.construto');
+      return mapName(q.map);
     case 'level':
       return t(`level.${q.level}`);
     case 'size':

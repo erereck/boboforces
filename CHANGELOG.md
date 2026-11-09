@@ -335,6 +335,18 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Fase 5b (parte 2), seus bots na partida:** a aba Bots da Partida personalizada passa a oferecer também os bots da
   Oficina, depois dos de fábrica. O escolhido vai embutido no preset (`embedded:<id>`), que continua jogável mesmo se
   o bot sair da Oficina; quando nenhum time usa mais, sai do preset. 1 teste novo.
+- **Fase 5c, Ringue:**
+  - **O mapa:** arena pequena de treino, com 36×36 m de área jogável.
+    - No meio, o ringue: um tablado de 10×10 m, com cordas e uma entrada em cada lado.
+    - Coberturas espelhadas para o X1: os times nascem atrás de um abrigo de 2,5 m e não se veem ao nascer.
+    - No norte, 5 baias de tiro com toldo.
+    - A faixa listrada amarela marca o limite da área (a parede invisível), com corrimão logo fora.
+  - **Modos:** TDM pequeno (X1 e 2v2, até 8 bobos) e o Bobo Training (fase 5d). FFA não, porque numa arena desse
+    tamanho os nascimentos se veem.
+  - **Nos menus:** a Partida Rápida e a Partida personalizada passam a escolher o mapa entre os que têm o modo. Trocar
+    para FFA volta ao Construto, e os bots são cortados no teto do Ringue.
+  - **Cena:** a partida carrega o mapa da receita.
+  - 4 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

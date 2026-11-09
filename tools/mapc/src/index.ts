@@ -31,7 +31,14 @@ let failed = 0;
 
 for (const id of MAP_IDS) {
   const mod = (await import(pathToFileURL(join(MAPS_SOURCE_DIR, `${id}.ts`)).href)) as { default: MapScript };
-  const result = compileMap(mod.default, { blocks, models, requirePrintMarkers: true, maxSightLimitM: 50 });
+  // Os marcadores dos prints (câmeras, manequins, rota do bench) são o contrato do Construto (M1); os outros mapas
+  // (o Ringue, M2) não têm.
+  const result = compileMap(mod.default, {
+    blocks,
+    models,
+    requirePrintMarkers: id === 'construto',
+    maxSightLimitM: 50,
+  });
   if (!quiet) console.log(formatReport(result));
   const out = join(MAPS_OUT_DIR, `${id}.bfmap`);
   // A vista de cima sai sempre (com erro também): é o que se olha para consertar o mapa.

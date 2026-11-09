@@ -12,6 +12,7 @@ import {
   type HudRules,
 } from '@boboforces/format';
 import { t, type StringKey } from '@boboforces/ui';
+import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
 
 /**
  * M2 (fase 4e): o editor da Partida personalizada (gameplay.md §10.3), lógica pura sobre a receita. Cada aba tem
@@ -164,6 +165,16 @@ function setTeam(r: MatchRecipe, team: number, ref: BotRef, count: number): Matc
   return { ...r, teams };
 }
 
+/** M2 (fase 5c): os bots cabem no mapa (o Ringue leva 7): corta os inimigos primeiro até a metade, depois os aliados. */
+function fitMap(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  const cap = mapBotCap(r.map, l.maxBots);
+  if (ffa(r)) return botsOf(r, 0) > cap ? setTeam(r, 0, refOf(r, 0), cap) : r;
+  const enemies = Math.min(botsOf(r, 1), Math.ceil(cap / 2));
+  const allies = Math.min(botsOf(r, 0), cap - enemies);
+  if (enemies === botsOf(r, 1) && allies === botsOf(r, 0)) return r;
+  return setTeam(setTeam(r, 1, refOf(r, 1), enemies), 0, refOf(r, 0), allies);
+}
+
 /** TDM ↔ FFA mantendo a quantidade de bots: o FFA junta todo mundo num time; o TDM divide (você no primeiro). */
 function switchMode(r: MatchRecipe, maxBots: number): MatchRecipe {
   if (ffa(r)) {
@@ -197,9 +208,22 @@ const MATCH_ROWS: readonly RowDef[] = [
     id: 'mode',
     labelKey: 'quick.mode',
     value: (r) => t(ffa(r) ? 'mode.short.warfare.ffa' : 'mode.short.warfare.tdm'),
-    step: (r, _d, l) => switchMode(r, l.maxBots),
+    step: (r, _d, l) => {
+      // O mapa precisa ter o modo novo (o Ringue não tem FFA).
+      const next = switchMode(r, l.maxBots);
+      return fitMap({ ...next, map: mapForMode(next.map, next.mode) }, l);
+    },
   },
-  { id: 'map', labelKey: 'quick.map', value: () => t('map.construto'), step: (r) => r },
+  {
+    id: 'map',
+    labelKey: 'quick.map',
+    value: (r) => mapName(r.map),
+    step: (r, d, l) => {
+      const maps = mapsForMode(r.mode);
+      const i = cycleIndex(maps.length, Math.max(0, maps.indexOf(r.map as MenuMap)), d);
+      return fitMap({ ...r, map: maps[i]! }, l);
+    },
+  },
   {
     id: 'time',
     labelKey: 'custom.row.time',
@@ -337,7 +361,7 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
     step: (rr, d, l) => {
       const other = ffa(rr) ? 0 : botsOf(rr, 1 - team);
       const min = team === 0 && !ffa(rr) ? 0 : 1;
-      const n = Math.max(min, Math.min(l.maxBots - other, botsOf(rr, team) + d));
+      const n = Math.max(min, Math.min(mapBotCap(rr.map, l.maxBots) - other, botsOf(rr, team) + d));
       return setTeam(rr, team, refOf(rr, team), n);
     },
   });

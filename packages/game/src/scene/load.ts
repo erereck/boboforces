@@ -29,8 +29,15 @@ import {
   type LightGrid,
   type LightJob,
 } from '@boboforces/world';
-import { createLoadingModel, loadingStepIndex, type LoadingModel, type LoadingStep } from '@boboforces/ui';
-import { GAME_ASSETS_M1, TEXTURE_ARRAY_BASES, textureStripPaths } from '../assets-m1.ts';
+import {
+  createLoadingModel,
+  loadingStepIndex,
+  t,
+  type LoadingModel,
+  type LoadingStep,
+  type StringKey,
+} from '@boboforces/ui';
+import { GAME_ASSETS_M1, MAP_ASSETS, TEXTURE_ARRAY_BASES, textureStripPaths } from '../assets-m1.ts';
 import type { SceneHost } from '../scene-api.ts';
 import { buildMapNav, buildMapWorld, buildSimMap, type MapWorld } from './world.ts';
 
@@ -117,11 +124,13 @@ export interface ConstrutoLoader {
 /** Fatia do job de luz (células visitadas por chamada; o laço segue até o orçamento de tempo do frame). */
 const LIGHT_SLICE = 40_000;
 
-export function createConstrutoLoader(host: SceneHost): ConstrutoLoader {
+/** M2 (fase 5c): `mapId` escolhe o mapa (o nome "Construto" do loader ficou do M1: ele carrega qualquer `map@1`). */
+export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): ConstrutoLoader {
   const { platform, renderer } = host;
   const now = (): number => platform.now();
   const model = createLoadingModel();
-  model.mapName = 'Construto';
+  const mapPath = MAP_ASSETS[mapId] ?? GAME_ASSETS_M1.construto;
+  model.mapName = t(`map.${MAP_ASSETS[mapId] ? mapId : 'construto'}` as StringKey);
   const times: LoadingTimes = {
     total: 0,
     assets: 0,
@@ -195,7 +204,7 @@ export function createConstrutoLoader(host: SceneHost): ConstrutoLoader {
     );
   Promise.all([
     track(a.loadText(GAME_ASSETS_M1.blocks)),
-    track(a.loadBytes(GAME_ASSETS_M1.construto)),
+    track(a.loadBytes(mapPath)),
     track(a.loadBytes(GAME_ASSETS_M1.models)),
     stripLoads('blocos16'),
     stripLoads('modelos64'),

@@ -703,6 +703,7 @@ export const STRINGS_PT_BR = {
   'mode.short.warfare.tdm': 'Times',
   'mode.short.warfare.ffa': 'Todos contra todos',
   'map.construto': 'Construto',
+  'map.ringue': 'Ringue',
   'mode.training': 'Bobo Training',
 
   'error.title': 'Algo deu errado',
