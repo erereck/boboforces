@@ -246,7 +246,8 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
   - **Nêmesis:** "Salvar na Oficina" no resultado;
   - **Conheça o Laboratório:** o card no fim da 1ª partida;
   - **Tryhard:** no nível mais alto, "Mais difícil" vira "Abrir Laboratório".
-- **5f. Calibrar mira:**
+- **5f. Calibrar mira.** Pronta em 09/11 no Bobo Training e nos Ajustes (`ARCHITECTURE.md` §12.37); a da 1ª
+  partida ficou para depois.
   - a estação do Bobo Training: 3 alvos, "Ajustei sua mira" com Desfazer;
   - a contagem estendida da 1ª partida (gameplay.md §2.5), com Pular.
 - **5g. Prints para o Erick.** A rodada 9 saiu em 09/11, antes da 5f (versão 10 da página, junto com a 8; perguntas

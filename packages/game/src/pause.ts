@@ -8,7 +8,12 @@ export const PAUSE_ACTION = {
   settings: 'settings',
   unstuck: 'unstuck',
   quit: 'quit',
+  /** M2 (fase 5f): no Bobo Training, no lugar do "Ajustar desafio". */
+  calibrate: 'calibrate',
 } as const;
+
+/** M2 (fase 5f): a página do resultado da calibração: OK fica com o ajuste; Desfazer volta o de antes. */
+export const CALIBRATED_ACTION = { ok: 'ok', undo: 'undo' } as const;
 
 /** Ações do "Ajustar desafio": `level:<nível>` escolhe; `back` volta à pausa. */
 export const CHALLENGE_ACTION = { back: 'back', levelPrefix: 'level:' } as const;
@@ -16,6 +21,10 @@ export const CHALLENGE_ACTION = { back: 'back', levelPrefix: 'level:' } as const
 /** O que a pausa precisa saber: se há partida de verdade (sem ela, o desafio não vale e fica apagado). */
 export interface PauseState {
   readonly challenge: boolean;
+  /** M2 (fase 5f): Bobo Training (o item vira "Calibrar mira"). */
+  readonly calibrate?: boolean;
+  /** Calibrando agora (o item vira "Pular calibração"). */
+  readonly calibrating?: boolean;
 }
 
 function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
@@ -50,7 +59,13 @@ export const pauseScreen: Screen<PauseState | null> = {
             },
             { kind: 'box', height: 18 },
             button('resume', 'pause.resume', PAUSE_ACTION.resume, { variant: 'primary', autofocus: true }),
-            button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
+            state?.calibrate
+              ? button(
+                  'calibrate',
+                  state.calibrating ? 'pause.calibrateSkip' : 'pause.calibrate',
+                  PAUSE_ACTION.calibrate,
+                )
+              : button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
             button('settings', 'menu.settings', PAUSE_ACTION.settings),
             button('unstuck', 'pause.unstuck', PAUSE_ACTION.unstuck),
             button('quit', 'pause.quitMatch', PAUSE_ACTION.quit, { variant: 'danger' }),
@@ -125,3 +140,45 @@ export function stepLevel(level: BotLevel, step: number): BotLevel {
   const i = BOT_LEVELS.indexOf(level);
   return BOT_LEVELS[Math.max(0, Math.min(BOT_LEVELS.length - 1, i + step))]!;
 }
+
+/** M2 (fase 5f): o resultado da calibração ("Sua mira passava do alvo: ×1 → ×0,85"), com OK e Desfazer. */
+export const calibratedScreen: Screen<{ readonly message: string; readonly changed: boolean }> = {
+  id: 'calibrated',
+  build(state) {
+    return {
+      kind: 'box',
+      id: 'root',
+      color: COLORS.veu,
+      children: [
+        {
+          kind: 'column',
+          id: 'main',
+          anchor: 'center',
+          align: 'center',
+          width: 760,
+          gap: 16,
+          children: [
+            { kind: 'text', id: 'title', text: { key: 'pause.calibrate' }, style: 'heading', color: COLORS.texto },
+            {
+              kind: 'text',
+              id: 'message',
+              text: { literal: state.message },
+              style: 'body',
+              color: COLORS.texto,
+              textAlign: 'center',
+            },
+            {
+              kind: 'row',
+              id: 'actions',
+              gap: 14,
+              children: [
+                button('ok', 'news.ok', CALIBRATED_ACTION.ok, { variant: 'primary', autofocus: true }),
+                ...(state.changed ? [button('undo', 'calibrate.undo', CALIBRATED_ACTION.undo)] : []),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  },
+};

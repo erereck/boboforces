@@ -662,7 +662,13 @@ export function startGame(deps: GameDeps): GameHandle {
             ? dataRows()
             : tab === 'about'
               ? aboutRows()
-              : settingsRows(tab, save.settings, settingsDevice, capturing),
+              : tab === 'controls'
+                ? [
+                    ...settingsRows(tab, save.settings, settingsDevice, capturing),
+                    // M2 (fase 5f): abre o Bobo Training já calibrando a mira.
+                    { kind: 'action', id: 'calibrate', label: { key: 'settings.row.calibrate' } },
+                  ]
+                : settingsRows(tab, save.settings, settingsDevice, capturing),
         note: settingsNote,
       }),
     );
@@ -853,7 +859,12 @@ export function startGame(deps: GameDeps): GameHandle {
     }
   }
 
-  function requestScene(kind: SceneKind, bench: BenchConfig | null, recipe: MatchRecipe | null = null): void {
+  function requestScene(
+    kind: SceneKind,
+    bench: BenchConfig | null,
+    recipe: MatchRecipe | null = null,
+    calibrate = false,
+  ): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
       return;
@@ -868,6 +879,7 @@ export function startGame(deps: GameDeps): GameHandle {
       device: menuInput.lastDevice,
       gamepad: menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
+      ...(calibrate ? { calibrate: true } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;
@@ -979,9 +991,9 @@ export function startGame(deps: GameDeps): GameHandle {
   }
 
   /** M2 (fase 5d): o treino não vira o último preset (o JOGAR continua sendo a última partida). */
-  function playTraining(preset: MatchRecipe): void {
+  function playTraining(preset: MatchRecipe, calibrate = false): void {
     playingPreset = preset;
-    requestScene('play', null, preset);
+    requestScene('play', null, preset, calibrate);
   }
 
   /** JOGAR do título: o último preset (ou a partida de estreia). */
@@ -1241,6 +1253,7 @@ export function startGame(deps: GameDeps): GameHandle {
           const tab = SETTINGS_TABS[settingsTab]!;
           const bind = tab === 'buttons' ? bindRowAction(id, settingsDevice) : null;
           if (tab === 'data' || tab === 'about') settingsAction(id);
+          else if (tab === 'controls' && id === 'calibrate') playTraining(trainingPreset(), true);
           else if (bind !== null) {
             capturing = bind;
             capture.start(raw, settingsDevice === 'gamepad' ? 'gamepad' : 'keyboardMouse');

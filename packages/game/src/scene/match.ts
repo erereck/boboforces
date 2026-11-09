@@ -27,7 +27,9 @@ import {
   type TimeOfDay,
   type BotDocument,
   type BotLevel,
+  type SettingsDocument,
   resolveBot,
+  SETTINGS_RANGES,
 } from '@boboforces/format';
 import {
   createGamepadProfile,
@@ -158,6 +160,13 @@ import {
 import { sampleLightGrid } from '@boboforces/world';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim } from './aim-assist.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
+import {
+  calibrationFactor,
+  calibrationTarget,
+  createCalibration,
+  stepCalibration,
+  type CalibrationState,
+} from './calibration.ts';
 import { formatBenchReport, type BenchReport } from '../bench/report.ts';
 import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
@@ -165,7 +174,14 @@ import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camer
 import { createTouchOverlay } from '../hud.ts';
 import { createLocalDriver, type LocalDriver } from '../local-driver.ts';
 import { createMenuController, followTab, type UiFrame } from '../menu.ts';
-import { challengeLevel, challengeScreen, PAUSE_ACTION, pauseScreen } from '../pause.ts';
+import {
+  CALIBRATED_ACTION,
+  calibratedScreen,
+  challengeLevel,
+  challengeScreen,
+  PAUSE_ACTION,
+  pauseScreen,
+} from '../pause.ts';
 import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '../result-screen.ts';
 import {
   actionLabel,
@@ -621,8 +637,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 3e): avisos do time (x, y, z) lidos do diretor. */
   const pingScratch = new Float64Array(MAX_TEAM_PINGS * 3);
   // M2 (fase 2e): pausa com páginas, nível dos bots adversários, Destravar e o resultado.
-  let pausePage: 'main' | 'challenge' | 'settings' = 'main';
-  const pauseState = { challenge: request.kind === 'play' };
+  let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' = 'main';
+  // M2 (fase 5f): no Bobo Training, "Ajustar desafio" vira "Calibrar mira".
+  const pauseState = {
+    challenge: request.kind === 'play' && recipe.mode !== 'training',
+    calibrate: recipe.mode === 'training',
+  };
+  /** M2 (fase 5f): a calibração em andamento, a pedida pelos Ajustes (começa no fim da contagem) e o "Desfazer". */
+  let calibration: CalibrationState | null = null;
+  let calibrationPending = request.calibrate === true;
+  let calibrationUndo: SettingsDocument | null = null;
+  const calibrationAim = new Float64Array(2);
+  const calibrationLines = [1, 2, 3].map((n) => t('calibrate.progress', { n }));
   let currentLevel: BotLevel =
     request.kind !== 'play'
       ? 'normal'
@@ -1255,7 +1281,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   // --- mapeador, pausa, painel F2 ---
   const pauseMenu = createMenuController();
-  pauseMenu.setRoot(pauseScreen.build(null));
+  pauseMenu.setRoot(pauseScreen.build(pauseState));
   const touchOverlay = createTouchOverlay();
   /** Rascunho do quadro do overlay de toque (preenchido por frame, sem objeto novo). */
   const touchFrame = { width: 0, height: 0, pixelRatio: 1, minTextPx: 0 };
@@ -1620,11 +1646,44 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function pause(): void {
     if (paused || disposed || humans === 0 || resultShown) return;
     paused = true;
+    // M2 (fase 5f): refeita ao abrir (calibrando, o item é "Pular calibração").
+    if (pausePage === 'main') pauseMain();
   }
 
   function pauseMain(): void {
     pausePage = 'main';
-    pauseMenu.setRoot(pauseScreen.build(pauseState));
+    pauseMenu.setRoot(pauseScreen.build({ ...pauseState, calibrating: calibration !== null }));
+  }
+
+  function startCalibration(): void {
+    calibration = createCalibration(player.yaw, player.pitch);
+    calibrationUndo = null;
+    host.log('[partida] calibrar mira: começou');
+  }
+
+  /** Fim da calibração: aplica o ajuste na sensibilidade do dispositivo (na hora) e mostra o resultado, com Desfazer. */
+  function finishCalibration(): void {
+    const st = calibration!;
+    calibration = null;
+    lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+    const factor = calibrationFactor(st);
+    const before = host.settings.current;
+    const c = before.controls[device];
+    const from = c.sensitivity;
+    const range = SETTINGS_RANGES.sensitivity;
+    const to = Math.max(range.min, Math.min(range.max, Math.round(from * factor * 100) / 100));
+    let message: string;
+    if (to === from) message = t('calibrate.same', { from });
+    else {
+      calibrationUndo = before;
+      host.settings.save({ ...before, controls: { ...before.controls, [device]: { ...c, sensitivity: to } } });
+      applySettings();
+      message = t(factor < 1 ? 'calibrate.lower' : 'calibrate.higher', { from, to });
+    }
+    host.log(`[partida] calibrar mira: ×${from} → ×${to} (passou ${st.overshoots}, não chegou ${st.undershoots})`);
+    pause();
+    pausePage = 'calibrated';
+    pauseMenu.setRoot(calibratedScreen.build({ message, changed: calibrationUndo !== null }));
   }
 
   /** M2 (fase 4f): a página de Ajustes da pausa (Controles, Botões, Vídeo, Acessibilidade), que vale na hora. */
@@ -1681,10 +1740,27 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         pauseSettingsDevice = device;
         pauseNote = '';
         pauseSettings();
+      } else if (a === PAUSE_ACTION.calibrate) {
+        // Calibrando: o item é "Pular calibração".
+        if (calibration !== null) {
+          calibration = null;
+          lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+          host.log('[partida] calibrar mira: pulou');
+        } else startCalibration();
+        resume();
       } else if (a === PAUSE_ACTION.unstuck) {
         unstuckPending = true;
         resume();
       } else if (a === PAUSE_ACTION.quit) return 'quit';
+      return 'none';
+    }
+    if (pausePage === 'calibrated') {
+      if (a === CALIBRATED_ACTION.undo && calibrationUndo !== null) {
+        host.settings.save(calibrationUndo);
+        applySettings();
+      }
+      calibrationUndo = null;
+      if (a !== null || nav.back) resume();
       return 'none';
     }
     if (pausePage === 'challenge') {
@@ -2328,7 +2404,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
     m.pingCount = 0;
-    if (!ffa && humans > 0 && slot.controller === 0) {
+    if (calibration !== null && slot.controller === 0) {
+      // M2 (fase 5f): o alvo da calibração, um losango a 10 m na direção dele.
+      calibrationTarget(calibration, calibration.index, calibrationAim);
+      const ty = calibrationAim[0]!;
+      const tp = calibrationAim[1]!;
+      const cam = desc.camera;
+      const px = cam.x - Math.sin(ty) * Math.cos(tp) * 10;
+      const py = cam.y + Math.sin(tp) * 10;
+      const pz = cam.z - Math.cos(ty) * Math.cos(tp) * 10;
+      if (projectToView(cam, lay.rects[s]!, px, py, pz, projected)) {
+        m.pings[0] = projected[0]!;
+        m.pings[1] = projected[1]!;
+        m.pingCount = 1;
+      }
+    } else if (!ffa && humans > 0 && slot.controller === 0) {
       const n = driver.director.pings(v.team[e]!, Math.round(PING_SHOW_S * sim.hz), pingScratch);
       for (let k = 0; k < n && m.pingCount < MAX_TEAM_PINGS; k++) {
         const o = k * 3;
@@ -2955,6 +3045,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const scale = frozen ? 1 : aimAssistBefore();
           player.update(raw, frozen ? 0 : dt, scale);
           if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
+          // M2 (fase 5f): a calibração anda com a mira (a pedida pelos Ajustes começa no fim da contagem).
+          if (calibrationPending && sim.view().match.phase === 'playing') {
+            calibrationPending = false;
+            startCalibration();
+          }
+          if (calibration !== null && !frozen) {
+            if (stepCalibration(calibration, player.yaw, player.pitch, player.wasPressed('fire'), dt))
+              finishCalibration();
+          }
           if (player.wasPressed('pause')) pause();
         } else {
           // Pausado: a sim não anda e a mira não gira (o mapeador lê só os botões).
@@ -3038,7 +3137,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const sharedArea = lay.shared;
           if (training) {
             sharedHud.teamCount = 0;
-            refreshTrainingLine();
+            if (calibration !== null) sharedHud.trainingLine = calibrationLines[calibration.index] ?? '';
+            else refreshTrainingLine();
           } else if (!ffa && request.kind === 'play') {
             sharedHud.teamCount = 2;
             const score = sim.view().match.teamScore;

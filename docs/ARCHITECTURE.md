@@ -1703,3 +1703,25 @@ mudanças de contrato ficam registradas aqui.
 - **ui:** `labIntroScreen`; o Laboratório tem Voltar · Testar · Salvar.
 - **Fica para depois:** no Pela vibe, o "Mais fácil" oferecendo "alvos maiores" e +1 aliado (gameplay.md §6.6).
 - **Tamanho:** o menu foi a 333,2 KB (+0,6 KB).
+
+### 12.37 Fase 5f: Calibrar mira (09/11/2026)
+
+- **`scene/calibration.ts`** (puro, sem alocação por frame):
+  - 3 alvos em direções fixas em relação ao olhar inicial (`CALIBRATION.targets`: [40°, 4°], [−55°, −6°], [85°, 8°]);
+  - o acerto é o gatilho a menos de 2,5° do alvo;
+  - **passou**: o erro ao longo da direção inicial fica negativo além de 2°;
+  - **não chegou**: a 1ª parada (giro abaixo de 12°/s, depois de 0,15 s) acontece com mais de 25% do caminho ainda
+    por fazer;
+  - `calibrationFactor`: ×0,85 com 2 ou mais "passou"; ×1,2 com 2 ou mais "não chegou"; senão 1.
+- **Escolhas (revisáveis):** os limites acima e os fatores ×0,85 e ×1,2. O ajuste multiplica a sensibilidade do
+  dispositivo em uso, arredondado a 0,01 dentro de `SETTINGS_RANGES.sensitivity`.
+- **Cena:**
+  - no treino, `PauseState.calibrate` e `calibrating`;
+  - os alvos são desenhados como losangos (o mesmo dos avisos do time), projetados a 10 m;
+  - a linha do topo mostra "alvo N de 3";
+  - no fim, a pausa abre `calibratedScreen` (OK e Desfazer);
+  - `SceneRequest.calibrate` (o "Calibrar mira" dos Ajustes) começa a calibração quando a contagem termina.
+- **Correção:** a pausa nascia com `pauseScreen.build(null)` (o estado padrão). Agora usa o estado da partida e é
+  refeita ao abrir.
+- **Fica para depois:** a calibração na contagem estendida da 1ª partida (§2.5); os prints dela entram na rodada 10.
+- **Tamanho:** o menu foi a 333,6 KB.

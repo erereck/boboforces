@@ -1626,3 +1626,30 @@ describe('Conheça o Laboratório (M2, fase 5e)', () => {
     game.dispose();
   }, 120_000);
 });
+
+describe('Calibrar mira (M2, fase 5f)', () => {
+  it('Ajustes → Controles → Calibrar mira abre o treino calibrando; a pausa oferece Pular calibração', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Ajustes (4º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('settings');
+    for (let i = 0; i < 10; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    // A contagem (3 s) e o começo da calibração.
+    platform.pump(240);
+    expect(platform.logLines.some((l) => l.includes('[partida] calibrar mira: começou'))).toBe(true);
+    // Pausa → o 2º item (Pular calibração).
+    platform.tap('KeyP');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(platform.logLines.some((l) => l.includes('[partida] calibrar mira: pulou'))).toBe(true);
+    expect(game.scene?.paused).toBe(false);
+    game.dispose();
+  }, 120_000);
+});

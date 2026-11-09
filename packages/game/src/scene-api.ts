@@ -48,6 +48,8 @@ export interface SceneRequest {
    * Com ela, `level` não vale; a semente da partida é `seed`, e o corte ao aparelho é o da cena.
    */
   readonly recipe?: MatchRecipe;
+  /** M2 (fase 5f): começa com a calibração da mira (o "Calibrar mira" dos Ajustes abre o Bobo Training assim). */
+  readonly calibrate?: boolean;
 }
 
 /** M2 (fase 4f): os ajustes do jogador, lidos na hora e gravados pelo núcleo. */

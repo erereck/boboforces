@@ -369,6 +369,19 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Rodada 9 de prints (antes da 5f):** 13 capturas da fase 5 até a 5e (Oficina, Laboratório, Ringue, Bobo Training,
   Testar, resultado no Tryhard e o card do Laboratório) e as perguntas E1–E6, publicadas como versão 10 da página das
   rodadas, junto com a rodada 8 (D1–D8), que ainda esperava resposta.
+- **Fase 5f, Calibrar mira:**
+  - **Onde:** no Bobo Training, a pausa troca "Ajustar desafio" por "Calibrar mira" ("Pular calibração" enquanto
+    calibra); nos Ajustes, em Controles, "Calibrar mira" abre o treino já calibrando (começa no fim da contagem).
+  - **Como funciona:** 3 alvos aparecem um de cada vez (um losango âmbar na tela, a 40°, 55° e 85° de onde você
+    olhava). Você mira e atira.
+  - **O que mede:** se a mira passou do alvo ou se parou antes dele.
+    - Passou duas vezes ou mais: a sensibilidade cai para ×0,85 da atual.
+    - Parou antes duas vezes ou mais: sobe para ×1,2.
+    - Senão, fica como está.
+    - O ajuste vale na hora, e a página do resultado tem OK e Desfazer.
+  - **Correção:** a pausa nascia com o estado padrão (sem o da partida) até ser reaberta.
+  - **Fica para depois:** a calibração na contagem estendida da 1ª partida (gameplay.md §2.5).
+  - 3 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
