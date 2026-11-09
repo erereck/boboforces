@@ -249,7 +249,8 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
 - **5f. Calibrar mira:**
   - a estação do Bobo Training: 3 alvos, "Ajustei sua mira" com Desfazer;
   - a contagem estendida da 1ª partida (gameplay.md §2.5), com Pular.
-- **5g. Prints para o Erick:** Oficina, Laboratório, Ringue, Bobo Training, Testar e calibração.
+- **5g. Prints para o Erick.** A rodada 9 saiu em 09/11, antes da 5f (versão 10 da página, junto com a 8; perguntas
+  E1–E6); a calibração entra na rodada seguinte: Oficina, Laboratório, Ringue, Bobo Training, Testar e calibração.
 
 ## Escolhas do Claude neste plano (revisáveis)
 

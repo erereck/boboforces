@@ -366,6 +366,9 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Conheça o Laboratório:** ao sair da 1ª partida terminada, uma vez, aparece um card com o Jorge the Immortal, os 4
     eixos e as opções Testar, Abrir Laboratório e Agora não.
   - 3 testes novos.
+- **Rodada 9 de prints (antes da 5f):** 13 capturas da fase 5 até a 5e (Oficina, Laboratório, Ringue, Bobo Training,
+  Testar, resultado no Tryhard e o card do Laboratório) e as perguntas E1–E6, publicadas como versão 10 da página das
+  rodadas, junto com a rodada 8 (D1–D8), que ainda esperava resposta.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
