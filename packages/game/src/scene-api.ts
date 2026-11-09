@@ -59,6 +59,11 @@ export interface SceneRequest {
   readonly recipe?: MatchRecipe;
   /** M2 (fase 5f): começa com a calibração da mira (o "Calibrar mira" dos Ajustes abre o Bobo Training assim). */
   readonly calibrate?: boolean;
+  /**
+   * Teste do sofá (antes do M3, que traz o "aperte A"): controles dos jogadores locais 2..4 no JOGAR, em tela dividida.
+   * O jogador 1 fica no `gamepad`. Vazio ou ausente = 1 jogador.
+   */
+  readonly localPads?: readonly number[];
 }
 
 /**

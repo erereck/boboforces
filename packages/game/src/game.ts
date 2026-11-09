@@ -25,7 +25,7 @@ import {
   type RawInputState,
   type RemapAction,
 } from '@boboforces/input';
-import type { Platform, TextInputSession } from '@boboforces/platform-api';
+import type { ControllerInfo, Platform, TextInputSession } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
 import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
@@ -134,6 +134,8 @@ import {
 
 /** Menus não têm mundo: `renderViews` vazio só zera as estatísticas do frame (o F2 mostra o custo da UI). */
 const NO_VIEWS: readonly ViewDesc[] = [];
+/** Teste do sofá: jogadores locais no máximo (decisão #1: até 4 em tela dividida). */
+const SOFA_MAX_PLAYERS = 4;
 
 /** Linha que o `game` grava no log da plataforma no primeiro frame do menu (o portcheck e o Teste Zero procuram). */
 export const MENU_READY_MARKER = '[boot] menu-ready';
@@ -933,6 +935,25 @@ export function startGame(deps: GameDeps): GameHandle {
     }
   }
 
+  /** Rascunho do `describeControllers` (o teste do sofá lê os controles ao abrir a partida). */
+  const controllerInfos: ControllerInfo[] = [];
+  /**
+   * Teste do sofá (antes do M3, que traz o "aperte A"): no Switch, cada controle completo conectado (par de Joy-Con,
+   * Pro ou portátil) vira um jogador local, na ordem do número do controle (a luz dele). Devolve os índices; com menos
+   * de 2, a partida é de 1 jogador como antes.
+   */
+  function sofaPads(): number[] {
+    if (platform.id !== 'switch' || !platform.input.describeControllers) return [];
+    const n = platform.input.describeControllers(controllerInfos);
+    const found: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const c = controllerInfos[i]!;
+      if (c.complete && !found.includes(c.index)) found.push(c.index);
+    }
+    found.sort((a, b) => a - b);
+    return found.slice(0, SOFA_MAX_PLAYERS);
+  }
+
   function requestScene(
     kind: SceneKind,
     bench: BenchConfig | null,
@@ -944,16 +965,20 @@ export function startGame(deps: GameDeps): GameHandle {
       return;
     }
     matches++;
+    // O Bobo Training (e a calibração) é de 1 jogador: o treino lê só o humano 0.
+    const sofa = kind === 'play' && !calibrate && recipe?.mode !== 'training' ? sofaPads() : [];
+    if (sofa.length >= 2) log(`[game] teste do sofá: ${sofa.length} jogadores (controles ${sofa.join(', ')})`);
     pendingScene = {
       kind,
       bench,
       benchWarnings: bench ? (deps.benchWarnings ?? []) : [],
       seed: bench ? bench.seed : (0x6b0b0 + matches * 0x9e37) >>> 0,
       convention,
-      device: menuInput.lastDevice,
-      gamepad: menuInput.lastGamepad,
+      device: sofa.length >= 2 ? 'gamepad' : menuInput.lastDevice,
+      gamepad: sofa.length >= 2 ? sofa[0]! : menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
       ...(calibrate ? { calibrate: true } : {}),
+      ...(sofa.length >= 2 ? { localPads: sofa.slice(1) } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;

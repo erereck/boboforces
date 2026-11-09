@@ -159,7 +159,7 @@ import {
   type UiFonts,
 } from '@boboforces/ui';
 import { sampleLightGrid } from '@boboforces/world';
-import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim } from './aim-assist.ts';
+import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
 import {
   calibrationFactor,
@@ -439,7 +439,8 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   const ref = builtinBotRef(request.kind === 'play' ? (request.level ?? 'normal') : 'normal');
   const bench = request.bench;
   let recipe: MatchRecipe;
-  let humans = 1;
+  // Teste do sofá (antes do M3): no JOGAR, um humano por controle de `localPads` além do jogador 1.
+  let humans = 1 + (request.kind === 'play' ? (request.localPads?.length ?? 0) : 0);
   if (request.kind === 'bench' && bench) {
     humans = 0;
     let bots = bench.bots;
@@ -620,6 +621,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const bindingFor = (kind: DeviceKind, pad: number): DeviceBinding =>
     kind === 'gamepad' ? pads[pad]! : kind === 'touch' ? touch : keyboard;
   const player: InputMapper = createInputMapper(bindingFor(device, padIndex), profiles[device]);
+  /**
+   * Teste do sofá (antes do M3): os jogadores locais 2..4, um controle fixo cada (`SceneRequest.localPads`); o humano
+   * `h` usa `extras[h - 1]`. Com eles, o jogador 1 também fica preso ao controle dele (não segue o último usado).
+   */
+  const extraPads = request.kind === 'play' ? (request.localPads ?? []).slice(0, Math.max(0, humans - 1)) : [];
+  const extras: InputMapper[] = extraPads.map((pad) => createInputMapper(pads[pad]!, profiles.gamepad));
+  const extraAssists = extras.map(() => createAimAssistState());
+  /** Mapeador do controlador `c` se ele for um humano local; `null` para bots. */
+  const mapperOf = (c: number): InputMapper | null =>
+    c === 0 && humans > 0 ? player : c > 0 && c <= extras.length ? extras[c - 1]! : null;
   /** M2 (fase 3h): assistência de mira do humano (controle e toque; o nível vem do perfil do dispositivo). */
   const assist = createAimAssistState();
   const assistAngles = new Float64Array(2);
@@ -738,7 +749,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let velCur = new Float32Array(3);
 
   // --- vistas ---
-  const viewCount = bench ? bench.views : 1;
+  const viewCount = bench ? bench.views : 1 + extras.length;
   const slots: ViewSlot[] = [];
   const descs: ViewDesc[] = [];
   for (let i = 0; i < viewCount; i++) {
@@ -1254,9 +1265,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           velPrev.fill(0, i * 3, i * 3 + 3);
           velCur.fill(0, i * 3, i * 3 + 3);
           reloadStart[i] = -1;
-          if (humans > 0 && ev.entity === s.controllerEntity(0)) {
-            player.setAngles(v.yaw[i]!, 0);
-            player.setWeapon(v.slot[i]!);
+          for (let h = 0; h < humans; h++) {
+            const m = mapperOf(h);
+            if (m === null || ev.entity !== s.controllerEntity(h)) continue;
+            m.setAngles(v.yaw[i]!, 0);
+            m.setWeapon(v.slot[i]!);
           }
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
@@ -1268,13 +1281,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const i = entityIndex(ev.entity);
           if (i >= reloadStart.length) break;
           // A sim trocou de slot sozinha (acabou a granada): o mapeador do humano passa a pedir o slot da mão.
-          if (
-            ev.action === 'switch' &&
-            humans > 0 &&
-            ev.entity === s.controllerEntity(0) &&
-            player.weapon !== v.slot[i]
-          ) {
-            player.setWeapon(v.slot[i]!);
+          if (ev.action === 'switch') {
+            for (let h = 0; h < humans; h++) {
+              const m = mapperOf(h);
+              if (m !== null && ev.entity === s.controllerEntity(h) && m.weapon !== v.slot[i]) m.setWeapon(v.slot[i]!);
+            }
           }
           if (ev.action === 'reloadStart') {
             reloadStart[i] = timeS;
@@ -1282,8 +1293,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             reloadDur[i] = def ? (def.reloadPerRoundS > 0 ? def.reloadPerRoundS : def.reloadS) : 2;
           } else if (ev.action === 'reloadEnd') {
             reloadStart[i] = -1;
-          } else if (ev.action === 'switch' && humans > 0 && ev.entity === s.controllerEntity(0)) {
-            player.setWeapon(ev.weapon);
+          } else if (ev.action === 'switch') {
+            for (let h = 0; h < humans; h++) {
+              const m = mapperOf(h);
+              if (m !== null && ev.entity === s.controllerEntity(h)) m.setWeapon(ev.weapon);
+            }
           }
           break;
         }
@@ -1341,7 +1355,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     recipe,
     map: loaded.simMap,
     humans,
-    writeHumanFrame: (_slot, out, seq) => {
+    writeHumanFrame: (slot, out, seq) => {
+      if (slot > 0) {
+        // Teste do sofá: os jogadores 2..4 só pelo controle de cada um (sem 3ª pessoa, toque nem Destravar).
+        (extras[slot - 1] ?? player).writeFrame(out, seq);
+        return;
+      }
       player.writeFrame(out, seq);
       // M2 (fase 6b): em 3ª pessoa, o tiro mira o ponto que a câmera mira (do olho).
       if (thirdPersonAim()) {
@@ -1386,6 +1405,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const e = entityIndex(sim.controllerEntity(0));
     player.setAngles(v.yaw[e]!, 0);
     player.setWeapon(v.weapon[e]!);
+    for (let h = 1; h <= extras.length; h++) {
+      slots[h]!.controller = h;
+      const eh = entityIndex(sim.controllerEntity(h));
+      extras[h - 1]!.setAngles(v.yaw[eh]!, 0);
+      extras[h - 1]!.setWeapon(v.weapon[eh]!);
+    }
   } else {
     const byTeam: number[][] = [[], [], [], []];
     for (const slot of expandRecipe(recipe, 0)) if (slot.bot !== null) byTeam[slot.team]?.push(slot.controller);
@@ -1658,36 +1683,60 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * M2 (fase 3h): antes do `update` do mapeador, procura o alvo da assistência pela mira atual (olho e alvos no estado
    * interpolado do último quadro) e devolve a fricção (multiplicador da sensibilidade).
    */
-  function aimAssistBefore(): number {
-    const level = assistAllowed ? player.profile.aimAssist : 0;
-    assist.target = -1;
-    assist.scale = 1;
+  function aimAssistBefore(m: InputMapper = player, controller = 0, st: AimAssistState = assist): number {
+    const level = assistAllowed ? m.profile.aimAssist : 0;
+    st.target = -1;
+    st.scale = 1;
     if (level <= 0) return 1;
     const v = sim.view();
-    const e = entityIndex(sim.controllerEntity(0));
+    const e = entityIndex(sim.controllerEntity(controller));
     if (e < 0 || v.alive[e] !== 1 || (v.flags[e]! & ENTITY_FLAG.dead) !== 0) return 1;
     const a = driver.alpha;
     const o = e * 3;
     const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
     const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(v.flags[e]!);
     const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
-    findAimAssist(v, e, ffa, ex, ey, ez, player.yaw, player.pitch, level, a, far, assist);
-    return assist.scale;
+    findAimAssist(v, e, ffa, ex, ey, ez, m.yaw, m.pitch, level, a, far, st);
+    return st.scale;
   }
 
   /** Depois do `update`: o ímã (mexendo a mira ou andando) e, no Forte, a trava ao apertar o ADS. */
-  function aimAssistAfter(dt: number, looked: boolean): void {
-    if (assist.target < 0) return;
-    const level = assistAllowed ? player.profile.aimAssist : 0;
-    if (level >= AIM_ASSIST.snapLevel && player.wasPressed('ads')) {
-      player.setAngles(assist.targetYaw, assist.targetPitch);
+  function aimAssistAfter(dt: number, looked: boolean, m: InputMapper = player, st: AimAssistState = assist): void {
+    if (st.target < 0) return;
+    const level = assistAllowed ? m.profile.aimAssist : 0;
+    if (level >= AIM_ASSIST.snapLevel && m.wasPressed('ads')) {
+      m.setAngles(st.targetYaw, st.targetPitch);
       return;
     }
-    const active = looked || player.moveX !== 0 || player.moveY !== 0;
-    pullAim(assist, level, dt, active, player.yaw, player.pitch, assistAngles);
-    if (assistAngles[0] !== player.yaw || assistAngles[1] !== player.pitch) {
-      player.setAngles(assistAngles[0]!, assistAngles[1]!);
+    const active = looked || m.moveX !== 0 || m.moveY !== 0;
+    pullAim(st, level, dt, active, m.yaw, m.pitch, assistAngles);
+    if (assistAngles[0] !== m.yaw || assistAngles[1] !== m.pitch) {
+      m.setAngles(assistAngles[0]!, assistAngles[1]!);
     }
+  }
+
+  /**
+   * Teste do sofá: os jogadores 2..4 no quadro (mira, assistência e o `+` que pausa). Pausado, só os botões: a mira
+   * fica onde estava. Devolve se algum deles apertou pausa.
+   */
+  function updateExtras(raw: RawInputState, dt: number, frozen: boolean, pausedNow: boolean): boolean {
+    let pausePressed = false;
+    for (let k = 0; k < extras.length; k++) {
+      const m = extras[k]!;
+      const yaw0 = m.yaw;
+      const pitch0 = m.pitch;
+      if (pausedNow || frozen) {
+        m.update(raw, 0);
+        m.setAngles(yaw0, pitch0);
+      } else {
+        const st = extraAssists[k]!;
+        const scale = aimAssistBefore(m, k + 1, st);
+        m.update(raw, dt, scale);
+        aimAssistAfter(dt, m.yaw !== yaw0 || m.pitch !== pitch0, m, st);
+      }
+      if (m.wasPressed('pause')) pausePressed = true;
+    }
+    return pausePressed;
   }
 
   // M2 (fase 4h): dicas de 1 linha (gameplay.md §2.5): só na partida de verdade com 1 jogador, nas 2 primeiras
@@ -1840,6 +1889,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function applySettings(): void {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
+    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles.gamepad);
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
     thirdPerson = thirdFromSettings();
@@ -2502,14 +2552,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     const human = humans > 0 && slot.controller === 0;
     // Humano: a mira vem do mapeador em todo frame de render (sem esperar o tick); bot: a da sim, interpolada.
-    const yaw = human ? player.yaw : lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
-    const pitch = human ? player.pitch : lerp(v.prevPitch[e]!, v.pitch[e]!, alpha);
+    // Teste do sofá: os jogadores 2..4 também, cada um pelo seu mapeador.
+    const local = mapperOf(slot.controller);
+    const yaw = local !== null ? local.yaw : lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
+    const pitch = local !== null ? local.pitch : lerp(v.prevPitch[e]!, v.pitch[e]!, alpha);
     slot.shake = Math.max(0, slot.shake - dt * SHAKE_DECAY_PER_S);
     const shakeYaw = Math.sin(timeS * 47) * SHAKE_AMPLITUDE * slot.shake;
     const shakePitch = Math.sin(timeS * 53 + 1) * SHAKE_AMPLITUDE * slot.shake;
     c.yaw = yaw + v.recoilYaw[e]! + shakeYaw;
     c.pitch = clamp(pitch + v.recoilPitch[e]! + shakePitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
-    const adsWanted = human ? !dead && !paused && player.isDown('ads') : (flags & ENTITY_FLAG.ads) !== 0;
+    const adsWanted = local !== null ? !dead && !paused && local.isDown('ads') : (flags & ENTITY_FLAG.ads) !== 0;
     const adsTarget = adsWanted && !dead ? 1 : 0;
     // M2: o ADS entra no tempo da arma na mão (`adsInS`) e o zoom é o dela (`adsZoom`; a sniper tem 4x).
     const held = weaponDef(v.weapon[e]!);
@@ -3221,7 +3273,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       let signal: SceneSignal = 'none';
       if (humans > 0) {
         const last = menu.lastDevice;
-        if (last !== null) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
+        if (last !== null && extras.length === 0)
+          useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
         if (resultShown) {
           // M2 (fase 2e): o resultado é um menu (D-pad, mouse, toque); o jogador não anda por trás dele.
           const nav = resultMenu.update(menu, raw, ui);
@@ -3275,16 +3328,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             if (stepCalibration(calibration, player.yaw, player.pitch, player.wasPressed('fire'), dt))
               finishCalibration();
           }
-          if (player.wasPressed('pause')) pause();
+          if (updateExtras(raw, dt, frozen, false)) pause();
+          else if (player.wasPressed('pause')) pause();
         } else {
           // Pausado: a sim não anda e a mira não gira (o mapeador lê só os botões).
           const yaw = player.yaw;
           const pitch = player.pitch;
           player.update(raw, 0);
           player.setAngles(yaw, pitch);
+          const extraPause = updateExtras(raw, 0, false, true);
           // Capturando um botão (e esperando soltar tudo depois): nem a pausa nem o menu andam.
           if (capture.active) finishCapture(capture.update(raw));
-          else if (player.wasPressed('pause')) resume();
+          else if (player.wasPressed('pause') || extraPause) resume();
           else {
             signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }
@@ -3399,7 +3454,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (mv.phase === 'warmup' && mv.countdownTicks > 0) {
             drawMatchCountdown(list, fonts, mv.countdownTicks / sim.hz, todayLine, ui.width, ui.height, minText);
           }
-          if (humans > 0 && !paused && player.isDown('scoreboard')) {
+          let wantsScoreboard = humans > 0 && player.isDown('scoreboard');
+          for (let k = 0; k < extras.length; k++) if (extras[k]!.isDown('scoreboard')) wantsScoreboard = true;
+          if (!paused && wantsScoreboard) {
             fillScoreboard(sim.view());
             drawScoreboard(list, fonts, scoreboard, ui.width, ui.height, minText);
           }

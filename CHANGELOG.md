@@ -474,6 +474,14 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Rodada 11 de prints:** os 52 sons para ouvir, a aba Áudio, o indicador de som e o F2 com as vozes. São as
   perguntas G1–G6, publicadas na versão 12 da página das rodadas junto com a rodada 10. A G6 é o OK do download da
   música do menu.
+- **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
+  em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
+  - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.
+  - Cada jogador tem a própria mira, com assistência, a própria vista e a própria HUD. Qualquer `+` pausa.
+  - O Bobo Training continua de 1 jogador.
+  - **Ainda não tem:** o "aperte A", entrar no meio e o radial da arma para os jogadores 2–4 (eles renascem com o
+    fuzil); a 3ª pessoa, o resultado e a vibração seguem só o jogador 1.
+  - A web continua com 1 jogador.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

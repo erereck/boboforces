@@ -1993,3 +1993,25 @@ mudanças de contrato ficam registradas aqui.
 - **Medido no Edge:** a música começa 0,2–0,5 s depois do primeiro gesto no título e para na partida.
 - **Risco:** o atraso foi medido no decodificador do Edge. Outro decodificador (o FFmpeg do nx.js) pode errar a emenda
   por alguns milissegundos; isso se confere no Switch, na fase 8.
+
+### 12.49 Teste do sofá no Switch (09/11/2026, antes do M3)
+
+Pedido do Erick, para jogar com amigos no console antes do M3. Fica atrás do `platform.id === 'switch'`; o M3 troca
+pela tela "aperte A" (`input/local-players.ts`, que segue sem uso).
+
+- **Quem joga:** no `requestScene` do JOGAR, `sofaPads()` lê o `describeControllers` e pega os controles completos
+  (par de Joy-Con, Pro ou portátil), em ordem de índice, até 4. O índice do nx.js é o número do controle (o 0 junta o
+  jogador 1 e o portátil). Com 2 ou mais, o jogador 1 fica no menor índice e os outros vão em
+  `SceneRequest.localPads`. O Bobo Training e a calibração ficam de fora.
+- **Cena:** `views` e `humans` passam a ser `1 + localPads.length`. O perfil sai pelo número de vistas
+  (`switch34p` com 3–4); a receita segue com `humans: 'all'` (TDM: todos no time 0; FFA: cada um por si).
+- **Partida:** um `InputMapper` por jogador extra, preso ao controle dele, com perfil de controle e assistência de mira
+  próprios (`aimAssistBefore`/`aimAssistAfter` agora recebem mapeador, controlador e estado). Com extras, o jogador 1
+  não segue mais o último dispositivo usado. A câmera e o ADS de cada vista leem o mapeador do controlador dela
+  (`mapperOf`). Qualquer `+` pausa e retoma; qualquer um abre o placar.
+- **Fica só no jogador 1:** a 3ª pessoa, o radial da arma na morte (os outros renascem com a primária padrão), a
+  calibração, as dicas, o fantasma do toque, a vibração e as estatísticas da partida.
+- **Conferido:** no Edge, com 3 controles falsos (`local/m2/capturar-sofa.ts`, liberando a web de propósito numa
+  edição temporária), aparecem 3 vistas mais o quadrante do placar; o jogador 2 anda, o 3 gira, o Start do 3 pausa e
+  retoma. No Eden, o NRO sobe até o menu (1,5 s), carrega os sons e a música, e um bench de 3 vistas com 12 bots roda
+  sem erro (`switch34p`). O caminho dos 3 controles de verdade só se confere no console.
