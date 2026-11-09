@@ -158,9 +158,10 @@ export interface GameDebugApi {
   whenReady(frames?: number): Promise<void>;
   /**
    * M2 (fase 2e): abre a tela de resultado agora, com os números do momento (prints e conferência; a partida segue
-   * rodando por trás, como depois do fim). Só no JOGAR; nas outras cenas não faz nada.
+   * rodando por trás, como depois do fim). Só no JOGAR; nas outras cenas não faz nada. Não grava estatística.
+   * M2 (fase 4i): `previewRecord` mostra o título de recorde no print, sem gravar nada.
    */
-  showResult(): void;
+  showResult(previewRecord?: 'kills' | 'streak' | 'both'): void;
   /**
    * Rodada 3 do porte do boneco (#56; pedido da F7 em `apps/web/scripts/prints-plan.ts`, `FigurePrintHook`): troca
    * aparência, time, pose, arma, mira, expressão e giro dos manequins nomeados. A lista SUBSTITUI a anterior (quem não

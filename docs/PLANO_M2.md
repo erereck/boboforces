@@ -212,7 +212,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - "Gire o celular" em retrato;
   - a calibração da sensibilidade (3 alvos) e o card "Conheça o Laboratório" entram com o Bobo Training e o
     Laboratório (fase 5).
-- **4i. Prints para o Erick:** título, menu principal, Partida Rápida, Partida personalizada, Ajustes, Novidades e o
+- **4i. Prints para o Erick.** Publicada em 09/11 (rodada 8, versão 9 da página das rodadas; perguntas D1–D8): título, menu principal, Partida Rápida, Partida personalizada, Ajustes, Novidades e o
   resultado com Salvar preset.
 
 ## Escolhas do Claude neste plano (revisáveis)

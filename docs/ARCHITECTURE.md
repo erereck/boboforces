@@ -1571,3 +1571,10 @@ mudanças de contrato ficam registradas aqui.
     no splash para sempre: o `onMenuReady` nunca vinha.
 - **Fica para a fase 5:** a calibração da sensibilidade e o card do Laboratório.
 - **Tamanho:** o menu foi a 325,7 KB (+0,3 KB).
+
+### 12.30 Fase 4i: rodada 8 de prints (09/11/2026)
+
+- `GameDebugApi.showResult(previewRecord?)`: nos prints, o título de recorde aparece sem gravar estatística (a prévia
+  não passa pelo `SceneHost.stats`).
+- As capturas saem dos scripts locais de `local/m2/` (`capturar-*.ts`, Edge headless sobre o `npm run dev`); a página é
+  montada por `local/m2/montar-pagina-r8.mjs`.

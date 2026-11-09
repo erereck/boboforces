@@ -304,6 +304,10 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Correção:** com o celular em retrato desde o boot, o splash da web não saía.
   - **Fica para a fase 5:** a calibração da sensibilidade (3 alvos) e o card "Conheça o Laboratório".
   - 6 testes novos.
+- **Fase 4i, prints da rodada 8:** 16 capturas ao vivo da fase 4 (título, Surpreenda-me, menu principal, Partida
+  Rápida, Modos, Partida personalizada, Ajustes com a aba Botões e a pausa, Dados, Sobre, Novidades, resultado com
+  recorde, dica e "Gire o celular") e as perguntas D1–D8, publicadas como versão 9 da página das rodadas. O gancho dos
+  prints ganha `showResult(previewRecord)`, que mostra o título de recorde sem gravar nada.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

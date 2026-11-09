@@ -1357,9 +1357,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       debugState.hideViewmodel = !visible;
       applyDebug();
     },
-    showResult(): void {
-      // Os prints não gravam estatística.
-      if (humans > 0 && !resultShown) showResult(false);
+    showResult(previewRecord): void {
+      // Os prints não gravam estatística (o recorde, quando pedido, é só a prévia do título).
+      if (humans > 0 && !resultShown) showResult(false, previewRecord ?? null);
       changed();
     },
     setFrozen(on: boolean): void {
@@ -1674,7 +1674,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
   /** M2 (fase 4e): o que o resultado mostra (para refazer a tela ao salvar o preset). */
   let resultData: ResultScreenData | null = null;
-  function showResult(record: boolean): void {
+  function showResult(record: boolean, previewRecord: 'kills' | 'streak' | 'both' | null = null): void {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
     const sum = summarizeMatch(matchStats, v, human, ffa);
@@ -1695,7 +1695,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         : null;
     const recordKind =
       breaks === null
-        ? null
+        ? previewRecord
         : breaks.mostKills && breaks.bestStreak
           ? 'both'
           : breaks.mostKills
