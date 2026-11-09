@@ -537,6 +537,8 @@ export interface ConstrutoMatch {
   readonly debug: GameDebugApi;
   readonly paused: boolean;
   readonly wantsPointerLock: boolean;
+  /** M2 (fase 7d): no resultado, a música do menu volta (GDD §5.10). */
+  readonly wantsMusic: boolean;
   /** M2 (fase 2e): nível rápido dos bots adversários agora. */
   readonly level: BotLevel;
   pause(): void;
@@ -3186,6 +3188,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     debug: debugApi,
     get paused(): boolean {
       return paused;
+    },
+    get wantsMusic(): boolean {
+      return resultShown;
     },
     get wantsPointerLock(): boolean {
       return (

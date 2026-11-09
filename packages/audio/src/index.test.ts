@@ -21,6 +21,45 @@ const surface = (ctx: FakeAudioContext) => ({ context: ctx, unlocked: true, onUn
 /** "MP3" sintético: o contexto falso lê o primeiro byte como duração em décimos de segundo. */
 const mp3 = (tenths: number) => new Uint8Array([tenths, 0xff, 0xfb, 0x90]);
 
+describe('música (M2, fase 7d)', () => {
+  it('toca em loop numa voz própria, não recomeça a mesma faixa e faz crossfade na troca', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    expect(mixer.playMusic('menu')).toBe(false);
+    await mixer.decode('menu', mp3(20));
+    await mixer.decode('outra', mp3(20));
+    const before = ctx.sources.length;
+    expect(mixer.playMusic('menu')).toBe(true);
+    const first = ctx.sources[before]!;
+    expect([first.loop, first.started, mixer.music]).toEqual([true, true, 'menu']);
+    expect(mixer.playMusic('menu')).toBe(true);
+    expect(ctx.sources.length).toBe(before + 1);
+    expect(mixer.playMusic('outra', 0.5)).toBe(true);
+    expect(mixer.music).toBe('outra');
+    // A velha sai no fim do fade, na próxima chamada ao mixer.
+    expect(first.stopped).toBe(false);
+    (ctx as { currentTime: number }).currentTime = 1;
+    mixer.stopMusic(0.2);
+    expect(first.stopped).toBe(true);
+    expect(mixer.music).toBe(null);
+    (ctx as { currentTime: number }).currentTime = 2;
+    mixer.playMusic('menu');
+    expect(ctx.sources[before + 1]!.stopped).toBe(true);
+    // A música não ocupa voz de efeito e o "duck" volta ao cheio.
+    expect(mixer.stats.activeVoices).toBe(0);
+    mixer.duckMusic(-6, 0.8);
+    mixer.dispose();
+  });
+
+  it('sem áudio, nada toca e nada quebra', () => {
+    const mixer = createMixer(null);
+    expect(mixer.playMusic('menu')).toBe(false);
+    mixer.stopMusic();
+    mixer.duckMusic(-6, 1);
+    expect(mixer.music).toBe(null);
+  });
+});
+
 describe('espacialização', () => {
   it('volume cheio até a distância de referência, cai depois e zera no alcance máximo', () => {
     expect(distanceGain(0)).toBe(1);
@@ -87,11 +126,11 @@ describe('mixer', () => {
     mixer.dispose();
   });
 
-  it('monta o grafo uma vez: 24 vozes (panner + gain), canais e master; tocar só cria o BufferSource', async () => {
+  it('monta o grafo uma vez: 24 vozes (panner + gain), canais, master e a música (duck + 2 fades); tocar só cria o BufferSource', async () => {
     const ctx = createFakeAudioContext();
     const mixer = createMixer(surface(ctx));
     expect(ctx.created.panner).toBe(MAX_VOICES);
-    expect(ctx.created.gain).toBe(MAX_VOICES + 4); // vozes + master + sfx + music + ui
+    expect(ctx.created.gain).toBe(MAX_VOICES + 4 + 3); // vozes + master + sfx + music + ui + duck e 2 fades da música
     const info = await mixer.decode('t0-tiro', mp3(3));
     expect(info.durationS).toBeCloseTo(0.3, 3);
     expect(mixer.has('t0-tiro')).toBe(true);

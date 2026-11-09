@@ -303,7 +303,7 @@ GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan,
 - **7c. Interface e Ajustes.** Pronta em 09/11 (`ARCHITECTURE.md` §12.46). Sons de navegar, confirmar, voltar e trocar valor nos menus; aba Áudio nos Ajustes
   (Geral, Efeitos, Música, Interface, saída mono, música na partida e indicador visual de som); o indicador como anel
   em volta da retícula (tiros e passos até 20 m).
-- **7d. Música do menu.** Tocador em loop com fade e a música 6 dB mais baixa nas explosões; carrega depois do menu
+- **7d. Música do menu.** Tocador pronto em 09/11 (`ARCHITECTURE.md` §12.47); a faixa espera o OK. Tocador em loop com fade e a música 6 dB mais baixa nas explosões; carrega depois do menu
   (`assets/music/`, sob demanda). A faixa CC0 espera o OK do Erick (nome, origem e tamanho).
 - **7e. Rodada 11.** Página para ouvir os sons, mais os prints da aba Áudio e do indicador.
 

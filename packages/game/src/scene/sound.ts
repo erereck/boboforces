@@ -45,6 +45,9 @@ export const MATCH_SOUND = {
   landFullSpeed: 9,
   /** Com 3 ou 4 jogadores locais, a própria arma perde 3 dB (arte-ux §10.3). */
   ownCrowdGain: 0.7,
+  /** A música nas explosões: −6 dB e volta em 0,8 s. */
+  duckDb: -6,
+  duckS: 0.8,
   /** Indicador visual de som (arte-ux §6.7): tiros, explosões e passos até aqui, e quanto tempo cada um fica. */
   indicatorRangeM: 20,
   indicatorLifeS: 0.8,
@@ -524,6 +527,9 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           break;
         }
         case 'explosion':
+          // A música abaixa 6 dB nas explosões (arte-ux §10.4), se estiver tocando na partida.
+          if (listenerDistance(ev.x, ev.y, ev.z) < MAX_DISTANCE_M)
+            mixer.duckMusic(MATCH_SOUND.duckDb, MATCH_SOUND.duckS);
           playAt(
             v,
             'explosao',

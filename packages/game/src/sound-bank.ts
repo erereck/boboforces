@@ -150,6 +150,21 @@ export function applyAudioSettings(mixer: Mixer, a: AudioSettings): void {
   mixer.setMono(a.mono);
 }
 
+/**
+ * M2 (fase 7d): a faixa do menu (#38 e #63: CC0 baixada, com crédito). `null` até o Erick aprovar o download; aí vira
+ * `'music/menu.mp3'` no runtime-assets.json (sob demanda no size-check) e carrega depois dos efeitos.
+ */
+export const MENU_MUSIC: string | null = null;
+/** Nome da faixa do menu no mixer. */
+export const MENU_MUSIC_ID = 'musica-menu';
+
+/**
+ * Quando a música do menu toca (GDD §5.10): nos menus e no resultado; na partida, só com "Música na partida".
+ */
+export function wantsMusic(inScene: boolean, sceneWants: boolean, musicInMatch: boolean): boolean {
+  return !inScene || sceneWants || musicInMatch;
+}
+
 /** O som de cada gesto de menu (`MenuSound` do `menu.ts`). */
 export const MENU_SOUNDS = {
   move: 'ui-mover',

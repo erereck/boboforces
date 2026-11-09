@@ -93,6 +93,17 @@ export interface Mixer extends Disposable {
   /** `resume()` do contexto (volta do HOME, primeiro toque na web). Resolve mesmo se falhar. */
   resume(): Promise<void>;
   resetStats(): void;
+  /**
+   * M2 (fase 7d): música em loop numa voz própria, fora das 24 (não rouba efeito nem é roubada), no canal `music`.
+   * Troca de faixa com crossfade de `fadeS`. A mesma faixa já tocando não recomeça. Som desconhecido: `false`.
+   */
+  playMusic(name: string, fadeS?: number): boolean;
+  /** Para a música com fade (a voz é liberada no fim do fade). */
+  stopMusic(fadeS?: number): void;
+  /** A faixa tocando, ou `null`. */
+  readonly music: string | null;
+  /** Abaixa a música `db` dB (negativo) em 50 ms e volta em `releaseS` (arte-ux §10.4: −6 dB nas explosões). */
+  duckMusic(db: number, releaseS: number): void;
 }
 
 interface Voice {
@@ -148,9 +159,25 @@ function createSilentMixer(): Mixer {
       stats.dropped = 0;
       stats.unknown = 0;
     },
+    playMusic: () => false,
+    stopMusic: () => {},
+    music: null,
+    duckMusic: () => {},
     dispose: () => {},
   };
 }
+
+/** Uma das 2 vozes da música (crossfade): fonte em loop → ganho do fade → ganho do "duck" → canal da música. */
+interface MusicVoice {
+  readonly fade: GainNodeLike;
+  source: AudioBufferSourceNodeLike | null;
+  name: string | null;
+}
+
+/** Fade padrão da música (s). */
+const MUSIC_FADE_S = 0.8;
+/** Ataque do "duck" (s). */
+const DUCK_ATTACK_S = 0.05;
 
 function createLiveMixer(ctx: AudioContextLike): Mixer {
   const sounds = new Map<string, AudioBufferLike>();
@@ -173,6 +200,53 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
   const busIndex = (bus: AudioBus): number => {
     const i = AUDIO_BUSES.indexOf(bus);
     return i < 0 ? 1 : i;
+  };
+
+  // M2 (fase 7d): a música, com 2 vozes para o crossfade, sobre um ganho de "duck" comum.
+  const duck = ctx.createGain();
+  duck.connect(buses[busIndex('music')]!);
+  const music: MusicVoice[] = [0, 1].map(() => {
+    const fade = ctx.createGain();
+    fade.gain.value = 0;
+    fade.connect(duck);
+    return { fade, source: null, name: null };
+  });
+  let musicActive = -1;
+  /** Quando a voz que saiu termina o fade (relógio do contexto); a liberação acontece na próxima chamada ao mixer. */
+  const musicReleaseAt = [Infinity, Infinity];
+  const stopMusicVoice = (m: MusicVoice): void => {
+    const src = m.source;
+    m.source = null;
+    m.name = null;
+    if (!src) return;
+    try {
+      src.stop();
+    } catch {
+      // já tinha parado
+    }
+    try {
+      src.disconnect();
+    } catch {
+      // já desconectado
+    }
+  };
+  const fadeTo = (m: MusicVoice, target: number, fadeS: number): void => {
+    const now = ctx.currentTime;
+    const g = m.fade.gain;
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(target, now + Math.max(0.01, fadeS));
+  };
+  /** Marca a voz `i` para soltar depois do fade (sem timer: o pacote não depende do runtime). */
+  const releaseAfter = (i: number, fadeS: number): void => {
+    musicReleaseAt[i] = ctx.currentTime + fadeS + 0.05;
+  };
+  /** Solta as vozes da música que já terminaram o fade (chamado no `play` e nas chamadas da música). */
+  const reclaimMusic = (now: number): void => {
+    for (let i = 0; i < 2; i++) {
+      if (i === musicActive || now < musicReleaseAt[i]!) continue;
+      musicReleaseAt[i] = Infinity;
+      stopMusicVoice(music[i]!);
+    }
   };
 
   const voices: Voice[] = [];
@@ -303,6 +377,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       }
       const now = ctx.currentTime;
       reclaim(now);
+      reclaimMusic(now);
       const priority = opts.priority ?? SOUND_PRIORITY.step;
       const index = pickVoice(priority, gain);
       if (index < 0) {
@@ -354,9 +429,65 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       stats.dropped = 0;
       stats.unknown = 0;
     },
+    get music() {
+      return musicActive >= 0 ? music[musicActive]!.name : null;
+    },
+    playMusic(name, fadeS = MUSIC_FADE_S) {
+      if (disposed) return false;
+      const buffer = sounds.get(name);
+      if (!buffer) {
+        stats.unknown++;
+        return false;
+      }
+      reclaimMusic(ctx.currentTime);
+      if (musicActive >= 0 && music[musicActive]!.name === name) return true;
+      const old = musicActive;
+      const next = old === 0 ? 1 : 0;
+      const m = music[next]!;
+      musicReleaseAt[next] = Infinity;
+      stopMusicVoice(m);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(m.fade);
+      m.source = source;
+      m.name = name;
+      m.fade.gain.value = 0;
+      fadeTo(m, 1, fadeS);
+      source.start();
+      musicActive = next;
+      if (old >= 0) {
+        fadeTo(music[old]!, 0, fadeS);
+        releaseAfter(old, fadeS);
+      }
+      return true;
+    },
+    stopMusic(fadeS = MUSIC_FADE_S) {
+      reclaimMusic(ctx.currentTime);
+      if (musicActive < 0) return;
+      const i = musicActive;
+      musicActive = -1;
+      fadeTo(music[i]!, 0, fadeS);
+      releaseAfter(i, fadeS);
+    },
+    duckMusic(db, releaseS) {
+      if (disposed) return;
+      const now = ctx.currentTime;
+      const low = Math.min(1, 10 ** (Math.min(0, db) / 20));
+      const g = duck.gain;
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(low, now + DUCK_ATTACK_S);
+      g.linearRampToValueAtTime(1, now + DUCK_ATTACK_S + Math.max(0.05, releaseS));
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
+      for (let i = 0; i < 2; i++) {
+        stopMusicVoice(music[i]!);
+        music[i]!.fade.disconnect();
+      }
+      musicActive = -1;
+      duck.disconnect();
       for (let i = 0; i < MAX_VOICES; i++) {
         const v = voices[i]!;
         release(v);

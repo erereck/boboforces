@@ -13,6 +13,8 @@ import {
   soundPath,
   SOUNDS,
   volumeGain,
+  wantsMusic,
+  MENU_MUSIC,
   type SoundId,
 } from './sound-bank.ts';
 
@@ -100,6 +102,19 @@ describe('banco de sons (fase 7a)', () => {
     };
     expect(await loadSoundFiles(mixer, assets, () => {})).toBe(0);
     expect(asked).toBe(0);
+  });
+});
+
+describe('música do menu (fase 7d)', () => {
+  it('toca nos menus e no resultado; na partida, só com o Ajuste', () => {
+    expect(wantsMusic(false, false, false)).toBe(true);
+    expect(wantsMusic(true, false, false)).toBe(false);
+    expect(wantsMusic(true, true, false)).toBe(true);
+    expect(wantsMusic(true, false, true)).toBe(true);
+  });
+
+  it('a faixa ainda espera o OK do download (decisão #63)', () => {
+    expect(MENU_MUSIC).toBe(null);
   });
 });
 

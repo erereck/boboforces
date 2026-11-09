@@ -57,6 +57,10 @@ function fakeMixer(): Mixer & { played: Played[]; synthesized: string[]; stops: 
     suspend: () => Promise.resolve(),
     resume: () => Promise.resolve(),
     resetStats: () => {},
+    playMusic: () => false,
+    stopMusic: () => {},
+    music: null,
+    duckMusic: () => {},
     dispose: () => {},
   };
   return m;

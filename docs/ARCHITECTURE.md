@@ -1954,3 +1954,19 @@ mudanças de contrato ficam registradas aqui.
     contorno, os pontos sumiam contra o céu e o concreto (visto no Edge).
 - **Escolhas (revisáveis):** os volumes padrão, a curva do quadrado, o raio e o desenho do anel, e o hover do mouse
   tocar "mover".
+
+### 12.47 Fase 7d: tocador de música (09/11/2026)
+
+- **No mixer** (`playMusic`, `stopMusic`, `music`, `duckMusic`): a música fica em 2 vozes próprias, fora das 24.
+  - Grafo: `BufferSource` em loop → ganho de fade da voz → ganho de "duck" comum → canal `music`.
+  - Trocar de faixa faz crossfade (0,8 s por padrão); a mesma faixa não recomeça.
+  - A voz que saiu é solta pelo relógio do contexto, na próxima chamada ao mixer. O pacote não usa `setTimeout`.
+  - O "duck" desce em 50 ms e volta no tempo pedido: a partida pede −6 dB e 0,8 s em cada explosão audível
+    (arte-ux §10.4).
+- **No jogo:** `MENU_MUSIC` (`sound-bank.ts`) é o caminho lógico da faixa do menu. É **`null` até o Erick aprovar o
+  download** da faixa CC0 (#63); aí vira `music/menu.mp3`, sob demanda no size-check (`assets/music/`).
+  - Carrega depois dos efeitos.
+  - O `step` liga e desliga pela regra `wantsMusic`: toca nos menus e no resultado (`Scene.wantsMusic`); na
+    partida, só com "Música na partida" (GDD §5.10).
+- **Escolhas (revisáveis):** o fade de 0,8 s e a música voltando no resultado com a mesma faixa do menu. As vinhetas
+  de vitória e derrota tocam no canal da música.

@@ -111,7 +111,15 @@ import {
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import { skipCappedFrame } from './frame-cap.ts';
-import { applyAudioSettings, loadSoundFiles, MENU_SOUNDS, playUiSound } from './sound-bank.ts';
+import {
+  applyAudioSettings,
+  loadSoundFiles,
+  MENU_MUSIC,
+  MENU_MUSIC_ID,
+  MENU_SOUNDS,
+  playUiSound,
+  wantsMusic,
+} from './sound-bank.ts';
 import { createMixer, type MixerStats } from '@boboforces/audio';
 import {
   DEFAULT_RENDERER_ROUTES,
@@ -263,10 +271,31 @@ export function startGame(deps: GameDeps): GameHandle {
       (n) => {
         soundCount += n;
         if (n > 0) platform.diagnostics.appendLog(`[audio] ${n} sons do banco prontos`);
+        loadMenuMusic();
       },
       () => {},
     );
     return soundFiles;
+  }
+  /** M2 (fase 7d): a faixa do menu, sob demanda, depois dos efeitos (`MENU_MUSIC` nulo = ainda sem faixa). */
+  function loadMenuMusic(): void {
+    const path = MENU_MUSIC;
+    if (path === null || !mixer.available || mixer.has(MENU_MUSIC_ID)) return;
+    platform.assets
+      .loadBytes(path)
+      .then((bytes) => mixer.decode(MENU_MUSIC_ID, bytes))
+      .then(
+        (info) => platform.diagnostics.appendLog(`[audio] música do menu pronta (${info.durationS.toFixed(1)} s)`),
+        (error: unknown) =>
+          platform.diagnostics.appendLog(`[audio] música: ${error instanceof Error ? error.message : String(error)}`),
+      );
+  }
+  /** 1x por frame: a música do menu segue a tela (menus e resultado) e o Ajuste "Música na partida". */
+  function updateMusic(): void {
+    if (!mixer.has(MENU_MUSIC_ID)) return;
+    const want = wantsMusic(screen === 'scene', scene?.wantsMusic ?? false, save.settings.audio.musicInMatch);
+    if (want && mixer.music !== MENU_MUSIC_ID) mixer.playMusic(MENU_MUSIC_ID);
+    else if (!want && mixer.music !== null) mixer.stopMusic();
   }
   let renderer: Renderer = deps.createRenderer
     ? deps.createRenderer(platform.graphics, routesOf(deps.bench))
@@ -1084,6 +1113,7 @@ export function startGame(deps: GameDeps): GameHandle {
       audioApplied = save.settings;
       applyAudioSettings(mixer, audioApplied.audio);
     }
+    updateMusic();
     platform.input.poll(raw);
     menuInput.update(raw, dt);
     const u = syncUi();

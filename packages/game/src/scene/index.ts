@@ -195,6 +195,9 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
     get wantsPointerLock(): boolean {
       return match?.wantsPointerLock ?? false;
     },
+    get wantsMusic(): boolean {
+      return match?.wantsMusic ?? false;
+    },
     get driver() {
       return match?.driver ?? null;
     },

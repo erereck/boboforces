@@ -161,6 +161,8 @@ export interface Scene extends Disposable {
   readonly paused: boolean;
   /** Jogando no teclado/mouse: a casca web pede o pointer lock. */
   readonly wantsPointerLock: boolean;
+  /** M2 (fase 7d): a cena quer a música do menu agora (o resultado; GDD §5.10). Fora disso, só com o Ajuste. */
+  readonly wantsMusic?: boolean;
   /** Partida em andamento (testes, F2, `window.__bfDebug.simTick`); `null` durante o loading. */
   readonly driver: LocalDriver | null;
   /** Gancho dos prints (`GameHandle.debug`): não nulo quando o Construto carregou. */

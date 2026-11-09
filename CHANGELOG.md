@@ -460,6 +460,12 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Indicador de som:** quando ligado, tiros e passos até 20 m aparecem como pontos num anel em volta da retícula,
     na direção de onde vieram.
   - 8 testes novos.
+- **Fase 7d, tocador de música:**
+  - **Onde toca:** nos menus e no resultado. Na partida, só com o Ajuste "Música na partida".
+  - **Troca de faixa:** em crossfade.
+  - **Explosões:** a música abaixa 6 dB.
+  - **A faixa do menu ainda não entrou:** espera o OK do download.
+  - 4 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
