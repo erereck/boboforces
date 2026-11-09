@@ -256,6 +256,17 @@ export interface PlatformFeatures {
   readonly canExit: boolean;
 }
 
+/**
+ * M2 (fase 8c): a versão nova baixada em segundo plano. Ela só vale quando o jogo pede (`apply`), e o jogo só pede no
+ * título (GDD §2: a atualização nunca cai no meio da partida); a página recarrega e a tela de Novidades aparece.
+ */
+export interface UpdateService {
+  /** Há uma versão nova pronta, esperando. */
+  readonly ready: boolean;
+  /** Troca para a versão nova e recarrega. Sem versão pronta, não faz nada. */
+  apply(): void;
+}
+
 export interface Platform {
   readonly id: PlatformId;
   readonly features: PlatformFeatures;
@@ -276,6 +287,11 @@ export interface Platform {
   readonly audio: AudioSurface | null;
   /** `null` no Switch e sempre que o online não estiver carregado. */
   readonly online: OnlineService | null;
+  /**
+   * M2 (fase 8c, opcional): atualização do jogo (web: o service worker, tecnico.md §19.1). Ausente no Switch, no
+   * `npm run dev` e no bench.
+   */
+  readonly updates?: UpdateService;
   /**
    * Relógio de parede em ms, monotônico. Só para o laço de frames (acumulador do passo fixo) e para medições do F2.
    * A sim NUNCA lê relógio: ela conta ticks (regra 10).

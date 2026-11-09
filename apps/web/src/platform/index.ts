@@ -14,6 +14,7 @@ import { createStoragePersistence, type StoragePersistence } from './persistence
 import { installShellGuards } from './shell-guards.ts';
 import { createWebStorage, readLocalStorage, type WebStorage } from './storage.ts';
 import { createWebTextInput } from './text-input.ts';
+import { createWebUpdates } from './updates.ts';
 
 export { WebGl2UnavailableError } from './graphics.ts';
 export { BUILD_INFO, type BuildInfo } from './build-info.ts';
@@ -32,6 +33,8 @@ export interface WebPlatformOptions {
   readonly assetsBaseUrl?: string;
   /** Fonte de input pronta (testes, integração). Padrão: os adaptadores web de `src/input` no canvas. */
   readonly input?: RawInputSource & Partial<Disposable>;
+  /** M2 (fase 8c): registra o service worker (só o build de produção, fora do bench). Padrão: não. */
+  readonly serviceWorker?: boolean;
   /** O que `exit()` faz. Padrão: grava o save e recarrega a página, que volta ao título. */
   readonly onExit?: () => void;
 }
@@ -126,6 +129,13 @@ export function createWebPlatform(target: HTMLCanvasElement | WebPlatformOptions
     }),
   ];
   const diagnostics = createWebDiagnostics({ win, build: BUILD_INFO, features, graphics, storage, persistence });
+  const updates = options.serviceWorker
+    ? createWebUpdates(
+        win,
+        (line) => diagnostics.appendLog(line),
+        () => storage.flush(),
+      )
+    : null;
   const assets = createWebAssets(options.assetsBaseUrl ?? new URL('./', doc.baseURI).href, (url, init) =>
     win.fetch(url, init),
   );
@@ -166,6 +176,7 @@ export function createWebPlatform(target: HTMLCanvasElement | WebPlatformOptions
     input,
     audio,
     online: null,
+    ...(updates ? { updates } : {}),
     persistence,
     webInput,
     now: () => win.performance.now(),
@@ -185,6 +196,7 @@ export function createWebPlatform(target: HTMLCanvasElement | WebPlatformOptions
       disposed = true;
       for (const unsubscribe of unsubscribes) unsubscribe();
       input.dispose?.();
+      updates?.dispose();
       guards.dispose();
       audio?.dispose();
       textInput.dispose();

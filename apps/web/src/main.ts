@@ -106,7 +106,12 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
 }
 
 async function main(): Promise<void> {
-  const boot = bootWeb({ assetsBaseUrl: new URL('./assets/', document.baseURI).href });
+  const search = window.location.search;
+  const boot = bootWeb({
+    assetsBaseUrl: new URL('./assets/', document.baseURI).href,
+    // M2 (fase 8c): o service worker só no build de produção, fora do bench e da prévia do título do Switch.
+    serviceWorker: import.meta.env.PROD && !urlAsksForBench(search) && !urlAsksForSwitchTitle(search),
+  });
   if (!boot) return;
   try {
     start(boot.platform, boot, await loadBenchShell(boot.platform));

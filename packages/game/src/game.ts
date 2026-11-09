@@ -1196,6 +1196,11 @@ export function startGame(deps: GameDeps): GameHandle {
       applyAudioSettings(mixer, audioApplied.audio);
       applyQuality();
     }
+    // M2 (fase 8c): a versão nova baixada pelo service worker só vale no título (GDD §2), nunca no meio da partida.
+    if (screen === 'title' && !deps.bench && platform.updates?.ready) {
+      log('[game] versão nova: aplicando no título');
+      platform.updates.apply();
+    }
     updateMusic();
     platform.input.poll(raw);
     menuInput.update(raw, dt);

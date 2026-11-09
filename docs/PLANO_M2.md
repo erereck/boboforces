@@ -321,7 +321,7 @@ o service worker (tecnico.md §19.1). Entram antes do portão final.
 - **8b. Qualidade.** Pronta em 09/11 (`ARCHITECTURE.md` §12.51). Linha "Qualidade" na aba Vídeo (Automática, Leve, Média, Alta), aplicada na escala de resolução,
   nos detritos e, no Leve, na visão. A Automática lê o aparelho (GPU, núcleos, memória, tela) e a lista de GPUs fracas,
   e escolhe uma vez; a escolha fica no save e não volta a rodar depois que o jogador mexe.
-- **8c. Service worker** escrito à mão (sem dependência nova): escopo próprio, precache da casca e cache-first nos
+- **8c. Service worker** pronto em 09/11 (`ARCHITECTURE.md` §12.52), escrito à mão (sem dependência nova): escopo próprio, precache da casca e cache-first nos
   arquivos com hash. A versão nova só é aplicada no menu; depois de atualizar, aparece a tela de Novidades.
 - **8d. Portão e medições:** `npm run check`, builds, `size-check`, `portcheck --strict`, `smoke:web`, balance e o bench
   do PC com 40 bots, tudo registrado no `PERF.md`.

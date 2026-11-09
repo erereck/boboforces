@@ -482,6 +482,11 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - A Automática lê o aparelho uma vez (GPU, núcleos, memória e uma lista de GPUs fracas) e guarda o nível no save.
   - Na partida, se mais de 10% dos quadros dos primeiros 10 s passam do alvo, ela baixa um nível para as próximas.
   - No Switch só os detritos mudam (720p fixo). 8 testes novos.
+- **Fase 8c, service worker:** o site abre e joga sem rede depois da primeira visita.
+  - O `sw.js` é gerado no build e guarda casca, código, Construto, Ringue e sons num cache da versão.
+  - A versão nova baixa em segundo plano e só é aplicada no título, nunca no meio da partida. A página recarrega
+    gravando o save antes.
+  - Sem dependência nova. 7 testes novos.
 - **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
   em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
   - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.

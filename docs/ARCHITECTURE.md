@@ -2057,3 +2057,38 @@ pela tela "aperte A" (`input/local-players.ts`, que segue sem uso).
 - **Medido no Edge headless (Intel UHD):** a Automática deu Média; o Leve levou o buffer de 1280×720 para 1088×612;
   numa partida, 0 de 601 quadros lentos, então a Média se manteve (`local/m2/capturar-qualidade.ts` e
   `conferir-sonda-qualidade.ts`).
+
+### 12.52 Fase 8c: o service worker (09/11/2026)
+
+Escrito à mão, sem o vite-plugin-pwa do tecnico.md §19.1 (seria dependência nova, regra 22).
+
+- **Build:** o plugin `boboforces:service-worker` (`vite.config.ts`, `enforce: 'post'`, só no build) grava `sw.js`
+  na raiz do `dist` (`scripts/service-worker.ts`).
+  - A versão é o sha256 do código do worker mais o nome e o conteúdo de cada arquivo do build. Mudou um byte, o
+    `sw.js` muda e o navegador instala a versão nova.
+  - O precache (`precacheList`) leva o `./` (o index) e todo o `dist`, menos a música (1 MB, sob demanda: entra no
+    cache quando toca), o `/bench/`, o próprio `sw.js` e os `.map`. Hoje são 59 arquivos.
+- **Worker:**
+  - Um cache por versão, `boboforces-<versão>`. Na ativação, apaga só os caches `boboforces-` antigos, porque a
+    origem é dividida com o gamebobo (tecnico.md §15).
+  - Tudo do escopo é servido do cache primeiro (cache-first). A navegação para o index, com ou sem query, responde com
+    o `./`; o resto busca pelo próprio pedido, com `ignoreVary`.
+  - O `ignoreVary` é necessário porque o import dinâmico do chunk da cena manda `Origin` e um `Vary: Origin` do
+    servidor fazia o cache errar: o `vite preview` reprovou o "sem rede" assim.
+  - No install, os arquivos com hash vêm do cache HTTP; os sem hash (`assets/<lógico>`, o index) revalidam
+    (`no-cache`), para a versão nova nunca guardar um arquivo velho.
+  - A versão nova fica em espera até receber `boboforces:apply-update`.
+- **Contrato:** `Platform.updates?: UpdateService` (`ready` e `apply()`), opcional. Ausente no Switch, no
+  `npm run dev`, no `?bench` e na prévia do título do Switch. O `main.ts` liga com `import.meta.env.PROD`.
+- **Página** (`platform/updates.ts`):
+  - Registra 4 s depois do `load`, para o precache não disputar a banda do menu, e procura versão nova a cada 30 min.
+  - Só conta como atualização se a página já tinha controlador; na 1ª visita é a instalação.
+  - O `apply` manda a mensagem. No `controllerchange`, grava o save (`storage.flush`) e recarrega.
+- **Jogo:** no `step`, com a tela no título e `updates.ready`, chama `apply()`. A tela de Novidades (fase 4g) aparece
+  no boot seguinte se a versão do `version.json` mudou.
+- **Conferido** (`local/m2/conferir-sw.ts`, `vite preview` + Edge):
+  - 1ª visita instala 59 arquivos; a 2ª é controlada.
+  - Sem rede, o título abre e a partida começa.
+  - Com um `sw.js` novo no disco, a versão nova espera durante a partida; ao sair para o título, a página recarrega
+    nela e sobra 1 cache.
+  - `smoke:web` ok. Menu em 345,7 de 350 KB (fases 8a–8c e o teste do sofá somam 1,7 KB).

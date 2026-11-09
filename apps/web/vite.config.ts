@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,7 @@ import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
 import runtimeAssets from '../../assets-src/runtime-assets.json' with { type: 'json' };
 import versionJson from '../../version.json' with { type: 'json' };
 import { composeLicenseNotices, UI_FONT_NOTICES_PATH, type PackageNotice } from './scripts/licenses.ts';
+import { precacheList, serviceWorkerSource } from './scripts/service-worker.ts';
 
 // Casca web (tecnico.md §19.1).
 // - `base: './'`: funciona no GitHub Pages com subcaminho (/boboforces/) e num domínio próprio no futuro.
@@ -14,7 +16,8 @@ import { composeLicenseNotices, UI_FONT_NOTICES_PATH, type PackageNotice } from 
 //   `net` entra como import dinâmico no M5 e vira chunk próprio sozinho. O Vite põe `modulepreload` dos chunks iniciais
 //   no index.html; sem polyfill, porque todo navegador com ES2022 que importa já tem `modulepreload` ou ignora a dica.
 // - Servidor só em 127.0.0.1 (nada exposto na rede local sem querer).
-// - Sem service worker no M0 (chega no M2 com a tela de "Novidades").
+// - Service worker (M2, fase 8c): `sw.js` gerado no fim do build (`scripts/service-worker.ts`); a página só registra
+//   no build de produção.
 // - Assets do jogo (`assets-src/runtime-assets.json`) servidos em `assets/<caminho lógico>`: middleware no dev,
 //   arquivos emitidos no build. Os do menu ganham `<link rel=preload as=fetch>` (baixam junto com o JS e entram na
 //   conta da carga inicial do size-check).
@@ -172,9 +175,34 @@ function licenseNotices(): Plugin {
   };
 }
 
+/**
+ * M2 (fase 8c): grava `sw.js` depois de todos os outros plugins (`enforce: 'post'`), com a lista do precache e a
+ * versão = hash do conteúdo de todo o build (mudou um byte de qualquer arquivo, o navegador vê um `sw.js` novo).
+ */
+function serviceWorker(): Plugin {
+  return {
+    name: 'boboforces:service-worker',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const hash = createHash('sha256');
+      // O código do próprio worker também conta: mudou a lógica, o cache é outro.
+      hash.update(serviceWorkerSource('', []));
+      const names = Object.keys(bundle).sort();
+      for (const name of names) {
+        const out = bundle[name]!;
+        hash.update(name);
+        hash.update(out.type === 'chunk' ? out.code : out.source);
+      }
+      const version = hash.digest('hex').slice(0, 16);
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: serviceWorkerSource(version, precacheList(names)) });
+    },
+  };
+}
+
 export default defineConfig({
   base: './',
-  plugins: [versionInHtml(versionJson.version), gameAssets(), benchRedirect(), licenseNotices()],
+  plugins: [versionInHtml(versionJson.version), gameAssets(), benchRedirect(), licenseNotices(), serviceWorker()],
   define: {
     __BF_VERSION__: JSON.stringify(versionJson.version),
     __BF_CODENAME__: JSON.stringify(versionJson.codename),

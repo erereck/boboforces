@@ -20,3 +20,11 @@ interface Window {
    */
   __bfDebug?: import('./debug-hook.ts').WebDebugHook;
 }
+
+/** O `import.meta.env` do Vite, só o que a casca lê (fase 8c: o service worker só no build de produção). */
+interface ImportMetaEnv {
+  readonly PROD: boolean;
+}
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
