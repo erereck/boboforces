@@ -2,7 +2,7 @@ import { FIGURE_BONE } from '@boboforces/format';
 import { BUTTON } from '@boboforces/input';
 import { DEG_TO_RAD } from '@boboforces/shared';
 import { ZOMBIE_RULES } from '../config/zombie.ts';
-import { hostile, isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
+import { canHurt, hostile, isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, type AimPoint } from '../hitbox.ts';
 import { isLivePhase } from '../view.ts';
@@ -53,7 +53,7 @@ function swing(ctx: SimContext, e: number): void {
   let best = -1;
   let bestD2 = RANGE2;
   for (let j = 0; j < s.count; j++) {
-    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0 || !hostile(ctx, e, j)) continue;
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0 || !canHurt(ctx, e, j)) continue;
     const j3 = j * 3;
     const dx = s.position[j3]! - ex;
     const dz = s.position[j3 + 2]! - ez;

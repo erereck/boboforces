@@ -49,7 +49,13 @@ export function damageSystem(ctx: SimContext): void {
     const source = q.attacker[i]!;
     let amount = q.amount[i]!;
     // M2 (fase 3b): multiplicador de dano de quem atacou (regra do bot).
-    if (source !== NULL_ENTITY && s.isCurrent(source)) amount *= ctx.rules.damageMult[source & 0xffff]!;
+    if (source !== NULL_ENTITY && s.isCurrent(source)) {
+      const a = source & 0xffff;
+      amount *= ctx.rules.damageMult[a]! * ctx.mods.damageMul;
+      // M2 (fase 4e): fogo amigo pela metade ou inteiro; um tiro mata (só dano de arma, nunca no aliado sem fogo amigo).
+      if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
+      if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
+    }
     // Proteção de spawn segura dano de inimigo; queda e plano de morte passam.
     if (source !== NULL_ENTITY && (s.flags[t]! & F.spawnProtected) !== 0) amount = 0;
     if (ctx.match.phase === 'ended' && source !== NULL_ENTITY) amount = 0;

@@ -1412,3 +1412,28 @@ mudanças de contrato ficam registradas aqui.
   separadas) e os itens recortados da coluna com rolagem, e cobre o menu principal, a Partida Rápida, os Modos e o
   Surpreenda-me nos 6 alvos e no Switch.
 - **Tamanho:** o menu foi a 313,6 KB (+2,0 KB).
+
+### 12.24 Fase 4e, parte 1: regras da partida no preset e na sim (09/11/2026)
+
+- **`preset@1` (format):**
+  - `PlayerRules` ganha `regen` (`REGEN_RULES`), `spawnProtectionS` (0 a 5), `gravity` (0,25 a 2) e
+    `fallDamage`;
+  - `WeaponRules`: `damageMul` (0,25 a 5), `headshotOnly`, `oneShot`, `ammo` (`AMMO_MODES`), `ads`, `recoil`,
+    `spread`, `friendlyFire` (0, 0,5 ou 1), `selfDamage`, `sniperBodyKill`, `allowed` (ids de arma conhecidos;
+    o desconhecido sai com `content.missingWeapon`) e `aimAssist`;
+  - `HudRules`: `killFeed`, `hitmarker`, `allyMarkers`;
+  - tudo validado no padrão do `players` (limite com `recipe.valueClamped`, tipo errado com
+    `recipe.invalidField`).
+- **sim:**
+  - `MatchMods` no contexto e na vista (`SimView.mods`), com `DEFAULT_MATCH_MODS`, fora do estado e do hash;
+  - `canHurt` (inimigo, ou aliado com fogo amigo) nos filtros de alvo da bala, da faca e da explosão; o
+    `damageSystem` aplica `damageMul`, o fogo amigo e o "um tiro mata"; o abate só conta com `hostile`;
+  - "só cabeça" e "sniper mata no corpo" ficam no `rayDamage`; sem ADS, `adsAmount` não sobe; sem espalhamento,
+    `aimSpread` é 0; sem recuo, nada de `kickRecoil`; sem autodano, a própria explosão não fere;
+  - a regeneração multiplica a padrão (0, ½, 1, 2); a proteção de spawn vem da receita;
+  - o perfil de movimento escala a gravidade e divide a altura do pulo pelo mesmo fator (a velocidade do pulo fica);
+  - munição e armas permitidas da partida valem para todos (com a regra do bot, a munição mais generosa e a
+    interseção das armas).
+- **ai:** a sniper não espera a mira cheia se a partida não tem ADS (`view.mods.ads`).
+- **game (cena):** `hud.*` desliga o kill feed, o hitmarker e os marcadores dos aliados; `weapons.aimAssist` falso
+  zera a assistência.

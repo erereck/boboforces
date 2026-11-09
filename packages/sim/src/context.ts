@@ -141,6 +141,39 @@ export interface PlayArea {
 }
 
 /** Tudo que os sistemas precisam, montado uma vez no `createSim`. Valores em ticks já convertidos pelo `hz` da partida. */
+/**
+ * M2 (fase 4e): modificadores da partida (gameplay.md §4.5; `MatchRecipe.weapons`), fixos na partida (fora do estado e
+ * do hash). Os padrões (`DEFAULT_MATCH_MODS`) são o jogo de sempre.
+ */
+export interface MatchMods {
+  /** Multiplicador do dano de arma (0,25 a 5). */
+  readonly damageMul: number;
+  /** Só tiro na cabeça fere (bala e chumbo; explosão e faca seguem valendo). */
+  readonly headshotOnly: boolean;
+  /** Qualquer dano de arma mata. */
+  readonly oneShot: boolean;
+  readonly ads: boolean;
+  readonly recoil: boolean;
+  readonly spread: boolean;
+  /** Fogo amigo: 0 (desligado: a bala passa pelo aliado), 0,5 ou 1. */
+  readonly friendlyFire: number;
+  readonly selfDamage: boolean;
+  /** A sniper mata em qualquer parte do corpo. */
+  readonly sniperBodyKill: boolean;
+}
+
+export const DEFAULT_MATCH_MODS: MatchMods = {
+  damageMul: 1,
+  headshotOnly: false,
+  oneShot: false,
+  ads: true,
+  recoil: true,
+  spread: true,
+  friendlyFire: 0,
+  selfDamage: true,
+  sniperBodyKill: false,
+};
+
 export interface SimContext {
   readonly s: SimState;
   readonly events: EventQueue;
@@ -184,6 +217,8 @@ export interface SimContext {
   readonly ammoBoxTicks: number;
   /** M2 (fase 3b): regras por entidade. */
   readonly rules: EntityRules;
+  /** M2 (fase 4e): modificadores da partida. */
+  readonly mods: MatchMods;
   /** Abaixo disto (pés, m) o bobo morre (tecnico.md §4.5). */
   readonly killPlaneY: number;
   /** Área jogável do mapa, ou `null` (a grade inteira; a borda da grade já é parede para a colisão). */
@@ -208,6 +243,16 @@ export function hostile(ctx: SimContext, a: number, b: number): boolean {
   const zb = s.kind[b] === ENTITY_KIND.zombie;
   if (za || zb) return za !== zb;
   return ctx.ffa || s.team[a] !== s.team[b];
+}
+
+/**
+ * M2 (fase 4e): `a` pode ferir `b`? Inimigos sempre; com fogo amigo, também o aliado (bobo do mesmo time, nunca a si
+ * mesmo). Quem decide se o abate conta é o `hostile`.
+ */
+export function canHurt(ctx: SimContext, a: number, b: number): boolean {
+  if (a === b) return false;
+  if (hostile(ctx, a, b)) return true;
+  return ctx.mods.friendlyFire > 0 && ctx.s.kind[a] === ENTITY_KIND.bobo && ctx.s.kind[b] === ENTITY_KIND.bobo;
 }
 
 /** Entidade com corpo de bobo (bobo ou zumbi): anda, leva tiro e morre. */

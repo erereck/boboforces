@@ -2,7 +2,7 @@ import { FIGURE_BONE, type FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { weaponDef, type WeaponDef } from '../config/weapons.ts';
-import { hostile, isBody, PART_TORSO, type SimContext } from '../context.ts';
+import { canHurt, hostile, isBody, PART_TORSO, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, type EntityId } from '../entity.ts';
 import { figurePostureOf, weaponGrip } from '../hitbox.ts';
@@ -230,7 +230,7 @@ function bodyOnSegment(
   let best = -1;
   for (let j = 0; j < s.count; j++) {
     if (s.alive[j] === 0 || !isBody(s.kind[j]!) || j === o) continue;
-    if (o >= 0 && !hostile(ctx, o, j)) continue;
+    if (o >= 0 && !canHurt(ctx, o, j)) continue;
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
     const bone = figures.testEntity(s, j, figurePostureOf(fj, weaponGrip(s.weapon[j]!), s.kind[j]!), ctx.tick);
@@ -266,7 +266,7 @@ export function explode(
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
     const self = j === o;
-    if (!self && o >= 0 && !hostile(ctx, o, j)) continue;
+    if (!self && o >= 0 && !canHurt(ctx, o, j)) continue;
     // Ponto mais perto da AABB do corpo.
     const j3 = j * 3;
     const half = METRICS.aabbWidth / 2;
@@ -305,7 +305,8 @@ export function explode(
       }
     }
     const falloff = 1 - dist / radius;
-    const amount = def.blastDamage * falloff * (self ? def.selfDamageMul : 1);
+    // M2 (fase 4e): sem autodano na partida, a própria explosão não fere.
+    const amount = def.blastDamage * falloff * (self ? (ctx.mods.selfDamage ? def.selfDamageMul : 0) : 1);
     if (amount <= 0) continue;
     const i = ctx.damage.push(j, owner, amount, PART_TORSO, FIGURE_BONE.torso, def.code, cx, cy, cz);
     ctx.damage.setDirection(i, dx, dy, dz, BLAST_MIN_FORCE + def.killForce * falloff);

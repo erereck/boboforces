@@ -16,6 +16,7 @@ import {
 import {
   AMMO_RULE,
   HIT_PARTS,
+  canHurt,
   hostile,
   isBody,
   PART_HEAD,
@@ -142,8 +143,11 @@ export function weaponSystem(ctx: SimContext): void {
 
     // ADS: entra e sai em `adsInS` (o movimento liga o bit `ads` só parado de correr e de deslizar).
     const adsStep = def.adsInS > 0 ? ctx.dt / def.adsInS : 1;
+    // M2 (fase 4e): sem ADS na partida, a mira nunca entra.
     s.adsAmount[e] =
-      (fl & F.ads) !== 0 ? Math.min(1, s.adsAmount[e]! + adsStep) : Math.max(0, s.adsAmount[e]! - adsStep);
+      (fl & F.ads) !== 0 && ctx.mods.ads
+        ? Math.min(1, s.adsAmount[e]! + adsStep)
+        : Math.max(0, s.adsAmount[e]! - adsStep);
 
     const trigger = def.automatic ? (btn & BUTTON.fire) !== 0 : (pressed & BUTTON.fire) !== 0;
 
@@ -325,8 +329,12 @@ function coneOffset(ctx: SimContext, halfAngle: number): void {
   dir[2] = nz;
 }
 
-/** Meio-ângulo da dispersão da mira (rad) pelo estado do corpo e pelo ADS. */
+/** M2 (fase 4e): dano da "sniper mata no corpo" (passa de qualquer vida da faixa da receita). */
+const SNIPER_KILL_DAMAGE = 10_000;
+
+/** Meio-ângulo da dispersão da mira (rad) pelo estado do corpo e pelo ADS; 0 sem espalhamento na partida. */
 function aimSpread(ctx: SimContext, e: number, def: WeaponDef, fl: number): number {
+  if (!ctx.mods.spread) return 0;
   const s = ctx.s;
   const i3 = e * 3;
   const vx = s.velocity[i3]!;
@@ -360,7 +368,7 @@ function castRay(ctx: SimContext, e: number, ox: number, oy: number, oz: number,
   let best = -1;
   let bestBone: FigurePart = FIGURE_BONE.torso;
   for (let j = 0; j < s.count; j++) {
-    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || !hostile(ctx, e, j)) continue;
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || !canHurt(ctx, e, j)) continue;
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
     const bone = figures.testEntity(s, j, figurePostureOf(fj, weaponGrip(s.weapon[j]!), s.kind[j]!), ctx.tick);
@@ -398,6 +406,9 @@ function emitImpact(ctx: SimContext): void {
  */
 function rayDamage(ctx: SimContext, def: WeaponDef, t: number, bone: FigurePart, target: number): number {
   const cat = FIGURE_PART_CATEGORY[bone]!;
+  // M2 (fase 4e): sniper mata no corpo; só cabeça conta.
+  if (ctx.mods.sniperBodyKill && def.category === 'sniper') return SNIPER_KILL_DAMAGE;
+  if (ctx.mods.headshotOnly && cat !== PART_HEAD) return 0;
   const base = weaponDamageAt(def, t);
   if (cat === PART_HEAD) {
     return base * ((ctx.rules.flags[target]! & RULE_FLAG.headshotImmune) !== 0 ? 1 : def.headMultiplier);
@@ -426,7 +437,7 @@ function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: 
   const cz = dir[2]!;
 
   // Recuo para os próximos tiros: sobe, e anda no padrão horizontal da arma mais o ruído.
-  kickRecoil(ctx, e, def);
+  if (ctx.mods.recoil) kickRecoil(ctx, e, def);
 
   const shooter = s.idOf(e);
   const code = s.weapon[e]!;
@@ -522,7 +533,7 @@ function swingKnife(ctx: SimContext, e: number, def: WeaponDef): void {
   let best = -1;
   let bestD2 = range2;
   for (let j = 0; j < s.count; j++) {
-    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0 || !hostile(ctx, e, j)) continue;
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0 || !canHurt(ctx, e, j)) continue;
     const j3 = j * 3;
     const dx = s.position[j3]! - ex;
     const dz = s.position[j3 + 2]! - ez;
@@ -594,7 +605,7 @@ function fireRocket(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: n
   s.lastShotTick[e] = ctx.tick;
   aimDirection(ctx, e);
   coneOffset(ctx, aimSpread(ctx, e, def, fl));
-  kickRecoil(ctx, e, def);
+  if (ctx.mods.recoil) kickRecoil(ctx, e, def);
   const e3 = e * 3;
   const v = def.projectileSpeed;
   launchProjectile(

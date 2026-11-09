@@ -19,7 +19,7 @@ import {
 import type { NavGrid } from '@boboforces/nav';
 import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } from '@boboforces/world';
 import { BASE_HP, METRICS } from './config/metrics.ts';
-import { MOVEMENT_BOBO } from './config/movement.ts';
+import { MOVEMENT_BOBO, type MovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
 import { ZOMBIE_RULES, MOVEMENT_ZOMBIE } from './config/zombie.ts';
@@ -32,7 +32,16 @@ import {
   SIM_HZ,
   ZOMBIE_CONTROLLER_BASE,
 } from './constants.ts';
-import { AMMO_RULE, DamageQueue, RULE_FLAG, type EntityRules, type MatchState, type SimContext } from './context.ts';
+import {
+  AMMO_RULE,
+  DamageQueue,
+  DEFAULT_MATCH_MODS,
+  RULE_FLAG,
+  type EntityRules,
+  type MatchMods,
+  type MatchState,
+  type SimContext,
+} from './context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM, NULL_ENTITY, type EntityId } from './entity.ts';
 import { EventQueue } from './event-queue.ts';
 import { bindFigureTable, FigureHitCache, unbindFigureTable } from './hitbox.ts';
@@ -205,6 +214,63 @@ function applyBotRules(r: EntityRules, e: number, rules: typeof DEFAULT_BOT_RULE
     (rules.headshotImmune ? RULE_FLAG.headshotImmune : 0) | (rules.explodeOnDeath ? RULE_FLAG.explodeOnDeath : 0);
 }
 
+/** M2 (fase 4e): regeneração da receita, em fração da padrão (25/s). */
+const REGEN_FACTOR = { off: 0, slow: 0.5, default: 1, fast: 2 } as const;
+
+/** M2 (fase 4e): os modificadores de arma da receita, sobre os padrões. */
+function matchModsOf(recipe: MatchRecipe): MatchMods {
+  const w = recipe.weapons;
+  if (w === undefined) return DEFAULT_MATCH_MODS;
+  const d = DEFAULT_MATCH_MODS;
+  return {
+    damageMul: w.damageMul ?? d.damageMul,
+    headshotOnly: w.headshotOnly ?? d.headshotOnly,
+    oneShot: w.oneShot ?? d.oneShot,
+    ads: w.ads ?? d.ads,
+    recoil: w.recoil ?? d.recoil,
+    spread: w.spread ?? d.spread,
+    friendlyFire: w.friendlyFire ?? d.friendlyFire,
+    selfDamage: w.selfDamage ?? d.selfDamage,
+    sniperBodyKill: w.sniperBodyKill ?? d.sniperBodyKill,
+  };
+}
+
+/**
+ * M2 (fase 4e): o perfil de movimento com a gravidade e o dano de queda da receita. A gravidade menor mantém a
+ * velocidade do pulo (o pulo sobe mais e demora mais no ar), por isso a altura do pulo divide pelo mesmo fator.
+ */
+function matchProfile(recipe: MatchRecipe): MovementProfile {
+  const g = recipe.players?.gravity ?? 1;
+  const fall = recipe.players?.fallDamage;
+  if (g === 1 && fall === undefined) return MOVEMENT_BOBO;
+  return {
+    ...MOVEMENT_BOBO,
+    gravity: MOVEMENT_BOBO.gravity * g,
+    jump: MOVEMENT_BOBO.jump / g,
+    fallDamage: fall ?? MOVEMENT_BOBO.fallDamage,
+  };
+}
+
+/**
+ * M2 (fase 4e): munição e armas permitidas da partida valem para todos (humanos e bots). Com regra do bot também, a
+ * munição fica a mais generosa e as armas, a interseção (se não sobrar nenhuma, valem as da partida).
+ */
+function applyMatchWeaponRules(r: EntityRules, e: number, recipe: MatchRecipe): void {
+  const w = recipe.weapons;
+  if (w === undefined) return;
+  if (w.ammo === 'infiniteClip') r.ammo[e] = AMMO_RULE.infiniteClip;
+  else if (w.ammo === 'infiniteReserve' && r.ammo[e] !== AMMO_RULE.infiniteClip) r.ammo[e] = AMMO_RULE.infiniteReserve;
+  if (w.allowed !== undefined && w.allowed.length > 0) {
+    let mask = 0;
+    for (const id of w.allowed) {
+      const code = WEAPONS.findIndex((def) => def.id === id);
+      if (code >= 0) mask |= 1 << code;
+    }
+    const both = r.weaponMask[e]! & mask;
+    r.weaponMask[e] = r.weaponMask[e] === 0 || both === 0 ? mask : both;
+  }
+}
+
 /** Menor Y (m) com bloco na grade; o plano de morte fica `METRICS.killPlaneBelow` abaixo dele. */
 function lowestBlockY(grid: WorldGrid): number {
   for (let y = 0; y < grid.sizeY; y++) {
@@ -286,7 +352,7 @@ export function createSim(config: SimConfig): Sim {
     colliders: map.colliders ?? null,
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
-    profile: MOVEMENT_BOBO,
+    profile: matchProfile(recipe),
     zombieProfile: MOVEMENT_ZOMBIE,
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
@@ -295,9 +361,9 @@ export function createSim(config: SimConfig): Sim {
     tick: 0,
     maxHp: recipe.players?.hp ?? BASE_HP,
     respawnTicks: Math.max(1, secondsToTicks(recipe.players?.respawnS ?? MATCH_DEFAULTS.respawnS, hz)),
-    spawnProtectTicks: secondsToTicks(MATCH_DEFAULTS.spawnProtectionS, hz),
+    spawnProtectTicks: secondsToTicks(recipe.players?.spawnProtectionS ?? MATCH_DEFAULTS.spawnProtectionS, hz),
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
-    regenPerTick: MATCH_DEFAULTS.regenPerS / hz,
+    regenPerTick: (MATCH_DEFAULTS.regenPerS * REGEN_FACTOR[recipe.players?.regen ?? 'default']) / hz,
     scoreLimit: recipe.match?.scoreLimit ?? 0,
     suddenDeathTicks: secondsToTicks(MATCH_DEFAULTS.suddenDeathS, hz),
     assistWindowTicks: secondsToTicks(MATCH_DEFAULTS.assistWindowS, hz),
@@ -309,6 +375,7 @@ export function createSim(config: SimConfig): Sim {
     navMainComponent: map.nav ? mainComponent(map.nav) : -1,
     ammoBoxTicks: secondsToTicks(MATCH_DEFAULTS.ammoBoxLifeS, hz),
     rules: createEntityRules(recipe.players?.hp ?? BASE_HP),
+    mods: matchModsOf(recipe),
     killPlaneY: map.killPlaneY ?? lowestBlockY(map.grid) - METRICS.killPlaneBelow,
     playArea: map.playArea ?? null,
     zombieHp: ZOMBIE_RULES.hp,
@@ -327,6 +394,7 @@ export function createSim(config: SimConfig): Sim {
     s.controllerEntity[slot.controller] = id;
     s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
     if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, ctx.maxHp);
+    applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
     const k = perTeam[slot.team]!;
     perTeam[slot.team] = k + 1;
     respawn(ctx, id & 0xffff, initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k));
@@ -410,6 +478,7 @@ export function createSim(config: SimConfig): Sim {
     colliders: map.colliders ?? null,
     nav: map.nav ?? null,
     playArea: map.playArea ?? null,
+    mods: ctx.mods,
   };
   const syncView = (): void => {
     view.tick = ctx.tick;

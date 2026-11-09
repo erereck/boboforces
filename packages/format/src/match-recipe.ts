@@ -67,10 +67,54 @@ export interface MatchRules {
   readonly viewDistanceM?: number;
 }
 
+/** Regeneração da vida (gameplay.md §10.3): desligada, lenta, padrão (25/s depois de 5 s) ou rápida. */
+export const REGEN_RULES = ['off', 'slow', 'default', 'fast'] as const;
+export type RegenRule = (typeof REGEN_RULES)[number];
+
 export interface PlayerRules {
   readonly movement?: MovementProfileId;
   readonly hp?: number;
   readonly respawnS?: number;
+  /** M2 (fase 4e): regeneração, proteção de spawn (s), gravidade (multiplicador) e dano de queda. */
+  readonly regen?: RegenRule;
+  readonly spawnProtectionS?: number;
+  readonly gravity?: number;
+  readonly fallDamage?: boolean;
+}
+
+/** Munição da partida (gameplay.md §4.5): normal, reserva infinita ou pente infinito. */
+export const AMMO_MODES = ['normal', 'infiniteReserve', 'infiniteClip'] as const;
+export type AmmoMode = (typeof AMMO_MODES)[number];
+
+/** Fogo amigo (gameplay.md §4.5): desligado, metade ou inteiro. */
+export const FRIENDLY_FIRE_LEVELS = [0, 0.5, 1] as const;
+
+/**
+ * M2 (fase 4e): os modificadores de arma do M2 (gameplay.md §4.5), regras da partida inteira. Ausente = o padrão do
+ * jogo (dano 1×, munição normal, ADS, recuo e espalhamento ligados, fogo amigo desligado, autodano ligado).
+ */
+export interface WeaponRules {
+  readonly damageMul?: number;
+  readonly headshotOnly?: boolean;
+  readonly oneShot?: boolean;
+  readonly ammo?: AmmoMode;
+  readonly ads?: boolean;
+  readonly recoil?: boolean;
+  readonly spread?: boolean;
+  readonly friendlyFire?: number;
+  readonly selfDamage?: boolean;
+  readonly sniperBodyKill?: boolean;
+  /** Ids de arma permitidos (`rifle`, `shotgun`…); vazio ou ausente = todas. */
+  readonly allowed?: readonly string[];
+  /** Assistência de mira permitida (padrão: sim). */
+  readonly aimAssist?: boolean;
+}
+
+/** M2 (fase 4e): o que a HUD mostra (gameplay.md §10.3, "Tela da partida"). Ausente = tudo ligado. */
+export interface HudRules {
+  readonly killFeed?: boolean;
+  readonly hitmarker?: boolean;
+  readonly allyMarkers?: boolean;
 }
 
 export interface MatchRecipe {
@@ -85,6 +129,9 @@ export interface MatchRecipe {
   readonly seed: number;
   readonly match?: MatchRules;
   readonly players?: PlayerRules;
+  /** M2 (fase 4e): modificadores de arma e o que a HUD mostra. */
+  readonly weapons?: WeaponRules;
+  readonly hud?: HudRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -105,6 +152,9 @@ export const RECIPE_RANGES = {
   viewDistanceM: { min: 20 },
   hp: { min: 25, max: 1000 },
   respawnS: { min: 0, max: 15 },
+  spawnProtectionS: { min: 0, max: 5 },
+  gravity: { min: 0.25, max: 2 },
+  damageMul: { min: 0.25, max: 5 },
   maxTeams: ENGINE_MAX_TEAMS,
   maxBotEntriesPerTeam: 16,
 } as const;
@@ -112,9 +162,36 @@ export const RECIPE_RANGES = {
 /** Bot que entra quando a ref não existe nesta versão (fallback de conteúdo). */
 export const FALLBACK_BOT_REF: BotRef = 'builtin:normal-bob';
 
-const TOP_KEYS = ['format', 'name', 'mode', 'map', 'seed', 'match', 'players', 'teams', 'embeddedBots'] as const;
+const TOP_KEYS = [
+  'format',
+  'name',
+  'mode',
+  'map',
+  'seed',
+  'match',
+  'players',
+  'weapons',
+  'hud',
+  'teams',
+  'embeddedBots',
+] as const;
 const MATCH_KEYS = ['timeLimitS', 'scoreLimit', 'viewDistanceM'] as const;
-const PLAYER_KEYS = ['movement', 'hp', 'respawnS'] as const;
+const PLAYER_KEYS = ['movement', 'hp', 'respawnS', 'regen', 'spawnProtectionS', 'gravity', 'fallDamage'] as const;
+const WEAPON_KEYS = [
+  'damageMul',
+  'headshotOnly',
+  'oneShot',
+  'ammo',
+  'ads',
+  'recoil',
+  'spread',
+  'friendlyFire',
+  'selfDamage',
+  'sniperBodyKill',
+  'allowed',
+  'aimAssist',
+] as const;
+const HUD_KEYS = ['killFeed', 'hitmarker', 'allyMarkers'] as const;
 const TEAM_KEYS = ['name', 'humans', 'bots'] as const;
 const BOT_KEYS = ['ref', 'count'] as const;
 
@@ -270,7 +347,107 @@ function readPlayers(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
     const { min, max } = RECIPE_RANGES.respawnS;
     out['respawnS'] = clampWarn(ctx, respawn, min, max, 'players.respawnS');
   }
+  // M2 (fase 4e).
+  readChoice(ctx, value, 'regen', 'players', REGEN_RULES, out);
+  readRange(ctx, value, 'spawnProtectionS', 'players', RECIPE_RANGES.spawnProtectionS, out);
+  readRange(ctx, value, 'gravity', 'players', RECIPE_RANGES.gravity, out);
+  readFlag(ctx, value, 'fallDamage', 'players', out);
   return Object.assign(out, unknownFields(value, PLAYER_KEYS));
+}
+
+/** Liga/desliga: só `true`/`false`; o resto vira aviso e fica de fora. */
+function readFlag(
+  ctx: Ctx,
+  src: Record<string, unknown>,
+  key: string,
+  block: string,
+  out: Record<string, unknown>,
+): void {
+  const v = src[key];
+  if (v === undefined) return;
+  if (typeof v === 'boolean') out[key] = v;
+  else warn(ctx, `${block}.${key}`, 'recipe.invalidField', describe(v));
+}
+
+function readChoice(
+  ctx: Ctx,
+  src: Record<string, unknown>,
+  key: string,
+  block: string,
+  allowed: readonly string[],
+  out: Record<string, unknown>,
+): void {
+  const v = src[key];
+  if (v === undefined) return;
+  if (typeof v === 'string' && allowed.includes(v)) out[key] = v;
+  else warn(ctx, `${block}.${key}`, 'recipe.invalidField', describe(v));
+}
+
+function readRange(
+  ctx: Ctx,
+  src: Record<string, unknown>,
+  key: string,
+  block: string,
+  range: { readonly min: number; readonly max: number },
+  out: Record<string, unknown>,
+): void {
+  const v = readNumber(ctx, src[key], `${block}.${key}`);
+  if (v !== undefined) out[key] = clampWarn(ctx, v, range.min, range.max, `${block}.${key}`);
+}
+
+/** M2 (fase 4e): os modificadores de arma (gameplay.md §4.5). */
+function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'weapons', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readRange(ctx, value, 'damageMul', 'weapons', RECIPE_RANGES.damageMul, out);
+  for (const key of [
+    'headshotOnly',
+    'oneShot',
+    'ads',
+    'recoil',
+    'spread',
+    'selfDamage',
+    'sniperBodyKill',
+    'aimAssist',
+  ]) {
+    readFlag(ctx, value, key, 'weapons', out);
+  }
+  readChoice(ctx, value, 'ammo', 'weapons', AMMO_MODES, out);
+  const ff = value['friendlyFire'];
+  if (ff !== undefined) {
+    if (typeof ff === 'number' && (FRIENDLY_FIRE_LEVELS as readonly number[]).includes(ff)) out['friendlyFire'] = ff;
+    else warn(ctx, 'weapons.friendlyFire', 'recipe.invalidField', describe(ff));
+  }
+  const allowed = value['allowed'];
+  if (allowed !== undefined) {
+    if (!Array.isArray(allowed)) warn(ctx, 'weapons.allowed', 'recipe.invalidField', describe(allowed));
+    else {
+      const ids: string[] = [];
+      for (const id of allowed) {
+        const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
+        if (r !== null && r.status === 'known' && !ids.includes(r.local)) ids.push(r.local);
+        else warn(ctx, 'weapons.allowed', 'content.missingWeapon', describe(id));
+      }
+      out['allowed'] = ids;
+    }
+  }
+  return Object.assign(out, unknownFields(value, WEAPON_KEYS));
+}
+
+/** M2 (fase 4e): o que a HUD mostra. */
+function readHud(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'hud', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  for (const key of HUD_KEYS) readFlag(ctx, value, key, 'hud', out);
+  return Object.assign(out, unknownFields(value, HUD_KEYS));
 }
 
 /** IDs dos bots embutidos no documento (o `bot@1` completo é validado no M2; aqui só a existência do id). */
@@ -470,6 +647,10 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (match !== undefined) out['match'] = match;
   const players = readPlayers(ctx, doc['players']);
   if (players !== undefined) out['players'] = players;
+  const weapons = readWeapons(ctx, doc['weapons']);
+  if (weapons !== undefined) out['weapons'] = weapons;
+  const hud = readHud(ctx, doc['hud']);
+  if (hud !== undefined) out['hud'] = hud;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

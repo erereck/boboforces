@@ -580,6 +580,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
+  /** M2 (fase 4e): o que a regra da partida deixa a HUD mostrar (`MatchRecipe.hud`) e a assistência permitida. */
+  const showKillFeed = recipe.hud?.killFeed ?? true;
+  const showHitmarker = recipe.hud?.hitmarker ?? true;
+  const showAllyMarkers = recipe.hud?.allyMarkers ?? true;
+  const assistAllowed = recipe.weapons?.aimAssist ?? true;
   /** M2 (fecho da fase 3): as regras ativas de cada controlador (placar e tela de morte). */
   const ruleTexts = controllerRules(recipe, humans);
   const deathTx = deathTexts();
@@ -1006,7 +1011,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const slot = slots[sIdx]!;
             if (slot.controller < 0) continue;
             const mine = s.controllerEntity(slot.controller);
-            if (mine === ev.shooter) {
+            // M2 (fase 4e): a regra da partida pode desligar o hitmarker.
+            if (mine === ev.shooter && showHitmarker) {
               if (ev.part === 'head') slot.model.headshotMarker = 1;
               else slot.model.hitMarker = 1;
             }
@@ -1452,7 +1458,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * interpolado do último quadro) e devolve a fricção (multiplicador da sensibilidade).
    */
   function aimAssistBefore(): number {
-    const level = player.profile.aimAssist;
+    const level = assistAllowed ? player.profile.aimAssist : 0;
     assist.target = -1;
     assist.scale = 1;
     if (level <= 0) return 1;
@@ -1471,7 +1477,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** Depois do `update`: o ímã (mexendo a mira ou andando) e, no Forte, a trava ao apertar o ADS. */
   function aimAssistAfter(dt: number, looked: boolean): void {
     if (assist.target < 0) return;
-    const level = player.profile.aimAssist;
+    const level = assistAllowed ? player.profile.aimAssist : 0;
     if (level >= AIM_ASSIST.snapLevel && player.wasPressed('ads')) {
       player.setAngles(assist.targetYaw, assist.targetPitch);
       return;
@@ -1836,6 +1842,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   /** M2 (fase 2d): uma morte no kill feed ("Normal Bob  Rattler  P1"; sem matador, "P1  Caiu no vazio"). */
   function feedKill(v: SimView, victim: number, killer: number, weapon: number, headshot: boolean): void {
+    if (!showKillFeed) return;
     const vi = entityIndex(victim);
     if (vi >= v.count) return;
     const ki = entityIndex(killer);
@@ -2122,7 +2129,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     // M2 (fase 2d): marcadores dos aliados (TDM), projetados com a câmera desta vista.
     m.markerCount = 0;
-    if (!ffa) {
+    if (!ffa && showAllyMarkers) {
       const team = v.team[e]!;
       m.markerColor = TEAM_COLORS[team] ?? COLORS.texto;
       const c = desc.camera;

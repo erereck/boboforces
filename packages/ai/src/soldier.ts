@@ -902,7 +902,8 @@ function canFire(
   if (held === null) return false;
   if (held.fire === WEAPON_FIRE.melee) return dist <= held.meleeRangeM;
   if (held.clipSize > 0 && heldClip(view, e) === 0) return false;
-  if (use.needFullAds && view.adsAmount[e]! < 0.95) return false;
+  // M2 (fase 4e): sem ADS na partida, a sniper atira sem esperar a mira cheia.
+  if (use.needFullAds && view.mods.ads && view.adsAmount[e]! < 0.95) return false;
   if (use.pistolBelowM > 0 && dist < use.pistolBelowM) {
     const other = use.splash
       ? b.personality.preset !== 'kamikaze'

@@ -215,6 +215,21 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Correções:** botão medido pelo texto agora arredonda para cima (o 640×360 cortava 0,4 px do "ROLAR DE NOVO"), e a
     área do valor da linha de opção foi para 320 px (cabia só "Times", não "Todos contra todos").
   - 8 testes novos, com as telas da fase 4 no teste de estouro de texto com o atlas real (6 alvos e o Switch).
+- **Fase 4e (parte 1), regras da partida:**
+  - **Formato:** o preset ganha os modificadores de arma do M2 (gameplay.md §4.5):
+    - dano de 0,25× a 5×;
+    - só cabeça conta e um tiro mata;
+    - munição (normal, reserva infinita, pente infinito);
+    - ADS, recuo e espalhamento ligados ou não;
+    - fogo amigo (desligado, metade, inteiro) e autodano;
+    - sniper mata no corpo;
+    - armas permitidas e assistência de mira permitida.
+  - **Jogadores e tela:** os jogadores ganham regeneração (desligada, lenta, padrão, rápida), proteção de spawn,
+    gravidade e dano de queda; a tela da partida pode tirar o kill feed, o hitmarker e os marcadores dos aliados.
+  - **Na sim:** com fogo amigo, a bala, a faca e a explosão acertam o aliado, e o abate de aliado não conta. Gravidade
+    menor faz o pulo subir mais.
+  - **Bots:** atiram com a sniper mesmo sem ADS na partida.
+  - **Golden e testes:** com os padrões, nada muda (golden igual). 9 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
