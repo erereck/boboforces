@@ -228,6 +228,7 @@ import {
 import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
+import { createWardrobe, WARDROBE, type Wardrobe } from './wardrobe.ts';
 import {
   aimFromCamera,
   createShoulderPose,
@@ -454,6 +455,17 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       seed: bench.seed >>> 0,
       match: { timeLimitS: 0, viewDistanceM: bench.viewDistanceM },
       teams: [{ bots: [{ ref, count: a }] }, { bots: b > 0 ? [{ ref, count: b }] : [] }],
+    };
+  } else if (request.kind === 'wardrobe') {
+    // M2 (fase 6c): o Meu Bobo: o Ringue sem ninguém (o bobo é um manequim).
+    humans = 0;
+    recipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'training',
+      map: 'ringue',
+      seed: request.seed >>> 0,
+      match: { timeLimitS: 0, scoreLimit: 0 },
+      teams: [{ bots: [] }],
     };
   } else if (request.kind === 'vitrine') {
     recipe = {
@@ -899,6 +911,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** Look do manequim: o do gancho, o da fila (com o pedido de prints) ou o do mapa; `null` = id desconhecido. */
   function mannequinLook(m: number, o: MannequinOverride | null): MannequinLook | null {
     const q = mannequins[m]!;
+    // M2 (fase 6c): o look inteiro (o Meu Bobo sendo editado), com o id que veio junto.
+    if (o?.lookData) return { id: o.look ?? WARDROBE.lookId, look: normalizeFigureLook(o.lookData), zombie: false };
     let id: string;
     if (o?.look !== undefined) id = bareLookId(o.look);
     else if (q.zombie) id = FIGURE_ZOMBIE_LOOK;
@@ -1007,11 +1021,40 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     overrideCamera = cameraByName.get('print:dia') ?? null;
   }
 
+  // --- M2 (fase 6c): o Meu Bobo (o editor; o bobo é o manequim do meio do Ringue) ---
+  const wardrobeMq = request.kind === 'wardrobe' ? (mannequinByName.get(WARDROBE.mannequin) ?? -1) : -1;
+  let wardrobe: Wardrobe | null = null;
+  if (wardrobeMq >= 0) {
+    overrideCamera = cameraByName.get(WARDROBE.camera) ?? null;
+    wardrobe = createWardrobe({
+      bobo: host.bobo,
+      seed: request.seed,
+      log: (line) => host.log(line),
+      apply(look, team) {
+        figures.restyle(WARDROBE.lookId, look);
+        const turn = mqTurn[wardrobeMq]!;
+        // Sem arma na mão: a roupa aparece inteira.
+        applyMannequin(wardrobeMq, {
+          name: WARDROBE.mannequin,
+          look: WARDROBE.lookId,
+          lookData: look,
+          team,
+          weapon: '',
+        });
+        mqTurn[wardrobeMq] = turn;
+        if (figures.takeTemplatesChanged()) renderer.setFigures(figures.templates, figures.table);
+      },
+      turn(deg) {
+        mqTurn[wardrobeMq] = (deg * Math.PI) / 180;
+      },
+    });
+  }
+
   // --- eventos da sim → VFX, HUD e estado cosmético ---
   let timeS = 0;
   /**
-   * Gabarito e skin do boneco da entidade i: zumbi; senão o look da rotação pelo controlador (o jogador 0 é o
-   * recruta, `FIGURE_BOT_ROTATION[0]`) no time dele (sem time no FFA). Tabelas prontas do loading: sem alocação.
+   * Gabarito e skin do boneco da entidade i: zumbi; o jogador 1 com o Meu Bobo (fase 6c); senão o look da rotação
+   * pelo controlador no time dele (sem time no FFA). Tabelas prontas do loading: sem alocação.
    */
   function resolveEntityFigure(v: SimView, i: number): void {
     if (v.kind[i] === ENTITY_KIND.zombie) {
@@ -1019,8 +1062,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       skinLayer[i] = figures.zombieSkin;
       return;
     }
-    const p = Math.max(0, v.controller[i]!) % figures.botLooks;
     const team = ffa || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
+    // M2 (fase 6c): o jogador 1 veste o Meu Bobo.
+    if (humans > 0 && v.controller[i] === 0) {
+      figureOf[i] = figures.playerFigure(team);
+      skinLayer[i] = figures.playerSkin(team);
+      return;
+    }
+    const p = Math.max(0, v.controller[i]!) % figures.botLooks;
     figureOf[i] = figures.botFigure(p, team);
     skinLayer[i] = figures.botSkin(p, team);
   }
@@ -3172,6 +3221,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }
         }
+      } else if (wardrobe) {
+        signal = wardrobe.frame(dt, menu, raw, ui);
       } else if (menu.pressed('back')) {
         // Bench: B (Switch) ou Esc interrompe; o relatório sai com o que foi medido.
         if (benchState && benchState.phase !== 'done') finishBench(true);
@@ -3287,6 +3338,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           }
         }
         drawBenchStatus(list, fonts, ui);
+        if (wardrobe) wardrobe.draw(list, ui);
         if (paused) pauseMenu.draw(list, ui);
         // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
         if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult(true);

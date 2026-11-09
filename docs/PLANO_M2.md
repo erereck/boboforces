@@ -269,7 +269,7 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
   - o tiro sai do olho, mirando no ponto que o raio da câmera acerta;
   - o próprio bobo aparece inteiro, com a arma na mão e sem viewmodel;
   - nos Ajustes: 1ª ou 3ª pessoa e o ombro; na receita: a regra "Câmera permitida" (1ª e 3ª, ou só 1ª).
-- **6c. Meu Bobo** (#17, #58, #62; GDD §4.7.2; arte-ux.md §2.4).
+- **6c. Meu Bobo** (#17, #58, #62; GDD §4.7.2; arte-ux.md §2.4). Pronta em 09/11 (`ARCHITECTURE.md` §12.41).
   - o look do jogador salvo para sempre num documento versionado;
   - o editor numa cena própria: o bobo girando num pedestal, com as abas ao lado;
   - abas: Pronto (os looks da farda e as fantasias), Rosto, Cabelo, Chapéu e Roupa, mais "Aleatório";

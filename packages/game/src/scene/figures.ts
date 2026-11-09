@@ -33,6 +33,8 @@ export const FIGURE_DEFAULT_LOOK = 'padrao';
 export const FIGURE_TEAM_SLOTS = 5;
 /** O zumbi (`skin:zombie`): look próprio, sempre sem time. */
 export const FIGURE_ZOMBIE_LOOK: FigurePresetId = 'zombie';
+/** M2 (fase 6c): o look do Meu Bobo (o jogador 1), um id que não é de preset. */
+export const FIGURE_PLAYER_LOOK = 'jogador';
 
 /** Um conjunto pedido: look (id de `FIGURE_PRESETS`, `padrao` ou um id de look montado pelo gancho) e time. */
 export interface FigureSkinSet {
@@ -125,6 +127,16 @@ export interface SceneFiguresInput {
   readonly onDemand: boolean;
   /** Tabela já montada (testes reaproveitam); ausente = monta aqui (a etapa "figuras"). */
   readonly table?: FigureGameTable;
+  /**
+   * M2 (fase 6c): o Meu Bobo e o time do jogador 1 (−1 sem time). Entra logo depois do zumbi no plano: nunca fica sem
+   * skin. Ausente = o jogador veste o 1º da rotação (o recruta), como até a fase 6b.
+   */
+  readonly player?: { readonly look: FigureLook; readonly team: number };
+  /**
+   * M2 (fase 6c): quantos looks da rotação dos bots entram (ausente = `figureBotLooks` do perfil). O Meu Bobo não tem
+   * bots: 1, e as vagas ficam para as skins sob demanda do editor.
+   */
+  readonly botLooks?: number;
   /** Só testes: rotação no lugar de `FIGURE_BOT_ROTATION` (id e look), sem o corte do perfil. */
   readonly rotation?: readonly (readonly [id: string, look: FigureLook])[];
 }
@@ -150,6 +162,9 @@ export interface SceneFigures {
   /** Gabarito e skin do bot com o preset p da rotação no time `team` (−1 = sem time). Sem alocação. */
   botFigure(p: number, team: number): number;
   botSkin(p: number, team: number): number;
+  /** M2 (fase 6c): gabarito e skin do jogador 1 no time `team` (o Meu Bobo; noutro time, o 1º da rotação). */
+  playerFigure(team: number): number;
+  playerSkin(team: number): number;
   readonly zombieFigure: number;
   readonly zombieSkin: number;
   /** Skins pintadas (`paintSkins`) e o cache delas; `null` antes da etapa "skins". */
@@ -166,6 +181,11 @@ export interface SceneFigures {
   resolve(lookId: string, look: FigureLook, team: number): FigureSlot | null;
   /** Solta as skins pedidas sob demanda pelo gancho (a lista de manequins mudou). */
   releaseOnDemand(): void;
+  /**
+   * M2 (fase 6c): o look do id passa a ser `look` (o Meu Bobo sendo editado): o gabarito é refeito no mesmo índice e
+   * as skins sob demanda desse id são soltas (a próxima `resolve` pinta de novo). Id sem gabarito ainda: só guarda.
+   */
+  restyle(lookId: string, look: FigureLook): void;
   /** Gabaritos mudaram desde a última leitura (o gancho dos prints acrescentou um look). */
   takeTemplatesChanged(): boolean;
   /** Fim da partida: solta o cache de skins e o pintor (regra 21); a tabela e os gabaritos saem com a partida. */
@@ -184,18 +204,21 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
 
   const rotation: readonly (readonly [string, FigureLook])[] =
     input.rotation ??
-    FIGURE_BOT_ROTATION.slice(0, Math.max(1, Math.min(FIGURE_BOT_ROTATION.length, input.profile.figureBotLooks))).map(
-      (id) => [id, FIGURE_PRESETS[id]] as const,
-    );
+    FIGURE_BOT_ROTATION.slice(
+      0,
+      Math.max(1, Math.min(FIGURE_BOT_ROTATION.length, input.botLooks ?? input.profile.figureBotLooks)),
+    ).map((id) => [id, FIGURE_PRESETS[id]] as const);
   const botLooks = rotation.length;
   /** Look de cada id conhecido nesta partida (presets, padrão, rotação de teste e os montados pelo gancho). */
   const lookById = new Map<string, FigureLook>();
   for (const [id, look] of rotation) lookById.set(id, look);
   lookById.set(FIGURE_ZOMBIE_LOOK, FIGURE_PRESETS.zombie);
   lookById.set(FIGURE_DEFAULT_LOOK, FIGURE_LOOK_DEFAULT);
+  if (input.player) lookById.set(FIGURE_PLAYER_LOOK, normalizeFigureLook(input.player.look));
 
   // Pedido na ordem de prioridade: zumbi, rotação × times, manequins do mapa e a fila dos prints.
   const requested: FigureSkinSet[] = [{ look: FIGURE_ZOMBIE_LOOK, team: -1 }];
+  if (input.player) requested.push({ look: FIGURE_PLAYER_LOOK, team: input.player.team });
   for (const [id] of rotation) for (const team of teams) requested.push({ look: id, team });
   for (const m of input.mannequins) {
     const id = m.zombie ? FIGURE_ZOMBIE_LOOK : bareLookId(m.look);
@@ -231,6 +254,8 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
   // Tabelas da partida por (preset da rotação, time): gabarito e skin (preenchidas no `paintSkins`).
   const botFigures = new Uint8Array(botLooks * FIGURE_TEAM_SLOTS);
   const botSkins = new Uint16Array(botLooks * FIGURE_TEAM_SLOTS);
+  const playerFigures = new Uint8Array(FIGURE_TEAM_SLOTS);
+  const playerSkins = new Uint16Array(FIGURE_TEAM_SLOTS);
   let zombieFigure = 0;
   let zombieSkin = 0;
   let cache: FigureSkinCache | null = null;
@@ -281,6 +306,8 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
     botLooks,
     botFigure: (p, team) => botFigures[(p % botLooks) * FIGURE_TEAM_SLOTS + slotOf(team)]!,
     botSkin: (p, team) => botSkins[(p % botLooks) * FIGURE_TEAM_SLOTS + slotOf(team)]!,
+    playerFigure: (team) => playerFigures[slotOf(team)]!,
+    playerSkin: (team) => playerSkins[slotOf(team)]!,
     get zombieFigure() {
       return zombieFigure;
     },
@@ -315,6 +342,12 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
           botSkins[p * FIGURE_TEAM_SLOTS + slot] = r ? r.skin : 0;
         }
       }
+      // O jogador 1: o Meu Bobo no time dele; noutro time (não acontece numa partida normal), o do bot 0.
+      for (let slot = 0; slot < FIGURE_TEAM_SLOTS; slot++) {
+        const r = input.player ? planned(FIGURE_PLAYER_LOOK, slot - 1) : null;
+        playerFigures[slot] = r ? r.figure : botFigures[slot]!;
+        playerSkins[slot] = r ? r.skin : botSkins[slot]!;
+      }
       const z = planned(FIGURE_ZOMBIE_LOOK, -1);
       zombieFigure = z ? z.figure : 0;
       zombieSkin = z ? z.skin : 0;
@@ -345,6 +378,23 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
       if (!cache) return;
       for (const skin of onDemand.values()) cache.release(skin);
       onDemand.clear();
+    },
+    restyle(lookId, look) {
+      if (disposed) return;
+      const clean = normalizeFigureLook(look);
+      lookById.set(lookId, clean);
+      const index = templateOf.get(lookId);
+      if (index !== undefined) {
+        templateLooks[index] = clean;
+        templates = createFigureTemplateSet(templateLooks);
+        templatesChanged = true;
+      }
+      if (!cache) return;
+      for (const [key, skin] of onDemand) {
+        if (!key.startsWith(`${lookId}|`)) continue;
+        cache.release(skin);
+        onDemand.delete(key);
+      }
     },
     takeTemplatesChanged() {
       const changed = templatesChanged;

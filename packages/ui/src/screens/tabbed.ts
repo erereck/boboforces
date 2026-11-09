@@ -15,7 +15,14 @@ export const TABBED_TAB_PREFIX = 'tab:';
 export const TABBED_ROW_PREFIX = 'row:';
 
 export type TabbedRow =
-  | { readonly kind: 'option'; readonly id: string; readonly labelKey: StringKey; readonly value: string }
+  | {
+      readonly kind: 'option';
+      readonly id: string;
+      readonly labelKey: StringKey;
+      readonly value: string;
+      /** M2 (fase 6c): quadradinho da cor (RGB) antes do valor (as cores do Meu Bobo). */
+      readonly swatch?: number;
+    }
   | { readonly kind: 'value'; readonly id: string; readonly labelKey: StringKey; readonly value: string }
   | {
       readonly kind: 'action';
@@ -42,12 +49,23 @@ export interface TabbedState {
   /** Aviso de uma linha, em âmbar, no lugar do resumo; `''` = nenhum. */
   readonly note: string;
   readonly buttons: readonly TabbedButton[];
+  /**
+   * M2 (fase 6c): painel à direita por cima da cena (o Meu Bobo: o bobo fica à esquerda), sem o fundo cheio, com as
+   * linhas e a área do valor nas larguras de `TABBED_LAYOUT`.
+   */
+  readonly panel?: boolean;
 }
 
 /** Medidas (px de referência): a coluna das linhas e a altura da janela dela. */
-export const TABBED_LAYOUT = { rowsWidth: 800, rowsHeight: 348 } as const;
+export const TABBED_LAYOUT = {
+  rowsWidth: 800,
+  rowsHeight: 348,
+  /** M2 (fase 6c): no painel à direita (o Meu Bobo), as linhas e a área do valor. */
+  panelRowsWidth: 640,
+  panelValueWidth: 300,
+} as const;
 
-function rowNode(row: TabbedRow): UiNode {
+function rowNode(row: TabbedRow, width: number, valueWidth: number | null): UiNode {
   switch (row.kind) {
     case 'option':
     case 'value':
@@ -58,8 +76,10 @@ function rowNode(row: TabbedRow): UiNode {
         action: `${TABBED_ROW_PREFIX}${row.id}`,
         value: { literal: row.value },
         ...(row.kind === 'value' ? { valueOnly: true } : {}),
+        ...(row.kind === 'option' && row.swatch !== undefined ? { swatch: row.swatch } : {}),
         variant: 'secondary',
-        width: TABBED_LAYOUT.rowsWidth,
+        width,
+        ...(valueWidth !== null ? { valueWidth } : {}),
       };
     case 'action':
       return {
@@ -68,7 +88,7 @@ function rowNode(row: TabbedRow): UiNode {
         text: row.label,
         action: `${TABBED_ROW_PREFIX}${row.id}`,
         variant: row.variant ?? 'secondary',
-        width: TABBED_LAYOUT.rowsWidth,
+        width,
       };
     case 'text':
       return {
@@ -97,40 +117,46 @@ export function buildTabbed(state: TabbedState): UiNode {
     ...down,
   }));
   const line = state.note !== '' ? state.note : state.summary;
+  const panel = state.panel === true;
+  const width = panel ? TABBED_LAYOUT.panelRowsWidth : TABBED_LAYOUT.rowsWidth;
+  const main: UiNode = {
+    kind: 'column',
+    id: 'main',
+    anchor: 'topLeft',
+    children: [
+      { kind: 'text', id: 'heading', text: { key: state.titleKey }, style: 'heading', color: COLORS.texto },
+      { kind: 'box', height: 4 },
+      // O resumo embaixo do título; o aviso toma o lugar dele enquanto vale.
+      {
+        kind: 'text',
+        id: state.note !== '' ? 'note' : 'summary',
+        text: { literal: line },
+        style: 'caption',
+        color: state.note !== '' ? COLORS.acao : COLORS.textoBaixo,
+      },
+      { kind: 'box', height: 10 },
+      { kind: 'row', id: 'tabs', gap: 8, children: tabs },
+      { kind: 'box', height: 16 },
+      {
+        kind: 'column',
+        id: 'rows',
+        scroll: true,
+        gap: 12,
+        width,
+        height: TABBED_LAYOUT.rowsHeight,
+        children: state.rows.map((r) => rowNode(r, width, panel ? TABBED_LAYOUT.panelValueWidth : null)),
+      },
+    ],
+  };
   return {
     kind: 'box',
     id: 'root',
-    color: COLORS.bunker,
+    ...(panel ? {} : { color: COLORS.bunker }),
     children: [
-      {
-        kind: 'column',
-        id: 'main',
-        anchor: 'topLeft',
-        children: [
-          { kind: 'text', id: 'heading', text: { key: state.titleKey }, style: 'heading', color: COLORS.texto },
-          { kind: 'box', height: 4 },
-          // O resumo embaixo do título; o aviso toma o lugar dele enquanto vale.
-          {
-            kind: 'text',
-            id: state.note !== '' ? 'note' : 'summary',
-            text: { literal: line },
-            style: 'caption',
-            color: state.note !== '' ? COLORS.acao : COLORS.textoBaixo,
-          },
-          { kind: 'box', height: 10 },
-          { kind: 'row', id: 'tabs', gap: 8, children: tabs },
-          { kind: 'box', height: 16 },
-          {
-            kind: 'column',
-            id: 'rows',
-            scroll: true,
-            gap: 12,
-            width: TABBED_LAYOUT.rowsWidth,
-            height: TABBED_LAYOUT.rowsHeight,
-            children: state.rows.map(rowNode),
-          },
-        ],
-      },
+      // No painel, a coluna vai num cartão à direita (o fundo da HUD) e a cena aparece em volta.
+      panel
+        ? { kind: 'box', id: 'panel', anchor: 'topRight', color: COLORS.hudFundo, padding: 20, children: [main] }
+        : main,
       {
         kind: 'row',
         id: 'buttons',

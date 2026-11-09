@@ -1,5 +1,6 @@
 import {
   createBackup,
+  DEFAULT_BOBO,
   DEFAULT_SETTINGS,
   EMPTY_PRESET_LIBRARY,
   EMPTY_STATS,
@@ -8,12 +9,14 @@ import {
   LIBRARY_LIMITS,
   PLATFORM_PROFILES,
   validateBackup,
+  validateBobo,
   validateBot,
   validatePresetLibrary,
   validateSettings,
   validateStats,
   WEB_LIBRARY_CAPS,
   type BackupDocument,
+  type BoboDocument,
   type BotDocument,
   type LibraryCaps,
   type MatchRecipe,
@@ -32,7 +35,14 @@ import type { PlatformId, Storage } from '@boboforces/platform-api';
  * estragado cai no padrão, com aviso em `loadWarnings`); a escrita vai direto para o storage, que junta as gravações
  * (debounce) e guarda a versão anterior. Exportar e importar o `backup@1` em texto (a casca baixa e escolhe o arquivo).
  */
-export const SAVE_KEYS = { settings: 'settings', stats: 'stats', presets: 'presets', bots: 'bots' } as const;
+export const SAVE_KEYS = {
+  settings: 'settings',
+  stats: 'stats',
+  presets: 'presets',
+  bots: 'bots',
+  // M2 (fase 6c): o Meu Bobo.
+  bobo: 'bobo',
+} as const;
 
 /** Tetos de receita para guardar presets: os do motor (o corte ao aparelho é na hora de jogar). */
 export const STORAGE_RECIPE_LIMITS: RecipeLimits = {
@@ -53,12 +63,15 @@ export type BackupMode = 'merge' | 'replace';
 export interface SaveStore {
   readonly settings: SettingsDocument;
   readonly stats: StatsDocument;
+  /** M2 (fase 6c): o Meu Bobo (a aparência do jogador). */
+  readonly bobo: BoboDocument;
   readonly presets: PresetLibrary;
   readonly bots: readonly BotDocument[];
   /** Avisos da leitura (migrou, corrigiu, descartou), para o relatório e a Novidades. */
   readonly loadWarnings: readonly ValidationIssue[];
   setSettings(next: SettingsDocument): void;
   setStats(next: StatsDocument): void;
+  setBobo(next: BoboDocument): void;
   /** O preset vai para o topo dos últimos (é o do JOGAR); o mesmo jeito de partida não se repete na lista. */
   pushRecent(preset: MatchRecipe): void;
   /** Salva pelo nome (o mesmo nome substitui); `false` se a biblioteca está cheia. */
@@ -124,6 +137,15 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       prefixed(SAVE_KEYS.stats, r.warnings);
     } else prefixed(SAVE_KEYS.stats, r.errors);
   }
+  let bobo = DEFAULT_BOBO;
+  const rawBobo = parse(storage, SAVE_KEYS.bobo, warnings);
+  if (rawBobo !== undefined) {
+    const r = validateBobo(rawBobo);
+    if (r.ok) {
+      bobo = r.value;
+      prefixed(SAVE_KEYS.bobo, r.warnings);
+    } else prefixed(SAVE_KEYS.bobo, r.errors);
+  }
   let presets = EMPTY_PRESET_LIBRARY;
   const rawPresets = parse(storage, SAVE_KEYS.presets, warnings);
   if (rawPresets !== undefined) {
@@ -155,6 +177,9 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
     get stats() {
       return stats;
     },
+    get bobo() {
+      return bobo;
+    },
     get presets() {
       return presets;
     },
@@ -169,6 +194,10 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
     setStats(next) {
       stats = next;
       write(SAVE_KEYS.stats, stats);
+    },
+    setBobo(next) {
+      bobo = next;
+      write(SAVE_KEYS.bobo, bobo);
     },
     pushRecent(preset) {
       const recent = [preset, ...presets.recent.filter((p) => !sameSetup(p, preset))].slice(0, LIBRARY_LIMITS.recent);
@@ -235,7 +264,7 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       return true;
     },
     exportBackup(createdAt, gameVersion) {
-      return JSON.stringify(createBackup({ settings, stats, presets, bots }, createdAt, gameVersion), null, 2);
+      return JSON.stringify(createBackup({ settings, stats, bobo, presets, bots }, createdAt, gameVersion), null, 2);
     },
     readBackup(text) {
       let doc: unknown;
@@ -250,6 +279,7 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       if (mode === 'replace') {
         settings = backup.settings;
         stats = backup.stats;
+        bobo = backup.bobo;
         presets = backup.presets;
         bots = backup.bots.slice(0, caps.bots);
       } else {
@@ -270,6 +300,7 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       }
       write(SAVE_KEYS.settings, settings);
       write(SAVE_KEYS.stats, stats);
+      write(SAVE_KEYS.bobo, bobo);
       writePresets();
       write(SAVE_KEYS.bots, bots);
     },

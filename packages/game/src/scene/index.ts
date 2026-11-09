@@ -8,6 +8,7 @@ import type { ViewDesc } from '@boboforces/render/data';
 import { createSceneFigures, type SceneFigures } from './figures.ts';
 import { createConstrutoLoader, type LoadingTimes } from './load.ts';
 import { createConstrutoMatch, profileFor, sceneRecipe, type ConstrutoMatch } from './match.ts';
+import { wardrobeMap } from './wardrobe.ts';
 
 export {
   buildMapNav,
@@ -81,6 +82,21 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
     renderer.drawUi(list);
   }
 
+  /** O time do jogador 1 na receita (o 1º time que leva humanos); −1 no FFA. */
+  function humanTeam(): number {
+    const r = recipe.recipe;
+    if (r.mode === 'warfare.ffa') return -1;
+    const t = r.teams.findIndex((team) => team.humans === 'all' || (team.humans ?? 0) > 0);
+    return Math.max(0, t);
+  }
+
+  /** O carregado com o mapa do Meu Bobo (o mesmo objeto do começo ao fim: os manequins são lidos dele). */
+  let wardrobeLoaded: typeof loader.result | null = null;
+  function withWardrobe(l: typeof loader.result): typeof loader.result {
+    wardrobeLoaded ??= { ...l, doc: wardrobeMap(l.doc) };
+    return wardrobeLoaded;
+  }
+
   function step(): void {
     if (post === 'none') {
       if (!loader.step(LOADING_BUDGET_MS)) return;
@@ -96,7 +112,8 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
       loading.current = loadingStepIndex('skins');
       return;
     }
-    const loaded = loader.result;
+    // M2 (fase 6c): o Meu Bobo põe um manequim e uma câmera no Ringue.
+    const loaded = request.kind === 'wardrobe' ? withWardrobe(loader.result) : loader.result;
     if (post === 'figures') {
       // Etapa "figuras" (#56): a tabela de jogo UMA vez (a sim e o render recebem o mesmo objeto) e os gabaritos.
       const t0 = platform.now();
@@ -106,7 +123,11 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
         mannequins: loaded.doc.markers.mannequins,
         prints: request.bench?.prints ?? false,
         capacity: Math.floor(loaded.models.reservedCount / FIGURE_SKIN_LAYERS),
-        onDemand: platform.id !== 'switch',
+        // O editor do Meu Bobo pinta o look a cada mudança (também no Switch); o gancho dos prints, só fora dele.
+        onDemand: platform.id !== 'switch' || request.kind === 'wardrobe',
+        ...(request.kind === 'wardrobe' ? { botLooks: 1 } : {}),
+        // M2 (fase 6c): o Meu Bobo veste o jogador 1, no time dele (sem time no FFA).
+        ...(recipe.humans > 0 ? { player: { look: host.bobo.current.look, team: humanTeam() } } : {}),
       });
       times.figures = platform.now() - t0;
       loading.progress[loadingStepIndex('skins')] = 0.3;

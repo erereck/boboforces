@@ -405,6 +405,20 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     acerta a parede: não dá para atirar escondido atrás da cobertura.
   - Na Partida personalizada, a regra **Câmera** (Livre ou Só primeira pessoa).
   - 6 testes novos.
+- **Fase 6c, Meu Bobo:**
+  - **Onde:** no menu principal, entre o Laboratório e os Ajustes. O editor abre no Ringue, com o seu bobo girando no
+    meio do tablado e o painel à direita.
+  - **Abas:**
+    - **Pronto:** os 11 visuais da farda, a prévia com o colete de cada time e "Sortear um bobo";
+    - **Rosto:** pele (10 tons e 4 cores fantasia), rosto, sobrancelha, barba, marca e olhos;
+    - **Cabelo:** os 34 cortes do FutBobo e 20 cores;
+    - **Acessórios:** faixa, tiara, bandana ou boné, óculos, brincos e a cor deles;
+    - **Roupa:** estampa (lisa ou os camuflados), jaqueta, calça, colete, botas e luvas.
+  - As cores aparecem num quadradinho ao lado do nome.
+  - Cada mudança vale na hora e fica salva. O jogador 1 entra nas partidas com o seu bobo, com o colete do time por
+    cima.
+  - O backup leva o Meu Bobo junto.
+  - 4 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

@@ -119,7 +119,17 @@ function drawButton(layout: LayoutResult, node: ButtonNode, r: Rect, focused: bo
   const left = node.valueOnly ? arrowX[0]! : arrowX[0]! + arrowX[2]!;
   const right = node.valueOnly ? arrowX[1]! + arrowX[2]! : arrowX[1]!;
   const vcap = (vfont.capHeight * value.px) / vfont.size;
-  const vx = left + (right - left - value.width) / 2;
+  // M2 (fase 6c): o quadradinho da cor vai antes do valor, e os dois juntos ficam centrados.
+  const sw = node.swatch !== undefined ? Math.round(r.h * 0.4) : 0;
+  const gap = sw > 0 ? Math.round(OPTION.swatchGap * s) : 0;
+  const vx = left + (right - left - value.width - sw - gap) / 2 + sw + gap;
+  if (sw > 0) {
+    const sx = Math.round(vx - gap - sw);
+    const sy = Math.round(r.y + (r.h - sw) / 2);
+    const edge = Math.max(1, Math.round(s));
+    pushRect(out, sx - edge, sy - edge, sw + edge * 2, sw + edge * 2, COLORS.linhaForte);
+    pushRect(out, sx, sy, sw, sw, ((node.swatch! << 8) | 0xff) >>> 0);
+  }
   drawText(out, vfont, value.text, vx, r.y + (r.h - vcap) / 2, value.px, l.text, value.tracking);
 }
 

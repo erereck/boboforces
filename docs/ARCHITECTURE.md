@@ -1790,3 +1790,43 @@ mudanças de contrato ficam registradas aqui.
 - **Escolhas (revisáveis):** as medidas da câmera e o ombro direito como padrão.
 - **Fica para depois:** a assistência de mira continua medindo do olho (a diferença para a câmera é pequena); o botão
   da 3ª pessoa no toque entra na 6e.
+
+### 12.41 Fase 6c: Meu Bobo (09/11/2026)
+
+- **`bobo@1`** (`format/bobo.ts`, tipo novo em `FORMAT_KINDS`): o look inteiro (`FigureLook`, o mesmo formato que pinta
+  a skin) e o visual pronto de onde ele saiu.
+  - O padrão é o Recruta (o look que o jogador 1 já usava).
+  - O validador normaliza o look e nunca deixa zumbi; look estragado volta ao Recruta.
+  - O `backup@1` ganhou a parte `bobo` (backup antigo sem ela usa o padrão). O SaveStore lê e grava a chave `bobo`.
+- **Na partida:** `SceneHost.bobo`. O plano das skins ganhou o look `jogador`, logo depois do zumbi (nunca fica sem
+  vaga), no time do jogador 1 (−1 no FFA). `resolveEntityFigure` veste o controlador 0 com ele.
+- **O editor é uma cena** (`SceneKind` `wardrobe`, `scene/wardrobe.ts`), porque o bobo em 3D só existe no pacote da
+  cena:
+  - o Ringue sem ninguém, com um manequim no meio do tablado e uma câmera fixa (`wardrobeMap` acrescenta os dois ao
+    documento do mapa);
+  - o bobo fica no terço esquerdo, gira 20°/s sozinho e aparece sem arma;
+  - cada mudança vale na hora e é gravada. `SceneFigures.restyle` refaz o gabarito no mesmo índice e solta a skin
+    sob demanda do look editado (os gabaritos não crescem a cada mudança);
+  - a cena pede só 1 look da rotação dos bots, para sobrar vaga para as skins sob demanda. Sob demanda vale também no
+    Switch, só nesta cena;
+  - `MannequinOverride.lookData` leva o look inteiro.
+- **O modelo do editor** (`game/bobo-editor.ts`, puro; só a cena importa, fora do menu):
+  - abas Pronto (visual pronto, prévia sem time/time 1/time 2, sortear), Rosto (pele, rosto, sobrancelha, barba,
+    marca, olhos), Cabelo (corte, cor), Acessórios (na cabeça, óculos, brincos, cor) e Roupa (estampa, jaqueta, calça,
+    colete, botas, luvas);
+  - nomes e cores de rosto e cabelo do FutBobo, nas mesmas listas dos índices;
+  - pele com 10 tons e as 4 cores fantasia do GDD; roupa com uma paleta militar de 12 cores; colete e luvas têm
+    "nenhum";
+  - "editado" quando o look sai do visual pronto; Aleatório sorteia um bobo inteiro (RNG com semente).
+- **UI:**
+  - `buildTabbed({ panel: true })`: sem o fundo cheio, com a coluna num cartão à direita e as linhas em 640 px, área
+    do valor de 300;
+  - `ButtonNode.swatch` desenha o quadradinho da cor antes do valor;
+  - o menu principal ganhou "Meu Bobo" entre o Laboratório e os Ajustes (GDD §2.2); o Voltar do editor leva ao menu
+    principal.
+- **Escolhas (revisáveis):** a câmera e o giro do editor, as paletas de pele fantasia e de roupa, gravar a cada
+  mudança (como os Ajustes, sem botão Salvar) e o Recruta como padrão.
+- **Fica para depois:**
+  - os acessórios 3D (chapéu de aba, capacete com viseira, mochila, rádio);
+  - as fantasias (6d);
+  - o visual dos bots pelo hash do nome (#58; hoje a rotação de 11 looks).

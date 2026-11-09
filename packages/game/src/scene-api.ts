@@ -1,4 +1,11 @@
-import type { BotDocument, BotLevel, MatchRecipe, SettingsDocument, StatsDocument } from '@boboforces/format';
+import type {
+  BoboDocument,
+  BotDocument,
+  BotLevel,
+  MatchRecipe,
+  SettingsDocument,
+  StatsDocument,
+} from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -25,7 +32,8 @@ export const DEFAULT_RENDERER_ROUTES: RendererRoutes = { textureMode: 'array', v
 export type RendererFactory = (surface: GraphicsSurface, routes?: RendererRoutes) => Renderer;
 
 /** Como se entrou na cena. */
-export type SceneKind = 'play' | 'vitrine' | 'bench';
+/** M2 (fase 6c): `wardrobe` = o editor do Meu Bobo (o bobo num pedestal no Ringue, sem partida). */
+export type SceneKind = 'play' | 'vitrine' | 'bench' | 'wardrobe';
 
 export interface SceneRequest {
   /**
@@ -83,6 +91,12 @@ export interface RecordBreaks {
   readonly bestStreak: boolean;
 }
 
+/** M2 (fase 6c): o Meu Bobo: a partida veste o jogador 1 com ele; o editor muda e grava. */
+export interface SceneBobo {
+  readonly current: BoboDocument;
+  save(doc: BoboDocument): void;
+}
+
 /** M2 (fase 4g): as estatísticas do aparelho; a cena entrega a partida no fim e o núcleo grava. */
 export interface SceneStats {
   /** M2 (fase 4h): o documento atual (as dicas olham as partidas terminadas e as já vistas). */
@@ -104,6 +118,8 @@ export interface SceneHost {
   readonly settings: SceneSettings;
   /** M2 (fase 4g): grava a partida no fim (só partidas de verdade: nem bench, nem os prints). */
   readonly stats: SceneStats;
+  /** M2 (fase 6c): o Meu Bobo. */
+  readonly bobo: SceneBobo;
   /** Relatório do bench pronto (`formatBenchReport`); o núcleo repassa para `GameHooks.onBenchReport`. */
   benchReport(text: string): void;
 }

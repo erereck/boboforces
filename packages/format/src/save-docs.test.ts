@@ -11,6 +11,8 @@ import {
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { DEFAULT_SETTINGS, SETTINGS_FORMAT, validateSettings } from './settings.ts';
 import { EMPTY_STATS, STATS_FORMAT, validateStats } from './stats.ts';
+import { BOBO_FORMAT, DEFAULT_BOBO, validateBobo } from './bobo.ts';
+import { FIGURE_PRESETS } from './model/figure-presets.ts';
 import { cloneJson, ISSUE_CODES, type RecipeLimits } from './validation.ts';
 
 /** M2, fase 4b: os documentos do jogador (settings@1, stats@1, a biblioteca de presets e o backup@1). */
@@ -122,12 +124,39 @@ describe('biblioteca de presets', () => {
   });
 });
 
+describe('bobo@1 (M2, fase 6c)', () => {
+  it('o padrão é o recruta; ida e volta por JSON não muda nada', () => {
+    expect(DEFAULT_BOBO.look).toEqual(FIGURE_PRESETS.recruit);
+    const r = validateBobo(JSON.parse(JSON.stringify(DEFAULT_BOBO)));
+    expect(r.ok && r.value).toEqual(DEFAULT_BOBO);
+    expect(r.ok && r.warnings).toEqual([]);
+  });
+
+  it('look estragado: índices e cores limitados, nunca zumbi; tipo errado cai no padrão com aviso', () => {
+    const r = validateBobo({
+      format: BOBO_FORMAT,
+      look: { ...FIGURE_PRESETS.recruit, hairStyle: 999, skinTone: -5, zombie: { kind: 'common', faceStyle: 2 } },
+      preset: 'recruit',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.look.hairStyle).toBe(33);
+    expect(r.value.look.skinTone).toBe(0);
+    expect(r.value.look.zombie).toBeNull();
+    const bad = validateBobo({ format: BOBO_FORMAT, look: 7, preset: 3 });
+    expect(bad.ok && bad.warnings.map((w) => w.code)).toEqual(['save.invalidField', 'save.invalidField']);
+    expect(bad.ok && bad.value.look).toEqual(FIGURE_PRESETS.recruit);
+    expect(validateBobo({ format: 'boboforces/stats@1' }).ok).toBe(false);
+  });
+});
+
 describe('backup@1', () => {
   it('ida e volta: o que sai do jogo volta igual', () => {
     const backup = createBackup(
       {
         settings: DEFAULT_SETTINGS,
         stats: EMPTY_STATS,
+        bobo: { format: BOBO_FORMAT, look: FIGURE_PRESETS.pilot, preset: 'pilot' },
         presets: { recent: [preset('última')], saved: [preset('Sexta')], favorites: ['Sexta'], botFavorites: [] },
         bots: [builtinBot('jorge-the-immortal')!],
       },
@@ -141,6 +170,7 @@ describe('backup@1', () => {
     expect(r.value.presets.saved[0]!.name).toBe('Sexta');
     expect(r.value.bots).toHaveLength(1);
     expect(r.value.createdAt).toBe('2026-11-09T05:00:00Z');
+    expect(r.value.bobo).toEqual({ format: BOBO_FORMAT, look: FIGURE_PRESETS.pilot, preset: 'pilot' });
     expect(r.warnings).toEqual([]);
   });
 

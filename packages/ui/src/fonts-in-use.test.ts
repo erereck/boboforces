@@ -8,7 +8,7 @@ import { layoutTree, type LayoutResult } from './layout.ts';
 import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
 import { settingsScreen } from './screens/settings.ts';
-import type { TabbedRow } from './screens/tabbed.ts';
+import { buildTabbed, type TabbedRow } from './screens/tabbed.ts';
 import { titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 import { t } from './text.ts';
@@ -591,6 +591,64 @@ describe('estouro de texto com o atlas real', () => {
           layout.focusable.length,
         );
       }
+    }
+  });
+
+  it('Meu Bobo (M2, fase 6c): o painel à direita, com os nomes mais longos e as cores, cabe e anda pelo D-pad', () => {
+    const tabs: StringKey[] = [
+      'bobo.tab.ready',
+      'bobo.tab.face',
+      'bobo.tab.hair',
+      'bobo.tab.extras',
+      'bobo.tab.outfit',
+    ];
+    const labels: StringKey[] = [
+      'bobo.row.preset',
+      'bobo.row.preview',
+      'bobo.row.skin',
+      'bobo.row.brow',
+      'bobo.row.headwear',
+      'bobo.row.eyewear',
+      'bobo.row.fabric',
+      'bobo.row.gloves',
+    ];
+    const values = [
+      'Camuflado deserto',
+      'Máscara protetora',
+      'Pintura de guerra',
+      'Moicano espetado',
+      'Dentes à mostra',
+      'Time laranja',
+      'Cinza-pedra',
+      'Personalizado',
+    ];
+    const rows: TabbedRow[] = labels.map((labelKey, i) => ({
+      kind: 'option',
+      id: `r${i}`,
+      labelKey,
+      value: values[i]!,
+      ...(i % 2 === 0 ? { swatch: 0x8d918c } : {}),
+    }));
+    rows.push({ kind: 'action', id: 'random', label: { key: 'bobo.row.random' } });
+    const tree = buildTabbed({
+      titleKey: 'menu.bobo',
+      tabs,
+      tab: 4,
+      rows,
+      summary: t('bobo.edited', { name: 'Black power' }),
+      note: '',
+      buttons: [
+        { id: 'back', labelKey: 'menu.back', variant: 'secondary' },
+        { id: 'random', labelKey: 'bobo.random', variant: 'secondary' },
+      ],
+      panel: true,
+    });
+    for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      const layout = layoutFor(tree, target);
+      expectNoOverflow(layout, target);
+      expect(reachableScrolling(tree, target, layout.focusable[0]!.id!).size, `${target.name}: foco`).toBe(
+        layout.focusable.length,
+      );
     }
   });
 

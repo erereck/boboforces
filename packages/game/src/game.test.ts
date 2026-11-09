@@ -5,6 +5,7 @@ import { createHeadlessMatch } from '@boboforces/ai';
 import {
   builtinBotRef,
   DEBUT_PRESET,
+  DEFAULT_BOBO,
   DEFAULT_SETTINGS,
   EMPTY_STATS,
   createFigureGameTable,
@@ -718,6 +719,7 @@ describe('startGame (NullRenderer)', () => {
       log: () => {},
       settings: { current: DEFAULT_SETTINGS, save: () => {} },
       stats: { current: EMPTY_STATS, record: () => ({ mostKills: false, bestStreak: false }), tipSeen: () => {} },
+      bobo: { current: DEFAULT_BOBO, save: () => {} },
       benchReport: () => {},
     };
     const loader = createConstrutoLoader(host);
@@ -1213,8 +1215,8 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('main');
-    // Partida Rápida, Modos, Laboratório, Ajustes.
-    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    // Partida Rápida, Modos, Laboratório, Meu Bobo, Ajustes.
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     platform.tap('Escape');
@@ -1325,6 +1327,35 @@ describe('Partida personalizada (M2, fase 4e)', () => {
   }, 120_000);
 });
 
+describe('Meu Bobo (M2, fase 6c)', () => {
+  it('Mudar → Meu Bobo abre o editor no Ringue; o visual muda na hora, fica salvo e o Voltar leva ao menu', async () => {
+    const { platform, game } = await bootToTitle();
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    // Partida Rápida, Modos, Laboratório, Meu Bobo.
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    expect(game.save.bobo.preset).toBe('recruit');
+    // O foco abre na aba Pronto; baixo vai para o visual pronto e a direita troca para o Mecânico.
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    expect(game.save.bobo.preset).toBe('mechanic');
+    // E (aba Rosto): baixo até a Barba (Pele, Rosto, Sobrancelha, Barba) e direita.
+    platform.tap('KeyE');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    const beard = game.save.bobo.look.beard;
+    platform.tap('ArrowRight');
+    expect(game.save.bobo.look.beard).toBe((beard + 1) % 12);
+    expect(platform.logLines).toContain('[meu bobo] abriu: recruit');
+    platform.tap('Escape');
+    expect(game.screen).toBe('main');
+    game.dispose();
+  }, 60_000);
+});
+
 describe('3ª pessoa (M2, fase 6b)', () => {
   it('na partida, T troca a câmera e X o ombro; a escolha vai para os Ajustes', async () => {
     const { platform, game } = await bootToTitle();
@@ -1350,11 +1381,11 @@ describe('3ª pessoa (M2, fase 6b)', () => {
 describe('Ajustes (M2, fase 4f)', () => {
   it('menu: Ajustes → Vídeo (E) → Tamanho dos menus; na pausa, Acessibilidade → Reduzir tremor vale na hora', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (Partida Rápida, Modos, Laboratório, Ajustes).
+    // Título → Mudar → Ajustes (Partida Rápida, Modos, Laboratório, Meu Bobo, Ajustes).
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     // E E: Vídeo. Da aba (o foco vai junto) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
@@ -1417,11 +1448,11 @@ describe('Novidades (M2, fase 4g)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
-    // Título → Mudar → Novidades (o 5º item) → OK volta ao menu principal.
+    // Título → Mudar → Novidades (o 6º item) → OK volta ao menu principal.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('news');
     platform.tap('Escape');
@@ -1654,11 +1685,11 @@ describe('Conheça o Laboratório (M2, fase 5e)', () => {
 describe('Calibrar mira (M2, fase 5f)', () => {
   it('Ajustes → Controles → Calibrar mira abre o treino calibrando; a pausa oferece Pular calibração', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (4º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
+    // Título → Mudar → Ajustes (5º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     for (let i = 0; i < 10; i++) platform.tap('ArrowDown');

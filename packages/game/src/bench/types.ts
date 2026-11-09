@@ -1,7 +1,7 @@
 // M1: tipos do bench, do gancho de depuração dos prints e dos itens de teste do título. CONTRATO da etapa de contratos;
 // quem liga tudo no `game` é a integração do M1. Puro (sem DOM): a web lê a URL e o Switch o menu de título, e os dois
 // entregam um `BenchConfig` pronto.
-import type { PlatformProfileId, PropDoseView, TimeOfDay } from '@boboforces/format';
+import type { FigureLook, PlatformProfileId, PropDoseView, TimeOfDay } from '@boboforces/format';
 import type { RawInputState } from '@boboforces/input';
 import type { Platform } from '@boboforces/platform-api';
 import type { MipFilterMode, TextureMode, VertexAttributeMode } from '@boboforces/render/data';
@@ -191,6 +191,8 @@ export interface MannequinOverride {
   readonly look?: string;
   /** −1 sem time (farda do look); 0 = time A; 1 = time B. */
   readonly team?: number;
+  /** M2 (fase 6c): o look inteiro (o Meu Bobo), com `look` como id dele. */
+  readonly lookData?: FigureLook;
   readonly pose?: MannequinPose;
   /** Modelo de arma sem prefixo (`rifle`, `pistol`, `sniper`; `''` sem arma). */
   readonly weapon?: string;

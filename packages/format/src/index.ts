@@ -12,6 +12,8 @@ export * from './bot.ts';
 export * from './doc-read.ts';
 export * from './settings.ts';
 export * from './stats.ts';
+// M2 (fase 6c): o Meu Bobo.
+export * from './bobo.ts';
 export * from './backup.ts';
 export * from './presets.ts';
 export * from './png.ts';

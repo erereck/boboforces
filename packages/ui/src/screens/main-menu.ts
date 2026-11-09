@@ -10,6 +10,7 @@ export const MAIN_MENU_ACTION = {
   quickMatch: 'quickMatch',
   modes: 'modes',
   lab: 'lab',
+  bobo: 'bobo',
   settings: 'settings',
   news: 'news',
   back: 'back',
@@ -23,12 +24,13 @@ export interface MainMenuState {
   readonly items: readonly MainMenuItem[];
 }
 
-export type MainMenuItem = 'quickMatch' | 'modes' | 'lab' | 'settings' | 'news';
+export type MainMenuItem = 'quickMatch' | 'modes' | 'lab' | 'bobo' | 'settings' | 'news';
 
 const LABEL = {
   quickMatch: 'menu.quickMatch',
   modes: 'menu.modes',
   lab: 'menu.lab',
+  bobo: 'menu.bobo',
   settings: 'menu.settings',
   news: 'menu.news',
 } as const;

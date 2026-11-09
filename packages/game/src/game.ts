@@ -282,7 +282,8 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
   refreshTitle();
-  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'settings', 'news'] }));
+  // M2 (fase 6c): o Meu Bobo entre o Laboratório e os Ajustes (GDD §2.2).
+  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'bobo', 'settings', 'news'] }));
 
   // M2 (fase 5a): a Oficina (a entrada do Laboratório): a biblioteca dos bots e o card do escolhido.
   const workshopMenu = createMenuController();
@@ -332,6 +333,8 @@ export function startGame(deps: GameDeps): GameHandle {
   let labHold = false;
   /** Testando o bot no Bobo Training (a volta da cena cai no Laboratório). */
   let labTesting = false;
+  /** M2 (fase 6c): a cena aberta é o Meu Bobo (o Voltar dela leva ao menu principal). */
+  let wardrobeOpen = false;
   const allBotNames = (): Set<string> => new Set([...save.bots, ...factoryBots].map(botDisplayName));
   function rebuildLab(): void {
     labMenu.setRoot(
@@ -923,6 +926,12 @@ export function startGame(deps: GameDeps): GameHandle {
             return r.records;
           },
         },
+        bobo: {
+          get current() {
+            return save.bobo;
+          },
+          save: (doc) => save.setBobo(doc),
+        },
         benchReport: (text) => hooks.onBenchReport?.(text),
       },
       request,
@@ -936,6 +945,11 @@ export function startGame(deps: GameDeps): GameHandle {
     scene?.dispose();
     scene = null;
     pendingScene = null;
+    if (wardrobeOpen) {
+      wardrobeOpen = false;
+      screen = 'main';
+      return;
+    }
     if (labTesting) {
       labTesting = false;
       const none = t('result.noAccuracy');
@@ -1093,6 +1107,11 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
         else if (nav.activated === MAIN_MENU_ACTION.news) openNews('main');
         else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
+        else if (nav.activated === MAIN_MENU_ACTION.bobo) {
+          // M2 (fase 6c): o editor é uma cena (o bobo em 3D); na volta, o menu principal.
+          wardrobeOpen = true;
+          requestScene('wardrobe', null);
+        }
         if (screen === 'main') {
           mainMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);

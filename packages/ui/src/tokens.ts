@@ -124,6 +124,8 @@ export const OPTION = {
   scrollBar: 4,
   scrollBarGap: 10,
   scrollMargin: 10,
+  /** M2 (fase 6c): espaço entre o quadradinho da cor e o valor. */
+  swatchGap: 10,
 } as const satisfies { readonly value: TypeStyle } & Readonly<Record<string, unknown>>;
 
 /** M2 (fase 4e): botão compacto (`ButtonNode.compact`): mais baixo (48 ≥ 44), respiro menor e sem largura mínima. */

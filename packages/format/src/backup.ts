@@ -5,6 +5,7 @@ import { validateMatchRecipe, type MatchRecipe } from './match-recipe.ts';
 import { migrateDocument } from './migrations.ts';
 import { DEFAULT_SETTINGS, validateSettings, type SettingsDocument } from './settings.ts';
 import { EMPTY_STATS, validateStats, type StatsDocument } from './stats.ts';
+import { DEFAULT_BOBO, validateBobo, type BoboDocument } from './bobo.ts';
 import { isPlainObject, type RecipeLimits, type ValidationResult } from './validation.ts';
 
 /**
@@ -44,6 +45,8 @@ export interface BackupDocument {
   readonly gameVersion: string;
   readonly settings: SettingsDocument;
   readonly stats: StatsDocument;
+  /** M2 (fase 6c): o Meu Bobo. Backup antigo sem ele: o padrão. */
+  readonly bobo: BoboDocument;
   readonly presets: PresetLibrary;
   /** Bots salvos da Oficina (fase 5). */
   readonly bots: readonly BotDocument[];
@@ -118,7 +121,13 @@ export function validatePresetLibrary(
 
 /** Monta o backup com o que o jogo tem agora. */
 export function createBackup(
-  parts: { settings: SettingsDocument; stats: StatsDocument; presets: PresetLibrary; bots: readonly BotDocument[] },
+  parts: {
+    settings: SettingsDocument;
+    stats: StatsDocument;
+    bobo: BoboDocument;
+    presets: PresetLibrary;
+    bots: readonly BotDocument[];
+  },
   createdAt: string,
   gameVersion: string,
 ): BackupDocument {
@@ -155,6 +164,14 @@ export function validateBackup(
       r.warnings.push(...s.warnings);
     } else r.warn('stats', 'save.droppedEntry', s.errors.map((e) => e.code).join(', '));
   }
+  let bobo = DEFAULT_BOBO;
+  if (doc['bobo'] !== undefined) {
+    const b = validateBobo(doc['bobo']);
+    if (b.ok) {
+      bobo = b.value;
+      r.warnings.push(...b.warnings);
+    } else r.warn('bobo', 'save.droppedEntry', b.errors.map((e) => e.code).join(', '));
+  }
   const lib = validatePresetLibrary(doc['presets'], limits, caps);
   if (lib.ok) r.warnings.push(...lib.warnings);
   const bots: BotDocument[] = [];
@@ -179,6 +196,7 @@ export function validateBackup(
       gameVersion: r.str(doc, 'gameVersion', 'gameVersion', '', 32),
       settings,
       stats,
+      bobo,
       presets: lib.ok ? lib.value : EMPTY_PRESET_LIBRARY,
       bots,
     },

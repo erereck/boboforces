@@ -9,6 +9,8 @@ export const FORMAT_KINDS = [
   'preset',
   'bot',
   'stats',
+  // M2 (fase 6c): o Meu Bobo (a aparência do jogador).
+  'bobo',
   'backup',
   'replay',
   'map',
@@ -29,10 +31,11 @@ export const RETIRED_FORMAT_KINDS = ['skinparts'] as const;
 
 export type FormatId = `boboforces/${FormatKind}@${number}`;
 
-/** Versão atual de cada tipo, derivada do `version.json` (settings/stats/backup/replay seguem `formats.save`). */
+/** Versão atual de cada tipo, derivada do `version.json` (settings/stats/bobo/backup/replay seguem `formats.save`). */
 export const CURRENT_FORMAT_VERSION: Readonly<Record<FormatKind, number>> = {
   settings: FORMAT_VERSIONS.save,
   stats: FORMAT_VERSIONS.save,
+  bobo: FORMAT_VERSIONS.save,
   backup: FORMAT_VERSIONS.save,
   replay: FORMAT_VERSIONS.save,
   preset: FORMAT_VERSIONS.preset,

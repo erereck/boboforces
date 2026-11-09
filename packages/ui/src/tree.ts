@@ -116,6 +116,8 @@ export interface ButtonNode extends NodeBase {
    * botão remapeável ("PULAR · Espaço").
    */
   readonly valueOnly?: boolean;
+  /** M2 (fase 6c): quadradinho de cor (RGB, `0xRRGGBB`) antes do valor (as cores do Meu Bobo). */
+  readonly swatch?: number;
   /** M2 (fase 4a): aba selecionada (variante `tab`). */
   readonly selected?: boolean;
   /** M2 (fase 4e): botão compacto (texto menor, 48 de altura, sem largura mínima): abas e barras de ferramentas. */
