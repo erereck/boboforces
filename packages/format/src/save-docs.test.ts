@@ -80,6 +80,18 @@ describe('settings@1', () => {
     codesKnown(r.warnings);
   });
 
+  it('M2 (fase 7c): áudio novo entra pelo padrão sem aviso; volumes limitados a 0..10 e inteiros', () => {
+    const old = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as Record<string, unknown>;
+    delete old['audio'];
+    const r = validateSettings(old);
+    expect(r.ok && r.warnings).toEqual([]);
+    expect(r.ok && r.value.audio).toEqual(DEFAULT_SETTINGS.audio);
+    expect(DEFAULT_SETTINGS.audio.musicInMatch).toBe(false);
+    const odd = validateSettings({ format: SETTINGS_FORMAT, audio: { master: 14, sfx: -2, music: 6.6, mono: 'sim' } });
+    expect(odd.ok && odd.value.audio).toMatchObject({ master: 10, sfx: 0, music: 7, mono: false });
+    expect(odd.ok && odd.warnings.map((w) => w.path).sort()).toEqual(['audio.master', 'audio.mono', 'audio.sfx']);
+  });
+
   it('recusa o que não é ajuste, e versão mais nova', () => {
     expect(validateSettings('oi').ok).toBe(false);
     expect(validateSettings({ format: STATS_FORMAT }).ok).toBe(false);

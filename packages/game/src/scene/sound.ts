@@ -45,6 +45,9 @@ export const MATCH_SOUND = {
   landFullSpeed: 9,
   /** Com 3 ou 4 jogadores locais, a própria arma perde 3 dB (arte-ux §10.3). */
   ownCrowdGain: 0.7,
+  /** Indicador visual de som (arte-ux §6.7): tiros, explosões e passos até aqui, e quanto tempo cada um fica. */
+  indicatorRangeM: 20,
+  indicatorLifeS: 0.8,
   /** Altura aproximada dos olhos e das mãos acima dos pés (m). */
   eyeM: 1.5,
   handsM: 1.2,
@@ -154,6 +157,11 @@ export interface MatchSound extends Disposable {
   event(ev: SimEvent, v: SimView, nowS: number): void;
   /** 1x por frame: passos, coração e contagem. */
   frame(v: SimView, dt: number, nowS: number): void;
+  /**
+   * M2 (fase 7c): o indicador visual de som da vista `slot`: escreve ângulo (relativo à mira, positivo = à esquerda)
+   * e força 0..1 dos sons recentes e devolve quantos (até o tamanho dos arrays).
+   */
+  fillIndicator(slot: number, angles: Float32Array, alphas: Float32Array): number;
   /** Pausa e troca de cena: corta o que está tocando. */
   silence(): void;
 }
@@ -176,7 +184,14 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
   const lx = new Float64Array(4);
   const ly = new Float64Array(4);
   const lz = new Float64Array(4);
+  const lyaw = new Float64Array(4);
   let listeners = 1;
+  // Indicador: um anel de `BLIPS` por vista (ângulo absoluto no mundo, idade e força).
+  const BLIPS = 8;
+  const blipYaw = new Float64Array(4 * BLIPS);
+  const blipAge = new Float32Array(4 * BLIPS).fill(Infinity);
+  const blipStrength = new Float32Array(4 * BLIPS);
+  const blipNext = new Uint8Array(4);
   const lastPlayed = new Float64Array(SOUND_IDS.length).fill(-1e9);
   const flat: FlatOptions = { bus: 'sfx', volume: 1, priority: 1, rate: 1 };
   const spatial: SpatialOptions = { bus: 'sfx', volume: 1, priority: 1, rate: 1, x: 0, y: 0, z: 0 };
@@ -282,6 +297,20 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     return Math.sqrt(best);
   };
 
+  /**
+   * Marca o som no indicador da vista que o ouve (a do ouvinte mais perto, achada pelo último `listenerDistance`),
+   * se estiver no alcance. `yaw` do mundo para o ponto: a mesma convenção da câmera (yaw 0 olha para −z).
+   */
+  const blip = (x: number, z: number, d: number, strength: number): void => {
+    if (d > MATCH_SOUND.indicatorRangeM || d < 1) return;
+    const l = nearestL;
+    const k = l * BLIPS + blipNext[l]!;
+    blipNext[l] = (blipNext[l]! + 1) % BLIPS;
+    blipYaw[k] = Math.atan2(-(x - lx[l]!), -(z - lz[l]!));
+    blipAge[k] = 0;
+    blipStrength[k] = strength;
+  };
+
   /** Há parede (bloco que tapa a visão) entre o ouvinte mais perto e o ponto? */
   const occluded = (v: SimView, x: number, y: number, z: number, d: number): boolean => {
     if (d < 2) return false;
@@ -316,9 +345,11 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     priority: number,
     volume = 1,
     rate = 1,
+    indicator = 0,
   ): void => {
     const d = listenerDistance(x, y, z);
     if (d >= MAX_DISTANCE_M) return;
+    if (indicator > 0 && priority !== SOUND_RANK.own) blip(x, z, d, indicator);
     const sound = far !== null && d > MATCH_SOUND.farM ? far : id;
     if (!ready(sound, nowS, priority === SOUND_RANK.own)) return;
     const def = SOUNDS[sound];
@@ -350,7 +381,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     const rate = 0.93 + ((h >>> 8) / 0xffffff) * 0.14;
     const flags = v.flags[i]!;
     const volume = (flags & ENTITY_FLAG.crouching ? MATCH_SOUND.crouchGain : 1) * (own ? 0.8 : 1);
-    playAt(v, pair[n & 1]!, null, x, y, z, nowS, SOUND_RANK.world, volume, rate);
+    playAt(v, pair[n & 1]!, null, x, y, z, nowS, SOUND_RANK.world, volume, rate, own ? 0 : 0.55 * volume);
   };
 
   /** Marca os N bobos (não locais) mais perto de cada ouvinte, até o alcance dos passos. */
@@ -397,6 +428,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
       lx[slot] = x;
       ly[slot] = y;
       lz[slot] = z;
+      lyaw[slot] = yaw;
       mixer.setListener(slot, x, y, z, yaw);
     },
     setListenerCount(count) {
@@ -411,7 +443,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           if (!pair) break;
           const rank = rankOf(v, ev.shooter);
           if (rank === SOUND_RANK.own) playFlat(pair[0], nowS, ownGain(), SOUND_RANK.own);
-          else playAt(v, pair[0], pair[1], ev.originX, ev.originY, ev.originZ, nowS, rank);
+          else playAt(v, pair[0], pair[1], ev.originX, ev.originY, ev.originZ, nowS, rank, 1, 1, 1);
           break;
         }
         case 'impact':
@@ -501,6 +533,9 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
             ev.z,
             nowS,
             Math.max(rankOf(v, ev.owner), SOUND_RANK.enemy),
+            1,
+            1,
+            1,
           );
           break;
         case 'weapon': {
@@ -584,6 +619,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     frame(v, dt, nowS) {
       if (disposed) return;
       ensure(v.capacity);
+      for (let k = 0; k < blipAge.length; k++) blipAge[k] = blipAge[k]! + dt;
       // Contagem: 3, 2, 1 e o "vai" quando a partida começa a valer.
       const phase = v.match.phase;
       if (phase === 'warmup') {
@@ -636,6 +672,21 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           heartT[p] = MATCH_SOUND.heartbeatS;
         }
       }
+    },
+    fillIndicator(slot, angles, alphas) {
+      if (slot < 0 || slot > 3) return 0;
+      let n = 0;
+      for (let b = 0; b < BLIPS && n < angles.length && n < alphas.length; b++) {
+        const k = slot * BLIPS + b;
+        const age = blipAge[k]!;
+        if (!(age < MATCH_SOUND.indicatorLifeS)) continue;
+        let a = blipYaw[k]! - lyaw[slot]!;
+        a -= Math.round(a / (Math.PI * 2)) * Math.PI * 2;
+        angles[n] = a;
+        alphas[n] = blipStrength[k]! * (1 - age / MATCH_SOUND.indicatorLifeS);
+        n++;
+      }
+      return n;
     },
     silence() {
       mixer.stopAll();

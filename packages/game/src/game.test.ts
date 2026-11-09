@@ -1412,8 +1412,8 @@ describe('Ajustes (M2, fase 4f)', () => {
     platform.tap('Escape');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
-    // Na partida (o foco do título ficou no Mudar: sobe até o JOGAR): P, Ajustes (2 abaixo), E E E
-    // (Acessibilidade), baixo, confirmar: Reduzir tremor ligado.
+    // Na partida (o foco do título ficou no Mudar: sobe até o JOGAR): P, Ajustes (2 abaixo), E E E E
+    // (Acessibilidade, depois do Áudio da fase 7c), baixo, confirmar: Reduzir tremor ligado.
     platform.tap('ArrowUp');
     platform.tap('ArrowUp');
     platform.tap('Enter');
@@ -1425,10 +1425,12 @@ describe('Ajustes (M2, fase 4f)', () => {
     platform.tap('KeyE');
     platform.tap('KeyE');
     platform.tap('KeyE');
+    platform.tap('KeyE');
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.save.settings.accessibility.reduceShake).toBe(true);
-    // Q Q: Botões; "Pular" (dispositivo, 4 de andar, atirar, mirar, pular) vira J na hora; o P (da pausa) é recusado.
+    // Q Q Q: Botões; "Pular" (dispositivo, 4 de andar, atirar, mirar, pular) vira J na hora; o P (da pausa) é recusado.
+    platform.tap('KeyQ');
     platform.tap('KeyQ');
     platform.tap('KeyQ');
     for (let i = 0; i < 8; i++) platform.tap('ArrowDown');

@@ -2723,6 +2723,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.headshotMarker = Math.max(0, m.headshotMarker - dt / HIT_MARKER_S);
       slot.damageT = Math.max(0, slot.damageT - dt);
       m.damageAmount = slot.damageT / DAMAGE_S;
+      // M2 (fase 7c): o indicador visual de som, se ligado nos Ajustes.
+      m.soundCount = host.settings.current.audio.soundIndicator
+        ? matchSound.fillIndicator(s, m.soundAngle, m.soundAlpha)
+        : 0;
       slot.flash = Math.max(0, slot.flash - dt / FLASH_DECAY_S);
     }
   }

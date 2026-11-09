@@ -1,7 +1,7 @@
 import { createRawInputState, type MenuInput } from '@boboforces/input';
 import { titleScreen, uiScale } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
-import { createMenuController, type UiFrame } from './menu.ts';
+import { createMenuController, setMenuSoundSink, type MenuSound, type UiFrame } from './menu.ts';
 
 function frame(width: number, height: number, userScale = 1): UiFrame {
   return { width, height, scale: uiScale(width, height, userScale), userScale, options: {}, revision: 1 };
@@ -89,5 +89,26 @@ describe('menu: peças da fase 4a', () => {
     };
     expect(click(r.x + r.w - 20)).toEqual({ activated: 'nivel', delta: 1 });
     expect(click(r.x + 20)).toEqual({ activated: 'nivel', delta: 0 });
+  });
+});
+
+describe('menu: sons (M2, fase 7c)', () => {
+  it('andar toca "move", confirmar "confirm", voltar "back"; sem ligação, mudo', () => {
+    const heard: MenuSound[] = [];
+    setMenuSoundSink((k) => heard.push(k));
+    try {
+      const menu = createMenuController();
+      menu.setRoot(titleScreen.build({ version: '0.0.1', codename: 'teste' }));
+      const ui = frame(1280, 720);
+      const press = (action: string): MenuInput => ({ pressed: (x: string) => x === action }) as unknown as MenuInput;
+      menu.update(IDLE, createRawInputState(), ui);
+      menu.update(press('down'), createRawInputState(), ui);
+      menu.update(press('confirm'), createRawInputState(), ui);
+      menu.update(press('back'), createRawInputState(), ui);
+      menu.update(IDLE, createRawInputState(), ui);
+      expect(heard).toEqual(['move', 'confirm', 'back']);
+    } finally {
+      setMenuSoundSink(null);
+    }
   });
 });

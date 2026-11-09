@@ -77,10 +77,26 @@ export interface AccessibilitySettings {
   readonly hudScale: number;
 }
 
+/**
+ * M2 (fase 7c): áudio (arte-ux.md §10.4; GDD §5.10). Volumes por canal em passos de 0 a 10 (0 = mudo; o mixer usa o
+ * quadrado, que soa mais por igual), saída mono, música também na partida (desligada por padrão) e o indicador visual
+ * de som (anel em volta da retícula, arte-ux §6.7).
+ */
+export interface AudioSettings {
+  readonly master: number;
+  readonly sfx: number;
+  readonly music: number;
+  readonly ui: number;
+  readonly mono: boolean;
+  readonly musicInMatch: boolean;
+  readonly soundIndicator: boolean;
+}
+
 export interface SettingsDocument {
   readonly format: FormatId;
   readonly controls: Readonly<Record<ControlDevice, DeviceControls>>;
   readonly video: VideoSettings;
+  readonly audio: AudioSettings;
   readonly accessibility: AccessibilitySettings;
 }
 
@@ -94,6 +110,7 @@ export const SETTINGS_RANGES = {
   uiScale: { min: 0.8, max: 1.3 },
   fovDeg: { min: 60, max: 110 },
   hudScale: { min: 0.8, max: 1.3 },
+  volume: { min: 0, max: 10 },
   bindingActions: 64,
   bindingSources: 4,
   bindingLength: 40,
@@ -126,6 +143,7 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     touch: deviceDefaults('medium'),
   },
   video: { quality: 'auto', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right', fpsCap: 60 },
+  audio: { master: 9, sfx: 10, music: 7, ui: 8, mono: false, musicInMatch: false, soundIndicator: false },
   accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
 };
 
@@ -207,6 +225,9 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
   const c = r.obj(doc, 'controls', 'controls');
   const v = r.obj(doc, 'video', 'video');
   const a = r.obj(doc, 'accessibility', 'accessibility');
+  const s = r.obj(doc, 'audio', 'audio');
+  const vol = (key: keyof AudioSettings & ('master' | 'sfx' | 'music' | 'ui')): number =>
+    Math.round(r.num(s, key, `audio.${key}`, D.audio[key], R.volume.min, R.volume.max));
   const fov = r.num(v, 'fovDeg', 'video.fovDeg', D.video.fovDeg, 0, R.fovDeg.max);
   if (fov !== 0 && fov < R.fovDeg.min) r.warn('video.fovDeg', 'save.valueClamped', `${fov} → ${R.fovDeg.min}`);
   const value: SettingsDocument = {
@@ -228,6 +249,15 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
       view: r.pick(v, 'view', 'video.view', D.video.view, VIEW_MODES),
       shoulder: r.pick(v, 'shoulder', 'video.shoulder', D.video.shoulder, SHOULDERS),
       fpsCap: readFpsCap(r, v['fpsCap']),
+    },
+    audio: {
+      master: vol('master'),
+      sfx: vol('sfx'),
+      music: vol('music'),
+      ui: vol('ui'),
+      mono: r.bool(s, 'mono', 'audio.mono', D.audio.mono),
+      musicInMatch: r.bool(s, 'musicInMatch', 'audio.musicInMatch', D.audio.musicInMatch),
+      soundIndicator: r.bool(s, 'soundIndicator', 'audio.soundIndicator', D.audio.soundIndicator),
     },
     accessibility: {
       reduceShake: r.bool(a, 'reduceShake', 'accessibility.reduceShake', D.accessibility.reduceShake),

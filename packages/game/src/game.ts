@@ -11,6 +11,7 @@ import {
   type BotLevel,
   type ControlDevice,
   type MatchRecipe,
+  type SettingsDocument,
 } from '@boboforces/format';
 import { stepLevel } from './pause.ts';
 import {
@@ -81,7 +82,7 @@ import {
 import { loadGameAssets } from './assets.ts';
 import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/types.ts';
 import type { LocalDriver } from './local-driver.ts';
-import { createMenuController, followTab, type UiFrame } from './menu.ts';
+import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
 import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
 import {
@@ -110,7 +111,7 @@ import {
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import { skipCappedFrame } from './frame-cap.ts';
-import { loadSoundFiles } from './sound-bank.ts';
+import { applyAudioSettings, loadSoundFiles, MENU_SOUNDS, playUiSound } from './sound-bank.ts';
 import { createMixer, type MixerStats } from '@boboforces/audio';
 import {
   DEFAULT_RENDERER_ROUTES,
@@ -251,6 +252,10 @@ export function startGame(deps: GameDeps): GameHandle {
   const mixer = createMixer(platform.audio);
   let soundFiles: Promise<void> | null = null;
   let soundCount = 0;
+  // M2 (fase 7c): os volumes dos Ajustes valem na hora (o `step` compara a referência do documento salvo) e os
+  // menus tocam pelo mixer.
+  let audioApplied: SettingsDocument | null = null;
+  setMenuSoundSink((sound) => playUiSound(mixer, MENU_SOUNDS[sound]));
   function startSoundFiles(): Promise<void> {
     soundFiles ??= loadSoundFiles(mixer, platform.assets, (id, error) =>
       platform.diagnostics.appendLog(`[audio] ${id}: ${error instanceof Error ? error.message : String(error)}`),
@@ -1075,6 +1080,10 @@ export function startGame(deps: GameDeps): GameHandle {
     const intervalMs = lastFrameMs < 0 ? 0 : Math.max(0, nowMs - lastFrameMs);
     const dt = Math.min(0.1, intervalMs / 1000);
     lastFrameMs = nowMs;
+    if (save.settings !== audioApplied) {
+      audioApplied = save.settings;
+      applyAudioSettings(mixer, audioApplied.audio);
+    }
     platform.input.poll(raw);
     menuInput.update(raw, dt);
     const u = syncUi();
@@ -1477,6 +1486,7 @@ export function startGame(deps: GameDeps): GameHandle {
       if (wantsLock) hooks.releasePointerLock?.();
       renderer.setUiAtlas(null);
       renderer.dispose();
+      setMenuSoundSink(null);
       mixer.dispose();
     },
   };

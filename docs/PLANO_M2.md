@@ -300,7 +300,7 @@ GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan,
 - **7b. Sons da partida.** Pronta em 09/11 (`ARCHITECTURE.md` §12.45). Eventos da sim → mixer, com a prioridade de arte-ux §10.4 (sua arma > dano em você >
   inimigos perto > aliados > ambiente), cooldown por som, só os passos dos 4 bots mais próximos de cada ouvinte, −6 dB
   atrás de parede (raio na grade), hitmarker "plic", headshot "PLOC", kill, dano, vida baixa e a contagem.
-- **7c. Interface e Ajustes.** Sons de navegar, confirmar, voltar e trocar valor nos menus; aba Áudio nos Ajustes
+- **7c. Interface e Ajustes.** Pronta em 09/11 (`ARCHITECTURE.md` §12.46). Sons de navegar, confirmar, voltar e trocar valor nos menus; aba Áudio nos Ajustes
   (Geral, Efeitos, Música, Interface, saída mono, música na partida e indicador visual de som); o indicador como anel
   em volta da retícula (tiros e passos até 20 m).
 - **7d. Música do menu.** Tocador em loop com fade e a música 6 dB mais baixa nas explosões; carrega depois do menu

@@ -3,7 +3,18 @@ import { join, resolve } from 'node:path';
 import { createMixer, GAME_SYNTH_SOUNDS } from '@boboforces/audio';
 import { createFakeAudioContext } from '@boboforces/audio/testing';
 import { describe, expect, it } from 'vitest';
-import { loadSoundFiles, SOUND_IDS, SOUND_RANK, soundPath, SOUNDS, type SoundId } from './sound-bank.ts';
+import { DEFAULT_SETTINGS } from '@boboforces/format';
+import {
+  applyAudioSettings,
+  loadSoundFiles,
+  MENU_SOUNDS,
+  SOUND_IDS,
+  SOUND_RANK,
+  soundPath,
+  SOUNDS,
+  volumeGain,
+  type SoundId,
+} from './sound-bank.ts';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const runtime = JSON.parse(readFileSync(join(ROOT, 'assets-src/runtime-assets.json'), 'utf8')) as {
@@ -89,5 +100,35 @@ describe('banco de sons (fase 7a)', () => {
     };
     expect(await loadSoundFiles(mixer, assets, () => {})).toBe(0);
     expect(asked).toBe(0);
+  });
+});
+
+describe('volumes dos Ajustes (fase 7c)', () => {
+  it('0 é mudo, 10 é cheio, e o meio cai como o ouvido espera (quadrado)', () => {
+    expect(volumeGain(0)).toBe(0);
+    expect(volumeGain(10)).toBe(1);
+    expect(volumeGain(5)).toBeCloseTo(0.25, 9);
+    expect(volumeGain(14)).toBe(1);
+  });
+
+  it('cada canal recebe o seu volume e a saída mono passa ao mixer', () => {
+    const set: Record<string, number> = {};
+    let mono = false;
+    const mixer = {
+      ...createMixer(null),
+      setBusVolume: (bus: string, v: number) => {
+        set[bus] = v;
+      },
+      setMono: (m: boolean) => {
+        mono = m;
+      },
+    };
+    applyAudioSettings(mixer, { ...DEFAULT_SETTINGS.audio, music: 0, mono: true });
+    expect(set).toEqual({ master: volumeGain(9), sfx: 1, music: 0, ui: volumeGain(8) });
+    expect(mono).toBe(true);
+  });
+
+  it('os sons de menu existem no banco e tocam no canal da interface', () => {
+    for (const id of Object.values(MENU_SOUNDS)) expect(SOUNDS[id].bus).toBe('ui');
   });
 });

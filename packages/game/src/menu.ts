@@ -42,6 +42,25 @@ export function followTab(menu: MenuController, tab: number): void {
   }
 }
 
+/**
+ * M2 (fase 7c): os sons dos menus saem daqui, para toda tela que usa o controlador (título, menus, pausa, resultado):
+ * foco que andou, confirmar, voltar e trocar valor ou aba. O `game` liga no mixer; sem ligação (testes), mudo.
+ */
+export type MenuSound = 'move' | 'confirm' | 'back' | 'change';
+let menuSound: ((sound: MenuSound) => void) | null = null;
+export function setMenuSoundSink(sink: ((sound: MenuSound) => void) | null): void {
+  menuSound = sink;
+}
+
+function emitMenuSound(nav: MenuNavigation, before: string | null): MenuNavigation {
+  if (menuSound === null) return nav;
+  if (nav.back) menuSound('back');
+  else if (nav.tab !== 0) menuSound('change');
+  else if (nav.activated !== null) menuSound(nav.delta !== 0 ? 'change' : 'confirm');
+  else if (nav.focusedId !== before && nav.focusedId !== null) menuSound('move');
+  return nav;
+}
+
 /** Ações de menu na ordem em que são tratadas num frame (a primeira que ativa ou volta encerra o frame). */
 const MENU_ORDER: readonly MenuAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'tabPrev', 'tabNext'];
 
@@ -180,16 +199,17 @@ export function createMenuController(): MenuController {
       nav.focusedId = focusedId;
       const l = relayout(ui);
       if (l === null) return nav;
+      const before = focusedId;
       for (let i = 0; i < MENU_ORDER.length; i++) {
         const action = MENU_ORDER[i]!;
         if (!menu.pressed(action)) continue;
         navigateMenu(l, focusedId, action, nav);
         focusedId = nav.focusedId;
-        if (nav.activated !== null || nav.back || nav.tab !== 0) return nav;
+        if (nav.activated !== null || nav.back || nav.tab !== 0) return emitMenuSound(nav, before);
       }
       pointer(l, raw);
       nav.focusedId = focusedId;
-      return nav;
+      return emitMenuSound(nav, before);
     },
     draw(out: DrawList, ui: UiFrame): void {
       const l = relayout(ui);

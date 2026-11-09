@@ -18,6 +18,8 @@ import { STRINGS_PT_BR, type StringKey } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { createMenuController, followTab } from './menu.ts';
 import {
+  PAUSE_SETTINGS_TABS,
+  SETTINGS_TABS,
   actionLabel,
   applyControls,
   bindingLabel,
@@ -143,5 +145,37 @@ describe('Ajustes', () => {
     menu.focus('back');
     followTab(menu, 0);
     expect(menu.focusedId).toBe('back');
+  });
+});
+
+describe('Ajustes: Áudio (M2, fase 7c)', () => {
+  it('a aba vem depois de Vídeo, no menu e na pausa', () => {
+    expect(SETTINGS_TABS.indexOf('audio')).toBe(SETTINGS_TABS.indexOf('video') + 1);
+    expect(PAUSE_SETTINGS_TABS).toContain('audio');
+  });
+
+  it('volumes em % de 0 a 100, em passos de 10; mono, música na partida e indicador ligam e desligam', () => {
+    const rows = settingsRows('audio', DEFAULT_SETTINGS, 'keyboardMouse');
+    expect(rows.map((r) => r.id)).toEqual([
+      'master',
+      'sfx',
+      'music',
+      'uiVolume',
+      'musicInMatch',
+      'mono',
+      'soundIndicator',
+    ]);
+    expect(rows[0]).toMatchObject({ value: '90%' });
+    let doc = DEFAULT_SETTINGS;
+    doc = stepSettings('audio', doc, 'keyboardMouse', 'master', 1).doc;
+    doc = stepSettings('audio', doc, 'keyboardMouse', 'master', 1).doc;
+    expect(doc.audio.master).toBe(10);
+    for (let i = 0; i < 12; i++) doc = stepSettings('audio', doc, 'keyboardMouse', 'music', -1).doc;
+    expect(doc.audio.music).toBe(0);
+    doc = stepSettings('audio', doc, 'keyboardMouse', 'uiVolume', -1).doc;
+    expect(doc.audio.ui).toBe(7);
+    doc = stepSettings('audio', doc, 'keyboardMouse', 'soundIndicator', 0).doc;
+    doc = stepSettings('audio', doc, 'keyboardMouse', 'mono', 1).doc;
+    expect([doc.audio.soundIndicator, doc.audio.mono, doc.audio.musicInMatch]).toEqual([true, true, false]);
   });
 });

@@ -3,6 +3,7 @@
 // o volume relativo (os MP3 saem todos a -1 dBFS: a mixagem mora aqui), a prioridade base e o cooldown. Fica no chunk
 // do menu (a interface toca daqui); a síntese só roda na cena (`scene/sound.ts`), fora do menu.
 import type { AudioBus, Mixer } from '@boboforces/audio';
+import type { AudioSettings } from '@boboforces/format';
 import type { Assets } from '@boboforces/platform-api';
 
 /**
@@ -135,4 +136,33 @@ export async function loadSoundFiles(
   };
   await Promise.all(Array.from({ length: DECODE_CONCURRENCY }, worker));
   return ok;
+}
+
+/** Volume do Ajuste (0..10) → ganho do canal. O quadrado soa mais por igual que a reta (o ouvido é logarítmico). */
+export const volumeGain = (steps: number): number => (Math.max(0, Math.min(10, steps)) / 10) ** 2;
+
+/** M2 (fase 7c): aplica os volumes por canal e a saída mono dos Ajustes no mixer. */
+export function applyAudioSettings(mixer: Mixer, a: AudioSettings): void {
+  mixer.setBusVolume('master', volumeGain(a.master));
+  mixer.setBusVolume('sfx', volumeGain(a.sfx));
+  mixer.setBusVolume('music', volumeGain(a.music));
+  mixer.setBusVolume('ui', volumeGain(a.ui));
+  mixer.setMono(a.mono);
+}
+
+/** O som de cada gesto de menu (`MenuSound` do `menu.ts`). */
+export const MENU_SOUNDS = {
+  move: 'ui-mover',
+  confirm: 'ui-confirmar',
+  back: 'ui-voltar',
+  change: 'ui-trocar',
+} as const satisfies Readonly<Record<string, SoundId>>;
+
+const uiOptions = { bus: 'ui' as AudioBus, volume: 1, priority: SOUND_RANK.ui };
+
+/** Toca um som de interface (2D, canal da interface). */
+export function playUiSound(mixer: Mixer, id: SoundId): void {
+  uiOptions.bus = SOUNDS[id].bus;
+  uiOptions.volume = SOUNDS[id].volume;
+  mixer.play(id, uiOptions);
 }

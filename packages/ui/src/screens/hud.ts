@@ -29,6 +29,13 @@ export interface HudModel {
    */
   damageAngle: number;
   damageAmount: number;
+  /**
+   * M2 (fase 7c): indicador visual de som (arte-ux.md §6.7): até `HUD_SOUND_BLIPS` sons perto (tiros e passos até
+   * 20 m), cada um com o ângulo relativo à mira (como `damageAngle`) e a força 0..1. `soundCount` 0 = desligado.
+   */
+  soundCount: number;
+  readonly soundAngle: Float32Array;
+  readonly soundAlpha: Float32Array;
   /** Jogador local 0..3 (borda da vista e ícone P1–P4) e time 0..3 (255 = FFA). */
   playerSlot: number;
   team: number;
@@ -154,6 +161,9 @@ export function createHudModel(): HudModel {
     headshotMarker: 0,
     damageAngle: 0,
     damageAmount: 0,
+    soundCount: 0,
+    soundAngle: new Float32Array(HUD_SOUND_BLIPS),
+    soundAlpha: new Float32Array(HUD_SOUND_BLIPS),
     playerSlot: 0,
     team: 255,
     spread: 0,
@@ -232,9 +242,31 @@ export const HUD_METRICS = {
   hitStep: 2,
   damageLength: 64,
   damageThickness: 4,
+  /** Indicador de som: raio do anel em volta da retícula e lado de cada ponto (px na referência 1280×720). */
+  soundRing: 36,
+  soundDot: 5,
   /** Borda da vista na cor do jogador (2–4P; arte-ux.md §6.6: 3 px por vista de 640×360). */
   border: 3,
 } as const;
+
+/** Quantos sons o indicador visual mostra de uma vez por vista. */
+export const HUD_SOUND_BLIPS = 8;
+
+/** Um som no anel: 3 pontos num arco curto na direção dele (frente = cima; positivo = à esquerda, como o yaw). */
+function drawSoundBlip(out: DrawList, cx: number, cy: number, angle: number, alpha: number, s: number): void {
+  const r = HUD_METRICS.soundRing * s;
+  const size = Math.max(2, Math.round(HUD_METRICS.soundDot * s));
+  // Contorno escuro como o da retícula: o ponto claro some contra céu e concreto sem ele. Nunca abaixo de 35%.
+  const k01 = 0.35 + 0.65 * clamp01(alpha);
+  for (let k = -1; k <= 1; k++) {
+    const a = angle + k * 0.12;
+    const side = k === 0 ? size : Math.max(2, size - 1);
+    const x = Math.round(cx - Math.sin(a) * r - side / 2);
+    const y = Math.round(cy - Math.cos(a) * r - side / 2);
+    pushRect(out, x - 1, y - 1, side + 2, side + 2, withAlpha(COLORS.bunker, 0.6 * k01));
+    pushRect(out, x, y, side, side, withAlpha(COLORS.texto, (k === 0 ? 0.95 : 0.7) * k01));
+  }
+}
 
 /** A plaquinha do alto à esquerda não passa desta fração da largura da vista (o meio é do placar). */
 const HUD_CHIP_MAX_FRACTION = 0.36;
@@ -658,6 +690,8 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       // A retícula é a da luneta.
     } else if (model.crosshair === HUD_CROSSHAIR.dot) drawDot(out, cx, cy, Math.max(2, thick + 1));
     else drawCrosshair(out, cx, cy, crossGap, len, thick);
+    for (let i = 0; i < model.soundCount; i++)
+      drawSoundBlip(out, cx, cy, model.soundAngle[i]!, model.soundAlpha[i]!, s);
     const marker = Math.max(model.hitMarker, model.headshotMarker);
     if (marker > 0.01) {
       const step = Math.max(2, Math.round(M.hitStep * s));

@@ -1927,3 +1927,30 @@ mudanças de contrato ficam registradas aqui.
   - a granada arremessada usa o sopro da faca, mais grave;
   - a vinheta só pelo jogador 1;
   - o pan de 50% com 3–4 jogadores fica para o M3 (sofá).
+
+### 12.46 Fase 7c: interface, Ajustes e indicador de som (09/11/2026)
+
+- **`settings@1` ganhou `audio`:**
+  - volumes `master`, `sfx`, `music` e `ui` em passos inteiros de 0 a 10 (padrão 9, 10, 7 e 8);
+  - `mono`, `musicInMatch` (desligada, GDD §5.10) e `soundIndicator` (desligado).
+  Campo novo com padrão, sem migração: save antigo entra sem aviso.
+- **Volume → ganho:** o quadrado do passo (`volumeGain`), que soa mais por igual que a reta. O `game` aplica no mixer
+  sempre que a referência de `save.settings` muda (`applyAudioSettings` no começo do `step`). Assim vale na hora,
+  venha a mudança do menu, da pausa ou de um backup importado.
+- **Aba Áudio** nos Ajustes e na pausa, depois de Vídeo: os 4 volumes em %, Música na partida, Saída mono e Indicador
+  de som. Nenhum glifo novo no atlas.
+- **Sons dos menus:** saem do `MenuController` (`setMenuSoundSink`), para toda tela que usa o controlador (título,
+  menus, pausa, resultado):
+  - foco que andou: `ui-mover`;
+  - confirmar: `ui-confirmar`;
+  - voltar: `ui-voltar`;
+  - trocar valor ou aba: `ui-trocar`.
+  Sem ligação (testes), fica mudo.
+- **Indicador visual de som** (arte-ux §6.7):
+  - `createMatchSound` guarda até 8 marcas por vista: tiros e explosões dos outros, força 1; passos, 0,55 × o volume
+    do passo. Só até 20 m do ouvinte, e cada marca dura 0,8 s;
+  - `fillIndicator` escreve no `HudModel` (`soundCount`, `soundAngle`, `soundAlpha`) o ângulo relativo à mira;
+  - o HUD desenha cada marca como 3 pontos claros com contorno escuro num anel de 36 px em volta da retícula. Sem o
+    contorno, os pontos sumiam contra o céu e o concreto (visto no Edge).
+- **Escolhas (revisáveis):** os volumes padrão, a curva do quadrado, o raio e o desenho do anel, e o hover do mouse
+  tocar "mover".

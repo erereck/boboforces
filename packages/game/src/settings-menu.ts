@@ -32,15 +32,22 @@ import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
  * Botões (parte 2): uma linha por ação remapeável; confirmar abre a captura (`createBindingCapture`, no `game`).
  */
 
-export const SETTINGS_TABS = ['controls', 'buttons', 'video', 'access', 'data', 'about'] as const;
+export const SETTINGS_TABS = ['controls', 'buttons', 'video', 'audio', 'access', 'data', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 /** As abas que a pausa mostra (Dados e Sobre ficam no menu). */
-export const PAUSE_SETTINGS_TABS = ['controls', 'buttons', 'video', 'access'] as const satisfies readonly SettingsTab[];
+export const PAUSE_SETTINGS_TABS = [
+  'controls',
+  'buttons',
+  'video',
+  'audio',
+  'access',
+] as const satisfies readonly SettingsTab[];
 
 export const SETTINGS_TAB_LABELS: Readonly<Record<SettingsTab, StringKey>> = {
   controls: 'settings.tab.controls',
   buttons: 'settings.tab.buttons',
   video: 'settings.tab.video',
+  audio: 'settings.tab.audio',
   access: 'settings.tab.access',
   data: 'settings.tab.data',
   about: 'settings.tab.about',
@@ -218,6 +225,38 @@ const VIDEO_ROWS: readonly OptionDef[] = [
   },
 ];
 
+/** M2 (fase 7c): um volume de 0 a 10, mostrado em %. */
+function volumeRow(id: string, labelKey: StringKey, key: 'master' | 'sfx' | 'music' | 'ui'): OptionDef {
+  return {
+    id,
+    labelKey,
+    value: (doc) => t('settings.percent', { n: doc.audio[key] * 10 }),
+    step: (doc, _dev, d) => ({
+      ...doc,
+      audio: { ...doc.audio, [key]: Math.max(0, Math.min(10, doc.audio[key] + d)) },
+    }),
+  };
+}
+
+function audioToggle(id: string, labelKey: StringKey, key: 'mono' | 'musicInMatch' | 'soundIndicator'): OptionDef {
+  return {
+    id,
+    labelKey,
+    value: (doc) => onOff(doc.audio[key]),
+    step: (doc) => ({ ...doc, audio: { ...doc.audio, [key]: !doc.audio[key] } }),
+  };
+}
+
+const AUDIO_ROWS: readonly OptionDef[] = [
+  volumeRow('master', 'settings.row.master', 'master'),
+  volumeRow('sfx', 'settings.row.sfx', 'sfx'),
+  volumeRow('music', 'settings.row.music', 'music'),
+  volumeRow('uiVolume', 'settings.row.uiVolume', 'ui'),
+  audioToggle('musicInMatch', 'settings.row.musicInMatch', 'musicInMatch'),
+  audioToggle('mono', 'settings.row.mono', 'mono'),
+  audioToggle('soundIndicator', 'settings.row.soundIndicator', 'soundIndicator'),
+];
+
 const ACCESS_ROWS: readonly OptionDef[] = [
   {
     id: 'shake',
@@ -236,6 +275,7 @@ const ACCESS_ROWS: readonly OptionDef[] = [
 function optionDefs(tab: SettingsTab, device: ControlDevice): readonly OptionDef[] {
   if (tab === 'controls') return CONTROL_ROWS.filter((r) => !r.devices || r.devices.includes(device));
   if (tab === 'video') return VIDEO_ROWS;
+  if (tab === 'audio') return AUDIO_ROWS;
   if (tab === 'access') return ACCESS_ROWS;
   return [];
 }

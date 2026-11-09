@@ -256,6 +256,11 @@ describe('sons da partida (fase 7b)', () => {
     };
     // 4 m/s por 3 s = 12 m; passada de 1,7 m, a 1ª depois de meia passada: 7 passos.
     const steps = run(near, 3);
+    // Os passos do bot à frente também marcam o indicador (na frente: ângulo ~0).
+    const angles = new Float32Array(8);
+    const alphas = new Float32Array(8);
+    expect(near.sound.fillIndicator(0, angles, alphas)).toBeGreaterThan(0);
+    expect(Math.abs(angles[0]!)).toBeLessThan(0.5);
     expect(steps).toHaveLength(7);
     expect(new Set(steps.map((p) => p.sound))).toEqual(new Set(['passo-concreto-1', 'passo-concreto-2']));
     for (const p of steps) expect(p.rate).toBeGreaterThanOrEqual(0.93);
@@ -294,6 +299,27 @@ describe('sons da partida (fase 7b)', () => {
     health[entityIndex(me)] = 100;
     for (let t = 0; t < 120; t++) sound.frame(v, 1 / 60, 20 + t / 60);
     expect(mixer.played.filter((p) => p.sound === 'coracao').length).toBe(beats);
+  });
+
+  it('indicador visual: tiro de inimigo à esquerda até 20 m vira um ponto à esquerda que some; o seu não', () => {
+    const { v, me, bot, sound } = setup({ botDz: 10 });
+    const angles = new Float32Array(8);
+    const alphas = new Float32Array(8);
+    // Ouvinte olhando para −z (yaw 0); tiro em x = 0 (10 m à esquerda).
+    sound.event({ ...shot(bot, WEAPON_CODE.rifle, 30), originX: 0 } as SimEvent, v, 1);
+    sound.event(shot(me, WEAPON_CODE.rifle, 30), v, 1);
+    expect(sound.fillIndicator(0, angles, alphas)).toBe(1);
+    expect(angles[0]).toBeCloseTo(Math.PI / 2, 2);
+    expect(alphas[0]).toBeCloseTo(1, 6);
+    sound.frame(v, MATCH_SOUND.indicatorLifeS / 2, 1.4);
+    expect(sound.fillIndicator(0, angles, alphas)).toBe(1);
+    expect(alphas[0]).toBeCloseTo(0.5, 2);
+    sound.frame(v, MATCH_SOUND.indicatorLifeS, 2.2);
+    expect(sound.fillIndicator(0, angles, alphas)).toBe(0);
+    // Longe demais: toca, mas não marca.
+    const far = setup({ botDz: MATCH_SOUND.indicatorRangeM + 5 });
+    far.sound.event(shot(far.bot, WEAPON_CODE.rifle, 30 - MATCH_SOUND.indicatorRangeM - 5), far.v, 1);
+    expect(far.sound.fillIndicator(0, angles, alphas)).toBe(0);
   });
 
   it('pausa e fim cortam o que está tocando', () => {

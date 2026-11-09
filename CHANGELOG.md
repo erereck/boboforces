@@ -453,6 +453,13 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Mixagem:** atrás de parede o som fica mais baixo. A sua arma e o dano em você têm prioridade sobre o resto.
   - **F2:** mostra as vozes de áudio tocando.
   - 13 testes novos.
+- **Fase 7c, interface e Ajustes de áudio:**
+  - **Menus com som:** andar, confirmar, voltar e trocar valor.
+  - **Aba Áudio nos Ajustes** (também na pausa): volume geral, efeitos, música e interface; música na partida, saída
+    mono e indicador de som.
+  - **Indicador de som:** quando ligado, tiros e passos até 20 m aparecem como pontos num anel em volta da retícula,
+    na direção de onde vieram.
+  - 8 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
