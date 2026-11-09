@@ -204,3 +204,50 @@ export function aimFromCamera(
   out[0] = Math.atan2(-dx, -dz);
   out[1] = Math.atan2(dy, flat);
 }
+
+/** M2 (fase 6e): alcance do "atirar sozinho" (m): além disso a retícula num inimigo não dispara. */
+export const AUTO_FIRE_RANGE_M = 80;
+
+/**
+ * M2 (fase 6e): o bobo sob a retícula, para o "atirar sozinho" do toque (arte-ux.md §7.3), ou −1. O raio é o da
+ * câmera (cx, cy, cz → yaw, pitch); em 1ª pessoa a câmera é o olho. Começa no plano do olho (o que fica entre a
+ * câmera de ombro e o bobo não conta), para no cenário que segura bala e devolve o bobo vivo mais perto antes disso
+ * (menos o `self`).
+ */
+export function crosshairTarget(
+  view: SimView,
+  self: number,
+  ex: number,
+  ey: number,
+  ez: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  yaw: number,
+  pitch: number,
+  maxRange: number,
+): number {
+  const cp = Math.cos(pitch);
+  const fx = -Math.sin(yaw) * cp;
+  const fy = Math.sin(pitch);
+  const fz = -Math.cos(yaw) * cp;
+  const depth = Math.max(0, (ex - cx) * fx + (ey - cy) * fy + (ez - cz) * fz);
+  const ox = cx + fx * depth;
+  const oy = cy + fy * depth;
+  const oz = cz + fz * depth;
+  raycastGrid(view.world, view.blocks, ox, oy, oz, fx, fy, fz, maxRange, BLOCK_FLAG.blocksBullets, hit, view.colliders);
+  let t = hit.hit ? hit.distance : maxRange;
+  let best = -1;
+  for (let j = 0; j < view.count; j++) {
+    if (j === self || view.alive[j] !== 1) continue;
+    const kind = view.kind[j]!;
+    if (kind !== ENTITY_KIND.bobo && kind !== ENTITY_KIND.zombie) continue;
+    if ((view.flags[j]! & ENTITY_FLAG.dead) !== 0) continue;
+    const tj = rayBody(view, j, ox, oy, oz, fx, fy, fz, t);
+    if (tj >= 0 && tj < t) {
+      t = tj;
+      best = j;
+    }
+  }
+  return best;
+}

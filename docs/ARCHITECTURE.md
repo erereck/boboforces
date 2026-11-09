@@ -1846,3 +1846,31 @@ mudanças de contrato ficam registradas aqui.
   máscara do mergulhador cobre o nariz; o teste do nariz pula a máscara).
 - **Os bots continuam com a farda** (#58): as fantasias não entram em `FIGURE_BOT_ROTATION`.
 - A prévia do skingen (`npm run skingen:figuras`) mostra os 16 looks.
+
+### 12.43 Fase 6e: toque completo (09/11/2026)
+
+- **Botões novos:** `TOUCH_CONTROLS` ganhou `melee` e `camera` no fim (os índices de antes não mudam).
+  - **Faca** à esquerda da troca de arma, na fileira de baixo, fora da área livre de mirar no alto à direita;
+  - **Vista** (1ª/3ª pessoa) ao lado da pausa, pequena como ela;
+  - o teste do layout confere: todos na metade direita, a 24 px da borda e a 12 px dos outros, em 667×375.
+- **Correr no toque** (`TOUCH_SPRINT`): o joystick a 92% do raio ou mais, com 70% ou mais para a frente (não há
+  botão de correr).
+- **Ajustes:**
+  - no toque, `autoFire` (Atirar sozinho) e `leftHanded` (Canhoto, que espelha botões e joystick pelo
+    `TouchLayout.leftHanded` que já existia);
+  - em Vídeo, `fpsCap` (60 ou 30).
+  Todos são campos novos com padrão, sem migração.
+- **Atirar sozinho** (`crosshairTarget` em `scene/third-person.ts`):
+  - o raio da câmera (o olho em 1ª pessoa; em 3ª, a partir do plano do olho) acha o bobo mais perto antes do cenário
+    que segura bala, até 80 m;
+  - sendo inimigo, o quadro do humano aperta o gatilho.
+- **Limite de 30 FPS** (`frame-cap.ts`): o laço do `game` pula o quadro que chega antes de 33,3 ms (menos 4 ms de
+  folga). A sim anda pelo tempo real, então nada fica lento. O bench não limita.
+- **Fantasma dos dedos** (gameplay.md §2.5): nas 2 primeiras partidas no toque, depois da contagem:
+  - um dedo dá voltas num anel na metade do joystick ("Arraste para andar") e outro varre a da mira ("Arraste para
+    mirar");
+  - some quando o jogador anda 0,6 s e mexe a mira, ou depois de 10 s;
+  - respeita o canhoto.
+- **Escolhas (revisáveis):** as posições da Faca e da Vista, os limiares do correr, o alcance do atirar sozinho, e a
+  troca de arma continua no botão Arma. Tocar no ícone da arma da HUD ficou para depois: no celular os botões já
+  ocupam aquele canto.

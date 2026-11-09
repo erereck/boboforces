@@ -15,7 +15,19 @@ export function sameDevice(a: DeviceBinding, b: DeviceBinding): boolean {
 }
 
 /** Controles de toque desenhados pelo jogo (arte-ux.md §7.3). Ordem só interna; o save guarda o nome. */
-export const TOUCH_CONTROLS = ['fire', 'ads', 'jump', 'crouch', 'reload', 'grenade', 'weapon', 'pause'] as const;
+/** M2 (fase 6e): faca e câmera no fim da lista (o índice de um controle não muda). */
+export const TOUCH_CONTROLS = [
+  'fire',
+  'ads',
+  'jump',
+  'crouch',
+  'reload',
+  'grenade',
+  'weapon',
+  'pause',
+  'melee',
+  'camera',
+] as const;
 
 export type TouchControlId = (typeof TOUCH_CONTROLS)[number];
 

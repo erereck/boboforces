@@ -53,6 +53,12 @@ export const STRINGS_PT_BR = {
   'settings.row.shoulder': 'Ombro',
   'settings.shoulder.right': 'Direito',
   'settings.shoulder.left': 'Esquerdo',
+  /** M2 (fase 6e): o toque e o limite de quadros (arte-ux.md §7.3). */
+  'settings.row.autoFire': 'Atirar sozinho',
+  'settings.row.leftHanded': 'Canhoto',
+  'settings.row.fps': 'Limite de quadros',
+  'settings.fps.60': '60 por segundo',
+  'settings.fps.30': '30 por segundo',
   'settings.default': 'Padrão',
   'settings.degrees': '{n}°',
   'settings.row.uiScale': 'Tamanho dos menus',
@@ -896,6 +902,11 @@ export const STRINGS_PT_BR = {
   'touch.grenade': 'Granada',
   'touch.weapon': 'Arma',
   'touch.pause': 'II',
+  'touch.melee': 'Faca',
+  'touch.camera': 'Vista',
+  /** M2 (fase 6e): o fantasma dos dedos nas primeiras partidas no celular. */
+  'touch.ghost.move': 'Arraste para andar',
+  'touch.ghost.look': 'Arraste para mirar',
 
   'level.vibe': 'Pela vibe',
   'level.chill': 'De boa',

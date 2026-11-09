@@ -66,7 +66,14 @@ describe('settings@1', () => {
     expect(g.deadzoneInner).toBe(0.4);
     expect(g.deadzoneOuter).toBeCloseTo(0.5, 9);
     expect(r.value.controls.keyboardMouse.bindings).toEqual({ tabPrev: ['key:KeyZ', 'key:KeyX'] });
-    expect(r.value.video).toEqual({ quality: 'auto', uiScale: 1.2, fovDeg: 60, view: 'first', shoulder: 'right' });
+    expect(r.value.video).toEqual({
+      quality: 'auto',
+      uiScale: 1.2,
+      fovDeg: 60,
+      view: 'first',
+      shoulder: 'right',
+      fpsCap: 60,
+    });
     expect(r.value.accessibility).toEqual(DEFAULT_SETTINGS.accessibility);
     expect(r.value.controls.touch).toEqual(DEFAULT_SETTINGS.controls.touch);
     expect(r.warnings.length).toBeGreaterThanOrEqual(6);

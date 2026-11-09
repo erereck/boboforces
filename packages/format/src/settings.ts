@@ -40,12 +40,18 @@ export interface DeviceControls {
    * padrão do perfil.
    */
   readonly bindings: Readonly<Record<string, readonly string[]>>;
+  /** M2 (fase 6e, só toque): atirar sozinho com a retícula num inimigo e o layout canhoto (arte-ux.md §7.3). */
+  readonly autoFire: boolean;
+  readonly leftHanded: boolean;
 }
 
 /** M2 (fase 6b): a câmera do jogador (gameplay.md §3.5): 1ª pessoa (padrão) ou 3ª, de ombro. */
 export const VIEW_MODES = ['first', 'third'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 export const SHOULDERS = ['right', 'left'] as const;
+/** M2 (fase 6e): limite de quadros (arte-ux.md §7.3): 60 (padrão) ou 30, para poupar bateria e calor no celular. */
+export const FPS_CAPS = [60, 30] as const;
+export type FpsCap = (typeof FPS_CAPS)[number];
 export type Shoulder = (typeof SHOULDERS)[number];
 
 export interface VideoSettings {
@@ -57,6 +63,7 @@ export interface VideoSettings {
   /** M2 (fase 6b): 1ª ou 3ª pessoa, e o ombro da 3ª (a regra "Câmera permitida" da partida pode forçar a 1ª). */
   readonly view: ViewMode;
   readonly shoulder: Shoulder;
+  readonly fpsCap: FpsCap;
 }
 
 export interface AccessibilitySettings {
@@ -105,6 +112,8 @@ function deviceDefaults(aimAssist: AimAssistName): DeviceControls {
     deadzoneInner: 0.15,
     deadzoneOuter: 0.95,
     bindings: {},
+    autoFire: false,
+    leftHanded: false,
   };
 }
 
@@ -116,7 +125,7 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     gamepad: deviceDefaults('medium'),
     touch: deviceDefaults('medium'),
   },
-  video: { quality: 'auto', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right' },
+  video: { quality: 'auto', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right', fpsCap: 60 },
   accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
 };
 
@@ -170,7 +179,17 @@ function readDevice(r: DocReader, src: Record<string, unknown>, path: string, d:
     // A externa nunca fica abaixo da interna + 0,1.
     deadzoneOuter: Math.max(outer, inner + 0.1),
     bindings,
+    autoFire: r.bool(src, 'autoFire', `${path}.autoFire`, d.autoFire),
+    leftHanded: r.bool(src, 'leftHanded', `${path}.leftHanded`, d.leftHanded),
   };
+}
+
+/** O limite de quadros: 60 ou 30; outro valor cai no padrão com aviso. */
+function readFpsCap(r: DocReader, v: unknown): FpsCap {
+  if (v === undefined) return DEFAULT_SETTINGS.video.fpsCap;
+  if ((FPS_CAPS as readonly unknown[]).includes(v)) return v as FpsCap;
+  r.warn('video.fpsCap', 'save.invalidField');
+  return DEFAULT_SETTINGS.video.fpsCap;
 }
 
 /**
@@ -208,6 +227,7 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
       fovDeg: fov === 0 ? 0 : Math.max(fov, R.fovDeg.min),
       view: r.pick(v, 'view', 'video.view', D.video.view, VIEW_MODES),
       shoulder: r.pick(v, 'shoulder', 'video.shoulder', D.video.shoulder, SHOULDERS),
+      fpsCap: readFpsCap(r, v['fpsCap']),
     },
     accessibility: {
       reduceShake: r.bool(a, 'reduceShake', 'accessibility.reduceShake', D.accessibility.reduceShake),

@@ -166,6 +166,21 @@ const CONTROL_ROWS: readonly OptionDef[] = [
     (c, d) => ({ deadzoneOuter: Math.max(c.deadzoneInner + 0.1, stepList(DEAD_OUT, c.deadzoneOuter, d)) }),
     ['gamepad'],
   ),
+  // M2 (fase 6e): só no toque.
+  control(
+    'autoFire',
+    'settings.row.autoFire',
+    (c) => onOff(c.autoFire),
+    (c) => ({ autoFire: !c.autoFire }),
+    ['touch'],
+  ),
+  control(
+    'leftHanded',
+    'settings.row.leftHanded',
+    (c) => onOff(c.leftHanded),
+    (c) => ({ leftHanded: !c.leftHanded }),
+    ['touch'],
+  ),
 ];
 
 const VIDEO_ROWS: readonly OptionDef[] = [
@@ -193,6 +208,13 @@ const VIDEO_ROWS: readonly OptionDef[] = [
     labelKey: 'settings.row.shoulder',
     value: (doc) => t(doc.video.shoulder === 'left' ? 'settings.shoulder.left' : 'settings.shoulder.right'),
     step: (doc) => ({ ...doc, video: { ...doc.video, shoulder: doc.video.shoulder === 'left' ? 'right' : 'left' } }),
+  },
+  // M2 (fase 6e): 60 ou 30 quadros por segundo (o celular poupa bateria e esquenta menos).
+  {
+    id: 'fps',
+    labelKey: 'settings.row.fps',
+    value: (doc) => t(doc.video.fpsCap === 30 ? 'settings.fps.30' : 'settings.fps.60'),
+    step: (doc) => ({ ...doc, video: { ...doc.video, fpsCap: doc.video.fpsCap === 30 ? 60 : 30 } }),
   },
 ];
 
@@ -293,6 +315,8 @@ export function applyControls(base: ControlProfile, c: DeviceControls): ControlP
     toggleCrouch: c.toggleCrouch,
     toggleSprint: c.toggleSprint,
     ...(base.device === 'gamepad' ? { deadzoneInner: c.deadzoneInner, deadzoneOuter: c.deadzoneOuter } : {}),
+    // M2 (fase 6e): o layout canhoto espelha os botões e o joystick.
+    ...(base.device === 'touch' && base.touch ? { touch: { ...base.touch, leftHanded: c.leftHanded } } : {}),
   };
 }
 

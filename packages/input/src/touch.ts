@@ -56,6 +56,10 @@ export const DEFAULT_TOUCH_LAYOUT: TouchLayout = {
     { control: 'ads', anchor: 'bottomRight', x: 224, y: 56, radius: 32, aims: false },
     { control: 'weapon', anchor: 'bottomRight', x: 224, y: 140, radius: 32, aims: false },
     { control: 'pause', anchor: 'topRight', x: 56, y: 56, radius: 24, aims: false },
+    // M2 (fase 6e): a faca à esquerda da troca de arma (fora da área de mirar, no alto) e a câmera (1ª/3ª pessoa) ao
+    // lado da pausa, pequena como ela.
+    { control: 'melee', anchor: 'bottomRight', x: 300, y: 132, radius: 32, aims: false },
+    { control: 'camera', anchor: 'topRight', x: 128, y: 56, radius: 24, aims: false },
   ],
 };
 

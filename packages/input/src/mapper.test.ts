@@ -351,6 +351,25 @@ describe('toque', () => {
     expect(frameOf(m).moveX).toBe(0);
   });
 
+  it('M2 (fase 6e): o joystick até a borda e para a frente corre; no meio, ou de lado, não', () => {
+    const raw = touchRaw();
+    const m = createInputMapper({ kind: 'touch' }, createTouchProfile());
+    finger(raw, 0, 7, 300, 500);
+    m.update(raw, DT);
+    // Frente total (120 px reais = o raio): corre.
+    finger(raw, 0, 7, 300, 380, 300, 500);
+    m.update(raw, DT);
+    expect(frameOf(m).buttons & BUTTON.sprint).toBe(BUTTON.sprint);
+    // Meio caminho: anda.
+    finger(raw, 0, 7, 300, 440, 300, 500);
+    m.update(raw, DT);
+    expect(frameOf(m).buttons & BUTTON.sprint).toBe(0);
+    // Borda, mas de lado: anda.
+    finger(raw, 0, 7, 420, 500, 300, 500);
+    m.update(raw, DT);
+    expect(frameOf(m).buttons & BUTTON.sprint).toBe(0);
+  });
+
   it('arrastar na metade direita mira (em px de layout)', () => {
     const raw = touchRaw();
     const p = createTouchProfile();

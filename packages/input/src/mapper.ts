@@ -124,6 +124,8 @@ const MENU_DIRECTION_COUNT = 4;
 const A_ADS = GAME_ACTION_INDEX.ads;
 const A_CROUCH = GAME_ACTION_INDEX.crouch;
 const A_SPRINT = GAME_ACTION_INDEX.sprint;
+/** M2 (fase 6e): correr no toque: joystick a 92% do raio ou mais, com 70% ou mais para a frente. */
+export const TOUCH_SPRINT = { edge: 0.92, forward: 0.7 } as const;
 const A_NEXT = GAME_ACTION_INDEX.nextWeapon;
 const A_PREV = GAME_ACTION_INDEX.prevWeapon;
 const A_LAST = GAME_ACTION_INDEX.lastWeapon;
@@ -397,6 +399,14 @@ class Mapper implements InputMapper {
       } else if (tgt === TGT_MENU) {
         if (v > this.menuValue[idx]!) this.menuValue[idx] = v;
       } else if (v > this.moveValue[idx]!) this.moveValue[idx] = v;
+    }
+    // M2 (fase 6e): no toque, o joystick empurrado até a borda e para a frente corre (não há botão de correr).
+    if (kind === 'touch') {
+      const jx = this.joystickMoveX;
+      const jy = this.joystickMoveY;
+      if (jy >= TOUCH_SPRINT.forward && jx * jx + jy * jy >= TOUCH_SPRINT.edge * TOUCH_SPRINT.edge) {
+        this.gameValue[A_SPRINT] = 1;
+      }
     }
   }
 

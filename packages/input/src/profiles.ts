@@ -214,6 +214,9 @@ export function createTouchProfile(layout: TouchLayout = DEFAULT_TOUCH_LAYOUT): 
       grenade: [touch('grenade')],
       nextWeapon: [touch('weapon')],
       pause: [touch('pause')],
+      // M2 (fase 6e).
+      melee: [touch('melee')],
+      camera: [touch('camera')],
     },
     menu: {},
     moveStick: null,

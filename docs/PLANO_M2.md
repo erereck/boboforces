@@ -277,7 +277,8 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
 - **6d. Fantasias** (#62). Pronta em 09/11 (`ARCHITECTURE.md` §12.42): Astronauta, Pijama, Robô de papelão e
   Mergulhador, esperando o print. As skins prontas extras, com a lista final por print (proposta: astronauta, pijama e robô de
   papelão, mais as do banco de ideias que couberem).
-- **6e. Toque completo** (arte-ux.md §7.3).
+- **6e. Toque completo** (arte-ux.md §7.3). Pronta em 09/11 (`ARCHITECTURE.md` §12.43); tocar no ícone da arma
+  ficou para depois.
   - trocar de arma tocando no ícone dela;
   - atirar sozinho, layout canhoto e o limitador de 30/60 FPS nos Ajustes;
   - o "fantasma dos dedos" nas primeiras partidas no celular;

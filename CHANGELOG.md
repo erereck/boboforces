@@ -424,6 +424,15 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - Cada um tem tecido próprio: traje espacial com painéis, listrado e papelão com fita adesiva. O mergulhador usa a
     máscara.
   - Os bots continuam de farda. Capacete e outros acessórios 3D ainda não entraram.
+- **Fase 6e, toque completo:**
+  - **Botões novos:** **Faca** (ao lado de Arma) e **Vista** (1ª/3ª pessoa, ao lado da pausa).
+  - **Correr:** empurre o joystick até a borda, para a frente.
+  - **Nos Ajustes, para o toque:** **Atirar sozinho** (dispara quando a mira passa num inimigo à vista) e
+    **Canhoto** (espelha os botões e o joystick).
+  - **Em Vídeo:** **Limite de quadros** de 60 ou 30 por segundo, para poupar bateria.
+  - **Fantasma dos dedos:** nas 2 primeiras partidas no celular, dois dedos mostram onde arrastar para andar e para
+    mirar, até você fazer os dois.
+  - 4 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

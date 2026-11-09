@@ -231,7 +231,9 @@ import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from '
 import { createWardrobe, WARDROBE, type Wardrobe } from './wardrobe.ts';
 import {
   aimFromCamera,
+  AUTO_FIRE_RANGE_M,
   createShoulderPose,
+  crosshairTarget,
   placeShoulderCamera,
   THIRD_PERSON,
   type ShoulderPose,
@@ -824,6 +826,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let thirdPerson = thirdFromSettings();
   let shoulderSide = sideFromSettings();
   const thirdAim = new Float64Array(2);
+  // M2 (fase 6e): o fantasma dos dedos nas 2 primeiras partidas no celular, até o jogador andar e mirar (ou 10 s).
+  const GHOST = { matches: 2, maxS: 10, fadeS: 0.4, moveS: 0.6 } as const;
+  let ghostT = 0;
+  let ghostMoved = 0;
+  let ghostLooked = false;
+  let ghostDone = humans === 0 || host.stats.current.totals.matches >= GHOST.matches;
+  let ghostAlpha = 0;
   const env = createEnvironment();
   env.timeOfDay = bench?.timeOfDay ?? doc.light.timeOfDay;
   const sun = doc.light.sunDir;
@@ -1326,6 +1335,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (thirdPersonAim()) {
         out.yaw = yawToU16(thirdAim[0]!);
         out.pitch = pitchToI16(thirdAim[1]!);
+      }
+      // M2 (fase 6e): no toque, "atirar sozinho" aperta o gatilho com a retícula num inimigo.
+      if (device === 'touch' && host.settings.current.controls.touch.autoFire && enemyUnderCrosshair()) {
+        out.buttons |= BUTTON.fire;
       }
       // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
       if (unstuckPending) {
@@ -1834,6 +1847,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * M2 (fase 6b): com a vista do humano em 3ª pessoa, o tiro sai do olho na direção do ponto que o raio da câmera
    * acerta (`aimFromCamera`). A câmera fica onde o último frame a pôs, em relação ao olho do tick atual.
    */
+  /** M2 (fase 6e): a retícula do jogador 1 está num inimigo vivo e à vista (o "atirar sozinho" do toque)? */
+  function enemyUnderCrosshair(): boolean {
+    if (humans === 0) return false;
+    const v = sim.view();
+    const e = entityIndex(sim.controllerEntity(0));
+    const fl = v.flags[e]!;
+    if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
+    const ex = v.position[e * 3]!;
+    const ey = v.position[e * 3 + 1]! + eyeHeightFor(fl);
+    const ez = v.position[e * 3 + 2]!;
+    let third: ViewSlot | null = null;
+    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === 0 && slots[i]!.third) third = slots[i]!;
+    const cx = third ? ex + third.camOffX : ex;
+    const cy = third ? ey + third.camOffY : ey;
+    const cz = third ? ez + third.camOffZ : ez;
+    const j = crosshairTarget(v, e, ex, ey, ez, cx, cy, cz, player.yaw, player.pitch, AUTO_FIRE_RANGE_M);
+    return j >= 0 && (ffa || v.team[j] !== v.team[e]);
+  }
+
   function thirdPersonAim(): boolean {
     if (humans === 0) return false;
     let slot: ViewSlot | null = null;
@@ -3195,6 +3227,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const scale = frozen ? 1 : aimAssistBefore();
           player.update(raw, frozen ? 0 : dt, scale);
           if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
+          if (!ghostDone && device === 'touch' && !frozen) {
+            ghostT += dt;
+            if (player.moveX !== 0 || player.moveY !== 0) ghostMoved += dt;
+            if (player.yaw !== yaw0 || player.pitch !== pitch0) ghostLooked = true;
+            const learned = ghostMoved >= GHOST.moveS && ghostLooked;
+            if (learned || ghostT >= GHOST.maxS) {
+              ghostDone = true;
+              host.log(`[partida] fantasma dos dedos: ${learned ? 'aprendeu' : 'tempo'}`);
+            }
+          }
+          ghostAlpha =
+            !ghostDone && device === 'touch'
+              ? Math.min(1, ghostT / GHOST.fadeS)
+              : Math.max(0, ghostAlpha - dt / GHOST.fadeS);
           if (player.wasPressed('camera') && thirdAllowed) saveVideo({ view: thirdPerson ? 'first' : 'third' });
           if (player.wasPressed('shoulder') && thirdPerson)
             saveVideo({ shoulder: shoulderSide > 0 ? 'left' : 'right' });
@@ -3335,6 +3381,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             tf.pixelRatio = platform.graphics.pixelRatio;
             tf.minTextPx = ui.options.minTextPx ?? 0;
             touchOverlay.draw(list, fonts, tf, player);
+            if (ghostAlpha > 0) {
+              const left = host.settings.current.controls.touch.leftHanded;
+              touchOverlay.drawGhost(list, fonts, tf, left, ghostAlpha, timeS);
+            }
           }
         }
         drawBenchStatus(list, fonts, ui);

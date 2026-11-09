@@ -2,7 +2,14 @@ import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforce
 import { createInputFrames, createSim, METRICS, type SimView } from '@boboforces/sim';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell, type WorldGrid } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { aimFromCamera, createShoulderPose, placeShoulderCamera, THIRD_PERSON } from './third-person.ts';
+import {
+  aimFromCamera,
+  AUTO_FIRE_RANGE_M,
+  createShoulderPose,
+  crosshairTarget,
+  placeShoulderCamera,
+  THIRD_PERSON,
+} from './third-person.ts';
 
 /** M2, fase 6b: a câmera de ombro (braço que encurta na parede) e a mira pelo raio da câmera. */
 
@@ -89,5 +96,19 @@ describe('3ª pessoa (M2, fase 6b)', () => {
     const eyeY = 0.5 + EYE;
     aimFromCamera(v, 0, 10, eyeY, 30, 10.6, eyeY + 0.25, 32.3, 0.05, -0.02, out);
     expect([out[0], out[1]]).toEqual([0.05, -0.02]);
+  });
+});
+
+describe('atirar sozinho (M2, fase 6e)', () => {
+  it('a retícula no adversário acha ele; com parede na frente, não; fora da linha, não', () => {
+    const eyeY = 0.5 + EYE;
+    const v = scene();
+    // Você em (10, 30) olha para −Z: o adversário está em (10, 10), 20 m à frente (o raio na altura do peito).
+    const pitch = Math.atan2(1.4 - eyeY, 20);
+    expect(crosshairTarget(v, 0, 10, eyeY, 30, 10, eyeY, 30, 0, pitch, AUTO_FIRE_RANGE_M)).toBe(1);
+    expect(crosshairTarget(v, 0, 10, eyeY, 30, 10, eyeY, 30, 0.3, pitch, AUTO_FIRE_RANGE_M)).toBe(-1);
+    // Parede em z = 20 (do chão até 5 m) entre os dois.
+    const walled = scene((grid) => fillBox(grid, 0, 1, 40, 39, 10, 40, concrete));
+    expect(crosshairTarget(walled, 0, 10, eyeY, 30, 10, eyeY, 30, 0, pitch, AUTO_FIRE_RANGE_M)).toBe(-1);
   });
 });

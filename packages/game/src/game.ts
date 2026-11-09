@@ -109,6 +109,7 @@ import {
 } from './quick-match.ts';
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
+import { skipCappedFrame } from './frame-cap.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
   type RendererFactory,
@@ -1368,6 +1369,11 @@ export function startGame(deps: GameDeps): GameHandle {
 
   function onFrame(frameMs: number): void {
     if (disposed || screen === 'error') return;
+    // M2 (fase 6e): o limite de 30 FPS dos Ajustes pula o quadro que chega cedo (o bench mede sem limite).
+    if (!deps.bench && skipCappedFrame(save.settings.video.fpsCap, lastFrameMs, frameMs)) {
+      frameHandle = platform.requestFrame(onFrame);
+      return;
+    }
     try {
       step(frameMs);
     } catch (error) {
