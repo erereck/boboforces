@@ -110,6 +110,8 @@ import {
   MAX_ALLY_MARKERS,
   MAX_TEAM_PINGS,
   SETTINGS_ACTION,
+  SETTINGS_ROW_PREFIX,
+  SETTINGS_TAB_PREFIX,
   settingsScreen,
   PLAYER_COLORS,
   pushKillFeed,
@@ -142,6 +144,7 @@ import {
   withAlpha,
   type DrawList,
   type HudModel,
+  type MenuNavigation,
   type HudScreenLayout,
   type StringKey,
   type UiFonts,
@@ -154,9 +157,16 @@ import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } fr
 import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camera.ts';
 import { createTouchOverlay } from '../hud.ts';
 import { createLocalDriver, type LocalDriver } from '../local-driver.ts';
-import { createMenuController, type UiFrame } from '../menu.ts';
+import { createMenuController, followTab, type UiFrame } from '../menu.ts';
 import { challengeLevel, challengeScreen, PAUSE_ACTION, pauseScreen } from '../pause.ts';
 import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '../result-screen.ts';
+import {
+  applyControls,
+  PAUSE_SETTINGS_TABS,
+  SETTINGS_TAB_LABELS,
+  settingsRows,
+  stepSettings,
+} from '../settings-menu.ts';
 import type { SceneHost, SceneRequest, SceneSignal } from '../scene-api.ts';
 import {
   beginDeath,
@@ -207,6 +217,8 @@ const PLAY_TIME_LIMIT_S = 600;
 /** M2 (fase 2d): marcadores de aliado até esta distância (m), com a ponta este tanto acima dos pés (m). */
 const ALLY_MARKER_MAX_M = 80;
 const ALLY_MARKER_HEIGHT_M = 2.05;
+/** M2 (fase 4f): com "Reduzir tremor", o tremor das explosões fica nesta fração. */
+const REDUCED_SHAKE = 0.25;
 /** M2 (fase 3e): por quanto tempo o aviso de um aliado fica na tela (s). */
 const PING_SHOW_S = 2.5;
 /** M2 (fase 3h, prints): avisos a menos desta fração da altura da vista um do outro viram um só. */
@@ -510,11 +522,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   // --- jogador humano (JOGAR e Cena-vitrine): mapeador que segue o último dispositivo usado (como no M0) ---
-  const profiles: Readonly<Record<DeviceKind, ControlProfile>> = {
-    keyboardMouse: createKeyboardMouseProfile(),
-    gamepad: createGamepadProfile(request.convention),
-    touch: createTouchProfile(),
+  // M2 (fase 4f): os perfis com os controles dos Ajustes (refeitos quando a pausa muda um ajuste).
+  const buildProfiles = (): Readonly<Record<DeviceKind, ControlProfile>> => {
+    const c = host.settings.current.controls;
+    return {
+      keyboardMouse: applyControls(createKeyboardMouseProfile(), c.keyboardMouse),
+      gamepad: applyControls(createGamepadProfile(request.convention), c.gamepad),
+      touch: applyControls(createTouchProfile(), c.touch),
+    };
   };
+  let profiles = buildProfiles();
   const keyboard: DeviceBinding = { kind: 'keyboardMouse' };
   const touch: DeviceBinding = { kind: 'touch' };
   const pads: readonly DeviceBinding[] = Array.from({ length: MAX_GAMEPADS }, (_, index) => ({
@@ -661,7 +678,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     recipe.match?.viewDistanceM ?? MATCH_DEFAULTS.viewDistanceM,
     bench ? 140 : profile.maxViewDistanceM,
   );
-  const fovDeg = defaultFovFor(platform.features);
+  // M2 (fase 4f): o campo de visão dos Ajustes (0 = o padrão da plataforma) e o tremor reduzido.
+  const fovFromSettings = (): number => host.settings.current.video.fovDeg || defaultFovFor(platform.features);
+  let fovDeg = fovFromSettings();
+  const shakeFromSettings = (): number => (host.settings.current.accessibility.reduceShake ? REDUCED_SHAKE : 1);
+  let shakeMul = shakeFromSettings();
   const env = createEnvironment();
   env.timeOfDay = bench?.timeOfDay ?? doc.light.timeOfDay;
   const sun = doc.light.sunDir;
@@ -1078,7 +1099,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const slot = slots[sIdx]!;
             const c = slot.desc.camera;
             const d = Math.hypot(c.x - ev.x, c.y - ev.y, c.z - ev.z);
-            if (d < SHAKE_RANGE_M) slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M));
+            if (d < SHAKE_RANGE_M) slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M) * shakeMul);
           }
           break;
         }
@@ -1470,7 +1491,29 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   /** M2 (fase 2e): uma ação da pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair) ou das páginas dela. */
-  function pauseAction(nav: { readonly back: boolean; readonly activated: string | null }): SceneSignal {
+  /** M2 (fase 4f): a página de Ajustes da pausa (Controles, Vídeo, Acessibilidade), que vale na hora. */
+  let pauseSettingsTab = 0;
+  let pauseSettingsDevice: DeviceKind = device;
+  function pauseSettings(): void {
+    const tab = PAUSE_SETTINGS_TABS[pauseSettingsTab]!;
+    pauseMenu.setRoot(
+      settingsScreen.build({
+        tabs: PAUSE_SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
+        tab: pauseSettingsTab,
+        rows: settingsRows(tab, host.settings.current, pauseSettingsDevice),
+        note: '',
+      }),
+    );
+  }
+  /** Leva os ajustes novos para a partida: perfis, campo de visão e tremor. */
+  function applySettings(): void {
+    profiles = buildProfiles();
+    player.setProfile(profiles[device]);
+    fovDeg = fovFromSettings();
+    shakeMul = shakeFromSettings();
+  }
+
+  function pauseAction(nav: MenuNavigation): SceneSignal {
     const a = nav.activated;
     if (pausePage === 'main') {
       if (nav.back || a === PAUSE_ACTION.resume) resume();
@@ -1479,7 +1522,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         pauseMenu.setRoot(challengeScreen.build(currentLevel));
       } else if (a === PAUSE_ACTION.settings) {
         pausePage = 'settings';
-        pauseMenu.setRoot(settingsScreen.build(null));
+        pauseSettingsDevice = device;
+        pauseSettings();
       } else if (a === PAUSE_ACTION.unstuck) {
         unstuckPending = true;
         resume();
@@ -1496,7 +1540,30 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (nav.back || a === 'back') pauseMain();
       return 'none';
     }
-    if (nav.back || a === SETTINGS_ACTION.back) pauseMain();
+    if (nav.tab !== 0) {
+      pauseSettingsTab = (pauseSettingsTab + nav.tab + PAUSE_SETTINGS_TABS.length) % PAUSE_SETTINGS_TABS.length;
+      followTab(pauseMenu, pauseSettingsTab);
+      pauseSettings();
+    } else if (nav.back || a === SETTINGS_ACTION.back) pauseMain();
+    else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
+      pauseSettingsTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
+      pauseSettings();
+    } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
+      const tab = PAUSE_SETTINGS_TABS[pauseSettingsTab]!;
+      const next = stepSettings(
+        tab,
+        host.settings.current,
+        pauseSettingsDevice,
+        a.slice(SETTINGS_ROW_PREFIX.length),
+        nav.delta,
+      );
+      pauseSettingsDevice = next.device;
+      if (next.doc !== host.settings.current) {
+        host.settings.save(next.doc);
+        applySettings();
+      }
+      pauseSettings();
+    }
     return 'none';
   }
 

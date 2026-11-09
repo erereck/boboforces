@@ -10,3 +10,4 @@ export * from './pool.ts';
 export * from './ring-buffer.ts';
 export * from './bits.ts';
 export * from './log.ts';
+export * from './utf8.ts';

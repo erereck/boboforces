@@ -1,4 +1,4 @@
-import type { BotLevel, MatchRecipe } from '@boboforces/format';
+import type { BotLevel, MatchRecipe, SettingsDocument } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -50,6 +50,12 @@ export interface SceneRequest {
   readonly recipe?: MatchRecipe;
 }
 
+/** M2 (fase 4f): os ajustes do jogador, lidos na hora e gravados pelo núcleo. */
+export interface SceneSettings {
+  readonly current: SettingsDocument;
+  save(doc: SettingsDocument): void;
+}
+
 /** O que o núcleo empresta para a cena. */
 export interface SceneHost {
   readonly platform: Platform;
@@ -58,6 +64,8 @@ export interface SceneHost {
   readonly fonts: UiFonts | null;
   readonly uiAtlas: UiAtlasImage | null;
   log(line: string): void;
+  /** M2 (fase 4f): os ajustes do jogador (a pausa mostra e muda; o save é do núcleo). */
+  readonly settings: SceneSettings;
   /** Relatório do bench pronto (`formatBenchReport`); o núcleo repassa para `GameHooks.onBenchReport`. */
   benchReport(text: string): void;
 }

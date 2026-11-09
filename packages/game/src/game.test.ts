@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHeadlessMatch } from '@boboforces/ai';
 import {
   builtinBotRef,
+  DEFAULT_SETTINGS,
   createFigureGameTable,
   decodeMap,
   FIGURE_BOT_ROTATION,
@@ -705,6 +706,7 @@ describe('startGame (NullRenderer)', () => {
       fonts: null,
       uiAtlas: null,
       log: () => {},
+      settings: { current: DEFAULT_SETTINGS, save: () => {} },
       benchReport: () => {},
     };
     const loader = createConstrutoLoader(host);
@@ -1305,6 +1307,45 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     platform.tap('ArrowLeft');
     platform.tap('Enter');
     expect(game.screen).toBe('custom');
+    game.dispose();
+  }, 120_000);
+});
+
+describe('Ajustes (M2, fase 4f)', () => {
+  it('menu: Ajustes → Vídeo (E) → Tamanho dos menus; na pausa, Acessibilidade → Reduzir tremor vale na hora', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Ajustes (Partida Rápida, Modos, Ajustes).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('settings');
+    // E: Vídeo. Da aba (foco inicial) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
+    platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    expect(game.save.settings.video.uiScale).toBe(1.1);
+    platform.tap('Escape');
+    platform.tap('Escape');
+    expect(game.screen).toBe('title');
+    // Na partida (o foco do título ficou no Mudar: sobe até o JOGAR): P, Ajustes (2 abaixo), E E (Acessibilidade),
+    // baixo, confirmar: Reduzir tremor ligado.
+    platform.tap('ArrowUp');
+    platform.tap('ArrowUp');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    platform.tap('KeyP');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('KeyE');
+    platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.save.settings.accessibility.reduceShake).toBe(true);
     game.dispose();
   }, 120_000);
 });

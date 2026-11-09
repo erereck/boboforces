@@ -150,6 +150,16 @@ export function createWebPlatform(target: HTMLCanvasElement | WebPlatformOptions
     storage,
     assets,
     files,
+    // M2 (fase 4f): Copiar relatório. O navegador só deixa dentro do gesto do jogador (o confirmar do menu).
+    clipboard: {
+      writeText: (text: string): Promise<boolean> =>
+        win.navigator.clipboard
+          ? win.navigator.clipboard.writeText(text).then(
+              () => true,
+              () => false,
+            )
+          : Promise.resolve(false),
+    },
     textInput,
     lifecycle,
     diagnostics,

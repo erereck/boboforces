@@ -148,7 +148,18 @@ describe('telas nas resoluções de referência (regra 17)', () => {
   ];
   const screens = [
     { id: 'title', tree: titleScreen.build({ version: '0.0.1', codename: 'Primeiro Bloco' }) },
-    { id: 'settings', tree: settingsScreen.build(null) },
+    {
+      id: 'settings',
+      tree: settingsScreen.build({
+        tabs: ['settings.tab.controls', 'settings.tab.video', 'settings.tab.access'],
+        tab: 1,
+        rows: [
+          { kind: 'option', id: 'fov', labelKey: 'settings.row.fov', value: 'Padrão' },
+          { kind: 'option', id: 'uiScale', labelKey: 'settings.row.uiScale', value: '×1' },
+        ],
+        note: '',
+      }),
+    },
   ];
 
   for (const c of cases) {

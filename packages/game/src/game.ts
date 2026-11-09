@@ -4,7 +4,9 @@ import {
   GAME_VERSION,
   selectPlatformProfile,
   withPresetLevel,
+  type BackupDocument,
   type BotLevel,
+  type ControlDevice,
   type MatchRecipe,
 } from '@boboforces/format';
 import { stepLevel } from './pause.ts';
@@ -16,7 +18,7 @@ import {
 } from '@boboforces/input';
 import type { Platform } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
-import { createRng, type Disposable, type Unsubscribe } from '@boboforces/shared';
+import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
   createDrawList,
   createLoadingModel,
@@ -41,6 +43,8 @@ import {
   resetDrawList,
   settingsScreen,
   SETTINGS_ACTION,
+  SETTINGS_ROW_PREFIX,
+  SETTINGS_TAB_PREFIX,
   SURPRISE_ACTION,
   surpriseScreen,
   TITLE_ACTION,
@@ -50,6 +54,7 @@ import {
   uiScale,
   type LayoutOptions,
   type StringKey,
+  type TabbedRow,
   type TitleExtraItem,
   type UiAtlasImage,
   type UiFonts,
@@ -57,9 +62,10 @@ import {
 import { loadGameAssets } from './assets.ts';
 import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/types.ts';
 import type { LocalDriver } from './local-driver.ts';
-import { createMenuController, type UiFrame } from './menu.ts';
+import { createMenuController, followTab, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
 import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
+import { SETTINGS_TAB_LABELS, SETTINGS_TABS, settingsRows, stepSettings } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import {
   factoryPresets,
@@ -309,7 +315,123 @@ export function startGame(deps: GameDeps): GameHandle {
     quickMenu.focus('start');
     screen = 'quick';
   }
-  settingsMenu.setRoot(settingsScreen.build(null));
+  // M2 (fase 4f): Ajustes.
+  let settingsTab = 0;
+  let settingsDevice: ControlDevice = platform.id === 'switch' ? 'gamepad' : 'keyboardMouse';
+  let settingsNote = '';
+  /** O backup lido do arquivo, esperando "Juntar" ou "Substituir". */
+  let pendingBackup: BackupDocument | null = null;
+  function dataRows(): TabbedRow[] {
+    if (platform.files === null) return [{ kind: 'text', id: 'none', text: t('settings.data.none'), dim: true }];
+    const rows: TabbedRow[] = [
+      { kind: 'text', id: 'warning', text: t('settings.data.warning'), dim: true },
+      { kind: 'text', id: 'warning2', text: t('settings.data.warning2'), dim: true },
+      { kind: 'action', id: 'export', label: { key: 'settings.data.export' } },
+      { kind: 'action', id: 'import', label: { key: 'settings.data.import' } },
+    ];
+    if (pendingBackup !== null) {
+      rows.push(
+        {
+          kind: 'text',
+          id: 'found',
+          text: t('settings.data.found', {
+            presets: pendingBackup.presets.saved.length,
+            bots: pendingBackup.bots.length,
+          }),
+        },
+        { kind: 'action', id: 'merge', label: { key: 'settings.data.merge' } },
+        { kind: 'action', id: 'replace', label: { key: 'settings.data.replace' }, variant: 'danger' },
+        { kind: 'action', id: 'cancel', label: { key: 'settings.data.cancel' } },
+      );
+    }
+    return rows;
+  }
+  function aboutRows(): TabbedRow[] {
+    return [
+      { kind: 'text', id: 'version', text: t('title.version', { version: GAME_VERSION, codename: GAME_CODENAME }) },
+      { kind: 'text', id: 'credit', text: t('title.credit') },
+      { kind: 'text', id: 'fonts', text: t('settings.about.fonts'), dim: true },
+      { kind: 'text', id: 'fonts2', text: t('settings.about.fonts2'), dim: true },
+      { kind: 'text', id: 'three', text: t('settings.about.three'), dim: true },
+      { kind: 'action', id: 'copy', label: { key: 'settings.about.copy' } },
+    ];
+  }
+  function rebuildSettings(): void {
+    const tab = SETTINGS_TABS[settingsTab]!;
+    settingsMenu.setRoot(
+      settingsScreen.build({
+        tabs: SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
+        tab: settingsTab,
+        rows:
+          tab === 'data'
+            ? dataRows()
+            : tab === 'about'
+              ? aboutRows()
+              : settingsRows(tab, save.settings, settingsDevice),
+        note: settingsNote,
+      }),
+    );
+  }
+  function openSettings(): void {
+    settingsTab = 0;
+    settingsNote = '';
+    pendingBackup = null;
+    const last = menuInput.lastDevice;
+    if (last !== null) settingsDevice = last;
+    rebuildSettings();
+    screen = 'settings';
+  }
+  /** Texto do relatório (#42): versão, plataforma, render e as últimas linhas do registro. */
+  function reportText(): string {
+    const stats = renderer.stats;
+    return [
+      `BoboForces ${GAME_VERSION} (${GAME_CODENAME})`,
+      `plataforma: ${platform.id} · perfil: ${platform.features.profileHint}`,
+      `render: ${renderer.info.textureMode} · programas ${stats.programs} · draw calls ${stats.drawCalls}`,
+      'registro:',
+      ...(platform.diagnostics.recentLog?.(40) ?? []),
+    ].join('\n');
+  }
+  function settingsAction(id: string): void {
+    const note = (text: string): void => {
+      settingsNote = text;
+      rebuildSettings();
+    };
+    if (id === 'export' && platform.files !== null) {
+      const date = new Date().toISOString();
+      const name = `boboforces-backup-${date.slice(0, 10)}.json`;
+      void platform.files
+        .save(name, save.exportBackup(date, GAME_VERSION), 'application/json')
+        .then((ok) => note(ok ? t('settings.data.exported', { name }) : t('settings.data.exportFailed')));
+    } else if (id === 'import' && platform.files !== null) {
+      void platform.files.pick(['.json']).then((file) => {
+        if (file === null) return;
+        const read = save.readBackup(decodeUtf8(file.bytes));
+        pendingBackup = read.ok ? read.value : null;
+        note(read.ok ? '' : t('settings.data.invalid'));
+      });
+    } else if ((id === 'merge' || id === 'replace') && pendingBackup !== null) {
+      save.applyBackup(pendingBackup, id);
+      pendingBackup = null;
+      refreshTitle();
+      note(t('settings.data.imported'));
+    } else if (id === 'cancel') {
+      pendingBackup = null;
+      note('');
+    } else if (id === 'copy') {
+      const text = reportText();
+      const clip = platform.clipboard;
+      if (clip === undefined) {
+        log(text);
+        note(t('settings.about.copyFailed'));
+      } else {
+        void clip.writeText(text).then((ok) => {
+          if (!ok) log(text);
+          note(t(ok ? 'settings.about.copied' : 'settings.about.copyFailed'));
+        });
+      }
+    }
+  }
   function rollNewSurprise(): void {
     surprise = rollSurprise(surpriseRng);
     surpriseMenu.setRoot(surpriseScreen.build({ lines: presetLines(surprise) }));
@@ -345,9 +467,12 @@ export function startGame(deps: GameDeps): GameHandle {
     const h = Math.max(1, g.height);
     const safe = g.safeArea;
     const o = ui.options;
+    // M2 (fase 4f): o tamanho da interface vem dos Ajustes.
+    const userScale = save.settings.video.uiScale;
     if (
       ui.width === w &&
       ui.height === h &&
+      ui.userScale === userScale &&
       o.fonts === fonts &&
       o.safeArea !== undefined &&
       o.safeArea.top === safe.top &&
@@ -366,8 +491,8 @@ export function startGame(deps: GameDeps): GameHandle {
     ui = {
       width: w,
       height: h,
-      scale: uiScale(w, h, ui.userScale),
-      userScale: ui.userScale,
+      scale: uiScale(w, h, userScale),
+      userScale,
       options,
       revision: ui.revision + 1,
     };
@@ -457,6 +582,12 @@ export function startGame(deps: GameDeps): GameHandle {
         fonts,
         uiAtlas,
         log,
+        settings: {
+          get current() {
+            return save.settings;
+          },
+          save: (doc) => save.setSettings(doc),
+        },
         benchReport: (text) => hooks.onBenchReport?.(text),
       },
       request,
@@ -555,7 +686,7 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'main': {
         const nav = mainMenu.update(menuInput, raw, u);
         if (nav.back || nav.activated === MAIN_MENU_ACTION.back) screen = 'title';
-        else if (nav.activated === MAIN_MENU_ACTION.settings) screen = 'settings';
+        else if (nav.activated === MAIN_MENU_ACTION.settings) openSettings();
         else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
         else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
         if (screen === 'main') {
@@ -592,6 +723,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const a = nav.activated;
         if (nav.tab !== 0) {
           customTab = (customTab + nav.tab + CUSTOM_TABS.length) % CUSTOM_TABS.length;
+          followTab(customMenu, customTab);
           rebuildCustom();
         } else if (nav.back || a === CUSTOM_ACTION.back) screen = customReturn;
         else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
@@ -643,7 +775,29 @@ export function startGame(deps: GameDeps): GameHandle {
       }
       case 'settings': {
         const nav = settingsMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === SETTINGS_ACTION.back) screen = 'main';
+        const a = nav.activated;
+        if (nav.tab !== 0) {
+          settingsTab = (settingsTab + nav.tab + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+          followTab(settingsMenu, settingsTab);
+          settingsNote = '';
+          rebuildSettings();
+        } else if (nav.back || a === SETTINGS_ACTION.back) screen = 'main';
+        else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
+          settingsTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
+          settingsNote = '';
+          rebuildSettings();
+        } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
+          const id = a.slice(SETTINGS_ROW_PREFIX.length);
+          const tab = SETTINGS_TABS[settingsTab]!;
+          if (tab === 'data' || tab === 'about') settingsAction(id);
+          else {
+            const next = stepSettings(tab, save.settings, settingsDevice, id, nav.delta);
+            settingsDevice = next.device;
+            if (next.doc !== save.settings) save.setSettings(next.doc);
+            settingsNote = '';
+            rebuildSettings();
+          }
+        }
         settingsMenu.draw(list, u);
         renderer.renderViews(NO_VIEWS);
         renderer.drawUi(list);

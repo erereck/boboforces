@@ -12,6 +12,7 @@ export * from './focus.ts';
 export * from './draw.ts';
 export * from './screens/title.ts';
 export * from './screens/settings.ts';
+export * from './screens/tabbed.ts';
 export * from './screens/main-menu.ts';
 export * from './screens/surprise.ts';
 export * from './screens/quick-match.ts';

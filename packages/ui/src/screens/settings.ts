@@ -1,40 +1,35 @@
-import { COLORS } from '../tokens.ts';
+import type { StringKey } from '../strings.pt-BR.ts';
 import type { Screen } from '../tree.ts';
+import { buildTabbed, TABBED_ROW_PREFIX, TABBED_TAB_PREFIX, type TabbedRow } from './tabbed.ts';
 
-/** Ajustes do M0: só o lugar da tela e o caminho de volta (os ajustes de verdade chegam no M2). */
+/**
+ * M2 (fase 4f): Ajustes (gameplay.md §10.5; arte-ux.md §6.12 e §8), no esqueleto de abas com linhas (`tabbed.ts`):
+ * Controles (por dispositivo), Vídeo, Acessibilidade, Dados (backup em arquivo) e Sobre (versão, créditos e Copiar
+ * relatório). As linhas vêm montadas do `game`; o Voltar fica no canto.
+ */
 export const SETTINGS_ACTION = { back: 'back' } as const;
+export const SETTINGS_TAB_PREFIX = TABBED_TAB_PREFIX;
+export const SETTINGS_ROW_PREFIX = TABBED_ROW_PREFIX;
 
-export const settingsScreen: Screen<null> = {
+export interface SettingsScreenState {
+  readonly tabs: readonly StringKey[];
+  readonly tab: number;
+  readonly rows: readonly TabbedRow[];
+  /** Aviso de uma linha (backup exportado, relatório copiado); `''` = nenhum. */
+  readonly note: string;
+}
+
+export const settingsScreen: Screen<SettingsScreenState> = {
   id: 'settings',
-  build() {
-    return {
-      kind: 'box',
-      id: 'root',
-      color: COLORS.bunker,
-      children: [
-        {
-          kind: 'column',
-          id: 'main',
-          anchor: 'left',
-          children: [
-            { kind: 'text', id: 'heading', text: { key: 'menu.settings' }, style: 'title', color: COLORS.texto },
-            { kind: 'box', height: 16 },
-            { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 28 },
-            { kind: 'text', id: 'empty', text: { key: 'settings.empty' }, style: 'body', color: COLORS.textoBaixo },
-            { kind: 'box', height: 44 },
-            {
-              kind: 'button',
-              id: 'back',
-              text: { key: 'menu.back' },
-              action: SETTINGS_ACTION.back,
-              variant: 'secondary',
-              autofocus: true,
-              width: 380,
-            },
-          ],
-        },
-      ],
-    };
+  build(state) {
+    return buildTabbed({
+      titleKey: 'menu.settings',
+      tabs: state.tabs,
+      tab: state.tab,
+      rows: state.rows,
+      summary: '',
+      note: state.note,
+      buttons: [{ id: SETTINGS_ACTION.back, labelKey: 'menu.back', variant: 'secondary' }],
+    });
   },
 };

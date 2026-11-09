@@ -9,7 +9,8 @@ import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
 import { settingsScreen } from './screens/settings.ts';
 import { titleScreen, type TitleExtraItem } from './screens/title.ts';
-import { STRINGS_PT_BR } from './strings.pt-BR.ts';
+import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
+import { t } from './text.ts';
 import { drawnCommands } from './test-fixtures.ts';
 import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
@@ -169,6 +170,64 @@ function reachableScrolling(tree: UiNode, t: Target, start: string): Set<string>
     }
   }
   return seen;
+}
+
+/** M2 (fase 4f): as 5 abas dos Ajustes com os rótulos e os valores mais longos. */
+const SETTINGS_TABS_FIXTURE = [
+  'settings.tab.controls',
+  'settings.tab.video',
+  'settings.tab.access',
+  'settings.tab.data',
+  'settings.tab.about',
+] as const;
+function settingsFixtures(): UiNode[] {
+  const option = (id: string, labelKey: StringKey, value: string) => ({ kind: 'option' as const, id, labelKey, value });
+  const rows = [
+    [
+      option('device', 'settings.row.device', 'Teclado e mouse'),
+      option('sens', 'settings.row.sens', '×2,5'),
+      option('sensY', 'settings.row.sensY', '×1,25'),
+      option('ads', 'settings.row.ads', '×0,75'),
+      option('invertY', 'settings.row.invertY', 'Desligado'),
+      option('assist', 'settings.row.assist', 'Desligada'),
+      option('toggleAds', 'settings.row.toggleAds', 'Alternar'),
+      option('toggleCrouch', 'settings.row.toggleCrouch', 'Alternar'),
+      option('toggleSprint', 'settings.row.toggleSprint', 'Alternar'),
+      option('deadIn', 'settings.row.deadIn', '30%'),
+      option('deadOut', 'settings.row.deadOut', '100%'),
+    ],
+    [option('fov', 'settings.row.fov', 'Padrão'), option('uiScale', 'settings.row.uiScale', '×1,3')],
+    [option('shake', 'settings.row.reduceShake', 'Desligado'), option('tips', 'settings.row.tips', 'Desligado')],
+    [
+      { kind: 'text' as const, id: 'w', text: t('settings.data.warning'), dim: true },
+      { kind: 'text' as const, id: 'w2', text: t('settings.data.warning2'), dim: true },
+      { kind: 'action' as const, id: 'export', label: { key: 'settings.data.export' as const } },
+      { kind: 'action' as const, id: 'import', label: { key: 'settings.data.import' as const } },
+      { kind: 'text' as const, id: 'found', text: t('settings.data.found', { presets: 200, bots: 500 }) },
+      { kind: 'action' as const, id: 'merge', label: { key: 'settings.data.merge' as const } },
+      {
+        kind: 'action' as const,
+        id: 'replace',
+        label: { key: 'settings.data.replace' as const },
+        variant: 'danger' as const,
+      },
+    ],
+    [
+      { kind: 'text' as const, id: 'v', text: 'v0.0.1 · Primeiro Bloco' },
+      { kind: 'text' as const, id: 'f', text: t('settings.about.fonts'), dim: true },
+      { kind: 'text' as const, id: 'f2', text: t('settings.about.fonts2'), dim: true },
+      { kind: 'text' as const, id: 'three', text: t('settings.about.three'), dim: true },
+      { kind: 'action' as const, id: 'copy', label: { key: 'settings.about.copy' as const } },
+    ],
+  ];
+  return rows.map((r, tab) =>
+    settingsScreen.build({
+      tabs: SETTINGS_TABS_FIXTURE,
+      tab,
+      rows: r,
+      note: t('settings.data.exported', { name: 'boboforces-backup-2026-11-09.json' }),
+    }),
+  );
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -368,9 +427,15 @@ describe('estouro de texto com o atlas real', () => {
     }
   });
 
-  it('ajustes: cabe nos 6 alvos da web e no Switch', () => {
-    for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
-      expectNoOverflow(layoutFor(settingsScreen.build(null), t), t);
+  it('ajustes (as 5 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {
+    for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      for (const tree of settingsFixtures()) {
+        const layout = layoutFor(tree, target);
+        expectNoOverflow(layout, target);
+        expect(reachableScrolling(tree, target, layout.focusable[0]!.id!).size, `${target.name}: foco`).toBe(
+          layout.focusable.length,
+        );
+      }
     }
   });
 });

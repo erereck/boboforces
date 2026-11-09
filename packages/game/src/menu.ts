@@ -7,6 +7,8 @@ import {
   hitTest,
   layoutTree,
   navigateMenu,
+  TABBED_ROW_PREFIX,
+  TABBED_TAB_PREFIX,
   type ButtonNode,
   type DrawList,
   type LayoutOptions,
@@ -27,6 +29,17 @@ export interface UiFrame {
   readonly options: LayoutOptions;
   /** Muda quando qualquer coisa acima muda (o menu refaz o layout só aí). */
   readonly revision: number;
+}
+
+/**
+ * M2 (fase 4f): numa tela com abas, ao trocar de aba o foco que estava numa aba ou numa linha (que some com a aba
+ * velha) vai para a aba nova; um botão de baixo (Voltar, Começar) fica onde está.
+ */
+export function followTab(menu: MenuController, tab: number): void {
+  const id = menu.focusedId;
+  if (id === null || id.startsWith(TABBED_TAB_PREFIX) || id.startsWith(TABBED_ROW_PREFIX)) {
+    menu.focus(TABBED_TAB_PREFIX + String(tab));
+  }
 }
 
 /** Ações de menu na ordem em que são tratadas num frame (a primeira que ativa ou volta encerra o frame). */

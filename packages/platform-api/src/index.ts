@@ -79,6 +79,11 @@ export interface Assets {
   loadText(path: string): Promise<string>;
 }
 
+/** M2 (fase 4f): área de transferência; `false` se o navegador recusou. */
+export interface Clipboard {
+  writeText(text: string): Promise<boolean>;
+}
+
 export interface PickedFile {
   readonly name: string;
   readonly bytes: Uint8Array;
@@ -253,6 +258,11 @@ export interface Platform {
   readonly storage: Storage;
   readonly assets: Assets;
   readonly files: Files | null;
+  /**
+   * M2 (fase 4f): copiar texto (Ajustes › Sobre › Copiar relatório, #42). Web: `navigator.clipboard` (precisa do
+   * gesto do jogador). Ausente no Switch: o relatório vai para o `runtime.log`.
+   */
+  readonly clipboard?: Clipboard;
   readonly textInput: TextInput;
   readonly lifecycle: Lifecycle;
   readonly diagnostics: Diagnostics;

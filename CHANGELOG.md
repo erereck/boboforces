@@ -250,6 +250,21 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Teste de estouro:** confere também que a fileira do canto não encosta nas listas, e o alcance pelo D-pad refaz o
     layout a cada foco, como o menu.
   - 7 testes novos.
+- **Fase 4f (parte 1), Ajustes:**
+  - **Abas:** Controles, Vídeo, Acessibilidade, Dados e Sobre, no mesmo molde de abas da Partida personalizada (trocar
+    de aba leva o foco junto).
+  - **Controles:** cada dispositivo tem os seus (a linha "Ajustando" troca entre teclado e mouse, controle e toque):
+    sensibilidade, sensibilidade vertical, sensibilidade na mira, Y invertido, assistência de mira (Desligada, Leve,
+    Média, Forte), alternar ou segurar para mira, agachar e correr, e as zonas mortas (só no controle).
+  - **Vídeo:** campo de visão (padrão da plataforma ou 60° a 110°) e tamanho dos menus (×0,8 a ×1,3).
+  - **Acessibilidade:** reduzir tremor (as explosões tremem 1/4) e dicas ligadas ou não.
+  - **Dados:** exportar o backup num arquivo `.json` e importar, juntando ou substituindo, com o aviso de que limpar o
+    navegador apaga tudo.
+  - **Sobre:** versão, créditos, fontes, three.js e "Copiar relatório" (#42).
+  - **Na partida:** a pausa tem Controles, Vídeo e Acessibilidade, que valem na hora; a partida lê os ajustes salvos.
+  - **Ficam para depois:** qualidade gráfica (com o item Web), cores para daltônico e tamanho do HUD (fase 6), volumes
+    (fase 7) e o remapeamento (parte 2).
+  - 7 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

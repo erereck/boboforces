@@ -1466,3 +1466,33 @@ mudanças de contrato ficam registradas aqui.
 - **Teste de estouro (`fonts-in-use`):** a Partida personalizada nos 6 alvos e no Switch; a fileira do canto não pode
   encostar nas listas; o alcance pelo D-pad (`reachableScrolling`) refaz o layout a cada foco, com a rolagem.
 - **Tamanho:** o menu foi a 317,4 KB (+3,8 KB).
+
+### 12.26 Fase 4f, parte 1: Ajustes (09/11/2026)
+
+- **ui:**
+  - `tabbed.ts`: o molde das telas com abas (`buildTabbed`, `TabbedRow` de opção, ação ou texto, `tab:<i>` e
+    `row:<id>`, coluna 800 × 348); a Partida personalizada e os Ajustes usam o mesmo;
+  - `settingsScreen` recebe o estado (abas, aba, linhas, aviso), em vez de montar uma tela fixa;
+  - as strings `settings.*`.
+- **`game/settings-menu.ts`** (puro):
+  - `SETTINGS_TABS` (5) e `PAUSE_SETTINGS_TABS` (Controles, Vídeo e Acessibilidade);
+  - `settingsRows(tab, doc, device)` e `stepSettings`; os controles valem por dispositivo;
+  - `applyControls(perfil, controles)`: as sensibilidades multiplicam a do perfil, a assistência vem de
+    `AIM_ASSIST_LEVELS`, as zonas mortas só valem no controle.
+- **game:**
+  - tela `settings` (pelo menu principal), com Dados (exportar e importar o `backup@1`, juntar ou substituir) e Sobre
+    (Copiar relatório, #42);
+  - `followTab`: trocar de aba leva o foco de uma aba ou linha para a aba nova (antes caía na primeira aba);
+  - o tamanho dos menus sai de `settings.video.uiScale`.
+- **Contrato (integração):**
+  - `SceneHost.settings` (`SceneSettings`: o documento atual e `save`): a cena monta os perfis com os controles
+    salvos, usa o campo de visão e o tremor reduzido, e a pausa grava e aplica na hora;
+  - `Platform.clipboard?` (opcional; a web usa `navigator.clipboard`; sem ele, "Copiar relatório" avisa que falhou);
+  - `decodeUtf8` no `shared` (o Switch não tem `TextDecoder`), para ler o backup importado.
+- **Ficam para depois:**
+  - qualidade gráfica: o render fixa o `maxPixelRatio` ao nascer; entra com o item Web;
+  - cores de time para daltônico e tamanho do HUD (fase 6);
+  - volumes (fase 7);
+  - remapeamento do teclado e do controle (parte 2).
+- **Teste de estouro:** as 5 abas nos 6 alvos e no Switch, com alcance pelo D-pad.
+- **Tamanho:** o menu foi a 320,6 KB (+3,2 KB; teto 350).
