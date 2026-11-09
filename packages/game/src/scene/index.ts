@@ -179,6 +179,9 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
     get debug() {
       return match?.debug ?? null;
     },
+    get level() {
+      return match?.level ?? request.level ?? 'normal';
+    },
     pause(): void {
       if (match) match.pause();
       else pausedBeforeLoad = true;

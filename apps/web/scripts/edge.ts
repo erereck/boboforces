@@ -30,6 +30,7 @@ export interface PageDebugApi {
   setMipFilter(filter: string): void;
   setHudVisible(visible: boolean): void;
   setViewmodelVisible(visible: boolean): void;
+  showResult(): void;
   setFrozen(frozen: boolean): void;
   showFontSpecimen(on: boolean): void;
   whenReady(frames?: number): Promise<void>;

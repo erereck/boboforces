@@ -13,7 +13,7 @@ import {
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { METRICS } from '../config/metrics.ts';
 import type { MovementProfile } from '../config/movement.ts';
-import { isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
+import { isBody, PART_TORSO, WEAPON_KILL_PLANE, WEAPON_NONE, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 
@@ -205,7 +205,8 @@ export function movementSystem(ctx: SimContext): void {
         s.slideCooldownTicks[e] = pt.slideCooldown;
       }
     } else {
-      let target = crouching ? p.crouch : sprinting ? p.sprint : p.walk;
+      // M2 (fase 3b): velocidade por regra do bot (×0,5 a ×2).
+      let target = (crouching ? p.crouch : sprinting ? p.sprint : p.walk) * ctx.rules.speed[e]!;
       if (ads) target *= p.adsMoveMul;
       const tx = wx * target;
       const tz = wz * target;
@@ -354,7 +355,8 @@ export function movementSystem(ctx: SimContext): void {
     if (stepDy !== 0 && !onSlope(ctx, x, y, z)) ctx.events.move(ctx.tick, s.idOf(e), 'step', stepDy);
 
     // Plano de morte (tecnico.md §4.5): dano letal sem atacante, passa pela proteção de spawn.
-    if (y < ctx.killPlaneY) ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, FIGURE_BONE.torso, WEAPON_NONE, x, y, z);
+    if (y < ctx.killPlaneY)
+      ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, FIGURE_BONE.torso, WEAPON_KILL_PLANE, x, y, z);
 
     s.position[i3] = x;
     s.position[i3 + 1] = y;

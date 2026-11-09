@@ -95,6 +95,54 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_smg",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_shotgun",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_rocket",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_knife",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_grenade",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_lmg",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_rocket_shell",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_ammo_box",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

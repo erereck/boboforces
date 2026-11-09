@@ -1,4 +1,12 @@
-import { botLevelFromRef, type MatchRecipe } from '@boboforces/format';
+import {
+  botLevelFromRef,
+  LEVEL_ORDER,
+  PERSONALITY_PRESETS,
+  personalityForRoll,
+  resolveBot,
+  type BotLevel,
+  type MatchRecipe,
+} from '@boboforces/format';
 import type { InputFrame } from '@boboforces/input';
 import { assert, createRng, type Disposable } from '@boboforces/shared';
 import {
@@ -14,6 +22,7 @@ import { AiContext } from './context.ts';
 import { AI_BUDGET, type AiBudget } from './config.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
 import { SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
+import { TeamBoard } from './team.ts';
 import { thinkZombie, ZombieBrain, ZombieTiming } from './zombie.ts';
 
 /**
@@ -24,6 +33,16 @@ import { thinkZombie, ZombieBrain, ZombieTiming } from './zombie.ts';
 export interface BotDirector extends Disposable {
   readonly botCount: number;
   think(view: SimView, frames: InputFrame[]): void;
+  /**
+   * M2 (fase 3e): avisos do time `team` com até `maxAgeTicks` (os bots N3 avisam quando veem um inimigo). Escreve x, y,
+   * z de cada um em `out` (até `out.length / 3`) e devolve quantos. O `game` mostra o ping para os humanos do time.
+   */
+  pings(team: number, maxAgeTicks: number, out: Float64Array): number;
+  /**
+   * M2 (fase 2e): "Ajustar desafio" (gameplay.md §2.2): troca o nível dos bots do time `team` (-1 = todos) no meio
+   * da partida. Devolve quantos mudaram.
+   */
+  setLevel(level: BotLevel, team: number): number;
 }
 
 export interface BotDirectorConfig {
@@ -86,17 +105,38 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const root = createRng(recipe.seed);
   const followers: PathFollower[] = [];
   const soldiers: SoldierBrain[] = [];
+  /** Time de cada soldado (na ordem de `soldiers`). */
+  const soldierTeams: number[] = [];
   const zombieBrains: ZombieBrain[] = [];
   let maxController = -1;
   for (const slot of expandRecipe(recipe, config.humans)) {
     if (slot.bot === null) continue;
     // Bot embutido (`embedded:`) ainda não existe no M1: vira Normal.
-    const level = botLevelFromRef(slot.bot) ?? 'normal';
+    // M2 (fase 3a): o bot da ref (de fábrica ou embutido; sem ele, o Normal Bob). O nível rápido é o da ref ou, nos
+    // especiais, o da inteligência (base do "Ajustar desafio").
+    const bot = resolveBot(recipe, slot.bot);
+    const quick = botLevelFromRef(slot.bot);
+    const level = quick ?? LEVEL_ORDER[bot.intelligence.level] ?? 'normal';
+    // Os bots de nível sorteiam a personalidade da mistura (§6.6) num fluxo próprio: o RNG do cérebro não muda.
+    const personality =
+      quick !== null
+        ? PERSONALITY_PRESETS[personalityForRoll(root.fork('personality', slot.botIndex).next())]
+        : bot.personality;
     const follower = new PathFollower(followers.length);
     followers.push(follower);
     soldiers.push(
-      new SoldierBrain(slot.botIndex, slot.controller, level, root.fork('bot', slot.botIndex), soldierTiming, follower),
+      new SoldierBrain(
+        slot.botIndex,
+        slot.controller,
+        level,
+        root.fork('bot', slot.botIndex),
+        soldierTiming,
+        follower,
+        bot,
+        personality,
+      ),
     );
+    soldierTeams.push(slot.team);
     maxController = Math.max(maxController, slot.controller);
   }
   for (let i = 0; i < zombies; i++) {
@@ -122,6 +162,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       ctx.begin(view);
       paths.service();
       if (total === 0) return;
+      // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
+      ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa);
+      ctx.board.update(view, view.tick);
       // Ordem girando a cada tick: o orçamento de raios e a fila não favorecem sempre os mesmos.
       const start = view.tick % total;
       for (let k = 0; k < total; k++) {
@@ -134,6 +177,29 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
           thinkZombie(ctx, z, frames[z.controller]!, zombieTiming);
         }
       }
+    },
+    pings(team, maxAgeTicks, out): number {
+      const board = ctx.board;
+      if (board === null) return 0;
+      let n = 0;
+      const tick = ctx.tick;
+      for (let k = 0; k < board.pingTick.length && (n + 1) * 3 <= out.length; k++) {
+        if (board.pingTeam[k] !== (ctx.ffa ? 0 : team) || tick - board.pingTick[k]! > maxAgeTicks) continue;
+        out[n * 3] = board.pingX[k]!;
+        out[n * 3 + 1] = board.pingY[k]!;
+        out[n * 3 + 2] = board.pingZ[k]!;
+        n++;
+      }
+      return n;
+    },
+    setLevel(level, team): number {
+      let n = 0;
+      for (let i = 0; i < soldiers.length; i++) {
+        if (team >= 0 && soldierTeams[i] !== team) continue;
+        soldiers[i]!.setLevel(level, soldierTiming);
+        n++;
+      }
+      return n;
     },
     stats(): BotDirectorStats {
       return { rays: ctx.raysTotal, pathCalls: paths.calls, pathsServed: paths.served, visibleAims: ctx.aimsTotal };

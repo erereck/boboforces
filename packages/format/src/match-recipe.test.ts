@@ -70,7 +70,14 @@ describe('validateMatchRecipe: caminho feliz', () => {
     };
     const { value, codes } = ok(validateMatchRecipe(preset, PC));
     expect(codes).toEqual([]);
-    expect(value).toEqual(preset);
+    // M2 (fase 3a): o bot embutido sai validado e completo (o que faltava vem do Normal Bob); o resto, igual.
+    expect({ ...value, embeddedBots: null }).toEqual({ ...preset, embeddedBots: null });
+    expect(value.embeddedBots?.[0]).toMatchObject({
+      format: 'boboforces/bot@1',
+      id: 'b7f3c2',
+      name: 'Jorge the Immortal',
+    });
+    expect(value.embeddedBots?.[0]?.skill.reactionMs).toBe(450);
     // Campos desconhecidos continuam lá para regravar (tecnico.md §14.5).
     const loose = value as unknown as Record<string, unknown>;
     expect(loose['weapons']).toEqual(preset.weapons);

@@ -33,6 +33,10 @@ export function createNullRenderer(): Renderer {
     resize(width: number, height: number, pixelRatio: number): void {
       void [width, height, pixelRatio];
     },
+    setProjectiles(): void {
+      // Sem GPU, nada a desenhar.
+    },
+
     setActors(actors: ActorBuffer): void {
       void actors;
     },

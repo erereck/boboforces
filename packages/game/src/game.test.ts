@@ -42,7 +42,7 @@ import {
   ENTITY_KIND,
   expandRecipe,
   figurePostureOf,
-  WEAPON_SLOTS,
+  weaponDef,
   weaponGrip,
   type Sim,
 } from '@boboforces/sim';
@@ -305,6 +305,10 @@ describe('startGame (NullRenderer)', () => {
     const view = sim.view();
     // TDM 6 × 6: o jogador (controlador 0) e 11 bots N0.
     expect(match.director.botCount).toBe(11);
+    // M2 (fase 2d): o JOGAR começa com a contagem de 3 s, sem ninguém andar; os bots saem depois dela.
+    expect([view.match.phase, view.match.countdownTicks > 0]).toEqual(['warmup', true]);
+    platform.pump(view.match.countdownTicks + 5);
+    expect(view.match.phase).toBe('playing');
     const bots = [4, 5, 6, 7].map((c) => entityIndex(sim.controllerEntity(c)));
     const start = bots.map((e) => [view.position[e * 3]!, view.position[e * 3 + 2]!] as const);
     const tick0 = sim.tick;
@@ -345,7 +349,8 @@ describe('startGame (NullRenderer)', () => {
     debug.setFrozen(false);
     debug.setCamera(null);
 
-    // Pausa pelo ciclo de vida congela a sim; Enter continua; P + baixo + Enter volta ao título.
+    // Pausa pelo ciclo de vida congela a sim; Enter continua. M2 (fase 2e): P, Ajustar desafio → Suado (um abaixo do
+    // Normal, que vem com o foco) volta à pausa com o nível novo; 4 × baixo + Enter (Sair) volta ao título.
     platform.firePause();
     expect(game.paused).toBe(true);
     platform.pump(1);
@@ -360,6 +365,11 @@ describe('startGame (NullRenderer)', () => {
     platform.tap('KeyP');
     expect(game.paused).toBe(true);
     platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect([game.scene!.level, game.paused]).toEqual(['sweaty', true]);
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.scene).toBeNull();
@@ -454,7 +464,7 @@ describe('startGame (NullRenderer)', () => {
     expect(lines).toContain('erro "three: error: THREE.WebGLProgram: Shader Error 1282"');
     expect(lines).toContain('aviso "three: warn: aviso qualquer"');
     // 4 jogadores locais (bots) + 60 extras = 64; o relatório diz os extras de verdade, o [t0] o total da partida.
-    expect(lines[3]).toMatch(/ bots=64 .* bots_efetivos=60 manequins=6 detritos=500$/);
+    expect(lines[3]).toMatch(/ bots=64 .* bots_efetivos=60 manequins=6 detritos=500 armas=rifle$/);
     expect(t0(12)).toMatch(/ bots=64 /);
     expect(budget).toBe(500); // pcSplit (PC com 4 vistas)
     game.dispose();
@@ -505,9 +515,11 @@ describe('startGame (NullRenderer)', () => {
       { ...BENCH_DEFAULTS, views: 2, bots: 6, durationS: 600, warmupS: 0 },
       factory,
     );
-    platform.pump(900);
-    // Algum tiro clareou uma vista e não a outra (antes era um uniform só para as duas).
-    expect(flashes.some((f) => f.length === 2 && Math.abs(f[0]! - f[1]!) > 0.2)).toBe(true);
+    // Algum tiro clareou uma vista e não a outra (antes era um uniform só para as duas). Roda até o 1º tiro de um dos
+    // bots das vistas (até 60 s): quando ele vem depende do sorteio das personalidades (fase 3g).
+    const split = (): boolean => flashes.some((f) => f.length === 2 && Math.abs(f[0]! - f[1]!) > 0.2);
+    for (let k = 0; k < 60 && !split(); k++) platform.pump(60);
+    expect(split()).toBe(true);
     const debug = game.debug!;
     debug.setFrozen(true);
     platform.pump(2);
@@ -563,7 +575,7 @@ describe('startGame (NullRenderer)', () => {
             const expected = figurePostureOf(v.flags[e]!, weaponGrip(v.weapon[e]!), v.kind[e]!);
             if (a.posture[i] !== expected) problems.push(`tick ${s.tick}: ${a.posture[i]} ≠ ${expected}`);
             const zombie = v.kind[e] === ENTITY_KIND.zombie;
-            const grip = zombie ? FIGURE_GRIP.none : (WEAPON_SLOTS[v.weapon[e]!]?.grip ?? FIGURE_GRIP.none);
+            const grip = zombie ? FIGURE_GRIP.none : (weaponDef(v.weapon[e]!)?.grip ?? FIGURE_GRIP.none);
             if (FIGURE_POSTURE_INFO[a.posture[i]! * 3 + 1] !== grip) problems.push(`tick ${s.tick}: empunhadura`);
             if (a.figure[i] === NO_FIGURE) problems.push(`tick ${s.tick}: sem gabarito`);
             if (zombie) zombies++;
@@ -954,7 +966,7 @@ describe('textos do game com o atlas real (#54)', () => {
     { name: 'Switch 1280×720', w: 1280, h: 720, minTextPx: MIN_TEXT.tv, minTarget: 0 },
   ];
 
-  it('pausa: título e botões cabem (texto ≤ largura − 2·padX·escala) e o D-pad alcança os dois botões', () => {
+  it('pausa: título e botões cabem (texto ≤ largura − 2·padX·escala) e o D-pad passa pelos 5 botões', () => {
     for (const t of TARGETS) {
       const layout = layoutTree(pauseScreen.build(null), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
         fonts,
@@ -977,8 +989,12 @@ describe('textos do game com o atlas real (#54)', () => {
           expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
         }
       }
-      expect(moveFocus(layout, 'resume', 'down'), t.name).toBe('quit');
-      expect(moveFocus(layout, 'quit', 'up'), t.name).toBe('resume');
+      // M2 (fase 2e): Continuar · Ajustar desafio · Ajustes · Destravar · Sair.
+      const order = ['resume', 'challenge', 'settings', 'unstuck', 'quit'];
+      for (let i = 0; i + 1 < order.length; i++) {
+        expect(moveFocus(layout, order[i]!, 'down'), t.name).toBe(order[i + 1]);
+        expect(moveFocus(layout, order[i + 1]!, 'up'), t.name).toBe(order[i]);
+      }
     }
   });
 
@@ -1171,5 +1187,37 @@ describe('textos', () => {
   it('todo código de ISSUE_CODES (format) tem texto issue.<código> na tabela pt-BR', () => {
     const keys = Object.keys(STRINGS_PT_BR);
     for (const code of ISSUE_CODES) expect(keys, code).toContain(`issue.${code}`);
+  });
+});
+
+describe('JOGAR com os bots de fábrica (M2, fase 3g)', () => {
+  it('os especiais contra o jogador e o Buddy no time dele; a receita passa no validador', () => {
+    const request: SceneRequest = {
+      kind: 'play',
+      bench: null,
+      benchWarnings: [],
+      seed: 3,
+      convention: undefined as unknown as SceneRequest['convention'],
+      device: null,
+      gamepad: 0,
+      level: 'normal',
+      squad: 'factory',
+    };
+    const { recipe } = sceneRecipe(request, profileFor('pc', 1, null));
+    expect(recipe.teams[1]!.bots.map((b) => [b.ref, b.count])).toEqual([
+      ['builtin:jorge-the-immortal', 1],
+      ['builtin:camper-carl', 1],
+      ['builtin:knife-ninja', 1],
+      ['builtin:scaredy-sam', 1],
+      ['builtin:hunter-hank', 1],
+      ['builtin:goofy-gus', 1],
+    ]);
+    expect(recipe.teams[0]!.bots.map((b) => [b.ref, b.count])).toEqual([
+      ['builtin:buddy', 1],
+      ['builtin:normal-bob', 4],
+    ]);
+    // Sem o esquadrão, o de sempre: o nível rápido nos dois times.
+    const { recipe: plain } = sceneRecipe({ ...request, squad: 'levels' }, profileFor('pc', 1, null));
+    expect(plain.teams[1]!.bots).toEqual([{ ref: 'builtin:normal-bob', count: 6 }]);
   });
 });

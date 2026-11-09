@@ -34,8 +34,10 @@ import {
   pushBlockImpact,
   pushDeath,
   pushDebris,
+  pushExplosion,
   pushMuzzleFlash,
   pushTracer,
+  pushTrail,
 } from '../fx-queue.ts';
 import { COMMON_UNIFORM_NAMES } from '../shared/glsl-common.ts';
 import {
@@ -49,6 +51,7 @@ import {
 import {
   ACTOR_POSE,
   createActorBuffer,
+  createProjectileBuffer,
   createRenderDebug,
   createViewDesc,
   NO_MODEL,
@@ -109,6 +112,7 @@ const rifle: ModelDocument = {
   blocksNav: false,
 };
 const barrel: ModelDocument = { ...rifle, id: 'barrel', kind: 'prop', sockets: [] };
+const ammoBox: ModelDocument = { ...rifle, id: 'ammo-box', kind: 'pickup', sockets: [] };
 
 function frame(timeS: number, debug = createRenderDebug(), dt = 1 / 60): FrameContext {
   return { dt, timeS, debug, world: null, views: createFrameViews() };
@@ -246,6 +250,48 @@ describe('passe dos atores (three sem GPU)', () => {
     expect(mesh(ctx.scene, 'props-1').visible).toBe(false);
     pass.dispose();
   });
+
+  it('M2: projéteis em voo entram no conjunto instanciado da arma do modelo, sem malha nova', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    pass.setModels([rifle, barrel]);
+    const projectiles = createProjectileBuffer(4);
+    projectiles.count = 3;
+    projectiles.model[0] = 0;
+    projectiles.model[1] = 0;
+    // Prop não tem conjunto de arma: não desenha.
+    projectiles.model[2] = 1;
+    projectiles.position.set([0, 1, -3, 2, 1, -3], 0);
+    projectiles.yaw[1] = Math.PI / 2;
+    projectiles.pitch[1] = 0.3;
+    pass.setProjectiles(projectiles);
+    pass.update(frame(0));
+    const weapon = mesh(ctx.scene, 'arma-rifle');
+    expect(weapon.count).toBe(2);
+    // A matriz do 1º projétil leva a posição dele (translação na coluna 3).
+    const m = weapon.instanceMatrix.array;
+    expect([m[12], m[13], m[14]]).toEqual([0, 1, -3]);
+    pass.setProjectiles(null);
+    pass.update(frame(1 / 60));
+    expect(weapon.count).toBe(0);
+    pass.dispose();
+  });
+
+  it('M2 (fase 2b): a caixinha (modelo pickup) tem conjunto instanciado próprio no mesmo buffer', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    pass.setModels([rifle, barrel, ammoBox]);
+    const buffer = createProjectileBuffer(4);
+    buffer.count = 2;
+    buffer.model[0] = 2;
+    buffer.model[1] = 2;
+    pass.setProjectiles(buffer);
+    pass.update(frame(0));
+    expect(mesh(ctx.scene, 'arma-ammo-box').count).toBe(2);
+    expect(mesh(ctx.scene, 'arma-rifle').count).toBe(0);
+    expect(ctx.scene.getObjectByName('arma-barrel')).toBeUndefined();
+    pass.dispose();
+  });
 });
 
 describe('passe de VFX (three sem GPU)', () => {
@@ -293,6 +339,17 @@ describe('passe de VFX (three sem GPU)', () => {
     expect(ctx.scene.getObjectByName('desmonte')).toBeUndefined();
     expect(mesh(ctx.scene, 'fx-aditivo').visible).toBe(true);
     expect(mesh(ctx.scene, 'fx-marcas').count).toBe(1);
+
+    // M2: explosão e rastro do foguete usam os mesmos anéis e o mesmo pool de cubinhos (nenhuma malha nova).
+    const before = mesh(ctx.scene, 'cubinhos').count;
+    pushExplosion(q, 0, 1, -10, 4);
+    pushTrail(q, 0, 1.5, -5, 0, 0, -1);
+    fx.submit(q);
+    fx.update(frame(1 / 60));
+    expect(mesh(ctx.scene, 'cubinhos').count).toBeGreaterThanOrEqual(before + 14);
+    expect(
+      ctx.scene.getObjectByName('render-fx')!.children.filter((c: Object3D) => c.visible).length,
+    ).toBeLessThanOrEqual(5);
 
     // Todo material do passe usa um dos 2 programas (instanciado ou partículas).
     const shaders = new Set<string>();

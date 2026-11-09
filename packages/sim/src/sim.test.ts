@@ -20,6 +20,7 @@ import type { SimEvent } from './events.ts';
 import { aimPointWorld, boundFigureTable, type AimPoint } from './hitbox.ts';
 import { createInputFrames, createSimLoop } from './loop.ts';
 import { createSim, type Sim, type SimMap } from './sim.ts';
+import { heldClip, heldReserve } from './view.ts';
 
 const blocks = createTestBlocks();
 const concrete = makeCell(blocks.byKey('concrete')!.id);
@@ -93,7 +94,7 @@ describe('criação e contrato', () => {
     const e = entityIndex(sim.controllerEntity(1));
     expect(v.team[e]).toBe(1);
     expect(v.health[e]).toBe(100);
-    expect(v.ammoClip[e]).toBe(WEAPON_RIFLE.clipSize);
+    expect(heldClip(v, e)).toBe(WEAPON_RIFLE.clipSize);
     expect(pos(sim, 1)).toEqual([north.x, FLOOR, north.z]);
     const events: SimEvent[] = [];
     sim.step(frames());
@@ -331,7 +332,7 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     expect(v.deaths[victim]).toBe(1);
     expect(v.match.teamScore[0]).toBe(1);
     expect(v.flags[victim]! & ENTITY_FLAG.dead).toBeTruthy();
-    expect(v.ammoClip[shooter]).toBe(WEAPON_RIFLE.clipSize - shots);
+    expect(heldClip(v, shooter)).toBe(WEAPON_RIFLE.clipSize - shots);
 
     let spawned = false;
     run(sim, f, 3 * SIM_HZ, (events) => {
@@ -430,7 +431,7 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     f[0]!.buttons = 0;
     run(sim, f, 60);
     expect(sim.view().recoilPitch[e]).toBe(0);
-    expect(sim.view().ammoReserve[e]).toBe(WEAPON_RIFLE.reserve - WEAPON_RIFLE.clipSize);
+    expect(heldReserve(sim.view(), e)).toBe(WEAPON_RIFLE.reserve - WEAPON_RIFLE.clipSize);
   });
 
   it('correndo não atira', () => {

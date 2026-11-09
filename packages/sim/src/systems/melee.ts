@@ -5,6 +5,7 @@ import { ZOMBIE_RULES } from '../config/zombie.ts';
 import { hostile, isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, type AimPoint } from '../hitbox.ts';
+import { isLivePhase } from '../view.ts';
 
 /**
  * Passo 3 (zumbis): o golpe corpo a corpo do zumbi do teste de estresse. Segurando `melee` (ou `fire`), golpeia a cada
@@ -22,7 +23,7 @@ const point: AimPoint = { x: 0, y: 0, z: 0 };
 
 export function meleeSystem(ctx: SimContext): void {
   const s = ctx.s;
-  const playing = ctx.match.phase === 'playing';
+  const playing = isLivePhase(ctx.match.phase);
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.zombie) continue;
     let fl = s.flags[e]! & ~F.firing;

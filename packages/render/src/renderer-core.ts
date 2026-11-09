@@ -63,6 +63,7 @@ import {
   createRenderDebug,
   createViewDesc,
   type ActorBuffer,
+  type ProjectileBuffer,
   type RenderDebug,
   type Renderer,
   type RendererOptions,
@@ -477,6 +478,12 @@ export function createRendererCore(
     setActors(buffer: ActorBuffer): void {
       if (disposed) return;
       ensurePasses().actors.setActors(buffer);
+    },
+
+    setProjectiles(projectiles: ProjectileBuffer | null): void {
+      if (disposed) return;
+      if (projectiles === null && !passes) return;
+      ensurePasses().actors.setProjectiles(projectiles);
     },
 
     renderViews(views: readonly ViewDesc[]): void {

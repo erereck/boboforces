@@ -10,7 +10,7 @@ import type { BenchConfig } from './types.ts';
  *   versao=0.0.1 codinome="Primeiro Bloco" plataforma=switch perfil=switch34p
  *   sistema="..." gpu="..." tela=1280x720 dpr=1 three=187 textura=array atributos=int
  *   cena=construto vistas=4 bots=12 zumbis=0 armados=1 visao=50 hora=day duracao=600 aquecimento=10 rota=- semente=1 hz=60 gpufinish=0
- *     hud=1 vm=1 fx=1 atores=1 bots_efetivos=12 manequins=6 detritos=120          (continuação da mesma linha)
+ *     hud=1 vm=1 fx=1 atores=1 bots_efetivos=12 manequins=6 detritos=120 armas=rifle   (continuação da mesma linha)
  *   loading_ms total=3120 assets=410 texturas=120 malha=1290 luz=820 nav=150 skins=90 figuras=40 shaders=360
  *   frames=17980 segundos=600.0 fps=29.97
  *   frame_ms media=33.37 p50=33.33 p90=34.10 p99=38.90 max=52.00
@@ -188,7 +188,7 @@ export function formatBenchReport(r: BenchReport): string {
       ` visao=${c.viewDistanceM} hora=${c.timeOfDay} duracao=${c.durationS} aquecimento=${c.warmupS}` +
       ` rota=${c.route ?? '-'} semente=${c.seed} hz=${c.simHz} gpufinish=${bit(c.gpuFinish)}` +
       ` hud=${bit(c.hud)} vm=${bit(c.viewmodel)} fx=${bit(c.fx)} atores=${bit(c.actors)}` +
-      ` bots_efetivos=${r.effectiveBots} manequins=${r.mannequins} detritos=${r.maxDebris}`,
+      ` bots_efetivos=${r.effectiveBots} manequins=${r.mannequins} detritos=${r.maxDebris} armas=${c.weapons}`,
     `loading_ms total=${num(r.loadingMs.total, 0)} assets=${num(r.loadingMs.assets, 0)}` +
       ` texturas=${num(r.loadingMs.textures, 0)} malha=${num(r.loadingMs.mesh, 0)}` +
       ` luz=${num(r.loadingMs.light, 0)} nav=${num(r.loadingMs.nav, 0)} skins=${num(r.loadingMs.skins, 0)}` +

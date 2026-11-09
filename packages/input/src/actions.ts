@@ -20,11 +20,22 @@ export const BUTTON = {
   grenade: 1 << 8,
   ping: 1 << 9,
   emote: 1 << 10,
+  /**
+   * M2 (fase 2b): Destravar (GDD §3.8). A sim leva o bobo ao nó de navegação livre mais próximo. O humano aperta pela
+   * pausa; a IA, depois de 8 s sem progresso na rota.
+   */
+  unstuck: 1 << 11,
 } as const;
 
 export type FrameButton = keyof typeof BUTTON;
 
 export const FRAME_BUTTONS = Object.keys(BUTTON) as readonly FrameButton[];
+
+/**
+ * M2 (fase 2b): botões do frame que só vêm de um menu (o Destravar da pausa), sem atalho no teclado nem no controle.
+ * O `game` liga o bit por um tick quando a opção é escolhida.
+ */
+export const MENU_ONLY_FRAME_BUTTONS: readonly FrameButton[] = ['unstuck'];
 
 /** Bits reservados para os botões no fio (InputFrame serializado). */
 export const FRAME_BUTTON_BITS = 16;

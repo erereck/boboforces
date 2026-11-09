@@ -55,6 +55,12 @@ export interface BenchConfig {
    * B) para os manequins `linha:*` e `close:*`. Fora dos prints fica desligado (a reserva é da partida).
    */
   readonly prints: boolean;
+  /**
+   * M2 (fase 1): primária dos bots e do jogador no bench: `rifle` (padrão, o critério do M1), o ID de uma primária
+   * (`smg`, `shotgun`, `sniper`, `rocket`, `lmg`) ou `mix` (em rodízio por controlador). Mede o custo do arsenal
+   * (explosões, chumbos) e serve aos prints.
+   */
+  readonly weapons: string;
 }
 
 /** Padrão: o critério do Switch na dock (4 vistas, 12 bots armados, visão de 50 m, 10 min). */
@@ -80,6 +86,7 @@ export const BENCH_DEFAULTS: BenchConfig = {
   fx: true,
   actors: true,
   prints: false,
+  weapons: 'rifle',
 };
 
 /**
@@ -108,6 +115,7 @@ export const BENCH_PARAMS = {
   fx: 'fx',
   actors: 'actors',
   prints: 'prints',
+  weapons: 'weapons',
 } as const satisfies Readonly<Record<keyof BenchConfig, string>>;
 
 // --- Gancho de depuração dos prints (window.__bfDebug.print na web; scripts/prints.ts) ---
@@ -148,6 +156,11 @@ export interface GameDebugApi {
   showFontSpecimen(on: boolean): void;
   /** Resolve quando as mudanças pendentes já estão na tela e mais `frames` frames (padrão 3) foram desenhados. */
   whenReady(frames?: number): Promise<void>;
+  /**
+   * M2 (fase 2e): abre a tela de resultado agora, com os números do momento (prints e conferência; a partida segue
+   * rodando por trás, como depois do fim). Só no JOGAR; nas outras cenas não faz nada.
+   */
+  showResult(): void;
   /**
    * Rodada 3 do porte do boneco (#56; pedido da F7 em `apps/web/scripts/prints-plan.ts`, `FigurePrintHook`): troca
    * aparência, time, pose, arma, mira, expressão e giro dos manequins nomeados. A lista SUBSTITUI a anterior (quem não

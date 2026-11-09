@@ -130,7 +130,9 @@ vitrine) e o teto de detritos do perfil (`detritos=`; 120 no `switch34p`, 200 no
 | `planB` | 4 | 12 | 0 | 50 m | 120 s | atlas + float |
 | `gpu` | 4 | 12 | 0 | 50 m | 60 s | `gl.finish()` |
 
-Todos com aquecimento de 10 s, armados, Dia, semente 1 e 60 Hz.
+Todos com aquecimento de 10 s, armados, Dia, semente 1 e 60 Hz. Desde o M2 (fase 1c) o `bench.json` também aceita
+`"weapons"` (`rifle` padrão, `smg`, `shotgun`, `sniper`, `rocket`, `lmg` ou `mix`) para medir o custo do arsenal; os
+presets acima continuam no fuzil.
 
 ## 7. Os 21 itens: o que cada linha mede
 
@@ -185,9 +187,78 @@ Mande de volta:
 2. três anotações suas: se a imagem travou ou piscou em algum momento (e quando); se a vibração e o som saíram
    certos (esquerda/direita no teste de áudio, os 4 controles vibrando); se o console esquentou ou a ventoinha
    disparou no bench de 10 min;
-3. se alguma coisa fechou o jogo sozinha ou travou: o que você estava fazendo.
+3. se alguma coisa fechou o jogo sozinha ou travou: o que você estava fazendo, o código do erro (Configurações do
+   sistema › Suporte › Histórico de erros) e, do cartão, o `sdmc:/switch/nxjs-debug.log` (o log do próprio nx.js, se
+   existir) e o relatório mais novo de `sdmc:/atmosphere/crash_reports/`.
 
 O log não tem nada pessoal: sem nomes, sem o texto digitado, sem o número de série dos controles.
+
+## 8b. Console, primeira tentativa (08/11/2026)
+
+Pelo álbum (applet) o aviso saiu certo. Segurando R, o Switch fechou o jogo ("O software foi fechado porque ocorreu
+um erro") sem gravar nenhuma linha no `runtime.log`: a queda foi no runtime do nx.js, antes do nosso código. É o
+defeito aberto do nx.js 1.0.0-beta.7 (issue #424): com o JIT do modo aplicativo, o Sparkplug do V8 grava o
+cabeçalho de uma página grande de código pelo endereço só de execução (Data Abort, 2168-0002). O Eden não reproduz.
+Desde então o build grava `romfs:/nxjs.ini` com `[v8] flags = --no-sparkplug` (o JIT segue ligado com Maglev e
+TurboFan; a issue mediu o dobro de fps contra o `jit = off`). **Resolveu:** com o NRO novo o jogo abriu segurando R
+nas três aberturas da §8c. Se o boot voltar a cair, o próximo passo é `[v8] jit = off`.
+
+## 8c. Console, Teste Zero (08/11/2026)
+
+NRO `2d17e81+` com o `nxjs.ini`, Horizon 22.5.0, Atmosphère 1.11.2 (emuMMC), nx.js 1.0.0-beta.7 com JIT (Maglev e
+TurboFan). Foram três aberturas, ~45 min no total: o `solo` no portátil e os outros benches na dock. Log em
+`local/console/runtime-2026-11-08-b.log`; os números completos estão no `PERF.md` §1b e §4.
+
+| Critério (tecnico.md §24.3) | No console | |
+|---|---|---|
+| Dock, 4 vistas, 12 bots, 50 m, 10 min, p99 ≤ 40 ms | **59,57 fps**, p99 18 ms, máx 321, 0 vão | ok |
+| 1P, 24 bots, 90 m, 30 fps (portátil) | **57,55 fps**, p99 34 ms | ok |
+| Heap < 200 MB | máx 43,7 MB | ok |
+| Loading do Construto ≤ 4 s | 1ª cena depois do boot: **4,98–5,04 s**; da 2ª cena em diante: 1,45–3,15 s | **reprova** (item 13) |
+| three com o shim; texture array ou atlas | three r187 sobe em 66–123 ms com 0 aviso; array + int em todos os benches que terminaram | ok |
+
+Estresses na dock: 24 zumbis a 58,84 fps (p99 27) e 48 bots a 59,21 fps (p99 25). GPU com `gl.finish()`: p50
+15 ms e p99 31 ms por frame, o dobro de folga para os 30 fps.
+
+Itens: 1–7 e 9 ok (o 7 em 25–52 ms). Na sonda do instanciamento, o console dá "normal" (4/4): o contorno do Eden fica
+desligado lá, como previsto. As figuras saem 108/108 nas duas rotas. No 8, `system-ui` dá "Method not implemented"
+(informativo). Os itens 10, 11, 14 e 16 ok, este último na dock e no portátil (p50 17 ms no 1º e no último minuto). 18
+ok. 19 ok no boot (4 MP3 em 402–419 ms, 24 vozes). 20 registrou a troca para a dock e o controle desconectado. 21: sem
+`Intl`, `DecompressionStream` ok. Os testes 17 (4 controles), a tela de áudio e o 20 numa partida JOGAR (HOME e
+sleep) ainda não rodaram.
+
+**O que falta, pelo §24.2:**
+
+- **Item 13 (loading):** reprova só a 1ª cena depois do boot, porque o JIT ainda está frio. Nessa cena a navegação
+  leva 1,4 s, a malha 0,9 s, a luz 0,7 s e os shaders 1,0 s. O plano é a pré-malha e a navegação no `.bfmap`, que tiram
+  ~3 s e deixam a 1ª cena perto de 2 s (PLANO_M1, "pré-malha no build só se o loading passar de 4 s").
+- **Item 15 (travadas de shader):** reprova em todos os benches, com 4–6 frames de 100 ms ou mais entre os 120
+  primeiros (o 1º frame tem 146–306 ms de CPU). O plano é um aquecimento mais completo: desenhar uma vez cada
+  combinação de programa e estado no loading, fora da tela.
+
+**Quedas (o Switch fechou o jogo):**
+
+1. **Plano B** (17:53:25 UTC): o renderer foi recriado com atlas + float, a cena carregou (2,8 s) e desenhou os 3
+   primeiros frames (136 draws). O log para ~1 s depois, e o próximo boot vem 16 s depois. O Eden rodou essa rota
+   sem erro (03/11), mas como 1ª cena, não depois de 4 cenas com o array.
+2. **O console inteiro reiniciou** (17:29:29 UTC): o bench 1P foi aberto na dock logo depois da troca de modo, e o
+   log para antes da linha `loading`. Segundo o Erick, foi o Switch todo que reiniciou sozinho, não só o jogo, e não se
+   repetiu. O próximo boot vem 85 s depois.
+
+**Decisão #60:** o loading fica como está e o M1 fecha. A pré-malha, o aquecimento (item 15) e a queda do plano B
+ficam para uma rodada só de otimização, mais adiante. As hipóteses abaixo ficam registradas para essa rodada.
+
+Duas hipóteses para o plano B, que o relatório de crash separa:
+
+- **(a) A mesma família da issue #424:** o Maglev ou o TurboFan gera um objeto de código grande o bastante para ir à
+  página grande de código. Isso aconteceria se código quente fosse reotimizado com tipos novos (Float32 e atlas no lugar
+  de inteiros e array). É menos provável, porque a issue diz que eles respeitam o limite de bytecode, mas uma queda
+  dessas pode acontecer em qualquer cena.
+- **(b) Algo da rota atlas + float que a GPU de verdade recusa e o Eden aceita.**
+
+Para decidir: o relatório de `sdmc:/atmosphere/crash_reports/` (as duas quedas dão nomes começando em `0179415`
+e `0179416`) e o código de erro do Histórico de erros. Se o PC cair na escrita do cabeçalho da página, como na issue, é
+o JIT.
 
 ## 9. Já medido no Eden deste PC (03/11/2026, build 0.0.1 local, frente switch-audio)
 

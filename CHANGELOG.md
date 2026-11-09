@@ -6,7 +6,181 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M1 Cena-vitrine + Teste Zero (em construção)
+### M2 MVP web solo (em construção)
+
+Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 (Meu Bobo militar + fantasias bobas),
+#63 (Kenney + música de menu CC0) e #64 (partida primeiro).
+
+- **Fase 1a, as 8 armas na sim:** pistola, SMG, fuzil, escopeta, sniper, lança-foguetes, faca e granada (mais a LMG de
+  reserva) com os números da `gameplay.md` §4.3, num código estável por arma. Cada bobo nasce com primária, pistola,
+  faca e 2 granadas, com munição por slot. A primária do próximo spawn vai no `InputFrame.primary`.
+  - Escopeta com 8 chumbos somados por alvo e recarga por cartucho; faca a 2 m (100 pelas costas); sniper que espalha
+    muito sem zoom; ADS com tempo de entrada e zoom por arma; padrão fixo de recuo.
+  - 12 testes novos de armas. Golden `81150d3b` (era `cb50303f`): o estado mudou e o recuo do fuzil ganhou o padrão
+    (`ARCHITECTURE.md` §12).
+- **Fase 1b, projéteis e explosões na sim:** o foguete voa reto e explode no contato (120 no acerto direto, área de
+  100 → 0 em 4 m). A granada quica, explode no pavio de 2,5 s e dá para cozinhar; se o pavio acabar na mão, explode
+  ali. Explosões respeitam paredes e tiram 50% de quem lançou. 7 testes novos. Golden `28969b8b`, com o mesmo combate:
+  só o estado ganhou o pool de projéteis.
+- **Fase 1c, armas na tela:** modelos da SMG, da escopeta, do lança-foguetes, da faca, da granada, da LMG e do foguete
+  em voo. Foguetes e granadas em voo, explosão com clarão, fogo, faíscas, fumaça e cubinhos, rastro do foguete e tremor
+  de câmera. O zoom do ADS é o da arma (sniper 4x, com o viewmodel escondido na luneta). Nenhum programa de shader novo.
+  O bench aceita `weapons=` (`mix` dá armas variadas aos bots), e o relatório diz `armas=`.
+- **Fase 1d, a IA usa as armas:** cada bot sorteia a primária pela semente (fuzil, SMG, escopeta, LMG, sniper ou
+  foguete) e usa cada uma do jeito dela.
+  - Chega perto com a escopeta e a SMG e fica longe com a sniper.
+  - A sniper só atira com a luneta; o foguete mira no pé, adiantado.
+  - Troca para a pistola sem munição ou com o alvo perto demais para o foguete e a sniper, e para a faca colado.
+  - 6 testes novos. O balance segue em ordem. Golden `b66afdf7`. O bench continua no fuzil por padrão.
+- **Fase 1e, HUD das armas:** "Rattler · Fuzil" em cima da munição e as granadas ao lado. A faca não mostra munição e a
+  granada na mão mostra quantas sobram. Mira em ponto para faca, granada e sniper, e cruz que abre com a dispersão da
+  arma. Luneta blocada da sniper com retícula e ponto vermelho, com as plaquinhas por cima. Correções: o foguete não
+  tapa mais a câmera de quem atira, e a sniper e o clarão da explosão ficaram menores. 4 testes novos de HUD.
+- **Fase 1f, prints das armas (rodada 5):** `npm run prints -- --so rodada5` gera 12 cenas: o arsenal em linha (de
+  frente, a 3/4 e mirando), três pares a 1 m e a vista do jogador com HUD, uma por primária. O gancho de debug ganhou
+  `setViewmodelVisible`, e o lança-foguetes, a LMG e a sniper ficaram menores e mais para o lado na mão. Explosão e
+  luneta vão como capturas ao vivo. Aprovada no padrão (#65), o que fecha a fase 1.
+- **Fase 2a, regras da partida na sim:**
+  - **Contagem de 3 s** (fase `warmup`): dá para olhar em volta, mas não andar nem atirar, e o relógio fica parado.
+    O padrão da sim é sem contagem; a partida liga a contagem junto com a HUD dela (2d).
+  - **Morte súbita:** empate no fim abre 60 s, e o primeiro abate que desempata encerra. **Vencedor do FFA** é o bobo.
+  - **Assistências:** 25 de dano ou mais nos últimos 10 s. O plano de morte credita o abate a quem feriu a vítima nos
+    5 s antes; sem ninguém, é acidente.
+  - **Spawn pontuado:** no FFA, longe (mais de 20 m) e fora da vista dos inimigos; no TDM, o ponto do time com menos
+    inimigos à vista.
+  - 11 testes novos. Golden `b26c3ec1`, com o mesmo combate (só o estado mudou); balance igual.
+- **Fase 2b, caixinha de munição e Destravar:**
+  - **Caixinha:** quem morre no Bobo Warfare deixa uma lata de munição oliva, que cai até o chão, gira devagar, pisca
+    nos últimos 3 s e some em 20 s. Quem passa por cima ganha 1 pente da primária e da pistola e 1 granada, até o
+    máximo de cada; com tudo cheio, ela fica. Modelo novo `model:ammo-box`, desenhado no mesmo conjunto instanciado
+    das armas (sem programa de shader novo).
+  - **Destravar:** botão novo do frame. Leva o bobo ao nó de navegação livre mais perto, a pelo menos 2 m; o bot
+    escolhe um nó fora da vista dos humanos e, na 3ª vez na mesma vida, renasce num spawn. O ponto vai para o log de
+    avisos (o relatório do F2). O humano ganha a opção na pausa (2e).
+  - **Bot parado:** 8 s sem andar 2 m nem chegar 1 m mais perto do objetivo, fora de combate, aperta Destravar.
+  - **HUD:** com a faca, o nome da arma ficava em cima do ícone das granadas; agora fica sempre na mesma altura.
+  - 9 testes novos. Golden `d0ba0eca` (os bots pegaram 4 caixinhas e não precisaram do Destravar); balance igual.
+- **Fase 2c, tela de morte:**
+  - **Câmera de morte:** sobe um pouco e vira em meio segundo para quem matou, com ele acima da contagem; sem
+    matador, fica onde estava.
+  - **Faixa:** "ABATIDO POR Normal Bob · Rattler · 57 HP" (os bots usam o nome do nível, #61, até os bots de fábrica
+    da fase 3), ou só a causa: "Caiu no vazio", "Queda", "Foi você mesmo".
+  - **Menu da primária** em volta de "RENASCENDO… 3": anel com as 6 primárias quando cabe (1280×720 e o celular
+    deitado), fileira nas vistas baixas e "« arma »" no 3–4P. Escolhe pela direção do mouse ou do analógico, pela roda
+    ou pelos botões de troca de arma, ou tocando. A escolha vai no `InputFrame.primary` e vale no próximo spawn.
+  - **"Tá puxado? Pausa » Ajustar desafio"** na faixa, 1 vez por partida, depois de 5 mortes seguidas sem abate ou
+    perdendo por 50% da metade da partida em diante.
+  - Morto, a HUD esconde a munição e o nome da arma. 17 testes novos. A sim só passou a mostrar
+    `SimView.respawnTicks`: o golden não mudou.
+- **Fase 2d, HUD da partida:**
+  - **O JOGAR segue o GDD:** TDM com 75 abates ou 10 min, e contagem de 3 s ("3", "Hoje: 6 × Normal Bob"), em que
+    dá para olhar em volta mas não andar.
+  - **Placar no alto com o relógio** e "MORTE SÚBITA" embaixo dele na prorrogação.
+  - **Kill feed** no canto de cima à direita: "Normal Bob Rattler P1" nas cores dos times, a arma em âmbar no tiro de
+    cabeça, até 5 linhas por 6 s.
+  - **Placar no Tab** (Select no controle): uma tabela por time com abates, mortes e assistências; a sua linha em
+    âmbar.
+  - **Marcadores dos aliados:** chevron na cor do time em cima da cabeça, através das paredes, até 80 m.
+  - O indicador direcional de dano já existia desde o M1. A faixa listrada no limite fica para o primeiro mapa aberto
+    (o Construto é fechado por paredes).
+  - 9 testes novos.
+- **Fase 2e, pausa e resultado:**
+  - **Pausa completa:** Continuar · Ajustar desafio · Ajustes · Destravar · Sair. "Ajustar desafio" troca na hora o
+    nível dos bots adversários (os 5 níveis rápidos). "Ajustes" abre a tela de ajustes, que por enquanto está vazia.
+    "Destravar" leva você ao ponto livre mais perto.
+  - **Resultado** 2,5 s depois do fim: vitória, derrota ou empate e o placar; o nível dos bots; MVP; Nêmesis (com
+    "Salvar na Oficina", desligado até a fase 5); Freguês; abates, precisão e maior sequência; e até 3 prêmios bobos,
+    um por bobo (Mira torta, Kamikaze, Mais covarde, Garçom das assistências, Imortal de verdade).
+  - **Botões do resultado:** De novo, Mais fácil, Mais difícil e Sair (Mudar regras e Salvar preset desligados até a
+    fase 4). Depois de uma derrota feia, o foco começa em "Mais fácil". Os botões recarregam o JOGAR com semente nova
+    e o nível um passo abaixo ou acima.
+  - Com o resultado na tela, a HUD sai.
+  - 7 testes novos.
+- **Fase 2f, prints da rodada 6:** página com capturas ao vivo (`local/m2/montar-pagina-r6.mjs`) da tela de morte,
+  da HUD da partida, da pausa, do resultado e da caixinha, com as perguntas B1–B6. Aprovada no padrão (#66), o que fecha
+  a fase 2.
+- **Fase 3a, o `bot@1`:**
+  - **O formato do bot** com os 4 eixos do Laboratório: habilidade, inteligência (o nível e os comportamentos), personalidade e regras. O validador limita cada valor à faixa, com aviso.
+  - **Os 12 bots de fábrica:** os 5 níveis e Jorge the Immortal, Camper Carl, Knife Ninja, Scaredy Sam, Hunter
+    Hank, Buddy e Goofy Gus.
+  - **A receita valida os bots embutidos.** A IA passa a ler o bot pelo documento, e os bots de nível sorteiam a
+    personalidade da mistura (50% Equilibrado, 20% Rusher, 15% Camper e 15% Estrategista).
+  - Os nomes saem da tabela de textos.
+  - O golden não mudou.
+  - 6 testes novos.
+- **Fase 3b, regras por bot na sim:**
+  - Vida própria (o Jorge tem 500), multiplicador de dano e velocidade.
+  - Munição infinita (no pente ou na reserva).
+  - Armas permitidas: o que não está na lista sai do loadout (Knife Ninja só com faca, Jorge só com a Door Knocker).
+  - Imunidade a tiro de cabeça e explosão ao morrer.
+  - O golden não mudou. 8 testes novos.
+- **Fase 3c, inteligência N1:**
+  - O bot sabe de onde tomou dano e vira para lá.
+  - A partir do N1, decide pela personalidade se corre para uma cobertura: um ponto perto, do lado oposto, fora da vista
+    de quem atirou. Lá fica agachado um tempo (mais com paciência), recarrega e atira de lá. Com o pente vazio no meio
+    do tiroteio, também busca cobertura para recarregar.
+  - Patrulhando, olha para os lados de tempos em tempos.
+  - O balance segue em ordem. Golden `c3f257c6`: menos tiros, porque os bots se escondem.
+  - 1 teste novo, que falha sem a cobertura.
+- **Fase 3d, inteligência N2:**
+  - **Segura o ângulo:** quando o alvo some, fica um tempo mirando onde ele sumiu (mais tempo com paciência).
+  - **Flanqueia:** passa por um ponto de lado antes de voltar à caça.
+  - **Recua:** com a vida baixa, foge para longe e fora da vista e espera regenerar.
+  - **Joga granada** em quem se escondeu a 7–25 m: troca de arma, mira o arco certo, cozinha o que o voo deixa e
+    solta.
+  - O balance segue em ordem. Golden `856785f5` (8 granadas em 60 s).
+  - 2 testes novos (o da granada falha sem o uso de granada).
+- **Fases 3e e 3f, inteligência N3 e N4:**
+  - **N3, o time:**
+    - Quem vê um inimigo avisa o time; os aliados sem pista vão atrás do aviso, e o humano aliado vê um losango âmbar
+      no lugar.
+    - Os bots andam em dupla ou trio, seguindo o objetivo de um líder.
+    - No cerco, cada um flanqueia para o lado do seu número.
+  - **N4, o leitor:** aprende na partida, num mapa de calor de 4 m que esquece pela metade a cada minuto, onde os
+    humanos ficam e de onde matam. Com isso:
+    - vai caçar lá e pré-mira lá;
+    - joga granada lá;
+    - evita passear onde o time dele morreu;
+    - às vezes finge recuar para emboscar.
+  - Os bots do golden (Normal, N2) não mudam. O balance segue em ordem.
+  - 3 testes novos.
+- **Fase 3g, personalidades e bots de fábrica:**
+  - **As 10 personalidades se veem em jogo** (gameplay.md §6.4):
+    - Rusher corre até o contato, atira andando e pula muito;
+    - Lunático troca de intenção a cada 2–5 s e às vezes atira pro alto;
+    - Covarde mantém distância, foge com 60% de vida gritando por ajuda e às vezes finge de morto;
+    - Camper segura um ponto alto, agachado, até 2 abates ou até ser descoberto;
+    - Estrategista flanqueia mais e anda com o time;
+    - Kamikaze persegue o humano e, com granada, se explode;
+    - Caçador persegue o humano com mais abates;
+    - Suporte segue o humano aliado, vigia as costas dele e vai atrás de quem atirou nele;
+    - Palhaço dança depois do abate;
+    - todos dão pulinhos conforme a bobeira.
+  - **Loadout restrito:** a IA usa só a arma que tem (Knife Ninja na faca, Jorge na escopeta, Carl na sniper, que
+    agora atira de perto quando não há outra arma).
+  - **Bots de fábrica no JOGAR:** com `?bots=fabrica` na URL, os 6 especiais jogam contra você e o Buddy no seu time,
+    até os menus da fase 4.
+  - **Golden e balance:** o golden muda para `5ee925a0`; o balance segue em ordem. 12 testes novos.
+- **Fase 3h, assistência de mira:**
+  - **Fricção:** no controle e no toque, a mira desacelera perto de um inimigo à vista: 25% no Leve, 40% no Médio e
+    60% no Forte, mais no centro do alvo.
+  - **Ímã leve:** mexendo a mira ou andando, ela é puxada de leve para o alvo.
+  - **Trava do Forte:** no Forte, apertar o ADS trava a mira no alvo.
+  - **Escopo:** o mouse continua sem assistência. A mira assistida vai gravada no `InputFrame`, então o replay não
+    muda.
+  - **Golden e balance:** o golden fica igual (`5ee925a0`) e o balance segue em ordem. A fase 3 (IA) está completa.
+- **Fecho da fase 3 (conferido nos prints):**
+  - **Regras à vista** (GDD §6.5):
+    - o placar ganha embaixo de cada time a lista dos bots com regra ("Jorge the Immortal: 500 de vida · só
+      escopeta");
+    - a tela de morte mostra as regras de quem te matou.
+  - **Avisos do time:** avisos quase no mesmo ponto da tela viram um losango só.
+  - **`?nivel=` na URL:** escolhe o nível do primeiro JOGAR (`?nivel=suado`), até os menus da fase 4.
+- **Prints da rodada 7:** página com capturas ao vivo (`local/m2/montar-pagina-r7.mjs`) do aviso do time, dos bots de
+  fábrica e das regras no placar e na tela de morte, com as perguntas C1–C6. Aprovada no padrão (#67), o que fecha a
+  fase 3.
+
+### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
 **Parte 1: contratos e frentes em paralelo**
 
@@ -260,10 +434,26 @@ números com data e método no `docs/PERF.md` §1e; contratos no `docs/ARCHITECT
 - **Crédito do menu (commits do Erick de 03/11, depois do M0):** "EriLab™ / Erick Luiz". As fontes do M1 não têm o ™: o
   `drawText` o compõe com T e M a 0,48 em sobrescrito, escrevendo direto na lista como os outros glifos (sem alocação).
   `COMPOSED_CHARS` diz aos testes de cobertura (ui e fontbake) que o ™ conta como "TM".
+- **Celulares (critério 5 do M1):** no site publicado, 1 vista e 12 bots por 3 min: Galaxy A36 a 60,00 fps e Galaxy A04s
+  (no lugar do Redmi Note 13; Exynos 850, mais fraco) a 59,91 fps, p99 16,8 ms nos dois (`PERF.md`). Rodados em pé.
+- **Console, 1ª tentativa (Teste Zero):** segurando R o jogo caía no boot (2168-0002) sem nenhuma linha no
+  `runtime.log`: defeito do nx.js 1.0.0-beta.7 com o Sparkplug do V8 no JIT (issue #424 do nx.js). O build do Switch
+  grava `romfs:/nxjs.ini` com `[v8] flags = --no-sparkplug` (`TESTE_ZERO.md` §8b); o Eden segue subindo igual.
+- **Teste Zero no console** (`TESTE_ZERO.md` §8c, `PERF.md` §1b e §4): com o `nxjs.ini` o jogo abre segurando R.
+  - Dock, 4 vistas e 12 bots por 10 min: **59,57 fps, p99 18 ms**. 1P com 24 bots no portátil: **57,55 fps**.
+  - Zumbis: 58,84 fps. 48 bots: 59,21 fps. Heap máximo de 43,7 MB. GPU a 15 ms por frame na dock.
+  - O loading reprova na 1ª cena depois do boot (4,98–5,04 s, com o JIT frio); da 2ª cena em diante fica em
+    1,45–3,15 s.
+  - O item 15 reprova (4–6 travadas nos primeiros 120 frames).
+  - O bench do plano B fechou o jogo ~1 s depois de começar. Não reprova o Teste Zero, porque o array passou.
+  - **Decisão #60:** o loading fica como está e o **M1 fecha**. A pré-malha, o aquecimento e a queda do plano B vão
+    para uma rodada só de otimização, mais adiante.
 - **Relógio do bench:** "Aquecendo" e "Medindo" mostram quanto falta da fase (" · faltam m:ss", `test.bench.timeLeft`),
   desenhado sem string por frame como o relógio do HUD; vale na web e no Switch. Pedido do Erick ao rodar no celular.
 - **Pendente:** tabela de jogo no Eden (259 ms; meta ≤ 75, plano B = tabela gerada no build), skins no Eden (237 ms; meta
-  180), console (Teste Zero), bench nos celulares, emote no `ActorBuffer` (M2) e escala do zumbi na hitbox (M3).
+  180), emote no `ActorBuffer` (M2) e escala do zumbi na hitbox (M3). Para a rodada de otimização (#60): pré-malha e
+  navegação no `.bfmap` (loading da 1ª cena no console), aquecimento mais completo dos shaders (item 15) e a queda do
+  plano B no console.
 
 ### M0 Fundação (publicado em erereck.github.io/boboforces, P-002)
 

@@ -1,4 +1,7 @@
 import { createHeadlessMatch } from '@boboforces/ai';
+
+/** Primária de todo controlador no duelo: o fuzil. */
+const RIFLE_PRIMARIES: readonly number[] = new Array<number>(MAX_CONTROLLERS).fill(WEAPON_CODE.rifle);
 import {
   BOT_LEVELS,
   builtinBotRef,
@@ -8,7 +11,7 @@ import {
   type FigureGameTable,
   type MatchRecipe,
 } from '@boboforces/format';
-import { BOT_CONTROLLER_BASE, SIM_HZ, type SimMap } from '@boboforces/sim';
+import { BOT_CONTROLLER_BASE, MAX_CONTROLLERS, SIM_HZ, WEAPON_CODE, type SimMap } from '@boboforces/sim';
 import { cellCenter, createTestBlocks, createWorldGrid, fillBox, makeCell, type MapSpawn } from '@boboforces/world';
 
 /**
@@ -122,6 +125,8 @@ function runRound(
     map,
     humans: 0,
     figureTable,
+    // O robô calibra o duelo de FUZIL (GDD §4.4.6): os dois com o fuzil, sem o sorteio de primária do M2.
+    primaries: RIFLE_PRIMARIES,
     onEvents: (events) => {
       for (const ev of events) {
         if (ev.type === 'shot') {

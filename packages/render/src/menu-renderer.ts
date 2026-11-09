@@ -101,6 +101,10 @@ export function createMenuRenderer(
 
   return {
     resize,
+    setProjectiles(): void {
+      // O menu não tem cena.
+    },
+
     setActors(actors: ActorBuffer): void {
       void actors;
     },

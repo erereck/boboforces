@@ -3,15 +3,19 @@ import type { BlockId } from '@boboforces/world';
 import type { HitPart } from './config/metrics.ts';
 import type { EntityId } from './entity.ts';
 import type {
+  ExplosionEvent,
   HitEvent,
   MeleeEvent,
   ImpactEvent,
   KillEvent,
   MatchPhaseEvent,
   MoveEvent,
+  PickupEvent,
+  ProjectileEvent,
   ShotEvent,
   SimEvent,
   SpawnEvent,
+  UnstuckEvent,
   WeaponEvent,
 } from './events.ts';
 import type { MatchPhase } from './view.ts';
@@ -97,6 +101,7 @@ export class EventQueue {
       dirY: 0,
       dirZ: 0,
       force: 0,
+      assister: 0,
     }),
     16,
   );
@@ -136,6 +141,46 @@ export class EventQueue {
     () => ({ type: 'matchPhase', tick: 0, phase: 'playing' }),
     2,
   );
+  private readonly projectiles = new EventPool<Mutable<ProjectileEvent>>(
+    () => ({
+      type: 'projectile',
+      tick: 0,
+      action: 'launch',
+      index: 0,
+      weapon: 0,
+      owner: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+    }),
+    16,
+  );
+  private readonly explosions = new EventPool<Mutable<ExplosionEvent>>(
+    () => ({ type: 'explosion', tick: 0, owner: 0, weapon: 0, x: 0, y: 0, z: 0, radius: 0 }),
+    8,
+  );
+  private readonly pickups = new EventPool<Mutable<PickupEvent>>(
+    () => ({ type: 'pickup', tick: 0, action: 'drop', index: 0, entity: 0, x: 0, y: 0, z: 0 }),
+    8,
+  );
+  private readonly unstucks = new EventPool<Mutable<UnstuckEvent>>(
+    () => ({
+      type: 'unstuck',
+      tick: 0,
+      entity: 0,
+      fromX: 0,
+      fromY: 0,
+      fromZ: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      respawned: false,
+    }),
+    2,
+  );
 
   get size(): number {
     return this.length;
@@ -152,6 +197,10 @@ export class EventQueue {
     this.weapons.reset();
     this.melees.reset();
     this.phases.reset();
+    this.projectiles.reset();
+    this.explosions.reset();
+    this.pickups.reset();
+    this.unstucks.reset();
   }
 
   /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
@@ -232,6 +281,7 @@ export class EventQueue {
     dir: Float64Array,
     force: number,
     i: number,
+    assister: EntityId,
   ): void {
     const e = this.kills.acquire();
     const i3 = i * 3;
@@ -245,6 +295,7 @@ export class EventQueue {
     e.dirY = dir[i3 + 1]!;
     e.dirZ = dir[i3 + 2]!;
     e.force = force;
+    e.assister = assister;
     this.push(e);
   }
 
@@ -314,6 +365,90 @@ export class EventQueue {
     e.tick = tick;
     e.attacker = attacker;
     e.target = target;
+    this.push(e);
+  }
+
+  projectile(
+    tick: number,
+    action: ProjectileEvent['action'],
+    index: number,
+    weapon: number,
+    owner: EntityId,
+    x: number,
+    y: number,
+    z: number,
+    vx: number,
+    vy: number,
+    vz: number,
+  ): void {
+    const e = this.projectiles.acquire();
+    e.tick = tick;
+    e.action = action;
+    e.index = index;
+    e.weapon = weapon;
+    e.owner = owner;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    e.vx = vx;
+    e.vy = vy;
+    e.vz = vz;
+    this.push(e);
+  }
+
+  explosion(tick: number, owner: EntityId, weapon: number, x: number, y: number, z: number, radius: number): void {
+    const e = this.explosions.acquire();
+    e.tick = tick;
+    e.owner = owner;
+    e.weapon = weapon;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    e.radius = radius;
+    this.push(e);
+  }
+
+  pickup(
+    tick: number,
+    action: PickupEvent['action'],
+    index: number,
+    entity: EntityId,
+    x: number,
+    y: number,
+    z: number,
+  ): void {
+    const e = this.pickups.acquire();
+    e.tick = tick;
+    e.action = action;
+    e.index = index;
+    e.entity = entity;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    this.push(e);
+  }
+
+  /** Destravar: `from[fromOffset..+2]` é de onde o bobo saiu. */
+  unstuck(
+    tick: number,
+    entity: EntityId,
+    from: Float64Array,
+    fromOffset: number,
+    x: number,
+    y: number,
+    z: number,
+    respawned: boolean,
+  ): void {
+    const e = this.unstucks.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    e.fromX = from[fromOffset]!;
+    e.fromY = from[fromOffset + 1]!;
+    e.fromZ = from[fromOffset + 2]!;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    e.respawned = respawned;
     this.push(e);
   }
 

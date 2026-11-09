@@ -14,7 +14,7 @@ import { KEY_COUNT, keyIndex } from './keys.ts';
 import { createRawInputState, MAX_GAMEPADS } from './raw.ts';
 
 describe('InputFrame', () => {
-  it('serializa em 11 bytes, ida e volta', () => {
+  it('serializa em 12 bytes, ida e volta', () => {
     const f = createInputFrame();
     f.seq = 65535;
     f.buttons = BUTTON.fire | BUTTON.jump | BUTTON.emote;
@@ -23,10 +23,11 @@ describe('InputFrame', () => {
     f.yaw = yawToU16(1.25);
     f.pitch = pitchToI16(-0.7);
     f.weapon = 3;
+    f.primary = 6;
     const w = new BitWriter(16);
     writeInputFrame(w, f);
     expect(w.bitLength).toBe(INPUT_FRAME_BITS);
-    expect(w.byteLength).toBe(11);
+    expect(w.byteLength).toBe(12);
     const back = readInputFrame(new BitReader(w.bytes()), createInputFrame());
     expect(back).toEqual(f);
     expect(hasButton(back, BUTTON.jump)).toBe(true);

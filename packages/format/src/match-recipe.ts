@@ -1,3 +1,4 @@
+import { validateBot, type BotDocument } from './bot.ts';
 import { isValidContentLocal, resolveContent } from './content-ids.ts';
 import type { FormatId } from './format-id.ts';
 import { migrateDocument } from './migrations.ts';
@@ -86,6 +87,8 @@ export interface MatchRecipe {
   readonly players?: PlayerRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
+  /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
+  readonly embeddedBots?: readonly BotDocument[];
 }
 
 /**
@@ -109,7 +112,7 @@ export const RECIPE_RANGES = {
 /** Bot que entra quando a ref não existe nesta versão (fallback de conteúdo). */
 export const FALLBACK_BOT_REF: BotRef = 'builtin:normal-bob';
 
-const TOP_KEYS = ['format', 'name', 'mode', 'map', 'seed', 'match', 'players', 'teams'] as const;
+const TOP_KEYS = ['format', 'name', 'mode', 'map', 'seed', 'match', 'players', 'teams', 'embeddedBots'] as const;
 const MATCH_KEYS = ['timeLimitS', 'scoreLimit', 'viewDistanceM'] as const;
 const PLAYER_KEYS = ['movement', 'hp', 'respawnS'] as const;
 const TEAM_KEYS = ['name', 'humans', 'bots'] as const;
@@ -492,6 +495,24 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
     });
   }
 
+  // M2 (fase 3a): os bots embutidos passam pelo validador do `bot@1` (avisos com o caminho; o que não é bot cai).
+  const embeddedIn = doc['embeddedBots'];
+  if (embeddedIn !== undefined) {
+    if (!Array.isArray(embeddedIn)) warn(ctx, 'embeddedBots', 'recipe.invalidField', describe(embeddedIn));
+    else {
+      const bots: BotDocument[] = [];
+      embeddedIn.forEach((bot, i) => {
+        const r = validateBot(bot);
+        if (!r.ok) {
+          warn(ctx, `embeddedBots[${i}]`, 'content.missingBot', r.errors[0]?.code);
+          return;
+        }
+        for (const w of r.warnings) ctx.warnings.push({ ...w, path: `embeddedBots[${i}].${w.path}` });
+        bots.push(r.value);
+      });
+      out['embeddedBots'] = bots;
+    }
+  }
   if (ctx.errors.length > 0) return { ok: false, errors: ctx.errors };
   Object.assign(out, unknownFields(doc, TOP_KEYS));
   return { ok: true, value: out as unknown as MatchRecipe, warnings: ctx.warnings };

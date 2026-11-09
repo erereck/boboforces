@@ -17,7 +17,7 @@ import { sampleLightGrid } from '@boboforces/world';
 import { Group, PerspectiveCamera, Scene, Sphere, type InstancedMesh } from 'three';
 import { INITIAL_ACTOR_CAPACITY } from '../limits.ts';
 import type { ActorPass, FrameContext, PassContext, ViewContext } from '../shared/passes.ts';
-import { ACTOR_POSE, NO_FIGURE, NO_MODEL, type ActorBuffer, type RenderMap } from '../types.ts';
+import { ACTOR_POSE, NO_FIGURE, NO_MODEL, type ActorBuffer, type ProjectileBuffer, type RenderMap } from '../types.ts';
 import { floorBelow } from '../fx/verlet.ts';
 import { PARTICLE_FLOATS } from '../fx/particles.ts';
 import { PARTICLE_KIND } from '../fx/shader.ts';
@@ -152,6 +152,7 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
 
   let shadows = createShadows(INITIAL_ACTOR_CAPACITY);
   let actors: ActorBuffer | null = null;
+  let projectiles: ProjectileBuffer | null = null;
   let boboCount = 0;
   const slotCounts = new Int32Array(4);
 
@@ -231,7 +232,9 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     }
     weapons = bindings.map((binding, i) => {
       const vertex = modelVertex[i];
-      if (!binding || !vertex || binding.kind !== 'weapon' || vertex.vertexCount === 0) return null;
+      // Armas, projéteis (modelo `weapon`) e pickups (M2, fase 2b: a caixinha) dividem o mesmo desenho instanciado.
+      if (!binding || !vertex || (binding.kind !== 'weapon' && binding.kind !== 'pickup')) return null;
+      if (vertex.vertexCount === 0) return null;
       const set = createInstanceSet(shadows.capacity);
       const mesh = instancedMesh(
         instancedGeometry(vertex, set.dataBuffer),
@@ -424,6 +427,10 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       actors = buffer;
     },
 
+    setProjectiles(buffer) {
+      projectiles = buffer;
+    },
+
     setFigures(templates, table) {
       if (disposed) return;
       figureTemplates = templates;
@@ -486,6 +493,26 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
           }
           writeShadow(shadowCount++, a, i, frame, FIGURE_SHADOW_SIZE);
         }
+      }
+      // M2: projéteis em voo nos conjuntos instanciados das armas (o modelo do projétil é `kind: 'weapon'`).
+      const pj = projectiles;
+      for (let i = 0; pj !== null && i < pj.count; i++) {
+        const model = pj.model[i]!;
+        const weapon = model !== NO_MODEL ? (weapons[model] ?? null) : null;
+        if (!weapon || weapon.count >= weapon.set.capacity) continue;
+        const wm = weapon.count * MAT4;
+        const mat = weapon.set.matrices;
+        m4Identity(mat, wm);
+        m4Translate(mat, pj.position[i * 3]!, pj.position[i * 3 + 1]!, pj.position[i * 3 + 2]!, wm);
+        m4RotateY(mat, pj.yaw[i]!, wm);
+        m4RotateX(mat, pj.pitch[i]!, wm);
+        m4RotateZ(mat, pj.roll[i]!, wm);
+        const d = weapon.count * INSTANCE_FLOATS;
+        writeInstanceDefaults(weapon.set.data, d);
+        weapon.set.data[d + INST.sky] = pj.light[i * 3]!;
+        weapon.set.data[d + INST.sun] = pj.light[i * 3 + 1]!;
+        weapon.set.data[d + INST.emissive] = pj.light[i * 3 + 2]!;
+        weapon.count++;
       }
       boboCount = figureOn ? figureFrame.stats.figures : 0;
 

@@ -6,7 +6,7 @@
 //   npm run prints -- --so leitura,altura                só alguns conjuntos (hora, densidade, leitura, fontes, altura,
 //                                                        titulo, setores, regua, fila, close, vitrine, zumbi, mira,
 //                                                        sequencia, andar, bots, tropa, farda, patio, infectado; o
-//                                                        número; ou a rodada: escolhas, rodada3, rodada4)
+//                                                        número; ou a rodada: escolhas, rodada3, rodada4, rodada5)
 //   npm run prints -- --copia h5                         na CÓPIA descartável (passo 6): só os prints da variante
 //                                                        (marca padrão `copia-<variante>`; ver COPY_VARIANTS)
 //   npm run prints -- --marca altura-a                   pasta <versão>-<marca> (rodadas da mesma versão lado a lado)
@@ -141,6 +141,7 @@ async function applyAndWait(page: Page, settings: PrintSettings): Promise<'ok' |
     p.setGrayscale(s.grayscale);
     p.setMipFilter(s.mipFilter);
     p.setHudVisible(s.hud);
+    p.setViewmodelVisible(s.viewmodel);
     p.showFontSpecimen(s.fontSpecimen);
     if (typeof p.setMannequins === 'function' && !p.setMannequins(s.mannequins)) return 'recusou';
     if (typeof p.setFigureClip === 'function' && !p.setFigureClip(s.clip)) return 'recusou';

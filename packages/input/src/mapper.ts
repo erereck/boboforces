@@ -53,6 +53,8 @@ export interface InputMapper {
   readonly moveY: number;
   /** Slot de arma desejado (0..`WEAPON_SLOT_COUNT`-1). */
   readonly weapon: number;
+  /** M2: primária do próximo spawn (código + 1; 0 = manter). */
+  readonly primary: number;
   /** Houve qualquer input deste dispositivo no último `update` (tela "aperte A", troca de glifos). */
   readonly active: boolean;
   /** O dispositivo está presente (controle desconectado = `false`; teclado e toque sempre `true`). */
@@ -81,6 +83,11 @@ export interface InputMapper {
   setAngles(yaw: number, pitch: number): void;
   /** Sincroniza a arma desejada com a sim (troca automática, respawn): sem isso o próximo aperto não mudaria nada. */
   setWeapon(slot: number): void;
+  /**
+   * M2: primária do próximo spawn (código da arma + 1; 0 = manter). Vai em todo `InputFrame.primary` até mudar de
+   * novo; o menu radial da tela de morte chama.
+   */
+  setPrimary(codePlusOne: number): void;
   setProfile(profile: ControlProfile): void;
   /** Troca o dispositivo do slot (reconexão do controle em outro índice). Zera toques, alternâncias e travas. */
   setDevice(device: DeviceBinding): void;
@@ -203,6 +210,7 @@ class Mapper implements InputMapper {
   moveX = 0;
   moveY = 0;
   weapon = 0;
+  primary = 0;
   active = false;
   connected = true;
   readonly touchJoystick = { active: false, baseX: 0, baseY: 0, knobX: 0, knobY: 0 };
@@ -283,6 +291,10 @@ class Mapper implements InputMapper {
     }
   }
 
+  setPrimary(codePlusOne: number): void {
+    this.primary = clamp(Math.floor(codePlusOne), 0, 255);
+  }
+
   isDown(action: GameAction): boolean {
     return this.down[GAME_ACTION_INDEX[action]] === 1;
   }
@@ -307,6 +319,7 @@ class Mapper implements InputMapper {
     out.yaw = yawToU16(this.yaw);
     out.pitch = pitchToI16(this.pitch);
     out.weapon = this.weapon & 0xff;
+    out.primary = this.primary & 0xff;
     this.latchBits = 0;
   }
 

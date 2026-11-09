@@ -3,9 +3,11 @@ import type { Disposable } from '@boboforces/shared';
 import { createInputFrames, createSim, createSimLoop, type Sim, type SimConfig, type SimEvent } from '@boboforces/sim';
 import { createBotDirectorWithPaths, type BotDirectorWithStats } from './director.ts';
 import { NAV_PATH_API, type NavPathApi } from './paths.ts';
+import { botPrimaries } from './weapons.ts';
 
 /**
  * Partida headless só com bots (teste golden, robô de balanceamento, bench): sim + IA + laço de 1 tick por chamada.
+ * M2: sem `primaries`, os bots sorteiam a primária como no jogo (`botPrimaries`).
  * Os frames dos humanos (se houver) ficam neutros, a não ser que `writeHumans` os escreva. Zumbis (`zombies`) vão
  * para a sim e para o diretor juntos.
  */
@@ -27,7 +29,8 @@ export interface HeadlessMatchConfig extends SimConfig {
 }
 
 export function createHeadlessMatch(config: HeadlessMatchConfig): HeadlessMatch {
-  const sim = createSim(config);
+  // M2: a mesma primária sorteada do jogo (o `LocalDriver` faz igual); quem calibra uma arma passa `primaries`.
+  const sim = createSim({ ...config, primaries: config.primaries ?? botPrimaries(config.recipe, config.humans) });
   const director = createBotDirectorWithPaths(
     {
       recipe: config.recipe,

@@ -1,23 +1,71 @@
-import type { BotLevel } from '@boboforces/format';
-import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
+import {
+  intelligenceForLevel,
+  LEVEL_ORDER,
+  LEVEL_SKILLS,
+  levelBot,
+  type BotDocument,
+  type BotIntelligence,
+  type BotLevel,
+  type BotPersonality,
+  type BotRules,
+} from '@boboforces/format';
+import { BUTTON, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, pitchToI16, wrapAngle, yawToU16, type Rng } from '@boboforces/shared';
 import {
   aimPointWorld,
   ENTITY_FLAG,
+  ENTITY_KIND,
   eyeHeightFor,
   figurePostureOf,
   secondsToTicks,
-  WEAPON_SLOTS,
+  heldClip,
+  WEAPON_FIRE,
+  WEAPON_SLOT,
+  weaponDef,
   visibleAimOffset,
   weaponGrip,
   type AimPoint,
   type SimView,
 } from '@boboforces/sim';
 import { CELLS_PER_METER, isCellSolid } from '@boboforces/world';
-import { AI_LOD, AI_PATH, AI_SENSES, AI_SOLDIER } from './config.ts';
+import {
+  AI_KNIFE,
+  AI_LOD,
+  AI_COVER,
+  AI_FLANK,
+  AI_GRENADE,
+  AI_HOLD,
+  AI_PATH,
+  AI_PERSONA,
+  AI_RETREAT,
+  AI_TEAM,
+  AI_PATROL,
+  AI_PISTOL_HYSTERESIS_M,
+  AI_SENSES,
+  AI_SOLDIER,
+  AI_WEAPON_USE,
+  type AiWeaponUse,
+} from './config.ts';
 import type { AiContext } from './context.ts';
 import { createSteer, PathFollower } from './paths.ts';
-import { aimSkillForLevel, type AimSkill } from './skill.ts';
+import {
+  CAMP_PHASE,
+  focusValid,
+  personaApproach,
+  personaCombat,
+  personaFled,
+  personaGoal,
+  personaHold,
+  personaOnDamaged,
+  personaOverride,
+  personaRetreat,
+  personaSpawn,
+  personaTick,
+  personaTravel,
+} from './persona.ts';
+import { COVER_PHASE, onDamaged, seekCover, updateCover } from './tactics.ts';
+import { GRENADE_PHASE, holdAngle, maybeStartGrenade, onTargetLost, retreatBelow, stepGrenade } from './tactics2.ts';
+import { aimSkillForLevel, aimSkillFromBot, type AimSkill } from './skill.ts';
 
 /**
  * Soldado N0 do M1 (gameplay.md §6.3 "Zumbi": vai pela rota e atira quando vê; ignora cobertura). Três camadas
@@ -29,7 +77,11 @@ import { aimSkillForLevel, type AimSkill } from './skill.ts';
  *   rota do A* (fila com orçamento) com o seguidor de caminho, pulando nas ligações de pulo e se afastando dos outros
  *   corpos. Sem navegação (M0, mapas de teste), anda reto com desvio simples por sondas de células;
  * - mira e tiro pelo modelo de habilidade dos 5 níveis (reação, giro, erro gaussiano que fecha na aquisição, recoil,
- *   cabeça), ADS de longe e o movimento em combate do nível.
+ *   cabeça), ADS de longe e o movimento em combate do nível;
+ * - M2 (fase 1d): uso de cada arma (`AI_WEAPON_USE`): distância preferida (chega perto ou recua), ADS por arma, a
+ *   sniper só atira com o ADS completo, o foguete mira no pé com antecipação; troca para a pistola com a primária vazia
+ *   ou com o alvo perto demais para o foguete e a sniper, e para a faca com o alvo colado. Nas semiautomáticas o
+ *   gatilho solta um tick entre dois tiros (a sim só atira na borda). Granada: só com o N2 (fase 3).
  * Determinístico: um fluxo de RNG por bot (`rng.fork('bot', i)`).
  */
 
@@ -56,6 +108,49 @@ export class SoldierTiming {
   readonly wander: number;
   readonly detour: number;
   readonly stuck: number;
+  readonly unstuck: number;
+  /** M2 (fase 3c): cobertura e patrulha, em ticks. */
+  readonly coverGoing: number;
+  readonly coverHoldMin: number;
+  readonly coverHoldExtra: number;
+  readonly coverCooldown: number;
+  readonly scanMin: number;
+  readonly scanMax: number;
+  readonly scanHold: number;
+  /** M2 (fase 3d): ângulo, flanco, recuo e granada, em ticks. */
+  readonly holdAngleMin: number;
+  readonly holdAngleExtra: number;
+  readonly flank: number;
+  readonly retreatHold: number;
+  readonly grenadeDecide: number;
+  readonly grenadeMemory: number;
+  readonly grenadeSwitch: number;
+  readonly grenadeCooldown: number;
+  /** M2 (fases 3e e 3f): avisos, dupla e calor, em ticks. */
+  readonly pingEvery: number;
+  readonly pingMaxAge: number;
+  readonly buddyGoalAge: number;
+  readonly preAimEvery: number;
+  readonly fakeRetreatEvery: number;
+  /** M2 (fase 3g): personalidades, em ticks (a dancinha gira `danceSpinStep` rad por tick). */
+  readonly hop: number;
+  readonly rusherJumpMin: number;
+  readonly rusherJumpMax: number;
+  readonly lunaticIntentMin: number;
+  readonly lunaticIntentMax: number;
+  readonly lunaticSky: number;
+  readonly lunaticJump: number;
+  readonly playDead: number;
+  readonly campHold: number;
+  readonly campHoldExtra: number;
+  readonly campRetry: number;
+  readonly quarryEvery: number;
+  readonly pursuitEvery: number;
+  readonly supportEvery: number;
+  readonly dance: number;
+  readonly danceCrouch: number;
+  readonly danceJump: number;
+  readonly danceSpinStep: number;
   readonly replanA: number;
   readonly replanB: number;
 
@@ -71,6 +166,46 @@ export class SoldierTiming {
     this.wander = secondsToTicks(AI_SOLDIER.wanderS, hz);
     this.detour = secondsToTicks(0.5, hz);
     this.stuck = Math.max(1, secondsToTicks(AI_PATH.stuckS, hz));
+    this.unstuck = secondsToTicks(AI_PATH.unstuckS, hz);
+    this.coverGoing = secondsToTicks(AI_COVER.goingS, hz);
+    this.coverHoldMin = secondsToTicks(AI_COVER.holdMinS, hz);
+    this.coverHoldExtra = secondsToTicks(AI_COVER.holdExtraS, hz);
+    this.coverCooldown = secondsToTicks(AI_COVER.cooldownS, hz);
+    this.scanMin = secondsToTicks(AI_PATROL.everyMinS, hz);
+    this.scanMax = secondsToTicks(AI_PATROL.everyMaxS, hz);
+    this.scanHold = secondsToTicks(AI_PATROL.holdS, hz);
+    this.holdAngleMin = secondsToTicks(AI_HOLD.minS, hz);
+    this.holdAngleExtra = secondsToTicks(AI_HOLD.extraS, hz);
+    this.flank = secondsToTicks(AI_FLANK.timeoutS, hz);
+    this.retreatHold = secondsToTicks(AI_RETREAT.holdS, hz);
+    this.grenadeDecide = secondsToTicks(AI_GRENADE.decideS, hz);
+    this.grenadeMemory = secondsToTicks(AI_GRENADE.memoryS, hz);
+    this.grenadeSwitch = Math.max(1, secondsToTicks(AI_GRENADE.switchS, hz));
+    this.grenadeCooldown = secondsToTicks(AI_GRENADE.cooldownS, hz);
+    this.pingEvery = secondsToTicks(AI_TEAM.pingEveryS, hz);
+    this.pingMaxAge = secondsToTicks(AI_TEAM.pingMaxAgeS, hz);
+    this.buddyGoalAge = secondsToTicks(AI_TEAM.buddyGoalAgeS, hz);
+    this.preAimEvery = secondsToTicks(AI_TEAM.preAimEveryS, hz);
+    this.fakeRetreatEvery = secondsToTicks(10, hz);
+    const P = AI_PERSONA;
+    this.hop = Math.max(1, secondsToTicks(P.hopEveryS, hz));
+    this.rusherJumpMin = Math.max(1, secondsToTicks(P.rusherJumpMinS, hz));
+    this.rusherJumpMax = Math.max(this.rusherJumpMin, secondsToTicks(P.rusherJumpMaxS, hz));
+    this.lunaticIntentMin = Math.max(1, secondsToTicks(P.lunaticIntentMinS, hz));
+    this.lunaticIntentMax = Math.max(this.lunaticIntentMin, secondsToTicks(P.lunaticIntentMaxS, hz));
+    this.lunaticSky = Math.max(1, secondsToTicks(P.lunaticSkyS, hz));
+    this.lunaticJump = Math.max(2, secondsToTicks(P.lunaticJumpS, hz));
+    this.playDead = secondsToTicks(P.playDeadS, hz);
+    this.campHold = secondsToTicks(P.campHoldS, hz);
+    this.campHoldExtra = secondsToTicks(P.campHoldExtraS, hz);
+    this.campRetry = secondsToTicks(P.campRetryS, hz);
+    this.quarryEvery = secondsToTicks(P.quarryEveryS, hz);
+    this.pursuitEvery = secondsToTicks(P.pursuitEveryS, hz);
+    this.supportEvery = secondsToTicks(P.supportEveryS, hz);
+    this.dance = secondsToTicks(P.danceS, hz);
+    this.danceCrouch = Math.max(1, secondsToTicks(P.danceCrouchS, hz));
+    this.danceJump = Math.max(2, secondsToTicks(P.danceJumpS, hz));
+    this.danceSpinStep = (P.danceSpinDegPerS * DEG_TO_RAD) / hz;
     this.replanA = secondsToTicks(AI_LOD.replanSA, hz);
     this.replanB = secondsToTicks(AI_LOD.replanSB, hz);
   }
@@ -85,13 +220,21 @@ export class SoldierTiming {
 export class SoldierBrain {
   readonly index: number;
   readonly controller: number;
-  readonly level: BotLevel;
-  readonly skill: AimSkill;
+  /**
+   * M2 (fase 3a): o bot (`bot@1`): inteligência (os comportamentos que valem), personalidade e regras. A habilidade
+   * sai dele em `skill`.
+   */
+  intelligence: BotIntelligence;
+  readonly personality: BotPersonality;
+  readonly rules: BotRules;
+  /** Nível e o que sai dele; mudam no meio da partida pelo "Ajustar desafio" (M2, fase 2e: `setLevel`). */
+  level: BotLevel;
+  skill: AimSkill;
   readonly rng: Rng;
-  readonly reactionTicks: number;
-  readonly acquireTicks: number;
-  readonly turnStep: number;
-  readonly errorRad: number;
+  reactionTicks: number;
+  acquireTicks: number;
+  turnStep: number;
+  errorRad: number;
   readonly follower: PathFollower;
 
   wasDead = true;
@@ -137,6 +280,16 @@ export class SoldierBrain {
   stuckX = 0;
   stuckZ = 0;
   stuckCount = 0;
+  /**
+   * M2 (fase 2b): progresso (Destravar): onde o bot estava na última vez que andou, o objetivo medido, o menor resto
+   * do caminho até ele e quando houve progresso.
+   */
+  progressX = 0;
+  progressZ = 0;
+  progressGoalX = 0;
+  progressGoalZ = 0;
+  progressBest = Infinity;
+  progressTick = 0;
   jumpHeld = false;
 
   strafeDir = 1;
@@ -149,6 +302,79 @@ export class SoldierBrain {
   lastHealth = 0;
   alertUntil = 0;
 
+  /** M2 (fase 3c): de onde veio o último dano (a ameaça), a vida cheia desta vida e a cobertura (`COVER_PHASE`). */
+  threatX = 0;
+  threatY = 0;
+  threatZ = 0;
+  maxHp = 100;
+  coverPhase: number = COVER_PHASE.none;
+  coverX = 0;
+  coverY = 0;
+  coverZ = 0;
+  coverUntil = 0;
+  coverCooldownUntil = 0;
+  /** M2 (fase 3d): a cobertura é um recuo (fica até a vida voltar). */
+  coverRetreat = false;
+  /** M2 (fase 3d): uso de granada do bot (0..1, `skill.grenadeUse`). */
+  grenadeUse = 0;
+  /** M2 (fase 3d): via o alvo no tick anterior (para notar quando ele some). */
+  wasTargetVisible = false;
+  holdAngleUntil = 0;
+  flankX = 0;
+  flankY = 0;
+  flankZ = 0;
+  flankUntil = 0;
+  grenadePhase: number = GRENADE_PHASE.none;
+  grenadePhaseTick = 0;
+  grenadeNextTick = 0;
+  grenadeCookTicks = 0;
+  grenadeX = 0;
+  grenadeY = 0;
+  grenadeZ = 0;
+  /** M2 (fases 3e e 3f): próximo aviso, o último aviso seguido, a pré-mira do calor e o próximo "fingir recuar". */
+  pingNextTick = 0;
+  pingTakenTick = -1;
+  preAimNextTick = 0;
+  preAimValid = false;
+  preAimX = 0;
+  preAimZ = 0;
+  fakeRetreatNextTick = 0;
+  /** M2 (fase 3g): estado da personalidade (`persona.ts`). */
+  lastKills = 0;
+  hopNextTick = 0;
+  personaJumpTick = 0;
+  lunaticIntent = 0;
+  lunaticStart = 0;
+  lunaticUntil = 0;
+  lunaticRange = 20;
+  playDeadUntil = 0;
+  playedDead = false;
+  campPhase: number = CAMP_PHASE.none;
+  campX = 0;
+  campY = 0;
+  campZ = 0;
+  campUntil = 0;
+  campNextTry = 0;
+  campKillCount = 0;
+  campLook = 0;
+  /** Foco: a presa do Caçador e do Kamikaze, o humano do Suporte (-1 = nenhum). */
+  focus = -1;
+  focusGen = 0;
+  focusNextTick = 0;
+  pursuitNextTick = 0;
+  guardHp = 0;
+  danceUntil = 0;
+  kamikazeArmed = false;
+  kamikazeCooking = false;
+  /** M2 (fase 3c): patrulha: quando olhar em volta de novo, até quando e para que lado (rad). */
+  scanNextTick = 0;
+  scanUntil = 0;
+  scanOffset = 0;
+
+  /** M2: slot pedido no `InputFrame.weapon` (0 primária, 1 pistola, 2 faca) e o gatilho do tick anterior. */
+  wantSlot = 0;
+  fireHeld = false;
+
   constructor(
     index: number,
     controller: number,
@@ -156,20 +382,45 @@ export class SoldierBrain {
     rng: Rng,
     timing: SoldierTiming,
     follower: PathFollower,
+    bot: BotDocument = levelBot(level),
+    personality: BotPersonality = bot.personality,
   ) {
     this.index = index;
     this.controller = controller;
-    this.level = level;
-    this.skill = aimSkillForLevel(level);
     this.rng = rng;
-    this.reactionTicks = secondsToTicks(this.skill.reactionS, timing.hz);
-    this.acquireTicks = secondsToTicks(this.skill.acquireS, timing.hz);
-    this.turnStep = (this.skill.turnDegPerS * DEG_TO_RAD) / timing.hz;
-    this.errorRad = this.skill.aimErrorDeg * DEG_TO_RAD;
+    this.level = level;
+    this.intelligence = bot.intelligence;
+    this.personality = personality;
+    this.rules = bot.rules;
+    this.skill = aimSkillFromBot(bot.skill, bot.intelligence.level);
+    this.grenadeUse = bot.skill.grenadeUse;
+    this.reactionTicks = 0;
+    this.acquireTicks = 0;
+    this.turnStep = 0;
+    this.errorRad = 0;
+    this.applySkill(timing);
     this.strafeDir = rng.chance(0.5) ? 1 : -1;
     this.follower = follower;
     // Espalha as percepções entre os ticks (baldes por índice).
     this.nextPerceiveTick = index % timing.perceptionA;
+  }
+
+  /**
+   * Troca o nível (habilidade e inteligência do nível; reação, giro e erro de mira); personalidade e regras ficam.
+   */
+  setLevel(level: BotLevel, timing: SoldierTiming): void {
+    this.level = level;
+    this.skill = aimSkillForLevel(level);
+    this.intelligence = intelligenceForLevel(LEVEL_ORDER.indexOf(level));
+    this.grenadeUse = LEVEL_SKILLS[level].grenadeUse;
+    this.applySkill(timing);
+  }
+
+  private applySkill(timing: SoldierTiming): void {
+    this.reactionTicks = secondsToTicks(this.skill.reactionS, timing.hz);
+    this.acquireTicks = secondsToTicks(this.skill.acquireS, timing.hz);
+    this.turnStep = (this.skill.turnDegPerS * DEG_TO_RAD) / timing.hz;
+    this.errorRad = this.skill.aimErrorDeg * DEG_TO_RAD;
   }
 }
 
@@ -238,6 +489,20 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
   const ey = view.position[e3 + 1]! + eyeHeightFor(view.flags[e]!);
   const ez = view.position[e3 + 2]!;
   b.targetVisible = false;
+  // M2 (fase 3g): o Caçador procura primeiro a presa dele e troca de alvo para ela assim que a vê.
+  if (
+    b.personality.preset === 'hunter' &&
+    b.focus !== b.target &&
+    focusValid(c, b) &&
+    inSight(view, b, ex, ez, c.viewDistance)
+  ) {
+    if (c.canSee(ex, ey, ez, b.focus)) {
+      acquire(view, b, b.focus, tick);
+      b.targetVisible = true;
+      remember(view, b, b.focus, tick);
+      return;
+    }
+  }
   if (targetValid(view, b) && c.canSee(ex, ey, ez, b.target)) {
     b.targetVisible = true;
     remember(view, b, b.target, tick);
@@ -305,6 +570,16 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
   remember(view, b, best, tick);
 }
 
+/** O foco do bot está no alcance de visão e no cone (ou o bot está alerta)? */
+function inSight(view: SimView, b: SoldierBrain, ex: number, ez: number, maxM: number): boolean {
+  const f3 = b.focus * 3;
+  const dx = view.position[f3]! - ex;
+  const dz = view.position[f3 + 2]! - ez;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d >= maxM) return false;
+  return d < 0.01 || (dx * -Math.sin(b.aimYaw) + dz * -Math.cos(b.aimYaw)) / d >= VIEW_CONE_COS;
+}
+
 /** Sem navegação: sonda as células à frente (0,45 e 0,8 m) em `heading`: livre, precisa pular ou bloqueado. */
 function probe(view: SimView, x: number, y: number, z: number, heading: number): number {
   const sx = -Math.sin(heading);
@@ -336,12 +611,54 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   const nav = view.nav;
   b.hasGoal = false;
   b.goalUntil = c.tick + t.wander;
+  const board = c.board;
+  const e = c.ctrlToEntity[b.controller]!;
+  const team = e >= 0 ? view.team[e]! : 0;
   if (nav !== null && nav.nodeCount > 0) {
     const from = nav.nearestNode(x, y, z);
+    // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
+    if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
+      const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
+      if (cell >= 0) {
+        board.cellCenter(cell, cellPos);
+        const n = nav.nearestNode(cellPos[0]!, y, cellPos[1]!);
+        if (n >= 0 && (from < 0 || nav.component[n] === nav.component[from])) {
+          nav.nodePosition(n, nodePos, 0);
+          setWanderGoal(c, b, e);
+          return;
+        }
+      }
+    }
+    // M2 (fase 3e): o N3 anda em dupla ou trio: segue o objetivo de um líder (aliado de controlador menor, perto).
+    // O Estrategista (N2+, fase 3g) também anda com o time.
+    const teamUp = b.intelligence.callouts || (b.personality.preset === 'strategist' && b.intelligence.level >= 2);
+    if (board !== null && teamUp && e >= 0) {
+      const leader = findLeader(c, b, e, t);
+      if (leader >= 0) {
+        const n = nav.nearestNode(
+          board.goalX[leader]! + b.rng.range(-AI_TEAM.buddyOffsetM, AI_TEAM.buddyOffsetM),
+          y,
+          board.goalZ[leader]! + b.rng.range(-AI_TEAM.buddyOffsetM, AI_TEAM.buddyOffsetM),
+        );
+        if (n >= 0 && (from < 0 || nav.component[n] === nav.component[from])) {
+          nav.nodePosition(n, nodePos, 0);
+          setWanderGoal(c, b, e);
+          return;
+        }
+      }
+    }
     for (let k = 0; k < AI_SOLDIER.wanderTries; k++) {
       const n = b.rng.int(0, nav.nodeCount);
       if (from >= 0 && nav.component[n] !== nav.component[from]) continue;
       nav.nodePosition(n, nodePos, 0);
+      // M2 (fase 3f): o N4 evita passear onde o time dele morreu.
+      if (
+        board !== null &&
+        b.intelligence.learn &&
+        board.dangerAt(team, nodePos[0]!, nodePos[2]!) >= AI_TEAM.dangerAvoid
+      ) {
+        continue;
+      }
       // Fora da área jogável (paredes invisíveis da sim) o bot nunca chega: tenta outro nó.
       const area = view.playArea;
       if (
@@ -349,10 +666,7 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
         (nodePos[0]! < area.minX || nodePos[0]! > area.maxX || nodePos[2]! < area.minZ || nodePos[2]! > area.maxZ)
       )
         continue;
-      b.goalX = nodePos[0]!;
-      b.goalY = nodePos[1]!;
-      b.goalZ = nodePos[2]!;
-      b.hasGoal = true;
+      setWanderGoal(c, b, e);
       return;
     }
     return;
@@ -367,6 +681,45 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   b.goalY = y;
   b.goalZ = b.rng.range(minZ + 2, Math.max(minZ + 2.5, maxZ - 2));
   b.hasGoal = true;
+}
+
+/** Rascunho do centro da célula de calor (x, z). */
+const cellPos = new Float64Array(2);
+
+/** O objetivo de passeio é o nó em `nodePos`; fica no quadro do time (para os aliados andarem junto). */
+function setWanderGoal(c: AiContext, b: SoldierBrain, e: number): void {
+  b.goalX = nodePos[0]!;
+  b.goalY = nodePos[1]!;
+  b.goalZ = nodePos[2]!;
+  b.hasGoal = true;
+  const board = c.board;
+  if (board !== null && e >= 0) {
+    board.goalX[e] = b.goalX;
+    board.goalZ[e] = b.goalZ;
+    board.goalTick[e] = c.tick;
+  }
+}
+
+/** Líder da dupla (N3): o aliado bot de controlador menor mais perto, a até `buddyM`, com objetivo recente; -1. */
+function findLeader(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): number {
+  const view = c.view!;
+  const board = c.board!;
+  const x = view.position[e * 3]!;
+  const z = view.position[e * 3 + 2]!;
+  let best = -1;
+  let bestD2 = AI_TEAM.buddyM * AI_TEAM.buddyM;
+  for (let j = 0; j < view.count; j++) {
+    if (j === e || !c.living(j) || view.kind[j] !== ENTITY_KIND.bobo || c.hostile(e, j)) continue;
+    if (view.controller[j]! >= b.controller || c.tick - board.goalTick[j]! > t.buddyGoalAge) continue;
+    const dx = view.position[j * 3]! - x;
+    const dz = view.position[j * 3 + 2]! - z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestD2) {
+      best = j;
+      bestD2 = d2;
+    }
+  }
+  return best;
 }
 
 /** Com alvo à vista: mira, atira e se mexe conforme o nível. Devolve os botões; escreve o strafe em `local`. */
@@ -399,11 +752,26 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   const ty = view.yaw[b.target]!;
   const tc = Math.cos(ty);
   const ts = Math.sin(ty);
-  const dx = aimPoint.x + tc * off.x - ts * off.z - ex;
-  const dy = aimPoint.y + off.y - ey;
-  const dz = aimPoint.z - ts * off.x - tc * off.z - ez;
-  const horiz = Math.sqrt(dx * dx + dz * dz);
-  const dist = Math.sqrt(horiz * horiz + dy * dy);
+  let dx = aimPoint.x + tc * off.x - ts * off.z - ex;
+  let dy = aimPoint.y + off.y - ey;
+  let dz = aimPoint.z - ts * off.x - tc * off.z - ez;
+  let horiz = Math.sqrt(dx * dx + dz * dz);
+  let dist = Math.sqrt(horiz * horiz + dy * dy);
+
+  // M2: slot pela distância e pela munição; a decisão de tiro vale para a arma NA MÃO (a troca leva 0,4 s).
+  chooseSlot(view, b, e, dist);
+  const held = weaponDef(view.weapon[e]!);
+  const use: AiWeaponUse = held ? AI_WEAPON_USE[held.category] : AI_WEAPON_USE.rifle;
+  if (held !== null && use.splash && held.projectileSpeed > 0) {
+    // Foguete: no pé do alvo, adiantado pelo tempo de voo (velocidade atual do alvo).
+    const t3 = tg * 3;
+    const flight = dist / held.projectileSpeed;
+    dx = view.position[t3]! + view.velocity[t3]! * flight - ex;
+    dy = view.position[t3 + 1]! + 0.1 - ey;
+    dz = view.position[t3 + 2]! + view.velocity[t3 + 2]! * flight - ez;
+    horiz = Math.sqrt(dx * dx + dz * dz);
+    dist = Math.sqrt(horiz * horiz + dy * dy);
+  }
   let goalYaw = Math.atan2(-dx, -dz);
   let goalPitch = Math.atan2(dy, horiz);
   let buttons = 0;
@@ -422,12 +790,18 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     b.aimPitch = clamp(moveToward(b.aimPitch, goalPitch, b.turnStep), -HALF_PI, HALF_PI);
     const remaining = Math.max(Math.abs(angleDelta(b.aimYaw, goalYaw)), Math.abs(goalPitch - b.aimPitch));
     const tolerance = FIRE_TOLERANCE + Math.atan(0.25 / Math.max(dist, 1));
-    if (remaining <= tolerance && view.ammoClip[e]! > 0) buttons |= BUTTON.fire;
+    if (remaining <= tolerance && canFire(view, b, e, held, use, dist)) buttons |= BUTTON.fire;
   }
-  if (dist > AI_SOLDIER.adsMinM) buttons |= BUTTON.ads;
+  if (dist > use.adsMinM) buttons |= BUTTON.ads;
+  // Semiautomática: solta o gatilho um tick entre dois tiros (a sim só atira na borda).
+  if (held !== null && !held.automatic && (buttons & BUTTON.fire) !== 0 && b.fireHeld) buttons &= ~BUTTON.fire;
+  b.fireHeld = (buttons & BUTTON.fire) !== 0;
 
   local.x = 0;
-  local.y = dist > AI_SOLDIER.approachM ? 1 : 0;
+  // Distância preferida da arma e da personalidade (fase 3g): chega perto, recua (foguete, sniper, Covarde) ou segura a
+  // posição; a faca vai em cima.
+  const approach = personaApproach(b, use);
+  local.y = dist > Math.max(approach, 1) ? 1 : dist < personaRetreat(b, use) ? -1 : 0;
   switch (sk.combatMove) {
     case 'none':
       break;
@@ -460,6 +834,7 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
       }
       break;
   }
+  buttons = personaCombat(c, b, e, t, buttons, dist, approach, local);
   // Strafe batendo em parede: troca de lado.
   if (local.x !== 0) {
     const side = b.aimYaw - (local.x > 0 ? HALF_PI : -HALF_PI);
@@ -469,6 +844,72 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     }
   }
   return buttons;
+}
+
+/** Pente e reserva do slot `slot` de `e` vazios? */
+function slotEmpty(view: SimView, e: number, slot: number): boolean {
+  const k = e * WEAPON_SLOT_COUNT + slot;
+  return view.slotClip[k] === 0 && view.slotReserve[k] === 0;
+}
+
+/**
+ * Slot do bot em combate (M2, fase 1d): faca com o alvo colado (menos de escopeta na mão: ela mata de perto), pistola
+ * com a primária vazia ou com o alvo perto demais para a primária (`pistolBelowM`), senão a primária. Volta com
+ * folga (`AI_KNIFE.backM`, `AI_PISTOL_HYSTERESIS_M`) para não trocar sem parar.
+ */
+function chooseSlot(view: SimView, b: SoldierBrain, e: number, dist: number): void {
+  const primary = weaponDef(view.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.primary]!);
+  const primaryUse = primary ? AI_WEAPON_USE[primary.category] : AI_WEAPON_USE.rifle;
+  const primaryEmpty = slotEmpty(view, e, WEAPON_SLOT.primary);
+  const pistolEmpty = slotEmpty(view, e, WEAPON_SLOT.secondary);
+  // M2 (fase 3g): loadout restrito (regra do bot): sem faca não troca para ela; sem nada além da primária, fica nela.
+  const hasMelee = hasSlotWeapon(view, e, WEAPON_SLOT.melee);
+  let want = b.wantSlot;
+  if (dist < AI_KNIFE.switchM && primary?.category !== 'shotgun' && hasMelee) want = WEAPON_SLOT.melee;
+  else if (want === WEAPON_SLOT.melee && (dist > AI_KNIFE.backM || !hasMelee)) want = WEAPON_SLOT.primary;
+  if (want !== WEAPON_SLOT.melee) {
+    const tooClose = primaryUse.pistolBelowM > 0 && dist < primaryUse.pistolBelowM;
+    if (primaryEmpty || tooClose) {
+      want = !pistolEmpty ? WEAPON_SLOT.secondary : hasMelee ? WEAPON_SLOT.melee : WEAPON_SLOT.primary;
+    } else if (
+      want === WEAPON_SLOT.secondary &&
+      (primaryUse.pistolBelowM === 0 || dist > primaryUse.pistolBelowM + AI_PISTOL_HYSTERESIS_M)
+    ) {
+      want = WEAPON_SLOT.primary;
+    }
+  }
+  b.wantSlot = want;
+}
+
+/** O slot `slot` de `e` tem arma (o loadout restrito tira armas)? */
+function hasSlotWeapon(view: SimView, e: number, slot: number): boolean {
+  return weaponDef(view.loadout[e * WEAPON_SLOT_COUNT + slot]!) !== null;
+}
+
+/**
+ * A arma na mão pode atirar agora? Munição (a faca não usa), alcance da faca, ADS completo da sniper e distância
+ * segura do foguete. De perto, a sniper espera a troca pela pistola ou faca, se houver (fase 3g: o Camper Carl só tem
+ * a sniper); o foguete nunca atira colado, menos no Kamikaze.
+ */
+function canFire(
+  view: SimView,
+  b: SoldierBrain,
+  e: number,
+  held: ReturnType<typeof weaponDef>,
+  use: AiWeaponUse,
+  dist: number,
+): boolean {
+  if (held === null) return false;
+  if (held.fire === WEAPON_FIRE.melee) return dist <= held.meleeRangeM;
+  if (held.clipSize > 0 && heldClip(view, e) === 0) return false;
+  if (use.needFullAds && view.adsAmount[e]! < 0.95) return false;
+  if (use.pistolBelowM > 0 && dist < use.pistolBelowM) {
+    const other = use.splash
+      ? b.personality.preset !== 'kamikaze'
+      : !slotEmpty(view, e, WEAPON_SLOT.secondary) || hasSlotWeapon(view, e, WEAPON_SLOT.melee);
+    if (other) return false;
+  }
+  return true;
 }
 
 /**
@@ -536,7 +977,34 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   let gx: number;
   let gy: number;
   let gz: number;
-  if (b.hasLastKnown && tick - b.lastSeenTick < t.chase) {
+  // M2 (fase 3e): sem pista, o N3 vai atrás do aviso mais novo do time (cada aviso uma vez).
+  const board = c.board;
+  if (!b.hasLastKnown && board !== null && b.intelligence.callouts) {
+    const k = board.freshest(view.team[e]!, x, z, tick, t.pingMaxAge, AI_TEAM.pingMaxM);
+    if (k >= 0 && board.pingTick[k] !== b.pingTakenTick) {
+      b.pingTakenTick = board.pingTick[k]!;
+      b.hasLastKnown = true;
+      b.lastSeenTick = board.pingTick[k]!;
+      b.lastKnownX = board.pingX[k]!;
+      b.lastKnownY = board.pingY[k]!;
+      b.lastKnownZ = board.pingZ[k]!;
+    }
+  }
+  const scouting = !b.hasLastKnown;
+  if (b.coverPhase === COVER_PHASE.going) {
+    // M2 (fase 3c): indo para a cobertura.
+    gx = b.coverX;
+    gy = b.coverY;
+    gz = b.coverZ;
+  } else if (tick < b.flankUntil) {
+    // M2 (fase 3d): passando pelo ponto de flanco antes de voltar à caça.
+    gx = b.flankX;
+    gy = b.flankY;
+    gz = b.flankZ;
+    const fdx = gx - x;
+    const fdz = gz - z;
+    if (fdx * fdx + fdz * fdz < GOAL_REACHED * GOAL_REACHED || f.failed) b.flankUntil = 0;
+  } else if (b.hasLastKnown && tick - b.lastSeenTick < t.chase) {
     gx = b.lastKnownX;
     gy = b.lastKnownY;
     gz = b.lastKnownZ;
@@ -545,11 +1013,14 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     if (ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED || f.failed) b.hasLastKnown = false;
   } else {
     b.hasLastKnown = false;
-    const ddx = b.goalX - x;
-    const ddz = b.goalZ - z;
-    if (!b.hasGoal || tick >= b.goalUntil || ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED || f.failed) {
-      if (f.failed) f.clear();
-      pickWanderGoal(c, b, x, y, z, t);
+    // M2 (fase 3g): o objetivo da personalidade (ponto do Camper, presa, humano do Suporte) vem antes do passeio.
+    if (!personaGoal(c, b, e, t, x, y, z)) {
+      const ddx = b.goalX - x;
+      const ddz = b.goalZ - z;
+      if (!b.hasGoal || tick >= b.goalUntil || ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED || f.failed) {
+        if (f.failed) f.clear();
+        pickWanderGoal(c, b, x, y, z, t);
+      }
     }
     gx = b.goalX;
     gy = b.goalY;
@@ -572,6 +1043,35 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     if (steer.crouch) buttons |= BUTTON.crouch;
   } else {
     buttons |= travelDirect(c, b, x, y, z, gx, gz, t);
+  }
+
+  // Anti-frustração (GDD §3.8): 8 s sem andar 2 m nem chegar 1 m mais perto do objetivo → Destravar.
+  const pmx = x - b.progressX;
+  const pmz = z - b.progressZ;
+  if (pmx * pmx + pmz * pmz >= AI_PATH.unstuckMoveM * AI_PATH.unstuckMoveM) {
+    b.progressX = x;
+    b.progressZ = z;
+    b.progressBest = steer.remaining;
+    b.progressTick = tick;
+  } else if (
+    Math.abs(gx - b.progressGoalX) > AI_PATH.replanGoalM ||
+    Math.abs(gz - b.progressGoalZ) > AI_PATH.replanGoalM
+  ) {
+    // Objetivo novo: mede o caminho até ele, sem recomeçar a conta.
+    b.progressGoalX = gx;
+    b.progressGoalZ = gz;
+    b.progressBest = steer.remaining;
+  } else if (steer.remaining < b.progressBest - AI_PATH.unstuckProgressM) {
+    b.progressBest = steer.remaining;
+    b.progressTick = tick;
+  } else if (tick - b.progressTick >= t.unstuck) {
+    buttons |= BUTTON.unstuck;
+    b.progressBest = Infinity;
+    b.progressTick = tick;
+    b.progressX = x;
+    b.progressZ = z;
+    b.stuckCount = 0;
+    f.clear();
   }
 
   // Empacou: pula; de novo, pede outra rota (ou troca o lado do desvio); de novo, desiste do objetivo.
@@ -607,7 +1107,33 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     wx /= wl;
     wz /= wl;
     const heading = Math.atan2(-wx, -wz);
-    b.aimYaw = turnToward(b.aimYaw, heading, b.turnStep);
+    // M2 (fase 3c): patrulha do N1: sem pista do inimigo, olha para os lados de tempos em tempos.
+    let look = heading;
+    // M2 (fase 3f): o N4 pré-mira a célula mais quente perto (onde os humanos costumam estar).
+    if (b.intelligence.learn && scouting && board !== null) {
+      if (tick >= b.preAimNextTick) {
+        b.preAimNextTick = tick + t.preAimEvery;
+        const cell = board.hottest(view.team[e]!, x, z, AI_TEAM.preAimMinM, AI_TEAM.preAimMaxM, AI_TEAM.minHeat);
+        b.preAimValid = cell >= 0;
+        if (b.preAimValid) {
+          board.cellCenter(cell, cellPos);
+          b.preAimX = cellPos[0]!;
+          b.preAimZ = cellPos[1]!;
+        }
+      }
+    }
+    const preAim = b.preAimValid && scouting ? Math.atan2(-(b.preAimX - x), -(b.preAimZ - z)) : heading;
+    if (b.preAimValid && scouting && Math.abs(angleDelta(heading, preAim)) < HALF_PI) {
+      look = preAim;
+    } else if (b.intelligence.level >= 1 && scouting && b.coverPhase === COVER_PHASE.none) {
+      if (tick >= b.scanNextTick) {
+        b.scanNextTick = tick + b.rng.int(t.scanMin, t.scanMax + 1);
+        b.scanUntil = tick + t.scanHold;
+        b.scanOffset = (b.rng.chance(0.5) ? 1 : -1) * AI_PATROL.deg * DEG_TO_RAD;
+      }
+      if (tick < b.scanUntil) look = heading + b.scanOffset;
+    }
+    b.aimYaw = turnToward(b.aimYaw, look, b.turnStep);
     if (steer.remaining > AI_SOLDIER.sprintMinM && Math.abs(angleDelta(b.aimYaw, heading)) < SPRINT_MAX_TURN) {
       buttons |= BUTTON.sprint;
     }
@@ -621,8 +1147,41 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   const co = Math.cos(b.aimYaw);
   local.y = -s * wx - co * wz;
   local.x = co * wx - s * wz;
-  const def = WEAPON_SLOTS[view.weapon[e]!];
-  if (def && view.ammoClip[e]! < def.clipSize / 2) buttons |= BUTTON.reload;
+  if (b.wantSlot !== WEAPON_SLOT.primary && !slotEmpty(view, e, WEAPON_SLOT.primary)) b.wantSlot = WEAPON_SLOT.primary;
+  const def = weaponDef(view.weapon[e]!);
+  if (def && def.clipSize > 0 && heldClip(view, e) < def.clipSize / 2) buttons |= BUTTON.reload;
+  return personaTravel(view, b, e, tick, t, buttons, local);
+}
+
+/** Distância (no plano) de `e` até `j`. */
+function targetDistance(view: SimView, e: number, j: number): number {
+  return Math.hypot(
+    view.position[j * 3]! - view.position[e * 3]!,
+    view.position[j * 3 + 2]! - view.position[e * 3 + 2]!,
+  );
+}
+
+/** A arma na mão está sem pente, mas tem reserva? */
+function clipOutWithReserve(view: SimView, e: number): boolean {
+  const def = weaponDef(view.weapon[e]!);
+  if (def === null || def.clipSize === 0 || heldClip(view, e) > 0) return false;
+  return view.slotReserve[e * WEAPON_SLOT_COUNT + view.slot[e]!]! > 0;
+}
+
+/**
+ * M2 (fase 3c): segurando a cobertura sem alvo à vista: agachado, parado, olhando para de onde veio o dano e
+ * recarregando se o pente não está cheio.
+ */
+function holdCover(view: SimView, b: SoldierBrain, e: number): number {
+  const e3 = e * 3;
+  const goal = Math.atan2(-(b.threatX - view.position[e3]!), -(b.threatZ - view.position[e3 + 2]!));
+  b.aimYaw = turnToward(b.aimYaw, goal, b.turnStep);
+  b.aimPitch = moveToward(b.aimPitch, 0, b.turnStep);
+  local.x = 0;
+  local.y = 0;
+  let buttons = BUTTON.crouch;
+  const def = weaponDef(view.weapon[e]!);
+  if (def && def.clipSize > 0 && heldClip(view, e) < def.clipSize) buttons |= BUTTON.reload;
   return buttons;
 }
 
@@ -633,7 +1192,6 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   f.buttons = 0;
   f.moveX = 0;
   f.moveY = 0;
-  f.weapon = 0;
   const e = c.ctrlToEntity[b.controller]!;
   if (e < 0) return;
   const fl = view.flags[e]!;
@@ -642,6 +1200,9 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     b.wasDead = true;
     b.target = -1;
     b.targetVisible = false;
+    b.wantSlot = WEAPON_SLOT.primary;
+    b.fireHeld = false;
+    f.weapon = WEAPON_SLOT.primary;
     return;
   }
   const tick = c.tick;
@@ -659,10 +1220,26 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     b.stuckX = view.position[e * 3]!;
     b.stuckZ = view.position[e * 3 + 2]!;
     b.stuckCount = 0;
+    b.progressBest = Infinity;
+    b.progressTick = tick;
+    b.progressX = view.position[e * 3]!;
+    b.progressZ = view.position[e * 3 + 2]!;
+    b.maxHp = view.health[e]!;
+    b.coverPhase = COVER_PHASE.none;
+    b.grenadePhase = GRENADE_PHASE.none;
+    b.holdAngleUntil = 0;
+    b.flankUntil = 0;
+    b.wasTargetVisible = false;
     b.follower.clear();
+    personaSpawn(view, b, e, tick);
   }
   const hp = view.health[e]!;
-  if (hp < b.lastHealth - 0.01) b.alertUntil = tick + t.alert;
+  if (hp < b.lastHealth - 0.01) {
+    b.alertUntil = tick + t.alert;
+    // M2 (fase 3c): sabe de onde veio; o N1 talvez corra para a cobertura.
+    onDamaged(c, b, e, t);
+    personaOnDamaged(c, b, e, t);
+  }
   b.lastHealth = hp;
 
   // Percepção no ritmo do LOD, quando o orçamento de raios do tick deixa (senão fica para o próximo tick).
@@ -676,12 +1253,96 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     b.targetVisible = false;
   }
   if (b.target >= 0 && !b.targetVisible && tick - b.lastSeenTick > t.memory) b.target = -1;
+  personaTick(c, b, e, t);
 
+  // M2 (fase 3e): o N3 avisa o time de onde está o inimigo que vê.
+  if (c.board !== null && b.intelligence.callouts && b.targetVisible && b.target >= 0 && tick >= b.pingNextTick) {
+    const t3 = b.target * 3;
+    c.board.post(view.team[e]!, view.position[t3]!, view.position[t3 + 1]!, view.position[t3 + 2]!, tick);
+    b.pingNextTick = tick + t.pingEvery;
+  }
+  // M2 (fase 3d): perdeu o alvo de vista agora (segura o ângulo, talvez flanqueie).
+  if (b.wasTargetVisible && !b.targetVisible) onTargetLost(c, b, e, t);
+  b.wasTargetVisible = b.targetVisible;
   let buttons: number;
-  if (b.target >= 0 && b.targetVisible) {
-    buttons = combat(c, b, e, tick, t);
-  } else {
+  updateCover(view, b, e, tick, t);
+  const closeFight = b.targetVisible && b.target >= 0 && targetDistance(view, e, b.target) < AI_COVER.fightBelowM;
+  // M2 (fase 3g): fingir de morto e a dancinha tomam o tick inteiro.
+  const override = personaOverride(view, b, e, tick, t, local);
+  if (override >= 0) {
+    buttons = override;
+    b.progressTick = tick;
+  } else if (b.grenadePhase !== GRENADE_PHASE.none) {
+    // M2 (fase 3d): jogando granada (parado).
+    buttons = stepGrenade(c, b, e, t, local);
+    b.progressTick = tick;
+  } else if (b.coverPhase === COVER_PHASE.going && !closeFight) {
+    // M2 (fase 3c): correndo para a cobertura (de perto, troca tiro).
     buttons = travel(c, b, e, t);
+    b.progressTick = tick;
+  } else if (b.target >= 0 && b.targetVisible) {
+    buttons = combat(c, b, e, tick, t);
+    // Trocando tiro não é estar preso.
+    b.progressTick = tick;
+    if (b.coverPhase === COVER_PHASE.holding) {
+      // Atira da cobertura: agachado, sem strafe.
+      local.x = 0;
+      local.y = 0;
+      buttons |= BUTTON.crouch;
+    } else if (
+      b.intelligence.retreat &&
+      b.coverPhase === COVER_PHASE.none &&
+      tick >= b.coverCooldownUntil &&
+      view.health[e]! < retreatBelow(b) * b.maxHp
+    ) {
+      // Vida baixa (N2): recua para longe e fora da vista até regenerar.
+      const t3 = b.target * 3;
+      b.threatX = view.position[t3]!;
+      b.threatY = view.position[t3 + 1]!;
+      b.threatZ = view.position[t3 + 2]!;
+      // O Covarde (fase 3g) grita por ajuda ao fugir.
+      if (seekCover(c, b, e, t, true)) personaFled(c, b, e);
+    } else if (
+      b.intelligence.learn &&
+      b.coverPhase === COVER_PHASE.none &&
+      tick >= b.fakeRetreatNextTick &&
+      view.health[e]! > AI_TEAM.fakeRetreatHpFrac * b.maxHp
+    ) {
+      // N4 (fase 3f): às vezes finge recuar: vai para a cobertura sem precisar e embosca de lá.
+      b.fakeRetreatNextTick = tick + t.fakeRetreatEvery;
+      if (b.rng.chance(AI_TEAM.fakeRetreatChance)) {
+        const t3 = b.target * 3;
+        b.threatX = view.position[t3]!;
+        b.threatY = view.position[t3 + 1]!;
+        b.threatZ = view.position[t3 + 2]!;
+        seekCover(c, b, e, t);
+      }
+    } else if (b.intelligence.useCover && clipOutWithReserve(view, e) && tick >= b.coverCooldownUntil) {
+      // Pente vazio no meio do tiroteio: recarrega protegido (o N1 procura cobertura do alvo).
+      const t3 = b.target * 3;
+      b.threatX = view.position[t3]!;
+      b.threatY = view.position[t3 + 1]!;
+      b.threatZ = view.position[t3 + 2]!;
+      seekCover(c, b, e, t);
+    }
+  } else if (b.coverPhase === COVER_PHASE.holding) {
+    buttons = holdCover(view, b, e);
+    b.progressTick = tick;
+  } else if (tick < b.holdAngleUntil) {
+    // M2 (fase 3d): segurando o ângulo de onde o alvo sumiu.
+    buttons = holdAngle(view, b, e, local);
+    b.progressTick = tick;
+  } else {
+    maybeStartGrenade(c, b, e, t);
+    if (b.grenadePhase !== GRENADE_PHASE.none) buttons = stepGrenade(c, b, e, t, local);
+    else {
+      // M2 (fase 3g): parado por escolha (Camper no ponto, Suporte perto do humano).
+      const held = personaHold(c, b, e, t, local);
+      if (held >= 0) {
+        buttons = held;
+        b.progressTick = tick;
+      } else buttons = travel(c, b, e, t);
+    }
   }
   // Pulo precisa de borda (a sim só pula ao apertar): solta um tick entre dois pulos.
   if ((buttons & BUTTON.jump) !== 0) {
@@ -691,6 +1352,7 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     b.jumpHeld = false;
   }
   f.buttons = buttons;
+  f.weapon = b.wantSlot;
   f.moveX = quantizeAxis(local.x);
   f.moveY = quantizeAxis(local.y);
   f.yaw = yawToU16(b.aimYaw);

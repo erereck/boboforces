@@ -546,7 +546,7 @@ Vale para mapas, armas, nomes, textos e skins.
 
 | Camada | Kit do MVP (proposta) |
 |---|---|
-| Skin pronta (atalho) | 12: recruta, sargento, piloto, mecânico, socorrista (sem cruz vermelha), cozinheiro de quartel, espião de terno, astronauta, apicultor, mergulhador, pijama, robô de papelão |
+| Skin pronta (atalho) | **Desde a #58 e a #62:** os 12 looks da farda (#59) mais algumas fantasias bobas como extras (ex.: astronauta, pijama, robô de papelão), com a lista final por print. A lista antiga (recruta, sargento, piloto, mecânico, socorrista sem cruz vermelha, cozinheiro de quartel, espião de terno, astronauta, apicultor, mergulhador, pijama, robô de papelão) fica como banco de ideias |
 | Tom de pele | 8 tons + 4 cores fantasia (verde, azul, roxo, cinza-pedra) |
 | Rosto | 8 estilos |
 | Cabelo | 8 cortes, cor livre na rampa de cabelo |
@@ -855,10 +855,10 @@ Ordem decidida [DECIDIDO #28]: **M0 Fundação → M1 Cena-vitrine + Teste Zero 
 | # | Pendência | Quando fecha | Quem decide |
 |---|---|---|---|
 | 1 | **Prints da cena-vitrine:** densidade de textura (cenário 32 px/m, bobos 16 px/m), dose de peças fora da grade, filtro de mipmap, paleta mestra, três luzes, contorno de time (entra ou não; fora do orçamento base), forma final das caixas de tronco e membros (propostas em `gameplay.md` 3.1 e `arte-ux.md` 2.1), grade de luz de 2 m contra 1 m, pose agachada. **Respondido em 03/11/2026 (#50–#54):** luzes e `NEAREST_MIPMAP_LINEAR` aprovados, sem contorno, bobos a 32 px/m, dose dobro, bobos mais altos (1,625 m no código; o valor volta para o print de altura) e as fontes. (Depois: altura B, 1,75 m, #55, e o boneco do FutBobo, #56.) | M1 | Erick, por print |
-| 2 | **Teste Zero no Switch real:** three com shim, `TEXTURE_2D_ARRAY`, atributos inteiros, custo do alpha test, AA por FBO multisample, `SIM_HZ` 60 ou 30, tetos de bots e zumbis, visão de 50 m no 3–4P, HUD em 640×360, 4 controles completos, teclado do sistema, áudio (MP3, `createBuffer`, StereoPanner), ciclo de vida. Checklist de 21 itens em `tecnico.md` 24.2. | M1 | medição |
+| 2 | **Teste Zero no Switch real:** three com shim, `TEXTURE_2D_ARRAY`, atributos inteiros, custo do alpha test, AA por FBO multisample, `SIM_HZ` 60 ou 30, tetos de bots e zumbis, visão de 50 m no 3–4P, HUD em 640×360, 4 controles completos, teclado do sistema, áudio (MP3, `createBuffer`, StereoPanner), ciclo de vida. Checklist de 21 itens em `tecnico.md` 24.2. **Medido em 08/11/2026** (`TESTE_ZERO.md` §8c): passou, menos o loading da 1ª cena (5,0 s) e o item 15, aceitos pela #60 para uma rodada de otimização. | M1 | medição |
 | 3 | **Calibração pelo robô de balanceamento:** headshot (1,5x / 2,0x / 1,25x), TTK, sniper com 95 no corpo, ordem dos 5 níveis. | M0–M2 | medição |
 | 4 | **Fontes:** escolher as duas OFL por print. | M0–M1 | Erick |
-| 5 | **Nomes provisórios:** armas, bots de fábrica, zumbis especiais, vantagens, presets de fábrica, o Bobo War Sim do backlog e mapas (Ringue, Base Abandonada e os do M6+). Os IDs internos não mudam. | antes do M2 (mapas do M3 antes do M3) | Erick |
+| 5 | **Nomes provisórios:** armas, bots de fábrica, zumbis especiais, vantagens, presets de fábrica, o Bobo War Sim do backlog e mapas (Ringue, Base Abandonada e os do M6+). Os IDs internos não mudam. **Os do M2 (armas, bots de fábrica e Ringue) foram aprovados como estão em 08/11/2026 (#61).** | antes do M2 (mapas do M3 antes do M3) | Erick |
 | 6 | **Online:** TURN (Cloudflare com Worker exige conta do Erick; Open Relay como reserva); confirmar se o Trystero na versão fixada expõe as `RTCPeerConnection`; texto do aviso de privacidade e obrigações do ECA Digital. | antes do M5 | Erick + pesquisa |
 | 7 | **Bobo Royale Mini (24)** no celular (teto 12) e no Switch 2P+ (tetos 16 e 12). | M6+, com bench | medição; reduzir exige registro em `DECISOES.md` |
 | 8 | **Aparelhos de referência:** modelos exatos do celular do Erick e do Android de entrada em `docs/PERF.md`. | M1 | Erick |

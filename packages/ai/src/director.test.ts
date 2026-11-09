@@ -13,7 +13,7 @@ import {
 import { cellCenter, createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { createBotDirector } from './director.ts';
-import { aimSkillForLevel, BOT_SKILLS } from './skill.ts';
+import { aimSkillForLevel, BOT_SKILLS, levelSkillsMatch } from './skill.ts';
 
 const blocks = createTestBlocks();
 const concrete = makeCell(blocks.byKey('concrete')!.id);
@@ -61,6 +61,24 @@ describe('níveis rápidos', () => {
 });
 
 describe('BotDirector', () => {
+  it('M2 (fase 3a): a habilidade dos níveis no bot@1 (format) é a mesma da IA', () => {
+    expect(levelSkillsMatch()).toBe(true);
+  });
+
+  it('M2 (fase 2e): Ajustar desafio troca o nível só do time pedido (-1 = todos)', () => {
+    const recipe = {
+      ...humanVsBot('normal'),
+      teams: [
+        { humans: 1, bots: [{ ref: builtinBotRef('vibe'), count: 2 }] },
+        { bots: [{ ref: builtinBotRef('vibe'), count: 3 }] },
+      ],
+    } as MatchRecipe;
+    const bots = createBotDirector({ recipe, humans: 1 });
+    expect(bots.setLevel('tryhard', 1)).toBe(3);
+    expect(bots.setLevel('chill', -1)).toBe(5);
+    expect(bots.setLevel('normal', 3)).toBe(0);
+  });
+
   it('acha o humano parado, mira e mata; não mexe no frame do humano', () => {
     const recipe = humanVsBot('normal');
     const sim = createSim({ recipe, map: corridor(15), humans: 1 });

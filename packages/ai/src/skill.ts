@@ -1,4 +1,4 @@
-import type { BotLevel } from '@boboforces/format';
+import { LEVEL_ORDER, LEVEL_SKILLS, type BotLevel, type BotSkill } from '@boboforces/format';
 
 /**
  * Movimento em combate (gameplay.md §6.2): parado, strafe leve (metade do tempo), strafe, ou strafe com agachadas e
@@ -89,4 +89,32 @@ export const BOT_SKILLS: Readonly<Record<BotLevel, AimSkill>> = {
 /** Nível rápido → parâmetros de habilidade (preset dos eixos, gameplay.md §6.6). */
 export function aimSkillForLevel(level: BotLevel): AimSkill {
   return BOT_SKILLS[level];
+}
+
+/**
+ * M2 (fase 3a): a habilidade de um `bot@1` (ms → s) com o nível de inteligência dele. Para os 5 níveis rápidos dá
+ * exatamente a `BOT_SKILLS` (o teste confere), então os bots de nível jogam igual.
+ */
+export function aimSkillFromBot(s: BotSkill, intelligence: number): AimSkill {
+  return {
+    reactionS: s.reactionMs / 1000,
+    aimErrorDeg: s.aimErrorDeg,
+    acquireS: s.acquireS,
+    turnDegPerS: s.turnDegS,
+    recoilControl: s.recoilControl,
+    headPreference: s.headPref,
+    intelligence,
+    combatMove: s.combatMove,
+  };
+}
+
+/** A tabela do format (`LEVEL_SKILLS`) tem que bater com a `BOT_SKILLS` (uma fonte da verdade por enquanto). */
+export function levelSkillsMatch(): boolean {
+  return LEVEL_ORDER.every((level, i) => {
+    const a = aimSkillFromBot(LEVEL_SKILLS[level], i);
+    const b = BOT_SKILLS[level];
+    return (Object.keys(b) as (keyof AimSkill)[]).every(
+      (k) => Math.abs(Number(a[k]) - Number(b[k])) < 1e-9 || a[k] === b[k],
+    );
+  });
 }

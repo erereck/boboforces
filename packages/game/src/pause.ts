@@ -1,12 +1,32 @@
-import { COLORS, type Screen } from '@boboforces/ui';
+import { BOT_LEVELS, type BotLevel } from '@boboforces/format';
+import { COLORS, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
 
-/** Ações da tela de pausa. */
-export const PAUSE_ACTION = { resume: 'resume', quit: 'quit' } as const;
+/** Ações da tela de pausa (gameplay.md §2.2: Continuar · Ajustar desafio · Ajustes · Destravar · Sair). */
+export const PAUSE_ACTION = {
+  resume: 'resume',
+  challenge: 'challenge',
+  settings: 'settings',
+  unstuck: 'unstuck',
+  quit: 'quit',
+} as const;
 
-/** Pausa (arte-ux.md §6): véu sobre a partida congelada, Continuar e Sair da partida (faixa de perigo). */
-export const pauseScreen: Screen<null> = {
+/** Ações do "Ajustar desafio": `level:<nível>` escolhe; `back` volta à pausa. */
+export const CHALLENGE_ACTION = { back: 'back', levelPrefix: 'level:' } as const;
+
+/** O que a pausa precisa saber: se há partida de verdade (sem ela, o desafio não vale e fica apagado). */
+export interface PauseState {
+  readonly challenge: boolean;
+}
+
+function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
+  return { kind: 'button', id, text: { key }, action, variant: 'secondary', ...extra } as UiNode;
+}
+
+/** Pausa (arte-ux.md §6): véu sobre a partida congelada, as 5 opções e Sair (faixa de perigo). */
+export const pauseScreen: Screen<PauseState | null> = {
   id: 'pause',
-  build() {
+  build(state) {
+    const challenge = state?.challenge ?? true;
     return {
       kind: 'box',
       id: 'root',
@@ -29,24 +49,79 @@ export const pauseScreen: Screen<null> = {
               textAlign: 'center',
             },
             { kind: 'box', height: 18 },
-            {
-              kind: 'button',
-              id: 'resume',
-              text: { key: 'pause.resume' },
-              action: PAUSE_ACTION.resume,
-              variant: 'primary',
-              autofocus: true,
-            },
-            {
-              kind: 'button',
-              id: 'quit',
-              text: { key: 'pause.quitMatch' },
-              action: PAUSE_ACTION.quit,
-              variant: 'danger',
-            },
+            button('resume', 'pause.resume', PAUSE_ACTION.resume, { variant: 'primary', autofocus: true }),
+            button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
+            button('settings', 'menu.settings', PAUSE_ACTION.settings),
+            button('unstuck', 'pause.unstuck', PAUSE_ACTION.unstuck),
+            button('quit', 'pause.quitMatch', PAUSE_ACTION.quit, { variant: 'danger' }),
           ],
         },
       ],
     };
   },
 };
+
+/**
+ * "Ajustar desafio": os 5 níveis rápidos (#21), o atual em destaque e com o foco. Vale na hora para os bots
+ * adversários (os aliados ficam como estão).
+ */
+export const challengeScreen: Screen<BotLevel> = {
+  id: 'challenge',
+  build(current) {
+    return {
+      kind: 'box',
+      id: 'root',
+      color: COLORS.veu,
+      children: [
+        {
+          kind: 'column',
+          id: 'main',
+          anchor: 'center',
+          align: 'stretch',
+          width: 380,
+          gap: 12,
+          children: [
+            {
+              kind: 'text',
+              id: 'title',
+              text: { key: 'pause.challenge' },
+              style: 'heading',
+              color: COLORS.texto,
+              textAlign: 'center',
+            },
+            {
+              kind: 'text',
+              id: 'hint',
+              text: { key: 'pause.challengeHint' },
+              style: 'caption',
+              color: COLORS.textoBaixo,
+              textAlign: 'center',
+            },
+            { kind: 'box', height: 8 },
+            ...BOT_LEVELS.map((level) =>
+              button(`level-${level}`, `level.${level}` as StringKey, CHALLENGE_ACTION.levelPrefix + level, {
+                variant: level === current ? 'primary' : 'secondary',
+                autofocus: level === current,
+              }),
+            ),
+            { kind: 'box', height: 8 },
+            button('back', 'menu.back', CHALLENGE_ACTION.back),
+          ],
+        },
+      ],
+    };
+  },
+};
+
+/** O nível pedido por uma ação do "Ajustar desafio", ou `null`. */
+export function challengeLevel(action: string | null): BotLevel | null {
+  if (action === null || !action.startsWith(CHALLENGE_ACTION.levelPrefix)) return null;
+  const level = action.slice(CHALLENGE_ACTION.levelPrefix.length);
+  return (BOT_LEVELS as readonly string[]).includes(level) ? (level as BotLevel) : null;
+}
+
+/** Um passo no nível rápido (Mais fácil −1, Mais difícil +1), sem passar das pontas. */
+export function stepLevel(level: BotLevel, step: number): BotLevel {
+  const i = BOT_LEVELS.indexOf(level);
+  return BOT_LEVELS[Math.max(0, Math.min(BOT_LEVELS.length - 1, i + step))]!;
+}

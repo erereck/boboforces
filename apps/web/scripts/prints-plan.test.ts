@@ -49,6 +49,8 @@ import {
   ROUND3_QUESTIONS,
   ROUND4_NOTES,
   ROUND4_QUESTIONS,
+  ROUND5_NOTES,
+  ROUND5_QUESTIONS,
   roundsWithQuestions,
   TROPA_NO_TEAM,
   runOrder,
@@ -96,6 +98,7 @@ const GAME_DEBUG_MEMBERS = {
   setMipFilter: true,
   setHudVisible: true,
   setViewmodelVisible: true,
+  showResult: true,
   setFrozen: true,
   showFontSpecimen: true,
   whenReady: true,
@@ -132,6 +135,9 @@ describe('roteiro dos prints', () => {
       '20-farda',
       '21-patio',
       '22-infectado',
+      '23-arsenal',
+      '24-empunhadura',
+      '25-na-mao',
     ]);
     expect(new Set(plan.map((p) => p.set))).toEqual(new Set(PRINT_SETS.map((s) => s.id)));
     expect(new Set(plan.map((p) => p.file)).size).toBe(plan.length);
@@ -150,7 +156,11 @@ describe('roteiro dos prints', () => {
     const round4 = filterPlan(plan, ['rodada4']);
     expect(round4.length).toBe(13 + 9);
     expect(round4.every((p) => p.copy === null)).toBe(true);
-    expect(plan.length).toBe(29 + 40 + 13 + 30);
+    // Rodada 5 (as armas do M2): arsenal 3 + empunhadura 3 + na mão 6 (12); sem cópia e sem a leitura.
+    const round5 = filterPlan(plan, ['rodada5']);
+    expect(round5.length).toBe(12);
+    expect(round5.every((p) => p.copy === null)).toBe(true);
+    expect(plan.length).toBe(29 + 40 + 13 + 12 + 30);
     const firstCopy = plan.findIndex((p) => p.copy !== null);
     expect(plan.slice(firstCopy).every((p) => p.copy !== null)).toBe(true);
   });
@@ -215,11 +225,14 @@ describe('roteiro dos prints', () => {
       expect(p.settings.mipFilter).toBe('nearest');
       if (p.set !== 'leitura') expect(p.settings.grayscale).toBe(false);
       if (p.set !== 'hora') expect(p.settings.timeOfDay).toBe('day');
-      if (p.set !== 'fontes' && p.set !== 'bots')
+      if (p.set !== 'fontes' && p.set !== 'bots' && p.set !== 'na-mao')
         expect([p.settings.hud, p.settings.fontSpecimen]).toEqual([false, false]);
+      // A arma na mão só aparece na rodada 5 (vista do jogador); o resto mostra a cena sem viewmodel.
+      expect(p.settings.viewmodel, p.file).toBe(p.set === 'na-mao');
       if (!(p.set === 'leitura' && p.file.includes('atlas'))) expect(p.atlas).toBe(false);
       // Bots só na variante dos visuais dos bots (na árvore principal os prints têm 0 bots, §B16).
-      if (p.set !== 'bots') expect([p.bots, p.profile]).toEqual([0, null]);
+      if (p.set !== 'bots' && p.set !== 'na-mao') expect([p.bots, p.profile]).toEqual([0, null]);
+      if (p.set !== 'na-mao') expect(p.weapons).toBe(null);
       if (inRound(p.set, 'escolhas')) expect([p.settings.mannequins, p.settings.clip]).toEqual([[], null]);
     }
   });
@@ -290,7 +303,7 @@ describe('roteiro dos prints', () => {
     expect(filterPlan(plan, ['']).length).toBe(plan.length);
     expect(() => filterPlan(plan, ['cores'])).toThrow('conjunto de prints desconhecido');
     expect(new Set(filterPlan(plan, ['16', 'zumbi']).map((p) => p.set))).toEqual(new Set(['sequencia', 'zumbi']));
-    expect(filterPlan(plan, ['escolhas', 'rodada3', 'rodada4']).length).toBe(plan.length);
+    expect(filterPlan(plan, ['escolhas', 'rodada3', 'rodada4', 'rodada5']).length).toBe(plan.length);
     expect(filterPlan(plan, ['rodada3']).some((p) => inRound(p.set, 'rodada4') && p.set !== 'leitura')).toBe(false);
   });
 
@@ -301,9 +314,12 @@ describe('roteiro dos prints', () => {
     expect(order.length).toBe(tree.length);
     const pages = order.map((p) => shotQuery(p, 'construto'));
     const changes = pages.filter((q, i) => i === 0 || q !== pages[i - 1]).length;
-    // Cena normal (escolhas e rodada 3 na mesma carga), cena no atlas, título da web e prévia do Switch.
-    expect(changes).toBe(4);
-    expect(new Set(pages).size).toBe(4);
+    // Cena normal (escolhas e rodadas 3 a 5 na mesma carga), cena no atlas, título da web e prévia do Switch, mais uma
+    // carga por arma na mão da rodada 5 (bench com 1 bot e `weapons=`).
+    const naMao = tree.filter((p) => p.set === 'na-mao').length;
+    expect(naMao).toBe(6);
+    expect(changes).toBe(4 + naMao);
+    expect(new Set(pages).size).toBe(4 + naMao);
     expect(order[0]!.file).toBe(tree[0]!.file);
     // A variante dos bots abre a sua página (12 bots, perfil do PC).
     const bots = copyPlan(plan, 'bots-visuais');
@@ -610,7 +626,7 @@ describe('rodada 4 (roupa militar, #58)', () => {
     expect(roundsWithQuestions(filterPlan(plan, ['rodada4']))).toEqual(['rodada4']);
     expect(roundsWithQuestions(filterPlan(plan, ['rodada3']))).toEqual(['rodada3']);
     expect(roundsWithQuestions(filterPlan(plan, ['escolhas']))).toEqual([]);
-    expect(roundsWithQuestions(plan)).toEqual(['rodada3', 'rodada4']);
+    expect(roundsWithQuestions(plan)).toEqual(['rodada3', 'rodada4', 'rodada5']);
     expect(questionsFor(filterPlan(plan, ['rodada4'])).map((q) => q.id)).toEqual(['R1', 'R2', 'R3', 'R4']);
   });
 });
@@ -779,5 +795,55 @@ describe('argumentos dos scripts', () => {
 
   it('carimbo de data legível', () => {
     expect(stamp(new Date(2026, 10, 3, 9, 5))).toBe('2026-11-03-0905');
+  });
+});
+
+describe('rodada 5 (as armas do M2)', () => {
+  const plan = buildPrintPlan();
+  const round5 = scenes(filterPlan(plan, ['rodada5']));
+
+  it('arsenal na fila e empunhadura a 1 m: as armas novas na mão dos manequins, nos 2 times', () => {
+    const arsenal = round5.filter((p) => p.set === 'arsenal');
+    expect(arsenal.map((p) => `${p.slug}@${p.settings.camera}`)).toEqual([
+      'frente@print:linha-frente',
+      '3-4@print:linha-3-4',
+      'mirando@print:linha-3-4',
+    ]);
+    const weapons = new Set(arsenal.flatMap((p) => p.settings.mannequins.map((m) => m.weapon)));
+    for (const w of ['pistol', 'smg', 'rifle', 'shotgun', 'sniper', 'rocket', 'knife', 'grenade', 'lmg']) {
+      expect(weapons, w).toContain(w);
+    }
+    const close = round5.filter((p) => p.set === 'empunhadura');
+    expect(close.map((p) => p.settings.mannequins.map((m) => m.weapon).join('+'))).toEqual([
+      'smg+shotgun',
+      'rocket+lmg',
+      'knife+grenade',
+    ]);
+    for (const p of [...arsenal, ...close]) expect([p.bots, p.weapons, p.settings.viewmodel]).toEqual([0, null, false]);
+  });
+
+  it('na mão: vista do jogador com HUD e viewmodel, 1 bot e uma primária por página', () => {
+    const naMao = round5.filter((p) => p.set === 'na-mao');
+    expect(naMao.map((p) => p.weapons)).toEqual(['rifle', 'smg', 'shotgun', 'sniper', 'rocket', 'lmg']);
+    for (const p of naMao) {
+      expect([p.settings.camera, p.settings.hud, p.settings.viewmodel, p.bots]).toEqual([null, true, true, 1]);
+      expect(shotQuery(p, 'construto')).toContain(`&weapons=${p.weapons}`);
+    }
+  });
+
+  it('as 4 perguntas A1–A4 com o padrão marcado; todo conjunto da rodada responde alguma', () => {
+    expect(ROUND5_QUESTIONS.map((q) => q.id)).toEqual(['A1', 'A2', 'A3', 'A4']);
+    for (const q of ROUND5_QUESTIONS) {
+      expect(q.default >= 0 && q.default < q.options.length, q.id).toBe(true);
+      for (const set of q.sets) expect(inRound(set, 'rodada5'), `${q.id} ${set}`).toBe(true);
+    }
+    for (const set of PRINT_SETS.filter((x) => inRound(x.id, 'rodada5'))) {
+      expect(
+        ROUND5_QUESTIONS.some((q) => q.sets.includes(set.id)),
+        set.id,
+      ).toBe(true);
+    }
+    expect(ROUND5_NOTES.length).toBeGreaterThan(0);
+    expect(roundsWithQuestions(filterPlan(plan, ['rodada5']))).toEqual(['rodada5']);
   });
 });

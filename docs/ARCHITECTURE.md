@@ -808,3 +808,502 @@ saíram. Contratos no §8 ("Port do boneco"). Escolhas da integração (menores 
   Eden (226 ms; meta 180) e o console (detecção do instanciamento, tabela, fps); emote (M2) e escala do zumbi na hitbox
   (M3); 15 nós de cerca de tábua que o boneco ainda atravessa (cabeça em pé 0,409 m, tronco agachado 0,392 m e coxas
   0,355 m saem da AABB) e o parapeito de 1,75 m (x 26–32, z 49,5–50), decisões de mapa do Erick.
+
+## 12. M2: MVP web solo (a partir de 08/11/2026)
+
+Plano em `docs/PLANO_M2.md` (#61–#64). Sem frentes em paralelo: o Claude faz fase por fase, como integração, e as
+mudanças de contrato ficam registradas aqui.
+
+### 12.1 Fase 1a: as 8 armas na sim (08/11/2026)
+
+- **Arma = código estável.** `WEAPONS` (`packages/sim/src/config/weapons.ts`) é indexado por `WEAPON_CODE` (fuzil 0,
+  pistola 1, SMG 2, escopeta 3, sniper 4, foguete 5, faca 6, granada 7, LMG 8). Código nunca muda nem é reaproveitado.
+  `WEAPON_SLOTS` saiu; quem precisava dele usa `weaponDef(code)` ou `WEAPONS`.
+- **`SimView` (mudança de contrato):**
+  - `weapon` passou a ser o **código** da arma na mão (antes era o slot);
+  - entraram `slot` (o slot ativo), `loadout`, `slotClip` e `slotReserve` (4 por entidade, passo `WEAPON_SLOT_COUNT`)
+    e `adsAmount` (0..1);
+  - `ammoClip` e `ammoReserve` saíram; a munição da arma na mão é `heldClip(view, e)` e `heldReserve(view, e)`.
+  - Nos eventos (`shot`, `hit`, `kill`, `weapon`) e na fila de dano, `weapon` também é o código.
+- **`InputFrame.primary` (mudança de contrato do input):** a primária do próximo spawn, código + 1 (0 = manter). O frame
+  passou de 88 para 96 bits. `InputMapper.setPrimary` escreve nele (o menu radial da fase 2 vai chamar).
+- **`SimConfig.primaries`:** a primária de cada controlador no 1º spawn (a IA da fase 1d e o game passam).
+- **Disparo por tipo** (`WEAPON_FIRE`): bala; chumbos, com dano somado por alvo (1 item por alvo e por tiro); golpe
+  (faca a 2 m, 100 pelas costas); projétil e arremesso ficam para a fase 1b. ADS com tempo de entrada (`adsInS`), zoom
+  por arma (`adsZoom`), recarga por cartucho (escopeta, interrompível pelo gatilho) e padrão horizontal fixo de recuo
+  (`recoilPatternDeg`) contado pela rajada (`burstShots`).
+- **Slots:** `InputFrame.weapon` segue sendo o slot desejado (absoluto). A sim só troca para um slot usável (a granada
+  sem nenhuma não é) e volta para a primária quando o da mão esvazia.
+- **Snapshot versão 4.** **Golden `81150d3b`** (21 abates, 304 tiros, placar 7×14; antes `cb50303f`): o estado ganhou os
+  campos por slot e o fuzil ganhou o padrão de recuo, então a mira dos bots muda.
+
+### 12.2 Fase 1b: projéteis e explosões (08/11/2026)
+
+- **Pool de projéteis** no estado (`SimState.proj*`, `MAX_PROJECTILES` = 512, separado das entidades, com `projCount`)
+  e na `SimView` como `projectiles` (`count`, `alive`, `weapon`, `owner`, `position`, `prevPosition`, `velocity`).
+  Entra no snapshot (versão 5) e no hash. O passo 4 da ordem fixa (`projectileSystem`) agora existe, entre armas e dano.
+- **Foguete:** reto a 35 m/s; o segmento de cada tick passa pela grade e pelas hitboxes dos inimigos. O acerto direto
+  dá 120 no alvo, e a área (100 → 0 em 4 m) vale para os outros; sem contato, explode no fim do alcance. Quem lançou
+  nunca é atingido pelo próprio foguete, só pela explosão.
+- **Granada:** apertar puxa o pino e o pavio (2,5 s) corre na mão; soltar joga a 16 m/s com a mira 0,15 rad acima e
+  metade da velocidade de quem joga. Ela quica nos blocos, atravessa corpos e explode no pavio. Se o pavio acabar na
+  mão, explode ali; quem morre cozinhando deixa a granada cair. Cozinhando não troca de slot. A última granada jogada
+  devolve a primária.
+- **Explosão:** a distância é medida até o ponto mais perto da AABB, com queda linear e linha de visão do centro até
+  esse ponto (blocos que param bala). Quem lançou leva 50% (autodano); aliados não levam nada (fogo amigo desligado).
+- **Eventos novos:** `projectile` (`launch`, `bounce`) e `explosion`; a ação `cook` no `weapon`.
+- **Golden `28969b8b`**, com o mesmo combate (21 abates, 304 tiros, 7×14): só o estado mudou.
+
+### 12.3 Fase 1c: armas na tela (08/11/2026)
+
+- **Modelos** (`assets-src/models/weapons.ts`): SMG, escopeta, lança-foguetes, faca, granada, LMG e o foguete em voo
+  (`rocket-shell`), registrados como `model:*` no fim do registro de conteúdo. O pacote do modelgen agora segue a ordem
+  do registro, então os índices das props do M1 não mudaram. São 22 camadas no `modelos64` (teto do M1: 32). Nas peças
+  com pivô, as caixas são relativas ao pivô. A folha de contato mostra as armas em linhas de 3.
+- **`Renderer.setProjectiles(ProjectileBuffer | null)`** (mudança de contrato do render): modelo, posição, yaw, pitch,
+  roll e luz por projétil. Desenha nos conjuntos instanciados das armas (programa 4): nenhum programa e nenhuma malha
+  novos. O foguete em voo é um modelo `kind: 'weapon'` só para usar esse caminho.
+- **Fila de VFX:** `FX_KIND.explosion` (`pushExplosion`: clarão, bola de fogo, línguas de fogo, faíscas, fumaça e 14
+  cubinhos) e `FX_KIND.trail` (`pushTrail`: fumacinha e chama do foguete), nos anéis e no pool de detritos que já
+  existiam.
+- **`game`:**
+  - os projéteis da `SimView` vão para o render (o foguete aponta para a velocidade, a granada rola) com o rastro;
+  - a explosão dá clarão nas vistas próximas e tremor de câmera (até 14 m);
+  - o lança-foguetes tem coice e clarão no lançamento;
+  - o zoom e o tempo do ADS são os da arma na mão (`adsZoom`, `adsInS`). Na luneta da sniper (4x) o viewmodel some; a
+    moldura da luneta é da fase 1e;
+  - o viewmodel do lança-foguetes, da LMG e da sniper ganhou ajuste de escala e posição fora do ADS.
+- **Bench:** `weapons=` (`rifle` padrão, `smg`, `shotgun`, `sniper`, `rocket`, `lmg` ou `mix` em rodízio) dá a
+  primária dos bots no 1º spawn (`LocalDriverConfig.primaries`). O relatório ganhou `armas=` no fim da linha `cena=`.
+- **Conferido no navegador** (`npm run dev`, painel do app; `.claude/launch.json` com a configuração `web-dev`): o
+  viewmodel do lança-foguetes, os foguetes em voo, as explosões e a fumaça, a LMG e a sniper com 4 vistas e 24 bots.
+  Console sem erros.
+
+### 12.4 Fase 1d: a IA usa as armas (08/11/2026)
+
+- **Primária dos bots** (`packages/ai/src/weapons.ts`): `botPrimary(seed, controller)` sorteia pela semente da receita
+  e pelo controlador, com pesos (fuzil 30, SMG 20, escopeta 15, LMG 13, sniper 12, foguete 10). `botPrimaries(recipe,
+  humans)` monta o `SimConfig.primaries`: humanos com a padrão, bots com o sorteio.
+- **Quem chama:** o `LocalDriver` e o `createHeadlessMatch` usam `botPrimaries` quando não recebem `primaries` (a
+  partida headless é a mesma do jogo). O bench sempre passa a do `weapons=`, que fica no fuzil por padrão, para
+  continuar comparável com o M1. O robô de balanceamento (`tools/balance/src/duel.ts`) fixa o fuzil, porque calibra o
+  duelo de fuzil.
+- **Uso por categoria** (`AI_WEAPON_USE` no `ai/src/config.ts`): distância preferida (chegar perto, recuar ou
+  segurar), ADS por arma, a sniper só atira com o ADS completo, e o foguete mira no pé com antecipação pelo tempo de
+  voo.
+- **Troca de slot** (`chooseSlot`): faca com o alvo a menos de 1,6 m (exceto com a escopeta na mão), volta acima de
+  3 m. A pistola entra com a primária vazia ou com o alvo perto demais para o foguete (5 m) e a sniper (6 m), e volta
+  com 2 m de folga. Fora de combate, volta para a primária.
+- **Semiautomáticas** (pistola, escopeta, sniper, foguete): o gatilho solta um tick entre dois tiros, porque a sim só
+  atira na borda.
+- **Granadas da IA:** só com o N2 (fase 3).
+- **Golden `b66afdf7`** (24 abates, 204 tiros, placar 9×15; antes `28969b8b`). O balance continua com os 5 níveis em
+  ordem; o par mais apertado é Tryhard × Suado, com 84,0%.
+
+### 12.5 Fase 1e: HUD das armas (08/11/2026)
+
+- **`HudModel` (mudança de contrato do ui):** entraram `weaponName` e `weaponCategory`, `ammoMode` (`HUD_AMMO`:
+  nenhuma, só o pente ou pente / reserva), `grenades` (-1 = não mostra), `crosshair` (`HUD_CROSSHAIR`: cruz ou ponto)
+  e `scope`. O `game` resolve os nomes uma vez na tabela pt-BR e só guarda as referências, sem string por frame
+  (regra 13).
+- **Textos:** `weapon.<id>` com os nomes do #61, `weapon.category.<categoria>` (Pistola, SMG, Fuzil, Escopeta, Sniper,
+  Lança-foguetes, Faca, Granada, Metralhadora) e `hud.weaponSeparator` (" · ").
+- **Desenho** (`ui/src/screens/hud.ts`):
+  - "Rattler · Fuzil" fica em cima da munição, e as granadas (ícone em pixels e o número) à esquerda dela, só no 1–2P;
+    no 3–4P continua só o pente;
+  - a faca não mostra munição, e a granada na mão mostra só quantas sobram;
+  - faca, granada e sniper fora da luneta usam um ponto como mira; as outras usam a cruz, que abre com a dispersão da
+    arma no quadril (chumbos inclusive) e fecha no ADS;
+  - a luneta (zoom ≥ 3x, ADS quase todo dentro) escurece fora de um círculo blocado, com retícula fina que engrossa na
+    borda e ponto vermelho no centro. Ela é desenhada antes de tudo, então as plaquinhas ficam por cima.
+- **`game`:**
+  - o mapeador do humano segue a troca automática da sim (por exemplo, depois da última granada);
+  - o projétil a menos de 1,5 m do olho de quem lançou não é desenhado (o fundo do foguete tapava a câmera);
+  - a sniper no quadril e o clarão da explosão ficaram menores.
+- **Conferido** no Edge headless (1280×720, DPR 1) com `local/m2/capturar-hud.ts` sobre o `npm run dev`: a HUD da
+  sniper, da pistola e do lança-foguetes, a luneta e o foguete saindo. O painel do navegador do app corta a parte de
+  baixo da página com DPR 1,25 e roda devagar escondido; para conferir a HUD, use o script.
+- **A primária do humano** continua sendo a padrão (o fuzil). O menu radial da tela de morte, que escreve
+  `InputFrame.primary`, é da fase 2.
+
+### 12.6 Fase 1f: prints das armas, rodada 5 (08/11/2026)
+
+- **Roteiro** (`apps/web/scripts/prints-plan.ts`): a rodada `rodada5` tem três conjuntos.
+  - `arsenal`: as 9 armas na mão dos manequins, na fila de frente, a 3/4 e mirando.
+  - `empunhadura`: SMG + escopeta, foguete + LMG e faca + granada, a 1 m.
+  - `na-mao`: a vista do jogador (`camera: null`) com HUD e viewmodel, uma página do bench por primária
+    (`weapons=<id>`, 2 bots).
+  - Perguntas A1–A4 e notas em `ROUND5_QUESTIONS` e `ROUND5_NOTES`.
+- **`GameDebugApi.setViewmodelVisible` (mudança de contrato do bench):** liga e desliga a arma na mão pelo
+  `hideViewmodel` do debug. O roteiro desliga em toda cena fora do `na-mao`.
+- **`VIEWMODEL_TWEAK` em `scene/match.ts`:** escala e deslocamento por arma, só fora do ADS. Vale para o lança-foguetes
+  (0,62), a LMG (0,9) e a sniper (0,75); na escala normal o tubo do foguete tomava metade da tela.
+- **Explosão e luneta** não param numa cena congelada. Vão para a página como capturas ao vivo (`local/m2/`, Edge
+  headless 1280×720) e servem de exemplo, não de régua.
+
+### 12.7 Fase 2a: regras da partida (08/11/2026)
+
+- **Fases (`MatchPhase`, mudança de contrato da sim):** entrou `suddenDeath`, no fim da lista (o snapshot guarda o
+  índice). `isLivePhase` diz se a partida está valendo (jogando ou morte súbita); armas e golpe usam ela.
+- **Contagem:** `SimConfig.countdownS` (padrão 0). Na `warmup`, a sim aplica só a mira e a primária da entrada;
+  botões, movimento e troca de arma ficam de fora, e o relógio não corre. `MatchView.countdownTicks` diz quanto falta.
+  O `game` ainda não liga a contagem: ela entra com a HUD dela, na 2d.
+- **Fim:** empate no fim do tempo ou da meta abre a morte súbita (`MATCH_DEFAULTS.suddenDeathS` = 60 s, em
+  `ticksLeft`). Nela, o primeiro abate que desempata encerra; o fim do relógio dela encerra empatado. No FFA,
+  `MatchView.winnerEntity` diz quem venceu (`winnerTeam` é 0, o time único).
+- **Agressores recentes** (`SimState.recentFrom`, `recentDamage` e `recentTick`, 4 por bobo): guardam o dano de
+  inimigos na vida atual e são limpos no respawn.
+  - **Assistência:** quem fez 25 ou mais nos 10 s antes da morte, fora o matador. Entra em `SimView.assists`, e o
+    `KillEvent.assister` leva o maior assistente.
+  - **Plano de morte:** usa `WEAPON_KILL_PLANE` (254) no lugar de `WEAPON_NONE`. O abate vai para quem feriu a
+    vítima nos 5 s antes (ponto e abate contam); sem ninguém, é acidente.
+- **Spawn pontuado** (`pickSpawn`, sem alocar: rascunho `spawnScore` e `spawnMark` por ponto, feito na criação):
+  - FFA: em ordem de distância, aceita o ponto a mais de 20 m de todo inimigo e sem linha de visão de nenhum
+    (`blocksSight`, olho no olho, até 100 m); para em 3. Sem ponto seguro, cai na regra antiga.
+  - TDM: cada inimigo que enxerga o ponto (conta até 3) pesa mais que qualquer distância; o sorteio fica entre os 3
+    melhores com tão poucos inimigos à vista quanto o melhor.
+- **Snapshot 6.** Golden `b26c3ec1` com o mesmo combate (§PERF).
+
+### 12.8 Fase 2b: caixinha de munição e Destravar (08/11/2026)
+
+- **Pickups (mudança de contrato da sim):** pool fixo no estado (`MAX_PICKUPS` = 256; `pickAlive`, `pickKind`,
+  `pickPosition`, `pickPrevPosition`, `pickVelY`, `pickTicks`), no snapshot e no hash como os projéteis.
+  `SimView.pickups` (`PickupView`) e `PICKUP_KIND.ammoBox`.
+  - O `kill` solta a caixinha (`dropAmmoBox`) no Bobo Warfare, menos no plano de morte. Ela nasce 25 cm acima dos
+    pés e cai com a gravidade do bobo até o chão (raio para baixo contra blocos sólidos e props).
+  - O `pickupSystem` roda depois dos projéteis: tempo (20 s), queda e coleta. Pega a até 1 m no plano, de 0,6 m
+    abaixo a 1,8 m acima dos pés. `refill` dá 1 pente de reserva a cada slot com reserva e +1 na granada; sem
+    espaço, a caixinha fica.
+  - Evento `pickup` (`drop` e `take`).
+- **Destravar:**
+  - `BUTTON.unstuck` (bit 11), em `MENU_ONLY_FRAME_BUTTONS`: sem atalho, porque vem da pausa (2e).
+  - O `unstuckSystem` roda logo depois da entrada, na borda do botão, com a partida valendo. Procura em ordem de
+    distância 3D os nós em pé do componente principal da navegação (`navMainComponent`, o com mais nós, calculado
+    na criação), a pelo menos 2 m.
+  - O humano fica com o primeiro nó. O bot testa até 8 e fica com o primeiro que nenhum humano vivo enxerga; se todos
+    estiverem à vista, fica com o mais perto.
+  - `SimState.unstuckCount` conta os usos na vida. Na 3ª vez, o bot renasce num spawn (`respawn` + `pickSpawn`,
+    sem contar morte). Sem navegação no mapa, o bobo renasce num spawn.
+  - Evento `unstuck`, com a origem e o destino. O `game` loga como aviso (escopo `partida`), no anel de recentes
+    do relatório do F2.
+- **IA:** `AI_PATH.unstuckS` (8 s), `unstuckProgressM` (1 m) e `unstuckMoveM` (2 m). Fora de combate, o soldado
+  aperta `BUTTON.unstuck` se não andou 2 m no plano nem chegou 1 m mais perto do objetivo nesse tempo. Trocar de
+  objetivo não zera a conta: o bot numa ilha da navegação troca sem sair do lugar. Os bots "Camper" da fase 3 vão
+  precisar zerar a conta enquanto acampam.
+- **Render:** os modelos `pickup` ganham conjunto instanciado como as armas. O `game` põe as caixinhas no
+  `ProjectileBuffer` depois dos projéteis (`MAX_DRAWN_PROJECTILES` 64 → 128): elas giram a 1,2 rad/s e piscam nos
+  últimos 3 s. Nenhum programa de shader novo.
+- **Snapshot 7.** Golden `d0ba0eca` (§PERF).
+
+### 12.9 Fase 2c: tela de morte (08/11/2026)
+
+- **sim:** `SimView.respawnTicks` (o array que já existia), para a contagem. Sem mudança de estado nem de golden.
+- **`HudModel` (mudança de contrato do ui):**
+  - Faixa: `deathLabel`, `deathName`, `deathWeapon` e `deathHp` (strings resolvidas pelo `game`, por
+    referência).
+  - Menu: `primaryNames`, `primaryCategories` e `primarySelected`; `hardTimeHint`.
+  - `primaryHit` é a SAÍDA do desenho: o formato (`PRIMARY_LAYOUT`) e os retângulos das opções, que o `game` usa no
+    quadro seguinte (`hitPrimaryOption` para o toque). Textos novos `death.*`, `bot.levelName.*` e `zombie.name`; a
+    fonte não tem "→", então a dica usa "»".
+- **Desenho** (`ui/src/screens/hud.ts`, ramo do morto):
+  - O formato sai do espaço (`ringRadius`): o anel cabe se o raio (até 22% do lado menor) deixa embaixo a faixa com
+    a dica e em cima o rótulo e o placar, sem as opções dos lados encostarem na contagem. No anel, a contagem vai em
+    letra de rótulo.
+  - Sem anel, a fileira de nomes; se ela não cabe na largura, ou no 3–4P, a linha "« arma »".
+  - A faixa vai embaixo do anel ou da fileira, ou no alto. Morto, a HUD esconde a munição e o nome da arma.
+  - Testado nas 4 resoluções com 1 vista e a 720p+ com 2: nada sai da vista e nada encosta. A 640×180 por vista
+    (2 vistas a 640×360) não é caso real.
+- **`game/src/scene/death.ts`** (puro, testado): `PRIMARY_ORDER` (fuzil, SMG, escopeta, sniper, foguete e LMG), a
+  câmera (`deathCamAngles`: sobe 0,45 m, vira em 0,5 s para o peito de quem matou, com `killerLift` de 25% da meia
+  altura para ele não ficar atrás da contagem), o cursor (`moveRadialCursor` + `radialIndex` no anel; `stepCursor`
+  na fileira e na linha), `losingBadly`, `controllerNames` e `fillDeathBanner`.
+- **`scene/match.ts`:**
+  - O `kill` abre a morte da vista que seguia a vítima; o `spawn` fecha.
+  - Para o humano: zera a mira do mapeador na morte. O giro de cada quadro vira o cursor e a mira volta a zero; a
+    câmera de morte não usa a do mapeador, e o `spawn` devolve a mira do ponto.
+  - A roda e `nextWeapon`/`prevWeapon` passam a opção; o toque usa os retângulos. A escolha vai para
+    `InputMapper.setPrimary`.
+- **Conferido** no Edge headless sobre o `npm run dev` (`local/m2/capturar-morte.ts`: JOGAR, esperar os bots
+  matarem, girar a roda): anel a 1280×720 e a 667×375, quem matou entre a 1ª opção e a contagem.
+
+### 12.10 Fase 2d: HUD da partida (09/11/2026)
+
+- **JOGAR:** a receita usa `PLAY_SCORE_LIMIT` (75) e `PLAY_TIME_LIMIT_S` (600). `LocalDriverConfig.countdownS`
+  repassa `MATCH_DEFAULTS.countdownS` à sim só nessa cena; bench, vitrine e prints começam jogando. Até o resultado
+  (2e), a partida que acaba fica parada.
+- **`ui/src/screens/match-hud.ts`** (novo; desenhado uma vez por quadro, em px da superfície):
+  - `KillFeedModel` + `pushKillFeed`/`ageKillFeed`/`drawKillFeed`: 5 linhas, 6 s, a última apagando.
+  - `ScoreboardModel` + `drawScoreboard`: até 40 linhas, uma tabela por time (lado a lado se couber), colunas da
+    largura do maior título.
+  - `drawMatchCountdown`.
+  - Strings por referência e números pintados (sem texto por quadro).
+- **`HudSharedModel.suddenDeath`** e **`HudModel.markers`/`markerCount`/`markerColor`** (mudanças de contrato
+  do ui). O chevron é desenhado por baixo das plaquinhas, só vivo e fora da luneta. Textos `hud.suddenDeath`,
+  `scoreboard.*` e `countdown.*`.
+- **`game`:**
+  - `scene/markers.ts` (`projectToView`, puro, com a convenção da câmera) projeta os aliados com a câmera de cada
+    vista.
+  - `countdownLine` (em `death.ts`) agrupa os bots do outro time.
+  - O placar ordena por abates e depois por menos mortes (inserção num `Int16Array`) e só é preenchido com o Tab
+    apertado.
+  - O feed usa os nomes e as cores do time (no FFA, a sua cor de jogador).
+- **Conferido** no Edge headless (`local/m2/capturar-partida.ts`): contagem, relógio 10:00 → 9:38, feed,
+  marcadores e o placar no Tab.
+
+### 12.11 Fase 2e: pausa e resultado (09/11/2026)
+
+- **Sinais da cena (mudança de contrato do `game`):** `SceneSignal` ganhou `again`, `easier` e `harder`.
+  `SceneRequest.level` (opcional, padrão `normal`) é o nível rápido dos bots do JOGAR, e `Scene.level` é o de
+  agora. O núcleo (`game.ts`) guarda `playLevel`, dá `stepLevel` (−1 / +1, sem passar das pontas) e recarrega o
+  JOGAR com semente nova; a cena carrega o Construto de novo. Recomeçar sem recarregar fica para a rodada de
+  otimização.
+- **IA (mudança de contrato do ai):** `BotDirector.setLevel(level, team)` (team -1 = todos) e
+  `SoldierBrain.setLevel` recalculam habilidade, reação, giro e erro de mira no meio da partida. O "Ajustar
+  desafio" muda o time adversário (o 1 no TDM; todos no FFA) e deixa os aliados como estão (escolha revisável).
+- **Pausa** (`game/src/pause.ts`): `pauseScreen` com 5 botões e `challengeScreen` (os 5 níveis, o atual em foco);
+  "Ajustes" reaproveita o `settingsScreen`. "Destravar" liga `BUTTON.unstuck` no frame do humano por um tick
+  (`writeHumanFrame`) e continua. Ao continuar, a pausa volta à página principal.
+- **Resultado:**
+  - `scene/result.ts`, puro: `MatchStats` sai dos eventos (um tiro e um acerto por tick por bobo, para a escopeta e
+    o foguete contarem um; sequência; quedas; abates no humano e do humano). `summarizeMatch` calcula o resultado,
+    o MVP (abates + ½ assistência; empate: menos mortes), o Nêmesis, o Freguês, os 3 números, até 3 prêmios (um por
+    bobo, na ordem de `PRIZES`) e `uglyLoss`.
+  - `game/src/result-screen.ts`: a árvore de menu, navegável no D-pad, com toque e mouse.
+  - O `match.ts` mostra o resultado 2,5 s depois do evento `matchPhase: ended`. Enquanto ele está na tela, a HUD
+    sai, o jogador não anda, a pausa não abre e o pointer lock é solto.
+- **Gancho dos prints:** `GameDebugApi.showResult()` abre o resultado com os números do momento. Serve para os
+  prints e para conferir sem esperar 10 min.
+- **Conferido** no Edge headless (`local/m2/capturar-pausa.ts`): pausa, desafio e resultado a 1280×720 e a 667×375.
+- **Pendência:** o teste do mapc "fila e close do boneco" falhou 2 vezes em 6 rodadas do portão inteiro, com
+  `r.errors` não vazio, e passa sozinho. A mensagem da falha não foi guardada. Hipótese: falta de CPU no laço do A*
+  dirigido. Investigar na próxima falha (o log do portão fica em `local/m2/check-*.log`).
+
+### 12.12 Fase 3a: o `bot@1` (09/11/2026)
+
+- **`format/src/bot.ts`** (novo; contrato do format):
+  - `BotDocument` com `skill` (§6.2, mais `triggerHold` e `targetSwitchS`), `intelligence` (nível e os 8
+    comportamentos do "modo avançado"), `personality` (preset e pesos) e `rules` (§6.5: vida, dano, velocidade,
+    munição, armas, imunidade a tiro de cabeça, explodir ao morrer, visão, audição e conhecimento). O `look` passa
+    como veio.
+  - `LEVEL_SKILLS`, `intelligenceForLevel` (cumulativo), `PERSONALITY_PRESETS`, `LEVEL_PERSONALITY_MIX` com
+    `personalityForRoll`, `BUILTIN_BOTS` (os 12) e `resolveBot` (de fábrica, embutido, ou o Normal Bob).
+  - `validateBot` só recusa o que não é bot; limita e avisa (`bot.valueClamped`, `bot.invalidField`, com texto
+    `issue.bot.*`).
+  - Para não haver ciclo na inicialização, `bot.ts` só importa TIPOS da receita (`LEVEL_ORDER` repete
+    `BOT_LEVELS`, e o teste confere).
+- **Receita:** `MatchRecipe.embeddedBots` (validados; os que não são bot caem com `content.missingBot`). Ids novos
+  `bot:jorge-the-immortal`, `camper-carl`, `knife-ninja`, `scaredy-sam`, `hunter-hank`, `buddy` e
+  `goofy-gus` (só acrescentados).
+- **IA:**
+  - O diretor resolve cada ref (`resolveBot`), e o `SoldierBrain` recebe o documento: `intelligence`,
+    `personality`, `rules` e a habilidade convertida (`aimSkillFromBot`).
+  - Os bots de nível sorteiam a personalidade num fluxo próprio (`fork('personality', i)`), sem mexer no RNG do
+    cérebro: o golden não mudou.
+  - `setLevel` troca a habilidade e a inteligência do nível e mantém a personalidade e as regras.
+  - `levelSkillsMatch` confere que a tabela do format e a `BOT_SKILLS` são iguais.
+- **`game`:** os nomes dos bots de fábrica saem de `bot.name.<id>`; os embutidos usam o nome do documento.
+
+### 12.13 Fase 3b: regras por bot na sim (09/11/2026)
+
+- **`SimContext.rules` (`EntityRules`, contrato interno da sim):** `maxHp`, `damageMult`, `speed`, `ammo`
+  (`AMMO_RULE`), `weaponMask` (bit = código da arma; 0 = todas) e `flags` (`RULE_FLAG`: imune a tiro de cabeça,
+  explode ao morrer), uma por índice de entidade.
+  - O `createSim` monta as tabelas a partir de `resolveBot`. Como saem da receita, ficam fora do snapshot e do hash.
+  - A vida do bot só troca a da partida quando a regra muda o padrão (100).
+- **Onde cada regra age:**
+  - `damageSystem` multiplica pelo `damageMult` de quem atacou.
+  - `respawn` usa a `maxHp`, filtra o loadout pela máscara (a primária vira a 1ª permitida) e põe a mão no 1º slot
+    que sobrou.
+  - A regeneração vai até a `maxHp`.
+  - `kill` faz a explosão do foguete no peito quando a regra pede (fora do plano de morte).
+  - `weaponSystem` cai no 1º slot usável e enche o pente ou a reserva a cada tick, conforme a regra.
+  - `rayDamage` dá o dano do tronco na cabeça de quem é imune.
+  - `movementSystem` multiplica a velocidade-alvo.
+- **Fica para depois:**
+  - O tamanho (pede hitbox e navegação).
+  - O colete, a regeneração por bot, as vidas e o "chefão".
+  - Visão, audição e conhecimento são da IA (3c em diante).
+  - A IA ainda não sabe lidar com loadout restrito (o Knife Ninja só tem faca): é da 3g.
+
+### 12.14 Fase 3c: N1 da IA (09/11/2026)
+
+- **sim:** `SimView.lastAttacker` (o array que já existia): quem causou o último dano. Sem mudança de estado.
+- **`ai/src/tactics.ts`** (novo):
+  - `onDamaged` vira para de onde veio o dano, em qualquer nível. Com `useCover`, tira a chance pela
+    personalidade: `AI_COVER.baseChance + cautionWeight·cautela − aggressionWeight·agressividade`, mais um bônus
+    com a vida baixa.
+  - `seekCover` amostra até 8 nós da navegação a 3–9 m, para o lado oposto da ameaça (±75°), alcançáveis, e de onde
+    o olho da ameaça não vê o olho do bot agachado. Usa `AiContext.clearLine`, um raio do orçamento por tentativa.
+  - `updateCover` passa de "indo" a "segurando" ao chegar, por 1,2 s mais até 2,5 s pela paciência, e desiste em 5 s.
+    Depois, 4 s de espera até a próxima.
+- **Soldado:**
+  - Indo para a cobertura, o `travel` usa ela como objetivo, e o bot só troca tiro se o alvo estiver a menos de 5 m.
+  - Segurando com alvo à vista, atira agachado e sem strafe. Sem alvo, fica agachado, olha para a ameaça e recarrega
+    (`holdCover`).
+  - Com o pente vazio e reserva no meio do tiroteio, procura cobertura do alvo.
+  - Patrulha (N1+): sem pista do inimigo, olha ±40° de tempos em tempos (`AI_PATROL`).
+- O "investigar sons" já existia desde o M1 (a audição leva até de onde veio o barulho).
+
+### 12.15 Fase 3d: N2 da IA (09/11/2026)
+
+- **`ai/src/tactics2.ts`** (novo):
+  - `onTargetLost` roda quando o alvo some de vista. Sorteia segurar o ângulo (`AI_HOLD`, pela paciência e pela
+    agressividade) e o flanco (`AI_FLANK`: um nó 4 m atrás da última posição do inimigo e 10 m para um lado,
+    alcançável; desiste em 8 s).
+  - `holdAngle`: parado mirando o peito de onde o alvo sumiu, agachado se for cauteloso.
+  - `maybeStartGrenade` e `stepGrenade` (`AI_GRENADE`): com granada no slot e o inimigo sumido há até 4 s a
+    7–25 m, sorteia pelo `skill.grenadeUse`, no máximo a cada 1,5 s. O arremesso troca de arma, mira o arco baixo
+    (`throwPitch`, com a velocidade, a gravidade e o `GRENADE_THROW.lift` da sim), cozinha o pavio menos o voo e
+    0,4 s (até 1,2 s), solta e volta para a primária. O bot fica parado. Espera 8 s para a próxima.
+  - `retreatBelow`: limite da vida para recuar (`AI_RETREAT`).
+- **Cobertura (`tactics.ts`):** `seekCover(…, retreat)` usa 8–16 m no recuo. O `updateCover` sai do recuo quando
+  a vida volta a 80%, ou em 8 s.
+- **sim:** `GRENADE_THROW` (`lift` e `inherit`) saiu do sistema de armas para a config, para a IA usar o mesmo.
+- **Ordem no soldado:** granada em andamento → indo para a cobertura → combate (recuo com a vida baixa, cobertura
+  para recarregar) → segurando a cobertura → segurando o ângulo → decide a granada → caça e passeio (com o flanco antes
+  da última posição).
+- O `SoldierBrain.grenadeUse` vem do bot e do `setLevel`.
+- O golden passou a contar as granadas dos bots.
+
+### 12.16 Fases 3e e 3f: N3 e N4 da IA (09/11/2026)
+
+- **`ai/src/team.ts`** (novo): `TeamBoard`, criado pelo diretor no 1º tick com o tamanho do mapa e atualizado antes
+  dos cérebros. Lê só a `SimView`.
+  - **Avisos:** anel de 16 (posição, tick, time). Funções `post` e `freshest`.
+  - **Objetivos de passeio:** um por entidade.
+  - **Calor, por time em células de 4 m** (`AI_TEAM`):
+    - os humanos inimigos somam 1 por segundo onde estão e 5 por abate onde estavam ao matar (`kills` que sobem);
+    - o perigo soma 3 onde um bobo do time morreu (`deaths` que sobem);
+    - meia-vida de 60 s (a memória cai a ~¼ em 2 min);
+    - funções `hottest` (a célula mais quente numa faixa de distância) e `dangerAt`.
+- **N3** (`intelligence.callouts`):
+  - Avisa o time a cada 1 s enquanto vê um inimigo.
+  - Sem pista, vai atrás do aviso mais novo, com até 3 s e a até 60 m (cada aviso uma vez).
+  - O passeio segue o objetivo do líder: o aliado de controlador menor mais perto, a até 25 m, com objetivo de até
+    10 s, com ±3 m de folga.
+  - No cerco, o flanco ganha +0,3 de chance, e o lado sai da paridade do índice do bot.
+- **N4** (`intelligence.learn`):
+  - O passeio vai para a célula mais quente a 12–60 m (metade das vezes) e evita nó com perigo ≥ 2,5.
+  - Pré-mira a célula mais quente a 8–40 m no lugar do olhar em volta, se estiver a menos de 90° do caminho.
+  - Sem pista, joga granada na célula quente a 7–25 m (metade da chance de granada).
+  - Com mais de 70% de vida ao trocar tiro, tem 15% de chance (a cada 10 s) de ir para a cobertura sem precisar,
+    para fingir recuar e emboscar.
+- **Diretor (mudança de contrato do ai):** `BotDirector.pings(team, maxAgeTicks, out)` entrega os avisos.
+  `HudModel.pings` e `pingCount` (mudança de contrato do ui) desenham o losango âmbar na vista do humano, por 2,5 s.
+- **Fica para depois:** a emboscada em pontos marcados do mapa (o Construto não tem marcadores de emboscada; entra
+  com os mapas novos).
+
+### 12.17 Fase 3g: personalidades e bots de fábrica (09/11/2026)
+
+- **`ai/src/persona.ts`** (novo): o comportamento visível das 10 personalidades (§6.4), com os números em
+  `AI_PERSONA`. Os pesos (agressividade, cautela, paciência) já mexiam nas chances do N1 e do N2. Ganchos no soldado:
+  - `personaTick`: abates novos, o foco e a guarda do Suporte;
+  - `personaOnDamaged`: para a dancinha, tira o Camper do ponto, acorda ou começa o "fingir de morto";
+  - `personaOverride`: fingir de morto e dancinha tomam o tick;
+  - `personaApproach` e `personaRetreat`: as distâncias do combate;
+  - `personaCombat`: o jeito de trocar tiro;
+  - `personaGoal`: o objetivo de passeio;
+  - `personaHold`: parado por escolha;
+  - `personaTravel`: pulinhos e Lunático andando.
+- **Cada personalidade:**
+  - **Rusher:** corre (sem atirar) até 6 m além da distância dele, depois atira andando e pula a cada 0,7–1,6 s.
+  - **Lunático:** troca de intenção a cada 2–5 s (avança pulando, roda pulando, recua, atira 65° pro alto por 0,8 s).
+    Cada troca sorteia a distância dele (2–35 m).
+  - **Covarde:**
+    - recua abaixo de 17,5 m;
+    - o recuo do N2 começa com 60% de vida e manda um aviso do time na posição dele (o losango da HUD; os aliados N3
+      vão ajudar);
+    - abaixo de 40% de vida, uma vez por vida e com 35% de chance, finge de morto por 4 s (agachado, parado, olhando o
+      chão) até tomar dano de novo.
+  - **Camper:**
+    - escolhe o nó mais alto entre 10 sorteados a 8–50 m (o N4 desconta o perigo) e fica lá por 20 s + 40 s ×
+      paciência;
+    - fica agachado, olhando para a célula mais quente dos humanos (ou o meio da área) com uma varredura de ±35°, e
+      vira para o que ouviu;
+    - sai depois de 2 abates, ao tomar dano ou no fim do tempo, e tenta outro ponto 5 s depois;
+    - no ponto, troca tiro sem sair dele.
+  - **Estrategista** (N2+): +0,35 na chance de flanquear e anda com o líder como a dupla do N3.
+  - **Kamikaze:**
+    - nunca recua e chega a 0 m;
+    - persegue o humano mais perto;
+    - com granada, a 3 m do alvo troca para ela e segura o gatilho até estourar na mão (a sim só cozinha na borda do
+      gatilho, então ele solta um tick antes).
+  - **Caçador:**
+    - a presa é o humano com mais abates (refeita a cada 10 s);
+    - a percepção procura a presa antes dos outros e troca de alvo assim que a vê;
+    - sem pista, vai até ela.
+  - **Suporte:**
+    - segue o humano aliado mais perto (para 3 m atrás dele) e, a até 6 m, fica vigiando as costas dele;
+    - quando o humano toma dano, vai atrás de quem atirou.
+  - **Palhaço:** dancinha de 2 s depois do abate (gira a 540°/s, agacha, pula), que só o dano interrompe.
+  - **Todos:** pulinhos andando, com chance de bobeira × 0,4 por segundo.
+- **Perseguição com conhecimento:** a do Kamikaze e a do Caçador sabe onde a presa está, com erro de ±6 m refeito a
+  cada 4 s. É o comportamento declarado no card ("persegue pelo mapa"), não uma regra escondida.
+- **Distância preferida:** é relativa à do Equilibrado (20 m), que usa a de cada arma (fase 1d), e só encurta. O
+  Rusher chega a 30% dela, o Caçador, o Suporte e o Palhaço a 75%. Alongar para o Camper (×2) e o Estrategista
+  (×1,25) esfriava o combate. Média de 8 sementes do golden, por minuto:
+
+  | Variante | Abates | Tiros |
+  |---|---|---|
+  | Alongando | 13,6 | 225 |
+  | Só encurtando (a escolhida) | 14,8 | 238 |
+  | Sem personalidade | 15,4 | 256 |
+
+- **Loadout restrito (soldado):**
+  - `chooseSlot` só troca para a faca se ela existe; sem pistola nem faca, fica na primária;
+  - `canFire` deixa a sniper atirar de perto quando não há outra arma (o Carl);
+  - o foguete continua sem atirar colado, menos no Kamikaze.
+- **Bots de fábrica no JOGAR (mudança de contrato do game):**
+  - `SceneRequest.squad` e `GameDeps.playSquad` (`PlaySquad`: `levels` | `factory`);
+  - o `factory` põe Jorge, Carl, Ninja, Sam, Hank e Gus contra o jogador e o Buddy no time dele (o resto, nível
+    rápido);
+  - a web liga com `?bots=fabrica` (`apps/web/src/play-squad.ts`), até a Partida personalizada da fase 4.
+- **Golden:** `5ee925a0`. A semente 42 sorteou um minuto mais parado (11 abates e 87 tiros), então o piso de tiros
+  do teste caiu de 100 para 60.
+- **Teste do clarão por vista** (`game.test`): roda até o primeiro tiro de um dos bots das vistas (até 60 s), em vez
+  de 15 s fixos, porque o momento do tiro depende do sorteio das personalidades.
+- **Fica para depois:**
+  - o Suporte reviver e dividir munição (o caído é do M3);
+  - o Estrategista priorizar o objetivo (os modos com objetivo são do M3);
+  - o Covarde fingir de morto deitado (não há pose deitada).
+
+### 12.18 Fase 3h: assistência de mira (09/11/2026)
+
+- **`game/src/scene/aim-assist.ts`** (novo, sem alocação). Calculada no cliente, sobre o estado interpolado, antes
+  do `InputFrame` (tecnico.md §10):
+  - `findAimAssist` escolhe o alvo: o inimigo vivo mais perto do centro da tela, dentro do cone, até o alcance de
+    visão e com a linha de visão livre;
+  - o cone é `atan(1,1 m / distância)`, entre 2° e 10°, em volta do meio do tronco (1,15 m; agachado, 0,8 m);
+  - no máximo 3 raios DDA por quadro, dos candidatos mais centrais;
+  - a fricção é `1 − nível × (1 − erro/cone)`;
+  - `pullAim` é o ímã: `nível × 2,5 × dt` do erro por quadro, só com o jogador mexendo a mira ou andando.
+- **Na cena** (`match.ts`, só o humano 0):
+  - `aimAssistBefore` dá a fricção como `aimScale` do `InputMapper.update` (o contrato do input já tinha o
+    parâmetro);
+  - `aimAssistAfter` puxa a mira com `setAngles`; no Forte (nível ≥ 0,6), o ADS apertado trava no alvo;
+  - o nível vem do perfil do dispositivo (`ControlProfile.aimAssist`): mouse 0, controle e toque Médio (0,4).
+- **Determinismo:** o `InputFrame` grava os ângulos já assistidos, então replay e sim não mudam. O golden não tem
+  humanos: `5ee925a0` igual. O balance segue em ordem.
+- **Fica para a fase 4 (menus e dados):**
+  - escolher o nível (Desligada, Leve, Média, Forte) nos Ajustes (`settings@1`);
+  - a regra da partida que desliga a assistência (`preset@1`, bloco de armas).
+
+### 12.19 Fecho da fase 3: regras à vista, avisos e `?nivel=` (09/11/2026)
+
+- **Regras ativas à vista** (GDD §6.5: "toda regra ativa aparece no card do bot, no placar e na tela de morte"):
+  - `game/src/scene/death.ts`: `rulesText(BotRules)` e `controllerRules(recipe, humans)` montam o texto uma vez
+    por partida ("500 de vida · só escopeta"; textos `rule.*`, categoria da arma em minúscula, menos siglas);
+  - só as regras que a sim aplica (vida, dano, velocidade, armas, munição, imune a tiro na cabeça, explode ao morrer);
+    visão, audição e conhecimento ainda não agem e não aparecem;
+  - **mudanças de contrato do ui:**
+    - `HudModel.deathRules`: uma linha baixa na faixa de morte, embaixo de quem matou;
+    - `ScoreboardModel.ruleLines`, `ruleTeam` e `ruleCount`: um bot diferente por linha, numa placa embaixo da
+      tabela do time dele;
+  - numa tela pequena com o placar cheio (640×360 com 6 por time), as linhas que não cabem saem, e a tela de morte
+    continua mostrando as regras de quem matou;
+  - o card do bot fica para a Oficina (fase 4).
+- **Avisos do time na HUD:** avisos a menos de 4% da altura da vista um do outro viram um losango só
+  (`PING_MERGE_FRAC`). Nos prints, 3 bots avisando o mesmo inimigo empilhavam 3 losangos.
+- **`?nivel=`** (`apps/web/src/play-squad.ts`, `GameDeps.playLevel`): o nível do primeiro JOGAR, pelo nome da
+  interface ou pelo id (`pela-vibe`, `de-boa`, `normal`, `suado`, `tryhard`), até os menus da fase 4. Os prints
+  do aviso do time usam `?nivel=suado` (aliados N3).

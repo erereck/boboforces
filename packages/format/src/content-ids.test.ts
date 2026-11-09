@@ -114,6 +114,14 @@ const LOCKED_IDS = [
   'model:sandbags',
   // Caixote grande (frente skins-modelos; registrado na integração do M1)
   'model:crate-large',
+  'model:smg',
+  'model:shotgun',
+  'model:rocket',
+  'model:knife',
+  'model:grenade',
+  'model:lmg',
+  'model:rocket-shell',
+  'model:ammo-box',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',
@@ -126,6 +134,13 @@ const LOCKED_IDS = [
   'skin:moicano',
   'skin:barbudo',
   'skin:trancas',
+  'bot:jorge-the-immortal',
+  'bot:camper-carl',
+  'bot:knife-ninja',
+  'bot:scaredy-sam',
+  'bot:hunter-hank',
+  'bot:buddy',
+  'bot:goofy-gus',
 ];
 
 describe('registro de IDs de conteúdo', () => {

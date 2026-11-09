@@ -218,6 +218,39 @@ export function createActorBuffer(capacity: number): ActorBuffer {
   };
 }
 
+/**
+ * M2 (fase 1c): projéteis em voo (foguete, granada), desenhados com o MESMO conjunto instanciado das armas do modelo
+ * (programa 4, sem programa novo). Fase 2b: os pickups no chão (a caixinha de munição, modelo `pickup`) vão no mesmo
+ * buffer, depois dos projéteis. O `game` preenche a cada frame a partir de `SimView.projectiles` (posição
+ * interpolada, orientação pela velocidade, giro da granada). Modelos de `setModels` (`NO_MODEL` = não desenha).
+ * Origem do modelo no centro do projétil; a frente (−Z do modelo) vai para `yaw`/`pitch`, e `roll` gira em volta dela.
+ */
+export interface ProjectileBuffer {
+  readonly capacity: number;
+  count: number;
+  readonly model: Uint8Array;
+  /** 3 por projétil (m). */
+  readonly position: Float32Array;
+  readonly yaw: Float32Array;
+  readonly pitch: Float32Array;
+  readonly roll: Float32Array;
+  /** Luz amostrada da grade (céu, sol, emissivo), 3 por projétil. */
+  readonly light: Float32Array;
+}
+
+export function createProjectileBuffer(capacity: number): ProjectileBuffer {
+  return {
+    capacity,
+    count: 0,
+    model: new Uint8Array(capacity).fill(NO_MODEL),
+    position: new Float32Array(capacity * 3),
+    yaw: new Float32Array(capacity),
+    pitch: new Float32Array(capacity),
+    roll: new Float32Array(capacity),
+    light: new Float32Array(capacity * 3).fill(1),
+  };
+}
+
 /** Câmera de uma viewport (convenção do shared: yaw 0 olha para -Z, pitch + para cima). */
 export interface CameraDesc {
   x: number;
@@ -422,6 +455,8 @@ export interface Renderer extends Disposable {
   /** Ajusta o drawing buffer (px reais). */
   resize(width: number, height: number, pixelRatio: number): void;
   setActors(actors: ActorBuffer): void;
+  /** M2: projéteis em voo do frame (`null` = nenhum). Guarda a referência; as matrizes saem no próximo `renderViews`. */
+  setProjectiles(projectiles: ProjectileBuffer | null): void;
   /** Desenha o mundo em 1 a 4 viewports (no M1, com a HUD de cada vista no fim do laço dela). */
   renderViews(views: readonly ViewDesc[]): void;
   /** Desenha a UI por cima; `viewport` restringe ao retângulo de uma viewport (HUD), senão é a tela toda. */

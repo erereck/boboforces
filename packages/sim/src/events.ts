@@ -67,6 +67,11 @@ export interface KillEvent extends EventBase {
   readonly dirY: number;
   readonly dirZ: number;
   readonly force: number;
+  /**
+   * M2 (fase 2a): o maior assistente (25 de dano ou mais nos últimos 10 s, fora o matador), ou `NULL_ENTITY`. No
+   * plano de morte, `weapon` é `WEAPON_KILL_PLANE` e `killer` é quem feriu a vítima nos 5 s antes (ou ninguém).
+   */
+  readonly assister: EntityId;
 }
 
 /**
@@ -103,11 +108,42 @@ export interface MoveEvent extends EventBase {
   readonly speed: number;
 }
 
+/** M2: `weapon` é o código da arma (`WEAPON_CODE`). `cook` = puxou o pino da granada (segurando o gatilho). */
 export interface WeaponEvent extends EventBase {
   readonly type: 'weapon';
   readonly entity: EntityId;
   readonly weapon: number;
-  readonly action: 'switch' | 'reloadStart' | 'reloadEnd' | 'empty';
+  readonly action: 'switch' | 'reloadStart' | 'reloadEnd' | 'empty' | 'cook';
+}
+
+/**
+ * M2 (fase 1b): projétil (foguete, granada). `launch` quando sai (da arma, ou caindo da mão de quem morreu
+ * cozinhando), `bounce` quando a granada quica forte (som). `index` é o slot no pool
+ * (`SimView.projectiles`); o render acompanha a posição por lá.
+ */
+export interface ProjectileEvent extends EventBase {
+  readonly type: 'projectile';
+  readonly action: 'launch' | 'bounce';
+  readonly index: number;
+  readonly weapon: number;
+  readonly owner: EntityId;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly vx: number;
+  readonly vy: number;
+  readonly vz: number;
+}
+
+/** M2 (fase 1b): explosão (clarão, cubinhos, som, tremor). O dano vem em `hit`s à parte. */
+export interface ExplosionEvent extends EventBase {
+  readonly type: 'explosion';
+  readonly owner: EntityId;
+  readonly weapon: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly radius: number;
 }
 
 /** M1: golpe corpo a corpo do zumbi (animação e som; o dano vem num `hit` à parte quando acerta). */
@@ -118,12 +154,54 @@ export interface MeleeEvent extends EventBase {
   readonly target: EntityId;
 }
 
+/**
+ * M2 (fase 2b): caixinha de munição. `drop` quando cai de quem morreu (`entity` = o morto), `take` quando alguém pega
+ * (`entity` = quem pegou). `index` é o slot no pool (`SimView.pickups`).
+ */
+export interface PickupEvent extends EventBase {
+  readonly type: 'pickup';
+  readonly action: 'drop' | 'take';
+  readonly index: number;
+  readonly entity: EntityId;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/**
+ * M2 (fase 2b): Destravar. De onde (`from*`) para onde (pés, m); `respawned` = o bot travou pela 3ª vez na vida e
+ * foi para um spawn. O F2 registra o ponto de origem para corrigir o mapa.
+ */
+export interface UnstuckEvent extends EventBase {
+  readonly type: 'unstuck';
+  readonly entity: EntityId;
+  readonly fromX: number;
+  readonly fromY: number;
+  readonly fromZ: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly respawned: boolean;
+}
+
 export interface MatchPhaseEvent extends EventBase {
   readonly type: 'matchPhase';
   readonly phase: MatchPhase;
 }
 
 export type SimEvent =
-  ShotEvent | HitEvent | KillEvent | ImpactEvent | SpawnEvent | MoveEvent | WeaponEvent | MeleeEvent | MatchPhaseEvent;
+  | ShotEvent
+  | HitEvent
+  | KillEvent
+  | ImpactEvent
+  | SpawnEvent
+  | MoveEvent
+  | WeaponEvent
+  | MeleeEvent
+  | MatchPhaseEvent
+  | ProjectileEvent
+  | ExplosionEvent
+  | PickupEvent
+  | UnstuckEvent;
 
 export type SimEventType = SimEvent['type'];

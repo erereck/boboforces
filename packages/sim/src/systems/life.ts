@@ -1,18 +1,43 @@
 import type { FigurePart } from '@boboforces/format';
-import { MAX_TEAMS } from '../constants.ts';
-import { WEAPON_SLOTS } from '../config/weapons.ts';
-import { HIT_PARTS, hostile, isBody, PART_HEAD, WEAPON_NONE, type SimContext } from '../context.ts';
+import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
+import { METRICS } from '../config/metrics.ts';
+import { MATCH_DEFAULTS } from '../config/rules.ts';
+import { MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
+import { WEAPON_SLOT_COUNT } from '@boboforces/input';
+import {
+  DEFAULT_LOADOUT_REST,
+  DEFAULT_PRIMARY,
+  isPrimaryWeapon,
+  WEAPON_ROCKET,
+  WEAPONS,
+  weaponDef,
+} from '../config/weapons.ts';
+import { dropAmmoBox } from './pickups.ts';
+import { explode, launchProjectile } from './projectiles.ts';
+import {
+  HIT_PARTS,
+  hostile,
+  isBody,
+  PART_HEAD,
+  RULE_FLAG,
+  WEAPON_KILL_PLANE,
+  WEAPON_NONE,
+  type SimContext,
+} from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
 
 /**
- * Passos 5 a 7: dano e morte, regras do modo (tempo e placar) e spawns (respawn, proteção, regeneração).
- * Spawn: entre os pontos do time (ou de qualquer time, `team = -1`), sorteia um dos 3 mais longe dos inimigos vivos
- * (gameplay.md §5.3, versão simples: sem checar linha de visão). Os pontos vêm dos marcadores do mapa
- * (`simMapFromMarkers`). Zumbis (M1, estresse) usam qualquer ponto, o mais longe dos bobos, sem proteção nem
- * regeneração, e abates de zumbi não contam no placar dos times.
+ * Passos 5 a 7: dano e morte, regras do modo (contagem, tempo, meta e morte súbita) e spawns (respawn, proteção,
+ * regeneração).
+ *
+ * Spawn pontuado (gameplay.md §5.3; M2, fase 2a): no FFA, um dos 3 melhores pontos sem linha de visão de inimigo e a
+ * mais de 20 m dele; no TDM, entre os pontos do time (ou `team = -1`), o com menos inimigos à vista e, no empate, o
+ * mais longe deles. Os pontos vêm dos marcadores do mapa (`simMapFromMarkers`). Zumbis (M1, estresse) usam qualquer
+ * ponto, o mais longe dos bobos, sem proteção nem regeneração, e abates de zumbi não contam no placar dos times.
  */
 
 const F = ENTITY_FLAG;
+const R = RECENT_ATTACKERS;
 
 /** Passo 5: aplica a fila de dano na ordem em que foi gerada. */
 export function damageSystem(ctx: SimContext): void {
@@ -21,11 +46,18 @@ export function damageSystem(ctx: SimContext): void {
   for (let i = 0; i < q.count; i++) {
     const t = q.target[i]!;
     if (s.alive[t] === 0 || (s.flags[t]! & F.dead) !== 0) continue;
-    const attacker = q.attacker[i]!;
+    const source = q.attacker[i]!;
     let amount = q.amount[i]!;
+    // M2 (fase 3b): multiplicador de dano de quem atacou (regra do bot).
+    if (source !== NULL_ENTITY && s.isCurrent(source)) amount *= ctx.rules.damageMult[source & 0xffff]!;
     // Proteção de spawn segura dano de inimigo; queda e plano de morte passam.
-    if (attacker !== NULL_ENTITY && (s.flags[t]! & F.spawnProtected) !== 0) amount = 0;
-    if (ctx.match.phase === 'ended' && attacker !== NULL_ENTITY) amount = 0;
+    if (source !== NULL_ENTITY && (s.flags[t]! & F.spawnProtected) !== 0) amount = 0;
+    if (ctx.match.phase === 'ended' && source !== NULL_ENTITY) amount = 0;
+    // Plano de morte: o abate vai para quem feriu a vítima pouco antes (GDD §3.8); sem ninguém, é acidente.
+    const attacker =
+      source === NULL_ENTITY && q.weapon[i] === WEAPON_KILL_PLANE
+        ? recentAttacker(ctx, t, ctx.killPlaneCreditTicks)
+        : source;
     const id = s.idOf(t);
     const part = q.part[i]!;
     const bodyPart = q.bodyPart[i]! as FigurePart;
@@ -33,11 +65,80 @@ export function damageSystem(ctx: SimContext): void {
       s.health[t] = s.health[t]! - amount;
       s.lastDamageTick[t] = ctx.tick;
       s.lastAttacker[t] = attacker;
+      if (source !== NULL_ENTITY) noteAttacker(ctx, t, source, amount);
     }
     ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, bodyPart, amount, q.point, q.dir, i);
     if (s.health[t]! <= 0) kill(ctx, t, attacker, q.weapon[i]!, part === PART_HEAD, bodyPart, i);
   }
   q.count = 0;
+}
+
+/**
+ * Guarda o golpe de um inimigo em `t` (assistência e crédito do plano de morte). O mesmo agressor soma o dano; o dano
+ * de fora da janela da assistência não conta. Sem vaga, entra no lugar do golpe mais antigo.
+ */
+function noteAttacker(ctx: SimContext, t: number, attacker: EntityId, amount: number): void {
+  const s = ctx.s;
+  if (!s.isCurrent(attacker) || !hostile(ctx, attacker & 0xffff, t)) return;
+  const base = t * R;
+  let slot = -1;
+  let empty = -1;
+  let oldest = -1;
+  for (let k = base; k < base + R; k++) {
+    const from = s.recentFrom[k]!;
+    if (from === attacker) {
+      slot = k;
+      break;
+    }
+    if (from === NULL_ENTITY) {
+      if (empty < 0) empty = k;
+    } else if (oldest < 0 || s.recentTick[k]! < s.recentTick[oldest]!) oldest = k;
+  }
+  if (slot < 0) {
+    slot = empty >= 0 ? empty : oldest;
+    s.recentFrom[slot] = attacker;
+    s.recentDamage[slot] = 0;
+  } else if (ctx.tick - s.recentTick[slot]! > ctx.assistWindowTicks) s.recentDamage[slot] = 0;
+  s.recentDamage[slot] = s.recentDamage[slot]! + amount;
+  s.recentTick[slot] = ctx.tick;
+}
+
+/** O inimigo que feriu `t` por último, se foi há no máximo `windowTicks` e ele ainda existe; senão `NULL_ENTITY`. */
+function recentAttacker(ctx: SimContext, t: number, windowTicks: number): EntityId {
+  const s = ctx.s;
+  let best: EntityId = NULL_ENTITY;
+  let bestTick = ctx.tick - windowTicks - 1;
+  for (let k = t * R; k < t * R + R; k++) {
+    const from = s.recentFrom[k]!;
+    if (from === NULL_ENTITY || s.recentTick[k]! <= bestTick || !s.isCurrent(from)) continue;
+    best = from;
+    bestTick = s.recentTick[k]!;
+  }
+  return best;
+}
+
+/**
+ * Conta as assistências da morte de `t` (quem não é o matador e fez `assistMinDamage` ou mais na janela) e devolve
+ * a maior delas (`NULL_ENTITY` se nenhuma).
+ */
+function creditAssists(ctx: SimContext, t: number, killer: EntityId): EntityId {
+  const s = ctx.s;
+  let assister: EntityId = NULL_ENTITY;
+  let best = 0;
+  for (let k = t * R; k < t * R + R; k++) {
+    const from = s.recentFrom[k]!;
+    if (from === NULL_ENTITY || from === killer || !s.isCurrent(from)) continue;
+    if (ctx.tick - s.recentTick[k]! > ctx.assistWindowTicks) continue;
+    const dmg = s.recentDamage[k]!;
+    if (dmg < ctx.assistMinDamage) continue;
+    const a = from & 0xffff;
+    s.assists[a] = s.assists[a]! + 1;
+    if (dmg > best) {
+      best = dmg;
+      assister = from;
+    }
+  }
+  return assister;
 }
 
 function kill(
@@ -52,6 +153,28 @@ function kill(
   const s = ctx.s;
   const q = ctx.damage;
   s.health[t] = 0;
+  // Morreu cozinhando a granada: ela cai da mão com o pavio que sobrou.
+  if (s.cookTicks[t]! >= 0) {
+    const held = weaponDef(s.weapon[t]!);
+    if (held !== null) {
+      const k = t * WEAPON_SLOT_COUNT + s.slot[t]!;
+      if (s.slotClip[k]! > 0) s.slotClip[k] = s.slotClip[k]! - 1;
+      const t3 = t * 3;
+      launchProjectile(
+        ctx,
+        s.idOf(t),
+        held,
+        s.position[t3]!,
+        s.position[t3 + 1]! + 1,
+        s.position[t3 + 2]!,
+        0,
+        0,
+        0,
+        s.cookTicks[t]!,
+      );
+    }
+    s.cookTicks[t] = -1;
+  }
   s.flags[t] = (s.flags[t]! & F.onGround) | F.dead;
   const t3 = t * 3;
   s.velocity[t3] = 0;
@@ -62,6 +185,8 @@ function kill(
   s.respawnTicks[t] = (zombie ? ctx.zombieRespawnTicks : ctx.respawnTicks) + 1;
   s.reloadTicks[t] = 0;
   s.slideTicks[t] = 0;
+  s.adsAmount[t] = 0;
+  s.burstShots[t] = 0;
   s.recoilPitch[t] = 0;
   s.recoilYaw[t] = 0;
   s.deaths[t] = s.deaths[t]! + 1;
@@ -76,13 +201,38 @@ function kill(
       }
     }
   }
-  ctx.events.kill(ctx.tick, killer, s.idOf(t), weapon, headshot, bodyPart, q.dir, q.force[item]!, item);
+  // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
+  if (ctx.warfare && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);
+  // M2 (fase 3b): "explode ao morrer" (regra do bot): a explosão do foguete no peito, de quem morreu.
+  if ((ctx.rules.flags[t]! & RULE_FLAG.explodeOnDeath) !== 0 && weapon !== WEAPON_KILL_PLANE) {
+    explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, WEAPON_ROCKET, s.idOf(t), -1);
+  }
+  const assister = creditAssists(ctx, t, killer);
+  ctx.events.kill(ctx.tick, killer, s.idOf(t), weapon, headshot, bodyPart, q.dir, q.force[item]!, item, assister);
 }
 
-/** Passo 6: relógio e limite de placar. Partida terminada não tem mais dano de arma nem respawn. */
+/**
+ * Passo 6: contagem inicial, relógio, meta e morte súbita. Empate no fim (tempo ou meta) abre a morte súbita, se a
+ * partida tiver; nela, o primeiro abate que desempata encerra, e o fim do relógio dela encerra empatado. Partida
+ * terminada não tem mais dano de arma nem respawn.
+ */
 export function rulesSystem(ctx: SimContext): void {
   const m = ctx.match;
-  if (m.phase !== 'playing') return;
+  if (m.phase === 'ended') return;
+  if (m.phase === 'warmup') {
+    if (m.countdownTicks > 0) m.countdownTicks--;
+    if (m.countdownTicks === 0) {
+      m.phase = 'playing';
+      ctx.events.matchPhase(ctx.tick, 'playing');
+    }
+    return;
+  }
+  if (m.phase === 'suddenDeath') {
+    const lead = leader(ctx);
+    if (lead >= 0) endMatch(ctx, lead);
+    else if (m.ticksLeft > 0 && --m.ticksLeft === 0) endMatch(ctx, -1);
+    return;
+  }
   let ended = false;
   if (m.ticksLeft > 0) {
     m.ticksLeft--;
@@ -99,17 +249,36 @@ export function rulesSystem(ctx: SimContext): void {
     }
   }
   if (!ended) return;
+  const lead = leader(ctx);
+  if (lead < 0 && ctx.suddenDeathTicks > 0) {
+    m.phase = 'suddenDeath';
+    m.ticksLeft = ctx.suddenDeathTicks;
+    ctx.events.matchPhase(ctx.tick, 'suddenDeath');
+    return;
+  }
+  endMatch(ctx, lead);
+}
+
+function endMatch(ctx: SimContext, team: number): void {
+  const m = ctx.match;
   m.phase = 'ended';
-  m.winnerTeam = winner(ctx);
+  m.winnerTeam = team;
+  m.winnerEntity = ctx.ffa && team >= 0 ? leaderEntity : NULL_ENTITY;
   ctx.events.matchPhase(ctx.tick, 'ended');
 }
 
-/** Time com mais pontos (no FFA, o time de quem tem mais abates); empate = -1. */
-function winner(ctx: SimContext): number {
+/** O bobo na frente no FFA (escrito por `leader`). */
+let leaderEntity: EntityId = NULL_ENTITY;
+
+/**
+ * Time com mais pontos (no FFA, o time de quem tem mais abates, e o bobo vai em `leaderEntity`); empate = -1.
+ */
+function leader(ctx: SimContext): number {
   const s = ctx.s;
   let best = -1;
   let bestScore = -1;
   let tie = false;
+  leaderEntity = NULL_ENTITY;
   if (ctx.ffa) {
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
@@ -117,6 +286,7 @@ function winner(ctx: SimContext): number {
       if (k > bestScore) {
         bestScore = k;
         best = s.team[e]!;
+        leaderEntity = s.idOf(e);
         tie = false;
       } else if (k === bestScore) tie = true;
     }
@@ -148,62 +318,203 @@ export function spawnSystem(ctx: SimContext): void {
     if (
       ctx.warfare &&
       s.kind[e] === ENTITY_KIND.bobo &&
-      s.health[e]! < ctx.maxHp &&
+      s.health[e]! < ctx.rules.maxHp[e]! &&
       ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks
     ) {
-      s.health[e] = Math.min(ctx.maxHp, s.health[e]! + ctx.regenPerTick);
+      s.health[e] = Math.min(ctx.rules.maxHp[e]!, s.health[e]! + ctx.regenPerTick);
     }
   }
 }
 
+/** Teto da nota (distância², m²): sem inimigo vivo, todo ponto empata nele (e o 1º da lista ganha, como antes). */
+const SPAWN_SCORE_CAP = 1e8;
+/** Cada inimigo que enxerga o ponto do TDM pesa mais que qualquer distância. */
+const SIGHT_PENALTY = 1e9;
+/** No TDM, contar até 3 inimigos à vista basta (mais que isso é igualmente ruim) e poupa raios. */
+const SIGHT_COUNT_MAX = 3;
+const sightHit = createRayHit();
+let best0 = -1;
+let best1 = -1;
+let best2 = -1;
+
 /**
- * Melhor ponto para renascer: candidatos do time (ou `-1`; zumbi: todos), nota = menor distância² até um inimigo vivo,
- * sorteio entre os 3 melhores (`rng.spawn`). Sem candidatos, qualquer ponto.
+ * Melhor ponto para renascer (gameplay.md §5.3). Candidatos: os do time (ou `-1`; FFA e zumbi: todos; sem nenhum,
+ * qualquer ponto). Nota base = menor distância² até um inimigo vivo.
+ * - FFA: em ordem de nota, os pontos a mais de `ffaSpawnMinDistM` de todo inimigo e sem linha de visão de nenhum; a
+ *   visão só é testada até achar 3. Sem ponto seguro, cai na regra da distância.
+ * - TDM: cada inimigo que enxerga o ponto tira `SIGHT_PENALTY` da nota; o sorteio fica entre os 3 melhores que têm
+ *   tão poucos inimigos à vista quanto o melhor.
+ * - Zumbi: só a distância.
+ * O sorteio entre os 3 usa `rng.spawn`.
  */
 export function pickSpawn(ctx: SimContext, e: number): number {
   const s = ctx.s;
   const spawns = ctx.spawns;
-  const anyTeam = ctx.ffa || s.kind[e] === ENTITY_KIND.zombie;
-  let b0 = -1;
-  let b1 = -1;
-  let b2 = -1;
-  let s0 = -1;
-  let s1 = -1;
-  let s2 = -1;
-  for (let pass = 0; pass < 2 && b0 < 0; pass++) {
-    for (let i = 0; i < spawns.length; i++) {
+  const n = spawns.length;
+  const score = ctx.spawnScore;
+  const mark = ctx.spawnMark;
+  const zombie = s.kind[e] === ENTITY_KIND.zombie;
+  const anyTeam = ctx.ffa || zombie;
+  let allowed = 0;
+  for (let pass = 0; pass < 2 && allowed === 0; pass++) {
+    for (let i = 0; i < n; i++) {
       const sp = spawns[i]!;
-      if (pass === 0 && !anyTeam && sp.team !== -1 && sp.team !== s.team[e]) continue;
-      let score = Infinity;
-      for (let j = 0; j < s.count; j++) {
-        if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
-        if (!hostile(ctx, e, j)) continue;
-        const dx = s.position[j * 3]! - sp.x;
-        const dz = s.position[j * 3 + 2]! - sp.z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 < score) score = d2;
+      if (pass === 0 && !anyTeam && sp.team !== -1 && sp.team !== s.team[e]) {
+        score[i] = -Infinity;
+        continue;
       }
-      if (score > s0) {
-        b2 = b1;
-        s2 = s1;
-        b1 = b0;
-        s1 = s0;
-        b0 = i;
-        s0 = score;
-      } else if (score > s1) {
-        b2 = b1;
-        s2 = s1;
-        b1 = i;
-        s1 = score;
-      } else if (score > s2) {
-        b2 = i;
-        s2 = score;
-      }
+      score[i] = Math.min(nearestEnemy2(ctx, e, sp.x, sp.z), SPAWN_SCORE_CAP);
+      allowed++;
     }
   }
-  const n = b2 >= 0 ? 3 : b1 >= 0 ? 2 : 1;
+  if (!zombie && ctx.ffa) {
+    const minD2 = MATCH_DEFAULTS.ffaSpawnMinDistM * MATCH_DEFAULTS.ffaSpawnMinDistM;
+    mark.fill(0, 0, n);
+    let found = 0;
+    let a0 = -1;
+    let a1 = -1;
+    let a2 = -1;
+    while (found < 3) {
+      let pick = -1;
+      let v = -Infinity;
+      for (let i = 0; i < n; i++) {
+        if (mark[i] === 0 && score[i]! > v) {
+          v = score[i]!;
+          pick = i;
+        }
+      }
+      // Daqui para baixo todo ponto está a menos de 20 m de algum inimigo.
+      if (pick < 0 || v <= minD2) break;
+      mark[pick] = 1;
+      const sp = spawns[pick]!;
+      if (enemiesSeeing(ctx, e, sp.x, sp.y, sp.z, 1) > 0) continue;
+      if (found === 0) a0 = pick;
+      else if (found === 1) a1 = pick;
+      else a2 = pick;
+      found++;
+    }
+    if (a0 >= 0) return chooseSpawn(ctx, a0, a1, a2);
+  } else if (!zombie) {
+    for (let i = 0; i < n; i++) {
+      if (score[i] === -Infinity) continue;
+      const sp = spawns[i]!;
+      const seen = enemiesSeeing(ctx, e, sp.x, sp.y, sp.z, SIGHT_COUNT_MAX);
+      mark[i] = seen;
+      score[i] = score[i]! - seen * SIGHT_PENALTY;
+    }
+    top3(score, n);
+    const fewest = mark[best0]!;
+    return chooseSpawn(
+      ctx,
+      best0,
+      best1 >= 0 && mark[best1] === fewest ? best1 : -1,
+      best2 >= 0 && mark[best1] === fewest && mark[best2] === fewest ? best2 : -1,
+    );
+  }
+  top3(score, n);
+  return chooseSpawn(ctx, best0, best1, best2);
+}
+
+/** Menor distância² (no plano) de um inimigo vivo de `e` até (x, z); `Infinity` se não houver. */
+function nearestEnemy2(ctx: SimContext, e: number, x: number, z: number): number {
+  const s = ctx.s;
+  let best = Infinity;
+  for (let j = 0; j < s.count; j++) {
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
+    if (!hostile(ctx, e, j)) continue;
+    const dx = s.position[j * 3]! - x;
+    const dz = s.position[j * 3 + 2]! - z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < best) best = d2;
+  }
+  return best;
+}
+
+/**
+ * Quantos inimigos vivos de `e` enxergam o ponto (pés em x, y, z): olho no olho, dentro do alcance de visão, sem
+ * bloco ou prop que tape a vista no caminho. Para de contar em `max`.
+ */
+function enemiesSeeing(ctx: SimContext, e: number, x: number, y: number, z: number, max: number): number {
+  const s = ctx.s;
+  const eye = METRICS.eyeHeight;
+  const range = MATCH_DEFAULTS.viewDistanceM;
+  let n = 0;
+  for (let j = 0; j < s.count && n < max; j++) {
+    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
+    if (!hostile(ctx, e, j)) continue;
+    const ox = s.position[j * 3]!;
+    const oy = s.position[j * 3 + 1]! + eye;
+    const oz = s.position[j * 3 + 2]!;
+    const dx = x - ox;
+    const dy = y + eye - oy;
+    const dz = z - oz;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d > range) continue;
+    if (d < 1e-6) {
+      n++;
+      continue;
+    }
+    const blocked = raycastGrid(
+      ctx.grid,
+      ctx.blocks,
+      ox,
+      oy,
+      oz,
+      dx / d,
+      dy / d,
+      dz / d,
+      d,
+      BLOCK_FLAG.blocksSight,
+      sightHit,
+      ctx.colliders,
+    );
+    if (!blocked) n++;
+  }
+  return n;
+}
+
+/** Os 3 maiores de `score` (fora os `-Infinity`), em `best0..2` (-1 = faltou); no empate, o de índice menor. */
+function top3(score: Float64Array, n: number): void {
+  best0 = -1;
+  best1 = -1;
+  best2 = -1;
+  let s0 = -Infinity;
+  let s1 = -Infinity;
+  let s2 = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const v = score[i]!;
+    if (v === -Infinity) continue;
+    if (v > s0) {
+      best2 = best1;
+      s2 = s1;
+      best1 = best0;
+      s1 = s0;
+      best0 = i;
+      s0 = v;
+    } else if (v > s1) {
+      best2 = best1;
+      s2 = s1;
+      best1 = i;
+      s1 = v;
+    } else if (v > s2) {
+      best2 = i;
+      s2 = v;
+    }
+  }
+}
+
+/** Sorteia um dos até 3 pontos (`-1` = não há; `a` sempre existe). */
+function chooseSpawn(ctx: SimContext, a: number, b: number, c: number): number {
+  const n = b < 0 ? 1 : c < 0 ? 2 : 3;
   const k = ctx.rngSpawn.int(0, n);
-  return k === 0 ? b0 : k === 1 ? b1 : b2;
+  return k === 0 ? a : k === 1 ? b : c;
+}
+
+/** A 1ª primária permitida pela máscara, ou `WEAPON_NONE` (a lista só tem armas de outros slots). */
+function firstAllowedPrimary(mask: number): number {
+  for (let code = 0; code < WEAPONS.length; code++)
+    if ((mask & (1 << code)) !== 0 && isPrimaryWeapon(code)) return code;
+  return WEAPON_NONE;
 }
 
 /** Põe o bobo (ou zumbi) `e` vivo no spawn `index`, com vida, munição e proteção cheias. */
@@ -225,12 +536,30 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.prevYaw[e] = sp.yaw;
   s.pitch[e] = 0;
   s.prevPitch[e] = 0;
-  s.health[e] = zombie ? ctx.zombieHp : ctx.maxHp;
-  // Zumbi não tem arma (o render não desenha nenhuma; o golpe é o `meleeSystem`).
-  const def = zombie ? null : WEAPON_SLOTS[0];
-  s.weapon[e] = zombie ? WEAPON_NONE : 0;
-  s.ammoClip[e] = def ? def.clipSize : 0;
-  s.ammoReserve[e] = def ? def.reserve : 0;
+  s.health[e] = zombie ? ctx.zombieHp : ctx.rules.maxHp[e]!;
+  // Loadout do Bobo Warfare (gameplay.md §4.1): a primária escolhida (`primaryChoice`), pistola, faca e 2 granadas,
+  // com pente e reserva cheios. Zumbi não tem arma (o render não desenha nenhuma; o golpe é o `meleeSystem`).
+  const k = e * WEAPON_SLOT_COUNT;
+  // M2 (fase 3b): armas permitidas (regra do bot): o que não está na lista sai do loadout; a primária vira a 1ª
+  // permitida; a mão começa no 1º slot que sobrou.
+  const mask = ctx.rules.weaponMask[e]!;
+  let primary = isPrimaryWeapon(s.primaryChoice[e]!) ? s.primaryChoice[e]! : DEFAULT_PRIMARY;
+  if (mask !== 0 && (mask & (1 << primary)) === 0) primary = firstAllowedPrimary(mask);
+  let first = -1;
+  for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
+    let code = zombie ? WEAPON_NONE : slot === 0 ? primary : (DEFAULT_LOADOUT_REST[slot - 1] ?? WEAPON_NONE);
+    if (mask !== 0 && code !== WEAPON_NONE && (mask & (1 << code)) === 0) code = WEAPON_NONE;
+    const def = weaponDef(code);
+    s.loadout[k + slot] = code;
+    s.slotClip[k + slot] = def ? def.clipSize : 0;
+    s.slotReserve[k + slot] = def ? def.reserve : 0;
+    if (first < 0 && def !== null) first = slot;
+  }
+  s.slot[e] = first < 0 ? 0 : first;
+  s.weapon[e] = s.loadout[k + s.slot[e]!]!;
+  s.cookTicks[e] = -1;
+  s.adsAmount[e] = 0;
+  s.burstShots[e] = 0;
   s.recoilPitch[e] = 0;
   s.recoilYaw[e] = 0;
   s.coyoteTicks[e] = 0;
@@ -247,6 +576,10 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.spawnProtectTicks[e] = protect;
   s.lastDamageTick[e] = -1_000_000;
   s.lastAttacker[e] = NULL_ENTITY;
+  s.recentFrom.fill(NULL_ENTITY, e * R, e * R + R);
+  s.recentDamage.fill(0, e * R, e * R + R);
+  s.recentTick.fill(0, e * R, e * R + R);
+  s.unstuckCount[e] = 0;
   s.flags[e] = F.onGround | (protect > 0 ? F.spawnProtected : 0);
   ctx.events.spawn(ctx.tick, s.idOf(e));
 }

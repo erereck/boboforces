@@ -30,6 +30,9 @@ export const STRINGS_PT_BR = {
   'pause.title': 'Pausado',
   'pause.resume': 'Continuar',
   'pause.unstuck': 'Destravar',
+  /** M2 (fase 2e): Ajustar desafio na pausa (gameplay.md §2.2). */
+  'pause.challenge': 'Ajustar desafio',
+  'pause.challengeHint': 'Nível dos bots adversários, valendo agora',
   'pause.quitMatch': 'Sair da partida',
 
   'hud.health': 'Vida',
@@ -41,6 +44,112 @@ export const STRINGS_PT_BR = {
   'hud.clickToAim': 'Clique para mirar com o mouse',
   /** Rótulo da vista no 2–4P (com o ícone e a cor do jogador). */
   'hud.player': 'P{n}',
+  /** M2: entre o nome da arma e a categoria ("Rattler · Fuzil", gameplay.md §4.1). */
+  'hud.weaponSeparator': ' · ',
+
+  /** M2: nomes das armas em inglês bobo (#15, #61) e a categoria em pt-BR. IDs internos em `weapon:<id>`. */
+  'weapon.rifle': 'Rattler',
+  'weapon.pistol': 'Pop Gun',
+  'weapon.smg': 'Buzzer',
+  'weapon.shotgun': 'Door Knocker',
+  'weapon.sniper': 'Peekaboo',
+  'weapon.rocket': 'Kaboomer',
+  'weapon.knife': 'Butter Knife',
+  'weapon.grenade': 'Pineapple',
+  'weapon.lmg': 'Lawnmower',
+  'weapon.category.pistol': 'Pistola',
+  'weapon.category.smg': 'SMG',
+  'weapon.category.rifle': 'Fuzil',
+  'weapon.category.shotgun': 'Escopeta',
+  'weapon.category.sniper': 'Sniper',
+  'weapon.category.explosive': 'Lança-foguetes',
+  'weapon.category.melee': 'Faca',
+  'weapon.category.throwable': 'Granada',
+  'weapon.category.lmg': 'Metralhadora',
+
+  /** M2 (fase 2c): tela de morte (gameplay.md §5.5): quem matou, a causa sem matador e o menu da primária. */
+  'death.killedBy': 'Abatido por',
+  'death.self': 'Foi você mesmo',
+  'death.void': 'Caiu no vazio',
+  'death.fall': 'Queda',
+  /** A "arma" quando o abate veio do plano de morte com crédito (GDD §3.8). */
+  'death.pushedVoid': 'Empurrão no vazio',
+  /** A "arma" do zumbi. */
+  'death.bite': 'Mordida',
+  'death.hp': 'HP',
+  'death.choose': 'Arma da próxima vida',
+  /** Setas do seletor de uma linha (3–4P), com o espaço do lado do nome. */
+  'death.cyclePrev': '« ',
+  'death.cycleNext': ' »',
+  /** Derrota feia (GDD §3.8), 1 vez por partida. Sem "→" na fonte: o » faz a seta. */
+  'death.hardTime': 'Tá puxado? Pausa » Ajustar desafio',
+  /** Nomes dos bots de fábrica (gameplay.md §6.7; inglês bobo, #15 e #61). A chave é o id `bot:<id>`. */
+  'bot.name.vibe-bob': 'Vibe Bob',
+  'bot.name.chill-bob': 'Chill Bob',
+  'bot.name.normal-bob': 'Normal Bob',
+  'bot.name.sweaty-bob': 'Sweaty Bob',
+  'bot.name.tryhard-bob': 'Tryhard Bob',
+  'bot.name.jorge-the-immortal': 'Jorge the Immortal',
+  'bot.name.camper-carl': 'Camper Carl',
+  'bot.name.knife-ninja': 'Knife Ninja',
+  'bot.name.scaredy-sam': 'Scaredy Sam',
+  'bot.name.hunter-hank': 'Hunter Hank',
+  'bot.name.buddy': 'Buddy',
+  'bot.name.goofy-gus': 'Goofy Gus',
+  'zombie.name': 'Zumbi',
+
+  /** M2 (fase 2d): HUD da partida. */
+  'hud.suddenDeath': 'Morte súbita',
+  'scoreboard.player': 'Jogador',
+  'scoreboard.kills': 'Abates',
+  'scoreboard.deaths': 'Mortes',
+  'scoreboard.assists': 'Assist.',
+  // M2 (fecho da fase 3): regras ativas de um bot (GDD §6.5: aparecem no placar e na tela de morte).
+  'rule.line': '{name}: {rules}',
+  'rule.separator': ' · ',
+  'rule.hp': '{n} de vida',
+  'rule.damage': 'dano ×{n}',
+  'rule.speed': 'velocidade ×{n}',
+  'rule.only': 'só {list}',
+  'rule.listSeparator': ', ',
+  'rule.infiniteClip': 'pente infinito',
+  'rule.infiniteReserve': 'munição infinita',
+  'rule.headshotImmune': 'imune a tiro na cabeça',
+  'rule.explodeOnDeath': 'explode ao morrer',
+  /** Contagem inicial: quem vem pela frente (gameplay.md §2.2: "Hoje: 6 Jorges"). */
+  'countdown.today': 'Hoje: {list}',
+  'countdown.group': '{n} × {name}',
+  'countdown.separator': ', ',
+
+  /** M2 (fase 2e): tela de resultado (gameplay.md §2.2). */
+  'result.win': 'Vitória!',
+  'result.loss': 'Derrota',
+  'result.draw': 'Empate',
+  'result.ffaWinner': '{name} venceu',
+  'result.score': '{own} × {other}',
+  'result.level': 'Bots: {level}',
+  'result.mvp': 'MVP: {name}',
+  'result.nemesis': 'Nêmesis: {name} (te pegou {n}×)',
+  'result.noNemesis': 'Nêmesis: ninguém te pegou',
+  'result.victim': 'Freguês: {name} (você pegou {n}×)',
+  'result.noVictim': 'Freguês: ninguém, ainda',
+  'result.numbersTitle': 'Seus números',
+  'result.numbers': '{kills} abates · {accuracy} de precisão · sequência de {streak}',
+  'result.noAccuracy': '—',
+  'result.prizesTitle': 'Prêmios bobos',
+  'result.prizeLine': '{prize}: {name}',
+  'result.again': 'De novo',
+  'result.easier': 'Mais fácil',
+  'result.harder': 'Mais difícil',
+  'result.changeRules': 'Mudar regras',
+  'result.savePreset': 'Salvar preset',
+  'result.saveWorkshop': 'Salvar na Oficina',
+  'result.quit': 'Sair',
+  'prize.crookedAim': 'Mira torta',
+  'prize.kamikaze': 'Kamikaze',
+  'prize.coward': 'Mais covarde',
+  'prize.waiter': 'Garçom das assistências',
+  'prize.immortal': 'Imortal de verdade',
 
   /** Painel F2 (tecnico.md §9 e §24.2): rótulos curtos; números sem `Intl`. */
   'debug.title': 'Depuração · F2',
@@ -252,6 +361,9 @@ export const STRINGS_PT_BR = {
   'issue.recipe.botsOverPlatformCap': 'Bots demais para este aparelho: a partida foi reduzida.',
   'issue.recipe.humansOverPlatformCap': 'Jogadores demais para este aparelho.',
   'issue.recipe.viewDistanceOverPlatformCap': 'Alcance de visão limitado pelo aparelho.',
+  /** M2 (fase 3a): avisos do `bot@1`. */
+  'issue.bot.invalidField': 'Um campo do bot estava num formato estranho e foi ignorado.',
+  'issue.bot.valueClamped': 'Um valor do bot passou do limite e foi ajustado.',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type StringKey = keyof typeof STRINGS_PT_BR;

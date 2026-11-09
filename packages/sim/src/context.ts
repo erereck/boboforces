@@ -1,5 +1,6 @@
 import type { FigurePart } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
+import type { NavGrid } from '@boboforces/nav';
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 import type { HitPart } from './config/metrics.ts';
 import type { MovementProfile } from './config/movement.ts';
@@ -90,12 +91,45 @@ export class DamageQueue {
   }
 }
 
+/**
+ * M2 (fase 2a): o plano de morte entra no `weapon` do dano e da morte com este código (não é arma): a sim credita o
+ * abate a quem feriu a vítima pouco antes (GDD §3.8), e o kill feed mostra a queda.
+ */
+export const WEAPON_KILL_PLANE = 254;
+
+/**
+ * M2 (fase 3b): regras de cada bobo (gameplay.md §6.5), uma por índice de entidade, montadas na criação a partir dos
+ * bots da receita (`resolveBot`): ficam fora do estado (saem da receita), então não vão no snapshot nem no hash. Os
+ * humanos e os bots sem regra ficam no padrão (vida da partida, ×1, sem restrição).
+ */
+export interface EntityRules {
+  readonly maxHp: Float32Array;
+  readonly damageMult: Float32Array;
+  readonly speed: Float32Array;
+  /** `AMMO_RULE`. */
+  readonly ammo: Uint8Array;
+  /** Armas permitidas (bit = código da arma); 0 = todas. */
+  readonly weaponMask: Uint16Array;
+  /** `RULE_FLAG`. */
+  readonly flags: Uint8Array;
+}
+
+/** Munição por regra: normal, reserva infinita, pente infinito. */
+export const AMMO_RULE = { normal: 0, infiniteReserve: 1, infiniteClip: 2 } as const;
+
+/** Bits de `EntityRules.flags`. */
+export const RULE_FLAG = { headshotImmune: 1, explodeOnDeath: 2 } as const;
+
 /** Estado da partida (o `MatchView` lê daqui). */
 export interface MatchState {
   phase: MatchPhase;
   ticksLeft: number;
+  /** M2: ticks da contagem inicial que faltam (`warmup`). */
+  countdownTicks: number;
   readonly teamScore: Int32Array;
   winnerTeam: number;
+  /** M2: vencedor do FFA (EntityId) ou `NULL_ENTITY`. */
+  winnerEntity: number;
 }
 
 /** Paredes invisíveis em X/Z (metros); o movimento desconta a meia largura da AABB. */
@@ -132,6 +166,24 @@ export interface SimContext {
   readonly regenDelayTicks: number;
   readonly regenPerTick: number;
   readonly scoreLimit: number;
+  /** M2 (fase 2a): morte súbita, janela da assistência, crédito do plano de morte (ticks) e o mínimo da assistência. */
+  readonly suddenDeathTicks: number;
+  readonly assistWindowTicks: number;
+  readonly assistMinDamage: number;
+  readonly killPlaneCreditTicks: number;
+  /**
+   * M2: rascunho do spawn pontuado, um valor por ponto do mapa, alocado na criação: a nota e uma marca (FFA: ponto já
+   * testado; TDM: quantos inimigos o enxergam).
+   */
+  readonly spawnScore: Float64Array;
+  readonly spawnMark: Uint8Array;
+  /** M2 (fase 2b): navegação do mapa (Destravar) e o componente com mais nós (o "mapa de verdade"). */
+  readonly nav: NavGrid | null;
+  readonly navMainComponent: number;
+  /** M2 (fase 2b): vida da caixinha de munição em ticks. */
+  readonly ammoBoxTicks: number;
+  /** M2 (fase 3b): regras por entidade. */
+  readonly rules: EntityRules;
   /** Abaixo disto (pés, m) o bobo morre (tecnico.md §4.5). */
   readonly killPlaneY: number;
   /** Área jogável do mapa, ou `null` (a grade inteira; a borda da grade já é parede para a colisão). */

@@ -144,6 +144,16 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:sandbags',
   // Caixote grande (frente skins-modelos; registrado na integração do M1)
   'model:crate-large',
+  // M2 (fase 1c): o resto do arsenal e o foguete em voo (só acrescentados, regra 20)
+  'model:smg',
+  'model:shotgun',
+  'model:rocket',
+  'model:knife',
+  'model:grenade',
+  'model:lmg',
+  'model:rocket-shell',
+  // M2 (fase 2b): a caixinha de munição de quem morre (só acrescentado, regra 20)
+  'model:ammo-box',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',
@@ -158,6 +168,14 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'skin:moicano',
   'skin:barbudo',
   'skin:trancas',
+  // M2 (fase 3a): os bots de fábrica especiais (gameplay.md §6.7; só acrescentados, regra 20)
+  'bot:jorge-the-immortal',
+  'bot:camper-carl',
+  'bot:knife-ninja',
+  'bot:scaredy-sam',
+  'bot:hunter-hank',
+  'bot:buddy',
+  'bot:goofy-gus',
 ];
 
 /** IDs aposentados e quem os substitui (vazio no M0). */

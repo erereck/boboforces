@@ -1,7 +1,7 @@
 import { BitWriter, i16ToPitch, u16ToYaw } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
 import { BUTTON } from './actions.ts';
-import { createInputFrame, writeInputFrame, type InputFrame } from './frame.ts';
+import { createInputFrame, INPUT_FRAME_BITS, writeInputFrame, type InputFrame } from './frame.ts';
 import { keyIndex, type KeyCode } from './keys.ts';
 import { createInputMapper, MAX_PITCH, MENU_REPEAT_DELAY_S, MENU_REPEAT_INTERVAL_S } from './mapper.ts';
 import {
@@ -407,7 +407,7 @@ describe('determinismo', () => {
       raw.gamepads[0]!.connected = true;
       const a = kbm();
       const b = createInputMapper({ kind: 'gamepad', index: 0 }, createGamepadProfile());
-      const w = new BitWriter(240 * 2 * 11);
+      const w = new BitWriter((240 * 2 * INPUT_FRAME_BITS) / 8);
       const f = createInputFrame();
       let x = 12345;
       for (let tick = 0; tick < 240; tick++) {

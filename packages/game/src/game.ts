@@ -1,4 +1,5 @@
-import { GAME_CODENAME, GAME_VERSION } from '@boboforces/format';
+import { GAME_CODENAME, GAME_VERSION, type BotLevel } from '@boboforces/format';
+import { stepLevel } from './pause.ts';
 import {
   confirmConventionFor,
   createMenuInput,
@@ -38,6 +39,7 @@ import {
   type RendererFactory,
   type RendererRoutes,
   type Scene,
+  type PlaySquad,
   type SceneBundle,
   type SceneKind,
   type SceneRequest,
@@ -92,6 +94,10 @@ export interface GameDeps {
    * renderer completo; Switch e testes: o módulo direto. Ausente = JOGAR não abre nada (só registra no log).
    */
   readonly loadScene?: () => Promise<SceneBundle>;
+  /** M2 (fase 3g): quem joga no JOGAR (web: `?bots=fabrica`); padrão `levels`. */
+  readonly playSquad?: PlaySquad;
+  /** M2 (fase 3h): nível do primeiro JOGAR (web: `?nivel=suado`); padrão Normal. O resultado sobe e desce a partir dele. */
+  readonly playLevel?: BotLevel;
 }
 
 export type GameScreen = 'loading' | 'title' | 'settings' | 'scene' | 'test' | 'error';
@@ -262,6 +268,9 @@ export function startGame(deps: GameDeps): GameHandle {
     }
   }
 
+  /** M2 (fase 2e): nível dos bots do próximo JOGAR (o resultado sobe e desce um passo). */
+  let playLevel: BotLevel = deps.playLevel ?? 'normal';
+
   function requestScene(kind: SceneKind, bench: BenchConfig | null): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
@@ -276,6 +285,8 @@ export function startGame(deps: GameDeps): GameHandle {
       convention,
       device: menuInput.lastDevice,
       gamepad: menuInput.lastGamepad,
+      level: playLevel,
+      ...(deps.playSquad ? { squad: deps.playSquad } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;
@@ -420,7 +431,15 @@ export function startGame(deps: GameDeps): GameHandle {
           renderer.drawUi(list);
         }
       }
-      if (scene !== null && scene.frame(dt, raw, menuInput, u, list, intervalMs) === 'quit') leaveScene();
+      const signal = scene !== null ? scene.frame(dt, raw, menuInput, u, list, intervalMs) : 'none';
+      if (signal === 'quit') leaveScene();
+      else if (signal === 'again' || signal === 'easier' || signal === 'harder') {
+        // M2 (fase 2e): De novo / Mais fácil / Mais difícil: a mesma partida com semente nova, um passo de nível.
+        const level = scene!.level;
+        playLevel = signal === 'easier' ? stepLevel(level, -1) : signal === 'harder' ? stepLevel(level, 1) : level;
+        leaveScene();
+        requestScene('play', null);
+      }
     }
     syncPointerLock();
     frames++;

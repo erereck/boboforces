@@ -8,6 +8,7 @@ import {
   type SimView,
 } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
+import type { TeamBoard } from './team.ts';
 import { AI_BUDGET, AI_LOD, AI_PATH, AI_SOLDIER } from './config.ts';
 import type { PathService } from './paths.ts';
 
@@ -40,6 +41,8 @@ export class AiContext {
   /** Escolhas da mira visível desde a criação (estatística do bench). */
   aimsTotal = 0;
   observerCount = 0;
+  /** M2 (fases 3e e 3f): o quadro do time (avisos, objetivos, calor), criado no 1º tick com o tamanho do mapa. */
+  board: TeamBoard | null = null;
   readonly observers = new Float64Array(MAX_HUMANS * 3);
   private readonly rayHit = createRayHit();
   /** Rascunho do ponto de mira (cabeça ou tronco do alvo, no mundo). */
@@ -149,6 +152,37 @@ export class AiContext {
       if (!hit) return true;
     }
     return false;
+  }
+
+  /**
+   * M2 (fase 3c): linha de visão entre dois pontos (1 raio DDA do orçamento do tick): 1 = livre, 0 = tapada, -1 = sem
+   * orçamento.
+   */
+  clearLine(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
+    if (this.raysLeft <= 0) return -1;
+    const v = this.view!;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const dz = bz - az;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d < 1e-6) return 1;
+    this.raysLeft--;
+    this.raysTotal++;
+    const hit = raycastGrid(
+      v.world,
+      v.blocks,
+      ax,
+      ay,
+      az,
+      dx / d,
+      dy / d,
+      dz / d,
+      d,
+      BLOCK_FLAG.blocksSight,
+      this.rayHit,
+      v.colliders,
+    );
+    return hit ? 0 : 1;
   }
 
   /**

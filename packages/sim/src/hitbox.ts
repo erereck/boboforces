@@ -17,7 +17,7 @@ import {
   type FigurePart,
 } from '@boboforces/format';
 import { METRICS } from './config/metrics.ts';
-import { WEAPON_SLOTS } from './config/weapons.ts';
+import { weaponDef } from './config/weapons.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from './entity.ts';
 import type { SimState } from './state.ts';
 
@@ -82,9 +82,9 @@ const KEY_POSTURES = 32;
 
 // --- Postura ---
 
-/** Empunhadura da arma do slot (`WeaponDef.grip`); slot vazio = sem arma. */
-export function weaponGrip(slot: number): FigureGrip {
-  const def = WEAPON_SLOTS[slot];
+/** Empunhadura da arma do código (`WeaponDef.grip`, M2: `SimView.weapon` é o código); sem arma = nenhuma. */
+export function weaponGrip(code: number): FigureGrip {
+  const def = weaponDef(code);
   return def ? def.grip : FIGURE_GRIP.none;
 }
 

@@ -1,5 +1,6 @@
 import { AI_BUDGET, type AiBudget } from '@boboforces/ai';
 import {
+  BOT_LEVELS,
   builtinBotRef,
   ENGINE_MAX_BOTS,
   FACE_EXPRESSION,
@@ -23,6 +24,8 @@ import {
   type PlatformProfile,
   type PropDoseView,
   type TimeOfDay,
+  type BotLevel,
+  type BotRef,
 } from '@boboforces/format';
 import {
   createGamepadProfile,
@@ -30,8 +33,10 @@ import {
   createInputMapper,
   createKeyboardMouseProfile,
   createTouchProfile,
+  BUTTON,
   keyIndex,
   MAX_GAMEPADS,
+  WEAPON_SLOT_COUNT,
   type ControlProfile,
   type DeviceBinding,
   type DeviceKind,
@@ -45,6 +50,7 @@ import {
   createActorBuffer,
   createEnvironment,
   createFxQueue,
+  createProjectileBuffer,
   createRenderDebug,
   createViewDesc,
   NO_FIGURE,
@@ -52,9 +58,11 @@ import {
   pushActorImpact,
   pushBlockImpact,
   pushDeath,
+  pushExplosion,
   pushMuzzleFlash,
   pushPropImpact,
   pushTracer,
+  pushTrail,
   resetFxQueue,
   viewmodelAimOffset,
   type ActorBuffer,
@@ -62,7 +70,7 @@ import {
   type MipFilterMode,
   type ViewDesc,
 } from '@boboforces/render/data';
-import { clamp, HALF_PI, lerp, lerpAngle, wrapAngle } from '@boboforces/shared';
+import { clamp, createLogger, HALF_PI, lerp, lerpAngle, wrapAngle } from '@boboforces/shared';
 import {
   ENTITY_FLAG,
   ENTITY_KIND,
@@ -76,14 +84,37 @@ import {
   METRICS,
   NO_TEAM,
   NULL_ENTITY,
-  WEAPON_SLOTS,
+  heldClip,
+  heldReserve,
+  MAX_CONTROLLERS,
+  WEAPON_CODE,
+  WEAPON_FIRE,
+  WEAPON_KILL_PLANE,
+  WEAPON_NONE,
+  WEAPON_SLOT,
+  weaponDef,
+  WEAPONS,
   weaponGrip,
   type Sim,
   type SimEvent,
   type SimView,
 } from '@boboforces/sim';
 import {
+  ageKillFeed,
   COLORS,
+  createKillFeedModel,
+  createScoreboardModel,
+  drawKillFeed,
+  drawMatchCountdown,
+  drawScoreboard,
+  MAX_ALLY_MARKERS,
+  MAX_TEAM_PINGS,
+  SETTINGS_ACTION,
+  settingsScreen,
+  PLAYER_COLORS,
+  pushKillFeed,
+  SCOREBOARD_MAX_ROWS,
+  TEAM_COLORS,
   createDebugPanelModel,
   createDrawList,
   createHudModel,
@@ -92,7 +123,11 @@ import {
   drawFontSpecimen,
   drawHud,
   drawHudShared,
+  hitPrimaryOption,
+  PRIMARY_LAYOUT,
   drawText,
+  HUD_AMMO,
+  HUD_CROSSHAIR,
   layoutHudScreen,
   measureText,
   MIN_TEXT,
@@ -108,9 +143,11 @@ import {
   type DrawList,
   type HudModel,
   type HudScreenLayout,
+  type StringKey,
   type UiFonts,
 } from '@boboforces/ui';
 import { sampleLightGrid } from '@boboforces/world';
+import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim } from './aim-assist.ts';
 import { formatBenchReport, type BenchReport } from '../bench/report.ts';
 import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
@@ -118,9 +155,31 @@ import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camer
 import { createTouchOverlay } from '../hud.ts';
 import { createLocalDriver, type LocalDriver } from '../local-driver.ts';
 import { createMenuController, type UiFrame } from '../menu.ts';
-import { PAUSE_ACTION, pauseScreen } from '../pause.ts';
+import { challengeLevel, challengeScreen, PAUSE_ACTION, pauseScreen } from '../pause.ts';
+import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '../result-screen.ts';
 import type { SceneHost, SceneRequest, SceneSignal } from '../scene-api.ts';
+import {
+  beginDeath,
+  controllerNames,
+  controllerRules,
+  countdownLine,
+  createDeathState,
+  deathCamAngles,
+  deathTexts,
+  DEATH_CAM,
+  endDeath,
+  fillDeathBanner,
+  HARD_TIME,
+  losingBadly,
+  moveRadialCursor,
+  PRIMARY_ORDER,
+  radialIndex,
+  stepCursor,
+  type DeathState,
+} from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
+import { projectToView } from './markers.ts';
+import { createMatchStats, recordMatchEvent, summarizeMatch } from './result.ts';
 import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
@@ -142,6 +201,18 @@ const STRIDE_M = 1.2;
 const RUN_SPEED = 6.8;
 /** Bots do JOGAR (TDM 6 × 6 com o jogador), limitados pelo perfil. */
 const PLAY_BOTS = 11;
+/** M2 (fase 2d): regras do Bobo Warfare TDM no JOGAR (gameplay.md §7.4): 75 abates ou 10 min. */
+const PLAY_SCORE_LIMIT = 75;
+const PLAY_TIME_LIMIT_S = 600;
+/** M2 (fase 2d): marcadores de aliado até esta distância (m), com a ponta este tanto acima dos pés (m). */
+const ALLY_MARKER_MAX_M = 80;
+const ALLY_MARKER_HEIGHT_M = 2.05;
+/** M2 (fase 3e): por quanto tempo o aviso de um aliado fica na tela (s). */
+const PING_SHOW_S = 2.5;
+/** M2 (fase 3h, prints): avisos a menos desta fração da altura da vista um do outro viram um só. */
+const PING_MERGE_FRAC = 0.04;
+/** M2 (fase 2e): o resultado aparece este tempo depois do fim da partida (s). */
+const RESULT_DELAY_S = 2.5;
 /** Cubinhos por impacto (o render limita pelo teto do perfil). */
 const CUBES_BLOCK = 6;
 const CUBES_ACTOR = 5;
@@ -149,6 +220,19 @@ const CUBES_ACTOR = 5;
 const F2_WINDOW = 480;
 /** Clarão de tiro na luz ambiente (arte-ux.md §1.8): alcance, ganho por tiro e queda (s). */
 const FLASH_RANGE_M = 30;
+/** M2: tremor da câmera nas explosões (até onde chega, quanto some por segundo e a amplitude em rad). */
+const SHAKE_RANGE_M = 14;
+const SHAKE_DECAY_PER_S = 2.5;
+const SHAKE_AMPLITUDE = 0.02;
+/** M2: projétil a menos disto (m) do olho de quem lançou não é desenhado (o foguete sai do olho). */
+const PROJECTILE_HIDE_NEAR_EYE_M = 1.5;
+/** M2 (fase 2b): o Destravar vira aviso (anel de recentes do relatório do F2), com o ponto para corrigir o mapa. */
+const log = createLogger('partida');
+/** M2 (fase 2b): giro da caixinha de munição no chão (rad/s). */
+const PICKUP_SPIN_RAD_S = 1.2;
+/** M2: projéteis desenhados por frame (foguetes e granadas em voo). */
+/** Projéteis em voo e caixinhas no chão desenhados por frame (o resto fica de fora). */
+const MAX_DRAWN_PROJECTILES = 128;
 const FLASH_GAIN = 0.35;
 const FLASH_DECAY_S = 0.08;
 /**
@@ -205,9 +289,49 @@ function cameraGroup(name: string): number {
 /** Empunhadura do modelo de arma pelo id (`''` = sem arma; desconhecido = fuzil, a pose de duas mãos). */
 export function gripOfWeaponModel(id: string): FigureGrip {
   if (id === '') return FIGURE_GRIP.none;
-  for (let s = 0; s < WEAPON_SLOTS.length; s++) if (WEAPON_SLOTS[s]?.id === id) return WEAPON_SLOTS[s]!.grip;
+  for (let c = 0; c < WEAPONS.length; c++) if (WEAPONS[c]!.id === id) return WEAPONS[c]!.grip;
   return MODEL_GRIP.get(id) ?? FIGURE_GRIP.rifle;
 }
+/**
+ * M2: ajuste do viewmodel por código de arma (escala e deslocamento em m, só fora do ADS; +x direita, +y cima, −z
+ * para longe). O lança-foguetes tem 19 cm de tubo e a traseira passa da mão: sem o ajuste tomava metade da tela.
+ */
+interface ViewmodelTweak {
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+const VIEWMODEL_TWEAK: readonly (ViewmodelTweak | null)[] = WEAPONS.map((w) =>
+  w.code === WEAPON_CODE.rocket
+    ? { scale: 0.62, x: 0.13, y: -0.04, z: -0.1 }
+    : w.code === WEAPON_CODE.lmg
+      ? { scale: 0.9, x: 0.02, y: 0, z: -0.04 }
+      : w.code === WEAPON_CODE.sniper
+        ? { scale: 0.75, x: 0.05, y: -0.03, z: -0.1 }
+        : null,
+);
+
+/** Primárias em rodízio do `weapons=mix` do bench. */
+const MIX_PRIMARIES = [
+  WEAPON_CODE.rifle,
+  WEAPON_CODE.smg,
+  WEAPON_CODE.shotgun,
+  WEAPON_CODE.sniper,
+  WEAPON_CODE.rocket,
+  WEAPON_CODE.lmg,
+] as const;
+
+/** Primária de cada controlador para o `weapons=` do bench (`mix` em rodízio; senão todos com a arma dada). */
+export function benchPrimaries(weapons: string): number[] {
+  const out: number[] = [];
+  const fixed = WEAPONS.find((w) => w.id === weapons);
+  for (let c = 0; c < MAX_CONTROLLERS; c++) {
+    out.push(fixed ? fixed.code : MIX_PRIMARIES[c % MIX_PRIMARIES.length]!);
+  }
+  return out;
+}
+
 /** Bench: campos somados por vista (draws, triângulos, regiões, props, atores, draws de bonecos). */
 const VIEW_SUM_FIELDS = 6;
 /** Bench: frames do começo da partida medidos à parte (travada de shader, item 15 do T0). */
@@ -254,7 +378,7 @@ export interface SceneRecipe {
  */
 export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): SceneRecipe {
   const warnings: string[] = [];
-  const ref = builtinBotRef('normal');
+  const ref = builtinBotRef(request.kind === 'play' ? (request.level ?? 'normal') : 'normal');
   const bench = request.bench;
   let recipe: MatchRecipe;
   let humans = 1;
@@ -290,13 +414,16 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
     const bots = Math.min(PLAY_BOTS, profile.maxBots);
     const enemies = Math.ceil(bots / 2);
     const allies = bots - enemies;
+    const squad = request.kind === 'play' && request.squad === 'factory';
     recipe = {
       format: MATCH_RECIPE_FORMAT,
       mode: 'warfare.tdm',
       map: 'construto',
       seed: request.seed >>> 0,
-      match: { timeLimitS: 0 },
-      teams: [{ humans: 'all', bots: allies > 0 ? [{ ref, count: allies }] : [] }, { bots: [{ ref, count: enemies }] }],
+      match: { timeLimitS: PLAY_TIME_LIMIT_S, scoreLimit: PLAY_SCORE_LIMIT },
+      teams: squad
+        ? factorySquad(ref, allies, enemies)
+        : [{ humans: 'all', bots: allies > 0 ? [{ ref, count: allies }] : [] }, { bots: [{ ref, count: enemies }] }],
     };
   }
   // O bench mede além do perfil (é a ferramenta que acha o teto): limites do motor e visão do PC.
@@ -307,6 +434,32 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   const checked = validateMatchRecipe(recipe, limits);
   if (!checked.ok) throw new Error(`cena: receita recusada (${checked.errors.map((e) => e.code).join(', ')})`);
   return { recipe: checked.value, humans, warnings };
+}
+
+/** Os especiais de fábrica contra o jogador, na ordem em que entram (gameplay.md §6.7). */
+const FACTORY_ENEMIES = [
+  'jorge-the-immortal',
+  'camper-carl',
+  'knife-ninja',
+  'scaredy-sam',
+  'hunter-hank',
+  'goofy-gus',
+] as const;
+
+/**
+ * M2 (fase 3g): o esquadrão de fábrica do JOGAR: os especiais contra o jogador (um de cada, completando com o nível
+ * rápido se sobrar vaga) e o Buddy no time dele, com o nível rápido no resto.
+ */
+function factorySquad(ref: BotRef, allies: number, enemies: number): MatchRecipe['teams'] {
+  const foes = FACTORY_ENEMIES.slice(0, enemies).map((id) => ({ ref: builtinRef(id), count: 1 }));
+  if (enemies > foes.length) foes.push({ ref, count: enemies - foes.length });
+  const friends = allies > 0 ? [{ ref: builtinRef('buddy'), count: 1 }] : [];
+  if (allies > 1) friends.push({ ref, count: allies - 1 });
+  return [{ humans: 'all', bots: friends }, { bots: foes }];
+}
+
+function builtinRef(id: string): BotRef {
+  return `builtin:${id}`;
 }
 
 /** Uma vista local: a câmera, a HUD dela e o que ela segue. */
@@ -321,6 +474,10 @@ interface ViewSlot {
   damageT: number;
   /** Clarão de tiro na luz ambiente desta vista, 0..1 (arte-ux.md §1.8; vai para `ViewDesc.flash`). */
   flash: number;
+  /** M2: tremor de explosão, 0..1 (some em `SHAKE_DECAY_PER_S`). */
+  shake: number;
+  /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
+  readonly death: DeathState;
 }
 
 export interface ConstrutoMatch {
@@ -328,6 +485,8 @@ export interface ConstrutoMatch {
   readonly debug: GameDebugApi;
   readonly paused: boolean;
   readonly wantsPointerLock: boolean;
+  /** M2 (fase 2e): nível rápido dos bots adversários agora. */
+  readonly level: BotLevel;
   pause(): void;
   frame(
     dt: number,
@@ -399,17 +558,75 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const bindingFor = (kind: DeviceKind, pad: number): DeviceBinding =>
     kind === 'gamepad' ? pads[pad]! : kind === 'touch' ? touch : keyboard;
   const player: InputMapper = createInputMapper(bindingFor(device, padIndex), profiles[device]);
+  /** M2 (fase 3h): assistência de mira do humano (controle e toque; o nível vem do perfil do dispositivo). */
+  const assist = createAimAssistState();
+  const assistAngles = new Float64Array(2);
   const drain = createInputFrame();
 
-  // --- modelos: arma por slot da sim e o alvo do ADS do viewmodel ---
+  // --- modelos: arma por código da sim (M2: `SimView.weapon` é o código) e o alvo do ADS do viewmodel ---
   const modelIndex = loaded.world.modelIndex;
-  const weaponModel = new Uint8Array(Math.max(1, WEAPON_SLOTS.length)).fill(NO_MODEL);
-  WEAPON_SLOTS.forEach((w, slot) => {
-    const m = w ? modelIndex.get(w.id) : undefined;
-    if (m !== undefined) weaponModel[slot] = m;
+  const weaponModel = new Uint8Array(WEAPONS.length).fill(NO_MODEL);
+  WEAPONS.forEach((w, code) => {
+    const m = modelIndex.get(w.id);
+    if (m !== undefined) weaponModel[code] = m;
   });
   const aimOffsets = loaded.modelDocs.map((m) => viewmodelAimOffset(m));
-  const modelOf = (slot: number): number => (slot >= 0 && slot < weaponModel.length ? weaponModel[slot]! : NO_MODEL);
+  // M2: nome e categoria de cada arma na tabela pt-BR, resolvidos uma vez (a HUD só guarda a referência).
+  const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
+  const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
+  // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
+  const names = controllerNames(recipe, humans);
+  /** M2 (fecho da fase 3): as regras ativas de cada controlador (placar e tela de morte). */
+  const ruleTexts = controllerRules(recipe, humans);
+  const deathTx = deathTexts();
+  const primaryNames = PRIMARY_ORDER.map((code) => weaponNames[code] ?? '');
+  const primaryCategories = PRIMARY_ORDER.map((code) => weaponCategories[code] ?? '');
+  const NO_PRIMARIES: readonly string[] = [];
+  /** Escolha do humano no radial (índice em `PRIMARY_ORDER`; começa no fuzil, a primária padrão). */
+  let humanPrimary = 0;
+  /** Derrota feia (GDD §3.8): mortes seguidas do humano sem abate e se a dica já saiu nesta partida. */
+  let deathsWithoutKill = 0;
+  let hardHintUsed = false;
+  const timeLimitS = recipe.match?.timeLimitS ?? 0;
+  const scoreLimit = recipe.match?.scoreLimit ?? 0;
+  const camAngles = { yaw: 0, pitch: 0 };
+  // M2 (fase 2d): HUD da partida (kill feed, placar do Tab, contagem inicial e marcadores dos aliados).
+  const killFeed = createKillFeedModel();
+  const scoreboard = createScoreboardModel();
+  scoreboard.title = t(`mode.${recipe.mode}` as StringKey);
+  // A legenda das regras: um bot diferente por linha, embaixo do time dele.
+  scoreboard.ruleCount = 0;
+  for (const slot of expandRecipe(recipe, humans)) {
+    const rules = ruleTexts[slot.controller] ?? '';
+    if (rules === '' || scoreboard.ruleCount >= scoreboard.ruleLines.length) continue;
+    const line = t('rule.line', { name: names[slot.controller] ?? '', rules });
+    if (scoreboard.ruleLines.slice(0, scoreboard.ruleCount).includes(line)) continue;
+    scoreboard.ruleLines[scoreboard.ruleCount] = line;
+    scoreboard.ruleTeam[scoreboard.ruleCount] = slot.team;
+    scoreboard.ruleCount++;
+  }
+  const scoreOrder = new Int16Array(SCOREBOARD_MAX_ROWS);
+  const todayLine = countdownLine(recipe, humans, names);
+  const projected = new Float64Array(3);
+  /** M2 (fase 3e): avisos do time (x, y, z) lidos do diretor. */
+  const pingScratch = new Float64Array(MAX_TEAM_PINGS * 3);
+  // M2 (fase 2e): pausa com páginas, nível dos bots adversários, Destravar e o resultado.
+  let pausePage: 'main' | 'challenge' | 'settings' = 'main';
+  const pauseState = { challenge: request.kind === 'play' };
+  let currentLevel: BotLevel = request.kind === 'play' ? (request.level ?? 'normal') : 'normal';
+  /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
+  const challengeTeam = ffa ? -1 : 1;
+  let unstuckPending = false;
+  let matchStats = createMatchStats(1);
+  let endedAt = -1;
+  let resultShown = false;
+  const resultMenu = createMenuController();
+  // M2: o foguete em voo tem modelo próprio; a granada em voo usa o da mão.
+  const rocketShellModel = modelIndex.get('rocket-shell') ?? NO_MODEL;
+  // M2 (fase 2b): a caixinha de munição no chão.
+  const ammoBoxModel = modelIndex.get('ammo-box') ?? NO_MODEL;
+  const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
+  const modelOf = (code: number): number => (code >= 0 && code < weaponModel.length ? weaponModel[code]! : NO_MODEL);
 
   // --- estado por entidade (fora da sim: cosmético) ---
   let flash = new Float32Array(1);
@@ -437,7 +654,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   for (let i = 0; i < viewCount; i++) {
     const desc = createViewDesc();
     const hud = createDrawList(1024);
-    slots.push({ desc, hud, model: createHudModel(), controller: -1, eye: -1, adsBlend: 0, damageT: 0, flash: 0 });
+    slots.push({
+      desc,
+      hud,
+      model: createHudModel(),
+      controller: -1,
+      eye: -1,
+      adsBlend: 0,
+      damageT: 0,
+      flash: 0,
+      shake: 0,
+      death: createDeathState(),
+    });
     descs.push(desc);
   }
   const sharedHud = createHudSharedModel();
@@ -720,8 +948,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         velCur[o + c] = v.velocity[o + c]!;
       }
     }
+    const human = humans > 0 ? s.controllerEntity(0) : NULL_ENTITY;
+    if (matchStats.capacity < v.capacity) matchStats = createMatchStats(v.capacity);
     for (let k = 0; k < events.length; k++) {
       const ev = events[k]!;
+      recordMatchEvent(matchStats, ev, human);
+      if (ev.type === 'matchPhase' && ev.phase === 'ended' && endedAt < 0) endedAt = timeS;
       switch (ev.type) {
         case 'shot': {
           const i = entityIndex(ev.shooter);
@@ -803,6 +1035,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           d.scale = 1;
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           pushDeath(fx, d);
+          onDeath(s, ev.victim, ev.killer, ev.weapon);
+          feedKill(v, ev.victim, ev.killer, ev.weapon, ev.headshot);
           break;
         }
         case 'spawn': {
@@ -816,16 +1050,30 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           reloadStart[i] = -1;
           if (humans > 0 && ev.entity === s.controllerEntity(0)) {
             player.setAngles(v.yaw[i]!, 0);
-            player.setWeapon(v.weapon[i]!);
+            player.setWeapon(v.slot[i]!);
+          }
+          for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+            const slot = slots[sIdx]!;
+            if (slot.death.t >= 0 && slot.death.victim === ev.entity) endDeath(slot.death);
           }
           break;
         }
         case 'weapon': {
           const i = entityIndex(ev.entity);
           if (i >= reloadStart.length) break;
+          // A sim trocou de slot sozinha (acabou a granada): o mapeador do humano passa a pedir o slot da mão.
+          if (
+            ev.action === 'switch' &&
+            humans > 0 &&
+            ev.entity === s.controllerEntity(0) &&
+            player.weapon !== v.slot[i]
+          ) {
+            player.setWeapon(v.slot[i]!);
+          }
           if (ev.action === 'reloadStart') {
             reloadStart[i] = timeS;
-            reloadDur[i] = WEAPON_SLOTS[ev.weapon]?.reloadS ?? 2;
+            const def = weaponDef(ev.weapon);
+            reloadDur[i] = def ? (def.reloadPerRoundS > 0 ? def.reloadPerRoundS : def.reloadS) : 2;
           } else if (ev.action === 'reloadEnd') {
             reloadStart[i] = -1;
           } else if (ev.action === 'switch' && humans > 0 && ev.entity === s.controllerEntity(0)) {
@@ -838,6 +1086,45 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (i < firing.length) firing[i] = FIRING_S * 3;
           break;
         }
+        case 'explosion': {
+          pushExplosion(fx, ev.x, ev.y, ev.z, ev.radius);
+          flashViews(ev.x, ev.y, ev.z, -1);
+          for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+            const slot = slots[sIdx]!;
+            const c = slot.desc.camera;
+            const d = Math.hypot(c.x - ev.x, c.y - ev.y, c.z - ev.z);
+            if (d < SHAKE_RANGE_M) slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M));
+          }
+          break;
+        }
+        case 'projectile': {
+          if (ev.action !== 'launch' || ev.weapon !== WEAPON_CODE.rocket) break;
+          const i = entityIndex(ev.owner);
+          if (i < recoil.length) {
+            recoil[i] = 1;
+            firing[i] = FIRING_S;
+          }
+          const speed = Math.hypot(ev.vx, ev.vy, ev.vz);
+          if (speed > 1e-6) {
+            const dx = ev.vx / speed;
+            const dy = ev.vy / speed;
+            const dz = ev.vz / speed;
+            const mx = ev.x + dx * 0.8;
+            const my = ev.y + dy * 0.8 - 0.1;
+            const mz = ev.z + dz * 0.8;
+            const owner = viewOfEntity(ev.owner);
+            pushMuzzleFlash(fx, ev.owner, mx, my, mz, dx, dy, dz, owner, modelOf(ev.weapon));
+            flashViews(mx, my, mz, owner);
+          }
+          break;
+        }
+        case 'unstuck':
+          // Raro (anti-frustração): pode montar a string aqui.
+          log.warn(
+            `destravar: bobo ${entityIndex(ev.entity)} preso em (${ev.fromX.toFixed(1)}, ${ev.fromY.toFixed(1)}, ` +
+              `${ev.fromZ.toFixed(1)})${ev.respawned ? ' → spawn' : ''}`,
+          );
+          break;
         default:
           break;
       }
@@ -848,13 +1135,24 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     recipe,
     map: loaded.simMap,
     humans,
-    writeHumanFrame: (_slot, out, seq) => player.writeFrame(out, seq),
+    writeHumanFrame: (_slot, out, seq) => {
+      player.writeFrame(out, seq);
+      // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
+      if (unstuckPending) {
+        out.buttons |= BUTTON.unstuck;
+        unstuckPending = false;
+      }
+    },
     onEvents,
     ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
     budget: aiBudgetFor(profile),
     now,
     // A MESMA tabela que o render recebeu no `setFigures` (a hitbox e a pose de 3ª pessoa saem dela).
     figureTable: figures.table,
+    // Bench: a primária fixa do `weapons=` (fuzil por padrão, comparável ao M1); fora dele, o sorteio dos bots.
+    ...(bench ? { primaries: benchPrimaries(bench.weapons) } : {}),
+    // M2 (fase 2d): a contagem de 3 s só nas partidas de verdade (o bench, a vitrine e os prints começam jogando).
+    ...(request.kind === 'play' ? { countdownS: MATCH_DEFAULTS.countdownS } : {}),
   });
   const sim = driver.sim;
   {
@@ -1044,6 +1342,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       debugState.hideViewmodel = !visible;
       applyDebug();
     },
+    showResult(): void {
+      if (humans > 0 && !resultShown) showResult();
+      changed();
+    },
     setFrozen(on: boolean): void {
       frozen = on;
       changed();
@@ -1136,14 +1438,125 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (changedKind) player.setProfile(profiles[next]);
   }
 
+  /**
+   * M2 (fase 3h): antes do `update` do mapeador, procura o alvo da assistência pela mira atual (olho e alvos no estado
+   * interpolado do último quadro) e devolve a fricção (multiplicador da sensibilidade).
+   */
+  function aimAssistBefore(): number {
+    const level = player.profile.aimAssist;
+    assist.target = -1;
+    assist.scale = 1;
+    if (level <= 0) return 1;
+    const v = sim.view();
+    const e = entityIndex(sim.controllerEntity(0));
+    if (e < 0 || v.alive[e] !== 1 || (v.flags[e]! & ENTITY_FLAG.dead) !== 0) return 1;
+    const a = driver.alpha;
+    const o = e * 3;
+    const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
+    const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(v.flags[e]!);
+    const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
+    findAimAssist(v, e, ffa, ex, ey, ez, player.yaw, player.pitch, level, a, far, assist);
+    return assist.scale;
+  }
+
+  /** Depois do `update`: o ímã (mexendo a mira ou andando) e, no Forte, a trava ao apertar o ADS. */
+  function aimAssistAfter(dt: number, looked: boolean): void {
+    if (assist.target < 0) return;
+    const level = player.profile.aimAssist;
+    if (level >= AIM_ASSIST.snapLevel && player.wasPressed('ads')) {
+      player.setAngles(assist.targetYaw, assist.targetPitch);
+      return;
+    }
+    const active = looked || player.moveX !== 0 || player.moveY !== 0;
+    pullAim(assist, level, dt, active, player.yaw, player.pitch, assistAngles);
+    if (assistAngles[0] !== player.yaw || assistAngles[1] !== player.pitch) {
+      player.setAngles(assistAngles[0]!, assistAngles[1]!);
+    }
+  }
+
   function pause(): void {
-    if (paused || disposed || humans === 0) return;
+    if (paused || disposed || humans === 0 || resultShown) return;
     paused = true;
+  }
+
+  function pauseMain(): void {
+    pausePage = 'main';
+    pauseMenu.setRoot(pauseScreen.build(pauseState));
+  }
+
+  /** M2 (fase 2e): uma ação da pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair) ou das páginas dela. */
+  function pauseAction(nav: { readonly back: boolean; readonly activated: string | null }): SceneSignal {
+    const a = nav.activated;
+    if (pausePage === 'main') {
+      if (nav.back || a === PAUSE_ACTION.resume) resume();
+      else if (a === PAUSE_ACTION.challenge) {
+        pausePage = 'challenge';
+        pauseMenu.setRoot(challengeScreen.build(currentLevel));
+      } else if (a === PAUSE_ACTION.settings) {
+        pausePage = 'settings';
+        pauseMenu.setRoot(settingsScreen.build(null));
+      } else if (a === PAUSE_ACTION.unstuck) {
+        unstuckPending = true;
+        resume();
+      } else if (a === PAUSE_ACTION.quit) return 'quit';
+      return 'none';
+    }
+    if (pausePage === 'challenge') {
+      const level = challengeLevel(a);
+      if (level !== null) {
+        currentLevel = level;
+        const n = driver.director.setLevel(level, challengeTeam);
+        host.log(`[partida] desafio: ${level} (${n} bots)`);
+        pauseMain();
+      } else if (nav.back || a === 'back') pauseMain();
+      return 'none';
+    }
+    if (nav.back || a === SETTINGS_ACTION.back) pauseMain();
+    return 'none';
+  }
+
+  /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
+  function showResult(): void {
+    const v = sim.view();
+    const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    const sum = summarizeMatch(matchStats, v, human, ffa);
+    const nm = (i: number): string => (i >= 0 ? nameOf(v, i) : '');
+    const title =
+      sum.outcome === 'win'
+        ? t('result.win')
+        : sum.outcome === 'draw'
+          ? t('result.draw')
+          : ffa && sum.winner >= 0
+            ? t('result.ffaWinner', { name: nm(sum.winner) })
+            : t('result.loss');
+    const data: ResultScreenData = {
+      title,
+      titleColor: sum.outcome === 'win' ? COLORS.acao : sum.outcome === 'loss' ? COLORS.perigo : COLORS.texto,
+      own: sum.ownScore,
+      other: sum.otherScore,
+      mvp: nm(sum.mvp),
+      nemesis: nm(sum.nemesis),
+      nemesisKills: sum.nemesisKills,
+      victim: nm(sum.victim),
+      victimKills: sum.victimKills,
+      kills: sum.kills,
+      accuracy: sum.accuracy >= 0 ? `${sum.accuracy}%` : t('result.noAccuracy'),
+      bestStreak: sum.bestStreak,
+      prizes: sum.prizes.map((p) => prizeLine(p.prize, nm(p.entity))),
+      level: t(`level.${currentLevel}` as StringKey),
+      canEasier: currentLevel !== BOT_LEVELS[0],
+      canHarder: currentLevel !== BOT_LEVELS[BOT_LEVELS.length - 1],
+      focusEasier: sum.uglyLoss || hardHintUsed,
+    };
+    resultMenu.setRoot(resultScreen.build(data));
+    resultShown = true;
+    host.log(`[partida] fim: ${sum.outcome} ${sum.ownScore}×${sum.otherScore} abates=${sum.kills}`);
   }
 
   function resume(): void {
     if (!paused || disposed) return;
     paused = false;
+    if (pausePage !== 'main') pauseMain();
     // Botões apertados no menu de pausa (o clique em "Continuar") não podem virar tiro no primeiro tick.
     player.writeFrame(drain, 0);
   }
@@ -1317,6 +1730,219 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return layout;
   }
 
+  /**
+   * M2: foguetes e granadas em voo, da `SimView.projectiles` (posição interpolada). O foguete aponta para a velocidade e
+   * gira em volta dela, soltando o rastro; a granada rola enquanto voa e fica em pé parada.
+   */
+  function fillProjectiles(alpha: number, running: boolean): void {
+    const v = sim.view();
+    const pv = v.projectiles;
+    let n = 0;
+    for (let p = 0; p < pv.count && n < projectiles.capacity; p++) {
+      if (pv.alive[p] !== 1) continue;
+      const code = pv.weapon[p]!;
+      const model = code === WEAPON_CODE.rocket ? rocketShellModel : modelOf(code);
+      if (model === NO_MODEL) continue;
+      const o = p * 3;
+      const x = lerp(pv.prevPosition[o]!, pv.position[o]!, alpha);
+      const y = lerp(pv.prevPosition[o + 1]!, pv.position[o + 1]!, alpha);
+      const z = lerp(pv.prevPosition[o + 2]!, pv.position[o + 2]!, alpha);
+      // Recém-saído do olho de quem lançou: escondido até 1,5 m (senão o fundo do foguete tapa a câmera dele).
+      const owner = entityIndex(pv.owner[p]!);
+      if (owner < v.count && v.alive[owner] === 1) {
+        const ox = v.position[owner * 3]! - x;
+        const oy = v.position[owner * 3 + 1]! + eyeHeightFor(v.flags[owner]!) - y;
+        const oz = v.position[owner * 3 + 2]! - z;
+        if (ox * ox + oy * oy + oz * oz < PROJECTILE_HIDE_NEAR_EYE_M * PROJECTILE_HIDE_NEAR_EYE_M) continue;
+      }
+      const vx = pv.velocity[o]!;
+      const vy = pv.velocity[o + 1]!;
+      const vz = pv.velocity[o + 2]!;
+      const speed = Math.hypot(vx, vy, vz);
+      const flat = Math.hypot(vx, vz);
+      projectiles.model[n] = model;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = flat > 1e-6 ? Math.atan2(-vx, -vz) : 0;
+      if (code === WEAPON_CODE.rocket) {
+        projectiles.pitch[n] = Math.atan2(vy, Math.max(flat, 1e-6));
+        projectiles.roll[n] = timeS * 10 + p;
+        if (running && speed > 1e-6) pushTrail(fx, x, y, z, vx / speed, vy / speed, vz / speed);
+      } else {
+        projectiles.pitch[n] = speed > 0.5 ? timeS * 9 + p : 0;
+        projectiles.roll[n] = 0;
+      }
+      sampleLightGrid(loaded.lightGrid, x, y, z, lightScratch, 0);
+      projectiles.light[n * 3] = lightScratch[0]!;
+      projectiles.light[n * 3 + 1] = lightScratch[1]!;
+      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      n++;
+    }
+    n = fillPickups(alpha, n);
+    projectiles.count = n;
+  }
+
+  /**
+   * M2 (fase 2b): as caixinhas de munição, depois dos projéteis no mesmo buffer. Giram devagar no lugar (leitura de
+   * "pegue-me") e piscam nos últimos 3 s antes de sumir.
+   */
+  function fillPickups(alpha: number, first: number): number {
+    const pv = sim.view().pickups;
+    let n = first;
+    if (ammoBoxModel === NO_MODEL) return n;
+    const blinkTicks = 3 * sim.hz;
+    for (let i = 0; i < pv.count && n < projectiles.capacity; i++) {
+      if (pv.alive[i] !== 1) continue;
+      const left = pv.ticksLeft[i]!;
+      if (left < blinkTicks && Math.floor(timeS * 6) % 2 === 1) continue;
+      const o = i * 3;
+      const x = pv.position[o]!;
+      const y = lerp(pv.prevPosition[o + 1]!, pv.position[o + 1]!, alpha);
+      const z = pv.position[o + 2]!;
+      projectiles.model[n] = ammoBoxModel;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = timeS * PICKUP_SPIN_RAD_S + i * 1.7;
+      projectiles.pitch[n] = 0;
+      projectiles.roll[n] = 0;
+      sampleLightGrid(loaded.lightGrid, x, y + 0.2, z, lightScratch, 0);
+      projectiles.light[n * 3] = lightScratch[0]!;
+      projectiles.light[n * 3 + 1] = lightScratch[1]!;
+      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      n++;
+    }
+    return n;
+  }
+
+  /** Nome e cor de um bobo no feed e no placar: o nome do controlador; a cor do time (TDM) ou a sua (FFA). */
+  function nameOf(v: SimView, i: number): string {
+    return v.kind[i] === ENTITY_KIND.zombie ? deathTx.zombie : (names[v.controller[i]!] ?? deathTx.zombie);
+  }
+  function colorOf(v: SimView, i: number): number {
+    if (!ffa && v.kind[i] !== ENTITY_KIND.zombie) return TEAM_COLORS[v.team[i]!] ?? COLORS.texto;
+    return v.controller[i] === 0 && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
+  }
+
+  /** M2 (fase 2d): uma morte no kill feed ("Normal Bob  Rattler  P1"; sem matador, "P1  Caiu no vazio"). */
+  function feedKill(v: SimView, victim: number, killer: number, weapon: number, headshot: boolean): void {
+    const vi = entityIndex(victim);
+    if (vi >= v.count) return;
+    const ki = entityIndex(killer);
+    if (killer === NULL_ENTITY || killer === victim || ki >= v.count) {
+      const cause = killer === victim ? deathTx.self : weapon === WEAPON_KILL_PLANE ? deathTx.void : deathTx.fall;
+      pushKillFeed(killFeed, '', COLORS.texto, cause, nameOf(v, vi), colorOf(v, vi), false);
+      return;
+    }
+    const label =
+      weapon === WEAPON_KILL_PLANE
+        ? deathTx.pushedVoid
+        : weapon === WEAPON_NONE
+          ? deathTx.bite
+          : (weaponNames[weapon] ?? '');
+    pushKillFeed(killFeed, nameOf(v, ki), colorOf(v, ki), label, nameOf(v, vi), colorOf(v, vi), headshot);
+  }
+
+  /** M2 (fase 2d): preenche o placar do Tab (bobos por abates, depois menos mortes; ordenação sem alocar). */
+  function fillScoreboard(v: SimView): void {
+    let n = 0;
+    for (let i = 0; i < v.count && n < SCOREBOARD_MAX_ROWS; i++) {
+      if (v.alive[i] !== 1 || v.kind[i] !== ENTITY_KIND.bobo) continue;
+      let k = n++;
+      while (k > 0) {
+        const p = scoreOrder[k - 1]!;
+        const better = v.kills[i]! > v.kills[p]! || (v.kills[i] === v.kills[p] && v.deaths[i]! < v.deaths[p]!);
+        if (!better) break;
+        scoreOrder[k] = p;
+        k--;
+      }
+      scoreOrder[k] = i;
+    }
+    scoreboard.rowCount = n;
+    scoreboard.teamCount = ffa ? 0 : recipe.teams.length;
+    for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
+      scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;
+    const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    for (let r = 0; r < n; r++) {
+      const i = scoreOrder[r]!;
+      scoreboard.name[r] = nameOf(v, i);
+      scoreboard.team[r] = v.team[i]!;
+      scoreboard.kills[r] = v.kills[i]!;
+      scoreboard.deaths[r] = v.deaths[i]!;
+      scoreboard.assists[r] = v.assists[i]!;
+      scoreboard.local[r] = i === human ? 1 : 0;
+      scoreboard.dead[r] = (v.flags[i]! & ENTITY_FLAG.dead) !== 0 ? 1 : 0;
+    }
+  }
+
+  /**
+   * M2 (fase 2c): alguém morreu. A vista que seguia a vítima entra na tela de morte (câmera parte da mira atual). Para o
+   * humano: a conta da derrota feia, a dica (1 vez por partida) e a mira zerada, que vira o cursor do radial.
+   */
+  function onDeath(s: Sim, victim: number, killer: number, weapon: number): void {
+    const human = humans > 0 ? s.controllerEntity(0) : NULL_ENTITY;
+    if (human !== NULL_ENTITY && killer === human && victim !== human) deathsWithoutKill = 0;
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const slot = slots[sIdx]!;
+      if (slot.controller < 0 || s.controllerEntity(slot.controller) !== victim) continue;
+      const c = slot.desc.camera;
+      beginDeath(slot.death, victim, killer, weapon, c.yaw, c.pitch);
+      if (victim !== human || slot.controller !== 0) continue;
+      deathsWithoutKill++;
+      if (
+        !hardHintUsed &&
+        (deathsWithoutKill >= HARD_TIME.deathsWithoutKill ||
+          losingBadly(s.view(), entityIndex(victim), ffa, timeLimitS * s.hz, scoreLimit))
+      ) {
+        slot.death.hint = true;
+        hardHintUsed = true;
+      }
+      player.setAngles(0, 0);
+    }
+  }
+
+  /**
+   * M2 (fase 2c): o relógio das telas de morte e o radial do humano. O giro de mira do quadro (mouse ou analógico) move
+   * o cursor (a mira volta a zero a cada quadro; a câmera de morte não usa a do mapeador); a roda e os botões de troca
+   * de arma passam a opção; no toque, tocar numa opção escolhe. A escolha vai para `InputFrame.primary` e vale no
+   * próximo spawn.
+   */
+  function updateDeaths(dt: number, raw: RawInputState, lay: HudScreenLayout): void {
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const st = slots[sIdx]!.death;
+      if (st.t < 0) continue;
+      st.t += dt;
+      if (sIdx !== 0 || humans === 0 || slots[sIdx]!.controller !== 0 || paused) continue;
+      const n = PRIMARY_ORDER.length;
+      const hit = slots[sIdx]!.model.primaryHit;
+      let pick = -1;
+      // O formato é o que a HUD desenhou no quadro anterior: anel pela direção; fileira e linha passo a passo.
+      if (hit.layout === PRIMARY_LAYOUT.ring) {
+        moveRadialCursor(st, wrapAngle(player.yaw), player.pitch);
+        pick = radialIndex(st.cursorX, st.cursorY, n);
+      } else {
+        const step = stepCursor(st, wrapAngle(player.yaw));
+        if (step !== 0) pick = (humanPrimary + step + n) % n;
+      }
+      player.setAngles(0, 0);
+      if (player.wasPressed('nextWeapon')) pick = (humanPrimary + 1) % n;
+      if (player.wasPressed('prevWeapon')) pick = (humanPrimary + n - 1) % n;
+      if (device === 'touch') {
+        for (let k = 0; k < raw.touches.length; k++) {
+          const touch = raw.touches[k]!;
+          if (!touch.active) continue;
+          const tapped = hitPrimaryOption(hit, touch.x, touch.y);
+          if (tapped >= 0) pick = tapped;
+        }
+      }
+      if (pick >= 0 && pick !== humanPrimary) {
+        humanPrimary = pick;
+        player.setPrimary(PRIMARY_ORDER[pick]! + 1);
+      }
+    }
+  }
+
   function updateView(s: number, dt: number, alpha: number, lay: HudScreenLayout): void {
     const slot = slots[s]!;
     const desc = slot.desc;
@@ -1362,35 +1988,61 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     c.x = lerp(v.prevPosition[o]!, v.position[o]!, alpha);
     c.y = lerp(v.prevPosition[o + 1]!, v.position[o + 1]!, alpha) + slot.eye;
     c.z = lerp(v.prevPosition[o + 2]!, v.position[o + 2]!, alpha);
+    const st = slot.death;
+    if (dead && st.t >= 0) {
+      // M2 (fase 2c): câmera de morte, um pouco acima do olho, virando para quem matou.
+      c.y += DEATH_CAM.riseM * Math.min(1, st.t / DEATH_CAM.turnS);
+      c.fovY = verticalFov(fovDeg, aspect);
+      deathCamAngles(st, v, c.x, c.y, c.z, alpha, Math.atan(Math.tan(c.fovY / 2) * DEATH_CAM.killerLift), camAngles);
+      c.yaw = camAngles.yaw;
+      c.pitch = clamp(camAngles.pitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+      slot.adsBlend = 0;
+      desc.localSlot = s;
+      desc.team = ffa ? 255 : v.team[e]!;
+      desc.thirdPerson = false;
+      vm.visible = false;
+      return;
+    }
     const human = humans > 0 && slot.controller === 0;
     // Humano: a mira vem do mapeador em todo frame de render (sem esperar o tick); bot: a da sim, interpolada.
     const yaw = human ? player.yaw : lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
     const pitch = human ? player.pitch : lerp(v.prevPitch[e]!, v.pitch[e]!, alpha);
-    c.yaw = yaw + v.recoilYaw[e]!;
-    c.pitch = clamp(pitch + v.recoilPitch[e]!, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+    slot.shake = Math.max(0, slot.shake - dt * SHAKE_DECAY_PER_S);
+    const shakeYaw = Math.sin(timeS * 47) * SHAKE_AMPLITUDE * slot.shake;
+    const shakePitch = Math.sin(timeS * 53 + 1) * SHAKE_AMPLITUDE * slot.shake;
+    c.yaw = yaw + v.recoilYaw[e]! + shakeYaw;
+    c.pitch = clamp(pitch + v.recoilPitch[e]! + shakePitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
     const adsWanted = human ? !dead && !paused && player.isDown('ads') : (flags & ENTITY_FLAG.ads) !== 0;
     const adsTarget = adsWanted && !dead ? 1 : 0;
-    const blend = dt / ADS_BLEND_S;
+    // M2: o ADS entra no tempo da arma na mão (`adsInS`) e o zoom é o dela (`adsZoom`; a sniper tem 4x).
+    const held = weaponDef(v.weapon[e]!);
+    const blend = dt / (held !== null && held.adsInS > 0 ? held.adsInS : ADS_BLEND_S);
     slot.adsBlend =
       adsTarget > slot.adsBlend
         ? Math.min(adsTarget, slot.adsBlend + blend)
         : Math.max(adsTarget, slot.adsBlend - blend);
-    c.fovY = verticalFov(fovDeg, aspect) * (1 - (1 - ADS_FOV_SCALE) * slot.adsBlend);
+    const zoom = 1 + ((held !== null ? held.adsZoom : 1 / ADS_FOV_SCALE) - 1) * slot.adsBlend;
+    c.fovY = 2 * Math.atan(Math.tan(verticalFov(fovDeg, aspect) / 2) / zoom);
     desc.localSlot = s;
     desc.team = ffa ? 255 : v.team[e]!;
     desc.thirdPerson = false;
     // Viewmodel: a arma da mão, com mola simples (ADS, passo, coice); luz amostrada no olho.
     const model = modelOf(v.weapon[e]!);
-    vm.visible = !dead && model !== NO_MODEL;
+    // Na luneta (zoom ≥ 3x quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD (fase 1e).
+    const scoped = held !== null && held.adsZoom >= 3 && slot.adsBlend > 0.85;
+    vm.visible = !dead && model !== NO_MODEL && !scoped;
     vm.model = model;
     const aim = model !== NO_MODEL ? aimOffsets[model] : null;
     const ads = slot.adsBlend;
     const walk = (1 - ads) * Math.min(1, Math.hypot(v.velocity[o]!, v.velocity[o + 2]!) / RUN_SPEED);
     const phase = walkPhase[e] ?? 0;
     const kick = recoil[e] ?? 0;
-    vm.offsetX = (aim ? aim.x * ads : 0) + Math.sin(phase * 0.5) * 0.012 * walk;
-    vm.offsetY = (aim ? aim.y * ads : 0) - Math.abs(Math.cos(phase * 0.5)) * 0.01 * walk;
-    vm.offsetZ = kick * 0.045;
+    // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
+    const tweak = VIEWMODEL_TWEAK[v.weapon[e]!] ?? null;
+    const away = 1 - ads;
+    vm.offsetX = (aim ? aim.x * ads : 0) + Math.sin(phase * 0.5) * 0.012 * walk + (tweak ? tweak.x * away : 0);
+    vm.offsetY = (aim ? aim.y * ads : 0) - Math.abs(Math.cos(phase * 0.5)) * 0.01 * walk + (tweak ? tweak.y * away : 0);
+    vm.offsetZ = kick * 0.045 + (tweak ? tweak.z * away : 0);
     vm.pitch = kick * 0.06;
     vm.yaw = 0;
     vm.roll = 0;
@@ -1398,7 +2050,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     vm.skin = skinLayer[e] !== 0xffff ? skinLayer[e]! : 0;
     // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
     // 0,6 em 3–4P deixam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P).
-    vm.scale = viewCount >= 3 ? 0.6 : 0.8;
+    vm.scale = (viewCount >= 3 ? 0.6 : 0.8) * (tweak ? tweak.scale : 1);
     sampleLightGrid(loaded.lightGrid, c.x, c.y, c.z, lightScratch, 0);
     vm.lightSky = lightScratch[0]!;
     vm.lightSun = lightScratch[1]!;
@@ -1412,7 +2064,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     resetDrawList(slot.hud, desc.width, desc.height);
     const entity = slot.controller >= 0 ? sim.controllerEntity(slot.controller) : NULL_ENTITY;
     const override = s === 0 && (overrideCamera !== null || overrideRoute !== null);
-    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen) {
+    // M2 (fase 2e): com o resultado na tela, a HUD sai (o véu e os botões ficam limpos).
+    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen || resultShown) {
       desc.hud = null;
       return;
     }
@@ -1421,16 +2074,97 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const flags = v.flags[e]!;
     m.health = v.health[e]!;
     m.maxHealth = recipe.players?.hp ?? 100;
-    m.clip = v.ammoClip[e]!;
-    m.reserve = v.ammoReserve[e]!;
+    m.clip = heldClip(v, e);
+    m.reserve = heldReserve(v, e);
     m.kills = v.kills[e]!;
     m.deaths = v.deaths[e]!;
     m.dead = (flags & ENTITY_FLAG.dead) !== 0;
-    m.respawnS = 0;
+    m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
+    // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
+    m.pingCount = 0;
+    if (!ffa && humans > 0 && slot.controller === 0) {
+      const n = driver.director.pings(v.team[e]!, Math.round(PING_SHOW_S * sim.hz), pingScratch);
+      for (let k = 0; k < n && m.pingCount < MAX_TEAM_PINGS; k++) {
+        const o = k * 3;
+        if (
+          !projectToView(
+            desc.camera,
+            lay.rects[s]!,
+            pingScratch[o]!,
+            pingScratch[o + 1]! + 1.2,
+            pingScratch[o + 2]!,
+            projected,
+          )
+        ) {
+          continue;
+        }
+        // Avisos quase no mesmo lugar da tela viram um losango só (vários bots avisam o mesmo inimigo).
+        const near = PING_MERGE_FRAC * lay.rects[s]!.height;
+        let dup = false;
+        for (let q = 0; q < m.pingCount && !dup; q++) {
+          dup =
+            Math.abs(m.pings[q * 2]! - projected[0]!) < near && Math.abs(m.pings[q * 2 + 1]! - projected[1]!) < near;
+        }
+        if (dup) continue;
+        m.pings[m.pingCount * 2] = projected[0]!;
+        m.pings[m.pingCount * 2 + 1] = projected[1]!;
+        m.pingCount++;
+      }
+    }
+    // M2 (fase 2d): marcadores dos aliados (TDM), projetados com a câmera desta vista.
+    m.markerCount = 0;
+    if (!ffa) {
+      const team = v.team[e]!;
+      m.markerColor = TEAM_COLORS[team] ?? COLORS.texto;
+      const c = desc.camera;
+      const rect = lay.rects[s]!;
+      for (let j = 0; j < v.count && m.markerCount < MAX_ALLY_MARKERS; j++) {
+        if (j === e || v.alive[j] !== 1 || v.kind[j] !== ENTITY_KIND.bobo || v.team[j] !== team) continue;
+        if ((v.flags[j]! & ENTITY_FLAG.dead) !== 0) continue;
+        const o = j * 3;
+        const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M;
+        if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
+        if (projected[2]! > ALLY_MARKER_MAX_M) continue;
+        m.markers[m.markerCount * 2] = projected[0]!;
+        m.markers[m.markerCount * 2 + 1] = projected[1]!;
+        m.markerCount++;
+      }
+    }
+    // M2 (fase 2c): faixa de quem matou, o radial (só a vista do humano) e a dica da derrota feia.
+    const st = slot.death;
+    if (m.dead && st.t >= 0) {
+      fillDeathBanner(m, st, v, names, weaponNames, deathTx, ruleTexts);
+      const human = humans > 0 && s === 0 && slot.controller === 0;
+      m.primaryNames = human ? primaryNames : NO_PRIMARIES;
+      m.primaryCategories = human ? primaryCategories : NO_PRIMARIES;
+      m.primarySelected = humanPrimary;
+      m.hardTimeHint = st.hint;
+    } else {
+      m.deathName = '';
+      m.primaryNames = NO_PRIMARIES;
+      m.hardTimeHint = false;
+    }
     m.playerSlot = s;
     m.team = ffa ? 255 : v.team[e]!;
+    const held = weaponDef(v.weapon[e]!);
+    m.weaponName = held ? (weaponNames[held.code] ?? '') : '';
+    m.weaponCategory = held ? (weaponCategories[held.code] ?? '') : '';
+    m.ammoMode = !held || held.clipSize === 0 ? HUD_AMMO.none : held.reserve === 0 ? HUD_AMMO.clip : HUD_AMMO.full;
+    m.grenades =
+      held && held.fire === WEAPON_FIRE.thrown
+        ? -1
+        : v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable] === WEAPON_CODE.grenade
+          ? v.slotClip[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!
+          : -1;
+    m.crosshair =
+      held && (held.fire === WEAPON_FIRE.melee || held.fire === WEAPON_FIRE.thrown || held.adsZoom >= 3)
+        ? HUD_CROSSHAIR.dot
+        : HUD_CROSSHAIR.cross;
+    m.scope = held && held.adsZoom >= 3 && slot.adsBlend > 0.85 ? 1 : 0;
+    // A retícula abre com a dispersão da arma no quadril (chumbos inclusive), fecha no ADS, e abre com o movimento.
+    const hip = held ? Math.min(1, (held.hipSpreadDeg + held.pelletSpreadDeg) / 6) * (1 - slot.adsBlend) : 0;
     const speed = Math.hypot(v.velocity[e * 3]!, v.velocity[e * 3 + 2]!);
-    m.spread = Math.min(1, (speed / RUN_SPEED) * 0.6 + (recoil[e] ?? 0) * 0.5);
+    m.spread = Math.min(1, hip * 0.7 + (speed / RUN_SPEED) * 0.6 + (recoil[e] ?? 0) * 0.5);
     m.clickToAim =
       humans > 0 && s === 0 && !paused && device === 'keyboardMouse' && platform.id === 'web' && !rawLocked;
     drawHud(slot.hud, fonts, m, lay.views[s]!);
@@ -1439,6 +2173,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   function decay(dt: number): void {
+    ageKillFeed(killFeed, dt);
     const fade = dt / FLASH_S;
     for (let i = 0; i < flash.length; i++) {
       if (flash[i]! > 0) flash[i] = Math.max(0, flash[i]! - fade);
@@ -1912,7 +2647,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return paused;
     },
     get wantsPointerLock(): boolean {
-      return humans > 0 && !paused && !disposed && device === 'keyboardMouse' && platform.features.keyboardMouse;
+      return (
+        humans > 0 &&
+        !paused &&
+        !resultShown &&
+        !disposed &&
+        device === 'keyboardMouse' &&
+        platform.features.keyboardMouse
+      );
+    },
+    get level(): BotLevel {
+      return currentLevel;
     },
     pause,
     frame(dt, raw, menu, ui, list, rawFrameMs): SceneSignal {
@@ -1929,8 +2674,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (humans > 0) {
         const last = menu.lastDevice;
         if (last !== null) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
-        if (!paused) {
-          player.update(raw, frozen ? 0 : dt);
+        if (resultShown) {
+          // M2 (fase 2e): o resultado é um menu (D-pad, mouse, toque); o jogador não anda por trás dele.
+          const nav = resultMenu.update(menu, raw, ui);
+          const a = nav.activated;
+          if (a === RESULT_ACTION.again) signal = 'again';
+          else if (a === RESULT_ACTION.easier) signal = 'easier';
+          else if (a === RESULT_ACTION.harder) signal = 'harder';
+          else if (a === RESULT_ACTION.quit) signal = 'quit';
+        } else if (!paused) {
+          const yaw0 = player.yaw;
+          const pitch0 = player.pitch;
+          const scale = frozen ? 1 : aimAssistBefore();
+          player.update(raw, frozen ? 0 : dt, scale);
+          if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
           if (player.wasPressed('pause')) pause();
         } else {
           // Pausado: a sim não anda e a mira não gira (o mapeador lê só os botões).
@@ -1940,9 +2697,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           player.setAngles(yaw, pitch);
           if (player.wasPressed('pause')) resume();
           else {
-            const nav = pauseMenu.update(menu, raw, ui);
-            if (nav.back || nav.activated === PAUSE_ACTION.resume) resume();
-            else if (nav.activated === PAUSE_ACTION.quit) signal = 'quit';
+            signal = pauseAction(pauseMenu.update(menu, raw, ui));
           }
         }
       } else if (menu.pressed('back')) {
@@ -1979,6 +2734,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (bench && !bench.actors) actors.count = 0;
       else fillActors(alpha, running ? dt : 0);
       renderer.setActors(actors);
+      if (bench && !bench.actors) projectiles.count = 0;
+      else fillProjectiles(alpha, running);
+      renderer.setProjectiles(projectiles);
       renderer.setEnvironment(env);
       trace('atores', actors.count);
       if (fx.count > 0) {
@@ -1986,6 +2744,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         resetFxQueue(fx);
       }
       const lay = syncLayout(ui);
+      updateDeaths(running ? dt : 0, raw, lay);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
       trace('vfx e câmeras');
       const fonts = host.fonts;
@@ -2005,7 +2764,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         pushRect(list, 0, 0, ui.width, ui.height, COLORS.bunker);
         drawFontSpecimen(list, fonts, ui.width, ui.height);
       } else {
-        if (hudVisible && !(overrideCamera || overrideRoute)) {
+        if (hudVisible && !resultShown && !(overrideCamera || overrideRoute)) {
           const sharedArea = lay.shared;
           if (!ffa && request.kind === 'play') {
             sharedHud.teamCount = 2;
@@ -2015,8 +2774,32 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           } else {
             sharedHud.teamCount = 0;
           }
-          sharedHud.timeLeftS = -1;
-          if (viewCount === 3 || sharedHud.teamCount > 0) drawHudShared(list, fonts, sharedHud, sharedArea);
+          const mv = sim.view().match;
+          // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
+          sharedHud.timeLeftS = request.kind === 'play' && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
+          sharedHud.suddenDeath = mv.phase === 'suddenDeath';
+          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0) {
+            drawHudShared(list, fonts, sharedHud, sharedArea);
+          }
+          const hs = Math.min(ui.width / 640, ui.height / 360);
+          const minText = ui.options.minTextPx ?? 0;
+          const v0 = lay.views[0]!;
+          drawKillFeed(
+            list,
+            fonts,
+            killFeed,
+            ui.width - Math.max(v0.insetRight, 16 * hs),
+            Math.max(v0.insetTop, 12 * hs),
+            hs,
+            minText,
+          );
+          if (mv.phase === 'warmup' && mv.countdownTicks > 0) {
+            drawMatchCountdown(list, fonts, mv.countdownTicks / sim.hz, todayLine, ui.width, ui.height, minText);
+          }
+          if (humans > 0 && !paused && player.isDown('scoreboard')) {
+            fillScoreboard(sim.view());
+            drawScoreboard(list, fonts, scoreboard, ui.width, ui.height, minText);
+          }
           if (humans > 0 && device === 'touch' && !paused) {
             const tf = touchFrame;
             tf.width = ui.width;
@@ -2028,6 +2811,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         drawBenchStatus(list, fonts, ui);
         if (paused) pauseMenu.draw(list, ui);
+        // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
+        if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult();
+        if (resultShown) resultMenu.draw(list, ui);
         if (panel.visible) {
           fillPanel();
           drawDebugPanel(list, fonts, panel, ui.width, ui.height);
@@ -2069,6 +2855,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       driver.dispose();
       actors.count = 0;
       renderer.setActors(actors);
+      renderer.setProjectiles(null);
       // Bonecos (#56): o render solta gabaritos e tabela; o cache de skins solta o pintor (regra 21).
       renderer.setFigures(null, null);
       figures.dispose();

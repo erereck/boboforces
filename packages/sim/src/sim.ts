@@ -1,4 +1,10 @@
-import { createFigureGameTable, type FigureGameTable, type MatchRecipe } from '@boboforces/format';
+import {
+  createFigureGameTable,
+  DEFAULT_BOT_RULES,
+  resolveBot,
+  type FigureGameTable,
+  type MatchRecipe,
+} from '@boboforces/format';
 import { dequantizeAxis, type InputFrame } from '@boboforces/input';
 import {
   assert,
@@ -15,6 +21,7 @@ import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } 
 import { BASE_HP, METRICS } from './config/metrics.ts';
 import { MOVEMENT_BOBO } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
+import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
 import { ZOMBIE_RULES, MOVEMENT_ZOMBIE } from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
@@ -25,7 +32,7 @@ import {
   SIM_HZ,
   ZOMBIE_CONTROLLER_BASE,
 } from './constants.ts';
-import { DamageQueue, type MatchState, type SimContext } from './context.ts';
+import { AMMO_RULE, DamageQueue, RULE_FLAG, type EntityRules, type MatchState, type SimContext } from './context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM, NULL_ENTITY, type EntityId } from './entity.ts';
 import { EventQueue } from './event-queue.ts';
 import { bindFigureTable, FigureHitCache, unbindFigureTable } from './hitbox.ts';
@@ -35,9 +42,12 @@ import { hashState, readState, writeState } from './snapshot.ts';
 import { SimState } from './state.ts';
 import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { meleeSystem } from './systems/melee.ts';
+import { projectileSystem } from './systems/projectiles.ts';
 import { movementSystem } from './systems/movement.ts';
+import { pickupSystem } from './systems/pickups.ts';
+import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
-import type { MatchView, SimView } from './view.ts';
+import type { MatchView, PickupView, ProjectileView, SimView } from './view.ts';
 
 /** Ponto de spawn declarado pelo mapa (metros, radianos). `team` = -1 para FFA/qualquer time. */
 export interface SpawnPoint {
@@ -91,6 +101,17 @@ export interface SimConfig {
    * balanceamento) passa a mesma tabela a todas.
    */
   readonly figureTable?: FigureGameTable;
+  /**
+   * M2: primária de cada controlador no 1º spawn (código da arma; índice = controlador). Ausente ou inválida = o
+   * fuzil. Depois do 1º spawn a escolha vem de `InputFrame.primary` e vale no próximo spawn.
+   */
+  readonly primaries?: ReadonlyArray<number>;
+  /**
+   * M2 (fase 2a): contagem antes da partida, em segundos (padrão 0: começa jogando). Na contagem (fase `warmup`) dá
+   * para olhar em volta, mas a sim ignora o resto da entrada e o relógio não corre. O `game` passa
+   * `MATCH_DEFAULTS.countdownS` nas partidas de verdade.
+   */
+  readonly countdownS?: number;
 }
 
 /** Referência a um snapshot já confirmado (delta do online, M5). */
@@ -129,6 +150,60 @@ export interface Sim extends Disposable {
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+/** O componente conexo com mais nós (o Destravar só manda para ele; ilhas soltas não servem). Só na criação. */
+function mainComponent(nav: NavGrid): number {
+  const counts = new Map<number, number>();
+  let best = -1;
+  let bestCount = 0;
+  for (let n = 0; n < nav.nodeCount; n++) {
+    if (nav.clearance[n] !== 1) continue;
+    const c = nav.component[n]!;
+    const k = (counts.get(c) ?? 0) + 1;
+    counts.set(c, k);
+    if (k > bestCount || (k === bestCount && c < best)) {
+      best = c;
+      bestCount = k;
+    }
+  }
+  return best;
+}
+
+/** Regras no padrão (vida da partida, ×1, sem restrição) para todas as entidades. Só na criação. */
+function createEntityRules(maxHp: number): EntityRules {
+  return {
+    maxHp: new Float32Array(MAX_ENTITIES).fill(maxHp),
+    damageMult: new Float32Array(MAX_ENTITIES).fill(1),
+    speed: new Float32Array(MAX_ENTITIES).fill(1),
+    ammo: new Uint8Array(MAX_ENTITIES),
+    weaponMask: new Uint16Array(MAX_ENTITIES),
+    flags: new Uint8Array(MAX_ENTITIES),
+  };
+}
+
+/**
+ * Regras do bot `e` (gameplay.md §6.5). A vida do bot só troca a da partida quando a regra muda o padrão (100): um
+ * preset com 150 de vida dá 150 também aos bots sem regra.
+ */
+function applyBotRules(r: EntityRules, e: number, rules: typeof DEFAULT_BOT_RULES, matchHp: number): void {
+  r.maxHp[e] = rules.hp !== DEFAULT_BOT_RULES.hp ? rules.hp : matchHp;
+  r.damageMult[e] = rules.damageMult;
+  r.speed[e] = rules.speed;
+  r.ammo[e] =
+    rules.ammo === 'infiniteClip'
+      ? AMMO_RULE.infiniteClip
+      : rules.ammo === 'infiniteReserve'
+        ? AMMO_RULE.infiniteReserve
+        : AMMO_RULE.normal;
+  let mask = 0;
+  for (const id of rules.weapons) {
+    const code = WEAPONS.findIndex((w) => w.id === id);
+    if (code >= 0) mask |= 1 << code;
+  }
+  r.weaponMask[e] = mask;
+  r.flags[e] =
+    (rules.headshotImmune ? RULE_FLAG.headshotImmune : 0) | (rules.explodeOnDeath ? RULE_FLAG.explodeOnDeath : 0);
+}
 
 /** Menor Y (m) com bloco na grade; o plano de morte fica `METRICS.killPlaneBelow` abaixo dele. */
 function lowestBlockY(grid: WorldGrid): number {
@@ -190,11 +265,16 @@ export function createSim(config: SimConfig): Sim {
   // Tabela de jogo do boneco: a da partida, ou montada aqui (na criação; nunca no 1º raio).
   const figureTable = config.figureTable ?? createFigureGameTable();
   const timeLimitS = recipe.match?.timeLimitS ?? 0;
+  const countdownS = config.countdownS ?? 0;
+  assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
+  const countdownTicks = secondsToTicks(countdownS, hz);
   const match: MatchState = {
-    phase: 'playing',
+    phase: countdownTicks > 0 ? 'warmup' : 'playing',
     ticksLeft: timeLimitS > 0 ? Math.max(1, secondsToTicks(timeLimitS, hz)) : -1,
+    countdownTicks,
     teamScore: new Int32Array(MAX_TEAMS),
     winnerTeam: -1,
+    winnerEntity: NULL_ENTITY,
   };
   const ctx: SimContext = {
     s,
@@ -219,6 +299,16 @@ export function createSim(config: SimConfig): Sim {
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
     regenPerTick: MATCH_DEFAULTS.regenPerS / hz,
     scoreLimit: recipe.match?.scoreLimit ?? 0,
+    suddenDeathTicks: secondsToTicks(MATCH_DEFAULTS.suddenDeathS, hz),
+    assistWindowTicks: secondsToTicks(MATCH_DEFAULTS.assistWindowS, hz),
+    assistMinDamage: MATCH_DEFAULTS.assistMinDamage,
+    killPlaneCreditTicks: secondsToTicks(MATCH_DEFAULTS.killPlaneCreditS, hz),
+    spawnScore: new Float64Array(map.spawns.length),
+    spawnMark: new Uint8Array(map.spawns.length),
+    nav: map.nav ?? null,
+    navMainComponent: map.nav ? mainComponent(map.nav) : -1,
+    ammoBoxTicks: secondsToTicks(MATCH_DEFAULTS.ammoBoxLifeS, hz),
+    rules: createEntityRules(recipe.players?.hp ?? BASE_HP),
     killPlaneY: map.killPlaneY ?? lowestBlockY(map.grid) - METRICS.killPlaneBelow,
     playArea: map.playArea ?? null,
     zombieHp: ZOMBIE_RULES.hp,
@@ -235,6 +325,8 @@ export function createSim(config: SimConfig): Sim {
     const id = s.allocate(ENTITY_KIND.bobo, slot.team, slot.controller);
     assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
     s.controllerEntity[slot.controller] = id;
+    s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
+    if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, ctx.maxHp);
     const k = perTeam[slot.team]!;
     perTeam[slot.team] = k + 1;
     respawn(ctx, id & 0xffff, initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k));
@@ -251,14 +343,33 @@ export function createSim(config: SimConfig): Sim {
       controllerCount = controller + 1;
     }
   }
-  events.matchPhase(0, 'playing');
+  events.matchPhase(0, match.phase);
   bindFigureTable(figureTable);
 
   const matchView: Mutable<MatchView> = {
     phase: match.phase,
     ticksLeft: match.ticksLeft,
+    countdownTicks: match.countdownTicks,
     teamScore: match.teamScore,
     winnerTeam: match.winnerTeam,
+    winnerEntity: match.winnerEntity,
+  };
+  const projView: Mutable<ProjectileView> = {
+    count: 0,
+    alive: s.projAlive,
+    weapon: s.projWeapon,
+    owner: s.projOwner,
+    position: s.projPosition,
+    prevPosition: s.projPrevPosition,
+    velocity: s.projVelocity,
+  };
+  const pickView: Mutable<PickupView> = {
+    count: 0,
+    alive: s.pickAlive,
+    kind: s.pickKind,
+    position: s.pickPosition,
+    prevPosition: s.pickPrevPosition,
+    ticksLeft: s.pickTicks,
   };
   const view: Mutable<SimView> = {
     tick: 0,
@@ -279,12 +390,20 @@ export function createSim(config: SimConfig): Sim {
     prevPitch: s.prevPitch,
     health: s.health,
     weapon: s.weapon,
-    ammoClip: s.ammoClip,
-    ammoReserve: s.ammoReserve,
+    slot: s.slot,
+    loadout: s.loadout,
+    slotClip: s.slotClip,
+    slotReserve: s.slotReserve,
+    adsAmount: s.adsAmount,
     kills: s.kills,
     deaths: s.deaths,
+    assists: s.assists,
+    respawnTicks: s.respawnTicks,
+    lastAttacker: s.lastAttacker,
     recoilPitch: s.recoilPitch,
     recoilYaw: s.recoilYaw,
+    projectiles: projView,
+    pickups: pickView,
     match: matchView,
     world: map.grid,
     blocks: map.blocks,
@@ -295,9 +414,13 @@ export function createSim(config: SimConfig): Sim {
   const syncView = (): void => {
     view.tick = ctx.tick;
     view.count = s.count;
+    projView.count = s.projCount;
+    pickView.count = s.pickCount;
     matchView.phase = match.phase;
     matchView.ticksLeft = match.ticksLeft;
+    matchView.countdownTicks = match.countdownTicks;
     matchView.winnerTeam = match.winnerTeam;
+    matchView.winnerEntity = match.winnerEntity;
   };
 
   const hasher = new StateHasher();
@@ -319,10 +442,15 @@ export function createSim(config: SimConfig): Sim {
         s.inMoveY[e] = 0;
         continue;
       }
-      s.inButtons[e] = f.buttons & 0xffff;
-      s.inMoveX[e] = dequantizeAxis(f.moveX);
-      s.inMoveY[e] = dequantizeAxis(f.moveY);
-      s.inWeapon[e] = f.weapon & 0xff;
+      // Contagem inicial: só a mira e a primária valem (a troca de arma pedida agora entra quando a partida começar).
+      const frozen = match.phase === 'warmup';
+      s.inButtons[e] = frozen ? 0 : f.buttons & 0xffff;
+      s.inMoveX[e] = frozen ? 0 : dequantizeAxis(f.moveX);
+      s.inMoveY[e] = frozen ? 0 : dequantizeAxis(f.moveY);
+      if (!frozen) s.inWeapon[e] = f.weapon & 0xff;
+      // Primária do próximo spawn: código + 1 (0 = manter); código que não é primária é ignorado.
+      const p = (f.primary & 0xff) - 1;
+      if (p >= 0 && isPrimaryWeapon(p)) s.primaryChoice[e] = p;
       if ((s.flags[e]! & ENTITY_FLAG.dead) === 0) {
         s.yaw[e] = u16ToYaw(f.yaw);
         s.pitch[e] = i16ToPitch(f.pitch);
@@ -349,11 +477,15 @@ export function createSim(config: SimConfig): Sim {
         s.prevYaw[e] = s.yaw[e]!;
         s.prevPitch[e] = s.pitch[e]!;
       }
-      // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (4) projéteis e (8) diretor ainda não existem.
+      for (let p = 0; p < s.projCount * 3; p++) s.projPrevPosition[p] = s.projPosition[p]!;
+      // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (8) diretor ainda não existe.
       applyInputs(inputs);
+      unstuckSystem(ctx);
       movementSystem(ctx);
       weaponSystem(ctx);
       meleeSystem(ctx);
+      projectileSystem(ctx);
+      pickupSystem(ctx);
       damageSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);

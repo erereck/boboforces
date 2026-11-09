@@ -123,6 +123,7 @@ export function fakePrintsPage(): string {
     setMipFilter: function (v) { state.mip = v; },
     setHudVisible: function (v) { state.hud = !!v; },
     setViewmodelVisible: function (v) { state.viewmodel = !!v; },
+    showResult: function () { state.result = true; },
     setFrozen: function (v) { state.frozen = !!v; },
     showFontSpecimen: function (v) { state.specimen = !!v; },
     whenReady: whenReady

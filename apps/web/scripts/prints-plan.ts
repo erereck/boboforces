@@ -14,6 +14,9 @@
 //   cópia roda `--copia <variante>` (passo 6).
 // - RODADA 4 (roupa militar, decisão #58): a tropa (fila de frente e de costas nos 2 times e sem time), a farda a 1 m de
 //   frente e de costas, a leitura de 5 a 50 m, a vitrine e o zumbi, mais as 4 perguntas R1–R4 com o padrão marcado.
+// - RODADA 5 (M2, fase 1f: as armas): o arsenal na fila (de frente, a 3/4 e mirando), a empunhadura a 1 m e a arma na
+//   mão na vista do jogador do bench (com a HUD), mais as perguntas A1–A4. A explosão e a luneta não param numa cena
+//   congelada: entram como capturas ao vivo na página da rodada (fora do roteiro).
 //
 // Dois tipos de página:
 // - CENA: o bench parado numa vista (`?bench&…`), comandado pelo gancho `GameDebugApi`. Cada print traz TODAS as
@@ -162,6 +165,8 @@ export interface PrintSettings {
   readonly mannequins: readonly MannequinOverride[];
   /** Rodada 3: o manequim posado com dt fixo (`setFigureClip`); `null` = sem clipe. */
   readonly clip: FigureClipFrame | null;
+  /** Rodada 5: mostra a arma na mão (`setViewmodelVisible`; só existe na vista do jogador, `camera: null`). */
+  readonly viewmodel: boolean;
 }
 
 export type PrintSetId =
@@ -184,11 +189,17 @@ export type PrintSetId =
   | 'tropa'
   | 'farda'
   | 'patio'
-  | 'infectado';
+  | 'infectado'
+  | 'arsenal'
+  | 'empunhadura'
+  | 'na-mao';
 
-/** Rodada: as escolhas do M1 (#50–#54), a rodada 3 do porte do boneco (#56) ou a rodada 4 da roupa militar (#58). */
-export type PrintRound = 'escolhas' | 'rodada3' | 'rodada4';
-export const PRINT_ROUNDS: readonly PrintRound[] = ['escolhas', 'rodada3', 'rodada4'];
+/**
+ * Rodada: as escolhas do M1 (#50–#54), a rodada 3 do porte do boneco (#56), a rodada 4 da roupa militar (#58) ou a
+ * rodada 5 das armas do M2 (fase 1f).
+ */
+export type PrintRound = 'escolhas' | 'rodada3' | 'rodada4' | 'rodada5';
+export const PRINT_ROUNDS: readonly PrintRound[] = ['escolhas', 'rodada3', 'rodada4', 'rodada5'];
 
 export interface PrintSetInfo {
   readonly id: PrintSetId;
@@ -374,6 +385,31 @@ export const PRINT_SETS: readonly PrintSetInfo[] = [
     question: 'O zumbi de farda velha (desbotada, rasgada, com remendos e curativos coloridos) fica? (R1)',
     rounds: ['rodada4'],
   },
+  {
+    id: 'arsenal',
+    number: 23,
+    title: 'Arsenal do M2 na fila: as 8 armas e a LMG de reserva',
+    question:
+      'Pop Gun, Buzzer, Rattler, Door Knocker, Peekaboo, Kaboomer, Butter Knife e Pineapple na mão dos bobos, de frente,' +
+      ' a 3/4 e mirando (com a Lawnmower no lugar da granada): cada silhueta se distingue? (A1)',
+    rounds: ['rodada5'],
+  },
+  {
+    id: 'empunhadura',
+    number: 24,
+    title: 'Empunhadura a 1 m: SMG e escopeta, lança-foguetes e LMG, faca e granada',
+    question: 'De perto, ao lado da parede de 32 px/m: as texturas, a faixa de destaque de cada arma e a pegada (A1)',
+    rounds: ['rodada5'],
+  },
+  {
+    id: 'na-mao',
+    number: 25,
+    title: 'A arma na mão (1ª pessoa) com a HUD',
+    question:
+      'Cada arma na tela, com "Nome · Categoria", a munição, as granadas e a mira de cada uma: o tamanho e a posição' +
+      ' ficam bons? (A2, A4)',
+    rounds: ['rodada5'],
+  },
 ];
 
 /** De onde vem o título: a tela da web ou a prévia do Switch (`?titulo=switch`). */
@@ -414,6 +450,8 @@ export interface SceneShot extends ShotBase {
   readonly atlas: boolean;
   readonly bots: number;
   readonly profile: string | null;
+  /** Rodada 5: `weapons=` do bench (a primária dos bots); `null` = o fuzil. */
+  readonly weapons: string | null;
   readonly settings: PrintSettings;
 }
 
@@ -440,6 +478,7 @@ export const PRINT_BASE: PrintSettings = {
   fontSpecimen: false,
   mannequins: [],
   clip: null,
+  viewmodel: false,
 };
 
 const TIMES: readonly { readonly value: PrintTimeOfDay; readonly slug: string; readonly label: string }[] = [
@@ -469,6 +508,8 @@ interface SceneOptions {
   readonly atlas?: boolean;
   readonly bots?: number;
   readonly profile?: string;
+  /** Rodada 5: primária dos bots do bench (`weapons=`); ausente = o fuzil. */
+  readonly weapons?: string;
 }
 
 function sceneShot(
@@ -491,6 +532,7 @@ function sceneShot(
     atlas: options.atlas ?? false,
     bots: options.bots ?? 0,
     profile: options.profile ?? null,
+    weapons: options.weapons ?? null,
     settings: { ...PRINT_BASE, ...settings },
   };
 }
@@ -918,6 +960,84 @@ function round4Shots(): SceneShot[] {
   return plan;
 }
 
+/** Rodada 5: as armas na fila (linha:1..8), na ordem do GDD §4.3.2; o 2º lote troca a granada pela LMG de reserva. */
+const ARSENAL: readonly string[] = ['pistol', 'smg', 'rifle', 'shotgun', 'sniper', 'rocket', 'knife', 'grenade'];
+const ARSENAL_AIM: readonly string[] = ['pistol', 'smg', 'rifle', 'shotgun', 'sniper', 'rocket', 'lmg', 'knife'];
+
+/** Os 8 da fila com as armas dadas (looks 1–4 no time A e 5–8 no time B, como a tropa da rodada 4). */
+function arsenalLine(weapons: readonly string[], pose: MannequinPose): MannequinOverride[] {
+  return weapons.map((weapon, k): MannequinOverride => ({
+    name: LINE(k + 1),
+    look: FILA_LOOKS[k]!,
+    team: k < 4 ? TEAM_A : TEAM_B,
+    pose,
+    weapon,
+    pitch: 0,
+    expression: pose === 'aim' ? 1 : 0,
+  }));
+}
+
+/** As primárias na 1ª pessoa (bench com 1 bot só: a vista segue o bot do controlador 4, sem ninguém na frente). */
+const NA_MAO: readonly (readonly [string, string])[] = [
+  ['rifle', 'Rattler (fuzil)'],
+  ['smg', 'Buzzer (SMG)'],
+  ['shotgun', 'Door Knocker (escopeta)'],
+  ['sniper', 'Peekaboo (sniper, fora da luneta)'],
+  ['rocket', 'Kaboomer (lança-foguetes)'],
+  ['lmg', 'Lawnmower (LMG de reserva)'],
+];
+
+function round5Shots(): SceneShot[] {
+  const plan: SceneShot[] = [];
+  const hd = (
+    set: PrintSetId,
+    slug: string,
+    caption: string,
+    settings: Partial<PrintSettings>,
+    options: SceneOptions = {},
+  ): void => {
+    plan.push(sceneShot(set, slug, caption, SIZE_HD, settings, options));
+  };
+
+  // (23) Arsenal: as 8 armas na fila, de frente e a 3/4; depois mirando (ADS de 3ª pessoa) com a LMG.
+  hd('arsenal', 'frente', 'Arsenal de frente: pistola, SMG, fuzil, escopeta | sniper, foguete, faca, granada', {
+    camera: 'print:linha-frente',
+    mannequins: arsenalLine(ARSENAL, 'stand'),
+  });
+  hd('arsenal', '3-4', 'Arsenal a 3/4 (a silhueta de cada arma)', {
+    camera: 'print:linha-3-4',
+    mannequins: arsenalLine(ARSENAL, 'stand'),
+  });
+  hd('arsenal', 'mirando', 'Arsenal mirando a 3/4: pistola, SMG, fuzil, escopeta | sniper, foguete, LMG, faca', {
+    camera: 'print:linha-3-4',
+    mannequins: arsenalLine(ARSENAL_AIM, 'aim'),
+  });
+
+  // (24) Empunhadura a 1 m: os pares de armas novas (close:1 time A, close:5 time B).
+  for (const [slug, a, b, label] of [
+    ['smg-escopeta', 'smg', 'shotgun', 'Buzzer (SMG) e Door Knocker (escopeta)'],
+    ['foguete-lmg', 'rocket', 'lmg', 'Kaboomer (lança-foguetes) e Lawnmower (LMG)'],
+    ['faca-granada', 'knife', 'grenade', 'Butter Knife (faca) e Pineapple (granada)'],
+  ] as const) {
+    hd('empunhadura', slug, `Empunhadura a 1 m: ${label}`, {
+      camera: 'print:close-1m',
+      mannequins: closePair(0).map((m, k) => ({ ...m, weapon: k === 0 ? a : b, turnDeg: k === 0 ? 55 : -55 })),
+    });
+  }
+
+  // (25) Na mão: a vista do jogador do bench (pilotada pelo único bot, congelada no spawn) com a HUD e a arma.
+  for (const [weapon, label] of NA_MAO) {
+    hd(
+      'na-mao',
+      weapon,
+      `Na mão: ${label}, com a HUD`,
+      { camera: null, hud: true, viewmodel: true },
+      { bots: 1, weapons: weapon },
+    );
+  }
+  return plan;
+}
+
 /** Prints que só existem como variante da cópia (a árvore principal não os tem nem como base): os bots numa partida. */
 function copyOnlyBaseShots(): SceneShot[] {
   return [
@@ -1068,7 +1188,7 @@ function copyShots(bases: readonly PrintShot[]): PrintShot[] {
  * em 1280×720; a leitura é a mesma) e, por último, as 30 variantes da cópia descartável (`copy` não nulo).
  */
 export function buildPrintPlan(): PrintShot[] {
-  const main = [...choiceShots(), ...round3Shots(), ...round4Shots()];
+  const main = [...choiceShots(), ...round3Shots(), ...round4Shots(), ...round5Shots()];
   return [...main, ...copyShots([...main, ...copyOnlyBaseShots()])];
 }
 
@@ -1138,10 +1258,17 @@ export function fakeTag(tag: string | null): string {
  * 50 m e a fog do 3–4P esconderia o bobo de 50 m), sem aquecimento e com uma hora de duração (o bench não acaba no
  * meio dos prints). `atlas`: a rota do atlas do plano B. `bots` e `profile`: só a variante dos visuais dos bots.
  */
-export function printsQuery(scene: string, atlas = false, bots = 0, profile: string | null = null): string {
+export function printsQuery(
+  scene: string,
+  atlas = false,
+  bots = 0,
+  profile: string | null = null,
+  weapons: string | null = null,
+): string {
   return (
     `?bench&scene=${encodeURIComponent(scene)}&views=1&bots=${bots}&zombies=0&view=90&warmup=0&duration=3600&seed=1` +
     (profile ? `&profile=${encodeURIComponent(profile)}` : '') +
+    (weapons ? `&weapons=${encodeURIComponent(weapons)}` : '') +
     (atlas ? '&atlas=1' : '') +
     (PRINTS_LOADING_PARAM ? `&${PRINTS_LOADING_PARAM}=1` : '')
   );
@@ -1152,7 +1279,7 @@ export const SWITCH_TITLE_QUERY = '?titulo=switch';
 
 /** Query da página de um print (`''` = a página inicial, o título da web de verdade). */
 export function shotQuery(shot: PrintShot, scene: string): string {
-  if (shot.page === 'scene') return printsQuery(scene, shot.atlas, shot.bots, shot.profile);
+  if (shot.page === 'scene') return printsQuery(scene, shot.atlas, shot.bots, shot.profile, shot.weapons);
   return shot.shell === 'switch' ? SWITCH_TITLE_QUERY : '';
 }
 
@@ -1174,7 +1301,7 @@ export function runOrder(plan: readonly PrintShot[], scene: string): PrintShot[]
 
 // --- Perguntas das rodadas 3 (PLANO do porte §G) e 4 (roupa militar, #58) ---
 
-export type RoundQuestionId = `G${number}` | `R${number}`;
+export type RoundQuestionId = `G${number}` | `R${number}` | `A${number}`;
 
 export interface RoundQuestion {
   readonly id: RoundQuestionId;
@@ -1452,6 +1579,69 @@ export const ROUND4_NOTES: readonly string[] = [
     ' afro aumenta a silhueta.',
 ];
 
+/** Rodada 5 (M2, fase 1f): as armas. Os nomes já estão aprovados (#61). */
+export const ROUND5_QUESTIONS: readonly RoundQuestion[] = [
+  {
+    id: 'A1',
+    title: 'Modelos das armas novas',
+    text:
+      'SMG com pente laranja, escopeta de madeira com cartuchos vermelhos, lança-foguetes oliva com faixa amarela e' +
+      ' ogiva vermelha, faca de manteiga, granada "abacaxi" e LMG com caixa amarela (sem marca nem arma real, #10).' +
+      ' Aprovados?',
+    options: ['Aprovados', 'Aprovados, com ajustes no comentário', 'Refazer'],
+    default: 0,
+    sets: ['arsenal', 'empunhadura'],
+    copies: [],
+    evidence: 'Arsenal de frente, a 3/4 e mirando; empunhadura a 1 m',
+  },
+  {
+    id: 'A2',
+    title: 'Arma na mão (1ª pessoa)',
+    text:
+      'O lança-foguetes, a LMG e a sniper ficaram menores e mais para o lado que as outras (na escala normal tomavam' +
+      ' metade da tela). Tamanho e posição bons?',
+    options: ['Ficam assim', 'Ajustar (dizer qual no comentário)'],
+    default: 0,
+    sets: ['na-mao'],
+    copies: [],
+    evidence: 'Na mão, uma por arma; capturas ao vivo',
+  },
+  {
+    id: 'A3',
+    title: 'Explosão do foguete e da granada',
+    text:
+      'Clarão, bola de fogo, faíscas, fumaça cinza que sobe e 14 cubinhos de carvão e laranja, mais o tremor da câmera' +
+      ' a até 14 m. Sem programa de shader novo. Fica assim?',
+    options: ['Fica assim', 'Mais forte', 'Mais discreta'],
+    default: 0,
+    sets: ['na-mao'],
+    copies: [],
+    evidence: 'Capturas ao vivo (explosão)',
+  },
+  {
+    id: 'A4',
+    title: 'HUD das armas e luneta',
+    text:
+      '"Nome · Categoria" em cima da munição, as granadas ao lado (só no 1–2P), ponto como mira na faca, na granada e na' +
+      ' sniper, e a luneta blocada com retícula fina e ponto vermelho. Aprovados?',
+    options: ['Aprovados', 'Aprovados, com ajustes no comentário'],
+    default: 0,
+    sets: ['na-mao'],
+    copies: [],
+    evidence: 'Na mão com a HUD; captura ao vivo da luneta',
+  },
+];
+
+/** Registro sem pergunta da rodada 5 (decisões menores das armas, revisáveis). */
+export const ROUND5_NOTES: readonly string[] = [
+  'Cada bot sorteia a primária pela semente: fuzil 30%, SMG 20%, escopeta 15%, LMG 13%, sniper 12% e foguete 10%.',
+  'A escopeta soma os 8 chumbos por alvo; recarrega 1 cartucho a cada 0,5 s e atirar interrompe a recarga.',
+  'A granada cozinha segurando o gatilho; se o pavio acabar na mão, explode ali (55 em quem segura).',
+  'Explosões não atravessam parede, tiram 50% de quem lançou e não ferem aliados (fogo amigo desligado).',
+  'O foguete em voo só aparece a 1,5 m do olho de quem atirou (antes ele tapava a câmera).',
+  'A sua primária ainda é o fuzil: o menu radial da tela de morte é da fase 2.',
+];
+
 /** As perguntas e o registro de cada rodada com folha de perguntas. */
 export const ROUND_SHEETS = [
   {
@@ -1465,6 +1655,12 @@ export const ROUND_SHEETS = [
     title: 'Perguntas da rodada 4 (roupa militar, #58)',
     questions: ROUND4_QUESTIONS,
     notes: ROUND4_NOTES,
+  },
+  {
+    round: 'rodada5',
+    title: 'Perguntas da rodada 5 (as armas do M2)',
+    questions: ROUND5_QUESTIONS,
+    notes: ROUND5_NOTES,
   },
 ] as const satisfies readonly {
   readonly round: PrintRound;

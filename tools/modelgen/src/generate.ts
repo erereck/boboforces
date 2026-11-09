@@ -1,4 +1,5 @@
 import {
+  contentIdsOfKind,
   encodeModelPack,
   encodePng,
   isKnownContentId,
@@ -7,6 +8,7 @@ import {
   validateModelPack,
   type ModelPack,
 } from '@boboforces/format';
+import { PICKUP_RECIPES } from '../../../assets-src/models/pickups.ts';
 import { PROP_RECIPES } from '../../../assets-src/models/props.ts';
 import { WEAPON_RECIPES } from '../../../assets-src/models/weapons.ts';
 import { tone } from '../../skingen/src/palette.ts';
@@ -35,8 +37,17 @@ export interface ModelsBuild {
 
 export function buildModels(): ModelsBuild {
   const glow = new LayerCanvas('mdl_glow', 'emissive', tone('emissivo', 1));
-  const all: BuiltModel[] = [...WEAPON_RECIPES.map((r) => r()), ...PROP_RECIPES.map((r) => r({ glow }))];
-  const models = all.filter((m) => isKnownContentId(`model:${m.doc.id}`));
+  const all: BuiltModel[] = [
+    ...WEAPON_RECIPES.map((r) => r()),
+    ...PROP_RECIPES.map((r) => r({ glow })),
+    ...PICKUP_RECIPES.map((r) => r()),
+  ];
+  // Pacote na ordem do registro de conteúdo: o M2 acrescentou armas no FIM do registro, então os índices das props do
+  // M1 não mudam (e a ordem das camadas segue a dos modelos).
+  const order = contentIdsOfKind('model');
+  const models = all
+    .filter((m) => isKnownContentId(`model:${m.doc.id}`))
+    .sort((x, y) => order.indexOf(x.doc.id) - order.indexOf(y.doc.id));
   const pending = all.filter((m) => !models.includes(m));
   const canvases: LayerCanvas[] = [];
   for (const m of models) for (const l of m.layers) if (!canvases.includes(l)) canvases.push(l);

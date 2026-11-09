@@ -7,6 +7,8 @@ import { FRAME_BUTTON_BITS } from './actions.ts';
  * - `yaw`/`pitch` são ABSOLUTOS e quantizados (`yawToU16`/`pitchToI16` do shared): a câmera aplica a mira em todo
  *   frame de render e o tick só lê o último valor, sem latência extra mesmo a 30 Hz.
  * - `weapon` é o slot DESEJADO, absoluto. A sim age na borda (quando o valor muda), então repetir o frame é seguro.
+ * - `primary` (M2) é a primária escolhida para o PRÓXIMO spawn (código da arma + 1; 0 = manter a escolha atual). O
+ *   menu radial da tela de morte e a IA escrevem aqui; também é absoluto e repetir é seguro.
  * - Objetos mutáveis e reaproveitados: crie com `createInputFrame()` fora do laço e reescreva a cada tick.
  */
 export interface InputFrame {
@@ -24,18 +26,20 @@ export interface InputFrame {
   pitch: number;
   /** u8: slot de arma desejado (0 = primária, 1 = pistola, 2 = faca, 3 = granada…). */
   weapon: number;
+  /** u8 (M2): código da primária do próximo spawn + 1, ou 0 para manter a escolha atual. */
+  primary: number;
 }
 
-/** Tamanho serializado: seq 16 + botões 16 + move 8+8 + yaw 16 + pitch 16 + arma 8 = 88 bits (11 bytes). */
-export const INPUT_FRAME_BITS = 16 + FRAME_BUTTON_BITS + 8 + 8 + 16 + 16 + 8;
+/** Tamanho serializado: seq 16 + botões 16 + move 8+8 + yaw 16 + pitch 16 + arma 8 + primária 8 = 96 bits (12 bytes). */
+export const INPUT_FRAME_BITS = 16 + FRAME_BUTTON_BITS + 8 + 8 + 16 + 16 + 8 + 8;
 
 export const MOVE_AXIS_MAX = 127;
 
 export function createInputFrame(): InputFrame {
-  return { seq: 0, buttons: 0, moveX: 0, moveY: 0, yaw: 0, pitch: 0, weapon: 0 };
+  return { seq: 0, buttons: 0, moveX: 0, moveY: 0, yaw: 0, pitch: 0, weapon: 0, primary: 0 };
 }
 
-/** Zera tudo menos `seq`, `yaw`, `pitch` e `weapon` (que são absolutos e persistem entre ticks). */
+/** Zera tudo menos `seq`, `yaw`, `pitch`, `weapon` e `primary` (que são absolutos e persistem entre ticks). */
 export function clearInputFrameButtons(f: InputFrame): void {
   f.buttons = 0;
   f.moveX = 0;
@@ -50,6 +54,7 @@ export function copyInputFrame(dst: InputFrame, src: Readonly<InputFrame>): Inpu
   dst.yaw = src.yaw;
   dst.pitch = src.pitch;
   dst.weapon = src.weapon;
+  dst.primary = src.primary;
   return dst;
 }
 
@@ -75,6 +80,7 @@ export function writeInputFrame(w: BitWriter, f: Readonly<InputFrame>): void {
   w.writeBits(f.yaw, 16);
   w.writeInt(f.pitch, 16);
   w.writeBits(f.weapon, 8);
+  w.writeBits(f.primary, 8);
 }
 
 export function readInputFrame(r: BitReader, out: InputFrame): InputFrame {
@@ -85,5 +91,6 @@ export function readInputFrame(r: BitReader, out: InputFrame): InputFrame {
   out.yaw = r.readBits(16);
   out.pitch = r.readInt(16);
   out.weapon = r.readBits(8);
+  out.primary = r.readBits(8);
   return out;
 }

@@ -18,6 +18,8 @@ export const MAX_HUMANS = ENGINE_MAX_LOCAL_HUMANS;
 export const MAX_BOTS = ENGINE_MAX_BOTS;
 export const MAX_PROJECTILES = 512;
 export const MAX_PICKUPS = 256;
+/** M2 (fase 2a): agressores recentes guardados por bobo (assistência e crédito do plano de morte). */
+export const RECENT_ATTACKERS = 4;
 export const MAX_TEAMS = ENGINE_MAX_TEAMS;
 
 /**

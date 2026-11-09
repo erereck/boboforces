@@ -163,15 +163,19 @@ export function buildModelsSheet(
   for (const m of pending)
     for (const l of m.layers) byName.set(l.name, { name: l.name, kind: l.kind, cutout: false, image: l.image });
   const figure = referenceFigureTris('recruit');
-  const t = createTarget(1600, 1500, BG);
+  const weaponRows = Math.ceil(models.filter((m) => m.doc.kind === 'weapon').length / 3);
+  const t = createTarget(1600, 1200 + weaponRows * 300, BG);
   let y = 10;
 
   // 1. Armas: iso e lado em escala grande, e a silhueta em escala real (1 texel = 1 px), ampliada 4×.
   label(t, 'ARMAS (ISO, LADO E SILHUETA REAL 32 PX/M AMPLIADA 4X)', 12, y, TEXT, 2);
   y += 20;
   const weapons = models.filter((m) => m.doc.kind === 'weapon');
+  const y0Weapons = y;
+  // 3 por linha (M2: 10 armas, incluindo o foguete em voo).
   weapons.forEach((m, i) => {
-    const x0 = 12 + i * 528;
+    const x0 = 12 + (i % 3) * 528;
+    const y = y0Weapons + Math.floor(i / 3) * 300;
     const b = bounds(m.doc);
     const center: Vec3 = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
     fillRect(t, x0, y, 520, 200, PANEL);
@@ -191,7 +195,7 @@ export function buildModelsSheet(
     label(t, `pecas ${m.doc.parts.map((p) => p.name).join(' ')}`, x0 + 264, y + 246, MUTED, 1);
     label(t, `soquetes ${m.doc.sockets.map((s) => s.name).join(' ')}`, x0 + 264, y + 258, MUTED, 1);
   });
-  y += 300;
+  y += Math.ceil(weapons.length / 3) * 300;
 
   // 2. Props com o boneco de 1,75 m (decisão #55) ao lado e o colisor em arame laranja.
   label(t, 'PROPS (BOBO DE 1,75 M PARA ESCALA; COLISOR EM LARANJA)', 12, y, TEXT, 2);

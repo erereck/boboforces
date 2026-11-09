@@ -58,6 +58,9 @@ export const ISSUE_CODES = [
   'recipe.botsOverPlatformCap',
   'recipe.humansOverPlatformCap',
   'recipe.viewDistanceOverPlatformCap',
+  // Bot (M2, fase 3a): campo de tipo errado (ignorado) e valor fora da faixa (limitado)
+  'bot.invalidField',
+  'bot.valueClamped',
 ] as const;
 
 export type IssueCode = (typeof ISSUE_CODES)[number];

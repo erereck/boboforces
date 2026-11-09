@@ -1,5 +1,12 @@
 import { IndexAllocator } from '@boboforces/shared';
-import { MAX_CONTROLLERS_WITH_ZOMBIES, MAX_ENTITIES } from './constants.ts';
+import { WEAPON_SLOT_COUNT } from '@boboforces/input';
+import {
+  MAX_CONTROLLERS_WITH_ZOMBIES,
+  MAX_ENTITIES,
+  MAX_PICKUPS,
+  MAX_PROJECTILES,
+  RECENT_ATTACKERS,
+} from './constants.ts';
 import { makeEntityId, NO_CONTROLLER, NO_TEAM, NULL_ENTITY, type EntityId } from './entity.ts';
 
 /** Array de estado da sim (todos os typed arrays que entram em snapshot e hash). */
@@ -39,11 +46,20 @@ export class SimState {
   readonly pitch = new Float64Array(MAX_ENTITIES);
   readonly prevPitch = new Float64Array(MAX_ENTITIES);
   readonly health = new Float32Array(MAX_ENTITIES);
+  /** Código da arma na mão (`WEAPON_CODE`), ou `WEAPON_NONE` (zumbi). */
   readonly weapon = new Uint8Array(MAX_ENTITIES);
-  readonly ammoClip = new Uint16Array(MAX_ENTITIES);
-  readonly ammoReserve = new Uint16Array(MAX_ENTITIES);
+  /** Slot ativo do loadout (0..3, `WEAPON_SLOT`). */
+  readonly slot = new Uint8Array(MAX_ENTITIES);
+  /** M2: loadout e munição POR SLOT (passo `WEAPON_SLOT_COUNT`): código da arma de cada slot, pente e reserva. */
+  readonly loadout = new Uint8Array(MAX_ENTITIES * WEAPON_SLOT_COUNT);
+  readonly slotClip = new Uint16Array(MAX_ENTITIES * WEAPON_SLOT_COUNT);
+  readonly slotReserve = new Uint16Array(MAX_ENTITIES * WEAPON_SLOT_COUNT);
+  /** Quanto do ADS já entrou (0..1; a câmera aplica o zoom da arma nessa fração). */
+  readonly adsAmount = new Float32Array(MAX_ENTITIES);
   readonly kills = new Uint16Array(MAX_ENTITIES);
   readonly deaths = new Uint16Array(MAX_ENTITIES);
+  /** M2 (fase 2a): assistências. */
+  readonly assists = new Uint16Array(MAX_ENTITIES);
   readonly recoilPitch = new Float32Array(MAX_ENTITIES);
   readonly recoilYaw = new Float32Array(MAX_ENTITIES);
 
@@ -54,6 +70,8 @@ export class SimState {
   readonly inMoveX = new Float32Array(MAX_ENTITIES);
   readonly inMoveY = new Float32Array(MAX_ENTITIES);
   readonly inWeapon = new Uint8Array(MAX_ENTITIES);
+  /** Primária escolhida para o PRÓXIMO spawn (código; vem de `InputFrame.primary` ou de `SimConfig.primaries`). */
+  readonly primaryChoice = new Uint8Array(MAX_ENTITIES);
   /** Movimento. */
   readonly coyoteTicks = new Int16Array(MAX_ENTITIES);
   readonly jumpBufferTicks = new Int16Array(MAX_ENTITIES);
@@ -73,16 +91,61 @@ export class SimState {
   readonly switchTicks = new Int16Array(MAX_ENTITIES);
   readonly sprintFireDelayTicks = new Int16Array(MAX_ENTITIES);
   readonly lastShotTick = new Int32Array(MAX_ENTITIES).fill(-1_000_000);
+  /** Tiros seguidos da rajada atual (o padrão horizontal do recuo anda por ele; zera quando o recuo volta). */
+  readonly burstShots = new Uint16Array(MAX_ENTITIES);
+  /** Granada sendo cozida: ticks de pavio que sobram, ou -1 (não está cozinhando). */
+  readonly cookTicks = new Int32Array(MAX_ENTITIES).fill(-1);
   /** Vida e spawn. */
   readonly respawnTicks = new Int32Array(MAX_ENTITIES);
   readonly spawnProtectTicks = new Int32Array(MAX_ENTITIES);
   readonly lastDamageTick = new Int32Array(MAX_ENTITIES).fill(-1_000_000);
   readonly lastAttacker = new Uint32Array(MAX_ENTITIES);
+  /**
+   * M2 (fase 2a): os `RECENT_ATTACKERS` últimos inimigos que feriram o bobo nesta vida (passo `RECENT_ATTACKERS`):
+   * quem (EntityId, `NULL_ENTITY` = vazio), o dano somado na janela da assistência e o tick do último golpe.
+   */
+  readonly recentFrom = new Uint32Array(MAX_ENTITIES * RECENT_ATTACKERS);
+  readonly recentDamage = new Float32Array(MAX_ENTITIES * RECENT_ATTACKERS);
+  readonly recentTick = new Int32Array(MAX_ENTITIES * RECENT_ATTACKERS);
+  /** M2 (fase 2b): quantas vezes o bobo usou o Destravar nesta vida (o bot renasce na 3ª). */
+  readonly unstuckCount = new Uint8Array(MAX_ENTITIES);
 
   /** Controlador → entidade (EntityId com geração), `NULL_ENTITY` se não houver. Cobre humanos, bots e zumbis. */
   readonly controllerEntity = new Uint32Array(MAX_CONTROLLERS_WITH_ZOMBIES);
 
   readonly fields: readonly StateField[];
+
+  // --- Projéteis (M2, fase 1b): pool fixo, separado das entidades ---
+  /** Maior índice de projétil em uso + 1. */
+  projCount = 0;
+  readonly projAlive = new Uint8Array(MAX_PROJECTILES);
+  /** Código da arma que lançou (foguete ou granada). */
+  readonly projWeapon = new Uint8Array(MAX_PROJECTILES);
+  /** Quem lançou (EntityId com geração): o dano e o abate vão para ele. */
+  readonly projOwner = new Uint32Array(MAX_PROJECTILES);
+  readonly projPosition = new Float64Array(MAX_PROJECTILES * 3);
+  readonly projPrevPosition = new Float64Array(MAX_PROJECTILES * 3);
+  readonly projVelocity = new Float64Array(MAX_PROJECTILES * 3);
+  /** Ticks até explodir no ar (pavio da granada; alcance do foguete). */
+  readonly projFuseTicks = new Int32Array(MAX_PROJECTILES);
+  /** Os campos dos projéteis, na ordem do snapshot e do hash (até `projCount`). */
+  readonly projectileFields: readonly StateField[];
+
+  // --- Pickups (M2, fase 2b): pool fixo da caixinha de munição ---
+  /** Maior índice de pickup em uso + 1. */
+  pickCount = 0;
+  readonly pickAlive = new Uint8Array(MAX_PICKUPS);
+  /** `PICKUP_KIND`. */
+  readonly pickKind = new Uint8Array(MAX_PICKUPS);
+  /** 3 por pickup (pés da caixinha, m). */
+  readonly pickPosition = new Float64Array(MAX_PICKUPS * 3);
+  readonly pickPrevPosition = new Float64Array(MAX_PICKUPS * 3);
+  /** Velocidade de queda (m/s; 0 = no chão). */
+  readonly pickVelY = new Float64Array(MAX_PICKUPS);
+  /** Ticks até sumir. */
+  readonly pickTicks = new Int32Array(MAX_PICKUPS);
+  /** Os campos dos pickups, na ordem do snapshot e do hash (até `pickCount`). */
+  readonly pickupFields: readonly StateField[];
 
   constructor() {
     const f = (name: string, array: StateArray, stride = 1): StateField => ({ name, array, stride });
@@ -102,10 +165,14 @@ export class SimState {
       f('prevPitch', this.prevPitch),
       f('health', this.health),
       f('weapon', this.weapon),
-      f('ammoClip', this.ammoClip),
-      f('ammoReserve', this.ammoReserve),
+      f('slot', this.slot),
+      f('loadout', this.loadout, WEAPON_SLOT_COUNT),
+      f('slotClip', this.slotClip, WEAPON_SLOT_COUNT),
+      f('slotReserve', this.slotReserve, WEAPON_SLOT_COUNT),
+      f('adsAmount', this.adsAmount),
       f('kills', this.kills),
       f('deaths', this.deaths),
+      f('assists', this.assists),
       f('recoilPitch', this.recoilPitch),
       f('recoilYaw', this.recoilYaw),
       f('inButtons', this.inButtons),
@@ -113,6 +180,7 @@ export class SimState {
       f('inMoveX', this.inMoveX),
       f('inMoveY', this.inMoveY),
       f('inWeapon', this.inWeapon),
+      f('primaryChoice', this.primaryChoice),
       f('coyoteTicks', this.coyoteTicks),
       f('jumpBufferTicks', this.jumpBufferTicks),
       f('slideTicks', this.slideTicks),
@@ -124,11 +192,70 @@ export class SimState {
       f('switchTicks', this.switchTicks),
       f('sprintFireDelayTicks', this.sprintFireDelayTicks),
       f('lastShotTick', this.lastShotTick),
+      f('burstShots', this.burstShots),
+      f('cookTicks', this.cookTicks),
       f('respawnTicks', this.respawnTicks),
       f('spawnProtectTicks', this.spawnProtectTicks),
       f('lastDamageTick', this.lastDamageTick),
       f('lastAttacker', this.lastAttacker),
+      f('recentFrom', this.recentFrom, RECENT_ATTACKERS),
+      f('recentDamage', this.recentDamage, RECENT_ATTACKERS),
+      f('recentTick', this.recentTick, RECENT_ATTACKERS),
+      f('unstuckCount', this.unstuckCount),
     ];
+    this.projectileFields = [
+      f('projAlive', this.projAlive),
+      f('projWeapon', this.projWeapon),
+      f('projOwner', this.projOwner),
+      f('projPosition', this.projPosition, 3),
+      f('projPrevPosition', this.projPrevPosition, 3),
+      f('projVelocity', this.projVelocity, 3),
+      f('projFuseTicks', this.projFuseTicks),
+    ];
+    this.pickupFields = [
+      f('pickAlive', this.pickAlive),
+      f('pickKind', this.pickKind),
+      f('pickPosition', this.pickPosition, 3),
+      f('pickPrevPosition', this.pickPrevPosition, 3),
+      f('pickVelY', this.pickVelY),
+      f('pickTicks', this.pickTicks),
+    ];
+  }
+
+  /** Projétil num slot livre (`projAlive` ligado); -1 = pool cheio. */
+  allocateProjectile(): number {
+    for (let i = 0; i < MAX_PROJECTILES; i++) {
+      if (this.projAlive[i] === 0) {
+        this.projAlive[i] = 1;
+        if (i + 1 > this.projCount) this.projCount = i + 1;
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** Solta o projétil `i` e encolhe `projCount` até o último vivo. */
+  freeProjectile(i: number): void {
+    this.projAlive[i] = 0;
+    while (this.projCount > 0 && this.projAlive[this.projCount - 1] === 0) this.projCount--;
+  }
+
+  /** Pickup num slot livre (`pickAlive` ligado); -1 = pool cheio. */
+  allocatePickup(): number {
+    for (let i = 0; i < MAX_PICKUPS; i++) {
+      if (this.pickAlive[i] === 0) {
+        this.pickAlive[i] = 1;
+        if (i + 1 > this.pickCount) this.pickCount = i + 1;
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /** Solta o pickup `i` e encolhe `pickCount` até o último vivo. */
+  freePickup(i: number): void {
+    this.pickAlive[i] = 0;
+    while (this.pickCount > 0 && this.pickAlive[this.pickCount - 1] === 0) this.pickCount--;
   }
 
   /** Cria uma entidade num slot livre (geração nova, começando em 1). `NULL_ENTITY` = cheio. */

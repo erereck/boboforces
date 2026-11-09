@@ -1,8 +1,9 @@
 /**
  * Build do Switch (tecnico.md §19.2), herdado do `build.mjs` do MMM: esbuild de `src/main.ts` para `<romfs>/main.js`
  * (ESM, ES2022, sourcemap) com `__PLATFORM__ = 'switch'` e `__ONLINE__ = false`, cópia dos assets, o `licencas.txt`
- * da raiz (`licenses.ts`) e um manifesto com sha256 de cada arquivo e o commit. Usado por `build.ts` (romfs do app) e pelo `tools/portcheck` (pasta própria),
- * para os dois checarem exatamente o mesmo bundle.
+ * da raiz (`licenses.ts`), o `nxjs.ini` (V8 sem Sparkplug) e um manifesto com sha256 de cada arquivo e o commit.
+ * Usado por `build.ts` (romfs do app) e pelo `tools/portcheck` (pasta própria), para os dois checarem exatamente o
+ * mesmo bundle.
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -18,6 +19,24 @@ export const SWITCH_DEFINE: Readonly<Record<string, string>> = {
   __PLATFORM__: JSON.stringify('switch'),
   __ONLINE__: 'false',
 };
+
+/** `nxjs.ini` na raiz do RomFS: o runtime do nx.js lê antes de subir o V8 (docs do nx.js, runtime/configuration). */
+export const NXJS_INI_NAME = 'nxjs.ini';
+
+/**
+ * Sem o Sparkplug: no console, com o JIT do modo aplicativo (aberto segurando R), o nx.js 1.0.0-beta.7 cai no boot com
+ * Data Abort (erro 2168-0002) ao gravar o cabeçalho de uma página grande de código do Sparkplug, antes de qualquer
+ * linha do app (issue #424 do nx.js, aberta; o Eden não reproduz). Maglev e TurboFan seguem ligados; o `jit = auto`
+ * mantém o padrão de cada modo (JIT no aplicativo, interpretador no applet). Só ASCII: o arquivo é lido em C.
+ */
+export const NXJS_INI = [
+  '; BoboForces: configuracao do runtime do nx.js (lida antes do V8).',
+  '; --no-sparkplug: o Sparkplug derruba o boot no console com JIT (nx.js issue #424).',
+  '[v8]',
+  'jit = auto',
+  'flags = --no-sparkplug',
+  '',
+].join('\n');
 
 /** Assets gerados (assets-src → build/, tecnico.md §3), copiados para `<romfs>/assets/`. A variante do Switch vence. */
 export const ASSET_SOURCES = ['build/assets', 'build/assets-switch'] as const;
@@ -114,6 +133,7 @@ export async function buildSwitch(opts: SwitchBuildOptions): Promise<SwitchBuild
   }
   const licenses = buildLicenses(Object.keys(result.metafile.inputs), process.cwd(), ROOT_DIR);
   writeFileSync(join(opts.outDir, ROMFS_LICENSES_NAME), licenses);
+  writeFileSync(join(opts.outDir, NXJS_INI_NAME), NXJS_INI);
 
   const { version, codename } = readVersion();
   const commit = git(['rev-parse', 'HEAD']);

@@ -15,6 +15,8 @@ export * from './screens/settings.ts';
 // M1 (contratos; desenho da frente ui-fontes): HUD por vista, painel F2 e tela genérica de teste.
 export * from './screens/hud.ts';
 export * from './screens/debug-panel.ts';
+// M2 (fase 2d): kill feed, placar do Tab e contagem inicial.
+export * from './screens/match-hud.ts';
 export * from './screens/test-screen.ts';
 // Escolhas dos prints (decisão #54; contrato, desenho da frente ui-fontes): a folha das fontes em uso, que substitui a
 // comparação das candidatas.

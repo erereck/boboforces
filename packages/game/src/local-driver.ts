@@ -1,4 +1,10 @@
-import { createBotDirectorWithPaths, NAV_PATH_API, type AiBudget, type BotDirectorWithStats } from '@boboforces/ai';
+import {
+  botPrimaries,
+  createBotDirectorWithPaths,
+  NAV_PATH_API,
+  type AiBudget,
+  type BotDirectorWithStats,
+} from '@boboforces/ai';
 import type { FigureGameTable, MatchRecipe } from '@boboforces/format';
 import type { InputFrame } from '@boboforces/input';
 import type { Disposable } from '@boboforces/shared';
@@ -46,6 +52,10 @@ export interface LocalDriverConfig {
    * `setFigures`. Ausente = a sim monta a dela na criação (testes).
    */
   readonly figureTable?: FigureGameTable;
+  /** M2: primária de cada controlador no 1º spawn (`SimConfig.primaries`); ausente = o sorteio dos bots (`botPrimaries`). */
+  readonly primaries?: ReadonlyArray<number>;
+  /** M2 (fase 2d): contagem antes da partida (`SimConfig.countdownS`); ausente = sem contagem. */
+  readonly countdownS?: number;
 }
 
 export interface LocalDriver extends MatchDriver {
@@ -73,6 +83,9 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     zombies,
     ...(config.hz !== undefined ? { hz: config.hz } : {}),
     ...(config.figureTable ? { figureTable: config.figureTable } : {}),
+    // M2: bots com a primária sorteada pela semente (`botPrimaries` da IA); o bench fixa a dele.
+    primaries: config.primaries ?? botPrimaries(recipe, humans),
+    ...(config.countdownS !== undefined ? { countdownS: config.countdownS } : {}),
   });
   const director = createBotDirectorWithPaths(
     { recipe, humans, hz: sim.hz, zombies, ...(config.budget ? { budget: config.budget } : {}) },

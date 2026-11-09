@@ -1,3 +1,4 @@
+import type { BotLevel } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -26,6 +27,13 @@ export type RendererFactory = (surface: GraphicsSurface, routes?: RendererRoutes
 /** Como se entrou na cena. */
 export type SceneKind = 'play' | 'vitrine' | 'bench';
 
+/**
+ * M2 (fase 3g): quem joga no JOGAR. `levels` (padrão): bots do nível rápido nos dois times; `factory`: os bots de
+ * fábrica especiais contra o jogador (Jorge, Carl, Ninja, Sam, Hank e Gus) e o Buddy no time dele. Até os menus da
+ * fase 4 (Partida personalizada), a web liga com `?bots=fabrica`.
+ */
+export type PlaySquad = 'levels' | 'factory';
+
 export interface SceneRequest {
   /**
    * `play` (JOGAR): o Construto em Bobo Warfare TDM, o jogador e bots N0; `vitrine` (Cena-vitrine): o Construto só
@@ -40,6 +48,10 @@ export interface SceneRequest {
   /** Dispositivo que entrou (o mesmo segue jogando); `null` = o padrão da plataforma. */
   readonly device: DeviceKind | null;
   readonly gamepad: number;
+  /** M2 (fase 2e): nível rápido dos bots do JOGAR (padrão `normal`); o resultado sobe e desce um passo. */
+  readonly level?: BotLevel;
+  /** M2 (fase 3g): quem joga no JOGAR (padrão `levels`). */
+  readonly squad?: PlaySquad;
 }
 
 /** O que o núcleo empresta para a cena. */
@@ -54,7 +66,11 @@ export interface SceneHost {
   benchReport(text: string): void;
 }
 
-export type SceneSignal = 'none' | 'quit';
+/**
+ * O que a cena pede ao núcleo: `quit` volta ao título; M2 (fase 2e): `again` (De novo), `easier` e `harder` (Mais
+ * fácil / Mais difícil) recarregam o JOGAR com o nível de `Scene.level` (um passo abaixo ou acima).
+ */
+export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder';
 
 /** A cena viva: carrega por etapas dentro dos próprios frames, depois roda a partida. */
 export interface Scene extends Disposable {
@@ -66,6 +82,8 @@ export interface Scene extends Disposable {
   readonly driver: LocalDriver | null;
   /** Gancho dos prints (`GameHandle.debug`): não nulo quando o Construto carregou. */
   readonly debug: GameDebugApi | null;
+  /** M2 (fase 2e): nível rápido dos bots adversários agora (o da receita, ou o do "Ajustar desafio"). */
+  readonly level: BotLevel;
   /** Pausa vinda da plataforma (pointer lock perdido, aba oculta, HOME). */
   pause(): void;
   /**

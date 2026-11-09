@@ -44,6 +44,7 @@ import { NO_SLOT } from '../actors/layout.ts';
 import type { FxQueue } from '../fx-queue.ts';
 import type {
   ActorBuffer,
+  ProjectileBuffer,
   RenderDebug,
   RenderMap,
   RenderTextures,
@@ -193,6 +194,8 @@ export interface ActorPass extends ScenePass {
   setMap(map: RenderMap | null): void;
   /** Guarda a referência; as matrizes são escritas no `update`. */
   setActors(actors: ActorBuffer): void;
+  /** M2: projéteis em voo (`null` = nenhum), desenhados nos conjuntos instanciados das armas. */
+  setProjectiles(projectiles: ProjectileBuffer | null): void;
   /** Contadores da última vista (estatística por vista). */
   readonly lastViewActors: number;
   readonly lastViewPropGroups: number;

@@ -97,6 +97,9 @@ const FIGURE_CENTER_Y_M = FIGURE_HEIGHT_PX * FIGURE_PX_M * 0.5;
 /** Confete do "poof" da morte: cores de time + amarelo, rosa e branco. */
 const CONFETTI = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff, 0xffd23f, 0xff6fb5, 0xffffff] as const;
 
+/** M2: cores dos cubinhos da explosão (carvão, cinza e laranja da paleta mestra). */
+const EXPLOSION_CUBES = [0x2c2f3b, 0x454955, 0x9a4f30, 0xc4723f] as const;
+
 export function createFxPass(ctx: PassContext): FxPass {
   const link = linkFor(ctx.scene);
   const perView = createInstancedUniforms();
@@ -663,6 +666,134 @@ export function createFxPass(ctx: PassContext): FxPass {
     }
   }
 
+  /**
+   * M2: explosão (arte-ux.md §4: "brinquedo que reage"). Clarão e bola de fogo aditivos no tamanho do raio, línguas de
+   * fogo, faíscas, fumaça escura iluminada pela grade e cubinhos de carvão e laranja. Tudo nos anéis e no pool de
+   * detritos que já existem (nenhum programa novo).
+   */
+  function explosion(o: number, frame: FrameContext): void {
+    const d = pending.data;
+    const x = d[o]!;
+    const y = d[o + 1]!;
+    const z = d[o + 2]!;
+    const r = Math.max(1, d[o + 3]!);
+    sample(frame.world?.lightGrid ?? null, x, y + 0.3, z);
+
+    resetParticleSpec(spec);
+    spec.kind = PARTICLE_KIND.star;
+    spec.x = x;
+    spec.y = y;
+    spec.z = z;
+    spec.size = r * 0.6;
+    spec.growth = 0.6;
+    spec.life = 0.08;
+    spec.rotation = rng.range(0, Math.PI);
+    setColor(0xfff1b8, 1);
+    emitParticle(rings.additive, spec, clock);
+    spec.kind = PARTICLE_KIND.round;
+    spec.size = r * 0.45;
+    spec.growth = 1.8;
+    spec.life = 0.2;
+    setColor(0xffa040, 0.9);
+    emitParticle(rings.additive, spec, clock);
+
+    for (let k = 0; k < 6; k++) {
+      resetParticleSpec(spec);
+      spec.kind = PARTICLE_KIND.round;
+      spec.x = x + rng.range(-0.3, 0.3) * r;
+      spec.y = y + rng.range(0, 0.3) * r;
+      spec.z = z + rng.range(-0.3, 0.3) * r;
+      spec.vx = rng.range(-1, 1) * r * 1.2;
+      spec.vy = rng.range(0.2, 1) * r * 1.2;
+      spec.vz = rng.range(-1, 1) * r * 1.2;
+      spec.gravity = -1;
+      spec.size = 0.5;
+      spec.growth = 1.6;
+      spec.life = 0.3 + rng.next() * 0.1;
+      setColor(0xff8a33, 0.8);
+      emitParticle(rings.additive, spec, clock);
+    }
+    for (let k = 0; k < 12; k++) {
+      resetParticleSpec(spec);
+      spec.kind = PARTICLE_KIND.spark;
+      spec.x = x;
+      spec.y = y + 0.1;
+      spec.z = z;
+      spec.vx = rng.range(-1, 1) * 9;
+      spec.vy = rng.range(0, 1) * 9;
+      spec.vz = rng.range(-1, 1) * 9;
+      spec.gravity = 9.8;
+      spec.size = 0.015;
+      spec.life = 0.3 + rng.next() * 0.15;
+      setColor(0xffd873, 1);
+      emitParticle(rings.additive, spec, clock);
+    }
+    for (let k = 0; k < 8; k++) {
+      resetParticleSpec(spec);
+      lit();
+      spec.kind = PARTICLE_KIND.round;
+      spec.x = x + rng.range(-0.4, 0.4) * r;
+      spec.y = y + rng.range(0, 0.4) * r;
+      spec.z = z + rng.range(-0.4, 0.4) * r;
+      spec.vx = rng.range(-1.2, 1.2);
+      spec.vy = 1.5 + rng.next();
+      spec.vz = rng.range(-1.2, 1.2);
+      spec.gravity = -0.6;
+      spec.size = r * 0.22;
+      spec.growth = 2.2;
+      spec.life = 1.2 + rng.next() * 0.5;
+      setColor(0x6a6a6a, 0.5);
+      emitParticle(rings.alpha, spec, clock);
+    }
+    for (let k = 0; k < 14; k++) {
+      const speed = 5 + rng.next() * 4;
+      cube(
+        x,
+        y + 0.15,
+        z,
+        rng.range(-1, 1) * speed,
+        rng.range(0.4, 1) * speed,
+        rng.range(-1, 1) * speed,
+        EXPLOSION_CUBES[k % EXPLOSION_CUBES.length]!,
+        0.06 + rng.next() * 0.06,
+        1.6 + rng.next() * 0.8,
+      );
+    }
+  }
+
+  /** M2: rastro do foguete (uma fumacinha clara que cresce e sobe, e a chama colada na traseira). */
+  function trail(o: number, frame: FrameContext): void {
+    const d = pending.data;
+    const bx = d[o]! - d[o + 3]! * 0.3;
+    const by = d[o + 1]! - d[o + 4]! * 0.3;
+    const bz = d[o + 2]! - d[o + 5]! * 0.3;
+    sample(frame.world?.lightGrid ?? null, bx, by, bz);
+    resetParticleSpec(spec);
+    lit();
+    spec.kind = PARTICLE_KIND.round;
+    spec.x = bx;
+    spec.y = by;
+    spec.z = bz;
+    spec.vx = rng.range(-0.3, 0.3);
+    spec.vy = rng.range(0, 0.4);
+    spec.vz = rng.range(-0.3, 0.3);
+    spec.gravity = -0.3;
+    spec.size = 0.12;
+    spec.growth = 3.5;
+    spec.life = 0.7;
+    setColor(0xbfbfbf, 0.45);
+    emitParticle(rings.alpha, spec, clock);
+    resetParticleSpec(spec);
+    spec.kind = PARTICLE_KIND.round;
+    spec.x = bx;
+    spec.y = by;
+    spec.z = bz;
+    spec.size = 0.2;
+    spec.life = 0.05;
+    setColor(0xffb347, 0.9);
+    emitParticle(rings.additive, spec, clock);
+  }
+
   function processQueue(frame: FrameContext): void {
     for (let i = 0; i < pending.count; i++) {
       const o = i * FX_STRIDE;
@@ -687,6 +818,12 @@ export function createFxPass(ctx: PassContext): FxPass {
           break;
         case FX_KIND.death:
           death(o, frame);
+          break;
+        case FX_KIND.explosion:
+          explosion(o, frame);
+          break;
+        case FX_KIND.trail:
+          trail(o, frame);
           break;
         default:
           break;

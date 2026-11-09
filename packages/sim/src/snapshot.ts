@@ -14,9 +14,13 @@ import type { MatchPhase } from './view.ts';
 const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 2: `fireCooldownS` (f64, segundos) no lugar de `fireCooldownTicks` (i16).
 // 3 (M1): controladores dos zumbis (68..131) no fim da tabela de controladores.
-const SNAPSHOT_VERSION = 3;
+// 4 (M2): loadout e munição por slot, ADS e rajada (fase 1 das armas).
+// 5 (M2): granada cozinhando e o pool de projéteis (fase 1b).
+// 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
+// 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
+const SNAPSHOT_VERSION = 7;
 
-const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended'];
+const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
 const rngScratch = new Uint32Array(RNG_STATE_WORDS);
 
@@ -25,12 +29,17 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   h.reset();
   h.u32(ctx.tick).u32(s.count);
   h.u8(PHASES.indexOf(ctx.match.phase)).i32(ctx.match.ticksLeft).i32(ctx.match.winnerTeam);
+  h.i32(ctx.match.countdownTicks).u32(ctx.match.winnerEntity);
   for (let t = 0; t < MAX_TEAMS; t++) h.i32(ctx.match.teamScore[t]!);
   ctx.rngSpawn.saveState(rngScratch);
   h.bytes(rngScratch);
   ctx.rngWeapons.saveState(rngScratch);
   h.bytes(rngScratch);
   for (const f of s.fields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  h.u32(s.projCount);
+  for (const f of s.projectileFields) h.bytes(f.array.subarray(0, s.projCount * f.stride));
+  h.u32(s.pickCount);
+  for (const f of s.pickupFields) h.bytes(f.array.subarray(0, s.pickCount * f.stride));
   h.bytes(s.controllerEntity);
   return h.digest();
 }
@@ -63,12 +72,18 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
   w.writeU8(PHASES.indexOf(ctx.match.phase));
   w.writeBits(ctx.match.ticksLeft >>> 0, 32);
   w.writeBits(ctx.match.winnerTeam >>> 0, 32);
+  w.writeBits(ctx.match.countdownTicks >>> 0, 32);
+  w.writeBits(ctx.match.winnerEntity >>> 0, 32);
   for (let t = 0; t < MAX_TEAMS; t++) w.writeBits(ctx.match.teamScore[t]! >>> 0, 32);
   ctx.rngSpawn.saveState(rngScratch);
   writeArray(w, rngScratch, RNG_STATE_WORDS);
   ctx.rngWeapons.saveState(rngScratch);
   writeArray(w, rngScratch, RNG_STATE_WORDS);
   for (const f of s.fields) writeArray(w, f.array, s.count * f.stride);
+  w.writeU16(s.projCount);
+  for (const f of s.projectileFields) writeArray(w, f.array, s.projCount * f.stride);
+  w.writeU16(s.pickCount);
+  for (const f of s.pickupFields) writeArray(w, f.array, s.pickCount * f.stride);
   writeArray(w, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
 }
 
@@ -90,11 +105,22 @@ export function readState(ctx: SimContext, r: BitReader): void {
   ctx.match.phase = phase;
   ctx.match.ticksLeft = r.readBits(32) | 0;
   ctx.match.winnerTeam = r.readBits(32) | 0;
+  ctx.match.countdownTicks = r.readBits(32) | 0;
+  ctx.match.winnerEntity = r.readBits(32) >>> 0;
   for (let t = 0; t < MAX_TEAMS; t++) ctx.match.teamScore[t] = r.readBits(32) | 0;
   readArray(r, rngScratch, RNG_STATE_WORDS);
   ctx.rngSpawn.loadState(rngScratch);
   readArray(r, rngScratch, RNG_STATE_WORDS);
   ctx.rngWeapons.loadState(rngScratch);
   for (const f of s.fields) readArray(r, f.array, s.count * f.stride);
+  // Projéteis: os acima do `projCount` lido ficam mortos (o pool da sim pode ter mais vivos que o snapshot).
+  const projCount = r.readU16();
+  s.projAlive.fill(0, projCount);
+  s.projCount = projCount;
+  for (const f of s.projectileFields) readArray(r, f.array, projCount * f.stride);
+  const pickCount = r.readU16();
+  s.pickAlive.fill(0, pickCount);
+  s.pickCount = pickCount;
+  for (const f of s.pickupFields) readArray(r, f.array, pickCount * f.stride);
   readArray(r, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
 }

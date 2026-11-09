@@ -10,6 +10,9 @@ export const BENCH_RANGES = {
   warmupS: { min: 0, max: 120 },
 } as const;
 
+/** Valores de `weapons=`: `mix` e as primárias do M2 (ver `BenchConfig.weapons`). */
+export const BENCH_WEAPONS = ['rifle', 'smg', 'shotgun', 'sniper', 'rocket', 'lmg', 'mix'] as const;
+
 export interface ParsedBench {
   readonly config: BenchConfig;
   /** Avisos legíveis (pt-BR) para o relatório: parâmetro desconhecido, valor limitado, valor inválido. */
@@ -100,6 +103,7 @@ export function parseBenchParams(params: Readonly<Record<string, string>>): Pars
     fx: flag('fx', BENCH_DEFAULTS.fx),
     actors: flag('actors', BENCH_DEFAULTS.actors),
     prints: flag('prints', BENCH_DEFAULTS.prints),
+    weapons: oneOf('weapons', BENCH_WEAPONS, BENCH_DEFAULTS.weapons),
   };
   return { config, warnings };
 }

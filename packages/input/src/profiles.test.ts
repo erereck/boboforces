@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { GAME_ACTION_INDEX, GAME_ACTIONS, MENU_ACTIONS, confirmConventionFor } from './actions.ts';
+import {
+  GAME_ACTION_INDEX,
+  GAME_ACTIONS,
+  MENU_ACTIONS,
+  MENU_ONLY_FRAME_BUTTONS,
+  confirmConventionFor,
+} from './actions.ts';
 import { key, TOUCH_CONTROLS, type BindingSource } from './bindings.ts';
 import { keyIndex } from './keys.ts';
 import {
@@ -54,8 +60,10 @@ describe('perfil de controle', () => {
 
   it('todas as ações de jogo que viajam no frame têm botão no controle', () => {
     const g = createGamepadProfile();
-    for (const a of GAME_ACTIONS.slice(0, GAME_ACTION_INDEX.nextWeapon))
+    for (const a of GAME_ACTIONS.slice(0, GAME_ACTION_INDEX.nextWeapon)) {
+      if ((MENU_ONLY_FRAME_BUTTONS as readonly string[]).includes(a)) continue;
       expect(g.game[a]?.length, a).toBeGreaterThan(0);
+    }
   });
 });
 

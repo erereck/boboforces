@@ -20,6 +20,10 @@ export const FX_KIND = {
   debris: 6,
   /** Morte: o boneco se desmonta (6 corpos Verlet contra a grade, somem em 4 s) + "poof" de confete. */
   death: 7,
+  /** M2: explosão (foguete, granada): clarão, bola de fogo, faíscas, fumaça e cubinhos, no tamanho do raio. */
+  explosion: 8,
+  /** M2: rastro do foguete em voo (fumacinha + chama), um por projétil por frame. */
+  trail: 9,
 } as const;
 export type FxKind = (typeof FX_KIND)[keyof typeof FX_KIND];
 
@@ -37,6 +41,8 @@ export const FX_STRIDE = 16;
  * - debris: 0–2 ponto, 3–5 velocidade (m/s), 6 cor 0xRRGGBB (exata em float32), 7 cubinhos, 8 espalhamento (m/s)
  * - death: 0–2 pés (m), 3 yaw, 4–6 direção do golpe, 7 força (m/s), 8 osso do golpe final, 9 camada da skin,
  *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum); `entity` = vítima
+ * - explosion (M2): 0–2 centro (m), 3 raio (m)
+ * - trail (M2): 0–2 posição (m), 3–5 direção de voo (unitária; a fumaça sai para trás)
  */
 export interface FxQueue {
   readonly capacity: number;
@@ -234,5 +240,31 @@ export function pushDeath(q: FxQueue, d: Readonly<FxDeath>): boolean {
   a[o + 10] = d.scale;
   a[o + 11] = d.kind;
   a[o + 12] = d.figure;
+  return true;
+}
+
+/** M2: explosão de raio `radius` (m) em (x, y, z). */
+export function pushExplosion(q: FxQueue, x: number, y: number, z: number, radius: number): boolean {
+  const o = slot(q, FX_KIND.explosion, 0);
+  if (o < 0) return false;
+  put3(q.data, o, x, y, z);
+  q.data[o + 3] = radius;
+  return true;
+}
+
+/** M2: rastro do foguete em (x, y, z), voando em (dirX, dirY, dirZ). */
+export function pushTrail(
+  q: FxQueue,
+  x: number,
+  y: number,
+  z: number,
+  dirX: number,
+  dirY: number,
+  dirZ: number,
+): boolean {
+  const o = slot(q, FX_KIND.trail, 0);
+  if (o < 0) return false;
+  put3(q.data, o, x, y, z);
+  put3(q.data, o + 3, dirX, dirY, dirZ);
   return true;
 }

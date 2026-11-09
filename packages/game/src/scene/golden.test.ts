@@ -11,6 +11,7 @@ import {
   type MatchRecipe,
 } from '@boboforces/format';
 import { hashToHex } from '@boboforces/shared';
+import { WEAPON_CODE } from '@boboforces/sim';
 import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
@@ -43,11 +44,29 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * passa a ser as 12 OBB por postura × pitch do boneco do FutBobo (`figureHitBoxes`, tabela `9324de80`), com os braços
  * cortados a 0,75 m do eixo no plano e a cabeça agachada/deslizando que só levanta (pitch da cabeça em [0; +0,1]). As
  * duas últimas não mexem neste hash: os bots Normal passam 0 tick agachados e nenhum dos 30 acertos de braço cai fora
- * do corte. O `.bfmap` ganhou só a câmera `print:altura-45` (nav igual). O hash MUDA, de propósito, quando o mapa, os
- * blocos, as props, a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
+ * do corte. O `.bfmap` ganhou só a câmera `print:altura-45` (nav igual). M2, fase 1a das armas (08/11/2026):
+ * `81150d3b` (21 abates, 304 tiros, placar 7×14) — o estado ganhou loadout e munição por slot, ADS com tempo e a
+ * contagem da rajada, e o recuo do fuzil passou a ter o padrão horizontal fixo (0,12°) com ruído menor (0,15° →
+ * 0,08°): a mira dos bots muda e o combate muda junto. Fase 1b (08/11/2026): `28969b8b`, com o MESMO combate
+ * (21 abates, 304 tiros, 7×14): só o estado mudou (a granada cozinhando e o pool de projéteis entram no hash). Fase 1d (08/11/2026): `b66afdf7` (24
+ * abates, 204 tiros, placar 9×15) — os bots sorteiam a primária pela semente (`botPrimaries`: fuzil, SMG, escopeta, LMG,
+ * sniper e foguete; o foguete não gera `shot`, a escopeta gera 8) e a IA usa cada arma (distância, ADS, pistola, faca).
+ * Fase 2a (08/11/2026): `b26c3ec1`, com o MESMO combate (24 abates, 204 tiros, 9×15): o estado ganhou assistências,
+ * agressores recentes, a contagem e o vencedor do FFA. O spawn pontuado não mudou nenhuma escolha (os pontos de time
+ * do Construto já ficam fora da vista dos inimigos). Fase 2b (08/11/2026): `d0ba0eca` (22 abates, 205 tiros, 8×14) —
+ * quem morre deixa a caixinha de munição e os bots pegaram 4; nenhum bot precisou do Destravar. Fase 3c (09/11/2026):
+ * `c3f257c6` (18 abates, 152 tiros, 5×13, 7 caixinhas) — os bots Normal (N2) agora sabem de onde tomaram dano e
+ * correm para a cobertura, e patrulham olhando em volta. Fase 3d (09/11/2026): `856785f5` (17 abates, 134 tiros,
+ * 8×9, 8 granadas) — o N2: segura o ângulo, flanqueia, recua com a vida baixa e joga granada em quem se escondeu.
+ * Fases 3e e 3f: o mesmo hash (os bots Normal são N2). Fase 3g (09/11/2026): `5ee925a0` (11 abates, 87 tiros, 5×6,
+ * 7 granadas) — as personalidades da mistura dos níveis passaram a se ver (Rusher corre e pula, Camper segura um
+ * ponto, Estrategista flanqueia mais) e todos dão pulinhos de bobeira; esta semente sorteou um minuto mais parado (a
+ * média de 8 sementes é 14,8 abates e 238 tiros, contra 15,4 e 256 sem personalidade), então o piso de tiros caiu de
+ * 100 para 60. O hash MUDA, de propósito, quando o mapa, os blocos, as props,
+ * a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
  * Mudança sem querer é bug de determinismo. O CI no Linux confere o mesmo valor.
  */
-const GOLDEN_HASH = 'cb50303f';
+const GOLDEN_HASH = '5ee925a0';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -82,9 +101,25 @@ function loadWorld() {
   return { world, map: buildSimMap(world, buildMapNav(world)) };
 }
 
-function runGolden(): { hash: string; kills: number; shots: number; teamScore: number[]; missing: number } {
+interface GoldenRun {
+  hash: string;
+  kills: number;
+  shots: number;
+  /** M2 (fase 2b): caixinhas pegas e Destravar dos bots (só para a mensagem). */
+  boxes: number;
+  unstucks: number;
+  /** M2 (fase 3d): granadas que os bots jogaram. */
+  grenades: number;
+  teamScore: number[];
+  missing: number;
+}
+
+function runGolden(): GoldenRun {
   let kills = 0;
   let shots = 0;
+  let boxes = 0;
+  let unstucks = 0;
+  let grenades = 0;
   const { world, map } = loadWorld();
   const match = createHeadlessMatch({
     recipe,
@@ -94,6 +129,9 @@ function runGolden(): { hash: string; kills: number; shots: number; teamScore: n
       for (const ev of events) {
         if (ev.type === 'kill') kills++;
         else if (ev.type === 'shot') shots++;
+        else if (ev.type === 'pickup' && ev.action === 'take') boxes++;
+        else if (ev.type === 'unstuck') unstucks++;
+        else if (ev.type === 'projectile' && ev.action === 'launch' && ev.weapon === WEAPON_CODE.grenade) grenades++;
       }
     },
   });
@@ -102,7 +140,7 @@ function runGolden(): { hash: string; kills: number; shots: number; teamScore: n
   const teamScore = Array.from(match.sim.view().match.teamScore);
   match.dispose();
   const missing = world.missingBlocks.length + world.missingModels.length;
-  return { hash, kills, shots, teamScore, missing };
+  return { hash, kills, shots, boxes, unstucks, grenades, teamScore, missing };
 }
 
 describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.600 ticks', () => {
@@ -112,9 +150,12 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
     expect(a.missing).toBe(0);
     expect(b.hash).toBe(a.hash);
     // A partida precisa ter combate de verdade, senão o golden não prova nada.
-    expect(a.shots).toBeGreaterThan(100);
+    expect(a.shots).toBeGreaterThan(60);
     expect(a.kills).toBeGreaterThan(4);
     expect(a.teamScore[0]! + a.teamScore[1]!).toBe(a.kills);
-    expect(a.hash).toBe(GOLDEN_HASH);
+    const summary = `abates ${a.kills}, tiros ${a.shots}, placar ${a.teamScore.slice(0, 2).join('×')}`;
+    expect(a.hash, `${summary}, caixinhas ${a.boxes}, destravar ${a.unstucks}, granadas ${a.grenades}`).toBe(
+      GOLDEN_HASH,
+    );
   }, 120_000);
 });
