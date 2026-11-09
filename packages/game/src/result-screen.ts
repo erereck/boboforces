@@ -38,7 +38,15 @@ export interface ResultScreenData {
   readonly focusEasier: boolean;
   /** M2 (fase 4e): o preset desta partida já foi salvo (o botão vira "Preset salvo", desligado). */
   readonly presetSaved?: boolean;
+  /** M2 (fase 4g): o recorde que a partida bateu (o título dos números vira "Recorde!", em âmbar). */
+  readonly record?: 'kills' | 'streak' | 'both';
 }
+
+const RECORD_TITLE = {
+  kills: 'result.recordKills',
+  streak: 'result.recordStreak',
+  both: 'result.recordBoth',
+} as const satisfies Record<NonNullable<ResultScreenData['record']>, StringKey>;
 
 function line(id: string, key: StringKey, params: Record<string, string | number>, color: number = COLORS.texto) {
   return { kind: 'text', id, text: { key, params }, style: 'body', color, textAlign: 'center' } as UiNode;
@@ -103,9 +111,9 @@ export const resultScreen: Screen<ResultScreenData> = {
             {
               kind: 'text',
               id: 'numbersTitle',
-              text: { key: 'result.numbersTitle' },
+              text: { key: d.record ? RECORD_TITLE[d.record] : 'result.numbersTitle' },
               style: 'label',
-              color: COLORS.textoBaixo,
+              color: d.record ? COLORS.acao : COLORS.textoBaixo,
             },
             line('numbers', 'result.numbers', { kills: d.kills, accuracy: d.accuracy, streak: d.bestStreak }),
             ...(d.prizes.length > 0

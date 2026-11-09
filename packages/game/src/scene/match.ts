@@ -1355,7 +1355,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       applyDebug();
     },
     showResult(): void {
-      if (humans > 0 && !resultShown) showResult();
+      // Os prints não gravam estatística.
+      if (humans > 0 && !resultShown) showResult(false);
       changed();
     },
     setFrozen(on: boolean): void {
@@ -1601,10 +1602,35 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
   /** M2 (fase 4e): o que o resultado mostra (para refazer a tela ao salvar o preset). */
   let resultData: ResultScreenData | null = null;
-  function showResult(): void {
+  function showResult(record: boolean): void {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
     const sum = summarizeMatch(matchStats, v, human, ffa);
+    // M2 (fase 4g): a partida vai para o `stats@1` (os números do jogador 1; o bench não tem humano).
+    const breaks =
+      record && human >= 0 && !benchState
+        ? host.stats.record({
+            outcome: sum.outcome,
+            kills: sum.kills,
+            deaths: sum.deaths,
+            assists: sum.assists,
+            shots: sum.shots,
+            hits: sum.hits,
+            headshots: sum.headshots,
+            bestStreak: sum.bestStreak,
+            playTimeS: Math.round(timeS),
+          })
+        : null;
+    const recordKind =
+      breaks === null
+        ? null
+        : breaks.mostKills && breaks.bestStreak
+          ? 'both'
+          : breaks.mostKills
+            ? 'kills'
+            : breaks.bestStreak
+              ? 'streak'
+              : null;
     const nm = (i: number): string => (i >= 0 ? nameOf(v, i) : '');
     const title =
       sum.outcome === 'win'
@@ -1632,6 +1658,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       canEasier: currentLevel !== BOT_LEVELS[0],
       canHarder: currentLevel !== BOT_LEVELS[BOT_LEVELS.length - 1],
       focusEasier: sum.uglyLoss || hardHintUsed,
+      ...(recordKind !== null ? { record: recordKind } : {}),
     };
     resultData = data;
     resultMenu.setRoot(resultScreen.build(data));
@@ -2908,7 +2935,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         drawBenchStatus(list, fonts, ui);
         if (paused) pauseMenu.draw(list, ui);
         // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
-        if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult();
+        if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult(true);
         if (resultShown) resultMenu.draw(list, ui);
         if (panel.visible) {
           fillPanel();

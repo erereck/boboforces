@@ -15,6 +15,7 @@ import { t } from './text.ts';
 import { drawnCommands } from './test-fixtures.ts';
 import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
+import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
 import { customMatchScreen } from './screens/custom-match.ts';
@@ -339,8 +340,8 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
       expect(r.x, `${t.name}: ${node.id ?? text.text}`).toBeGreaterThanOrEqual(c.x - 0.5);
       expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
       // 1 px de folga, como nos botões: a posição e a altura arredondam separadas (coluna ancorada embaixo).
-      expect(r.y + r.h).toBeLessThanOrEqual(c.y + c.h + 1);
-      expect(r.y).toBeGreaterThanOrEqual(c.y - 0.5);
+      expect(r.y + r.h, `${t.name}: ${node.id ?? text.text}`).toBeLessThanOrEqual(c.y + c.h + 1);
+      expect(r.y, `${t.name}: ${node.id ?? text.text}`).toBeGreaterThanOrEqual(c.y - 0.5);
       expect(text.px).toBeGreaterThanOrEqual(t.minTextPx);
     }
     if (node.kind === 'button' && !clipped) {
@@ -401,9 +402,16 @@ describe('estouro de texto com o atlas real', () => {
     }
   });
 
-  it('menus da fase 4 (menu principal, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
+  it('menus da fase 4 (menu principal, Novidades, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
     const screens: UiNode[] = [
-      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings'] }),
+      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings', 'news'] }),
+      // M2 (fase 4g): Novidades com os 5 itens e o aviso de migração.
+      newsScreen.build({
+        version: '0.0.1',
+        codename: 'Primeiro Bloco',
+        items: NEWS_ITEMS,
+        migrated: t('news.migrated', { n: 12 }),
+      }),
       quickMatchScreen.build({
         // Os valores mais longos de cada linha.
         values: ['Todos contra todos', 'Construto', 'Pela vibe', '6 contra 6', 'Sem limite'],

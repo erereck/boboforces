@@ -56,6 +56,31 @@ export interface SceneSettings {
   save(doc: SettingsDocument): void;
 }
 
+/** M2 (fase 4g): o que uma partida terminada soma no `stats@1` (os números do jogador 1). */
+export interface MatchRecord {
+  readonly outcome: 'win' | 'loss' | 'draw';
+  readonly kills: number;
+  readonly deaths: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly hits: number;
+  readonly headshots: number;
+  readonly bestStreak: number;
+  /** Tempo jogado (s). */
+  readonly playTimeS: number;
+}
+
+/** Os recordes que a partida bateu (a primeira partida só marca a base: não bate nada). */
+export interface RecordBreaks {
+  readonly mostKills: boolean;
+  readonly bestStreak: boolean;
+}
+
+/** M2 (fase 4g): as estatísticas do aparelho; a cena entrega a partida no fim e o núcleo grava. */
+export interface SceneStats {
+  record(match: MatchRecord): RecordBreaks;
+}
+
 /** O que o núcleo empresta para a cena. */
 export interface SceneHost {
   readonly platform: Platform;
@@ -66,6 +91,8 @@ export interface SceneHost {
   log(line: string): void;
   /** M2 (fase 4f): os ajustes do jogador (a pausa mostra e muda; o save é do núcleo). */
   readonly settings: SceneSettings;
+  /** M2 (fase 4g): grava a partida no fim (só partidas de verdade: nem bench, nem os prints). */
+  readonly stats: SceneStats;
   /** Relatório do bench pronto (`formatBenchReport`); o núcleo repassa para `GameHooks.onBenchReport`. */
   benchReport(text: string): void;
 }

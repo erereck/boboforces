@@ -277,6 +277,20 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Nomes:** o controle aparece pela posição, sem marcas ("Botão de baixo", "Ombro direito"); as teclas de símbolo
     seguem o ABNT2.
   - 8 testes novos.
+- **Fase 4g, estatísticas e Novidades:**
+  - **Estatísticas:** cada partida terminada soma no save os números do jogador 1: partidas, vitórias, derrotas,
+    empates, abates, mortes, assistências, tiros, acertos, tiros na cabeça e tempo de jogo. Os prints e o bench não
+    contam.
+  - **Recordes:** mais abates numa partida e maior sequência. Quando a partida bate um deles, o título "Seus números" do
+    resultado vira "Recorde de abates!" (ou de sequência, ou "Dois recordes!"), em âmbar. A primeira partida só marca a
+    base.
+  - **Onde ver:** a aba Dados dos Ajustes mostra os totais, a precisão, os tiros na cabeça, o tempo de jogo e os
+    recordes.
+  - **Novidades:** versão, codinome e 5 itens de 1 linha. Aparece uma vez, antes do título, para quem já jogava e
+    atualizou; quem instala do zero vai direto ao título. Fica também no menu principal. Se o save veio de um formato
+    antigo, uma linha avisa quantos itens foram atualizados.
+  - **Menu principal:** Partida Rápida, Modos, Ajustes e Novidades.
+  - 5 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

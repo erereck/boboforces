@@ -35,6 +35,9 @@ import {
   MAIN_MENU_ACTION,
   mainMenuScreen,
   MODES_ACTION,
+  NEWS_ACTION,
+  NEWS_ITEMS,
+  newsScreen,
   MODES_PREFIX,
   modesScreen,
   QUICK_ACTION,
@@ -89,6 +92,7 @@ import {
   type QuickSettings,
 } from './quick-match.ts';
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
+import { addMatch, markNewsSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
   type RendererFactory,
@@ -151,7 +155,18 @@ export interface GameDeps {
 }
 
 export type GameScreen =
-  'loading' | 'title' | 'main' | 'quick' | 'modes' | 'custom' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
+  | 'loading'
+  | 'title'
+  | 'main'
+  | 'news'
+  | 'quick'
+  | 'modes'
+  | 'custom'
+  | 'surprise'
+  | 'settings'
+  | 'scene'
+  | 'test'
+  | 'error';
 
 export interface GameHandle extends Disposable {
   /** Renderer em uso (o real ou o NullRenderer). M1: pode trocar (menu → cena completa; rotas do bench). */
@@ -237,7 +252,26 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
   refreshTitle();
-  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings'] }));
+  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings', 'news'] }));
+
+  // M2 (fase 4g): Novidades: uma vez depois de atualizar (no boot, antes do título) e sempre pelo menu principal.
+  const newsMenu = createMenuController();
+  let newsReturn: 'title' | 'main' = 'title';
+  /** Documentos do save que vieram de um formato antigo neste boot (a Novidades avisa em 1 linha). */
+  const migrated = migratedCount(save.loadWarnings);
+  function openNews(back: 'title' | 'main'): void {
+    newsReturn = back;
+    newsMenu.setRoot(
+      newsScreen.build({
+        version: GAME_VERSION,
+        codename: GAME_CODENAME,
+        items: NEWS_ITEMS,
+        migrated: migrated > 0 ? t('news.migrated', { n: migrated }) : '',
+      }),
+    );
+    save.setStats(markNewsSeen(save.stats, GAME_VERSION));
+    screen = 'news';
+  }
 
   // M2 (fase 4d): Partida Rápida e Modos.
   const quickMenu = createMenuController();
@@ -333,8 +367,13 @@ export function startGame(deps: GameDeps): GameHandle {
   /** O backup lido do arquivo, esperando "Juntar" ou "Substituir". */
   let pendingBackup: BackupDocument | null = null;
   function dataRows(): TabbedRow[] {
-    if (platform.files === null) return [{ kind: 'text', id: 'none', text: t('settings.data.none'), dim: true }];
+    // M2 (fase 4g): as estatísticas e os recordes do aparelho em cima.
+    const stats: TabbedRow[] = statsLines(save.stats).map((text, i) => ({ kind: 'text', id: `stats${i}`, text }));
+    if (platform.files === null) {
+      return [...stats, { kind: 'text', id: 'none', text: t('settings.data.none'), dim: true }];
+    }
     const rows: TabbedRow[] = [
+      ...stats,
       { kind: 'text', id: 'warning', text: t('settings.data.warning'), dim: true },
       { kind: 'text', id: 'warning2', text: t('settings.data.warning2'), dim: true },
       { kind: 'action', id: 'export', label: { key: 'settings.data.export' } },
@@ -616,6 +655,13 @@ export function startGame(deps: GameDeps): GameHandle {
           },
           save: (doc) => save.setSettings(doc),
         },
+        stats: {
+          record: (m) => {
+            const r = addMatch(save.stats, m);
+            save.setStats(r.doc);
+            return r.records;
+          },
+        },
         benchReport: (text) => hooks.onBenchReport?.(text),
       },
       request,
@@ -717,8 +763,19 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.settings) openSettings();
         else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
         else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
+        else if (nav.activated === MAIN_MENU_ACTION.news) openNews('main');
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'news': {
+        const nav = newsMenu.update(menuInput, raw, u);
+        if (nav.back || nav.activated === NEWS_ACTION.ok) screen = newsReturn;
+        else {
+          newsMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
@@ -936,6 +993,10 @@ export function startGame(deps: GameDeps): GameHandle {
       uiAtlas = loaded.uiAtlas;
       renderer.setUiAtlas(loaded.uiAtlas);
       screen = 'title';
+      // M2 (fase 4g): versão nova para quem já jogava: Novidades antes do título; instalação nova só marca como vista.
+      const news = newsOnBoot(save.stats, GAME_VERSION);
+      if (news === 'show') openNews('title');
+      else if (news === 'silent') save.setStats(markNewsSeen(save.stats, GAME_VERSION));
     },
     (error: unknown) => fail(error),
   );

@@ -11,6 +11,8 @@ export interface MatchStats {
   readonly capacity: number;
   readonly shots: Uint16Array;
   readonly hits: Uint16Array;
+  /** M2 (fase 4g): ticks com acerto na cabeça (um por tick, como os acertos). */
+  readonly heads: Uint16Array;
   readonly streak: Uint16Array;
   readonly bestStreak: Uint16Array;
   /** Mortes sem matador ou pela própria mão (queda, vazio, o próprio foguete). */
@@ -18,6 +20,7 @@ export interface MatchStats {
   /** Último tick com tiro e com acerto de cada bobo (um por tick). */
   readonly shotTick: Int32Array;
   readonly hitTick: Int32Array;
+  readonly headTick: Int32Array;
   /** Quantas vezes cada bobo matou o humano, e quantas vezes o humano matou cada um. */
   readonly killedHuman: Uint16Array;
   readonly killedByHuman: Uint16Array;
@@ -28,11 +31,13 @@ export function createMatchStats(capacity: number): MatchStats {
     capacity,
     shots: new Uint16Array(capacity),
     hits: new Uint16Array(capacity),
+    heads: new Uint16Array(capacity),
     streak: new Uint16Array(capacity),
     bestStreak: new Uint16Array(capacity),
     mishaps: new Uint16Array(capacity),
     shotTick: new Int32Array(capacity).fill(-1),
     hitTick: new Int32Array(capacity).fill(-1),
+    headTick: new Int32Array(capacity).fill(-1),
     killedHuman: new Uint16Array(capacity),
     killedByHuman: new Uint16Array(capacity),
   };
@@ -50,7 +55,12 @@ export function recordMatchEvent(st: MatchStats, ev: SimEvent, human: number): v
     case 'hit': {
       if (ev.shooter === NULL_ENTITY || ev.shooter === ev.target) break;
       const a = entityIndex(ev.shooter);
-      if (a >= st.capacity || st.hitTick[a] === ev.tick) break;
+      if (a >= st.capacity) break;
+      if (ev.part === 'head' && st.headTick[a] !== ev.tick) {
+        st.headTick[a] = ev.tick;
+        st.heads[a] = st.heads[a]! + 1;
+      }
+      if (st.hitTick[a] === ev.tick) break;
       st.hitTick[a] = ev.tick;
       st.hits[a] = st.hits[a]! + 1;
       break;
@@ -122,6 +132,12 @@ export interface MatchSummary {
   readonly victim: number;
   readonly victimKills: number;
   readonly kills: number;
+  /** M2 (fase 4g): o resto dos números do jogador, para o `stats@1`. */
+  readonly deaths: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly hits: number;
+  readonly headshots: number;
   /** -1 = sem tiro. */
   readonly accuracy: number;
   readonly bestStreak: number;
@@ -248,6 +264,11 @@ export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa
     victim,
     victimKills: victim >= 0 ? st.killedByHuman[victim]! : 0,
     kills: human >= 0 ? view.kills[human]! : 0,
+    deaths: human >= 0 ? view.deaths[human]! : 0,
+    assists: human >= 0 ? view.assists[human]! : 0,
+    shots: human >= 0 ? st.shots[human]! : 0,
+    hits: human >= 0 ? Math.min(st.hits[human]!, st.shots[human]!) : 0,
+    headshots: human >= 0 ? st.heads[human]! : 0,
     accuracy: human >= 0 ? accuracyPct(st, human) : -1,
     bestStreak: human >= 0 ? st.bestStreak[human]! : 0,
     prizes,

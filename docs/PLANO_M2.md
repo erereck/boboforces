@@ -203,7 +203,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - Dados: exportar e importar o backup, com o aviso de que limpar o navegador apaga bots e presets;
   - Sobre: Copiar relatório (#42), créditos e versão;
   - os volumes chegam com o áudio (fase 7).
-- **4g. Estatísticas e Novidades:**
+- **4g. Estatísticas e Novidades.** Pronta em 09/11 (`ARCHITECTURE.md` §12.28).
   - `stats@1` gravado no fim de cada partida, com "Recorde!" no resultado;
   - a tela de Novidades (codinome e até 5 itens), que aparece uma vez depois de atualizar e avisa as migrações.
 - **4h. Onboarding opcional:**

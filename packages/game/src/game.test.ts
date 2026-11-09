@@ -5,6 +5,7 @@ import { createHeadlessMatch } from '@boboforces/ai';
 import {
   builtinBotRef,
   DEFAULT_SETTINGS,
+  EMPTY_STATS,
   createFigureGameTable,
   decodeMap,
   FIGURE_BOT_ROTATION,
@@ -17,6 +18,7 @@ import {
   FIGURE_SKIN_LAYERS,
   FIGURE_STANCE,
   figurePosture,
+  GAME_VERSION,
   ISSUE_CODES,
   MATCH_RECIPE_FORMAT,
   normalizeFigureLook,
@@ -111,9 +113,12 @@ interface FakePlatform extends Platform {
   firePause(): void;
 }
 
-function createFakePlatform(opts: { id?: PlatformId; brokenAssets?: boolean } = {}): FakePlatform {
+function createFakePlatform(
+  opts: { id?: PlatformId; brokenAssets?: boolean; store?: Readonly<Record<string, string>> } = {},
+): FakePlatform {
   const noop = (): (() => void) => () => {};
-  const store = new Map<string, string>();
+  // M2 (fase 4g): o save pode já vir preenchido (um jogador que atualizou o jogo).
+  const store = new Map<string, string>(Object.entries(opts.store ?? {}));
   const pauseListeners = new Set<() => void>();
   const callbacks = new Map<number, (nowMs: number) => void>();
   const rawNext = createRawInputState();
@@ -246,8 +251,12 @@ async function settle(): Promise<void> {
 /** A cena vem direto (como no Switch: um arquivo só). */
 const loadScene = (): Promise<SceneBundle> => Promise.resolve({ module: SCENE_MODULE });
 
-async function bootToTitle(id: PlatformId = 'web', extra: { testItems?: readonly TestItem[] } = {}) {
-  const platform = createFakePlatform({ id });
+async function bootToTitle(
+  id: PlatformId = 'web',
+  extra: { testItems?: readonly TestItem[] } = {},
+  store: Readonly<Record<string, string>> = {},
+) {
+  const platform = createFakePlatform({ id, store });
   const events: string[] = [];
   const game = startGame({
     platform,
@@ -707,6 +716,7 @@ describe('startGame (NullRenderer)', () => {
       uiAtlas: null,
       log: () => {},
       settings: { current: DEFAULT_SETTINGS, save: () => {} },
+      stats: { record: () => ({ mostKills: false, bestStreak: false }) },
       benchReport: () => {},
     };
     const loader = createConstrutoLoader(host);
@@ -1300,6 +1310,8 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     // Resultado (o gancho dos prints abre no meio): baixo (Mudar regras), direita (Salvar preset).
     game.debug!.showResult();
     platform.pump(2);
+    // O resultado dos prints não grava estatística (M2, fase 4g).
+    expect(game.save.stats.totals.matches).toBe(0);
     platform.tap('ArrowDown');
     platform.tap('ArrowRight');
     platform.tap('Enter');
@@ -1372,4 +1384,32 @@ describe('Ajustes (M2, fase 4f)', () => {
     expect(game.save.settings.controls.keyboardMouse.bindings).toEqual({ forward: ['key:KeyI'], jump: ['key:KeyJ'] });
     game.dispose();
   }, 120_000);
+});
+
+describe('Novidades (M2, fase 4g)', () => {
+  it('quem já jogava vê a Novidades uma vez antes do título; o menu principal abre de novo', async () => {
+    const stats = { ...EMPTY_STATS, totals: { ...EMPTY_STATS.totals, matches: 3 } };
+    const { platform, game } = await bootToTitle('web', {}, { stats: JSON.stringify(stats) });
+    expect(game.screen).toBe('news');
+    platform.tap('Enter');
+    expect(game.screen).toBe('title');
+    expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
+    // Título → Mudar → Novidades (o 4º item) → OK volta ao menu principal.
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('news');
+    platform.tap('Escape');
+    expect(game.screen).toBe('main');
+    game.dispose();
+  }, 60_000);
+
+  it('instalação nova: direto no título, com a versão marcada como vista', async () => {
+    const { game } = await bootToTitle();
+    expect(game.screen).toBe('title');
+    expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
+    game.dispose();
+  }, 60_000);
 });

@@ -52,7 +52,7 @@ export const mainMenuScreen: Screen<MainMenuState> = {
             { kind: 'text', id: 'heading', text: { key: 'menu.main' }, style: 'title', color: COLORS.texto },
             { kind: 'box', height: 16 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 40 },
+            { kind: 'box', height: 28 },
             {
               kind: 'column',
               id: 'items',

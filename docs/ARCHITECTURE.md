@@ -1523,3 +1523,26 @@ mudanças de contrato ficam registradas aqui.
 - **Teste de estouro:** a aba Botões com todas as ações e todos os nomes nos 6 alvos e no Switch.
 - **Tamanho:** o menu foi a 324,0 KB (+3,4 KB). Sobram 26 KB até o teto de 350; se a fase 4 apertar, as telas de
   Ajustes e da Partida personalizada podem ir para um chunk carregado sob demanda.
+
+### 12.28 Fase 4g: estatísticas e Novidades (09/11/2026)
+
+- **Contrato (integração):** `SceneHost.stats` (`SceneStats.record(MatchRecord) → RecordBreaks`). A cena entrega os números
+  do jogador 1 quando o resultado abre no fim de verdade (`showResult(true)`); o gancho dos prints
+  (`GameDebugApi.showResult`) e o bench não gravam.
+- **Escolha (revisável):** em tela dividida, só o jogador 1 conta (o `stats@1` é do aparelho, não do jogador).
+- **`game/stats.ts`** (puro):
+  - `addMatch`: soma os totais com teto de 2 × 10⁹; recorde só depois da primeira partida e só acima de zero;
+  - `statsLines` (aba Dados) e `playTimeText`;
+  - `newsOnBoot`: `show` quando já jogou (ou viu outra versão) e ainda não viu esta; `silent` na instalação nova (só
+    marca); `markNewsSeen`;
+  - `migratedCount`: os avisos `format.migrated` do carregamento do save.
+- **`scene/result.ts`:** conta os ticks com acerto na cabeça (`heads`, um por tick, mesmo quando o primeiro chumbo do tick
+  pegou no tronco); `MatchSummary` ganha mortes, assistências, tiros, acertos e cabeças.
+- **ui:**
+  - `newsScreen` e `NEWS_ITEMS` (os itens da versão atual na tabela, `news.item.1` a `news.item.5`);
+  - o menu principal ganha Novidades. O respiro embaixo do título caiu de 40 para 28, porque com 4 itens passava 1,5 px
+    no toque 640×360. Com o Laboratório e o Meu Bobo (fases 5 e 6), o menu vai precisar de outro arranjo (2 colunas ou
+    rolagem).
+- **Resultado:** `ResultScreenData.record` troca o título dos números (sem linha nova: a tela já está cheia no
+  640×360).
+- **Tamanho:** o menu foi a 325,4 KB (+1,4 KB).

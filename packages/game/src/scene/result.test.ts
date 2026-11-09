@@ -22,6 +22,11 @@ describe('estatísticas pelos eventos', () => {
     recordMatchEvent(st, ev({ type: 'hit', tick: 20, shooter: id(1), target: id(1) }), NULL_ENTITY);
     expect([st.shots[1], st.hits[1], accuracyPct(st, 1)]).toEqual([2, 1, 50]);
     expect(accuracyPct(st, 2)).toBe(-1);
+    // M2 (fase 4g): cabeça conta uma por tick, mesmo quando o primeiro chumbo do tick pegou no tronco.
+    recordMatchEvent(st, ev({ type: 'hit', tick: 30, shooter: id(1), target: id(2), part: 'torso' }), NULL_ENTITY);
+    recordMatchEvent(st, ev({ type: 'hit', tick: 30, shooter: id(1), target: id(2), part: 'head' }), NULL_ENTITY);
+    recordMatchEvent(st, ev({ type: 'hit', tick: 30, shooter: id(1), target: id(2), part: 'head' }), NULL_ENTITY);
+    expect([st.hits[1], st.heads[1]]).toEqual([2, 1]);
   });
 
   it('sequência sem morrer, quedas e quem mata o humano / quem o humano mata', () => {
@@ -97,6 +102,8 @@ describe('resumo do fim', () => {
     expect([sum.outcome, sum.ownScore, sum.otherScore, sum.uglyLoss]).toEqual(['loss', 10, 25, true]);
     expect([sum.mvp, sum.nemesis, sum.nemesisKills, sum.victim, sum.victimKills]).toEqual([2, 2, 5, 3, 3]);
     expect([sum.kills, sum.accuracy, sum.bestStreak]).toEqual([4, 25, 2]);
+    // M2 (fase 4g): o resto dos números do jogador (para o `stats@1`).
+    expect([sum.deaths, sum.assists, sum.shots, sum.hits, sum.headshots]).toEqual([9, 1, 40, 10, 0]);
     expect(sum.prizes.map((p) => [p.prize, p.entity])).toEqual([
       ['crookedAim', 1],
       ['kamikaze', 3],
