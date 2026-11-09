@@ -1,6 +1,7 @@
 import {
   BOT_RANGES,
   BUILTIN_BOTS,
+  DEFAULT_BOT_RULES,
   LEVEL_ORDER,
   LEVEL_SKILLS,
   type BotDocument,
@@ -53,6 +54,10 @@ export function ruleTags(r: BotRules): string[] {
   else if (r.ammo === 'infiniteReserve') tags.push(t('rule.infiniteReserve'));
   if (r.headshotImmune) tags.push(t('rule.headshotImmune'));
   if (r.explodeOnDeath) tags.push(t('rule.explodeOnDeath'));
+  if (r.visionDeg !== DEFAULT_BOT_RULES.visionDeg) tags.push(t('rule.vision', { n: r.visionDeg }));
+  if (r.visionRange !== DEFAULT_BOT_RULES.visionRange) tags.push(t('rule.visionRange', { n: r.visionRange }));
+  if (r.hearing !== DEFAULT_BOT_RULES.hearing) tags.push(t('rule.hearing', { n: r.hearing }));
+  if (r.knowledge !== 'normal') tags.push(t(`rule.knowledge.${r.knowledge}` as StringKey));
   return tags;
 }
 

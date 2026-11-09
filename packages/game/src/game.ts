@@ -1,4 +1,5 @@
 import {
+  BOT_RANGES,
   BUILTIN_BOTS,
   DEBUT_PRESET,
   GAME_CODENAME,
@@ -19,9 +20,10 @@ import {
   createRawInputState,
   type CaptureResult,
   type MenuConfirmConvention,
+  type RawInputState,
   type RemapAction,
 } from '@boboforces/input';
-import type { Platform } from '@boboforces/platform-api';
+import type { Platform, TextInputSession } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
 import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
@@ -36,6 +38,8 @@ import {
   customMatchScreen,
   MAIN_MENU_ACTION,
   mainMenuScreen,
+  LAB_ACTION,
+  labScreen,
   MODES_ACTION,
   WORKSHOP_ACTION,
   WORKSHOP_BOT_PREFIX,
@@ -65,6 +69,7 @@ import {
   titleScreen,
   uiScale,
   type LayoutOptions,
+  type MenuNavigation,
   type StringKey,
   type TabbedRow,
   type TitleExtraItem,
@@ -88,6 +93,7 @@ import {
 } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
+import { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotName, stepLab } from './lab.ts';
 import {
   factoryPresets,
   QUICK_MODES,
@@ -161,12 +167,24 @@ export interface GameDeps {
   readonly loadScene?: () => Promise<SceneBundle>;
 }
 
+/** Alguma tecla, botão do mouse ou do controle ainda apertado. */
+function anyInputHeld(raw: Readonly<RawInputState>): boolean {
+  if (raw.mouseButtons !== 0) return true;
+  for (let k = 0; k < raw.keys.length; k++) if (raw.keys[k] === 1) return true;
+  for (const pad of raw.gamepads) {
+    if (!pad.connected) continue;
+    for (let b = 0; b < pad.buttons.length; b++) if (pad.buttons[b]! >= 0.5) return true;
+  }
+  return false;
+}
+
 export type GameScreen =
   | 'loading'
   | 'title'
   | 'main'
   | 'news'
   | 'workshop'
+  | 'lab'
   | 'quick'
   | 'modes'
   | 'custom'
@@ -289,13 +307,131 @@ export function startGame(deps: GameDeps): GameHandle {
         name: botDisplayName(bot),
         lines: botCardLines(bot),
         note: workshopNote,
-        canEdit: false,
+        canEdit: true,
         canDelete: !isBuiltinBot(bot),
         favorite: save.presets.botFavorites.includes(bot.id),
         confirmDelete: workshopConfirm === bot.id,
       }),
     );
   }
+  // M2 (fase 5b): o Laboratório, o editor de um bot por vez.
+  const labMenu = createMenuController();
+  let labDoc: BotDocument = factoryBots[0]!;
+  let labTab = 0;
+  let labNote = '';
+  /** Mudou algo desde que abriu (Voltar pede confirmação); `labDiscard` = já pediu. */
+  let labDirty = false;
+  let labDiscard = false;
+  /** Digitando o nome (o menu não anda) e, depois, esperando soltar tudo (o Enter não reabre a digitação). */
+  let labTyping: TextInputSession | null = null;
+  let labTypingFrom = '';
+  let labHold = false;
+  const allBotNames = (): Set<string> => new Set([...save.bots, ...factoryBots].map(botDisplayName));
+  function rebuildLab(): void {
+    labMenu.setRoot(
+      labScreen.build({
+        tabs: LAB_TABS.map((id) => LAB_TAB_LABELS[id]),
+        tab: labTab,
+        rows: labRows(LAB_TABS[labTab]!, labDoc, platform.textInput.available),
+        summary: labSummary(labDoc),
+        note: labNote,
+      }),
+    );
+  }
+  /** De fábrica: edita uma cópia nova (o original fica); dos seus: o próprio (salvar substitui). */
+  function openLab(bot: BotDocument): void {
+    if (isBuiltinBot(bot)) {
+      const ids = new Set([...save.bots.map((b) => b.id), ...factoryBots.map((b) => b.id)]);
+      labDoc = { ...bot, id: newBotId(botRng, ids), name: copyName(botDisplayName(bot), allBotNames()) };
+    } else labDoc = bot;
+    labTab = 0;
+    labNote = '';
+    labDirty = false;
+    labDiscard = false;
+    labMenu.focus(null);
+    rebuildLab();
+    screen = 'lab';
+  }
+  function closeLab(): void {
+    endTyping();
+    screen = 'workshop';
+    rebuildWorkshop();
+  }
+  function endTyping(): void {
+    labTyping?.close();
+    labTyping = null;
+    labHold = true;
+  }
+  function startTyping(): void {
+    if (!platform.textInput.available || labTyping !== null) return;
+    labTypingFrom = labDoc.name;
+    const done = (name: string): void => {
+      labDoc = { ...labDoc, name: name.trim() || labTypingFrom };
+      labNote = '';
+      endTyping();
+      rebuildLab();
+    };
+    labTyping = platform.textInput.open(
+      { initial: labDoc.name, maxLength: BOT_RANGES.nameMaxLength, kind: 'name' },
+      {
+        onChange: (value) => {
+          labDoc = { ...labDoc, name: cleanBotName(value) };
+          labDirty = true;
+          rebuildLab();
+        },
+        onSubmit: (value) => done(cleanBotName(value)),
+        onCancel: () => done(labTypingFrom),
+      },
+    );
+    if (labTyping !== null) labNote = t('lab.typing');
+  }
+  function labAction(nav: MenuNavigation): void {
+    const a = nav.activated;
+    if (nav.tab !== 0) {
+      labTab = (labTab + nav.tab + LAB_TABS.length) % LAB_TABS.length;
+      followTab(labMenu, labTab);
+      labNote = '';
+    } else if (nav.back || a === LAB_ACTION.back) {
+      if (labDirty && !labDiscard) {
+        labDiscard = true;
+        labNote = t('lab.discardAsk');
+      } else {
+        closeLab();
+        return;
+      }
+    } else if (a === LAB_ACTION.save) {
+      if (save.saveBot(labDoc)) {
+        workshopSelected = labDoc.id;
+        workshopNote = t('lab.saved', { name: labDoc.name });
+        workshopConfirm = null;
+        workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${labDoc.id}`);
+        closeLab();
+        return;
+      }
+      labNote = t('workshop.full', { n: save.bots.length });
+    } else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
+      labTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
+      labNote = '';
+    } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
+      const id = a.slice(SETTINGS_ROW_PREFIX.length);
+      const tab = LAB_TABS[labTab]!;
+      labNote = '';
+      labDiscard = false;
+      if (tab === 'name' && id === 'roll') {
+        labDoc = { ...labDoc, name: rollBotName(botRng, allBotNames()) };
+        labDirty = true;
+      } else if (tab === 'name' && id === 'name') startTyping();
+      else {
+        const next = stepLab(tab, labDoc, id, nav.delta);
+        if (next !== labDoc) {
+          labDoc = next;
+          labDirty = true;
+        }
+      }
+    }
+    rebuildLab();
+  }
+
   function openWorkshop(): void {
     workshopNote = '';
     workshopConfirm = null;
@@ -320,6 +456,9 @@ export function startGame(deps: GameDeps): GameHandle {
         workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${copy.id}`);
       } else workshopNote = t('workshop.full', { n: save.bots.length });
       workshopConfirm = null;
+    } else if (a === WORKSHOP_ACTION.edit) {
+      openLab(bot);
+      return;
     } else if (a === WORKSHOP_ACTION.favorite) {
       const on = !save.presets.botFavorites.includes(bot.id);
       workshopNote = save.setBotFavorite(bot.id, on) ? '' : t('workshop.favoritesFull');
@@ -876,6 +1015,17 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'lab': {
+        // Digitando o nome, ou logo depois (até soltar tudo): o menu não anda.
+        if (labHold && !anyInputHeld(raw)) labHold = false;
+        if (labTyping === null && !labHold) labAction(labMenu.update(menuInput, raw, u));
+        if (screen === 'lab') {
+          labMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

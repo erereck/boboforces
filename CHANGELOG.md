@@ -318,6 +318,20 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Teste de estouro:** confere também que todo texto desenhado existe na fonte em que sai (a display só tem
     maiúsculas).
   - 5 testes novos.
+- **Fase 5b (parte 1), Laboratório:**
+  - **Editar** na Oficina abre o Laboratório. Um bot de fábrica vira uma cópia nova (o original fica); um dos seus é
+    editado no lugar.
+  - **Abas:** Habilidade (o nível rápido em cima, que preenche habilidade e inteligência, e os 10 números de mira),
+    Inteligência (o nível N0–N4 liga os comportamentos dele; depois, cada um liga e desliga), Personalidade (a base
+    preenche os pesos), Regras (vida, dano, velocidade, munição, armas, imune à cabeça, explode ao morrer, visão,
+    audição e conhecimento) e Nome.
+  - **Nome:** "Rolar nome" dá um nome bobo em inglês ("Private Burrito"); com teclado, confirmar no nome abre a
+    digitação.
+  - **Salvar** volta à Oficina com o bot escolhido. Voltar com mudanças pede confirmação.
+  - **Regras à vista:** o card, o placar e a tela de morte passam a mostrar também visão, alcance, audição e
+    conhecimento.
+  - **Abas:** de qualquer aba, "baixo" vai para a primeira linha (a aba da ponta caía nos botões do canto).
+  - 6 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

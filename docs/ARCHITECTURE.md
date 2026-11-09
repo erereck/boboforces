@@ -1603,3 +1603,23 @@ mudanças de contrato ficam registradas aqui.
   fonte do HUD, e o teste de estouro confere todo texto desenhado contra a fonte usada.
 - **Tamanho:** o menu foi a 328,2 KB (+2,5 KB; teto 350). O Laboratório (5b) deve levar o menu perto de 335: se passar,
   as telas de Ajustes, Partida personalizada e Laboratório vão para um pedaço sob demanda.
+
+### 12.32 Fase 5b, parte 1: Laboratório (09/11/2026)
+
+- **`game/lab.ts`** (puro):
+  - `LAB_TABS` (5: Habilidade, Inteligência, Personalidade, Regras, Nome; com 6 abas a última passava 12 px no
+    640×360, então o nível rápido virou a 1ª linha da Habilidade);
+  - `labRows` e `stepLab` (listas dentro de `BOT_RANGES`);
+  - `labSummary`, `rollBotName` (patente + comida, em inglês, como os de fábrica) e `cleanBotName` (só o que o atlas
+    do HUD desenha).
+- **ui:**
+  - `labScreen` (o molde de abas com Voltar e Salvar);
+  - `buildTabbed`: as abas têm `focusOverride.down` para a primeira linha.
+- **game:**
+  - tela `lab`;
+  - a digitação do nome usa `platform.textInput`, e o menu não anda enquanto ela está aberta. Depois, espera soltar
+    tudo (`anyInputHeld`), senão o Enter reabriria a digitação;
+  - Editar um de fábrica cria uma cópia (`newBotId` e `copyName`); Salvar usa `saveBot`.
+- **`bot-card`:** `ruleTags` ganha visão, alcance, audição e conhecimento (§6.5: toda regra ativa à vista).
+- **Tamanho:** o menu foi a 331,7 KB (+3,5 KB). Sobram 18,3 KB até o teto de 350; o Meu Bobo (fase 6) deve pedir o
+  pedaço sob demanda das telas de edição.

@@ -82,6 +82,10 @@ function rowNode(row: TabbedRow): UiNode {
 }
 
 export function buildTabbed(state: TabbedState): UiNode {
+  // M2 (fase 5b): de qualquer aba, "baixo" vai para a primeira linha (a fileira de abas pode passar da largura das
+  // linhas, e a aba da ponta cairia nos botões do canto).
+  const first = state.rows.find((r) => r.kind !== 'text');
+  const down = first ? { focusOverride: { down: `${TABBED_ROW_PREFIX}${first.id}` } } : {};
   const tabs: UiNode[] = state.tabs.map((key, i) => ({
     kind: 'button',
     id: `${TABBED_TAB_PREFIX}${i}`,
@@ -90,6 +94,7 @@ export function buildTabbed(state: TabbedState): UiNode {
     variant: 'tab',
     compact: true,
     selected: i === state.tab,
+    ...down,
   }));
   const line = state.note !== '' ? state.note : state.summary;
   return {

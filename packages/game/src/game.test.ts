@@ -1426,14 +1426,15 @@ describe('Oficina (M2, fase 5a)', () => {
     // O foco começa no escolhido (o Vibe Bob, primeiro de fábrica). Desce 5 (Jorge the Immortal) e escolhe.
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
-    // Direita: a primeira ação do card (Duplicar, sem o Editar).
+    // Direita: a primeira ação do card (Editar); direita de novo: Duplicar.
+    platform.tap('ArrowRight');
     platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(game.save.bots.map((b) => b.name)).toEqual(['Jorge the Immortal 2']);
     expect(game.save.bots[0]!.rules.hp).toBe(500);
     const id = game.save.bots[0]!.id;
     expect(id).toMatch(/^[0-9a-f]{6}$/);
-    // O foco foi para a cópia na lista; direita (Duplicar), baixo (Favoritar), confirmar.
+    // O foco foi para a cópia na lista; direita (Editar), baixo (Favoritar), confirmar.
     platform.tap('ArrowRight');
     platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1447,6 +1448,55 @@ describe('Oficina (M2, fase 5a)', () => {
     expect(game.save.presets.botFavorites).toEqual([]);
     platform.tap('Escape');
     expect(game.screen).toBe('main');
+    game.dispose();
+  }, 60_000);
+});
+
+describe('Laboratório (M2, fase 5b)', () => {
+  it('Editar um de fábrica abre uma cópia; mudar a vida, rolar o nome e salvar; Voltar com mudança pede confirmação', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Laboratório → Jorge (6º de fábrica) → direita (Editar).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    // E ×3: Regras; baixo (Vida) e direita: 500 → 750.
+    for (let i = 0; i < 3; i++) platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    // E: Nome; baixo ×2 (Rolar nome) e confirmar.
+    platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    // Baixo cai na fileira do canto; direita para no Salvar (o último).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('workshop');
+    expect(game.save.bots).toHaveLength(1);
+    const bot = game.save.bots[0]!;
+    expect(bot.rules.hp).toBe(750);
+    expect(bot.name).not.toBe('Jorge the Immortal 2');
+    expect(bot.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    // O salvo fica escolhido (foco nele): direita (Editar), confirmar; muda o nível e tenta voltar.
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Escape');
+    expect(game.screen).toBe('lab');
+    platform.tap('Escape');
+    expect(game.screen).toBe('workshop');
+    expect(game.save.bots[0]).toEqual(bot);
     game.dispose();
   }, 60_000);
 });

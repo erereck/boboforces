@@ -18,6 +18,7 @@ import { modesScreen } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { rotateScreen } from './screens/rotate.ts';
 import { workshopScreen } from './screens/workshop.ts';
+import { labScreen } from './screens/lab.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
 import { customMatchScreen } from './screens/custom-match.ts';
@@ -537,6 +538,47 @@ describe('estouro de texto com o atlas real', () => {
       const rectOf = (id: string): Rect => layout.rects.get(layout.byId.get(id)!)!;
       expect(overlaps(rectOf('buttons'), rectOf('card')), `${target.name}: Voltar × card`).toBe(false);
       expect(overlaps(rectOf('bots'), rectOf('card')), `${target.name}: lista × card`).toBe(false);
+    }
+  });
+
+  it('Laboratório (M2, fase 5b): as 5 abas, todos os rótulos e os valores mais longos cabem, alcançáveis', () => {
+    const tabs: StringKey[] = ['lab.tab.skill', 'lab.tab.mind', 'lab.tab.persona', 'lab.tab.rules', 'lab.tab.name'];
+    const labels = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter((k) => k.startsWith('lab.row.'));
+    const values = [
+      'Reserva infinita',
+      'Strafe e pulo',
+      'Vê através',
+      'Da arma',
+      'ajustada',
+      '1200 ms',
+      '900°/s',
+      '100%',
+      '×0,25',
+    ];
+    const rows: TabbedRow[] = labels.map((labelKey, i) => ({
+      kind: 'option',
+      id: `r${i}`,
+      labelKey,
+      value: values[i % values.length]!,
+    }));
+    rows.push({ kind: 'value', id: 'name', labelKey: 'lab.row.name', value: 'Sergeant Noodle the Grea' });
+    rows.push({ kind: 'action', id: 'roll', label: { key: 'lab.roll' } });
+    rows.push({ kind: 'text', id: 'hint', text: t('lab.mindHint'), dim: true });
+    for (const note of ['', t('lab.discardAsk'), t('lab.typing')]) {
+      const tree = labScreen.build({
+        tabs,
+        tab: 4,
+        rows,
+        summary: 'Sergeant Noodle the Grea · Estrategista · N4',
+        note,
+      });
+      for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+        const layout = layoutFor(tree, target);
+        expectNoOverflow(layout, target);
+        expect(reachableScrolling(tree, target, layout.focusable[0]!.id!).size, `${target.name}: foco`).toBe(
+          layout.focusable.length,
+        );
+      }
     }
   });
 
