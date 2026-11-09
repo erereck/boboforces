@@ -26,6 +26,7 @@ import {
   type PropDoseView,
   type TimeOfDay,
   type BotDocument,
+  type VideoSettings,
   type BotLevel,
   type SettingsDocument,
   resolveBot,
@@ -78,7 +79,7 @@ import {
   type MipFilterMode,
   type ViewDesc,
 } from '@boboforces/render/data';
-import { clamp, createLogger, HALF_PI, lerp, lerpAngle, wrapAngle } from '@boboforces/shared';
+import { clamp, createLogger, HALF_PI, lerp, lerpAngle, pitchToI16, wrapAngle, yawToU16 } from '@boboforces/shared';
 import {
   ENTITY_FLAG,
   ENTITY_KIND,
@@ -227,6 +228,13 @@ import {
 import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
+import {
+  aimFromCamera,
+  createShoulderPose,
+  placeShoulderCamera,
+  THIRD_PERSON,
+  type ShoulderPose,
+} from './third-person.ts';
 import { createSamples } from './stats.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
@@ -498,6 +506,15 @@ interface ViewSlot {
   shake: number;
   /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
   readonly death: DeathState;
+  /**
+   * M2 (fase 6b): 3ª pessoa nesta vista no último frame, a câmera de ombro e onde ela ficou em relação ao olho (o
+   * quadro do humano mira pelo raio da câmera).
+   */
+  third: boolean;
+  readonly shoulder: ShoulderPose;
+  camOffX: number;
+  camOffY: number;
+  camOffZ: number;
 }
 
 export interface ConstrutoMatch {
@@ -713,6 +730,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       flash: 0,
       shake: 0,
       death: createDeathState(),
+      third: false,
+      shoulder: createShoulderPose(),
+      camOffX: 0,
+      camOffY: 0,
+      camOffZ: 0,
     });
     descs.push(desc);
   }
@@ -783,6 +805,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let fovDeg = fovFromSettings();
   const shakeFromSettings = (): number => (host.settings.current.accessibility.reduceShake ? REDUCED_SHAKE : 1);
   let shakeMul = shakeFromSettings();
+  // M2 (fase 6b): 1ª ou 3ª pessoa e o ombro, dos Ajustes; a regra "Câmera permitida" da partida pode forçar a 1ª.
+  const thirdAllowed = (recipe.players?.camera ?? 'any') === 'any';
+  const thirdFromSettings = (): boolean => thirdAllowed && host.settings.current.video.view === 'third';
+  const sideFromSettings = (): number => (host.settings.current.video.shoulder === 'left' ? -1 : 1);
+  let thirdPerson = thirdFromSettings();
+  let shoulderSide = sideFromSettings();
+  const thirdAim = new Float64Array(2);
   const env = createEnvironment();
   env.timeOfDay = bench?.timeOfDay ?? doc.light.timeOfDay;
   const sun = doc.light.sunDir;
@@ -1015,6 +1044,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (let s = 0; s < slots.length; s++) {
       const c = slots[s]!.controller;
       if (s === 0 && (overrideCamera !== null || overrideRoute !== null)) continue;
+      if (slots[s]!.third) continue;
       if (c >= 0 && sim.controllerEntity(c) === entity) return s;
     }
     return -1;
@@ -1243,6 +1273,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     humans,
     writeHumanFrame: (_slot, out, seq) => {
       player.writeFrame(out, seq);
+      // M2 (fase 6b): em 3ª pessoa, o tiro mira o ponto que a câmera mira (do olho).
+      if (thirdPersonAim()) {
+        out.yaw = yawToU16(thirdAim[0]!);
+        out.pitch = pitchToI16(thirdAim[1]!);
+      }
       // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
       if (unstuckPending) {
         out.buttons |= BUTTON.unstuck;
@@ -1732,6 +1767,50 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     player.setProfile(profiles[device]);
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
+    thirdPerson = thirdFromSettings();
+    shoulderSide = sideFromSettings();
+  }
+
+  /** M2 (fase 6b): a troca de câmera e de ombro na partida vale para sempre (vai para os Ajustes). */
+  function saveVideo(patch: Partial<VideoSettings>): void {
+    const doc = host.settings.current;
+    host.settings.save({ ...doc, video: { ...doc.video, ...patch } });
+    applySettings();
+    host.log(
+      `[partida] câmera: ${thirdPerson ? '3ª' : '1ª'} pessoa, ombro ${shoulderSide > 0 ? 'direito' : 'esquerdo'}`,
+    );
+  }
+
+  /**
+   * M2 (fase 6b): com a vista do humano em 3ª pessoa, o tiro sai do olho na direção do ponto que o raio da câmera
+   * acerta (`aimFromCamera`). A câmera fica onde o último frame a pôs, em relação ao olho do tick atual.
+   */
+  function thirdPersonAim(): boolean {
+    if (humans === 0) return false;
+    let slot: ViewSlot | null = null;
+    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === 0 && slots[i]!.third) slot = slots[i]!;
+    if (slot === null) return false;
+    const v = sim.view();
+    const e = entityIndex(sim.controllerEntity(0));
+    const fl = v.flags[e]!;
+    if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
+    const ex = v.position[e * 3]!;
+    const ey = v.position[e * 3 + 1]! + eyeHeightFor(fl);
+    const ez = v.position[e * 3 + 2]!;
+    aimFromCamera(
+      v,
+      e,
+      ex,
+      ey,
+      ez,
+      ex + slot.camOffX,
+      ey + slot.camOffY,
+      ez + slot.camOffZ,
+      player.yaw,
+      player.pitch,
+      thirdAim,
+    );
+    return true;
   }
 
   /** M2 (fase 2e): uma ação da pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair) ou das páginas dela. */
@@ -2322,6 +2401,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       desc.localSlot = s;
       desc.team = ffa ? 255 : v.team[e]!;
       desc.thirdPerson = false;
+      slot.third = false;
+      slot.shoulder.arm = -1;
       vm.visible = false;
       return;
     }
@@ -2353,6 +2434,26 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // Na luneta (zoom ≥ 3x quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD (fase 1e).
     const scoped = held !== null && held.adsZoom >= 3 && slot.adsBlend > 0.85;
     vm.visible = !dead && model !== NO_MODEL && !scoped;
+    // M2 (fase 6b): 3ª pessoa (na luneta volta à 1ª): a câmera vai para o ombro, o bobo aparece e o viewmodel some.
+    slot.third = false;
+    if (human && thirdPerson && !dead && !scoped) {
+      placeShoulderCamera(v, c.x, c.y, c.z, yaw, pitch, shoulderSide, dt, slot.shoulder);
+      // Braço curto demais (de costas para a parede): fica a 1ª pessoa neste frame (o braço segue esticando).
+      slot.third = slot.shoulder.arm >= THIRD_PERSON.minVisibleArmM;
+    } else slot.shoulder.arm = -1;
+    if (slot.third) {
+      const eyeX = c.x;
+      const eyeY = c.y;
+      const eyeZ = c.z;
+      c.x = slot.shoulder.x;
+      c.y = slot.shoulder.y;
+      c.z = slot.shoulder.z;
+      slot.camOffX = c.x - eyeX;
+      slot.camOffY = c.y - eyeY;
+      slot.camOffZ = c.z - eyeZ;
+      desc.thirdPerson = true;
+      vm.visible = false;
+    }
     vm.model = model;
     const aim = model !== NO_MODEL ? aimOffsets[model] : null;
     const ads = slot.adsBlend;
@@ -3045,6 +3146,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const scale = frozen ? 1 : aimAssistBefore();
           player.update(raw, frozen ? 0 : dt, scale);
           if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
+          if (player.wasPressed('camera') && thirdAllowed) saveVideo({ view: thirdPerson ? 'first' : 'third' });
+          if (player.wasPressed('shoulder') && thirdPerson)
+            saveVideo({ shoulder: shoulderSide > 0 ? 'left' : 'right' });
           // M2 (fase 5f): a calibração anda com a mira (a pedida pelos Ajustes começa no fim da contagem).
           if (calibrationPending && sim.view().match.phase === 'playing') {
             calibrationPending = false;

@@ -264,7 +264,7 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
   - Personalizado: velocidade 0,5–2×, pulo 0,5–3×, mais a gravidade e o dano de queda que já existem;
   - a aba Jogadores da Partida personalizada ganha o perfil;
   - a navegação e os bots leem a altura de pulo e de escalada do perfil da partida.
-- **6b. 3ª pessoa** (gameplay.md §3.5; tecnico.md §9).
+- **6b. 3ª pessoa** (gameplay.md §3.5; tecnico.md §9). Pronta em 09/11 (`ARCHITECTURE.md` §12.40).
   - câmera de ombro, com troca de ombro e colisão contra o cenário;
   - o tiro sai do olho, mirando no ponto que o raio da câmera acerta;
   - o próprio bobo aparece inteiro, com a arma na mão e sem viewmodel;

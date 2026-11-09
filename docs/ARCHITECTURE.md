@@ -1765,3 +1765,28 @@ mudanças de contrato ficam registradas aqui.
   da Partida personalizada agora escreve até 2 casas.
 - **Bots:** a navegação liga saltos de até 1,0 m (`BOBO_NAV_METRICS`), que todo perfil alcança; os bots usam o mesmo
   perfil da partida (a sim aplica) e, no Tático, não deslizam.
+
+### 12.40 Fase 6b: 3ª pessoa (09/11/2026)
+
+- **`scene/third-person.ts`** (puro, sem alocação por frame):
+  - `placeShoulderCamera`: a câmera fica 2,6 m atrás do olho, 0,7 m para o lado do ombro e 0,4 m acima;
+  - o braço encurta na hora quando acerta parede (DDA na grade e nas props, com 0,25 m de folga) e volta a esticar a
+    6 m/s;
+  - `aimFromCamera`: o raio da câmera começa no plano do olho e para no cenário que segura bala ou na caixa de um bobo
+    vivo. O tiro vai do olho até esse ponto. Com o ponto a menos de 1,5 m, segue o olhar da câmera.
+- **A sim não muda.** A cena troca o yaw/pitch do quadro do humano (`writeHumanFrame`) pelos do olho até o ponto
+  mirado. A câmera usa o ângulo do mapeador. Com o caminho do olho tapado, a bala acerta o que tapa (gameplay.md §3.5).
+- **Vista:** o render já tinha `ViewDesc.thirdPerson` (mostra o corpo e esconde o viewmodel). Na cena:
+  - na luneta (zoom ≥ 3×) volta a 1ª pessoa;
+  - com o braço abaixo de 0,9 m (de costas para a parede), a câmera entraria na cabeça do bobo, então o frame sai em
+    1ª pessoa;
+  - o clarão do tiro do dono em 3ª pessoa sai da arma do boneco (`viewOfEntity` pula a vista).
+- **Ajustes:** `video.view` (`first`, `third`) e `video.shoulder` (`right`, `left`) no `settings@1`, campos novos com
+  padrão e sem migração. As linhas Câmera e Ombro ficam na aba Vídeo.
+- **Na partida:** as ações locais novas `camera` e `shoulder` (no fim da lista) trocam a câmera e o ombro, e a troca é
+  gravada nos Ajustes. Teclas padrão: T e X no teclado, direcional direita e esquerda no controle; dá para remapear.
+- **Receita:** `players.camera` (`any`, `first`), a regra "Câmera permitida", na aba Jogadores (Livre, Só primeira
+  pessoa).
+- **Escolhas (revisáveis):** as medidas da câmera e o ombro direito como padrão.
+- **Fica para depois:** a assistência de mira continua medindo do olho (a diferença para a câmera é pequena); o botão
+  da 3ª pessoa no toque entra na 6e.

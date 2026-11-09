@@ -38,6 +38,8 @@ const REMAP_GAME: readonly RemapAction[] = [
   'ping',
   'emote',
   'scoreboard',
+  'camera',
+  'shoulder',
 ];
 
 /** As ações de cada dispositivo, na ordem da tela (no controle, o movimento é o analógico). */

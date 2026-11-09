@@ -42,12 +42,21 @@ export interface DeviceControls {
   readonly bindings: Readonly<Record<string, readonly string[]>>;
 }
 
+/** M2 (fase 6b): a câmera do jogador (gameplay.md §3.5): 1ª pessoa (padrão) ou 3ª, de ombro. */
+export const VIEW_MODES = ['first', 'third'] as const;
+export type ViewMode = (typeof VIEW_MODES)[number];
+export const SHOULDERS = ['right', 'left'] as const;
+export type Shoulder = (typeof SHOULDERS)[number];
+
 export interface VideoSettings {
   readonly quality: QualityName;
   /** Tamanho da UI (multiplica a escala da referência 1280×720). */
   readonly uiScale: number;
   /** Campo de visão horizontal em graus; `0` = o padrão da plataforma. */
   readonly fovDeg: number;
+  /** M2 (fase 6b): 1ª ou 3ª pessoa, e o ombro da 3ª (a regra "Câmera permitida" da partida pode forçar a 1ª). */
+  readonly view: ViewMode;
+  readonly shoulder: Shoulder;
 }
 
 export interface AccessibilitySettings {
@@ -107,7 +116,7 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     gamepad: deviceDefaults('medium'),
     touch: deviceDefaults('medium'),
   },
-  video: { quality: 'auto', uiScale: 1, fovDeg: 0 },
+  video: { quality: 'auto', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right' },
   accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
 };
 
@@ -197,6 +206,8 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
       quality: r.pick(v, 'quality', 'video.quality', D.video.quality, QUALITY_NAMES),
       uiScale: r.num(v, 'uiScale', 'video.uiScale', D.video.uiScale, R.uiScale.min, R.uiScale.max),
       fovDeg: fov === 0 ? 0 : Math.max(fov, R.fovDeg.min),
+      view: r.pick(v, 'view', 'video.view', D.video.view, VIEW_MODES),
+      shoulder: r.pick(v, 'shoulder', 'video.shoulder', D.video.shoulder, SHOULDERS),
     },
     accessibility: {
       reduceShake: r.bool(a, 'reduceShake', 'accessibility.reduceShake', D.accessibility.reduceShake),

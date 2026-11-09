@@ -1294,15 +1294,15 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     platform.tap('ArrowLeft');
     platform.tap('Enter');
     expect(game.screen).toBe('custom');
-    // E (próxima aba): Jogadores (6 linhas desde a fase 6a: Movimento em cima). Do COMEÇAR: esquerda (Salvar), esquerda
-    // (Voltar), esquerda (uma linha); cima até a aba e baixo 2 (Movimento, Vida); direita: 150. De volta: baixo 5 vezes
-    // (até o Voltar) e direita 2 (COMEÇAR).
+    // E (próxima aba): Jogadores (7 linhas desde a fase 6b: Movimento em cima, Câmera embaixo). Do COMEÇAR: esquerda
+    // (Salvar), esquerda (Voltar), esquerda (uma linha); cima até a aba e baixo 2 (Movimento, Vida); direita: 150. De
+    // volta: baixo 6 vezes (até o Voltar) e direita 2 (COMEÇAR).
     platform.tap('KeyE');
     for (let k = 0; k < 3; k++) platform.tap('ArrowLeft');
     for (let k = 0; k < 8; k++) platform.tap('ArrowUp');
     for (let k = 0; k < 2; k++) platform.tap('ArrowDown');
     platform.tap('ArrowRight');
-    for (let k = 0; k < 5; k++) platform.tap('ArrowDown');
+    for (let k = 0; k < 6; k++) platform.tap('ArrowDown');
     for (let k = 0; k < 2; k++) platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
@@ -1323,6 +1323,28 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     expect(game.screen).toBe('custom');
     game.dispose();
   }, 120_000);
+});
+
+describe('3ª pessoa (M2, fase 6b)', () => {
+  it('na partida, T troca a câmera e X o ombro; a escolha vai para os Ajustes', async () => {
+    const { platform, game } = await bootToTitle();
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    const view = game.match!.sim.view();
+    platform.pump(view.match.countdownTicks + 5);
+    expect(game.save.settings.video).toMatchObject({ view: 'first', shoulder: 'right' });
+    // X sem a 3ª pessoa não faz nada.
+    platform.tap('KeyX');
+    expect(game.save.settings.video.shoulder).toBe('right');
+    platform.tap('KeyT');
+    platform.tap('KeyX');
+    platform.pump(5);
+    expect(game.save.settings.video).toMatchObject({ view: 'third', shoulder: 'left' });
+    expect(platform.logLines).toContain('[partida] câmera: 3ª pessoa, ombro esquerdo');
+    platform.tap('KeyT');
+    expect(game.save.settings.video.view).toBe('first');
+    game.dispose();
+  }, 60_000);
 });
 
 describe('Ajustes (M2, fase 4f)', () => {

@@ -43,7 +43,8 @@ export const FRAME_BUTTON_BITS = 16;
 /**
  * Ações de jogo que ficam no cliente: a troca de arma vira o campo absoluto `InputFrame.weapon`; placar e pausa são
  * locais (pausa sempre por `pause`, nunca por Esc/Home/voltar do navegador: regra 16). `lastWeapon` volta para a arma
- * usada antes (o Q do teclado, arte-ux.md §7.1). Ação nova entra no FIM da lista.
+ * usada antes (o Q do teclado, arte-ux.md §7.1). M2 (fase 6b): `camera` troca 1ª/3ª pessoa e `shoulder` o ombro da 3ª
+ * pessoa (gameplay.md §3.5). Ação nova entra no FIM da lista.
  */
 export const LOCAL_GAME_ACTIONS = [
   'nextWeapon',
@@ -55,6 +56,8 @@ export const LOCAL_GAME_ACTIONS = [
   'scoreboard',
   'pause',
   'lastWeapon',
+  'camera',
+  'shoulder',
 ] as const;
 
 export type LocalGameAction = (typeof LOCAL_GAME_ACTIONS)[number];

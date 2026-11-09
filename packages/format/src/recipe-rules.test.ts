@@ -74,4 +74,12 @@ describe('regras da receita (fase 4e)', () => {
     const clamped = validateMatchRecipe(recipe({ players: { movement: 'tactical', speed: 9, jump: 0.1 } }), LIMITS);
     expect(clamped.ok && clamped.value.players).toEqual({ movement: 'tactical', speed: 2, jump: 0.5 });
   });
+
+  it('M2 (fase 6b): a câmera permitida; valor fora da lista sai com aviso', () => {
+    const ok = validateMatchRecipe(recipe({ players: { camera: 'first' } }), LIMITS);
+    expect(ok.ok && ok.value.players).toEqual({ camera: 'first' });
+    const bad = validateMatchRecipe(recipe({ players: { camera: 'drone' } }), LIMITS);
+    expect(bad.ok && bad.value.players).toEqual({});
+    expect(bad.ok && bad.warnings.map((w) => w.code)).toContain('recipe.invalidField');
+  });
 });

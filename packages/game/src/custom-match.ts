@@ -339,6 +339,13 @@ const PLAYER_ROWS: readonly RowDef[] = [
     (r) => players(r).fallDamage ?? true,
     (r, v) => withPlayers(r, { fallDamage: v }),
   ),
+  // M2 (fase 6b): a câmera permitida (livre ou só a 1ª pessoa).
+  {
+    id: 'camera',
+    labelKey: 'custom.row.camera',
+    value: (r) => t(players(r).camera === 'first' ? 'custom.camera.first' : 'custom.camera.any'),
+    step: (r) => withPlayers(r, { camera: players(r).camera === 'first' ? 'any' : 'first' }),
+  },
 ];
 
 const WEAPON_ROWS: readonly RowDef[] = [

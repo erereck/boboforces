@@ -397,6 +397,14 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     - a escalada no ar não alcançava a altura do perfil: o Bobo não subia 1,5 m nem o Tático 1,0 m;
     - Gravidade e Dano mostravam ×0,25 como "×0,3".
   - 4 testes novos; golden igual.
+- **Fase 6b, 3ª pessoa:**
+  - **Câmera de ombro:** o T (teclado) ou o direcional direita (controle) troca entre 1ª e 3ª pessoa; o X ou o
+    direcional esquerda troca o ombro. A escolha fica salva nos Ajustes (aba Vídeo).
+  - Você vê o próprio bobo inteiro, com a arma na mão. Na luneta e de costas para a parede, a vista volta à 1ª pessoa.
+  - **A mira:** o tiro sai do olho do bobo e vai para onde a câmera mira. Se o caminho do olho estiver tapado, a bala
+    acerta a parede: não dá para atirar escondido atrás da cobertura.
+  - Na Partida personalizada, a regra **Câmera** (Livre ou Só primeira pessoa).
+  - 6 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

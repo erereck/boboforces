@@ -69,6 +69,10 @@ export interface MatchRules {
 
 /** Regeneração da vida (gameplay.md §10.3): desligada, lenta, padrão (25/s depois de 5 s) ou rápida. */
 export const REGEN_RULES = ['off', 'slow', 'default', 'fast'] as const;
+
+/** M2 (fase 6b): "Câmera permitida" (gameplay.md §3.5): 1ª e 3ª pessoa (padrão) ou só a 1ª. */
+export const CAMERA_RULES = ['any', 'first'] as const;
+export type CameraRule = (typeof CAMERA_RULES)[number];
 export type RegenRule = (typeof REGEN_RULES)[number];
 
 export interface PlayerRules {
@@ -86,6 +90,8 @@ export interface PlayerRules {
    */
   readonly speed?: number;
   readonly jump?: number;
+  /** M2 (fase 6b): a câmera permitida. */
+  readonly camera?: CameraRule;
 }
 
 /** Munição da partida (gameplay.md §4.5): normal, reserva infinita ou pente infinito. */
@@ -194,6 +200,7 @@ const PLAYER_KEYS = [
   'fallDamage',
   'speed',
   'jump',
+  'camera',
 ] as const;
 const WEAPON_KEYS = [
   'damageMul',
@@ -373,6 +380,7 @@ function readPlayers(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   // M2 (fase 6a).
   readRange(ctx, value, 'speed', 'players', RECIPE_RANGES.speed, out);
   readRange(ctx, value, 'jump', 'players', RECIPE_RANGES.jump, out);
+  readChoice(ctx, value, 'camera', 'players', CAMERA_RULES, out);
   return Object.assign(out, unknownFields(value, PLAYER_KEYS));
 }
 

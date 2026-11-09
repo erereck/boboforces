@@ -119,6 +119,9 @@ export function createKeyboardMouseProfile(): ControlProfile {
       nextWeapon: [wheel(1)],
       prevWeapon: [wheel(-1)],
       lastWeapon: [key('KeyQ')],
+      // M2 (fase 6b): T de terceira pessoa; X troca o ombro.
+      camera: [key('KeyT')],
+      shoulder: [key('KeyX')],
       scoreboard: [key('Tab')],
       pause: [key('Escape'), key('KeyP')],
     },
@@ -166,6 +169,9 @@ export function createGamepadProfile(convention: MenuConfirmConvention = 'bottom
       nextWeapon: [pad('faceUp')],
       ping: [pad('dpadUp')],
       emote: [pad('dpadDown')],
+      // M2 (fase 6b): o direcional dos lados (o de cima e o de baixo são aviso e emote).
+      camera: [pad('dpadRight')],
+      shoulder: [pad('dpadLeft')],
       scoreboard: [pad('select')],
       pause: [pad('start')],
     },

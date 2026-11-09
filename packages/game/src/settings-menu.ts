@@ -181,6 +181,19 @@ const VIDEO_ROWS: readonly OptionDef[] = [
     value: (doc) => mult(doc.video.uiScale),
     step: (doc, _dev, d) => ({ ...doc, video: { ...doc.video, uiScale: stepList(UI_SCALES, doc.video.uiScale, d) } }),
   },
+  // M2 (fase 6b): 1ª ou 3ª pessoa e o ombro (na partida: T e X no teclado, direcional dos lados no controle).
+  {
+    id: 'view',
+    labelKey: 'settings.row.view',
+    value: (doc) => t(doc.video.view === 'third' ? 'settings.view.third' : 'settings.view.first'),
+    step: (doc) => ({ ...doc, video: { ...doc.video, view: doc.video.view === 'third' ? 'first' : 'third' } }),
+  },
+  {
+    id: 'shoulder',
+    labelKey: 'settings.row.shoulder',
+    value: (doc) => t(doc.video.shoulder === 'left' ? 'settings.shoulder.left' : 'settings.shoulder.right'),
+    step: (doc) => ({ ...doc, video: { ...doc.video, shoulder: doc.video.shoulder === 'left' ? 'right' : 'left' } }),
+  },
 ];
 
 const ACCESS_ROWS: readonly OptionDef[] = [
