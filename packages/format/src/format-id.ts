@@ -18,6 +18,8 @@ export const FORMAT_KINDS = [
   // M1: arquivos internos de build (não são documentos do jogador, mas levam o mesmo carimbo de versão)
   'blocks',
   'layers',
+  // M2 (fase 7d): o manifesto da música em loop (audio-loop.ts).
+  'loop',
 ] as const;
 
 export type FormatKind = (typeof FORMAT_KINDS)[number];
@@ -44,6 +46,7 @@ export const CURRENT_FORMAT_VERSION: Readonly<Record<FormatKind, number>> = {
   model: 1,
   blocks: 1,
   layers: 1,
+  loop: 1,
 };
 
 export function formatId(kind: FormatKind, version: number = CURRENT_FORMAT_VERSION[kind]): FormatId {

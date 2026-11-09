@@ -9,6 +9,37 @@ export const MP3_DEFAULTS = { sampleRate: 44100, kbps: 96 } as const;
 /** Bloco que o LAME aceita por chamada (múltiplo de 576 amostras). */
 const BLOCK = 1152;
 
+const toInt16 = (src: Float32Array, from: number, n: number, out: Int16Array): void => {
+  for (let j = 0; j < n; j++) {
+    const s = Math.max(-1, Math.min(1, src[from + j]!));
+    out[j] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+  }
+};
+
+/** M2 (fase 7d): PCM estéreo em float → MP3 (CBR, joint stereo do LAME). Para a música. */
+export function encodeMp3Stereo(left: Float32Array, right: Float32Array, sampleRate: number, kbps: number): Uint8Array {
+  const encoder = new Mp3Encoder(2, sampleRate, kbps);
+  const chunks: Uint8Array[] = [];
+  const l = new Int16Array(BLOCK);
+  const r = new Int16Array(BLOCK);
+  for (let i = 0; i < left.length; i += BLOCK) {
+    const n = Math.min(BLOCK, left.length - i);
+    toInt16(left, i, n, l);
+    toInt16(right, i, n, r);
+    const out = n === BLOCK ? encoder.encodeBuffer(l, r) : encoder.encodeBuffer(l.subarray(0, n), r.subarray(0, n));
+    if (out.length > 0) chunks.push(new Uint8Array(out));
+  }
+  const tail = encoder.flush();
+  if (tail.length > 0) chunks.push(new Uint8Array(tail));
+  const bytes = new Uint8Array(chunks.reduce((sum, c) => sum + c.length, 0));
+  let o = 0;
+  for (const c of chunks) {
+    bytes.set(c, o);
+    o += c.length;
+  }
+  return bytes;
+}
+
 /** PCM mono em float (-1..1) → bytes de MP3 (CBR). Determinístico para a mesma entrada. */
 export function encodeMp3(
   pcm: Float32Array,

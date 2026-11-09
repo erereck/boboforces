@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { createMixer, GAME_SYNTH_SOUNDS } from '@boboforces/audio';
 import { createFakeAudioContext } from '@boboforces/audio/testing';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS } from '@boboforces/format';
+import { DEFAULT_SETTINGS, parseLoopManifest } from '@boboforces/format';
 import {
   applyAudioSettings,
   loadSoundFiles,
@@ -113,8 +113,22 @@ describe('música do menu (fase 7d)', () => {
     expect(wantsMusic(true, false, true)).toBe(true);
   });
 
-  it('a faixa ainda espera o OK do download (decisão #63)', () => {
-    expect(MENU_MUSIC).toBe(null);
+  it('a faixa do menu está no runtime-assets.json (MP3 e manifesto loop@1) e o loop fecha em 48 compassos', () => {
+    expect(MENU_MUSIC).toBe('music/menu');
+    expect(runtime.files['music/menu.mp3']).toBe('audio/generated/music/menu.mp3');
+    expect(runtime.files['music/menu.json']).toBe('audio/generated/music/menu.json');
+    const loop = parseLoopManifest(
+      JSON.parse(readFileSync(join(ROOT, 'assets-src', runtime.files['music/menu.json']!), 'utf8')),
+    );
+    // 135 BPM, 4 tempos, 48 compassos.
+    expect(loop.loopS).toBeCloseTo((48 * 4 * 60) / 135, 4);
+    expect(loop.loopStartS).toBeGreaterThan(0);
+    // O atraso do decodificador mais a folga circular de 4 quadros (~0,14 s).
+    expect(loop.loopStartS).toBeLessThan(0.5);
+    // Sob demanda: fora dos sons da primeira partida, perto de 1 MB.
+    const bytes = statSync(join(ROOT, 'assets-src', runtime.files['music/menu.mp3']!)).size;
+    expect(bytes).toBeGreaterThan(500_000);
+    expect(bytes).toBeLessThan(1_200_000);
   });
 });
 

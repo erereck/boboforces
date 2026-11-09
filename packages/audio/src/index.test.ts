@@ -22,6 +22,26 @@ const surface = (ctx: FakeAudioContext) => ({ context: ctx, unlocked: true, onUn
 const mp3 = (tenths: number) => new Uint8Array([tenths, 0xff, 0xfb, 0x90]);
 
 describe('música (M2, fase 7d)', () => {
+  it('recorta o loop num buffer novo; com a saída mono, a música toca uma versão mono', () => {
+    const ctx = createFakeAudioContext(48000);
+    const mixer = createMixer(surface(ctx));
+    const pcm = new Float32Array(48000);
+    for (let i = 0; i < pcm.length; i++) pcm[i] = i / pcm.length;
+    mixer.synthesize('faixa', pcm, 48000);
+    expect(mixer.crop('nada', 0, 1)).toBe(false);
+    expect(mixer.crop('faixa', 0.5, 0.75)).toBe(false); // passa do fim
+    expect(mixer.crop('faixa', 0.25, 0.5)).toBe(true);
+    const before = ctx.sources.length;
+    mixer.playMusic('faixa');
+    const src = ctx.sources[before]!;
+    expect(src.buffer!.length).toBe(24000);
+    expect(src.buffer!.getChannelData(0)[0]).toBeCloseTo(0.25, 6);
+    // Mono: a faixa (aqui já mono) não recomeça; com 2 canais ela trocaria de versão em crossfade.
+    mixer.setMono(true);
+    expect(ctx.sources.length).toBe(before + 1);
+    mixer.dispose();
+  });
+
   it('toca em loop numa voz própria, não recomeça a mesma faixa e faz crossfade na troca', async () => {
     const ctx = createFakeAudioContext();
     const mixer = createMixer(surface(ctx));

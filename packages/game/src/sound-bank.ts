@@ -151,10 +151,11 @@ export function applyAudioSettings(mixer: Mixer, a: AudioSettings): void {
 }
 
 /**
- * M2 (fase 7d): a faixa do menu (#38 e #63: CC0 baixada, com crédito). `null` até o Erick aprovar o download; aí vira
- * `'music/menu.mp3'` no runtime-assets.json (sob demanda no size-check) e carrega depois dos efeitos.
+ * M2 (fase 7d): a faixa do menu (#38 e #63: CC0 baixada com o OK do Erick, com crédito): "Toy Soldiers", de Zane Little
+ * Music, num loop de 48 compassos. Base do caminho lógico: `<base>.mp3` e o manifesto `<base>.json` (`loop@1`), sob
+ * demanda no size-check; carrega depois dos efeitos. `null` = sem música.
  */
-export const MENU_MUSIC: string | null = null;
+export const MENU_MUSIC: string | null = 'music/menu';
 /** Nome da faixa do menu no mixer. */
 export const MENU_MUSIC_ID = 'musica-menu';
 

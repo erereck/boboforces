@@ -10,4 +10,7 @@ export const ROOT = resolve(import.meta.dirname, '../../..');
 export const AUDIO_SOURCE_DIR = join(ROOT, 'assets-src', 'audio', 'source');
 export const AUDIO_OUT_DIR = join(ROOT, 'assets-src', 'audio', 'generated');
 export const SOUND_TABLE = join(ROOT, 'assets-src', 'audio', 'sounds.json');
+/** M2 (fase 7d): a tabela da música e a saída (`generated/music/<out>.mp3` + `<out>.json`, o `loop@1`). */
+export const MUSIC_TABLE = join(ROOT, 'assets-src', 'audio', 'music.json');
+export const MUSIC_OUT_DIR = join(AUDIO_OUT_DIR, 'music');
 export const T0_SOUNDS = ['t0-tiro', 't0-impacto', 't0-passo', 't0-ui'] as const;

@@ -1,0 +1,21 @@
+{
+  "$comment": "Música do jogo (M2, fase 7d; decisões #38 e #63): CC0 baixada com o OK do Erick → loop estéreo de N compassos em MP3 + manifesto loop@1 por `npm run audioconv -- --musica` (tools/audioconv). O original fica em local/ (fora do git: 6,2 MB e provisório, #38); o SHA-256 confere que é o mesmo arquivo. startSample é uma cabeça de compasso no original decodificado a sampleRate (achada por local/m2/achar-loop.ts e fase-compasso.ts: a emenda de 48 compassos que mais se repete). Crédito em docs/CREDITOS.md.",
+  "tracks": [
+    {
+      "out": "menu",
+      "title": "Toy Soldiers",
+      "author": "Zane Little Music",
+      "url": "https://opengameart.org/content/toy-soldiers",
+      "license": "CC0 1.0 (Creative Commons Zero)",
+      "sha256": "34eb762bd12b21b5358a7eb99f4d23591e1fa8d7d46f0723984b6cacd22c79c4",
+      "downloaded": "2026-11-09",
+      "source": "local/audio-originais/toy_soldiers.mp3",
+      "bpm": 135,
+      "bars": 48,
+      "startSample": 1765862,
+      "sampleRate": 44100,
+      "crossfadeS": 0.1,
+      "kbps": 96
+    }
+  ]
+}

@@ -52,7 +52,9 @@
     "audio/passo-tecido.mp3": "audio/generated/passo-tecido.mp3",
     "audio/pulo.mp3": "audio/generated/pulo.mp3",
     "audio/pouso.mp3": "audio/generated/pouso.mp3",
-    "audio/municao.mp3": "audio/generated/municao.mp3"
+    "audio/municao.mp3": "audio/generated/municao.mp3",
+    "music/menu.mp3": "audio/generated/music/menu.mp3",
+    "music/menu.json": "audio/generated/music/menu.json"
   },
   "local": {},
   "arrays": {

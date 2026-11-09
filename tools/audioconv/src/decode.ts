@@ -11,8 +11,18 @@ export interface DecodedAudio {
   readonly sourceRate: number;
 }
 
+/** M2 (fase 7d): os 2 canais (a música é estéreo); mono no original vira os 2 iguais. */
+export interface DecodedStereo {
+  readonly left: Float32Array;
+  readonly right: Float32Array;
+  readonly sampleRate: number;
+  readonly sourceChannels: number;
+  readonly sourceRate: number;
+}
+
 export interface Decoder {
   decode(bytes: Uint8Array, sampleRate: number): Promise<DecodedAudio>;
+  decodeStereo(bytes: Uint8Array, sampleRate: number): Promise<DecodedStereo>;
   close(): Promise<void>;
 }
 
@@ -56,6 +66,42 @@ export async function createDecoder(): Promise<Decoder> {
       const raw = Buffer.from(result.b64, 'base64');
       const pcm = new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
       return { pcm, sampleRate, sourceChannels: result.channels, sourceRate: result.sourceRate };
+    },
+    async decodeStereo(bytes, sampleRate) {
+      const r = await page.evaluate(
+        async ({ b64, rate }) => {
+          const bin = atob(b64);
+          const data = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+          const probe = new OfflineAudioContext(2, 1, rate);
+          const buffer = await probe.decodeAudioData(data.buffer);
+          const length = Math.ceil(buffer.duration * rate);
+          const ctx = new OfflineAudioContext(2, length, rate);
+          const source = ctx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(ctx.destination);
+          source.start();
+          const out = await ctx.startRendering();
+          const enc = (a: Float32Array): string => {
+            const raw = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+            let s = '';
+            for (let i = 0; i < raw.length; i += 0x8000) s += String.fromCharCode(...raw.subarray(i, i + 0x8000));
+            return btoa(s);
+          };
+          return {
+            l: enc(out.getChannelData(0)),
+            r: enc(out.getChannelData(1)),
+            channels: buffer.numberOfChannels,
+            sourceRate: buffer.sampleRate,
+          };
+        },
+        { b64: Buffer.from(bytes).toString('base64'), rate: sampleRate },
+      );
+      const dec = (s: string): Float32Array => {
+        const raw = Buffer.from(s, 'base64');
+        return new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
+      };
+      return { left: dec(r.l), right: dec(r.r), sampleRate, sourceChannels: r.channels, sourceRate: r.sourceRate };
     },
     close: () => browser.close(),
   };

@@ -77,6 +77,12 @@ export interface Mixer extends Disposable {
   decode(name: string, bytes: Uint8Array): Promise<SoundInfo>;
   /** Guarda PCM mono gerado em código (`createBuffer`). Lança se o contexto não tiver `createBuffer`. */
   synthesize(name: string, pcm: Float32Array, sampleRate: number): SoundInfo;
+  /**
+   * M2 (fase 7d): troca o som `name` por um recorte dele (`durationS` a partir de `startS`, em segundos do áudio
+   * decodificado), copiando os canais num buffer novo (`createBuffer`). A música usa para tirar o atraso do MP3 e
+   * fechar o loop no compasso (manifesto `loop@1`). `false` se o som não existe ou o recorte não cabe.
+   */
+  crop(name: string, startS: number, durationS: number): boolean;
   has(name: string): boolean;
   /** Ouvinte local `slot` (0..3): posição dos olhos (m) e yaw do jogo. */
   setListener(slot: number, x: number, y: number, z: number, yaw: number): void;
@@ -137,6 +143,7 @@ function createSilentMixer(): Mixer {
     context: null,
     stats,
     decode: (name) => Promise.reject(new Error(`áudio indisponível: ${name} não decodificado`)),
+    crop: () => false,
     synthesize: (name) => {
       throw new Error(`áudio indisponível: ${name} não sintetizado`);
     },
@@ -172,6 +179,8 @@ interface MusicVoice {
   readonly fade: GainNodeLike;
   source: AudioBufferSourceNodeLike | null;
   name: string | null;
+  /** Tocando a versão mono (saída mono ligada). */
+  mono: boolean;
 }
 
 /** Fade padrão da música (s). */
@@ -209,7 +218,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     const fade = ctx.createGain();
     fade.gain.value = 0;
     fade.connect(duck);
-    return { fade, source: null, name: null };
+    return { fade, source: null, name: null, mono: false };
   });
   let musicActive = -1;
   /** Quando a voz que saiu termina o fade (relógio do contexto); a liberação acontece na próxima chamada ao mixer. */
@@ -247,6 +256,53 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       musicReleaseAt[i] = Infinity;
       stopMusicVoice(music[i]!);
     }
+  };
+
+  /** Versões mono das músicas (só com a saída mono ligada; soltas quando ela desliga). */
+  const monoMusic = new Map<string, AudioBufferLike>();
+  const monoOf = (name: string, b: AudioBufferLike): AudioBufferLike => {
+    if (b.numberOfChannels < 2) return b;
+    let m = monoMusic.get(name);
+    if (m) return m;
+    m = ctx.createBuffer(1, b.length, b.sampleRate);
+    const out = m.getChannelData(0);
+    const l = b.getChannelData(0);
+    const r = b.getChannelData(1);
+    for (let i = 0; i < out.length; i++) out[i] = (l[i]! + r[i]!) * 0.5;
+    monoMusic.set(name, m);
+    return m;
+  };
+  const startMusic = (name: string, fadeS: number): boolean => {
+    if (disposed) return false;
+    const stereo = sounds.get(name);
+    if (!stereo) {
+      stats.unknown++;
+      return false;
+    }
+    reclaimMusic(ctx.currentTime);
+    const wantMono = mono && stereo.numberOfChannels > 1;
+    if (musicActive >= 0 && music[musicActive]!.name === name && music[musicActive]!.mono === wantMono) return true;
+    const old = musicActive;
+    const next = old === 0 ? 1 : 0;
+    const m = music[next]!;
+    musicReleaseAt[next] = Infinity;
+    stopMusicVoice(m);
+    const source = ctx.createBufferSource();
+    source.buffer = wantMono ? monoOf(name, stereo) : stereo;
+    source.loop = true;
+    source.connect(m.fade);
+    m.source = source;
+    m.name = name;
+    m.mono = wantMono;
+    m.fade.gain.value = 0;
+    fadeTo(m, 1, fadeS);
+    source.start();
+    musicActive = next;
+    if (old >= 0) {
+      fadeTo(music[old]!, 0, fadeS);
+      releaseAfter(old, fadeS);
+    }
+    return true;
   };
 
   const voices: Voice[] = [];
@@ -419,6 +475,24 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     setMono(on) {
       mono = on;
       if (on) for (let i = 0; i < MAX_VOICES; i++) voices[i]!.panner.pan.value = 0;
+      // A música troca de versão (estéreo ↔ mono) com crossfade.
+      const playing = musicActive >= 0 ? music[musicActive]!.name : null;
+      if (playing !== null) startMusic(playing, MUSIC_FADE_S);
+      if (!on) monoMusic.clear();
+    },
+    crop(name, startS, durationS) {
+      const b = sounds.get(name);
+      if (!b) return false;
+      const rate = b.sampleRate;
+      const from = Math.max(0, Math.round(startS * rate));
+      const len = Math.round(durationS * rate);
+      if (len <= 0 || from + len > b.length) return false;
+      const out = ctx.createBuffer(b.numberOfChannels, len, rate);
+      for (let c = 0; c < b.numberOfChannels; c++)
+        out.getChannelData(c).set(b.getChannelData(c).subarray(from, from + len));
+      sounds.set(name, out);
+      monoMusic.delete(name);
+      return true;
     },
     suspend: () => ctx.suspend().catch(() => {}),
     resume: () => ctx.resume().catch(() => {}),
@@ -432,36 +506,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     get music() {
       return musicActive >= 0 ? music[musicActive]!.name : null;
     },
-    playMusic(name, fadeS = MUSIC_FADE_S) {
-      if (disposed) return false;
-      const buffer = sounds.get(name);
-      if (!buffer) {
-        stats.unknown++;
-        return false;
-      }
-      reclaimMusic(ctx.currentTime);
-      if (musicActive >= 0 && music[musicActive]!.name === name) return true;
-      const old = musicActive;
-      const next = old === 0 ? 1 : 0;
-      const m = music[next]!;
-      musicReleaseAt[next] = Infinity;
-      stopMusicVoice(m);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      source.connect(m.fade);
-      m.source = source;
-      m.name = name;
-      m.fade.gain.value = 0;
-      fadeTo(m, 1, fadeS);
-      source.start();
-      musicActive = next;
-      if (old >= 0) {
-        fadeTo(music[old]!, 0, fadeS);
-        releaseAfter(old, fadeS);
-      }
-      return true;
-    },
+    playMusic: (name, fadeS = MUSIC_FADE_S) => startMusic(name, fadeS),
     stopMusic(fadeS = MUSIC_FADE_S) {
       reclaimMusic(ctx.currentTime);
       if (musicActive < 0) return;
@@ -496,6 +541,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       }
       for (const b of buses) b.disconnect();
       sounds.clear();
+      monoMusic.clear();
     },
   };
 }

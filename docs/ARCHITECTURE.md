@@ -1970,3 +1970,26 @@ mudanças de contrato ficam registradas aqui.
     partida, só com "Música na partida" (GDD §5.10).
 - **Escolhas (revisáveis):** o fade de 0,8 s e a música voltando no resultado com a mesma faixa do menu. As vinhetas
   de vitória e derrota tocam no canal da música.
+
+### 12.48 Fase 7d: a música do menu (09/11/2026)
+
+- **Faixa:** "Toy Soldiers", de Zane Little Music (CC0), baixada com o OK do Erick. O original (6,2 MB) fica em
+  `local/audio-originais/`, fora do git, por ser provisório (#38); o SHA-256 na tabela confere o arquivo.
+- **Loop:** `tools/audioconv --musica` (`assets-src/audio/music.json`).
+  - Trecho: 48 compassos a 135 BPM (o compasso tem exatamente 78.400 amostras a 44,1 kHz) a partir de uma cabeça de
+    compasso. O trecho saiu de `local/m2/achar-loop.ts`: a emenda de 48 compassos com a música mais parecida dos dois
+    lados (0,885 depois e 0,716 antes, em energia por faixa).
+  - Emenda: o começo do loop é misturado, em 0,1 s de crossfade **linear**, com o que vinha depois do fim no original.
+    A curva de potência igual somava até +3 dB, porque os dois lados são o mesmo trecho; o teste pegou.
+  - Codificação: MP3 estéreo a 96 kbps (1,0 MB, sob demanda) com **folga circular** de 4 quadros de cada lado (o fim
+    do loop antes, o começo depois). Sem ela, o MP3 borrava os primeiros e os últimos milissegundos e a volta dava um
+    salto de 0,44 (o passo médio da onda é 0,02); com ela, o salto fica no nível da própria música.
+- **Manifesto `loop@1`** (`format/audio-loop.ts`, `music/menu.json`): `loopStartS` (o atraso do decodificador mais a
+  folga, medido decodificando o próprio MP3 no Edge: 0,139 s) e `loopS` (85,333 s). O jogo lê o manifesto, decodifica
+  o MP3 e o mixer recorta (`Mixer.crop`, um buffer novo pelo `createBuffer`).
+- **Mono:** com a saída mono ligada, a música troca em crossfade para uma versão mono, feita na hora e solta quando o
+  mono desliga.
+- **Memória:** 85 s estéreo a 48 kHz decodificados dão ~33 MB (tecnico.md §12 previa ~35 MB).
+- **Medido no Edge:** a música começa 0,2–0,5 s depois do primeiro gesto no título e para na partida.
+- **Risco:** o atraso foi medido no decodificador do Edge. Outro decodificador (o FFmpeg do nx.js) pode errar a emenda
+  por alguns milissegundos; isso se confere no Switch, na fase 8.

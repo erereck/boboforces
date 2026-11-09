@@ -12,6 +12,7 @@ import {
   type ControlDevice,
   type MatchRecipe,
   type SettingsDocument,
+  parseLoopManifest,
 } from '@boboforces/format';
 import { stepLevel } from './pause.ts';
 import {
@@ -229,7 +230,13 @@ export interface GameHandle extends Disposable {
   /** M2 (fase 4b): o save do jogador (ajustes, estatísticas, presets e bots), lido na criação. */
   readonly save: SaveStore;
   /** M2 (fase 7b): os contadores do mixer e o estado do contexto (`'none'` sem áudio), para o F2 e os scripts. */
-  readonly audio: { readonly stats: MixerStats; readonly state: string; readonly sounds: number };
+  readonly audio: {
+    readonly stats: MixerStats;
+    readonly state: string;
+    readonly sounds: number;
+    /** M2 (fase 7d): a música tocando agora, ou `null`. */
+    readonly music: string | null;
+  };
 }
 
 /** Piso do texto em px reais (arte-ux.md §6.8): TV/Switch na dock, ou 13 px de layout no navegador. */
@@ -277,15 +284,23 @@ export function startGame(deps: GameDeps): GameHandle {
     );
     return soundFiles;
   }
-  /** M2 (fase 7d): a faixa do menu, sob demanda, depois dos efeitos (`MENU_MUSIC` nulo = ainda sem faixa). */
+  /**
+   * M2 (fase 7d): a faixa do menu, sob demanda, depois dos efeitos: o manifesto `loop@1` diz onde o loop começa no
+   * áudio decodificado (o atraso do MP3) e quanto dura; o mixer recorta e a música fecha o loop no compasso.
+   */
   function loadMenuMusic(): void {
-    const path = MENU_MUSIC;
-    if (path === null || !mixer.available || mixer.has(MENU_MUSIC_ID)) return;
+    const base = MENU_MUSIC;
+    if (base === null || !mixer.available || mixer.has(MENU_MUSIC_ID)) return;
     platform.assets
-      .loadBytes(path)
-      .then((bytes) => mixer.decode(MENU_MUSIC_ID, bytes))
+      .loadText(`${base}.json`)
+      .then(async (text) => {
+        const loop = parseLoopManifest(JSON.parse(text));
+        await mixer.decode(MENU_MUSIC_ID, await platform.assets.loadBytes(`${base}.mp3`));
+        if (!mixer.crop(MENU_MUSIC_ID, loop.loopStartS, loop.loopS)) throw new Error('o loop não cabe no MP3');
+        return loop;
+      })
       .then(
-        (info) => platform.diagnostics.appendLog(`[audio] música do menu pronta (${info.durationS.toFixed(1)} s)`),
+        (loop) => platform.diagnostics.appendLog(`[audio] música do menu pronta (loop de ${loop.loopS.toFixed(1)} s)`),
         (error: unknown) =>
           platform.diagnostics.appendLog(`[audio] música: ${error instanceof Error ? error.message : String(error)}`),
       );
@@ -1502,7 +1517,7 @@ export function startGame(deps: GameDeps): GameHandle {
     },
     save,
     get audio() {
-      return { stats: mixer.stats, state: mixer.context?.state ?? 'none', sounds: soundCount };
+      return { stats: mixer.stats, state: mixer.context?.state ?? 'none', sounds: soundCount, music: mixer.music };
     },
     dispose(): void {
       if (disposed) return;
