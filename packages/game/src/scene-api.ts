@@ -11,6 +11,7 @@ import type {
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
 // quando o jogador entra nela: a casca passa `GameDeps.loadScene`, que faz o `import()` (regra 15: `import()` só em
 // `apps/web`); o Switch empacota tudo num arquivo e devolve o módulo direto. Aqui só TIPOS (nada pesa no menu).
+import type { Mixer } from '@boboforces/audio';
 import type { DeviceKind, MenuConfirmConvention, MenuInput, RawInputState } from '@boboforces/input';
 import type { GraphicsSurface, Platform } from '@boboforces/platform-api';
 import type { Renderer, TextureMode, VertexAttributeMode } from '@boboforces/render/data';
@@ -58,6 +59,16 @@ export interface SceneRequest {
   readonly recipe?: MatchRecipe;
   /** M2 (fase 5f): começa com a calibração da mira (o "Calibrar mira" dos Ajustes abre o Bobo Training assim). */
   readonly calibrate?: boolean;
+}
+
+/**
+ * M2 (fase 7b): o áudio do jogo. O mixer é um só, criado no boot pelo núcleo (a interface toca nele); os MP3 do banco
+ * carregam depois do menu, em segundo plano. A cena sintetiza o resto no loading e toca os sons da partida.
+ */
+export interface SceneAudio {
+  readonly mixer: Mixer;
+  /** Resolve quando os MP3 do banco terminaram de carregar (com ou sem erro; nunca rejeita). */
+  readonly files: Promise<void>;
 }
 
 /** M2 (fase 4f): os ajustes do jogador, lidos na hora e gravados pelo núcleo. */
@@ -120,6 +131,8 @@ export interface SceneHost {
   readonly stats: SceneStats;
   /** M2 (fase 6c): o Meu Bobo. */
   readonly bobo: SceneBobo;
+  /** M2 (fase 7b): o mixer e os sons do banco. */
+  readonly audio: SceneAudio;
   /** Relatório do bench pronto (`formatBenchReport`); o núcleo repassa para `GameHooks.onBenchReport`. */
   benchReport(text: string): void;
 }

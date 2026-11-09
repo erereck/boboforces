@@ -445,6 +445,14 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - Os MP3 somam 83 KB, dentro dos 150 KB de sons da primeira partida; os sintetizados não baixam nada.
   - O banco guarda volume, canal, prioridade e cooldown de cada som. Créditos no `CREDITOS.md`.
   - 13 testes novos.
+- **Fase 7b, sons da partida:** a partida agora tem som.
+  - **Armas:** tiros (com a versão de longe a mais de 30 m), foguete, faca, granada, explosões, recarga e troca de
+    arma.
+  - **No mundo:** impactos por material e passos dos bots mais próximos, pelo chão que eles pisam.
+  - **Para você:** hitmarker, headshot, abate, dano, morte, o coração quando a vida está baixa e a contagem 3-2-1.
+  - **Mixagem:** atrás de parede o som fica mais baixo. A sua arma e o dano em você têm prioridade sobre o resto.
+  - **F2:** mostra as vozes de áudio tocando.
+  - 13 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

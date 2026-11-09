@@ -50,6 +50,9 @@ export interface DebugPanelModel {
   meshMb: number;
   /** Frames acima de 2× o alvo sem trabalho que explique (pausas de GC prováveis) desde o começo da cena. */
   gcPauses: number;
+  /** M2 (fase 7b): vozes do mixer tocando agora e o pico desde o começo da cena (teto de 24). */
+  voices: number;
+  voicesPeak: number;
   bots: number;
   zombies: number;
   simHz: number;
@@ -92,6 +95,8 @@ export function createDebugPanelModel(): DebugPanelModel {
     textureMb: -1,
     meshMb: -1,
     gcPauses: 0,
+    voices: 0,
+    voicesPeak: 0,
     bots: 0,
     zombies: 0,
     simHz: 60,
@@ -135,6 +140,7 @@ interface PanelTexts {
   readonly meshes: string;
   readonly mb: string;
   readonly gc: string;
+  readonly voices: string;
   readonly bots: string;
   readonly zombies: string;
   readonly viewDistance: string;
@@ -183,6 +189,7 @@ function panelTexts(): PanelTexts {
     meshes: t('debug.meshes'),
     mb: t('debug.mb'),
     gc: t('debug.gcPauses'),
+    voices: t('debug.voices'),
     bots: t('debug.bots'),
     zombies: t('debug.zombies'),
     viewDistance: t('debug.viewDistance'),
@@ -365,6 +372,11 @@ export function drawDebugPanel(
 
   penLabel(tx.gc);
   penNumber(model.gcPauses, 0);
+  penGroup();
+  penLabel(tx.voices);
+  penNumber(model.voices, 0);
+  penLiteral(tx.slash, COLORS.textoBaixo);
+  penNumber(model.voicesPeak, 0);
   penGroup();
   penLabel(tx.bots);
   penNumber(model.bots, 0);

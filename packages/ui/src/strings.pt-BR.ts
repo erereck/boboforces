@@ -779,6 +779,7 @@ export const STRINGS_PT_BR = {
   'debug.meshes': 'Malhas',
   'debug.mb': 'MB',
   'debug.gcPauses': 'Pausas de GC',
+  'debug.voices': 'Vozes',
   'debug.bots': 'Bots',
   'debug.zombies': 'Zumbis',
   'debug.viewDistance': 'Visão',

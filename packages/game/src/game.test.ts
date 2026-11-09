@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createMixer } from '@boboforces/audio';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeadlessMatch } from '@boboforces/ai';
@@ -720,6 +721,7 @@ describe('startGame (NullRenderer)', () => {
       settings: { current: DEFAULT_SETTINGS, save: () => {} },
       stats: { current: EMPTY_STATS, record: () => ({ mostKills: false, bestStreak: false }), tipSeen: () => {} },
       bobo: { current: DEFAULT_BOBO, save: () => {} },
+      audio: { mixer: createMixer(null), files: Promise.resolve() },
       benchReport: () => {},
     };
     const loader = createConstrutoLoader(host);

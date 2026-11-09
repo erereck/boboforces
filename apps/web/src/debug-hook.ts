@@ -29,6 +29,8 @@ export interface WebDebugHook {
   copyBenchReport(): Promise<ReportDelivery>;
   /** Heap do JS agora (Chromium); `null` nos outros navegadores. */
   memory(): MemoryUsage | null;
+  /** M2 (fase 7b): contadores do mixer (vozes, tocados, roubados, perdidos) e o estado do contexto de áudio. */
+  readonly audio: GameHandle['audio'];
   /** Últimas linhas do log da plataforma (`[boot]`, `[bench]`, `[t0]`, avisos). */
   log(maxLines?: number): readonly string[];
 }
@@ -75,6 +77,9 @@ export function createDebugHook(sources: DebugHookSources): WebDebugHook {
     },
     copyBenchReport: () => (report ? report.copy() : Promise.resolve('falhou')),
     memory: () => sources.memory(),
+    get audio() {
+      return game.audio;
+    },
     log: (maxLines = 200) => sources.recentLog(maxLines),
   };
 }

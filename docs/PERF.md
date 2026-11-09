@@ -192,6 +192,17 @@ a comparação precisou.
 **Pendente (mesmo método):** tabela no Eden (250 ms contra a meta de ≤ 75; plano B = tabela gerada no build), skins no Eden (226 ms contra a meta de 180), console (Teste Zero: detecção do instanciamento, fps, `figure_lod` real), update de 64 bobos no Edge (8 ms) e o tempo da tabela sem JIT medido na máquina livre.
 
 
+## 1f. Áudio do M2 (fase 7; 09/11/2026, 0.0.1 local, i5-12450H)
+
+"jitless" = Node 26.7 `--jitless` sobre bundle do esbuild (referência de interpretador para o nx.js); "JIT" = Node
+normal. Scripts em `local/m2/` (`tempo-sintese.ts`, `capturar-som.ts`).
+
+| Fase | Onde | Medida | Valor | Observação |
+|---|---|---|---|---|
+| 7a | `npm run audioconv` | MP3 do banco (33 arquivos, mono, 44,1 kHz, 96 kbps) | **83 KB** (98 KB com os 4 do Teste Zero) | sons essenciais da primeira partida: 85,3 KB de 150 no `size-check` |
+| 7a/7b | JIT / jitless | sintetizar os 19 sons (487 mil amostras) | **~100 ms / 614 ms** | depois de trocar as exponenciais por amostra por multiplicação; o loading fatia um som por vez dentro do orçamento do frame. No Switch, se passar de ~1 s, os sintetizados vão pré-renderizados em MP3 no romfs |
+| 7b | Edge 156 headless (Intel UHD), `npm run dev`, JOGAR no Construto, 25 s sem mexer | sons tocados / pico de vozes / roubados / perdidos / desconhecidos | **260 / 18 de 24 / 0 / 0 / 0** | frame p50 16,7 ms, CPU 3,1 ms (painel F2, "Vozes 0 / 18") |
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

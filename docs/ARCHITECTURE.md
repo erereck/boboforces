@@ -1895,3 +1895,35 @@ mudanças de contrato ficam registradas aqui.
   - qual arquivo da Kenney faz cada som;
   - os volumes relativos;
   - os parâmetros dos tiros, só por medida: não dá para ouvir aqui. A rodada 11 leva os sons para o Erick ouvir.
+
+### 12.45 Fase 7b: sons da partida (09/11/2026)
+
+- **Um mixer só** (`game.ts`): nasce no boot com `platform.audio` (mudo sem áudio). Os MP3 do banco começam a carregar
+  no primeiro frame do título (`startSoundFiles`). A cena recebe `SceneHost.audio` (o mixer e a promessa dos arquivos).
+- **Loading** (`scene/load.ts`): espera os MP3 e sintetiza os sons `synth` com `createSynthJob`.
+  - É um som por vez, no que sobra do orçamento de cada passo; enquanto os arquivos não chegam, um por frame.
+  - O mixer guarda o que fez, então a 2ª partida não refaz.
+- **`scene/sound.ts`** (`createMatchSound`): `event()` dentro do laço do `onEvents`; `frame()` 1x por frame, depois das
+  câmeras. Cada vista ouve da própria câmera.
+  - **Prioridade** pelo parentesco com os locais (`SOUND_RANK`). O som do próprio jogador toca "na cabeça", sem
+    posição e sem cooldown; com 3–4 locais a própria arma perde 3 dB.
+  - **Tiros e explosões:** a amostra de longe além de 30 m. Atrás de parede, −6 dB: `raycastGrid` do ouvinte mais
+    perto até o som, com `blocksSight`.
+  - **Cooldown por som**, global (`lastPlayed` por índice do banco).
+  - **Passos:**
+    - compasso pela velocidade no chão, com passada de 1,7 m andando e 2,3 m correndo;
+    - só os 4 bobos mais perto de cada ouvinte, até 25 m;
+    - família pelo `stepSound` do bloco sob os pés; agachado a 35%; tom ±7% por hash.
+  - **Retorno:** plic e PLOC (a regra sem hitmarker cala os dois), abate, dano, morte, coração abaixo de 30 de vida,
+    a contagem 3-2-1 + "vai" e a vinheta de vitória ou derrota do jogador 1.
+  - **Foley** (troca, recarga, pino, clique) dos outros só até 12 m.
+  - A pausa e o fim cortam tudo (`stopAll`).
+- **Sem alocação por som:** as opções do `mixer.play` são dois objetos reaproveitados (regra 11).
+- **Depuração:** o F2 ganhou "Vozes agora / pico". `GameHandle.audio` e `__bfDebug.audio` dão os contadores do mixer
+  e o estado do contexto.
+- **Escolhas (revisáveis):**
+  - os números de `MATCH_SOUND`;
+  - impacto em prop soa como madeira;
+  - a granada arremessada usa o sopro da faca, mais grave;
+  - a vinheta só pelo jogador 1;
+  - o pan de 50% com 3–4 jogadores fica para o M3 (sofá).

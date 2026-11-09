@@ -239,6 +239,7 @@ import {
   type ShoulderPose,
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
+import { createMatchSound } from './sound.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
@@ -640,6 +641,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const showHitmarker = recipe.hud?.hitmarker ?? true;
   const showAllyMarkers = recipe.hud?.allyMarkers ?? true;
   const assistAllowed = recipe.weapons?.aimAssist ?? true;
+  /** M2 (fase 7b): os sons da partida (o `sim` só existe depois do driver; as funções só rodam com a partida viva). */
+  const matchSound = createMatchSound({
+    mixer: host.audio.mixer,
+    humans,
+    localEntity: (p) => (p < humans ? sim.controllerEntity(p) : NULL_ENTITY),
+    hitmarker: showHitmarker,
+    ffa,
+  });
   /** M2 (fecho da fase 3): as regras ativas de cada controlador (placar e tela de morte). */
   const ruleTexts = controllerRules(recipe, humans);
   const deathTx = deathTexts();
@@ -1145,6 +1154,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (matchStats.capacity < v.capacity) matchStats = createMatchStats(v.capacity);
     for (let k = 0; k < events.length; k++) {
       const ev = events[k]!;
+      matchSound.event(ev, v, timeS);
       recordMatchEvent(matchStats, ev, human);
       if (ev.type === 'matchPhase' && ev.phase === 'ended' && endedAt < 0) endedAt = timeS;
       switch (ev.type) {
@@ -1750,6 +1760,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function pause(): void {
     if (paused || disposed || humans === 0 || resultShown) return;
     paused = true;
+    matchSound.silence();
     // M2 (fase 5f): refeita ao abrir (calibrando, o item é "Pular calibração").
     if (pausePage === 'main') pauseMain();
   }
@@ -3142,6 +3153,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     panel.bots = driver.director.botCount;
     panel.tick = sim.tick;
     panel.gcPauses = benchState?.gcPauses ?? panel.gcPauses;
+    panel.voices = host.audio.mixer.stats.activeVoices;
+    panel.voicesPeak = host.audio.mixer.stats.peakVoices;
   }
   let heapNowMb = -1;
   let memoryCheckS = 0;
@@ -3316,6 +3329,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const lay = syncLayout(ui);
       updateDeaths(running ? dt : 0, raw, lay);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
+      // M2 (fase 7b): cada vista ouve da própria câmera; passos, coração e contagem andam com a partida.
+      matchSound.setListenerCount(slots.length);
+      for (let s = 0; s < slots.length; s++) {
+        const c = slots[s]!.desc.camera;
+        matchSound.setListener(s, c.x, c.y, c.z, c.yaw);
+      }
+      if (running) matchSound.frame(sim.view(), dt, timeS);
       trace('vfx e câmeras');
       const fonts = host.fonts;
       const tUi0 = now();
@@ -3432,6 +3452,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       for (const w of waiters) w.resolve();
       waiters.length = 0;
       driver.dispose();
+      matchSound.dispose();
       actors.count = 0;
       renderer.setActors(actors);
       renderer.setProjectiles(null);

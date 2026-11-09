@@ -110,6 +110,8 @@ import {
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import { skipCappedFrame } from './frame-cap.ts';
+import { loadSoundFiles } from './sound-bank.ts';
+import { createMixer, type MixerStats } from '@boboforces/audio';
 import {
   DEFAULT_RENDERER_ROUTES,
   type RendererFactory,
@@ -217,6 +219,8 @@ export interface GameHandle extends Disposable {
   readonly debug: GameDebugApi | null;
   /** M2 (fase 4b): o save do jogador (ajustes, estatísticas, presets e bots), lido na criação. */
   readonly save: SaveStore;
+  /** M2 (fase 7b): os contadores do mixer e o estado do contexto (`'none'` sem áudio), para o F2 e os scripts. */
+  readonly audio: { readonly stats: MixerStats; readonly state: string; readonly sounds: number };
 }
 
 /** Piso do texto em px reais (arte-ux.md §6.8): TV/Switch na dock, ou 13 px de layout no navegador. */
@@ -242,6 +246,23 @@ export function startGame(deps: GameDeps): GameHandle {
   // M2 (fase 4b): o save do jogador. O que veio estragado ou de versão antiga vai para o log (e para o relatório).
   const save = createSaveStore(platform.storage, libraryCapsFor(platform.id));
   for (const w of save.loadWarnings) platform.diagnostics.appendLog(`[save] ${w.path}: ${w.code}`);
+  // M2 (fase 7b): um mixer só para o jogo inteiro (a interface e a partida tocam nele). Sem áudio na plataforma, ele
+  // existe mudo. Os MP3 do banco carregam depois do primeiro frame do título (`startSoundFiles`).
+  const mixer = createMixer(platform.audio);
+  let soundFiles: Promise<void> | null = null;
+  let soundCount = 0;
+  function startSoundFiles(): Promise<void> {
+    soundFiles ??= loadSoundFiles(mixer, platform.assets, (id, error) =>
+      platform.diagnostics.appendLog(`[audio] ${id}: ${error instanceof Error ? error.message : String(error)}`),
+    ).then(
+      (n) => {
+        soundCount += n;
+        if (n > 0) platform.diagnostics.appendLog(`[audio] ${n} sons do banco prontos`);
+      },
+      () => {},
+    );
+    return soundFiles;
+  }
   let renderer: Renderer = deps.createRenderer
     ? deps.createRenderer(platform.graphics, routesOf(deps.bench))
     : createNullRenderer();
@@ -933,6 +954,12 @@ export function startGame(deps: GameDeps): GameHandle {
           },
           save: (doc) => save.setBobo(doc),
         },
+        audio: {
+          mixer,
+          get files() {
+            return startSoundFiles();
+          },
+        },
         benchReport: (text) => hooks.onBenchReport?.(text),
       },
       request,
@@ -1361,6 +1388,7 @@ export function startGame(deps: GameDeps): GameHandle {
     menuReady = true;
     log(`${MENU_READY_MARKER} ${Math.round(platform.now() - bootAt)} ms`);
     hooks.onMenuReady?.();
+    void startSoundFiles();
     // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
     // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
     // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.
@@ -1434,6 +1462,9 @@ export function startGame(deps: GameDeps): GameHandle {
       return scene?.debug ?? null;
     },
     save,
+    get audio() {
+      return { stats: mixer.stats, state: mixer.context?.state ?? 'none', sounds: soundCount };
+    },
     dispose(): void {
       if (disposed) return;
       disposed = true;
@@ -1446,6 +1477,7 @@ export function startGame(deps: GameDeps): GameHandle {
       if (wantsLock) hooks.releasePointerLock?.();
       renderer.setUiAtlas(null);
       renderer.dispose();
+      mixer.dispose();
     },
   };
 }

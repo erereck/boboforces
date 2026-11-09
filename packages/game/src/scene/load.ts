@@ -40,6 +40,7 @@ import {
 import { GAME_ASSETS_M1, MAP_ASSETS, TEXTURE_ARRAY_BASES, textureStripPaths } from '../assets-m1.ts';
 import type { SceneHost } from '../scene-api.ts';
 import { buildMapNav, buildMapWorld, buildSimMap, type MapWorld } from './world.ts';
+import { createSynthJob } from './sound.ts';
 
 /**
  * Loading do Construto por etapas (integração do M1; tecnico.md §6.2 e §24.3: ≤ 4 s no Switch), DENTRO dos frames:
@@ -193,6 +194,15 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     });
   };
   const a = platform.assets;
+  // M2 (fase 7b): os sons sintetizados, um por vez no orçamento de cada passo (sobra do frame, ou um por frame enquanto
+  // os arquivos não chegam), e os MP3 do banco, que o núcleo começou a baixar depois do menu.
+  const synth = createSynthJob(host.audio.mixer, (id, e) =>
+    warnings.push(`som sintetizado ${id}: ${e instanceof Error ? e.message : String(e)}`),
+  );
+  let soundFilesReady = false;
+  void host.audio.files.then(() => {
+    soundFilesReady = true;
+  });
   const stripLoads = (name: TextureArrayName) =>
     Promise.all(
       TEXTURE_ARRAY_BASES[name].map((base) => {
@@ -384,13 +394,20 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     },
     warnings,
     step(budgetMs: number): boolean {
-      if (phase === 'done' || phase === 'error') return true;
+      if (phase === 'error') return true;
       const deadline = now() + budgetMs;
+      if (phase === 'done') {
+        if (!synth.done) synth.step(deadline, now);
+        return synth.done && soundFilesReady;
+      }
       try {
         if (phase === 'assets') {
           assetFrames++;
           mark('assets', filesTotal > 0 ? filesDone / filesTotal : 0);
-          if (files === null) return false;
+          if (files === null) {
+            if (!synth.done) synth.step(deadline, now);
+            return false;
+          }
           const d0 = now();
           decodeAssets(files);
           decodeMs = now() - d0;
@@ -409,6 +426,11 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
         phase = 'error';
       }
       times.total = now() - startedAt;
+      // `phase` muda dentro das etapas (o TS não vê): `finished()` relê.
+      if (finished() && phase !== 'error') {
+        if (!synth.done && now() < deadline) synth.step(deadline, now);
+        return synth.done && soundFilesReady;
+      }
       return finished();
     },
     get result(): LoadedConstruto {

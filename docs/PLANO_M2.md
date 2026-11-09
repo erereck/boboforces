@@ -297,7 +297,7 @@ GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan,
   passos por família de material (o `stepSound` dos blocos), recarga, troca, sem munição, granada, explosão, acertos,
   morte, caixinha e UI vindos da Kenney. Todos os MP3 contam nos sons essenciais da primeira partida (≤ 150 KB) e
   carregam depois do menu, em segundo plano.
-- **7b. Sons da partida.** Eventos da sim → mixer, com a prioridade de arte-ux §10.4 (sua arma > dano em você >
+- **7b. Sons da partida.** Pronta em 09/11 (`ARCHITECTURE.md` §12.45). Eventos da sim → mixer, com a prioridade de arte-ux §10.4 (sua arma > dano em você >
   inimigos perto > aliados > ambiente), cooldown por som, só os passos dos 4 bots mais próximos de cada ouvinte, −6 dB
   atrás de parede (raio na grade), hitmarker "plic", headshot "PLOC", kill, dano, vida baixa e a contagem.
 - **7c. Interface e Ajustes.** Sons de navegar, confirmar, voltar e trocar valor nos menus; aba Áudio nos Ajustes

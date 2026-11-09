@@ -47,6 +47,9 @@ function finish(out: Float32Array, peak: number, drive: number, rate: number): F
 
 const noise = (rng: Rng): number => rng.next() * 2 - 1;
 
+/** De quantas em quantas amostras o corte que varre é recalculado (o `exp` do coeficiente é caro sem JIT). */
+const SWEEP_STEP = 16;
+
 /**
  * Tiro de arma de fogo em 4 camadas: o **estalo** (ruído branco de 1–2 ms), o **corpo** (ruído num passa-baixa que
  * escurece), o **soco** (seno grave que cai de tom) e a **cauda** (ruído escuro e longo, o eco do lugar). `far` vira a
@@ -94,30 +97,54 @@ export function synthGunshot(r: GunshotRecipe, far = false, sampleRate = SYNTH_S
   const tailK = lowpassCoef(far ? r.tailHz * 0.6 : r.tailHz, rate);
   const farK = lowpassCoef(900, rate);
   const pellets = r.pellets ?? 0;
+  // Quedas exponenciais como multiplicação por amostra (no Switch o JS é interpretado: nada de `exp` no laço). O
+  // corte do corpo é recalculado a cada `SWEEP_STEP` amostras.
+  const decay = (s: number): number => Math.exp(-1 / (s * rate));
+  const dCrack = decay(0.0015);
+  const dPellet = decay(0.0012);
+  const dSweep = decay(bodyS * 0.8);
+  const dBody = decay(bodyS);
+  const dPitch = decay(0.03);
+  const dThump = decay(r.thumpS);
+  const dTail = decay(tailS);
+  const pelletLen = Math.round(0.012 * rate);
+  let eCrack = crack;
+  let eSweep = 1;
+  let eBody = 1;
+  let ePitch = 1;
+  let eThump = thump;
+  let eTail = tailLevel * 3;
+  let bodyK = 0;
   let phase = 0;
   for (let i = 0; i < n; i++) {
     const t = i / rate;
     const w = noise(rng);
     let x = 0;
     // Estalo: um ou mais (escopeta) cliques de ruído branco muito curtos.
-    if (crack > 0) {
-      x += w * crack * Math.exp(-t / 0.0015);
+    if (crack > 0 && i < pelletLen * (pellets + 1)) {
+      x += w * eCrack;
       for (let p = 1; p <= pellets; p++) {
-        const at = p * 0.0021;
-        if (t >= at) x += w * crack * 0.6 * Math.exp(-(t - at) / 0.0012);
+        const k = i - Math.round(p * 0.0021 * rate);
+        if (k >= 0 && k < pelletLen) x += w * crack * 0.6 * dPellet ** k;
       }
     }
+    eCrack *= dCrack;
     // Corpo: passa-baixa que fecha do brilhante para o escuro.
-    const cutoff = r.bodyDarkHz + (r.bodyBrightHz - r.bodyDarkHz) * Math.exp(-t / (bodyS * 0.8));
-    const env = (t < attack ? t / attack : 1) * Math.exp(-t / bodyS);
-    x += lp2(body, w, lowpassCoef(far ? cutoff * 0.45 : cutoff, rate)) * env * 2.2;
+    if (i % SWEEP_STEP === 0) {
+      const cutoff = r.bodyDarkHz + (r.bodyBrightHz - r.bodyDarkHz) * eSweep;
+      bodyK = lowpassCoef(far ? cutoff * 0.45 : cutoff, rate);
+    }
+    eSweep *= dSweep;
+    x += lp2(body, w, bodyK) * (t < attack ? t / attack : 1) * eBody * 2.2;
+    eBody *= dBody;
     // Soco: seno que cai de tom.
-    const f = r.thumpEndHz + (r.thumpHz - r.thumpEndHz) * Math.exp(-t / 0.03);
-    phase += (TAU * f) / rate;
-    x += Math.sin(phase) * thump * (t < 0.002 ? t / 0.002 : 1) * Math.exp(-t / r.thumpS);
+    phase += (TAU * (r.thumpEndHz + (r.thumpHz - r.thumpEndHz) * ePitch)) / rate;
+    ePitch *= dPitch;
+    x += Math.sin(phase) * (t < 0.002 ? t / 0.002 : 1) * eThump;
+    eThump *= dThump;
     // Cauda: ruído escuro que cresce em 12 ms e cai devagar.
-    const tailEnv = (t < 0.012 ? t / 0.012 : 1) * Math.exp(-t / tailS);
-    x += lp2(tail, noise(tailRng), tailK) * tailLevel * tailEnv * 3;
+    x += lp2(tail, noise(tailRng), tailK) * (t < 0.012 ? t / 0.012 : 1) * eTail;
+    eTail *= dTail;
     out[i] = far ? lp2(farLp, x, farK) : x;
   }
   return finish(out, far ? 0.8 : 0.95, r.drive ?? 2, rate);
@@ -216,12 +243,18 @@ export function synthRocket(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   const lo: Lowpass2 = { a: 0, b: 0 };
   const hi: Lowpass2 = { a: 0, b: 0 };
   let phase = 0;
+  let kHi = 0;
+  let kLo = 0;
   for (let i = 0; i < n; i++) {
     const t = i / rate;
     const w = noise(rng);
-    const cut = 500 + 2600 * (t < 0.12 ? t / 0.12 : Math.exp(-(t - 0.12) / 0.18));
+    if (i % SWEEP_STEP === 0) {
+      const cut = 500 + 2600 * (t < 0.12 ? t / 0.12 : Math.exp(-(t - 0.12) / 0.18));
+      kHi = lowpassCoef(cut, rate);
+      kLo = lowpassCoef(cut * 0.25, rate);
+    }
     // Faixa: o passa-baixa no corte menos um passa-baixa bem abaixo (tira o ronco do ruído).
-    const band = lp2(hi, w, lowpassCoef(cut, rate)) - lp2(lo, w, lowpassCoef(cut * 0.25, rate));
+    const band = lp2(hi, w, kHi) - lp2(lo, w, kLo);
     const whoosh = band * (t < 0.02 ? t / 0.02 : 1) * Math.exp(-t / 0.28) * 2.5;
     phase += (TAU * (50 + 50 * Math.exp(-t / 0.04))) / rate;
     const thump = Math.sin(phase) * Math.exp(-t / 0.09) * 0.9;
@@ -239,13 +272,18 @@ export function synthSwing(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   const rng = createRng(0x0b07);
   const lo: Lowpass2 = { a: 0, b: 0 };
   const hi: Lowpass2 = { a: 0, b: 0 };
+  let kHi = 0;
+  let kLo = 0;
   for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const u = t / len;
+    const u = i / rate / len;
     const bell = Math.sin(Math.PI * u) ** 2;
-    const cut = 900 + 3400 * Math.sin(Math.PI * Math.min(1, u * 1.2));
+    if (i % SWEEP_STEP === 0) {
+      const cut = 900 + 3400 * Math.sin(Math.PI * Math.min(1, u * 1.2));
+      kHi = lowpassCoef(cut, rate);
+      kLo = lowpassCoef(cut * 0.35, rate);
+    }
     const w = noise(rng);
-    out[i] = (lp2(hi, w, lowpassCoef(cut, rate)) - lp2(lo, w, lowpassCoef(cut * 0.35, rate))) * bell;
+    out[i] = (lp2(hi, w, kHi) - lp2(lo, w, kLo)) * bell;
   }
   return finish(out, 0.7, 0, rate);
 }
