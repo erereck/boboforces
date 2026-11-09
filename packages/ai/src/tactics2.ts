@@ -7,17 +7,17 @@ import type { SoldierBrain, SoldierTiming } from './soldier.ts';
 
 /**
  * M2 (fase 3d): o N2 da IA (gameplay.md §6.3: "flanqueia, segura ângulos, recua com HP baixo, joga granada em
- * cobertura"). Quatro peças, todas ligadas pelos comportamentos do bot (\`intelligence\`) e pesadas pela personalidade:
+ * cobertura"). Quatro peças, todas ligadas pelos comportamentos do bot (`intelligence`) e pesadas pela personalidade:
  * - segurar o ângulo: perdeu o alvo de vista, fica parado mirando onde ele sumiu (mais tempo com paciência);
  * - flanquear: depois, em vez de ir reto, passa por um ponto de lado (±90° da linha) antes de voltar à caça;
  * - recuar: vida baixa com o alvo à vista, corre para longe e fora da vista e espera regenerar (a cobertura do N1 com
- *   distância e tempo maiores, \`tactics.ts\`);
+ *   distância e tempo maiores, `tactics.ts`);
  * - granada: o inimigo sumiu atrás de algo a 7–25 m, joga na última posição dele (troca de arma, mira o arco baixo,
  *   cozinha o que dá e solta). O bot fica parado durante o arremesso.
  * Sem alocação: rascunhos fixos.
  */
 
-/** Fases da granada (\`SoldierBrain.grenadePhase\`). */
+/** Fases da granada (`SoldierBrain.grenadePhase`). */
 export const GRENADE_PHASE = { none: 0, switching: 1, aiming: 2, cooking: 3, release: 4 } as const;
 
 const nodePos = new Float64Array(3);
@@ -93,7 +93,7 @@ export function holdAngle(view: SimView, b: SoldierBrain, e: number, local: { x:
 
 /**
  * Decide se começa a jogar granada agora (chamado sem alvo à vista): tem granada, o inimigo sumiu há pouco a 7–25 m e
- * o sorteio pelo uso de granada (\`skill.grenadeUse\`) passou. A decisão é tirada no máximo a cada \`AI_GRENADE.decideS\`.
+ * o sorteio pelo uso de granada (`skill.grenadeUse`) passou. A decisão é tirada no máximo a cada `AI_GRENADE.decideS`.
  */
 export function maybeStartGrenade(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): void {
   const tick = c.tick;
@@ -210,8 +210,8 @@ function finishGrenade(b: SoldierBrain, tick: number, t: SoldierTiming): void {
 }
 
 /**
- * Ângulo do arco BAIXO (rad, acima do horizonte) para levar o projétil a \`d\` m no plano e \`dy\` m de altura, com
- * velocidade \`v\` e gravidade \`g\`; \`NaN\` se não alcança.
+ * Ângulo do arco BAIXO (rad, acima do horizonte) para levar o projétil a `d` m no plano e `dy` m de altura, com
+ * velocidade `v` e gravidade `g`; `NaN` se não alcança.
  */
 export function throwPitch(d: number, dy: number, v: number, g: number): number {
   if (d < 1e-3) return dy >= 0 ? HALF_PI : -HALF_PI;

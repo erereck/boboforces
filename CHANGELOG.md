@@ -185,6 +185,14 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - abas (Q/E, LB/RB) com o sublinhado âmbar na selecionada;
   - coluna com rolagem que segue o foco, recortada, com barrinha;
   - tudo navegável só com o D-pad. 13 testes novos.
+- **Fase 4b, dados e save:**
+  - **Formatos novos:** `settings@1` (controles por dispositivo, vídeo, acessibilidade), `stats@1` (totais,
+    recordes, dicas vistas, última Novidades vista), a biblioteca de presets (5 últimos, até 200 salvos com nome único,
+    6 favoritos) e o `backup@1` com tudo junto.
+  - **Leitura tolerante:** o campo estragado cai no padrão e o número fora da faixa é limitado, sempre com aviso.
+  - **Save do jogador:** sobre o storage da plataforma; exporta e importa o backup, juntando ou substituindo. Já é
+    criado ao abrir o jogo; as telas que o usam chegam nas próximas subfases.
+  - 12 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

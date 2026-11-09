@@ -61,6 +61,10 @@ export const ISSUE_CODES = [
   // Bot (M2, fase 3a): campo de tipo errado (ignorado) e valor fora da faixa (limitado)
   'bot.invalidField',
   'bot.valueClamped',
+  // Documentos do jogador (M2, fase 4b): settings@1, stats@1, presets e backup@1
+  'save.invalidField',
+  'save.valueClamped',
+  'save.droppedEntry',
 ] as const;
 
 export type IssueCode = (typeof ISSUE_CODES)[number];

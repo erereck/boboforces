@@ -5,16 +5,16 @@ import { AI_TEAM } from './config.ts';
 /**
  * M2 (fases 3e e 3f): o quadro do time, montado uma vez por partida no diretor (gameplay.md §6.3):
  * - **avisos (N3):** quem vê um inimigo avisa o time (posição e tick), num anel fixo; os aliados N3 sem pista vão
- *   atrás, e o \`game\` mostra um ícone de ping para os humanos do time;
+ *   atrás, e o `game` mostra um ícone de ping para os humanos do time;
  * - **objetivos (N3):** o objetivo de passeio de cada bot, para os outros andarem em dupla ou trio com um líder;
  * - **calor (N4):** células de 4 m por time, com onde os humanos inimigos ficam (amostra a cada 1 s) e de onde matam
- *   (peso maior), e onde o próprio time morreu (perigo). Tudo decai pela metade em ~2 min (\`AI_TEAM.heatHalfLifeS\`).
- * Lê só a \`SimView\` (contadores de abate e morte, posições); sem alocação depois da criação.
+ *   (peso maior), e onde o próprio time morreu (perigo). Tudo decai pela metade em ~2 min (`AI_TEAM.heatHalfLifeS`).
+ * Lê só a `SimView` (contadores de abate e morte, posições); sem alocação depois da criação.
  */
 export class TeamBoard {
   readonly cellsX: number;
   readonly cellsZ: number;
-  /** Calor de inimigo e de perigo, \`MAX_TEAMS × células\`. */
+  /** Calor de inimigo e de perigo, `MAX_TEAMS × células`. */
   readonly heat: Float32Array;
   readonly danger: Float32Array;
   readonly pingX = new Float64Array(AI_TEAM.pingCapacity);
@@ -52,7 +52,7 @@ export class TeamBoard {
     return cz * this.cellsX + cx;
   }
 
-  /** Centro (m) de uma célula, em \`out[0]\` e \`out[1]\` (x, z). */
+  /** Centro (m) de uma célula, em `out[0]` e `out[1]` (x, z). */
   cellCenter(cell: number, out: Float64Array): void {
     out[0] = ((cell % this.cellsX) + 0.5) * AI_TEAM.heatCellM;
     out[1] = (Math.floor(cell / this.cellsX) + 0.5) * AI_TEAM.heatCellM;
@@ -94,7 +94,7 @@ export class TeamBoard {
     }
   }
 
-  /** Soma calor na célula do humano \`i\` para cada time inimigo dele (no FFA, para o "time" único dos bots). */
+  /** Soma calor na célula do humano `i` para cada time inimigo dele (no FFA, para o "time" único dos bots). */
   private addEnemyHeat(view: SimView, i: number, w: number, n: number): void {
     const c = this.cell(view.position[i * 3]!, view.position[i * 3 + 2]!);
     if (c < 0) return;
@@ -117,7 +117,7 @@ export class TeamBoard {
     this.pingTeam[k] = this.ffa ? 0 : team;
   }
 
-  /** O aviso mais novo do time, com até \`maxAge\` ticks e a até \`maxM\` m de (x, z); -1 se nenhum. */
+  /** O aviso mais novo do time, com até `maxAge` ticks e a até `maxM` m de (x, z); -1 se nenhum. */
   freshest(team: number, x: number, z: number, tick: number, maxAge: number, maxM: number): number {
     let best = -1;
     const t = this.ffa ? 0 : team;
@@ -132,7 +132,7 @@ export class TeamBoard {
   }
 
   /**
-   * A célula mais quente (calor de inimigo) do time a \`minM\`..\`maxM\` m de (x, z), acima de \`minHeat\`; -1 se nenhuma.
+   * A célula mais quente (calor de inimigo) do time a `minM`..`maxM` m de (x, z), acima de `minHeat`; -1 se nenhuma.
    * Varre as células (centenas num mapa médio), então quem chama faz isso de tempos em tempos.
    */
   hottest(team: number, x: number, z: number, minM: number, maxM: number, minHeat: number): number {

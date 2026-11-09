@@ -8,6 +8,11 @@ export * from './migrations.ts';
 export * from './platform-profiles.ts';
 export * from './match-recipe.ts';
 export * from './bot.ts';
+// M2 (fase 4b): os documentos do jogador.
+export * from './doc-read.ts';
+export * from './settings.ts';
+export * from './stats.ts';
+export * from './backup.ts';
 export * from './png.ts';
 // M1: manifesto de camadas dos texture arrays, `map@1` (frente mapa-nav) e `model@1` + o boneco do FutBobo (#56;
 // frente skins-modelos e o porte).

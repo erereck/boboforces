@@ -362,6 +362,10 @@ export const STRINGS_PT_BR = {
   'issue.recipe.humansOverPlatformCap': 'Jogadores demais para este aparelho.',
   'issue.recipe.viewDistanceOverPlatformCap': 'Alcance de visão limitado pelo aparelho.',
   /** M2 (fase 3a): avisos do `bot@1`. */
+  /** M2 (fase 4b): avisos dos documentos do jogador (ajustes, estatísticas, presets, backup). */
+  'issue.save.invalidField': 'Um dado salvo estava num formato estranho e voltou para o padrão.',
+  'issue.save.valueClamped': 'Um dado salvo estava fora da faixa e foi ajustado.',
+  'issue.save.droppedEntry': 'Um item salvo estava estragado e ficou de fora.',
   'issue.bot.invalidField': 'Um campo do bot estava num formato estranho e foi ignorado.',
   'issue.bot.valueClamped': 'Um valor do bot passou do limite e foi ajustado.',
 } as const satisfies Readonly<Record<string, string>>;

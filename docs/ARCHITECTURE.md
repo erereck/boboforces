@@ -1330,3 +1330,29 @@ mudanças de contrato ficam registradas aqui.
   - guarda o `scrollState` entre telas;
   - refaz o layout quando o foco muda numa tela com rolagem.
 - **Tamanho:** o menu passou para 305,3 KB (meta 300 KB, teto 350 KB). As telas da fase 4 precisam ser enxutas.
+
+### 12.21 Fase 4b: dados e save (09/11/2026)
+
+- **`format`** (puro, sem relógio):
+  - `doc-read.ts`: o `DocReader`, a leitura tolerante dos documentos do jogador (falta → padrão; tipo errado →
+    padrão com `save.invalidField`; fora da faixa → limite com `save.valueClamped`);
+  - `settings.ts`: `settings@1` com os controles por `ControlDevice` (sensibilidade e ADS como multiplicadores,
+    Y invertido, assistência por nome, alternâncias, zonas mortas e as trocas de botão em texto, como
+    `"key:KeyQ"`), o vídeo (qualidade, escala da UI, FOV, em que `0` é o padrão) e a acessibilidade;
+  - `stats.ts`: `stats@1` com os totais, os recordes (mais abates, maior sequência) e o onboarding (dicas vistas,
+    última Novidades vista);
+  - `backup.ts`: a `PresetLibrary` e o `backup@1`. O backup traz `createdAt`, que o `game` passa. Cada parte
+    vale sozinha: o que não passa sai com `save.droppedEntry`.
+  - Os 3 códigos novos estão em `ISSUE_CODES`, com textos `issue.save.*`.
+- **`game/save-store.ts`** (`SaveStore`):
+  - uma chave por parte: `settings`, `stats`, `presets`, `bots`;
+  - lê na criação, com validação, migração e os avisos em `loadWarnings` (vão para o log);
+  - escreve pelo `Storage`, que tem debounce e guarda a versão anterior;
+  - `pushRecent` não repete o mesmo jeito de partida (ignora nome e semente);
+  - `savePreset` substitui pelo nome e respeita o teto da plataforma (`libraryCapsFor`: 200/500 na web, 50/100 no
+    Switch); `setFavorite` aceita até 6;
+  - `exportBackup`, `readBackup` e `applyBackup`: juntar soma os presets salvos e os bots (renomeando os repetidos)
+    e mantém os ajustes daqui; substituir troca tudo.
+  - Os presets guardados são validados com os tetos do motor; o corte ao aparelho é na hora de jogar.
+- **Mudança de contrato do game:** `GameHandle.save`.
+- **Tamanho:** o menu foi a 308,9 KB (+3,6 KB: os validadores e o save entram na carga do menu).

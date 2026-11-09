@@ -171,7 +171,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - lista com rolagem que segue o foco (presets, e depois a Oficina);
   - card com título, linha de texto e botão.
   Testes de layout e de navegação só com o D-pad.
-- **4b. Dados e save:**
+- **4b. Dados e save.** Pronta em 09/11 (`ARCHITECTURE.md` §12.21).
   - `settings@1` (controles por dispositivo, vídeo, acessibilidade) e `stats@1` (partidas, vitórias, abates,
     recordes);
   - a lista de presets: os 5 últimos (o último é o do JOGAR), até 200 salvos (50 no Switch) e 6 favoritos;

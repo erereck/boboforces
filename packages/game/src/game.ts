@@ -34,6 +34,7 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { LocalDriver } from './local-driver.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
+import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
   type RendererFactory,
@@ -118,6 +119,8 @@ export interface GameHandle extends Disposable {
   readonly scene: Scene | null;
   /** M1: gancho de depuração dos prints (`window.__bfDebug.print`): não nulo quando o Construto carregou. */
   readonly debug: GameDebugApi | null;
+  /** M2 (fase 4b): o save do jogador (ajustes, estatísticas, presets e bots), lido na criação. */
+  readonly save: SaveStore;
 }
 
 /** Piso do texto em px reais (arte-ux.md §6.8): TV/Switch na dock, ou 13 px de layout no navegador. */
@@ -140,6 +143,9 @@ function routesOf(bench: BenchConfig | null | undefined): RendererRoutes {
 export function startGame(deps: GameDeps): GameHandle {
   const { platform } = deps;
   const hooks = deps.hooks ?? {};
+  // M2 (fase 4b): o save do jogador. O que veio estragado ou de versão antiga vai para o log (e para o relatório).
+  const save = createSaveStore(platform.storage, libraryCapsFor(platform.id));
+  for (const w of save.loadWarnings) platform.diagnostics.appendLog(`[save] ${w.path}: ${w.code}`);
   let renderer: Renderer = deps.createRenderer
     ? deps.createRenderer(platform.graphics, routesOf(deps.bench))
     : createNullRenderer();
@@ -512,6 +518,7 @@ export function startGame(deps: GameDeps): GameHandle {
     get debug(): GameDebugApi | null {
       return scene?.debug ?? null;
     },
+    save,
     dispose(): void {
       if (disposed) return;
       disposed = true;

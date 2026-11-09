@@ -12,6 +12,7 @@ export {
   type GameScreen,
 } from './game.ts';
 export { createNullRenderer } from './null-renderer.ts';
+export * from './save-store.ts';
 export { createLocalDriver, type LocalDriver, type LocalDriverConfig, type MatchDriver } from './local-driver.ts';
 export { GAME_ASSETS, loadGameAssets, type GameAssets } from './assets.ts';
 export { pauseScreen, PAUSE_ACTION } from './pause.ts';
