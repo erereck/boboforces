@@ -284,7 +284,7 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
   - o "fantasma dos dedos" nas primeiras partidas no celular;
   - os botões que faltam (faca, 3ª pessoa).
 - **6f. Prints para o Erick.** Rodada 10: a calibração (5f) e a fase 6 (perfis, 3ª pessoa, Meu Bobo, fantasias e
-  toque).
+  toque). Publicada em 09/11 como versão 11 da página das rodadas (perguntas F1–F7, `local/m2/montar-pagina-r10.mjs`).
 
 ## Escolhas do Claude neste plano (revisáveis)
 

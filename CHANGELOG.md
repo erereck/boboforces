@@ -433,8 +433,8 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Fantasma dos dedos:** nas 2 primeiras partidas no celular, dois dedos mostram onde arrastar para andar e para
     mirar, até você fazer os dois.
   - 4 testes novos.
-
-### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
+- **Rodada 10 de prints:** 26 capturas da calibração da mira e da fase 6 (perfis, 3ª pessoa, Meu Bobo, fantasias e
+  toque) e as perguntas F1–F7, publicadas como versão 11 da página das rodadas. + Teste Zero (concluído em 08/11/2026, #60)
 
 **Parte 1: contratos e frentes em paralelo**
 
