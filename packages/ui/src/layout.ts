@@ -154,7 +154,8 @@ function measure(node: UiNode, ctx: Ctx): Size {
       const st = TYPE.button;
       const resolved = resolveText(ctx, node.text, st.font, st.size, st.tracking, st.uppercase);
       ctx.texts.set(node, resolved);
-      w = Math.max(resolved.width + BUTTON.padX * s * 2, BUTTON.minWidth * s);
+      // Para cima: o arredondamento do retângulo não pode cortar o texto (M2, fase 4d: 135,45 px virava 135).
+      w = Math.ceil(Math.max(resolved.width + BUTTON.padX * s * 2, BUTTON.minWidth * s));
       h = BUTTON.height * s;
       if (node.value !== undefined) {
         // Linha de opção: rótulo, folga e a área do valor (com as setas) à direita.

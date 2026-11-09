@@ -14,6 +14,8 @@ export * from './screens/title.ts';
 export * from './screens/settings.ts';
 export * from './screens/main-menu.ts';
 export * from './screens/surprise.ts';
+export * from './screens/quick-match.ts';
+export * from './screens/modes.ts';
 // M1 (contratos; desenho da frente ui-fontes): HUD por vista, painel F2 e tela genérica de teste.
 export * from './screens/hud.ts';
 export * from './screens/debug-panel.ts';

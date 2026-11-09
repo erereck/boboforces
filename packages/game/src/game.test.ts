@@ -1232,6 +1232,9 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('main');
+    // Partida Rápida, Modos, Ajustes.
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     platform.tap('Escape');
@@ -1266,6 +1269,37 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     await untilRunning(platform, game);
     expect(game.match!.director.botCount).toBe(bots);
     expect(game.save.presets.recent).toHaveLength(1);
+    game.dispose();
+  }, 120_000);
+});
+
+describe('Partida Rápida e Modos (M2, fase 4d)', () => {
+  it('mudar os bots e COMEÇAR joga o tamanho escolhido, que vira o último preset', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Partida Rápida (o foco abre no COMEÇAR).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('Enter');
+    expect(game.screen).toBe('quick');
+    // COMEÇAR fica no canto: esquerda (Voltar), esquerda (Duração), cima (Bots), direita (5 contra 5); de volta: baixo
+    // (Duração), baixo (Voltar), direita (COMEÇAR).
+    platform.tap('ArrowLeft');
+    platform.tap('ArrowLeft');
+    platform.tap('ArrowUp');
+    platform.tap('ArrowRight');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    expect(game.match!.director.botCount).toBe(9);
+    platform.tap('KeyP');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('title');
+    expect(game.save.presets.recent[0]!.teams[1]!.bots[0]!.count).toBe(5);
     game.dispose();
   }, 120_000);
 });

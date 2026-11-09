@@ -2,6 +2,7 @@ import {
   DEBUT_PRESET,
   GAME_CODENAME,
   GAME_VERSION,
+  selectPlatformProfile,
   withPresetLevel,
   type BotLevel,
   type MatchRecipe,
@@ -24,6 +25,13 @@ import {
   drawTestScreen,
   MAIN_MENU_ACTION,
   mainMenuScreen,
+  MODES_ACTION,
+  MODES_PREFIX,
+  modesScreen,
+  QUICK_ACTION,
+  QUICK_ROWS,
+  QUICK_SHORTCUT_PREFIX,
+  quickMatchScreen,
   MIN_TEXT,
   MIN_TOUCH_TARGET,
   resetDrawList,
@@ -45,7 +53,17 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { LocalDriver } from './local-driver.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
-import { presetLines, presetSummary, rollSurprise } from './presets-ui.ts';
+import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
+import {
+  factoryPresets,
+  QUICK_MODES,
+  quickFromPreset,
+  quickToPreset,
+  quickValue,
+  stepQuick,
+  type QuickMode,
+  type QuickSettings,
+} from './quick-match.ts';
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
@@ -113,7 +131,8 @@ export interface GameDeps {
   readonly playLevel?: BotLevel;
 }
 
-export type GameScreen = 'loading' | 'title' | 'main' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
+export type GameScreen =
+  'loading' | 'title' | 'main' | 'quick' | 'modes' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
 
 export interface GameHandle extends Disposable {
   /** Renderer em uso (o real ou o NullRenderer). M1: pode trocar (menu → cena completa; rotas do bench). */
@@ -201,7 +220,51 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
   refreshTitle();
-  mainMenu.setRoot(mainMenuScreen.build({ items: ['settings'] }));
+  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings'] }));
+
+  // M2 (fase 4d): Partida Rápida e Modos.
+  const quickMenu = createMenuController();
+  const modesMenu = createMenuController();
+  modesMenu.setRoot(
+    modesScreen.build({
+      modes: QUICK_MODES.map((id) => ({
+        id,
+        nameKey: id === 'warfare.tdm' ? 'mode.name.warfare.tdm' : 'mode.name.warfare.ffa',
+        descKey: id === 'warfare.tdm' ? 'mode.desc.warfare.tdm' : 'mode.desc.warfare.ffa',
+      })),
+    }),
+  );
+  /** Teto de bots do aparelho com 1 jogador local (a Partida Rápida não deixa passar). */
+  const maxBots = selectPlatformProfile(platform.features.profileHint, 1).maxBots;
+  let quick: QuickSettings = quickFromPreset(DEBUT_PRESET, maxBots);
+  /** Os atalhos na tela, por grupo, para achar o preset do botão apertado. */
+  const quickGroups = new Map<string, readonly MatchRecipe[]>();
+  function rebuildQuick(): void {
+    const favorites = save.presets.favorites
+      .map((name) => save.presets.saved.find((p) => p.name === name))
+      .filter((p): p is MatchRecipe => p !== undefined);
+    const groups = [
+      { id: 'recent', titleKey: 'quick.recent' as const, presets: save.presets.recent },
+      { id: 'favorites', titleKey: 'quick.favorites' as const, presets: favorites },
+      { id: 'factory', titleKey: 'quick.factory' as const, presets: factoryPresets() },
+    ];
+    quickGroups.clear();
+    for (const g of groups) quickGroups.set(g.id, g.presets);
+    quickMenu.setRoot(
+      quickMatchScreen.build({
+        values: QUICK_ROWS.map((row) => quickValue(quick, row)),
+        groups: groups.map((g) => ({ id: g.id, titleKey: g.titleKey, items: g.presets.map(presetShortcut) })),
+      }),
+    );
+  }
+  /** Abre a Partida Rápida como o último preset estava (com o modo pedido, se veio dos Modos). */
+  function openQuick(mode: QuickMode | null): void {
+    quick = quickFromPreset(currentPreset(), maxBots);
+    if (mode !== null && mode !== quick.mode) quick = stepQuick(quick, 'mode', 1, maxBots);
+    rebuildQuick();
+    quickMenu.focus('start');
+    screen = 'quick';
+  }
   settingsMenu.setRoot(settingsScreen.build(null));
   function rollNewSurprise(): void {
     surprise = rollSurprise(surpriseRng);
@@ -457,8 +520,46 @@ export function startGame(deps: GameDeps): GameHandle {
         const nav = mainMenu.update(menuInput, raw, u);
         if (nav.back || nav.activated === MAIN_MENU_ACTION.back) screen = 'title';
         else if (nav.activated === MAIN_MENU_ACTION.settings) screen = 'settings';
+        else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
+        else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'quick': {
+        const nav = quickMenu.update(menuInput, raw, u);
+        const a = nav.activated;
+        if (nav.back || a === QUICK_ACTION.back) screen = 'main';
+        else if (a === QUICK_ACTION.start) playPreset(quickToPreset(quick));
+        else if (a !== null && (QUICK_ROWS as readonly string[]).includes(a)) {
+          // Linha de opção: esquerda e direita andam; o confirmar avança um.
+          quick = stepQuick(quick, a as (typeof QUICK_ROWS)[number], nav.delta === 0 ? 1 : nav.delta, maxBots);
+          rebuildQuick();
+        } else if (a !== null && a.startsWith(QUICK_SHORTCUT_PREFIX)) {
+          const [group, index] = a.slice(QUICK_SHORTCUT_PREFIX.length).split(':');
+          const preset = quickGroups.get(group ?? '')?.[Number(index)];
+          if (preset) playPreset(preset);
+        }
+        if (screen === 'quick') {
+          quickMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'modes': {
+        const nav = modesMenu.update(menuInput, raw, u);
+        const a = nav.activated;
+        if (nav.back || a === MODES_ACTION.back) screen = 'main';
+        else if (a !== null && a.startsWith(MODES_PREFIX)) {
+          const id = a.slice(MODES_PREFIX.length);
+          if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
+        }
+        if (screen === 'modes') {
+          modesMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

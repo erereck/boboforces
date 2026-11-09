@@ -184,7 +184,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - **Surpreenda-me:** card com o sorteio (modo, nível, bots), "Rolar de novo" e "Jogar".
   - **Mudar** leva ao menu principal: Partida Rápida, Modos, Ajustes e Novidades. O Laboratório e o Meu Bobo entram
     nas fases 5 e 6.
-- **4d. Partida Rápida e Modos:**
+- **4d. Partida Rápida e Modos.** Pronta em 09/11 (`ARCHITECTURE.md` §12.23).
   - Rápido: modo, mapa, nível, bots e duração, com COMEÇAR fixo; os 6 favoritos e os 5 últimos como atalhos;
   - Modos: grade de cards (Warfare TDM e FFA; o Training entra na fase 5) → configurar → COMEÇAR;
   - os presets de fábrica cujo modo já existe (Vibe, Tryhard, Sexta do Jorge).

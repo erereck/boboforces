@@ -1386,3 +1386,29 @@ mudanças de contrato ficam registradas aqui.
   - de volta da partida, o foco vai para o JOGAR;
   - com `?bots=fabrica` ou `?nivel=`, o JOGAR monta a partida do jeito antigo até a 4e.
 - **Tamanho:** o menu foi a 311,6 KB (+2,7 KB).
+
+### 12.23 Fase 4d: Partida Rápida e Modos (09/11/2026)
+
+- **`game/quick-match.ts`** (puro):
+  - `QuickSettings`: modo, mapa, nível, tamanho e minutos;
+  - `quickFromPreset` e `quickToPreset`: TDM com o tamanho por lado (você conta no seu) e FFA com o número de bots;
+  - `stepQuick`: modo, mapa e duração dão a volta; nível e tamanho param nas pontas; o tamanho para no teto
+    (`sizeRange`); trocar o modo mantém a quantidade de bobos;
+  - `scoreFor`: a meta de abates por duração (TDM 3/5/10/15/20 min = 20/30/75/100/125; FFA 10/15/25/30/40; sem
+    limite, a de 10 min);
+  - `factoryPresets`: Vibe, Tryhard e Sexta do Jorge (6 Jorges), com o nome da tabela (`preset.name.*`).
+- **`game/presets-ui.ts`:** `presetShortcut` (rótulo curto, "4×4 De boa" ou o nome, e a linha "Times · 5 min ou 30
+  abates"; o mapa entra na linha quando houver mais de um).
+- **Telas novas (ui):**
+  - `quickMatchScreen`: `QUICK_ROWS` em linhas de opção; COMEÇAR e Voltar fixos embaixo à direita (arte-ux.md §6.3);
+    os atalhos numa coluna com rolagem, com ação `preset:<grupo>:<índice>`;
+  - `modesScreen`: cards com ação `mode:<id>`.
+- **`game.ts`:** telas `quick` e `modes`; o teto de bots é o do perfil com 1 jogador
+  (`selectPlatformProfile(profileHint, 1)`); a Partida Rápida abre com o foco no COMEÇAR.
+- **Mudanças de contrato (ui):**
+  - `OPTION.valueWidth` foi de 260 para 320;
+  - o `layout` arredonda para cima a largura do botão medido pelo texto.
+- **Teste de estouro com o atlas real (`fonts-in-use.test`):** entende a linha de opção (rótulo e valor em áreas
+  separadas) e os itens recortados da coluna com rolagem, e cobre o menu principal, a Partida Rápida, os Modos e o
+  Surpreenda-me nos 6 alvos e no Switch.
+- **Tamanho:** o menu foi a 313,6 KB (+2,0 KB).

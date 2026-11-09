@@ -11,7 +11,11 @@ import { settingsScreen } from './screens/settings.ts';
 import { titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR } from './strings.pt-BR.ts';
 import { drawnCommands } from './test-fixtures.ts';
-import { BUTTON, MIN_TEXT, MIN_TOUCH_TARGET } from './tokens.ts';
+import { mainMenuScreen } from './screens/main-menu.ts';
+import { modesScreen } from './screens/modes.ts';
+import { quickMatchScreen } from './screens/quick-match.ts';
+import { surpriseScreen } from './screens/surprise.ts';
+import { BUTTON, MIN_TEXT, MIN_TOUCH_TARGET, OPTION } from './tokens.ts';
 import type { Rect, UiNode } from './tree.ts';
 
 // Testes com o atlas REAL das fontes em uso (decisão #54), lido de assets-src pelo caminho lógico do runtime-assets:
@@ -167,7 +171,17 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
     const r = layout.rects.get(node) as Rect;
     const text = layout.texts.get(node);
     if (node.kind === 'button' && text) {
-      const room = r.w - 2 * BUTTON.padX * layout.scale;
+      // Linha de opção (M2, fase 4a): o rótulo divide o botão com a área do valor; o valor cabe entre as setas.
+      const valueW = node.value !== undefined ? (node.valueWidth ?? OPTION.valueWidth) * layout.scale : 0;
+      const room = r.w - 2 * BUTTON.padX * layout.scale - (valueW > 0 ? valueW + 16 * layout.scale : 0);
+      const value = layout.values.get(node);
+      if (value) {
+        const between = valueW - 2 * OPTION.arrow * layout.scale;
+        expect(
+          value.width,
+          `${t.name}: valor "${value.text}" ${value.width.toFixed(1)} px em ${between.toFixed(1)}`,
+        ).toBeLessThanOrEqual(between);
+      }
       expect(
         text.width,
         `${t.name}: "${text.text}" ${text.width.toFixed(1)} px em ${room.toFixed(1)}`,
@@ -176,14 +190,20 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
       expect(Math.min(r.w, r.h), `${t.name}: ${node.id ?? ''} ${r.w}×${r.h}`).toBeGreaterThanOrEqual(t.minTarget);
       expect(text.px).toBeGreaterThanOrEqual(t.minTextPx);
     }
-    if (node.kind === 'text' && text) {
+    // Dentro de uma coluna com rolagem, o que está fora da janela é recortado: só a largura conta.
+    const clipped = layout.clips.has(node);
+    if (node.kind === 'text' && text && clipped) {
+      const clip = layout.clips.get(node)!;
+      expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(clip.x + clip.w + 0.5);
+    }
+    if (node.kind === 'text' && text && !clipped) {
       expect(r.x, `${t.name}: ${node.id ?? text.text}`).toBeGreaterThanOrEqual(c.x - 0.5);
       expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
       expect(r.y + r.h).toBeLessThanOrEqual(c.y + c.h + 0.5);
       expect(r.y).toBeGreaterThanOrEqual(c.y - 0.5);
       expect(text.px).toBeGreaterThanOrEqual(t.minTextPx);
     }
-    if (node.kind === 'button') {
+    if (node.kind === 'button' && !clipped) {
       // 1 px de folga: o layout arredonda cada retângulo para o pixel (330 × 0,75 = 247,5 → 248).
       const where = `${t.name}: ${node.id ?? ''}`;
       expect(r.x, where).toBeGreaterThanOrEqual(c.x - 1);
@@ -238,6 +258,44 @@ describe('estouro de texto com o atlas real', () => {
       expect(ids.length).toBe(13);
       expect([...reachable(layout, 'play')].sort(), t.name).toEqual([...ids].sort());
       for (const id of ids) expect(reachable(layout, id).has('play'), `${t.name}: ${id} → JOGAR`).toBe(true);
+    }
+  });
+
+  it('menus da fase 4 (menu principal, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
+    const screens: UiNode[] = [
+      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings'] }),
+      quickMatchScreen.build({
+        // Os valores mais longos de cada linha.
+        values: ['Todos contra todos', 'Construto', 'Pela vibe', '6 contra 6', 'Sem limite'],
+        groups: [
+          {
+            id: 'recent',
+            titleKey: 'quick.recent',
+            items: [{ label: '12 bots Pela vibe', caption: 'Todos contra todos · 10 min ou 25 abates' }],
+          },
+          {
+            id: 'factory',
+            titleKey: 'quick.factory',
+            items: [{ label: 'Sexta do Jorge', caption: 'Times · 10 min ou 75 abates' }],
+          },
+        ],
+      }),
+      modesScreen.build({
+        modes: [
+          { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
+          { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
+        ],
+      }),
+      surpriseScreen.build({
+        lines: ['Bobo Warfare: Todos contra todos', 'Construto', 'Pela vibe', '10 bobos', '10 min ou 25 abates'],
+      }),
+    ];
+    for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      for (const tree of screens) {
+        const layout = layoutFor(tree, t);
+        expectNoOverflow(layout, t);
+        expect(reachable(layout, layout.focusable[0]!.id!).size, `${t.name}: foco`).toBe(layout.focusable.length);
+      }
     }
   });
 

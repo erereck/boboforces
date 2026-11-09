@@ -204,6 +204,17 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Foco:** de volta da partida, o foco fica no JOGAR.
   - **Menu principal:** por enquanto, Ajustes e Voltar (a Partida Rápida e os Modos chegam na 4d).
   - 7 testes novos.
+- **Fase 4d, Partida Rápida e Modos:**
+  - **Partida Rápida:** modo, mapa, nível, bots e duração em linhas de opção, com COMEÇAR fixo no canto (já com o
+    foco). Abre como a última partida estava; o tamanho para no teto de bots do aparelho; trocar o modo mantém a
+    quantidade de bobos. A meta de abates segue a duração (TDM 10 min = 75).
+  - **Atalhos:** à direita, numa coluna com rolagem: as últimas 5, os favoritos e os prontos (Vibe, Tryhard, Sexta do
+    Jorge).
+  - **Modos:** um card por modo (Times, Todos contra todos), com uma frase; escolher abre a Partida Rápida com ele.
+  - **Menu principal:** Partida Rápida, Modos e Ajustes.
+  - **Correções:** botão medido pelo texto agora arredonda para cima (o 640×360 cortava 0,4 px do "ROLAR DE NOVO"), e a
+    área do valor da linha de opção foi para 320 px (cabia só "Times", não "Todos contra todos").
+  - 8 testes novos, com as telas da fase 4 no teste de estouro de texto com o atlas real (6 alvos e o Switch).
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

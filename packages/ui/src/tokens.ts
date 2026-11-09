@@ -115,7 +115,7 @@ export type TypeToken = keyof typeof TYPE;
  * barrinha (largura e distância da coluna) e a folga do foco nas bordas da janela.
  */
 export const OPTION = {
-  valueWidth: 260,
+  valueWidth: 320,
   arrow: 44,
   arrowSteps: 5,
   value: { font: 'hud', size: 30, tracking: 0.02, uppercase: false },

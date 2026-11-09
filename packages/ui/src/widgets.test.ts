@@ -18,7 +18,7 @@ const option = (id: string, value: string, extra: Partial<ButtonNode> = {}): But
   text: { literal: id },
   action: `opt:${id}`,
   value: { literal: value },
-  width: 640,
+  width: 760,
   ...extra,
 });
 

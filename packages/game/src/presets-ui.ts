@@ -103,3 +103,24 @@ export function rollSurprise(rng: Rng): MatchRecipe {
     teams: [{ humans: 'all', bots: side > 1 ? [{ ref, count: side - 1 }] : [] }, { bots: [{ ref, count: side }] }],
   };
 }
+
+/**
+ * M2 (fase 4d): um atalho da Partida Rápida: o rótulo curto do botão (o nome do preset ou "4×4 De boa") e a linha de
+ * baixo ("Times · 5 min ou 30 abates"; o mapa entra quando houver mais de um, na fase 5).
+ */
+export function presetShortcut(recipe: MatchRecipe): { label: string; caption: string } {
+  const counts = presetBotCounts(recipe);
+  let size: string;
+  if (ffa(recipe) || recipe.teams.length < 2) size = t('quick.bots', { n: counts.reduce((a, b) => a + b, 0) });
+  else {
+    const a = counts[0]! + humansIn(recipe.teams[0]!);
+    const b = counts[1]! + humansIn(recipe.teams[1]!);
+    size = t('summary.teamsShort', { a, b });
+  }
+  const name = (recipe.name ?? '').trim();
+  const label = name !== '' ? name : [size, levelName(recipe)].filter((p) => p !== '').join(' ');
+  const caption = [t(`mode.short.${recipe.mode}` as StringKey), duration(recipe)]
+    .filter((p) => p !== '')
+    .join(t('summary.separator'));
+  return { label, caption };
+}
