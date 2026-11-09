@@ -1,5 +1,5 @@
 {
-  "$comment": "Sons do Teste Zero (item 19; decisão #47): origem CC0 da Kenney (kenney.nl) → MP3 mono 44,1 kHz 96 kbps por `npm run audioconv` (tools/audioconv). Originais e licenças em source/<pacote>/; saída em generated/<out>.mp3 com o nome lógico do runtime-assets.json. Crédito em docs/CREDITOS.md. `maxS`: corta o fim com fade de 20 ms; `peakDb`: normaliza o pico (dBFS).",
+  "$comment": "Sons do jogo (fase 7a do M2; decisões #39, #47 e #63) e do Teste Zero (item 19): origem CC0 da Kenney (kenney.nl) → MP3 mono 44,1 kHz 96 kbps por `npm run audioconv` (tools/audioconv). Originais e licenças em source/<pacote>/; saída em generated/<out>.mp3 com o nome lógico do runtime-assets.json (`audio/<out>.mp3`). Crédito em docs/CREDITOS.md. `maxS`: corta o fim com fade de 20 ms; `peakDb`: normaliza o pico (dBFS). Os sons do jogo saem todos a -1 dBFS: o volume relativo de cada um mora no banco de sons do game (`packages/game/src/sound-bank.ts`). Os tiros, o foguete, a faca, o PLOC, os bipes e as vinhetas são sintetizados em código (`packages/audio/src/synth-game.ts`) e não passam por aqui.",
   "packs": {
     "kenney-impact-sounds": {
       "title": "Impact Sounds (1.0)",
@@ -16,6 +16,14 @@
       "license": "CC0 1.0 (Creative Commons Zero)",
       "zipSha256": "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04",
       "downloaded": "2026-11-03"
+    },
+    "kenney-interface-sounds": {
+      "title": "Interface Sounds (1.0)",
+      "author": "Kenney (www.kenney.nl)",
+      "url": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0 1.0 (Creative Commons Zero)",
+      "zipSha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+      "downloaded": "2026-11-09"
     }
   },
   "sounds": [
@@ -46,6 +54,237 @@
       "file": "impactGeneric_light_000.ogg",
       "maxS": 0.3,
       "peakDb": -6
+    },
+    {
+      "out": "ui-mover",
+      "pack": "kenney-interface-sounds",
+      "file": "select_002.ogg",
+      "maxS": 0.1,
+      "peakDb": -1
+    },
+    {
+      "out": "ui-confirmar",
+      "pack": "kenney-interface-sounds",
+      "file": "confirmation_001.ogg",
+      "maxS": 0.3,
+      "peakDb": -1
+    },
+    {
+      "out": "ui-voltar",
+      "pack": "kenney-interface-sounds",
+      "file": "back_002.ogg",
+      "maxS": 0.1,
+      "peakDb": -1
+    },
+    {
+      "out": "ui-trocar",
+      "pack": "kenney-interface-sounds",
+      "file": "switch_002.ogg",
+      "maxS": 0.15,
+      "peakDb": -1
+    },
+    {
+      "out": "ui-erro",
+      "pack": "kenney-interface-sounds",
+      "file": "error_004.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "hitmarker",
+      "pack": "kenney-interface-sounds",
+      "file": "pluck_001.ogg",
+      "maxS": 0.1,
+      "peakDb": -1
+    },
+    {
+      "out": "abate",
+      "pack": "kenney-interface-sounds",
+      "file": "glass_002.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "dano",
+      "pack": "kenney-impact-sounds",
+      "file": "impactSoft_heavy_000.ogg",
+      "maxS": 0.35,
+      "peakDb": -1
+    },
+    {
+      "out": "morte",
+      "pack": "kenney-impact-sounds",
+      "file": "impactPunch_heavy_000.ogg",
+      "maxS": 0.4,
+      "peakDb": -1
+    },
+    {
+      "out": "recarga-tira",
+      "pack": "kenney-impact-sounds",
+      "file": "impactMetal_light_001.ogg",
+      "maxS": 0.15,
+      "peakDb": -1
+    },
+    {
+      "out": "recarga-poe",
+      "pack": "kenney-impact-sounds",
+      "file": "impactMetal_medium_001.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "sem-municao",
+      "pack": "kenney-interface-sounds",
+      "file": "click_002.ogg",
+      "maxS": 0.05,
+      "peakDb": -1
+    },
+    {
+      "out": "troca-arma",
+      "pack": "kenney-interface-sounds",
+      "file": "switch_005.ogg",
+      "maxS": 0.15,
+      "peakDb": -1
+    },
+    {
+      "out": "granada-pino",
+      "pack": "kenney-interface-sounds",
+      "file": "toggle_004.ogg",
+      "maxS": 0.07,
+      "peakDb": -1
+    },
+    {
+      "out": "granada-quica",
+      "pack": "kenney-impact-sounds",
+      "file": "impactTin_medium_000.ogg",
+      "maxS": 0.17,
+      "peakDb": -1
+    },
+    {
+      "out": "explosao",
+      "pack": "kenney-sci-fi-sounds",
+      "file": "explosionCrunch_000.ogg",
+      "maxS": 0.75,
+      "peakDb": -1
+    },
+    {
+      "out": "explosao-longe",
+      "pack": "kenney-sci-fi-sounds",
+      "file": "lowFrequency_explosion_001.ogg",
+      "maxS": 0.65,
+      "peakDb": -1
+    },
+    {
+      "out": "faca-acerto",
+      "pack": "kenney-impact-sounds",
+      "file": "impactPunch_medium_001.ogg",
+      "maxS": 0.22,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-concreto",
+      "pack": "kenney-impact-sounds",
+      "file": "impactGeneric_light_001.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-metal",
+      "pack": "kenney-impact-sounds",
+      "file": "impactMetal_light_000.ogg",
+      "maxS": 0.2,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-madeira",
+      "pack": "kenney-impact-sounds",
+      "file": "impactWood_light_000.ogg",
+      "maxS": 0.1,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-vidro",
+      "pack": "kenney-impact-sounds",
+      "file": "impactGlass_light_000.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-macio",
+      "pack": "kenney-impact-sounds",
+      "file": "impactSoft_medium_000.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "impacto-bobo",
+      "pack": "kenney-impact-sounds",
+      "file": "impactPunch_medium_000.ogg",
+      "maxS": 0.23,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-concreto-1",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_concrete_000.ogg",
+      "maxS": 0.11,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-concreto-2",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_concrete_001.ogg",
+      "maxS": 0.11,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-metal",
+      "pack": "kenney-impact-sounds",
+      "file": "impactPlate_light_000.ogg",
+      "maxS": 0.15,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-madeira",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_wood_000.ogg",
+      "maxS": 0.08,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-grama",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_grass_000.ogg",
+      "maxS": 0.12,
+      "peakDb": -1
+    },
+    {
+      "out": "passo-tecido",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_carpet_000.ogg",
+      "maxS": 0.08,
+      "peakDb": -1
+    },
+    {
+      "out": "pulo",
+      "pack": "kenney-impact-sounds",
+      "file": "footstep_carpet_001.ogg",
+      "maxS": 0.08,
+      "peakDb": -1
+    },
+    {
+      "out": "pouso",
+      "pack": "kenney-impact-sounds",
+      "file": "impactSoft_medium_001.ogg",
+      "maxS": 0.18,
+      "peakDb": -1
+    },
+    {
+      "out": "municao",
+      "pack": "kenney-interface-sounds",
+      "file": "maximize_009.ogg",
+      "maxS": 0.21,
+      "peakDb": -1
     }
   ]
 }

@@ -35,3 +35,17 @@ export {
   type NoiseBurstOptions,
   type SynthSoundName,
 } from './synth.ts';
+export {
+  GAME_SYNTH_SOUNDS,
+  GUNSHOTS,
+  synthGunshot,
+  synthRocket,
+  synthSwing,
+  synthPop,
+  synthCountBeep,
+  synthJingle,
+  synthHeartbeat,
+  synthSlide,
+  type GunshotName,
+  type GunshotRecipe,
+} from './synth-game.ts';

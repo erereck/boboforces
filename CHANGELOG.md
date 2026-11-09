@@ -434,7 +434,19 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     mirar, até você fazer os dois.
   - 4 testes novos.
 - **Rodada 10 de prints:** 26 capturas da calibração da mira e da fase 6 (perfis, 3ª pessoa, Meu Bobo, fantasias e
-  toque) e as perguntas F1–F7, publicadas como versão 11 da página das rodadas. + Teste Zero (concluído em 08/11/2026, #60)
+  toque) e as perguntas F1–F7, publicadas como versão 11 da página das rodadas.
+- **Fase 7a, banco de sons:**
+  - **52 sons:** 33 em MP3, de 3 pacotes CC0 da Kenney (Impact, Sci-Fi e o Interface Sounds, novo), e 19
+    sintetizados em código.
+  - **Sintetizados:** os tiros das 5 armas de fogo, cada um com a versão de perto e a de longe; o foguete, a faca, o
+    "PLOC" do headshot, os bipes da contagem, o coração da vida baixa, as vinhetas de vitória e derrota e o deslize.
+  - **Da Kenney:** interface, hitmarker, abate, dano, recarga, granada, explosão (perto e longe), impactos e passos
+    por material, pulo, pouso e caixinha de munição.
+  - Os MP3 somam 83 KB, dentro dos 150 KB de sons da primeira partida; os sintetizados não baixam nada.
+  - O banco guarda volume, canal, prioridade e cooldown de cada som. Créditos no `CREDITOS.md`.
+  - 13 testes novos.
+
+### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
 **Parte 1: contratos e frentes em paralelo**
 

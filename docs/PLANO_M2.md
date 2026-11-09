@@ -286,6 +286,27 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
 - **6f. Prints para o Erick.** Rodada 10: a calibração (5f) e a fase 6 (perfis, 3ª pessoa, Meu Bobo, fantasias e
   toque). Publicada em 09/11 como versão 11 da página das rodadas (perguntas F1–F7, `local/m2/montar-pagina-r10.mjs`).
 
+## Fase 7 em detalhe: áudio
+
+Escrito em 09/11/2026, com o OK do Erick para baixar os 3 pacotes da Kenney (Impact Sounds 1.0, 0,76 MB; Sci-Fi
+Sounds 1.0, 5,60 MB, os dois com o mesmo hash do M1; Interface Sounds 1.0, 0,80 MB, novo). Base: arte-ux.md §10.4–§10.6,
+GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan, ouvinte mais próximo, mono) já existe.
+
+- **7a. Banco de sons.** Pronta em 09/11 (`ARCHITECTURE.md` §12.44): 52 sons: os tiros das 5 armas de fogo (a LMG de reserva usa o do fuzil) **sintetizados em código** (perto e longe, que
+  troca além de 30 m), faca, foguete, bipes e o "PLOC" do headshot também sintetizados (0 KB de download); impactos e
+  passos por família de material (o `stepSound` dos blocos), recarga, troca, sem munição, granada, explosão, acertos,
+  morte, caixinha e UI vindos da Kenney. Todos os MP3 contam nos sons essenciais da primeira partida (≤ 150 KB) e
+  carregam depois do menu, em segundo plano.
+- **7b. Sons da partida.** Eventos da sim → mixer, com a prioridade de arte-ux §10.4 (sua arma > dano em você >
+  inimigos perto > aliados > ambiente), cooldown por som, só os passos dos 4 bots mais próximos de cada ouvinte, −6 dB
+  atrás de parede (raio na grade), hitmarker "plic", headshot "PLOC", kill, dano, vida baixa e a contagem.
+- **7c. Interface e Ajustes.** Sons de navegar, confirmar, voltar e trocar valor nos menus; aba Áudio nos Ajustes
+  (Geral, Efeitos, Música, Interface, saída mono, música na partida e indicador visual de som); o indicador como anel
+  em volta da retícula (tiros e passos até 20 m).
+- **7d. Música do menu.** Tocador em loop com fade e a música 6 dB mais baixa nas explosões; carrega depois do menu
+  (`assets/music/`, sob demanda). A faixa CC0 espera o OK do Erick (nome, origem e tamanho).
+- **7e. Rodada 11.** Página para ouvir os sons, mais os prints da aba Áudio e do indicador.
+
 ## Escolhas do Claude neste plano (revisáveis)
 
 - **Partida antes dos menus:** o combate e as regras são o que dá para jogar e medir; os menus vêm quando os dados da

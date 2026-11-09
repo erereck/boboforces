@@ -1874,3 +1874,24 @@ mudanças de contrato ficam registradas aqui.
 - **Escolhas (revisáveis):** as posições da Faca e da Vista, os limiares do correr, o alcance do atirar sozinho, e a
   troca de arma continua no botão Arma. Tocar no ícone da arma da HUD ficou para depois: no celular os botões já
   ocupam aquele canto.
+
+### 12.44 Fase 7a: banco de sons (09/11/2026)
+
+- **Síntese** (`audio/src/synth-game.ts`, `GAME_SYNTH_SOUNDS`): PCM mono a 44,1 kHz feito de ruído com semente e
+  seno, sem nó de Web Audio além do `createBuffer` (regra 9).
+  - Tiro em 4 camadas: estalo, corpo num passa-baixa que escurece, soco grave que cai de tom e cauda escura.
+  - A amostra de longe (GDD §5.10) tira o estalo, amolece o ataque, passa tudo por um passa-baixa de 900 Hz e
+    alonga a cauda.
+  - As receitas ficam em `GUNSHOTS`; saturação leve (`tanh`) e pico normalizado.
+- **Banco** (`game/src/sound-bank.ts`): cada som é `file` (`audio/<id>.mp3`, gerado pelo audioconv a −1 dBFS) ou
+  `synth`.
+  - Guarda o canal, o volume relativo (a mixagem mora aqui, não no MP3), a prioridade base (`SOUND_RANK`) e o
+    cooldown por som.
+  - `loadSoundFiles` decodifica, 4 por vez, só os MP3 que o mixer ainda não tem. Erro num som não para o resto.
+  - O banco fica no chunk do menu; a síntese só roda na cena, para o `synth-game` não pesar no menu.
+- **Assets:** os 3 pacotes da Kenney foram baixados de novo (o Interface Sounds 1.0 é novo). Os originais usados e o
+  `License.txt` ficam em `assets-src/audio/source/`; os 33 MP3 somam 83 KB.
+- **Escolhas (revisáveis):**
+  - qual arquivo da Kenney faz cada som;
+  - os volumes relativos;
+  - os parâmetros dos tiros, só por medida: não dá para ouvir aqui. A rodada 11 leva os sons para o Erick ouvir.

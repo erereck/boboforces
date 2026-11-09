@@ -14,9 +14,9 @@ describe('audioconv: tabela e licenças', () => {
     for (const name of T0_SOUNDS) expect(table.files[`audio/${name}.mp3`]).toBe(`audio/generated/${name}.mp3`);
   });
 
-  it('sounds.json cobre os 4 sons do T0, com original e License.txt CC0 ao lado', () => {
+  it('sounds.json cobre os 4 sons do T0 (e os do jogo, fase 7a), com original e License.txt CC0 ao lado', () => {
     const t = readSoundTable(SOUND_TABLE);
-    expect(t.sounds.map((s) => s.out).sort()).toEqual([...T0_SOUNDS].sort());
+    expect(t.sounds.map((s) => s.out)).toEqual(expect.arrayContaining([...T0_SOUNDS]));
     for (const pack of Object.values(t.packs)) {
       expect(pack.license).toMatch(/CC0/);
       expect(pack.url).toMatch(/^https:\/\/kenney\.nl\/assets\//);
@@ -24,9 +24,10 @@ describe('audioconv: tabela e licenças', () => {
   });
 
   it('os MP3 gerados são de verdade (não o provisório de silêncio): quadros MPEG-1 Layer III mono', () => {
-    for (const name of T0_SOUNDS) {
+    for (const name of readSoundTable(SOUND_TABLE).sounds.map((s) => s.out)) {
       const bytes = readFileSync(join(AUDIO_OUT_DIR, `${name}.mp3`));
-      expect(bytes.length, name).toBeGreaterThan(1000);
+      // O clique de sem munição tem 9 ms (0,6 KB); os do T0 passam de 1 KB.
+      expect(bytes.length, name).toBeGreaterThan((T0_SOUNDS as readonly string[]).includes(name) ? 1000 : 500);
       // Silêncio do LAME é quase só byte zero (~94%); som de verdade fica abaixo de 15%.
       let zeros = 0;
       for (const b of bytes) if (b === 0) zeros++;
