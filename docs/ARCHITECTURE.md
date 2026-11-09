@@ -1658,3 +1658,31 @@ mudanças de contrato ficam registradas aqui.
     e `mapName`;
   - a Partida Rápida e a personalizada usam esse módulo (`fitMap` corta os bots no teto do mapa).
 - **Tamanho:** o menu foi a 332,2 KB (+0,5 KB).
+
+### 12.35 Fase 5d: Bobo Training (09/11/2026)
+
+- **format:**
+  - personalidade `dummy` (Alvo), no fim de `PERSONALITIES` (os ids só crescem);
+  - bots de fábrica `training-dummy` e `training-runner` (paciência 0), registrados e travados.
+- **ai:** `personaOverride` do Alvo: não atira nem procura ninguém. Paciência ≥ 0,5 fica parado; abaixo disso, anda de
+  lado e troca a cada `AI_PERSONA.dummyStrideS` (1,4 s).
+- **sim:**
+  - `isWarfareMode('training')` (regeneração e caixinha);
+  - `SimContext.training`;
+  - no treino, os bots fora do time 0 nascem nos pontos sem time, no começo (`initialSpawn`) e no respawn
+    (`pickSpawn`, longe de qualquer bobo, para não empilhar);
+  - tempo e meta zerados: a partida não termina.
+- **Escolha (revisável):** o jogador nasce atrás do abrigo oeste do Ringue (os nascimentos do time 0) e sai para
+  treinar.
+- **game:**
+  - `training.ts` (`trainingPreset`: Ringue, 2 alvos parados e 2 andando, respawn de 1 s, e os bots extras do
+    Testar);
+  - `playTraining` não vira o último preset (o JOGAR continua sendo a última partida);
+  - `MatchStats.humanFirstHit` e `ttk`, e `trainingNumbers`;
+  - a cena refaz `HudSharedModel.trainingLine` só quando os números mudam (`refreshTrainingLine`).
+- **ui:**
+  - `HudSharedModel.trainingLine`: a plaquinha do topo no lugar do placar;
+  - o Modos em grade de 2 colunas.
+- **Fica para depois:** a skin de treino dos alvos (bonecos de caixas, gameplay.md §7) e a estação "Calibrar mira"
+  (5f).
+- **Tamanho:** o menu foi a 332,6 KB (+0,4 KB).

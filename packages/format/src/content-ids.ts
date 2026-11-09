@@ -177,6 +177,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'bot:hunter-hank',
   'bot:buddy',
   'bot:goofy-gus',
+  'bot:training-dummy',
+  'bot:training-runner',
 ];
 
 /** IDs aposentados e quem os substitui (vazio no M0). */

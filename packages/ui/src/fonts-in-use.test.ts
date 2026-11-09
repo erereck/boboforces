@@ -445,6 +445,7 @@ describe('estouro de texto com o atlas real', () => {
         modes: [
           { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
           { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
+          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
         ],
       }),
       customMatchScreen.build({

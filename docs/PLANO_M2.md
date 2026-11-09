@@ -236,7 +236,7 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
   - arena pequena, de 30×30 a 40×40 m, com alvos e estandes;
   - a faixa listrada no limite da área jogável;
   - entra nos seletores de mapa (Partida Rápida e personalizada).
-- **5d. Bobo Training:**
+- **5d. Bobo Training.** Pronta em 09/11 (`ARCHITECTURE.md` §12.35).
   - o modo na sim, sem placar;
   - bots do Laboratório em loop, de 1 a N;
   - alvos fixos e móveis (bonecos de caixas com a skin de treino);

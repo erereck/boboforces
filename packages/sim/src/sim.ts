@@ -300,15 +300,18 @@ function zombieSpawnOrder(spawns: readonly SpawnPoint[], s: SimState): number[] 
   return order.slice(0, Math.max(1, Math.ceil(order.length / 2)));
 }
 
-/** Spawn inicial: o k-ésimo membro do time vai para o k-ésimo ponto do time (sem empilhar ninguém no tick 0). */
-function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean, k: number): number {
+/**
+ * Spawn inicial: o k-ésimo membro do time vai para o k-ésimo ponto do time (sem empilhar ninguém no tick 0). M2 (fase
+ * 5d): no Bobo Training, os bots (fora do time do jogador) usam os pontos sem time, espalhados como no respawn.
+ */
+function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean, k: number, spread = false): number {
   const own: number[] = [];
   const any: number[] = [];
   spawns.forEach((sp, i) => {
     if (!ffa && sp.team === team) own.push(i);
     if (sp.team === -1) any.push(i);
   });
-  const list = own.length > 0 ? own : any.length > 0 ? any : spawns.map((_, i) => i);
+  const list = spread && any.length > 0 ? any : own.length > 0 ? own : any.length > 0 ? any : spawns.map((_, i) => i);
   return list[k % list.length]!;
 }
 
@@ -356,6 +359,7 @@ export function createSim(config: SimConfig): Sim {
     zombieProfile: MOVEMENT_ZOMBIE,
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
+    training: recipe.mode === 'training',
     hz,
     dt: 1 / hz,
     tick: 0,
@@ -397,7 +401,11 @@ export function createSim(config: SimConfig): Sim {
     applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
     const k = perTeam[slot.team]!;
     perTeam[slot.team] = k + 1;
-    respawn(ctx, id & 0xffff, initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k));
+    respawn(
+      ctx,
+      id & 0xffff,
+      initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k, ctx.training && slot.team !== 0),
+    );
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
   if (zombies > 0) {

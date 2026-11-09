@@ -216,6 +216,8 @@ export const AI_TEAM = {
 export const AI_PERSONA = {
   /** Pulinhos de bobeira andando: a cada `hopEveryS`, chance `bobeira·hopWeight`. */
   hopEveryS: 1,
+  /** M2 (fase 5d): o Alvo que anda troca de lado a cada tanto. */
+  dummyStrideS: 1.4,
   hopWeight: 0.4,
   /** Rusher e Kamikaze: correm até o contato (passando desta folga além da distância preferida) e pulam em combate. */
   sprintGapM: 6,

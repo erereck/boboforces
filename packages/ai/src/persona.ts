@@ -192,6 +192,13 @@ export function personaOverride(
   t: SoldierTiming,
   local: { x: number; y: number },
 ): number {
+  if (b.personality.preset === 'dummy') {
+    // M2 (fase 5d): o Alvo não ataca nem procura ninguém: o paciente fica parado; o outro anda de lado, indo e voltando.
+    local.y = 0;
+    local.x = b.personality.patience >= 0.5 ? 0 : Math.floor(tick / t.dummyStride) % 2 === 0 ? 1 : -1;
+    b.fireHeld = false;
+    return 0;
+  }
   if (tick < b.playDeadUntil) {
     local.x = 0;
     local.y = 0;

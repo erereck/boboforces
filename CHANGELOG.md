@@ -347,6 +347,17 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     para FFA volta ao Construto, e os bots são cortados no teto do Ringue.
   - **Cena:** a partida carrega o mapa da receita.
   - 4 testes novos.
+- **Fase 5d, Bobo Training:**
+  - **Entrada:** o Modos ganha o card "Bobo Training" (os cards agora em grade de 2 colunas), que começa direto no
+    Ringue.
+  - **Alvos:** a personalidade nova Alvo não ataca. Paciente, fica parada; impaciente, anda de lado, indo e voltando. Os
+    alvos de fábrica são Dummy Dan (parado) e Dashing Dave (andando), e no Laboratório dá para fazer os seus.
+  - **Regras:** sem placar e sem fim (sai-se pela pausa), com as regras de Warfare (regeneração, caixinha) e respawn
+    de 1 s. Os bots nascem espalhados pelos pontos sem time do mapa.
+  - **HUD:** no lugar do placar, a linha "Precisão · TTK médio · Na cabeça · Abates". O TTK conta do primeiro acerto
+    seu até o seu abate.
+  - **Fica para depois:** a skin de treino dos alvos (arte).
+  - 2 testes novos; golden igual.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

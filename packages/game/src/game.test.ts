@@ -1523,3 +1523,38 @@ describe('Ringue (M2, fase 5c)', () => {
     game.dispose();
   }, 120_000);
 });
+
+describe('Bobo Training (M2, fase 5d)', () => {
+  it('Modos → Bobo Training: Ringue sem placar, alvos espalhados que não atacam e a linha dos números', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Modos (2º item) → o card de baixo (Bobo Training).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('modes');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] ringue (play)'))).toBe(true);
+    // 10 s de jogo: ninguém atira no jogador (os alvos não atacam) e nenhum nasce atrás do abrigo leste.
+    platform.pump(600, 1000 / 60);
+    const sim = game.match!.sim;
+    const v = sim.view();
+    const me = entityIndex(sim.controllerEntity(0));
+    expect(v.health[me]).toBe(100);
+    let bots = 0;
+    for (let i = 0; i < v.count; i++) {
+      if (i === me || v.alive[i] !== 1 || v.kind[i] !== ENTITY_KIND.bobo) continue;
+      bots++;
+      // Atrás do abrigo leste (x além de 37,5 m, z entre 15 e 33 m) ninguém veria o alvo.
+      const x = v.position[i * 3]!;
+      const z = v.position[i * 3 + 2]!;
+      expect(x > 37.5 && z > 15 && z < 33, `bot ${i} em (${x}, ${z})`).toBe(false);
+    }
+    expect(bots).toBe(4);
+    expect(v.match.phase).not.toBe('ended');
+    game.dispose();
+  }, 120_000);
+});

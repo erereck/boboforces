@@ -361,15 +361,22 @@ export function pickSpawn(ctx: SimContext, e: number): number {
   const mark = ctx.spawnMark;
   const zombie = s.kind[e] === ENTITY_KIND.zombie;
   const anyTeam = ctx.ffa || zombie;
+  // M2 (fase 5d): no Bobo Training, os bots (fora do time do jogador) nascem só nos pontos sem time, longe de qualquer
+  // bobo: os alvos se espalham pela arena em vez de ir para a base do outro time.
+  const spread = ctx.training && s.team[e] !== 0;
   let allowed = 0;
   for (let pass = 0; pass < 2 && allowed === 0; pass++) {
     for (let i = 0; i < n; i++) {
       const sp = spawns[i]!;
-      if (pass === 0 && !anyTeam && sp.team !== -1 && sp.team !== s.team[e]) {
+      const wrongTeam = spread ? sp.team !== -1 : !anyTeam && sp.team !== -1 && sp.team !== s.team[e];
+      if (pass === 0 && wrongTeam) {
         score[i] = -Infinity;
         continue;
       }
-      score[i] = Math.min(nearestEnemy2(ctx, e, sp.x, sp.z), SPAWN_SCORE_CAP);
+      score[i] = Math.min(
+        spread ? nearestBody2(ctx, e, sp.x, sp.z) : nearestEnemy2(ctx, e, sp.x, sp.z),
+        SPAWN_SCORE_CAP,
+      );
       allowed++;
     }
   }
@@ -422,6 +429,20 @@ export function pickSpawn(ctx: SimContext, e: number): number {
 }
 
 /** Menor distância² (no plano) de um inimigo vivo de `e` até (x, z); `Infinity` se não houver. */
+/** M2 (fase 5d): distância² até o bobo vivo mais perto (de qualquer time), fora o próprio. */
+function nearestBody2(ctx: SimContext, e: number, x: number, z: number): number {
+  const s = ctx.s;
+  let best = Infinity;
+  for (let j = 0; j < s.count; j++) {
+    if (j === e || s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
+    const dx = s.position[j * 3]! - x;
+    const dz = s.position[j * 3 + 2]! - z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < best) best = d2;
+  }
+  return best;
+}
+
 function nearestEnemy2(ctx: SimContext, e: number, x: number, z: number): number {
   const s = ctx.s;
   let best = Infinity;

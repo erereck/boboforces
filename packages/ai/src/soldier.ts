@@ -151,6 +151,7 @@ export class SoldierTiming {
   readonly danceCrouch: number;
   readonly danceJump: number;
   readonly danceSpinStep: number;
+  readonly dummyStride: number;
   readonly replanA: number;
   readonly replanB: number;
 
@@ -206,6 +207,7 @@ export class SoldierTiming {
     this.danceCrouch = Math.max(1, secondsToTicks(P.danceCrouchS, hz));
     this.danceJump = Math.max(2, secondsToTicks(P.danceJumpS, hz));
     this.danceSpinStep = (P.danceSpinDegPerS * DEG_TO_RAD) / hz;
+    this.dummyStride = Math.max(1, secondsToTicks(P.dummyStrideS, hz));
     this.replanA = secondsToTicks(AI_LOD.replanSA, hz);
     this.replanB = secondsToTicks(AI_LOD.replanSB, hz);
   }

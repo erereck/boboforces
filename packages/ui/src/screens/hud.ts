@@ -982,10 +982,15 @@ export interface HudSharedModel {
   readonly teamScores: number[];
   /** M2 (fase 2d): morte súbita (uma plaquinha "MORTE SÚBITA" embaixo do placar). */
   suddenDeath: boolean;
+  /**
+   * M2 (fase 5d): Bobo Training: a linha dos números no lugar do placar ("Precisão 34% · TTK médio 0,8 s…"; `''` = placar
+   * normal). O `game` só refaz a string quando os números mudam.
+   */
+  trainingLine: string;
 }
 
 export function createHudSharedModel(): HudSharedModel {
-  return { timeLeftS: -1, teamCount: 0, teamScores: [0, 0, 0, 0], suddenDeath: false };
+  return { timeLeftS: -1, teamCount: 0, teamScores: [0, 0, 0, 0], suddenDeath: false, trainingLine: '' };
 }
 
 export type HudSharedMode = 'top' | 'center' | 'spare';
@@ -1105,6 +1110,20 @@ export function drawHudShared(
   const pad = hudPad(s);
   const gap = Math.max(3, Math.round(HUD_METRICS.gap * s));
   const hasContent = model.timeLeftS >= 0 || model.teamCount > 0;
+  if (model.trainingLine !== '' && area.mode !== 'spare') {
+    // Bobo Training: sem placar nem relógio; a linha dos números no lugar.
+    const px = hudLabelPx(s, area.minTextPx);
+    const w = textWidth(font, model.trainingLine, px) + pad * 2;
+    const h = capHeightPx(font, px) + pad * 2;
+    const x = Math.round(area.x + (area.width - w) / 2);
+    const y =
+      area.mode === 'top'
+        ? Math.round(area.y + Math.max(area.insetTop, HUD_METRICS.marginY * s))
+        : Math.round(area.y + (area.height - h) / 2);
+    plate(out, x, y, w, h, s);
+    paintText(out, font, model.trainingLine, x + pad, y + pad, px, COLORS.texto);
+    return;
+  }
 
   if (area.mode === 'spare') {
     pushRect(

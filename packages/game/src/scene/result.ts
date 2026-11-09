@@ -24,6 +24,12 @@ export interface MatchStats {
   /** Quantas vezes cada bobo matou o humano, e quantas vezes o humano matou cada um. */
   readonly killedHuman: Uint16Array;
   readonly killedByHuman: Uint16Array;
+  /**
+   * M2 (fase 5d): Bobo Training: o tick do 1º acerto do humano em cada bobo desde que ele nasceu (-1 = nenhum) e o TTK
+   * somado ([ticks, abates]): do 1º acerto ao abate.
+   */
+  readonly humanFirstHit: Int32Array;
+  readonly ttk: Float64Array;
 }
 
 export function createMatchStats(capacity: number): MatchStats {
@@ -40,6 +46,8 @@ export function createMatchStats(capacity: number): MatchStats {
     headTick: new Int32Array(capacity).fill(-1),
     killedHuman: new Uint16Array(capacity),
     killedByHuman: new Uint16Array(capacity),
+    humanFirstHit: new Int32Array(capacity).fill(-1),
+    ttk: new Float64Array(2),
   };
 }
 
@@ -56,6 +64,10 @@ export function recordMatchEvent(st: MatchStats, ev: SimEvent, human: number): v
       if (ev.shooter === NULL_ENTITY || ev.shooter === ev.target) break;
       const a = entityIndex(ev.shooter);
       if (a >= st.capacity) break;
+      if (human !== NULL_ENTITY && ev.shooter === human) {
+        const v = entityIndex(ev.target);
+        if (v < st.capacity && st.humanFirstHit[v]! < 0) st.humanFirstHit[v] = ev.tick;
+      }
       if (ev.part === 'head' && st.headTick[a] !== ev.tick) {
         st.headTick[a] = ev.tick;
         st.heads[a] = st.heads[a]! + 1;
@@ -67,6 +79,14 @@ export function recordMatchEvent(st: MatchStats, ev: SimEvent, human: number): v
     }
     case 'kill': {
       const v = entityIndex(ev.victim);
+      if (v < st.capacity) {
+        const first = st.humanFirstHit[v]!;
+        if (human !== NULL_ENTITY && ev.killer === human && first >= 0) {
+          st.ttk[0] = st.ttk[0]! + (ev.tick - first);
+          st.ttk[1] = st.ttk[1]! + 1;
+        }
+        st.humanFirstHit[v] = -1;
+      }
       if (v < st.capacity) st.streak[v] = 0;
       if (ev.killer === NULL_ENTITY || ev.killer === ev.victim) {
         if (v < st.capacity) st.mishaps[v] = st.mishaps[v]! + 1;
@@ -93,6 +113,22 @@ function countShot(st: MatchStats, shooter: number, tick: number): void {
   if (i >= st.capacity || st.shotTick[i] === tick) return;
   st.shotTick[i] = tick;
   st.shots[i] = st.shots[i]! + 1;
+}
+
+/** M2 (fase 5d): os números do Bobo Training do humano: precisão e cabeça (%, -1 = sem dado) e TTK médio (s, -1). */
+export interface TrainingNumbers {
+  accuracy: number;
+  headPct: number;
+  ttkS: number;
+  kills: number;
+}
+
+export function trainingNumbers(st: MatchStats, view: SimView, human: number, hz: number, out: TrainingNumbers): void {
+  out.accuracy = human >= 0 ? accuracyPct(st, human) : -1;
+  const hits = human >= 0 ? st.hits[human]! : 0;
+  out.headPct = hits > 0 ? Math.round((Math.min(st.heads[human]!, hits) * 100) / hits) : -1;
+  out.ttkS = st.ttk[1]! > 0 ? st.ttk[0]! / st.ttk[1]! / hz : -1;
+  out.kills = human >= 0 ? view.kills[human]! : 0;
 }
 
 /** Precisão (0..100, inteiro) de um bobo; -1 sem tiro. */

@@ -3,7 +3,14 @@ import { createInputFrames, createSim, NULL_ENTITY, type SimEvent } from '@bobof
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { challengeLevel, stepLevel } from '../pause.ts';
-import { accuracyPct, createMatchStats, PRIZE_RULES, recordMatchEvent, summarizeMatch } from './result.ts';
+import {
+  accuracyPct,
+  createMatchStats,
+  PRIZE_RULES,
+  recordMatchEvent,
+  summarizeMatch,
+  trainingNumbers,
+} from './result.ts';
 
 /** M2, fase 2e: as contas do resultado (tiros e acertos por tick, sequência, Nêmesis, Freguês, prêmios). */
 
@@ -44,6 +51,35 @@ describe('estatísticas pelos eventos', () => {
     expect([st.bestStreak[0], st.streak[0]]).toEqual([3, 1]);
     expect([st.killedByHuman[3], st.killedByHuman[4], st.killedHuman[5]]).toEqual([3, 1, 1]);
     expect(st.mishaps[4]).toBe(2);
+  });
+});
+
+describe('Bobo Training (M2, fase 5d)', () => {
+  it('TTK médio: do 1º acerto do humano ao abate dele; abate de outro zera a contagem daquele alvo', () => {
+    const st = createMatchStats(8);
+    const human = id(0);
+    const hit = (tick: number, target: number, part = 'torso'): void =>
+      recordMatchEvent(st, ev({ type: 'hit', tick, shooter: human, target: id(target), part }), human);
+    const kill = (tick: number, killer: number, victim: number): void =>
+      recordMatchEvent(
+        st,
+        ev({ type: 'kill', tick, killer: killer < 0 ? NULL_ENTITY : id(killer), victim: id(victim) }),
+        human,
+      );
+    hit(100, 1);
+    hit(120, 1, 'head');
+    kill(130, 0, 1); // 30 ticks
+    hit(200, 2);
+    kill(260, 3, 2); // outro matou: não conta
+    hit(300, 2);
+    kill(390, 0, 2); // 90 ticks
+    expect([st.ttk[0], st.ttk[1]]).toEqual([120, 2]);
+    const view = { kills: new Uint16Array([2, 0, 0, 0, 0, 0, 0, 0]) } as never;
+    const out = { accuracy: 0, headPct: 0, ttkS: 0, kills: 0 };
+    trainingNumbers(st, view, 0, 60, out);
+    expect(out.ttkS).toBeCloseTo(1, 9);
+    expect(out.kills).toBe(2);
+    expect(out.headPct).toBe(25);
   });
 });
 

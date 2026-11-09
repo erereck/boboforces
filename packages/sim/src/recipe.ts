@@ -51,7 +51,10 @@ export function isFfaMode(mode: string): boolean {
   return mode === 'warfare.ffa';
 }
 
-/** Família Bobo Warfare (regeneração, respawn padrão). */
+/**
+ * Família Bobo Warfare (regeneração, respawn padrão, caixinha de munição). M2 (fase 5d): o Bobo Training joga com as
+ * mesmas regras (sem placar e sem fim: tempo e meta zerados).
+ */
 export function isWarfareMode(mode: string): boolean {
-  return mode.startsWith('warfare.');
+  return mode.startsWith('warfare.') || mode === 'training';
 }

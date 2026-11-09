@@ -189,6 +189,8 @@ export interface SimContext {
   readonly zombieProfile: MovementProfile;
   readonly ffa: boolean;
   readonly warfare: boolean;
+  /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
+  readonly training: boolean;
   readonly hz: number;
   readonly dt: number;
   /** Tick sendo simulado agora (o `tick` dos eventos). */

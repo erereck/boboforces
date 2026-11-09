@@ -142,6 +142,8 @@ const LOCKED_IDS = [
   'bot:hunter-hank',
   'bot:buddy',
   'bot:goofy-gus',
+  'bot:training-dummy',
+  'bot:training-runner',
 ];
 
 describe('registro de IDs de conteúdo', () => {

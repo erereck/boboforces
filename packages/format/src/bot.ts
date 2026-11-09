@@ -24,6 +24,8 @@ export const PERSONALITIES = [
   'hunter',
   'support',
   'clown',
+  // M2 (fase 5d): o Alvo do Bobo Training: não ataca; paciência alta fica parado, baixa anda de um lado para o outro.
+  'dummy',
 ] as const;
 export type PersonalityId = (typeof PERSONALITIES)[number];
 
@@ -196,6 +198,7 @@ export const PERSONALITY_PRESETS: Readonly<Record<PersonalityId, BotPersonality>
   hunter: personality('hunter', 0.8, 0.3, 0.4, 15, 0.05),
   support: personality('support', 0.4, 0.6, 0.6, 15, 0.05),
   clown: personality('clown', 0.5, 0.3, 0.3, 15, 0.5),
+  dummy: personality('dummy', 0, 0, 1, -1, 0),
 };
 
 function personality(
@@ -304,6 +307,12 @@ export const BUILTIN_BOTS: Readonly<Record<string, BotDocument>> = {
   buddy: special('buddy', 'normal', 2, 'support', {}),
   // Palhaço.
   'goofy-gus': special('goofy-gus', 'chill', 1, 'clown', {}),
+  // M2 (fase 5d): os alvos do Bobo Training (parado e andando de um lado para o outro).
+  'training-dummy': special('training-dummy', 'vibe', 0, 'dummy', {}),
+  'training-runner': {
+    ...special('training-runner', 'vibe', 0, 'dummy', {}),
+    personality: { ...PERSONALITY_PRESETS.dummy, patience: 0 },
+  },
 };
 
 /**

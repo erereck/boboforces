@@ -376,6 +376,8 @@ export const STRINGS_PT_BR = {
   'bot.name.hunter-hank': 'Hunter Hank',
   'bot.name.buddy': 'Buddy',
   'bot.name.goofy-gus': 'Goofy Gus',
+  'bot.name.training-dummy': 'Dummy Dan',
+  'bot.name.training-runner': 'Dashing Dave',
   // M2 (fase 5a): a Oficina (biblioteca dos bots) e o card do bot (§6.5: toda regra ativa à vista).
   'menu.lab': 'Laboratório',
   'workshop.title': 'Oficina',
@@ -410,6 +412,11 @@ export const STRINGS_PT_BR = {
   'persona.hunter': 'Caçador',
   'persona.support': 'Suporte',
   'persona.clown': 'Palhaço',
+  'persona.dummy': 'Alvo',
+  // M2 (fase 5d): Bobo Training.
+  'training.line': 'Precisão {accuracy} · TTK médio {ttk} · Na cabeça {head} · Abates {kills}',
+  'mode.name.training': 'Bobo Training',
+  'mode.desc.training': 'Alvos parados e andando no Ringue, sem placar.',
   // M2 (fase 5b): o Laboratório (editor de um bot por vez, gameplay.md §6).
   'lab.tab.skill': 'Habilidade',
   'lab.tab.mind': 'Inteligência',

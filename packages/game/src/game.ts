@@ -94,6 +94,7 @@ import {
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotName, stepLab } from './lab.ts';
+import { trainingPreset } from './training.ts';
 import {
   factoryPresets,
   QUICK_MODES,
@@ -504,11 +505,15 @@ export function startGame(deps: GameDeps): GameHandle {
   const modesMenu = createMenuController();
   modesMenu.setRoot(
     modesScreen.build({
-      modes: QUICK_MODES.map((id) => ({
-        id,
-        nameKey: id === 'warfare.tdm' ? 'mode.name.warfare.tdm' : 'mode.name.warfare.ffa',
-        descKey: id === 'warfare.tdm' ? 'mode.desc.warfare.tdm' : 'mode.desc.warfare.ffa',
-      })),
+      modes: [
+        ...QUICK_MODES.map((id) => ({
+          id,
+          nameKey: id === 'warfare.tdm' ? ('mode.name.warfare.tdm' as const) : ('mode.name.warfare.ffa' as const),
+          descKey: id === 'warfare.tdm' ? ('mode.desc.warfare.tdm' as const) : ('mode.desc.warfare.ffa' as const),
+        })),
+        // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
+        { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
+      ],
     }),
   );
   /** Teto de bots do aparelho com 1 jogador local (a Partida Rápida não deixa passar). */
@@ -920,6 +925,12 @@ export function startGame(deps: GameDeps): GameHandle {
     requestScene('play', null, preset);
   }
 
+  /** M2 (fase 5d): o treino não vira o último preset (o JOGAR continua sendo a última partida). */
+  function playTraining(preset: MatchRecipe): void {
+    playingPreset = preset;
+    requestScene('play', null, preset);
+  }
+
   /** JOGAR do título: o último preset (ou a partida de estreia). */
   function play(): void {
     playPreset(currentPreset());
@@ -1113,6 +1124,7 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
+          else if (id === 'training') playTraining(trainingPreset());
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);

@@ -198,7 +198,7 @@ import {
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
 import { projectToView } from './markers.ts';
-import { createMatchStats, recordMatchEvent, summarizeMatch } from './result.ts';
+import { createMatchStats, recordMatchEvent, summarizeMatch, trainingNumbers, type TrainingNumbers } from './result.ts';
 import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
@@ -679,6 +679,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     descs.push(desc);
   }
   const sharedHud = createHudSharedModel();
+  // M2 (fase 5d): Bobo Training: sem placar nem relógio; a linha dos números, refeita só quando eles mudam.
+  const training = recipe.mode === 'training';
+  const trainingNow: TrainingNumbers = { accuracy: -1, headPct: -1, ttkS: -1, kills: 0 };
+  let lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+  function refreshTrainingLine(): void {
+    const h = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    trainingNumbers(matchStats, sim.view(), h, sim.hz, trainingNow);
+    const n = trainingNow;
+    const prev = lastTraining;
+    if (prev[0] === n.accuracy && prev[1] === n.headPct && prev[2] === n.ttkS && prev[3] === n.kills) return;
+    lastTraining = [n.accuracy, n.headPct, n.ttkS, n.kills];
+    const none = t('result.noAccuracy');
+    sharedHud.trainingLine = t('training.line', {
+      accuracy: n.accuracy >= 0 ? t('settings.percent', { n: n.accuracy }) : none,
+      ttk: n.ttkS >= 0 ? t('lab.seconds', { n: Math.round(n.ttkS * 10) / 10 }) : none,
+      head: n.headPct >= 0 ? t('settings.percent', { n: n.headPct }) : none,
+      kills: n.kills,
+    });
+  }
   let layout: HudScreenLayout | null = null;
   /** Entradas do último `layoutHudScreen` (comparadas número a número: nada de chave em string por frame). */
   const layoutKey = new Float64Array(7).fill(-1);
@@ -2968,7 +2987,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else {
         if (hudVisible && !resultShown && !(overrideCamera || overrideRoute)) {
           const sharedArea = lay.shared;
-          if (!ffa && request.kind === 'play') {
+          if (training) {
+            sharedHud.teamCount = 0;
+            refreshTrainingLine();
+          } else if (!ffa && request.kind === 'play') {
             sharedHud.teamCount = 2;
             const score = sim.view().match.teamScore;
             sharedHud.teamScores[0] = score[0]!;
@@ -2978,9 +3000,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           }
           const mv = sim.view().match;
           // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
-          sharedHud.timeLeftS = request.kind === 'play' && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
+          sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
-          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0) {
+          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training) {
             drawHudShared(list, fonts, sharedHud, sharedArea);
           }
           const hs = Math.min(ui.width / 640, ui.height / 360);

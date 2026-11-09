@@ -67,7 +67,18 @@ export const modesScreen: Screen<ModesState> = {
             { kind: 'box', height: 16 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
             { kind: 'box', height: 36 },
-            { kind: 'row', id: 'cards', gap: 24, children: cards },
+            // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card).
+            {
+              kind: 'column',
+              id: 'cards',
+              gap: 24,
+              children: Array.from({ length: Math.ceil(cards.length / 2) }, (_, r) => ({
+                kind: 'row',
+                id: `cards${r}`,
+                gap: 24,
+                children: cards.slice(r * 2, r * 2 + 2),
+              })) as UiNode[],
+            },
             { kind: 'box', height: 36 },
             {
               kind: 'button',
