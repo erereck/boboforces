@@ -1437,3 +1437,32 @@ mudanças de contrato ficam registradas aqui.
 - **ai:** a sniper não espera a mira cheia se a partida não tem ADS (`view.mods.ads`).
 - **game (cena):** `hud.*` desliga o kill feed, o hitmarker e os marcadores dos aliados; `weapons.aimAssist` falso
   zera a assistência.
+
+### 12.25 Fase 4e, parte 2: a tela da Partida personalizada (09/11/2026)
+
+- **ui:**
+  - `ButtonNode.compact`, com `TYPE.buttonCompact` e `BUTTON_COMPACT` (48 de altura, respiro 16, sem largura
+    mínima): as 6 abas cabem numa fileira;
+  - `customMatchScreen`: abas `tab:<i>`, linhas `row:<id>` numa coluna com rolagem (800 × 348), o resumo ou o
+    aviso embaixo do título, e Voltar, Salvar preset e COMEÇAR embaixo à direita;
+  - `moveFocus`: um item recortado fora da janela só é vizinho de quem está na mesma lista (no 640×360 com toque, o
+    Voltar ficava inalcançável);
+  - a Partida Rápida ganha "Mais regras" (`QUICK_ACTION.custom`) e as opções numa coluna com rolagem (348);
+  - `result.presetSaved`.
+- **`game/custom-match.ts`** (puro):
+  - `CUSTOM_TABS` e `customRows(tab, recipe)`: cada linha tem o valor em texto e um passo;
+  - `stepCustom`;
+  - `CUSTOM_BOTS`: os 5 níveis e os 7 especiais, um bot por time, com a quantidade limitada ao teto do aparelho;
+  - TDM ↔ FFA mantém a quantidade de bots;
+  - a visão para no teto do perfil;
+  - `presetName`: nome do gerador; se já existe, " 2", " 3"…
+- **game:**
+  - tela `custom`: `openCustom(recipe, back)` e `saveCustomPreset`;
+  - `SceneSignal` ganha `rules` (Mudar regras abre a personalizada com o preset da partida) e `save` (o `game`
+    salva; a cena troca o botão por "Preset salvo");
+  - os sinais do resultado sempre partem de um preset.
+- **Saem os parâmetros de desenvolvimento:** `GameDeps.playSquad` e `playLevel`, `SceneRequest.squad`,
+  `PlaySquad`, o esquadrão de fábrica da cena e o `apps/web/src/play-squad.ts`.
+- **Teste de estouro (`fonts-in-use`):** a Partida personalizada nos 6 alvos e no Switch; a fileira do canto não pode
+  encostar nas listas; o alcance pelo D-pad (`reachableScrolling`) refaz o layout a cada foco, com a rolagem.
+- **Tamanho:** o menu foi a 317,4 KB (+3,8 KB).

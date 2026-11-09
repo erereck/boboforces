@@ -113,6 +113,8 @@ export interface ButtonNode extends NodeBase {
   readonly valueWidth?: number;
   /** M2 (fase 4a): aba selecionada (variante `tab`). */
   readonly selected?: boolean;
+  /** M2 (fase 4e): botão compacto (texto menor, 48 de altura, sem largura mínima): abas e barras de ferramentas. */
+  readonly compact?: boolean;
   /** Exceções de foco declaradas: id do vizinho por direção. */
   readonly focusOverride?: Readonly<Partial<Record<'up' | 'down' | 'left' | 'right', string>>>;
 }

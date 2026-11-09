@@ -40,6 +40,10 @@ function inDirection(dir: Direction, from: Rect, to: Rect): boolean {
   }
 }
 
+function intersects(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
 function overlapsCross(dir: Direction, a: Rect, b: Rect): boolean {
   if (dir === 'left' || dir === 'right') return a.y < b.y + b.h && b.y < a.y + a.h;
   return a.x < b.x + b.w && b.x < a.x + a.w;
@@ -72,12 +76,17 @@ export function moveFocus(layout: LayoutResult, currentId: string | null, action
   if (override !== undefined && findFocusable(layout, override)) return override;
 
   const from = layout.rects.get(current) as Rect;
+  const fromClip = layout.clips.get(current);
   let best: ButtonNode | null = null;
   let bestInBeam = false;
   let bestScore = Infinity;
   for (const candidate of layout.focusable) {
     if (candidate === current) continue;
     const to = layout.rects.get(candidate) as Rect;
+    // M2 (fase 4e): item fora da janela de uma lista com rolagem só é vizinho de quem já está nela (para rolar);
+    // de fora, entra-se pelos itens à vista.
+    const clip = layout.clips.get(candidate);
+    if (clip && clip !== fromClip && !intersects(to, clip)) continue;
     if (!inDirection(action, from, to)) continue;
     const inBeam = overlapsCross(action, from, to);
     const sc = score(action, from, to);

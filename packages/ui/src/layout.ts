@@ -1,6 +1,6 @@
 import { measureText, textBoxHeight, type UiFonts } from './font.ts';
 import { t } from './text.ts';
-import { BUTTON, OPTION, SCREEN_MARGIN, TYPE, uiScale, type FontRole } from './tokens.ts';
+import { BUTTON, BUTTON_COMPACT, OPTION, SCREEN_MARGIN, TYPE, uiScale, type FontRole } from './tokens.ts';
 import type { Anchor, ButtonNode, Insets, Rect, StackNode, TextContent, TextNode, UiNode } from './tree.ts';
 
 /**
@@ -151,12 +151,17 @@ function measure(node: UiNode, ctx: Ctx): Size {
       break;
     }
     case 'button': {
-      const st = TYPE.button;
+      const st = node.compact ? TYPE.buttonCompact : TYPE.button;
       const resolved = resolveText(ctx, node.text, st.font, st.size, st.tracking, st.uppercase);
       ctx.texts.set(node, resolved);
       // Para cima: o arredondamento do retângulo não pode cortar o texto (M2, fase 4d: 135,45 px virava 135).
-      w = Math.ceil(Math.max(resolved.width + BUTTON.padX * s * 2, BUTTON.minWidth * s));
-      h = BUTTON.height * s;
+      if (node.compact) {
+        w = Math.ceil(resolved.width + BUTTON_COMPACT.padX * s * 2);
+        h = BUTTON_COMPACT.height * s;
+      } else {
+        w = Math.ceil(Math.max(resolved.width + BUTTON.padX * s * 2, BUTTON.minWidth * s));
+        h = BUTTON.height * s;
+      }
       if (node.value !== undefined) {
         // Linha de opção: rótulo, folga e a área do valor (com as setas) à direita.
         const v = OPTION.value;

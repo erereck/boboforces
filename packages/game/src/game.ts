@@ -23,6 +23,10 @@ import {
   createTestScreenModel,
   drawLoadingScreen,
   drawTestScreen,
+  CUSTOM_ACTION,
+  CUSTOM_ROW_PREFIX,
+  CUSTOM_TAB_PREFIX,
+  customMatchScreen,
   MAIN_MENU_ACTION,
   mainMenuScreen,
   MODES_ACTION,
@@ -41,9 +45,11 @@ import {
   surpriseScreen,
   TITLE_ACTION,
   TITLE_ACTION_TEST_PREFIX,
+  t,
   titleScreen,
   uiScale,
   type LayoutOptions,
+  type StringKey,
   type TitleExtraItem,
   type UiAtlasImage,
   type UiFonts,
@@ -53,6 +59,7 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { LocalDriver } from './local-driver.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
+import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import {
   factoryPresets,
@@ -70,7 +77,6 @@ import {
   type RendererFactory,
   type RendererRoutes,
   type Scene,
-  type PlaySquad,
   type SceneBundle,
   type SceneKind,
   type SceneRequest,
@@ -125,14 +131,10 @@ export interface GameDeps {
    * renderer completo; Switch e testes: o módulo direto. Ausente = JOGAR não abre nada (só registra no log).
    */
   readonly loadScene?: () => Promise<SceneBundle>;
-  /** M2 (fase 3g): quem joga no JOGAR (web: `?bots=fabrica`); padrão `levels`. */
-  readonly playSquad?: PlaySquad;
-  /** M2 (fase 3h): nível do primeiro JOGAR (web: `?nivel=suado`); padrão Normal. O resultado sobe e desce a partir dele. */
-  readonly playLevel?: BotLevel;
 }
 
 export type GameScreen =
-  'loading' | 'title' | 'main' | 'quick' | 'modes' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
+  'loading' | 'title' | 'main' | 'quick' | 'modes' | 'custom' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
 
 export interface GameHandle extends Disposable {
   /** Renderer em uso (o real ou o NullRenderer). M1: pode trocar (menu → cena completa; rotas do bench). */
@@ -198,12 +200,10 @@ export function startGame(deps: GameDeps): GameHandle {
   const surpriseMenu = createMenuController();
   /**
    * M2 (fase 4c): o que o JOGAR joga: o último preset (o save guarda os 5 últimos) ou, na primeira vez, a partida de
-   * estreia (gameplay.md §2.5). Os parâmetros de desenvolvimento da web (`?bots=fabrica`, `?nivel=`) ainda montam a
-   * partida do jeito antigo, até a Partida personalizada (fase 4e).
+   * estreia (gameplay.md §2.5).
    */
-  const devPlay = deps.playSquad !== undefined || deps.playLevel !== undefined;
   const currentPreset = (): MatchRecipe => save.presets.recent[0] ?? DEBUT_PRESET;
-  /** O preset da partida em andamento (para De novo, Mais fácil e Mais difícil); `null` no caminho antigo. */
+  /** O preset da partida em andamento (para De novo, Mais fácil, Mais difícil, Mudar regras e Salvar preset). */
   let playingPreset: MatchRecipe | null = null;
   /** O sorteio na tela do Surpreenda-me. */
   let surprise: MatchRecipe = DEBUT_PRESET;
@@ -214,7 +214,7 @@ export function startGame(deps: GameDeps): GameHandle {
         version: GAME_VERSION,
         codename: GAME_CODENAME,
         canExit: platform.features.canExit,
-        ...(devPlay ? {} : { playSummary: presetSummary(currentPreset()) }),
+        playSummary: presetSummary(currentPreset()),
         ...(extraItems.length > 0 ? { extraItems } : {}),
       }),
     );
@@ -257,6 +257,50 @@ export function startGame(deps: GameDeps): GameHandle {
       }),
     );
   }
+  // M2 (fase 4e): Partida personalizada.
+  const customMenu = createMenuController();
+  let customRecipe: MatchRecipe = DEBUT_PRESET;
+  let customTab = 0;
+  let customNote = '';
+  let customReturn: GameScreen = 'quick';
+  const customLimits = {
+    maxBots,
+    maxViewM: selectPlatformProfile(platform.features.profileHint, 1).maxViewDistanceM,
+  };
+  function rebuildCustom(): void {
+    const tab = CUSTOM_TABS[customTab]!;
+    customMenu.setRoot(
+      customMatchScreen.build({
+        tabs: CUSTOM_TABS.map((id) => CUSTOM_TAB_LABELS[id]),
+        tab: customTab,
+        rows: customRows(tab, customRecipe).map((r) => ({
+          id: r.id,
+          labelKey: r.labelKey,
+          value: r.value(customRecipe),
+        })),
+        summary: presetSummary(customRecipe),
+        note: customNote,
+      }),
+    );
+  }
+  function openCustom(recipe: MatchRecipe, back: GameScreen): void {
+    customRecipe = recipe;
+    customTab = 0;
+    customNote = '';
+    customReturn = back;
+    rebuildCustom();
+    customMenu.focus('start');
+    screen = 'custom';
+  }
+  /** Salva o preset com nome do gerador ("Times 4×4 De boa"; repetido, " 2"); devolve o aviso para a tela. */
+  function saveCustomPreset(recipe: MatchRecipe): string {
+    const short = presetShortcut({ ...recipe, name: '' }).label;
+    const base = `${t(`mode.short.${recipe.mode}` as StringKey)} ${short}`;
+    const name = presetName(base, (n) => save.presets.saved.some((p) => p.name === n));
+    const ok = save.savePreset({ ...recipe, name, seed: 0 });
+    return ok ? t('custom.saved', { name }) : t('custom.full');
+  }
+
   /** Abre a Partida Rápida como o último preset estava (com o modo pedido, se veio dos Modos). */
   function openQuick(mode: QuickMode | null): void {
     quick = quickFromPreset(currentPreset(), maxBots);
@@ -372,9 +416,6 @@ export function startGame(deps: GameDeps): GameHandle {
     }
   }
 
-  /** M2 (fase 2e): nível dos bots do próximo JOGAR (o resultado sobe e desce um passo). */
-  let playLevel: BotLevel = deps.playLevel ?? 'normal';
-
   function requestScene(kind: SceneKind, bench: BenchConfig | null, recipe: MatchRecipe | null = null): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
@@ -389,8 +430,6 @@ export function startGame(deps: GameDeps): GameHandle {
       convention,
       device: menuInput.lastDevice,
       gamepad: menuInput.lastGamepad,
-      level: playLevel,
-      ...(deps.playSquad ? { squad: deps.playSquad } : {}),
       ...(recipe ? { recipe } : {}),
     };
     screen = 'scene';
@@ -442,12 +481,9 @@ export function startGame(deps: GameDeps): GameHandle {
     requestScene('play', null, preset);
   }
 
-  /** JOGAR do título: o último preset (ou o caminho antigo, com os parâmetros de desenvolvimento). */
+  /** JOGAR do título: o último preset (ou a partida de estreia). */
   function play(): void {
-    if (devPlay) {
-      playingPreset = null;
-      requestScene('play', null);
-    } else playPreset(currentPreset());
+    playPreset(currentPreset());
   }
 
   function startTest(item: TestItem): void {
@@ -534,6 +570,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const a = nav.activated;
         if (nav.back || a === QUICK_ACTION.back) screen = 'main';
         else if (a === QUICK_ACTION.start) playPreset(quickToPreset(quick));
+        else if (a === QUICK_ACTION.custom) openCustom(quickToPreset(quick), 'quick');
         else if (a !== null && (QUICK_ROWS as readonly string[]).includes(a)) {
           // Linha de opção: esquerda e direita andam; o confirmar avança um.
           quick = stepQuick(quick, a as (typeof QUICK_ROWS)[number], nav.delta === 0 ? 1 : nav.delta, maxBots);
@@ -545,6 +582,33 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'quick') {
           quickMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'custom': {
+        const nav = customMenu.update(menuInput, raw, u);
+        const a = nav.activated;
+        if (nav.tab !== 0) {
+          customTab = (customTab + nav.tab + CUSTOM_TABS.length) % CUSTOM_TABS.length;
+          rebuildCustom();
+        } else if (nav.back || a === CUSTOM_ACTION.back) screen = customReturn;
+        else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
+        else if (a === CUSTOM_ACTION.save) {
+          customNote = saveCustomPreset(customRecipe);
+          rebuildCustom();
+        } else if (a !== null && a.startsWith(CUSTOM_TAB_PREFIX)) {
+          customTab = Number(a.slice(CUSTOM_TAB_PREFIX.length));
+          rebuildCustom();
+        } else if (a !== null && a.startsWith(CUSTOM_ROW_PREFIX)) {
+          const id = a.slice(CUSTOM_ROW_PREFIX.length);
+          customRecipe = stepCustom(CUSTOM_TABS[customTab]!, customRecipe, id, nav.delta, customLimits);
+          customNote = '';
+          rebuildCustom();
+        }
+        if (screen === 'custom') {
+          customMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
@@ -623,13 +687,17 @@ export function startGame(deps: GameDeps): GameHandle {
       else if (signal === 'again' || signal === 'easier' || signal === 'harder') {
         // M2 (fase 2e): De novo / Mais fácil / Mais difícil: a mesma partida com semente nova, um passo de nível.
         const level = scene!.level;
-        playLevel = signal === 'easier' ? stepLevel(level, -1) : signal === 'harder' ? stepLevel(level, 1) : level;
-        const preset = playingPreset;
+        const next = signal === 'easier' ? stepLevel(level, -1) : signal === 'harder' ? stepLevel(level, 1) : level;
+        const preset = playingPreset ?? currentPreset();
         leaveScene();
-        // M2 (fase 4c): com preset, o nível novo vale para todos os bots de nível dele, e ele vira o último.
-        if (preset !== null) playPreset(withPresetLevel(preset, playLevel));
-        else requestScene('play', null);
-      }
+        // M2 (fase 4c): o nível novo vale para todos os bots de nível do preset, e ele vira o último.
+        playPreset(withPresetLevel(preset, next));
+      } else if (signal === 'rules') {
+        // M2 (fase 4e): Mudar regras abre a Partida personalizada com o preset desta partida.
+        const preset = playingPreset ?? currentPreset();
+        leaveScene();
+        openCustom(preset, 'title');
+      } else if (signal === 'save') saveCustomPreset(playingPreset ?? currentPreset());
     }
     syncPointerLock();
     frames++;

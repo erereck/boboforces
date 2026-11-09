@@ -15,7 +15,8 @@ import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
-import { BUTTON, MIN_TEXT, MIN_TOUCH_TARGET, OPTION } from './tokens.ts';
+import { customMatchScreen } from './screens/custom-match.ts';
+import { BUTTON, BUTTON_COMPACT, MIN_TEXT, MIN_TOUCH_TARGET, OPTION } from './tokens.ts';
 import type { Rect, UiNode } from './tree.ts';
 
 // Testes com o atlas REAL das fontes em uso (decisão #54), lido de assets-src pelo caminho lógico do runtime-assets:
@@ -140,6 +141,36 @@ function layoutFor(root: UiNode, t: Target): LayoutResult {
   });
 }
 
+/**
+ * Alcance pelo D-pad com rolagem (M2, fase 4e): como o menu, refaz o layout a cada foco (a janela da lista anda junto) e
+ * anda a partir dali.
+ */
+function reachableScrolling(tree: UiNode, t: Target, start: string): Set<string> {
+  const scrollState = new Map<string, number>();
+  const at = (id: string): LayoutResult =>
+    layoutTree(tree, { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+      fonts,
+      minTextPx: t.minTextPx,
+      minTarget: t.minTarget,
+      focusedId: id,
+      scrollState,
+    });
+  const seen = new Set([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const id = queue.shift() as string;
+    const l = at(id);
+    for (const dir of ['up', 'down', 'left', 'right'] as const) {
+      const next = moveFocus(l, id, dir);
+      if (next !== null && !seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return seen;
+}
+
 function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
@@ -173,7 +204,8 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
     if (node.kind === 'button' && text) {
       // Linha de opção (M2, fase 4a): o rótulo divide o botão com a área do valor; o valor cabe entre as setas.
       const valueW = node.value !== undefined ? (node.valueWidth ?? OPTION.valueWidth) * layout.scale : 0;
-      const room = r.w - 2 * BUTTON.padX * layout.scale - (valueW > 0 ? valueW + 16 * layout.scale : 0);
+      const padX = node.compact ? BUTTON_COMPACT.padX : BUTTON.padX;
+      const room = r.w - 2 * padX * layout.scale - (valueW > 0 ? valueW + 16 * layout.scale : 0);
       const value = layout.values.get(node);
       if (value) {
         const between = valueW - 2 * OPTION.arrow * layout.scale;
@@ -199,7 +231,8 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
     if (node.kind === 'text' && text && !clipped) {
       expect(r.x, `${t.name}: ${node.id ?? text.text}`).toBeGreaterThanOrEqual(c.x - 0.5);
       expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
-      expect(r.y + r.h).toBeLessThanOrEqual(c.y + c.h + 0.5);
+      // 1 px de folga, como nos botões: a posição e a altura arredondam separadas (coluna ancorada embaixo).
+      expect(r.y + r.h).toBeLessThanOrEqual(c.y + c.h + 1);
       expect(r.y).toBeGreaterThanOrEqual(c.y - 0.5);
       expect(text.px).toBeGreaterThanOrEqual(t.minTextPx);
     }
@@ -286,6 +319,30 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
         ],
       }),
+      customMatchScreen.build({
+        tabs: [
+          'custom.tab.match',
+          'custom.tab.players',
+          'custom.tab.weapons',
+          'custom.tab.bots',
+          'custom.tab.mods',
+          'custom.tab.hud',
+        ],
+        tab: 4,
+        // Os rótulos e os valores mais longos.
+        rows: [
+          { id: 'a', labelKey: 'custom.row.allyMarkers', value: 'Desligado' },
+          { id: 'b', labelKey: 'custom.row.enemies', value: 'Jorge the Immortal' },
+          { id: 'c', labelKey: 'custom.row.ammo', value: 'Reserva infinita' },
+          { id: 'd', labelKey: 'custom.row.allowed', value: 'Só metralhadora' },
+          { id: 'e', labelKey: 'custom.row.regen', value: 'Desligada' },
+          { id: 'f', labelKey: 'custom.row.friendlyFire', value: 'Desligado' },
+          { id: 'g', labelKey: 'custom.row.headshotOnly', value: 'Ligado' },
+          { id: 'h', labelKey: 'custom.row.selfDamage', value: 'Ligado' },
+        ],
+        summary: 'Todos contra todos · Pela vibe · 12 bobos · Construto',
+        note: 'Salvo como Todos contra todos 12 bots Pela vibe 2',
+      }),
       surpriseScreen.build({
         lines: ['Bobo Warfare: Todos contra todos', 'Construto', 'Pela vibe', '10 bobos', '10 min ou 25 abates'],
       }),
@@ -294,7 +351,19 @@ describe('estouro de texto com o atlas real', () => {
       for (const tree of screens) {
         const layout = layoutFor(tree, t);
         expectNoOverflow(layout, t);
-        expect(reachable(layout, layout.focusable[0]!.id!).size, `${t.name}: foco`).toBe(layout.focusable.length);
+        expect(reachableScrolling(tree, t, layout.focusable[0]!.id!).size, `${t.name}: foco`).toBe(
+          layout.focusable.length,
+        );
+        // A fileira do canto (COMEÇAR) não encosta na lista nem nos atalhos.
+        const rectOfId = (id: string): Rect | null => {
+          const n = layout.byId.get(id);
+          return n ? (layout.rects.get(n) ?? null) : null;
+        };
+        const corner = rectOfId('buttons');
+        for (const other of ['rows', 'options', 'shortcutsPanel']) {
+          const r = rectOfId(other);
+          if (corner && r) expect(overlaps(corner, r), `${t.name}: buttons × ${other}`).toBe(false);
+        }
       }
     }
   });

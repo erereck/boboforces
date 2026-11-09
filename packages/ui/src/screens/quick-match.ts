@@ -10,7 +10,7 @@ import type { Screen, UiNode } from '../tree.ts';
 export const QUICK_ROWS = ['mode', 'map', 'level', 'size', 'minutes'] as const;
 export type QuickRow = (typeof QUICK_ROWS)[number];
 
-export const QUICK_ACTION = { start: 'start', back: 'back' } as const;
+export const QUICK_ACTION = { start: 'start', custom: 'custom', back: 'back' } as const;
 /** Ação de um atalho: `preset:<grupo>:<índice>`. */
 export const QUICK_SHORTCUT_PREFIX = 'preset:';
 
@@ -41,7 +41,12 @@ export interface QuickMatchState {
 }
 
 /** Medidas (px de referência): a coluna das opções e a dos atalhos. */
-export const QUICK_LAYOUT = { optionsWidth: 660, shortcutsWidth: 420, shortcutsHeight: 470 } as const;
+export const QUICK_LAYOUT = {
+  optionsWidth: 660,
+  optionsHeight: 348,
+  shortcutsWidth: 420,
+  shortcutsHeight: 470,
+} as const;
 
 function shortcuts(groups: readonly QuickShortcutGroup[]): UiNode[] {
   const nodes: UiNode[] = [];
@@ -99,11 +104,20 @@ export const quickMatchScreen: Screen<QuickMatchState> = {
           id: 'main',
           anchor: 'topLeft',
           children: [
-            { kind: 'text', id: 'heading', text: { key: 'quick.title' }, style: 'title', color: COLORS.texto },
+            { kind: 'text', id: 'heading', text: { key: 'quick.title' }, style: 'heading', color: COLORS.texto },
             { kind: 'box', height: 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 24 },
-            { kind: 'column', id: 'options', gap: 12, children: rows },
+            { kind: 'box', height: 16 },
+            // Em coluna com rolagem: nas telas pequenas (alvos de toque altos) ela rola em vez de invadir o canto.
+            {
+              kind: 'column',
+              id: 'options',
+              scroll: true,
+              gap: 12,
+              width: QUICK_LAYOUT.optionsWidth,
+              height: QUICK_LAYOUT.optionsHeight,
+              children: rows,
+            },
           ],
         },
         // COMEÇAR fixo no canto (arte-ux.md §6.3), com o Voltar ao lado.
@@ -118,6 +132,13 @@ export const quickMatchScreen: Screen<QuickMatchState> = {
               id: 'back',
               text: { key: 'menu.back' },
               action: QUICK_ACTION.back,
+              variant: 'secondary',
+            },
+            {
+              kind: 'button',
+              id: 'custom',
+              text: { key: 'menu.custom' },
+              action: QUICK_ACTION.custom,
               variant: 'secondary',
             },
             {

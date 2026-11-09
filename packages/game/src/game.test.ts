@@ -1193,38 +1193,6 @@ describe('textos', () => {
   });
 });
 
-describe('JOGAR com os bots de fábrica (M2, fase 3g)', () => {
-  it('os especiais contra o jogador e o Buddy no time dele; a receita passa no validador', () => {
-    const request: SceneRequest = {
-      kind: 'play',
-      bench: null,
-      benchWarnings: [],
-      seed: 3,
-      convention: undefined as unknown as SceneRequest['convention'],
-      device: null,
-      gamepad: 0,
-      level: 'normal',
-      squad: 'factory',
-    };
-    const { recipe } = sceneRecipe(request, profileFor('pc', 1, null));
-    expect(recipe.teams[1]!.bots.map((b) => [b.ref, b.count])).toEqual([
-      ['builtin:jorge-the-immortal', 1],
-      ['builtin:camper-carl', 1],
-      ['builtin:knife-ninja', 1],
-      ['builtin:scaredy-sam', 1],
-      ['builtin:hunter-hank', 1],
-      ['builtin:goofy-gus', 1],
-    ]);
-    expect(recipe.teams[0]!.bots.map((b) => [b.ref, b.count])).toEqual([
-      ['builtin:buddy', 1],
-      ['builtin:normal-bob', 4],
-    ]);
-    // Sem o esquadrão, o de sempre: o nível rápido nos dois times.
-    const { recipe: plain } = sceneRecipe({ ...request, squad: 'levels' }, profileFor('pc', 1, null));
-    expect(plain.teams[1]!.bots).toEqual([{ ref: 'builtin:normal-bob', count: 6 }]);
-  });
-});
-
 describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
   it('Mudar abre o menu principal; Ajustes e Voltar andam pelas telas', async () => {
     const { platform, game } = await bootToTitle();
@@ -1282,15 +1250,14 @@ describe('Partida Rápida e Modos (M2, fase 4d)', () => {
     platform.tap('Enter');
     platform.tap('Enter');
     expect(game.screen).toBe('quick');
-    // COMEÇAR fica no canto: esquerda (Voltar), esquerda (Duração), cima (Bots), direita (5 contra 5); de volta: baixo
-    // (Duração), baixo (Voltar), direita (COMEÇAR).
-    platform.tap('ArrowLeft');
-    platform.tap('ArrowLeft');
+    // COMEÇAR fica no canto: esquerda (Mais regras), esquerda (Voltar), esquerda (Duração), cima (Bots), direita (5
+    // contra 5); de volta: baixo (Duração), baixo (a fileira do canto) e direita até o COMEÇAR.
+    for (let i = 0; i < 3; i++) platform.tap('ArrowLeft');
     platform.tap('ArrowUp');
     platform.tap('ArrowRight');
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
-    platform.tap('ArrowRight');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);
@@ -1300,6 +1267,44 @@ describe('Partida Rápida e Modos (M2, fase 4d)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.presets.recent[0]!.teams[1]!.bots[0]!.count).toBe(5);
+    game.dispose();
+  }, 120_000);
+});
+
+describe('Partida personalizada (M2, fase 4e)', () => {
+  it('Mais regras → aba Jogadores → Vida 150 → COMEÇAR; no resultado, Salvar preset e Mudar regras', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Partida Rápida → Mais regras (à esquerda do COMEÇAR).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('Enter');
+    platform.tap('ArrowLeft');
+    platform.tap('Enter');
+    expect(game.screen).toBe('custom');
+    // E (próxima aba): Jogadores (5 linhas). Do COMEÇAR: esquerda (Salvar), esquerda (Voltar), esquerda (a última linha,
+    // Dano de queda); cima 4 vezes (Vida) e direita: 150. De volta: baixo 5 vezes (até o Voltar) e direita 2 (COMEÇAR).
+    platform.tap('KeyE');
+    for (let k = 0; k < 3; k++) platform.tap('ArrowLeft');
+    for (let k = 0; k < 4; k++) platform.tap('ArrowUp');
+    platform.tap('ArrowRight');
+    for (let k = 0; k < 5; k++) platform.tap('ArrowDown');
+    for (let k = 0; k < 2; k++) platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    const sim = game.match!.sim;
+    expect(sim.view().health[entityIndex(sim.controllerEntity(0))]).toBe(150);
+    // Resultado (o gancho dos prints abre no meio): baixo (Mudar regras), direita (Salvar preset).
+    game.debug!.showResult();
+    platform.pump(2);
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.save.presets.saved.map((p) => p.players?.hp)).toEqual([150]);
+    platform.tap('ArrowLeft');
+    platform.tap('Enter');
+    expect(game.screen).toBe('custom');
     game.dispose();
   }, 120_000);
 });

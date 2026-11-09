@@ -26,7 +26,6 @@ import {
   type PropDoseView,
   type TimeOfDay,
   type BotLevel,
-  type BotRef,
 } from '@boboforces/format';
 import {
   createGamepadProfile,
@@ -418,16 +417,13 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
     const bots = Math.min(PLAY_BOTS, profile.maxBots);
     const enemies = Math.ceil(bots / 2);
     const allies = bots - enemies;
-    const squad = request.kind === 'play' && request.squad === 'factory';
     recipe = {
       format: MATCH_RECIPE_FORMAT,
       mode: 'warfare.tdm',
       map: 'construto',
       seed: request.seed >>> 0,
       match: { timeLimitS: PLAY_TIME_LIMIT_S, scoreLimit: PLAY_SCORE_LIMIT },
-      teams: squad
-        ? factorySquad(ref, allies, enemies)
-        : [{ humans: 'all', bots: allies > 0 ? [{ ref, count: allies }] : [] }, { bots: [{ ref, count: enemies }] }],
+      teams: [{ humans: 'all', bots: allies > 0 ? [{ ref, count: allies }] : [] }, { bots: [{ ref, count: enemies }] }],
     };
   }
   // O bench mede além do perfil (é a ferramenta que acha o teto): limites do motor e visão do PC.
@@ -438,32 +434,6 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   const checked = validateMatchRecipe(recipe, limits);
   if (!checked.ok) throw new Error(`cena: receita recusada (${checked.errors.map((e) => e.code).join(', ')})`);
   return { recipe: checked.value, humans, warnings };
-}
-
-/** Os especiais de fábrica contra o jogador, na ordem em que entram (gameplay.md §6.7). */
-const FACTORY_ENEMIES = [
-  'jorge-the-immortal',
-  'camper-carl',
-  'knife-ninja',
-  'scaredy-sam',
-  'hunter-hank',
-  'goofy-gus',
-] as const;
-
-/**
- * M2 (fase 3g): o esquadrão de fábrica do JOGAR: os especiais contra o jogador (um de cada, completando com o nível
- * rápido se sobrar vaga) e o Buddy no time dele, com o nível rápido no resto.
- */
-function factorySquad(ref: BotRef, allies: number, enemies: number): MatchRecipe['teams'] {
-  const foes = FACTORY_ENEMIES.slice(0, enemies).map((id) => ({ ref: builtinRef(id), count: 1 }));
-  if (enemies > foes.length) foes.push({ ref, count: enemies - foes.length });
-  const friends = allies > 0 ? [{ ref: builtinRef('buddy'), count: 1 }] : [];
-  if (allies > 1) friends.push({ ref, count: allies - 1 });
-  return [{ humans: 'all', bots: friends }, { bots: foes }];
-}
-
-function builtinRef(id: string): BotRef {
-  return `builtin:${id}`;
 }
 
 /** Uma vista local: a câmera, a HUD dela e o que ela segue. */
@@ -1531,6 +1501,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
+  /** M2 (fase 4e): o que o resultado mostra (para refazer a tela ao salvar o preset). */
+  let resultData: ResultScreenData | null = null;
   function showResult(): void {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
@@ -1563,6 +1535,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       canHarder: currentLevel !== BOT_LEVELS[BOT_LEVELS.length - 1],
       focusEasier: sum.uglyLoss || hardHintUsed,
     };
+    resultData = data;
     resultMenu.setRoot(resultScreen.build(data));
     resultShown = true;
     host.log(`[partida] fim: ${sum.outcome} ${sum.ownScore}×${sum.otherScore} abates=${sum.kills}`);
@@ -2698,6 +2671,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           else if (a === RESULT_ACTION.easier) signal = 'easier';
           else if (a === RESULT_ACTION.harder) signal = 'harder';
           else if (a === RESULT_ACTION.quit) signal = 'quit';
+          else if (a === RESULT_ACTION.changeRules) signal = 'rules';
+          else if (a === RESULT_ACTION.savePreset && resultData !== null && !resultData.presetSaved) {
+            // M2 (fase 4e): quem salva é o `game` (o save é dele); aqui o botão vira "Preset salvo".
+            signal = 'save';
+            resultData = { ...resultData, presetSaved: true };
+            resultMenu.setRoot(resultScreen.build(resultData));
+          }
         } else if (!paused) {
           const yaw0 = player.yaw;
           const pitch0 = player.pitch;

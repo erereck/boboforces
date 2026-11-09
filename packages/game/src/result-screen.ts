@@ -36,6 +36,8 @@ export interface ResultScreenData {
   readonly canHarder: boolean;
   /** Derrota feia: o foco começa em "Mais fácil" (GDD §3.8). */
   readonly focusEasier: boolean;
+  /** M2 (fase 4e): o preset desta partida já foi salvo (o botão vira "Preset salvo", desligado). */
+  readonly presetSaved?: boolean;
 }
 
 function line(id: string, key: StringKey, params: Record<string, string | number>, color: number = COLORS.texto) {
@@ -146,8 +148,10 @@ export const resultScreen: Screen<ResultScreenData> = {
               id: 'more',
               gap: 12,
               children: [
-                button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules, { disabled: true }),
-                button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset, { disabled: true }),
+                button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                d.presetSaved
+                  ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
+                  : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
                 button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
               ],
             },

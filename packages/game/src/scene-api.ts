@@ -27,13 +27,6 @@ export type RendererFactory = (surface: GraphicsSurface, routes?: RendererRoutes
 /** Como se entrou na cena. */
 export type SceneKind = 'play' | 'vitrine' | 'bench';
 
-/**
- * M2 (fase 3g): quem joga no JOGAR. `levels` (padrão): bots do nível rápido nos dois times; `factory`: os bots de
- * fábrica especiais contra o jogador (Jorge, Carl, Ninja, Sam, Hank e Gus) e o Buddy no time dele. Até os menus da
- * fase 4 (Partida personalizada), a web liga com `?bots=fabrica`.
- */
-export type PlaySquad = 'levels' | 'factory';
-
 export interface SceneRequest {
   /**
    * `play` (JOGAR): o Construto em Bobo Warfare TDM, o jogador e bots N0; `vitrine` (Cena-vitrine): o Construto só
@@ -50,11 +43,9 @@ export interface SceneRequest {
   readonly gamepad: number;
   /** M2 (fase 2e): nível rápido dos bots do JOGAR (padrão `normal`); o resultado sobe e desce um passo. */
   readonly level?: BotLevel;
-  /** M2 (fase 3g): quem joga no JOGAR (padrão `levels`). */
-  readonly squad?: PlaySquad;
   /**
    * M2 (fase 4c): a receita do JOGAR (o preset: o último jogado, a partida de estreia, o sorteio do Surpreenda-me).
-   * Com ela, `level` e `squad` não valem; a semente da partida é `seed`, e o corte ao aparelho é o da cena.
+   * Com ela, `level` não vale; a semente da partida é `seed`, e o corte ao aparelho é o da cena.
    */
   readonly recipe?: MatchRecipe;
 }
@@ -75,7 +66,8 @@ export interface SceneHost {
  * O que a cena pede ao núcleo: `quit` volta ao título; M2 (fase 2e): `again` (De novo), `easier` e `harder` (Mais
  * fácil / Mais difícil) recarregam o JOGAR com o nível de `Scene.level` (um passo abaixo ou acima).
  */
-export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder';
+/** M2 (fase 4e): `rules` = Mudar regras (abre a Partida personalizada com o preset); `save` = Salvar preset. */
+export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder' | 'rules' | 'save';
 
 /** A cena viva: carrega por etapas dentro dos próprios frames, depois roda a partida. */
 export interface Scene extends Disposable {

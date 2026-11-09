@@ -230,6 +230,26 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     menor faz o pulo subir mais.
   - **Bots:** atiram com a sniper mesmo sem ADS na partida.
   - **Golden e testes:** com os padrões, nada muda (golden igual). 9 testes novos.
+- **Fase 4e (parte 2), Partida personalizada:**
+  - **Abas:** Partida, Jogadores, Armas, Bots, Modificadores e Tela, em botões compactos, trocadas também com Q/E e
+    LB/RB.
+  - **Linhas:** as regras de cada aba em linhas de opção numa lista com rolagem; o resumo do preset fica embaixo do
+    título.
+  - **Botões:** Voltar, Salvar preset e COMEÇAR no canto.
+  - **Aba Bots:** escolhe o bot de cada time (os 5 níveis e os 7 especiais de fábrica) e a quantidade, até o teto do
+    aparelho.
+  - **Salvar preset:** usa um nome gerado ("Times 4×4 De boa"; repetido, " 2").
+  - **Entradas:** pela Partida Rápida ("Mais regras") e pelo resultado, onde "Mudar regras" e "Salvar preset" agora
+    funcionam (salvo, o botão vira "Preset salvo").
+  - **Fim dos parâmetros de desenvolvimento:** `?bots=fabrica` e `?nivel=` saem da web; a aba Bots faz o mesmo.
+  - **UI:**
+    - botão compacto;
+    - um item recortado fora da janela só é vizinho de quem já está na mesma lista (de fora, entra-se pelos itens à
+      vista);
+    - as opções da Partida Rápida também rolam nas telas pequenas.
+  - **Teste de estouro:** confere também que a fileira do canto não encosta nas listas, e o alcance pelo D-pad refaz o
+    layout a cada foco, como o menu.
+  - 7 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

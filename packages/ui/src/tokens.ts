@@ -100,6 +100,8 @@ export const TYPE = {
   title: { font: 'display', size: 64, tracking: 0.02, uppercase: true },
   heading: { font: 'display', size: 40, tracking: 0.02, uppercase: true },
   button: { font: 'display', size: 30, tracking: 0.06, uppercase: true },
+  /** M2 (fase 4e): botão compacto (abas, barras de ferramentas). */
+  buttonCompact: { font: 'display', size: 22, tracking: 0.08, uppercase: true },
   body: { font: 'hud', size: 26, tracking: 0, uppercase: false },
   label: { font: 'hud', size: 22, tracking: 0.14, uppercase: true },
   caption: { font: 'hud', size: 22, tracking: 0.02, uppercase: false },
@@ -123,6 +125,9 @@ export const OPTION = {
   scrollBarGap: 10,
   scrollMargin: 10,
 } as const satisfies { readonly value: TypeStyle } & Readonly<Record<string, unknown>>;
+
+/** M2 (fase 4e): botão compacto (`ButtonNode.compact`): mais baixo (48 ≥ 44), respiro menor e sem largura mínima. */
+export const BUTTON_COMPACT = { height: 48, padX: 16 } as const;
 
 /** Botão: medidas em px de referência. O layout aplica `minTarget` por cima da altura. */
 export const BUTTON = {

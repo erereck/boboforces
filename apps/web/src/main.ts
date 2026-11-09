@@ -22,7 +22,6 @@ import type { BenchShell } from './bench/shell.ts';
 import { bootWeb, type WebBoot } from './boot.ts';
 import { createDebugHook } from './debug-hook.ts';
 import { BUILD_INFO, type WebPlatform } from './platform/index.ts';
-import { playLevelFromUrl, playSquadFromUrl } from './play-squad.ts';
 import { asSwitchTitlePlatform, SWITCH_TITLE_ITEMS, urlAsksForSwitchTitle } from './title-preview.ts';
 
 /** Resultado do relatório no título da aba (sem UI em DOM, decisão #3). */
@@ -64,10 +63,6 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
   // Prévia do título do Switch (`?titulo=switch`, prints da decisão #54): a plataforma com a cara do Switch e os 9
   // itens de teste dele, sem cena (`title-preview.ts`).
   const switchTitle = !bench && urlAsksForSwitchTitle(window.location.search);
-  // M2 (fase 3g): `?bots=fabrica` põe os bots de fábrica no JOGAR (até os menus da fase 4).
-  const squad = playSquadFromUrl(window.location.search);
-  // M2 (fase 3h): `?nivel=suado` escolhe o nível do primeiro JOGAR.
-  const level = playLevelFromUrl(window.location.search);
   const game = startGame({
     platform: switchTitle ? asSwitchTitlePlatform(platform) : platform,
     // O menu desenha com o renderer só de UI; o completo (mundo, atores, VFX) chega com a cena (`loadScene`), por
@@ -91,8 +86,6 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
       },
     },
     ...(bench ? { bench: bench.config, benchWarnings: bench.warnings } : {}),
-    ...(squad ? { playSquad: squad } : {}),
-    ...(level ? { playLevel: level } : {}),
   });
   // O pointer lock só sai dentro de um gesto: o clique do mouse na canvas durante a cena pega o mouse de volta (o
   // pedido automático ao entrar ou continuar pode ser recusado, por exemplo logo depois de o jogador sair com Esc).
