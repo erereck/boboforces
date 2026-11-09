@@ -323,9 +323,12 @@ o service worker (tecnico.md §19.1). Entram antes do portão final.
   e escolhe uma vez; a escolha fica no save e não volta a rodar depois que o jogador mexe.
 - **8c. Service worker** pronto em 09/11 (`ARCHITECTURE.md` §12.52), escrito à mão (sem dependência nova): escopo próprio, precache da casca e cache-first nos
   arquivos com hash. A versão nova só é aplicada no menu; depois de atualizar, aparece a tela de Novidades.
-- **8d. Portão e medições:** `npm run check`, builds, `size-check`, `portcheck --strict`, `smoke:web`, balance e o bench
-  do PC com 40 bots, tudo registrado no `PERF.md`.
-- **8e. Roteiros:** o checklist do celular e o checkpoint do Switch (1 a 2 h de jogo) para o Erick seguir.
+- **8d. Portão e medições.** Feitos em 09/11 (`PERF.md` §2 e §3).
+  - `npm run check` verde (1.623 testes); `size-check` (menu 345,7 de 350 KB, primeira partida 707,6 KB);
+    `smoke:web`, `portcheck --strict` e balance (5 níveis em ordem) ok.
+  - PC na GPU integrada com 40 bots: **60,01 fps** (critério 4). Com 4 vistas e 24 bots, 36,6 fps: limite da GPU, fica
+    para o M3.
+- **8e. Roteiros.** Prontos em 09/11 (`docs/ROTEIRO_M2.md`): o checklist do celular e o checkpoint do Switch (1 a 2 h de jogo) para o Erick seguir.
 - **8f. Rodada 12 e publicação:** prints do que a 8a–8c mudaram e, com o OK do Erick, push e deploy.
 
 ## Escolhas do Claude neste plano (revisáveis)
