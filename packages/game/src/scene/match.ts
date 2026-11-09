@@ -225,7 +225,7 @@ import {
   trainingNumbers,
   type TrainingNumbers,
 } from './result.ts';
-import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
+import { bareLookId, botLookIndices, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
 import { createWardrobe, WARDROBE, type Wardrobe } from './wardrobe.ts';
@@ -649,6 +649,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
+  /** M2 (fase 8a): o look de cada bot pelo nome (o mesmo bot veste o mesmo look em qualquer partida). */
+  const botLook = botLookIndices(names, figures.botLooks);
   /** M2 (fase 4e): o que a regra da partida deixa a HUD mostrar (`MatchRecipe.hud`) e a assistência permitida. */
   const showKillFeed = recipe.hud?.killFeed ?? true;
   const showHitmarker = recipe.hud?.hitmarker ?? true;
@@ -1100,7 +1102,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       skinLayer[i] = figures.playerSkin(team);
       return;
     }
-    const p = Math.max(0, v.controller[i]!) % figures.botLooks;
+    const c = Math.max(0, v.controller[i]!);
+    const p = c < botLook.length ? botLook[c]! : c % figures.botLooks;
     figureOf[i] = figures.botFigure(p, team);
     skinLayer[i] = figures.botSkin(p, team);
   }

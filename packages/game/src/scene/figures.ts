@@ -25,6 +25,7 @@ import {
   type PlatformProfile,
 } from '@boboforces/format';
 import { createFigureSkinCache, type FigureSkinCache } from '@boboforces/render/data';
+import { fnv1a32String } from '@boboforces/shared';
 import { TEAM_COLORS } from '@boboforces/ui';
 
 /** Id do look padrão (`FIGURE_LOOK_DEFAULT`): o do bot excedente e o 12º da fila dos prints. */
@@ -106,6 +107,24 @@ export function figureLookById(id: string): FigureLook | null {
 /** Id sem o prefixo `skin:` (o `MapMannequin.look` já vem sem). */
 export function bareLookId(id: string): string {
   return id.startsWith('skin:') ? id.slice('skin:'.length) : id;
+}
+
+/**
+ * M2 (fase 8a): o look de cada controlador na rotação dos bots (GDD §4.7.2, #58: visual genérico que sai do hash do
+ * nome). O mesmo bot veste o mesmo look em qualquer partida; bots com o mesmo nome (o mesmo bot de fábrica repetido)
+ * seguem a rotação a partir dele, para não saírem iguais.
+ */
+export function botLookIndices(names: readonly (string | undefined)[], looks: number): Uint8Array {
+  const n = Math.max(1, Math.floor(looks));
+  const out = new Uint8Array(names.length);
+  const seen = new Map<string, number>();
+  for (let c = 0; c < names.length; c++) {
+    const name = names[c] ?? '';
+    const k = seen.get(name) ?? 0;
+    seen.set(name, k + 1);
+    out[c] = (fnv1a32String(name) + k) % n;
+  }
+  return out;
 }
 
 /** Cores dos times da partida em RGB (`0xRRGGBB`; o `TEAM_COLORS` do ui é RGBA). */

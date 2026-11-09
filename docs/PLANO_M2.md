@@ -310,6 +310,24 @@ GDD §5.10 e tecnico.md §12. O mixer do M1 (24 vozes, canais, distância e pan,
   versão 12 da página das rodadas, junto com a rodada 10 ainda sem resposta (perguntas G1–G6;
   `local/m2/montar-pagina-r11.mjs`). A G6 é o OK do download da música do menu.
 
+## Fase 8 em detalhe: fechamento
+
+Escrito em 09/11/2026, depois de conferir o "O que entra" contra o código. Três entregas do M2 ainda faltavam: o visual
+dos bots pelo nome, a qualidade na primeira abertura (tecnico.md §17.2; o `video.quality` existia no save sem efeito) e
+o service worker (tecnico.md §19.1). Entram antes do portão final.
+
+- **8a. Visual dos bots pelo nome.** Pronta em 09/11 (`ARCHITECTURE.md` §12.50). O look da rotação sai do hash do nome do bot, não do índice do controlador: o mesmo
+  bot veste o mesmo look em qualquer partida.
+- **8b. Qualidade.** Linha "Qualidade" na aba Vídeo (Automática, Leve, Média, Alta), aplicada na escala de resolução,
+  nos detritos e, no Leve, na visão. A Automática lê o aparelho (GPU, núcleos, memória, tela) e a lista de GPUs fracas,
+  e escolhe uma vez; a escolha fica no save e não volta a rodar depois que o jogador mexe.
+- **8c. Service worker** escrito à mão (sem dependência nova): escopo próprio, precache da casca e cache-first nos
+  arquivos com hash. A versão nova só é aplicada no menu; depois de atualizar, aparece a tela de Novidades.
+- **8d. Portão e medições:** `npm run check`, builds, `size-check`, `portcheck --strict`, `smoke:web`, balance e o bench
+  do PC com 40 bots, tudo registrado no `PERF.md`.
+- **8e. Roteiros:** o checklist do celular e o checkpoint do Switch (1 a 2 h de jogo) para o Erick seguir.
+- **8f. Rodada 12 e publicação:** prints do que a 8a–8c mudaram e, com o OK do Erick, push e deploy.
+
 ## Escolhas do Claude neste plano (revisáveis)
 
 - **Partida antes dos menus:** o combate e as regras são o que dá para jogar e medir; os menus vêm quando os dados da

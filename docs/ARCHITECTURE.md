@@ -2015,3 +2015,12 @@ pela tela "aperte A" (`input/local-players.ts`, que segue sem uso).
   edição temporária), aparecem 3 vistas mais o quadrante do placar; o jogador 2 anda, o 3 gira, o Start do 3 pausa e
   retoma. No Eden, o NRO sobe até o menu (1,5 s), carrega os sons e a música, e um bench de 3 vistas com 12 bots roda
   sem erro (`switch34p`). O caminho dos 3 controles de verdade só se confere no console.
+
+### 12.50 Fase 8a: o visual dos bots pelo nome (09/11/2026)
+
+- `botLookIndices(names, looks)` (`game/scene/figures.ts`): o look de cada controlador na rotação dos bots é
+  `(fnv1a32String(nome) + k) % looks`, com `k` = quantas vezes o mesmo nome já apareceu antes na partida. Um bot da
+  Oficina com nome próprio veste sempre o mesmo look; os bots de fábrica repetidos andam na rotação a partir do look
+  do nome deles.
+- O humano 0 continua com o Meu Bobo. No teste do sofá, os jogadores 2–4 vestem o look de "Jogador N".
+- Só cosmético: o golden e o balance não mudam.

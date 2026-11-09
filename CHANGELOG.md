@@ -474,6 +474,9 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Rodada 11 de prints:** os 52 sons para ouvir, a aba Áudio, o indicador de som e o F2 com as vozes. São as
   perguntas G1–G6, publicadas na versão 12 da página das rodadas junto com a rodada 10. A G6 é o OK do download da
   música do menu.
+- **Fase 8a, visual dos bots pelo nome:** o look de cada bot na rotação sai do hash do nome. O mesmo bot veste o mesmo
+  look em qualquer partida; bots repetidos (o mesmo bot de fábrica várias vezes) seguem a rotação e não saem iguais. 3
+  testes novos.
 - **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
   em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
   - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.
