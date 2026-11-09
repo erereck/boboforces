@@ -14,19 +14,30 @@ import { ZOMBIE_KINDS, type ZombieKind } from './bobo.ts';
 
 /**
  * Tecidos da farda (o padrão que vai no tronco; os membros ficam no tom principal). Ordem fixa: o índice vai no save do
- * editor. Liso, os 4 camuflados (woodland, deserto, urbano cinza, noturno) e o liso manchado de graxa do mecânico.
+ * editor. Liso, os 4 camuflados (woodland, deserto, urbano cinza, noturno) e o liso manchado de graxa do mecânico. M2
+ * (fase 6d): os tecidos das fantasias (#62): listrado (pijama), papelão (robô) e traje espacial (astronauta).
  */
-export const FIGURE_FABRIC = { plain: 0, woodland: 1, desert: 2, urban: 3, night: 4, grease: 5 } as const;
+export const FIGURE_FABRIC = {
+  plain: 0,
+  woodland: 1,
+  desert: 2,
+  urban: 3,
+  night: 4,
+  grease: 5,
+  stripes: 6,
+  cardboard: 7,
+  spacesuit: 8,
+} as const;
 export type FigureFabric = (typeof FIGURE_FABRIC)[keyof typeof FIGURE_FABRIC];
 /** Quantos tecidos existem (o normalizador clampa em 0..n − 1). */
-export const FIGURE_FABRICS = 6;
+export const FIGURE_FABRICS = 9;
 
 /**
  * A farda do look (fora de time; com time, `figureOutfitFor` troca o colete e as luvas pelos do time). `vest` e `gloves`
  * aceitam −1 = sem a peça.
  */
 export interface FigureOutfit {
-  /** Índice de `FIGURE_FABRIC` (0..5). */
+  /** Índice de `FIGURE_FABRIC` (0..8). */
   readonly fabric: number;
   /** 0xRRGGBB: tom principal do tecido (jaqueta e mangas; os camuflados tiram os outros tons dele). */
   readonly jacket: number;

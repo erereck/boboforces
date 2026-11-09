@@ -64,6 +64,11 @@ export const PREVIEW_LOOKS: readonly FigurePresetId[] = [
   'moicano',
   'barbudo',
   'trancas',
+  // M2 (fase 6d): as fantasias do Meu Bobo (#62).
+  'astronaut',
+  'pajamas',
+  'cardboard',
+  'diver',
 ];
 
 /** A skin pintada: as 2 camadas 64×64 e o nível 1 (32×32 por camada). */

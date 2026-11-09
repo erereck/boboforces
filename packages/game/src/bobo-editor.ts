@@ -62,7 +62,7 @@ export const BOBO_COUNTS = {
   earrings: 4,
 } as const;
 
-/** Os visuais prontos (a farda; o zumbi não). A fase 6d acrescenta as fantasias. */
+/** Os visuais prontos: a farda e as fantasias (o zumbi não). */
 export const READY_LOOKS: readonly FigurePresetId[] = [
   'recruit',
   'mechanic',
@@ -75,6 +75,11 @@ export const READY_LOOKS: readonly FigurePresetId[] = [
   'moicano',
   'barbudo',
   'trancas',
+  // M2 (fase 6d): as fantasias (#62).
+  'astronaut',
+  'pajamas',
+  'cardboard',
+  'diver',
 ];
 
 /** A prévia: sem time (a farda do look) ou com o colete de um time. */

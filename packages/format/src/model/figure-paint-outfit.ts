@@ -13,7 +13,7 @@
  * Interno do pacote: o `figure-paint.ts` chama.
  */
 import { mix32 } from '@boboforces/shared';
-import { FIGURE_FABRIC } from './figure-look.ts';
+import { FIGURE_FABRIC, FIGURE_FABRICS } from './figure-look.ts';
 import { luminanceRgb, mixRgb, paintTarget, readableInkRgb, shadeRgb, texel, texelRgb } from './figure-paint-head.ts';
 
 /** Primeiro texel (Int32) da camada 1. */
@@ -163,6 +163,30 @@ function buildMask(fabric: number): Uint8Array {
     // Poucas manchas escuras irregulares (o macacão do mecânico).
     const a = blobs(0x63a5e, 0.5);
     for (let i = 0; i < m.length; i++) m[i] = a[i]! > 0.74 ? 2 : a[i]! > 0.66 ? 1 : 0;
+  } else if (fabric === W.stripes) {
+    // M2 (fase 6d): pijama: listras verticais de 2 px do boneco (4 t), as escuras entre as do tom principal.
+    for (let v = 0; v < CROSS_H; v++) {
+      for (let u = 0; u < RING_W; u++) m[v * RING_W + u] = (u >> 2) & 1;
+    }
+  } else if (fabric === W.cardboard) {
+    // Robô de papelão: fita adesiva clara numa faixa e numa costura, pintas escuras e manchas de umidade.
+    const a = blobs(0xca7db0, 0.45);
+    for (let v = 0; v < CROSS_H; v++) {
+      for (let u = 0; u < RING_W; u++) {
+        const i = v * RING_W + u;
+        const tape = (v >= 12 && v < 16) || (u >= 22 && u < 26);
+        m[i] = tape ? 1 : texelHash(0xb0c5, u, v) % 29 === 0 ? 2 : a[i]! > 0.7 ? 3 : 0;
+      }
+    }
+  } else if (fabric === W.spacesuit) {
+    // Traje espacial: painéis com costura cinza (a cada 5 e 6 px do boneco) e uma sombra leve nos gomos.
+    const a = blobs(0x5bace, 0.3);
+    for (let v = 0; v < CROSS_H; v++) {
+      for (let u = 0; u < RING_W; u++) {
+        const i = v * RING_W + u;
+        m[i] = v % 10 === 9 || u % 12 === 11 ? 1 : a[i]! > 0.66 ? 2 : 0;
+      }
+    }
   }
   return m;
 }
@@ -170,7 +194,7 @@ function buildMask(fabric: number): Uint8Array {
 /** Garante o rascunho dos tons e as tabelas do ruído (1ª pintura do processo; as máscaras vêm por tecido). */
 export function ensureOutfitMasks(): void {
   if (masks !== null) return;
-  masks = [null, null, null, null, null, null];
+  masks = Array.from({ length: FIGURE_FABRICS }, () => null);
   tones = new Int32Array(5);
   smooth8 = new Float64Array(8);
   smooth4 = new Float64Array(4);
@@ -228,6 +252,22 @@ export function fabricTones(fabric: number, j: number, fadeTo: number, fade: num
     case FIGURE_FABRIC.grease:
       t[1] = mixRgb(j, 0x2b2620, 0.5);
       t[2] = mixRgb(j, 0x17140f, 0.75);
+      n = 3;
+      break;
+    case FIGURE_FABRIC.stripes:
+      // Listras escuras (azul-marinho puxado pelo tom principal): no claro sobre claro elas sumiam de longe.
+      t[1] = mixRgb(j, 0x253f6b, 0.6);
+      n = 2;
+      break;
+    case FIGURE_FABRIC.cardboard:
+      t[1] = mixRgb(j, 0xe2d4ad, 0.7);
+      t[2] = mixRgb(j, 0x3a2a18, 0.6);
+      t[3] = mixRgb(j, 0x6e5434, 0.4);
+      n = 4;
+      break;
+    case FIGURE_FABRIC.spacesuit:
+      t[1] = mixRgb(j, 0x7d8288, 0.55);
+      t[2] = mixRgb(j, 0xb9bdc0, 0.35);
       n = 3;
       break;
     default:

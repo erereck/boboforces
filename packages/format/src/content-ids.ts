@@ -169,6 +169,11 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'skin:moicano',
   'skin:barbudo',
   'skin:trancas',
+  // M2 (fase 6d): as fantasias do Meu Bobo (#62; só acrescentados, regra 20)
+  'skin:astronaut',
+  'skin:pajamas',
+  'skin:cardboard',
+  'skin:diver',
   // M2 (fase 3a): os bots de fábrica especiais (gameplay.md §6.7; só acrescentados, regra 20)
   'bot:jorge-the-immortal',
   'bot:camper-carl',

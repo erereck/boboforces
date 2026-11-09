@@ -10,7 +10,7 @@ import {
 } from './figure-preview.ts';
 
 describe('prévia do pintor do boneco (figuras)', () => {
-  it('as 12 aparências prontas, cada uma uma vez', () => {
+  it('as 16 aparências prontas (12 e as 4 fantasias), cada uma uma vez', () => {
     expect([...PREVIEW_LOOKS].sort()).toEqual(Object.keys(FIGURE_PRESETS).sort());
   });
 

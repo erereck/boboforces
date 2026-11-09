@@ -88,6 +88,11 @@ const SKIN_HASHES: Readonly<Record<FigurePresetId, readonly [string, string, str
   moicano: ['e81ec0fa', 'de286129', '72c745d8'],
   barbudo: ['0718571a', '05ebdc78', '9334c583'],
   trancas: ['e3fd6579', '9b363df7', 'f86504a6'],
+  // M2 (fase 6d): as fantasias (#62).
+  astronaut: ['4d788bb6', '2dc8302a', '09b03cf6'],
+  pajamas: ['17f93150', 'fde238f4', 'c8abdf71'],
+  cardboard: ['3587db0e', '3f14b90f', '0980bb70'],
+  diver: ['f5d5d0a7', '11f8176b', '007e6423'],
 };
 /** Zumbi comum nos 8 estilos de rosto, e os 5 tipos no estilo 0 (sem time). */
 const ZOMBIE_STYLE_HASHES = [
@@ -351,6 +356,8 @@ describe('pintor do boneco: orientação pelo gêmeo da UV (E.6)', () => {
     expect(uv.flags & FIGURE_BOX_FLAG.face).not.toBe(0);
     for (const id of IDS) {
       const look = FIGURE_PRESETS[id];
+      // A máscara protetora (o mergulhador, fase 6d) cobre o nariz de propósito.
+      if (look.eyewear === 2) continue;
       const { out } = paint({ look, team: -1, teamColors: [] });
       const nose = shade(look.skinTone, -18);
       for (const col of [7, 8]) {

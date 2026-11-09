@@ -1830,3 +1830,19 @@ mudanças de contrato ficam registradas aqui.
   - os acessórios 3D (chapéu de aba, capacete com viseira, mochila, rádio);
   - as fantasias (6d);
   - o visual dos bots pelo hash do nome (#58; hoje a rotação de 11 looks).
+
+### 12.42 Fase 6d: fantasias (09/11/2026)
+
+- **#62:** as fantasias bobas entram como visuais prontos extras do Meu Bobo; a lista final sai por print (rodada 10).
+  Proposta implementada: **Astronauta, Pijama, Robô de papelão e Mergulhador** (ids `skin:astronaut`,
+  `skin:pajamas`, `skin:cardboard`, `skin:diver`, só acrescentados; regra 20).
+- **Tecidos novos** (`FIGURE_FABRIC` 6–8, `FIGURE_FABRICS` = 9), feitos pelo mesmo pintor de máscaras de tons:
+  - listrado: listras verticais de 2 px do boneco, escuras;
+  - papelão: fita clara numa faixa e numa costura, pintas e manchas;
+  - traje espacial: costuras cinza em painéis e uma sombra leve.
+  Os 12 looks de antes não mudam (hashes travados iguais); os 4 novos têm hash travado.
+- **Sem acessório 3D:** o capacete de astronauta, a cauda do robô e os pés de pato ficam para a arte (os acessórios
+  3D do GDD §4.7.2). A fantasia sai do tecido, das cores, do rosto (a pele cinza e o visor do robô) e dos óculos (a
+  máscara do mergulhador cobre o nariz; o teste do nariz pula a máscara).
+- **Os bots continuam com a farda** (#58): as fantasias não entram em `FIGURE_BOT_ROTATION`.
+- A prévia do skingen (`npm run skingen:figuras`) mostra os 16 looks.

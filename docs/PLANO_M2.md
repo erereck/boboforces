@@ -274,7 +274,8 @@ câmera, depois o Meu Bobo (o maior pedaço) e por fim o toque, que precisa de t
   - o editor numa cena própria: o bobo girando num pedestal, com as abas ao lado;
   - abas: Pronto (os looks da farda e as fantasias), Rosto, Cabelo, Chapéu e Roupa, mais "Aleatório";
   - o jogador 1 entra na partida com o seu look (com o colete do time por cima).
-- **6d. Fantasias** (#62). As skins prontas extras, com a lista final por print (proposta: astronauta, pijama e robô de
+- **6d. Fantasias** (#62). Pronta em 09/11 (`ARCHITECTURE.md` §12.42): Astronauta, Pijama, Robô de papelão e
+  Mergulhador, esperando o print. As skins prontas extras, com a lista final por print (proposta: astronauta, pijama e robô de
   papelão, mais as do banco de ideias que couberem).
 - **6e. Toque completo** (arte-ux.md §7.3).
   - trocar de arma tocando no ícone dela;

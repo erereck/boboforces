@@ -66,13 +66,13 @@ describe('aparência do boneco: normalizador (só clamp, sem ramo legado)', () =
   });
 
   it('farda (#58): tecido 0..5, RGB das peças, colete e luvas −1 = sem; campo inválido = padrão', () => {
-    expect(Object.values(FIGURE_FABRIC)).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(FIGURE_FABRICS).toBe(6);
+    expect(Object.values(FIGURE_FABRIC)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(FIGURE_FABRICS).toBe(9);
     const outfit = normalizeFigureLook({
       outfit: { fabric: 4.4, jacket: 0x586a4b, pants: 0x1ffffff, vest: -1, boots: 0x141414, gloves: -7 },
     }).outfit;
     expect(outfit).toEqual({ fabric: 4, jacket: 0x586a4b, pants: 0xffffff, vest: -1, boots: 0x141414, gloves: -1 });
-    expect(normalizeFigureLook({ outfit: { ...outfit, fabric: 9 } }).outfit.fabric).toBe(5);
+    expect(normalizeFigureLook({ outfit: { ...outfit, fabric: 99 } }).outfit.fabric).toBe(8);
     expect(normalizeFigureLook({ outfit: { ...outfit, fabric: -2, jacket: -5 } }).outfit).toMatchObject({
       fabric: 0,
       jacket: 0,
@@ -223,13 +223,13 @@ describe('chave da skin', () => {
     );
   });
 
-  it('os 12 looks prontos têm chaves distintas, e o zumbi muda com o estilo de rosto e o tipo', () => {
+  it('os 16 looks prontos (12 + 4 fantasias, fase 6d) têm chaves distintas, e o zumbi muda com o estilo e o tipo', () => {
     const keys = new Set(
       (Object.keys(FIGURE_PRESETS) as FigurePresetId[]).map((id) =>
         figureSkinKey({ look: FIGURE_PRESETS[id], team: -1, teamColors: [] }),
       ),
     );
-    expect(keys.size).toBe(12);
+    expect(keys.size).toBe(16);
     const z = FIGURE_PRESETS.zombie;
     const key = (look: FigureLook): string => figureSkinKey({ look, team: -1, teamColors: [] });
     expect(key({ ...z, zombie: { kind: 'common', faceStyle: 3 } })).not.toBe(key(z));
@@ -240,7 +240,7 @@ describe('chave da skin', () => {
 describe('aparências prontas e rotação dos bots', () => {
   it('um look por id, já normalizado e com id de conteúdo; só o zumbi é zumbi', () => {
     const ids = Object.keys(FIGURE_PRESETS) as FigurePresetId[];
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(16);
     for (const id of ids) {
       expect(normalizeFigureLook(FIGURE_PRESETS[id])).toEqual(FIGURE_PRESETS[id]);
       expect(isKnownContentId(`skin:${id}`), id).toBe(true);

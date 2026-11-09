@@ -22,7 +22,12 @@ export type FigurePresetId =
   | 'bandana'
   | 'moicano'
   | 'barbudo'
-  | 'trancas';
+  | 'trancas'
+  // M2 (fase 6d): as fantasias (#62), só para o Meu Bobo (os bots seguem com a farda).
+  | 'astronaut'
+  | 'pajamas'
+  | 'cardboard'
+  | 'diver';
 
 const F = FIGURE_FABRIC;
 /** Sem a peça (colete ou luvas). */
@@ -181,6 +186,52 @@ export const FIGURE_PRESETS: Readonly<Record<FigurePresetId, FigureLook>> = {
     accessory: 0xf4f4f2,
     earrings: 1,
     outfit: outfit(F.plain, 0xa99470, 0x5a5e42, 0x7a6547, BROWN_BOOTS, BLACK_GLOVES),
+  }),
+  // M2 (fase 6d): as fantasias (#62). Sem acessório 3D por enquanto (o capacete de astronauta e o resto ficam para a
+  // arte): a fantasia sai do tecido, das cores e do rosto.
+  // Astronauta: traje branco com painéis, mochila de suporte cinza (o "colete"), luvas e botas brancas.
+  astronaut: normalizeFigureLook({
+    skinTone: 0xe5aa84,
+    hair: 0x473023,
+    eyes: 0x31505b,
+    hairStyle: 5,
+    face: 1,
+    brow: 1,
+    outfit: outfit(F.spacesuit, 0xe8e6df, 0xe8e6df, 0xa7abad, 0xd0d0cc, 0xf0f0ec),
+  }),
+  // Pijama: listrado azul-claro, cabelo de quem acabou de acordar, de mão nua e pantufa.
+  pajamas: normalizeFigureLook({
+    skinTone: 0xd99b73,
+    hair: 0x69422a,
+    eyes: 0x35251d,
+    hairStyle: 24,
+    face: 4,
+    brow: 0,
+    outfit: outfit(F.stripes, 0x8fb0d6, 0x8fb0d6, NONE, 0x5a6f8f, NONE),
+  }),
+  // Robô de papelão: caixas com fita, "pele" de lata, careca e o visor (os óculos esportivos).
+  cardboard: normalizeFigureLook({
+    skinTone: 0x8d918c,
+    hair: 0x12110f,
+    eyes: 0x111816,
+    hairStyle: 12,
+    face: 0,
+    brow: 2,
+    eyewear: 1,
+    accessory: 0x151515,
+    outfit: outfit(F.cardboard, 0xb08a5a, 0xa47f50, 0x9c7748, 0x6b6f6c, 0x8d918c),
+  }),
+  // Mergulhador: roupa de neoprene preta, a máscara e o cilindro escuro nas costas (o "colete").
+  diver: normalizeFigureLook({
+    skinTone: 0xbd7b58,
+    hair: 0x28201b,
+    eyes: 0x1f6a74,
+    hairStyle: 5,
+    face: 3,
+    brow: 1,
+    eyewear: 2,
+    accessory: 0xffd23f,
+    outfit: outfit(F.plain, 0x1c1c1a, 0x1c1c1a, 0x2f3640, 0x1c1c1a, 0x1c1c1a),
   }),
 };
 

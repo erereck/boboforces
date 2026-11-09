@@ -419,6 +419,11 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     cima.
   - O backup leva o Meu Bobo junto.
   - 4 testes novos.
+- **Fase 6d, fantasias:**
+  - Quatro visuais prontos novos no Meu Bobo: **Astronauta**, **Pijama**, **Robô de papelão** e **Mergulhador**.
+  - Cada um tem tecido próprio: traje espacial com painéis, listrado e papelão com fita adesiva. O mergulhador usa a
+    máscara.
+  - Os bots continuam de farda. Capacete e outros acessórios 3D ainda não entraram.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
