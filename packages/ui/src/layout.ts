@@ -1,7 +1,7 @@
 import { measureText, textBoxHeight, type UiFonts } from './font.ts';
 import { t } from './text.ts';
-import { BUTTON, SCREEN_MARGIN, TYPE, uiScale, type FontRole } from './tokens.ts';
-import type { Anchor, ButtonNode, Insets, Rect, TextContent, TextNode, UiNode } from './tree.ts';
+import { BUTTON, OPTION, SCREEN_MARGIN, TYPE, uiScale, type FontRole } from './tokens.ts';
+import type { Anchor, ButtonNode, Insets, Rect, StackNode, TextContent, TextNode, UiNode } from './tree.ts';
 
 /**
  * Layout em duas passadas: mede de baixo para cima (tamanho intrínseco ou fixo) e posiciona de cima para baixo
@@ -20,6 +20,23 @@ export interface LayoutOptions {
   readonly minTarget?: number;
   /** Piso do tamanho de fonte em px reais (arte-ux.md §6.8; `MIN_TEXT`). */
   readonly minTextPx?: number;
+  /** M2 (fase 4a): foco atual, para as colunas com rolagem deixarem ele à vista. */
+  readonly focusedId?: string | null;
+  /**
+   * M2 (fase 4a): deslocamento de cada coluna com rolagem, por id (px reais). O layout lê o anterior, mexe o mínimo
+   * para o foco ficar à vista e grava de volta: quem guarda o mapa (o menu) mantém a posição entre telas.
+   */
+  readonly scrollState?: Map<string, number>;
+}
+
+/** M2 (fase 4a): uma coluna com rolagem resolvida (para a barrinha). */
+export interface ScrollInfo {
+  readonly node: StackNode;
+  /** Janela da coluna (px reais), deslocamento, altura do conteúdo e da janela. */
+  readonly rect: Rect;
+  readonly offset: number;
+  readonly total: number;
+  readonly view: number;
 }
 
 /** Texto já resolvido (tabela + parâmetros + caixa alta) e medido. */
@@ -50,6 +67,11 @@ export interface LayoutResult {
   readonly order: readonly UiNode[];
   readonly texts: ReadonlyMap<UiNode, ResolvedText>;
   readonly byId: ReadonlyMap<string, UiNode>;
+  /** M2 (fase 4a): o valor resolvido de cada linha de opção (`ButtonNode.value`). */
+  readonly values: ReadonlyMap<UiNode, ResolvedText>;
+  /** M2 (fase 4a): o recorte de cada nó dentro de uma coluna com rolagem (a janela dela, com a folga do foco). */
+  readonly clips: ReadonlyMap<UiNode, Rect>;
+  readonly scrolls: readonly ScrollInfo[];
 }
 
 interface Size {
@@ -68,6 +90,11 @@ interface Ctx {
   readonly order: UiNode[];
   readonly focusable: ButtonNode[];
   readonly byId: Map<string, UiNode>;
+  readonly values: Map<UiNode, ResolvedText>;
+  readonly clips: Map<UiNode, Rect>;
+  readonly scrolls: ScrollInfo[];
+  readonly focusedId: string | null;
+  readonly scrollState: Map<string, number> | null;
 }
 
 function resolveString(content: TextContent): string {
@@ -129,6 +156,12 @@ function measure(node: UiNode, ctx: Ctx): Size {
       ctx.texts.set(node, resolved);
       w = Math.max(resolved.width + BUTTON.padX * s * 2, BUTTON.minWidth * s);
       h = BUTTON.height * s;
+      if (node.value !== undefined) {
+        // Linha de opção: rótulo, folga e a área do valor (com as setas) à direita.
+        const v = OPTION.value;
+        ctx.values.set(node, resolveText(ctx, node.value, v.font, v.size, v.tracking, v.uppercase));
+        w = Math.max(w, resolved.width + (BUTTON.padX * 2 + 16 + (node.valueWidth ?? OPTION.valueWidth)) * s);
+      }
       break;
     }
     case 'sprite':
@@ -199,9 +232,17 @@ function anchorFactors(anchor: Anchor): [number, number] {
   }
 }
 
-function place(node: UiNode, x: number, y: number, w: number, h: number, ctx: Ctx, content?: Rect): void {
+/** O nó ou algum descendente tem o id? */
+function containsId(node: UiNode, id: string): boolean {
+  if (node.id === id) return true;
+  for (const child of childrenOf(node)) if (containsId(child, id)) return true;
+  return false;
+}
+
+function place(node: UiNode, x: number, y: number, w: number, h: number, ctx: Ctx, content?: Rect, clip?: Rect): void {
   const rect: Rect = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
   ctx.rects.set(node, rect);
+  if (clip) ctx.clips.set(node, clip);
   ctx.order.push(node);
   if (node.id !== undefined && !ctx.byId.has(node.id)) ctx.byId.set(node.id, node);
   if (node.kind === 'button' && node.id !== undefined && !node.disabled) ctx.focusable.push(node);
@@ -216,7 +257,7 @@ function place(node: UiNode, x: number, y: number, w: number, h: number, ctx: Ct
       const [fx, fy] = anchorFactors(child.anchor ?? 'topLeft');
       const cx = inner.x + (inner.w - size.w) * fx + (child.x ?? 0) * s;
       const cy = inner.y + (inner.h - size.h) * fy + (child.y ?? 0) * s;
-      place(child, cx, cy, size.w, size.h, ctx);
+      place(child, cx, cy, size.w, size.h, ctx, undefined, clip);
     }
     return;
   }
@@ -225,6 +266,13 @@ function place(node: UiNode, x: number, y: number, w: number, h: number, ctx: Ct
     const gap = (node.gap ?? 0) * s;
     const align = node.align ?? 'start';
     let cursor = row ? inner.x : inner.y;
+    let childClip = clip;
+    if (!row && node.scroll === true && clip === undefined) {
+      cursor -= scrollOffset(node, inner, gap, ctx);
+      // A folga do contorno de foco fica dentro do recorte (o anel não é cortado nas bordas da janela).
+      const ring = Math.round((BUTTON.focusGap + BUTTON.focusStroke) * s);
+      childClip = { x: inner.x - ring, y: inner.y - ring, w: inner.w + ring * 2, h: inner.h + ring * 2 };
+    }
     for (const child of node.children) {
       const size = ctx.sizes.get(child) as Size;
       const crossSpace = row ? inner.h : inner.w;
@@ -233,11 +281,42 @@ function place(node: UiNode, x: number, y: number, w: number, h: number, ctx: Ct
       if (align === 'stretch' && !explicitCross) cross = crossSpace;
       const factor = align === 'center' ? 0.5 : align === 'end' ? 1 : 0;
       const crossPos = (row ? inner.y : inner.x) + (crossSpace - cross) * factor;
-      if (row) place(child, cursor, crossPos, size.w, cross, ctx);
-      else place(child, crossPos, cursor, cross, size.h, ctx);
+      if (row) place(child, cursor, crossPos, size.w, cross, ctx, undefined, childClip);
+      else place(child, crossPos, cursor, cross, size.h, ctx, undefined, childClip);
       cursor += (row ? size.w : size.h) + gap;
     }
   }
+}
+
+/**
+ * M2 (fase 4a): o deslocamento de uma coluna com rolagem: o anterior (`scrollState`), mexido o mínimo para o filho
+ * com o foco ficar inteiro na janela (com a folga `OPTION.scrollMargin` e a do anel de foco), preso ao conteúdo.
+ */
+function scrollOffset(node: StackNode, inner: Rect, gap: number, ctx: Ctx): number {
+  const s = ctx.scale;
+  let total = 0;
+  for (const child of node.children) total += (ctx.sizes.get(child) as Size).h;
+  total += Math.max(0, node.children.length - 1) * gap;
+  const key = node.id ?? '';
+  let offset = ctx.scrollState?.get(key) ?? 0;
+  const fid = ctx.focusedId;
+  if (fid !== null) {
+    const margin = (OPTION.scrollMargin + BUTTON.focusGap + BUTTON.focusStroke) * s;
+    let y = 0;
+    for (const child of node.children) {
+      const ch = (ctx.sizes.get(child) as Size).h;
+      if (containsId(child, fid)) {
+        if (y - margin < offset) offset = y - margin;
+        if (y + ch + margin > offset + inner.h) offset = y + ch + margin - inner.h;
+        break;
+      }
+      y += ch + gap;
+    }
+  }
+  offset = Math.round(Math.max(0, Math.min(offset, total - inner.h)));
+  ctx.scrollState?.set(key, offset);
+  ctx.scrolls.push({ node, rect: { ...inner }, offset, total, view: inner.h });
+  return offset;
 }
 
 /**
@@ -257,6 +336,11 @@ export function layoutTree(root: UiNode, viewport: Rect, scale = 1, options: Lay
     order: [],
     focusable: [],
     byId: new Map(),
+    values: new Map(),
+    clips: new Map(),
+    scrolls: [],
+    focusedId: options.focusedId ?? null,
+    scrollState: options.scrollState ?? null,
   };
   measure(root, ctx);
   const safe = options.safeArea ?? { top: 0, right: 0, bottom: 0, left: 0 };
@@ -283,5 +367,8 @@ export function layoutTree(root: UiNode, viewport: Rect, scale = 1, options: Lay
     order: ctx.order,
     texts: ctx.texts,
     byId: ctx.byId,
+    values: ctx.values,
+    clips: ctx.clips,
+    scrolls: ctx.scrolls,
   };
 }

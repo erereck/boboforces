@@ -94,7 +94,7 @@ describe('navegação de menu e ponteiro', () => {
     navigateMenu(l, nav.focusedId, 'confirm', nav);
     expect(nav.activated).toBe(TITLE_ACTION.settings);
     navigateMenu(l, nav.focusedId, 'up', nav);
-    expect(nav).toEqual({ focusedId: 'play', activated: null, back: false });
+    expect(nav).toEqual({ focusedId: 'play', activated: null, back: false, delta: 0, tab: 0 });
     navigateMenu(l, 'play', 'confirm', nav);
     expect(nav.activated).toBe(TITLE_ACTION.play);
     navigateMenu(l, 'play', 'back', nav);

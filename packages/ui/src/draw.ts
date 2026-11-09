@@ -1,7 +1,8 @@
-import { pushShape, type DrawList } from './draw-list.ts';
+import { popClip, pushClip, pushRect, pushShape, type DrawList } from './draw-list.ts';
+import { optionArrows } from './focus.ts';
 import { drawText } from './font.ts';
-import type { LayoutResult } from './layout.ts';
-import { BUTTON, CHAMFER, COLORS, withAlpha } from './tokens.ts';
+import type { LayoutResult, ScrollInfo } from './layout.ts';
+import { BUTTON, CHAMFER, COLORS, OPTION, withAlpha } from './tokens.ts';
 import type { ButtonNode, Rect, TextNode, UiNode } from './tree.ts';
 
 /** Largura da faixa zebrada em px de referência. */
@@ -44,8 +45,27 @@ function buttonLook(node: ButtonNode, focused: boolean): ButtonLook {
       look.text = COLORS.texto;
       look.border = COLORS.linhaForte;
       break;
+    case 'tab':
+      // M2 (fase 4a): aba sem placa; a selecionada tem o texto claro e o sublinhado âmbar.
+      look.fill = focused ? COLORS.chapaAlta : 0;
+      look.text = node.selected || focused ? COLORS.texto : COLORS.textoBaixo;
+      break;
   }
   return look;
+}
+
+const arrowX = new Float64Array(3);
+
+/** Seta em degraus de pixel-art (`OPTION.arrowSteps` colunas), com a ponta para `dir` (-1 esquerda, +1 direita). */
+function drawArrow(out: DrawList, cx: number, cy: number, size: number, dir: number, color: number): void {
+  const steps = OPTION.arrowSteps;
+  const u = Math.max(1, Math.round(size / (steps * 2)));
+  const x0 = Math.round(cx - (steps * u) / 2);
+  for (let i = 0; i < steps; i++) {
+    const h = (2 * i + 1) * u;
+    const x = dir < 0 ? x0 + i * u : x0 + (steps - 1 - i) * u;
+    pushRect(out, x, Math.round(cy - h / 2), u, h, color);
+  }
 }
 
 function drawButton(layout: LayoutResult, node: ButtonNode, r: Rect, focused: boolean, out: DrawList): void {
@@ -53,7 +73,11 @@ function drawButton(layout: LayoutResult, node: ButtonNode, r: Rect, focused: bo
   const chamfer = Math.round(CHAMFER.button * s);
   const stroke = Math.max(1, Math.round(BUTTON.stroke * s));
   const l = buttonLook(node, focused);
-  pushShape(out, r.x, r.y, r.w, r.h, l.fill, chamfer);
+  if (l.fill !== 0) pushShape(out, r.x, r.y, r.w, r.h, l.fill, chamfer);
+  if (node.variant === 'tab' && node.selected) {
+    const bar = Math.max(2, Math.round(4 * s));
+    pushRect(out, r.x + chamfer / 2, r.y + r.h - bar, r.w - chamfer, bar, COLORS.acao);
+  }
   if (l.stripes !== 0) pushShape(out, r.x, r.y, r.w, r.h, l.stripes, chamfer, 0, Math.max(3, STRIPE_WIDTH * s));
   if (l.border !== 0) pushShape(out, r.x, r.y, r.w, r.h, l.border, chamfer, stroke);
   if (focused) {
@@ -66,7 +90,45 @@ function drawButton(layout: LayoutResult, node: ButtonNode, r: Rect, focused: bo
   const font = text ? layout.fonts?.[text.font] : undefined;
   if (!text || !font) return;
   const capH = (font.capHeight * text.px) / font.size;
-  drawText(out, font, text.text, r.x + (r.w - text.width) / 2, r.y + (r.h - capH) / 2, text.px, l.text, text.tracking);
+  if (node.value === undefined) {
+    drawText(
+      out,
+      font,
+      text.text,
+      r.x + (r.w - text.width) / 2,
+      r.y + (r.h - capH) / 2,
+      text.px,
+      l.text,
+      text.tracking,
+    );
+    return;
+  }
+  // M2 (fase 4a): linha de opção: rótulo à esquerda; valor centrado entre as setas, na área da direita.
+  drawText(out, font, text.text, r.x + BUTTON.padX * s, r.y + (r.h - capH) / 2, text.px, l.text, text.tracking);
+  optionArrows(layout, node, r, arrowX);
+  const arrowColor = node.disabled ? COLORS.linha : focused ? COLORS.acao : COLORS.textoBaixo;
+  const glyph = Math.round(r.h * 0.42);
+  drawArrow(out, arrowX[0]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, -1, arrowColor);
+  drawArrow(out, arrowX[1]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, 1, arrowColor);
+  const value = layout.values.get(node);
+  const vfont = value ? layout.fonts?.[value.font] : undefined;
+  if (!value || !vfont) return;
+  const left = arrowX[0]! + arrowX[2]!;
+  const vcap = (vfont.capHeight * value.px) / vfont.size;
+  const vx = left + (arrowX[1]! - left - value.width) / 2;
+  drawText(out, vfont, value.text, vx, r.y + (r.h - vcap) / 2, value.px, l.text, value.tracking);
+}
+
+/** M2 (fase 4a): barrinha de uma coluna com rolagem (só quando o conteúdo passa da janela), à direita dela. */
+function drawScrollBar(layout: LayoutResult, sc: ScrollInfo, out: DrawList): void {
+  if (sc.total <= sc.view) return;
+  const s = layout.scale;
+  const w = Math.max(2, Math.round(OPTION.scrollBar * s));
+  const x = sc.rect.x + sc.rect.w + Math.round(OPTION.scrollBarGap * s);
+  pushRect(out, x, sc.rect.y, w, sc.view, COLORS.linha);
+  const thumb = Math.max(w * 4, Math.round((sc.view * sc.view) / sc.total));
+  const y = sc.rect.y + Math.round(((sc.view - thumb) * sc.offset) / Math.max(1, sc.total - sc.view));
+  pushRect(out, x, y, w, thumb, COLORS.textoBaixo);
 }
 
 function drawTextNode(layout: LayoutResult, node: TextNode, r: Rect, out: DrawList): void {
@@ -110,8 +172,23 @@ function drawNode(layout: LayoutResult, node: UiNode, focusedId: string | null, 
   }
 }
 
-/** Desenha a árvore já com layout na `DrawList` (o foco ganha o token `acao`). Sem alocação: pode rodar por frame. */
+/**
+ * Desenha a árvore já com layout na `DrawList` (o foco ganha o token `acao`). Sem alocação: pode rodar por frame. Os
+ * filhos de uma coluna com rolagem saem recortados pela janela dela (M2, fase 4a).
+ */
 export function drawTree(layout: LayoutResult, focusedId: string | null, out: DrawList): void {
   const order = layout.order;
-  for (let i = 0; i < order.length; i++) drawNode(layout, order[i] as UiNode, focusedId, out);
+  let clip: Rect | null = null;
+  for (let i = 0; i < order.length; i++) {
+    const node = order[i] as UiNode;
+    const c = layout.clips.get(node) ?? null;
+    if (c !== clip) {
+      if (clip !== null) popClip(out);
+      if (c !== null) pushClip(out, c.x, c.y, c.w, c.h);
+      clip = c;
+    }
+    drawNode(layout, node, focusedId, out);
+  }
+  if (clip !== null) popClip(out);
+  for (let i = 0; i < layout.scrolls.length; i++) drawScrollBar(layout, layout.scrolls[i]!, out);
 }

@@ -1307,3 +1307,26 @@ mudanças de contrato ficam registradas aqui.
 - **`?nivel=`** (`apps/web/src/play-squad.ts`, `GameDeps.playLevel`): o nível do primeiro JOGAR, pelo nome da
   interface ou pelo id (`pela-vibe`, `de-boa`, `normal`, `suado`, `tryhard`), até os menus da fase 4. Os prints
   do aviso do time usam `?nivel=suado` (aliados N3).
+
+### 12.20 Fase 4a: peças de UI dos menus (09/11/2026)
+
+- **Mudanças de contrato do ui (árvore, layout e navegação):**
+  - `ButtonNode.value` (e `valueWidth`) faz a linha de opção: rótulo à esquerda, valor entre setas de pixel-art
+    à direita (`OPTION` nos tokens);
+  - `ButtonVariant 'tab'` com `selected`;
+  - `StackNode.scroll` faz a coluna com rolagem (com `height` e `id`).
+- **`MenuNavigation`:**
+  - `delta`: -1 ou +1 numa linha de opção, por esquerda e direita ou pelas setas no toque e no mouse
+    (`hitOptionArrow`); 0 no confirmar comum (a tela decide se inverte ou avança);
+  - `tab`: -1 ou +1, de `tabPrev` e `tabNext`.
+- **Rolagem:**
+  - `LayoutOptions.focusedId` e `scrollState` (por id): o layout mexe a janela o mínimo para o foco ficar à vista,
+    com a folga do anel;
+  - os filhos ganham o recorte da janela (`LayoutResult.clips`); o `drawTree` emite `pushClip`/`popClip`, e o
+    `hitTest` ignora o que está fora;
+  - `LayoutResult.scrolls` alimenta a barrinha.
+- **Controlador de menus (`game/menu.ts`):**
+  - trata `tabPrev` e `tabNext`;
+  - guarda o `scrollState` entre telas;
+  - refaz o layout quando o foco muda numa tela com rolagem.
+- **Tamanho:** o menu passou para 305,3 KB (meta 300 KB, teto 350 KB). As telas da fase 4 precisam ser enxutas.

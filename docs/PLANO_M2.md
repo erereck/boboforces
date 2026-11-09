@@ -164,7 +164,7 @@ Fontes: arte-ux.md §6.3, §6.4, §6.12 e §8; gameplay.md §2.5, §4.5, §10 e 
 D-pad + confirmar/voltar, alvos de toque ≥ 44 px, nada de botão "em breve" (cada item aparece quando o marco dele
 chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
 
-- **4a. Peças de UI que faltam:**
+- **4a. Peças de UI que faltam.** Pronta em 09/11 (`ARCHITECTURE.md` §12.20).
   - seletor de valor ("‹ Normal ›": esquerda e direita no D-pad, setas no toque e no mouse);
   - alternador (sim/não) e passo numérico (vida, tempo, bots);
   - abas (LB/RB, Q/E, toque);

@@ -3,6 +3,7 @@ import {
   createMenuNavigation,
   defaultFocus,
   drawTree,
+  hitOptionArrow,
   hitTest,
   layoutTree,
   navigateMenu,
@@ -29,7 +30,7 @@ export interface UiFrame {
 }
 
 /** Ações de menu na ordem em que são tratadas num frame (a primeira que ativa ou volta encerra o frame). */
-const MENU_ORDER: readonly MenuAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back'];
+const MENU_ORDER: readonly MenuAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'tabPrev', 'tabNext'];
 
 /**
  * Uma tela de menu viva: árvore → layout (refeito só quando a árvore ou o tamanho mudam) → foco → DrawList.
@@ -52,6 +53,9 @@ export function createMenuController(): MenuController {
   let layout: LayoutResult | null = null;
   let revision = -1;
   let focusedId: string | null = null;
+  /** M2 (fase 4a): deslocamento das colunas com rolagem por id, e o foco com que o layout foi feito. */
+  const scrollState = new Map<string, number>();
+  let layoutFocus: string | null = null;
   const nav = createMenuNavigation();
   // Ponteiro: o mouse confirma ao soltar no botão em que desceu; cada dedo idem.
   let mouseWasDown = false;
@@ -66,21 +70,37 @@ export function createMenuController(): MenuController {
 
   function relayout(ui: UiFrame): LayoutResult | null {
     if (root === null) return null;
-    if (layout !== null && revision === ui.revision) return layout;
-    layout = layoutTree(root, { x: 0, y: 0, w: ui.width, h: ui.height }, ui.userScale, ui.options);
+    // Com coluna com rolagem, o foco novo pode pedir outra janela: refaz o layout (só quando o foco muda).
+    const scrolled = layout !== null && layout.scrolls.length > 0 && layoutFocus !== focusedId;
+    if (layout !== null && revision === ui.revision && !scrolled) return layout;
+    layout = layoutTree(root, { x: 0, y: 0, w: ui.width, h: ui.height }, ui.userScale, {
+      ...ui.options,
+      focusedId,
+      scrollState,
+    });
     revision = ui.revision;
     if (focusedId === null || !layout.focusable.some((b) => b.id === focusedId)) {
       focusedId = defaultFocus(layout);
+      if (layout.scrolls.length > 0) {
+        layout = layoutTree(root, { x: 0, y: 0, w: ui.width, h: ui.height }, ui.userScale, {
+          ...ui.options,
+          focusedId,
+          scrollState,
+        });
+      }
     }
+    layoutFocus = focusedId;
     return layout;
   }
 
-  function activate(l: LayoutResult, id: string): void {
+  function activate(l: LayoutResult, id: string, x: number): void {
     const node = l.byId.get(id) as ButtonNode | undefined;
     if (!node || node.kind !== 'button' || node.disabled) return;
     focusedId = id;
     nav.focusedId = id;
     nav.activated = node.action;
+    // M2 (fase 4a): nas setas de uma linha de opção, o toque e o clique mudam o valor.
+    nav.delta = hitOptionArrow(l, id, x);
   }
 
   function pointer(l: LayoutResult, raw: Readonly<RawInputState>): void {
@@ -92,7 +112,7 @@ export function createMenuController(): MenuController {
         if (moved && id !== null) focusedId = id;
         if (mouseDown && !mouseWasDown) mousePressedId = id;
         else if (!mouseDown && mouseWasDown) {
-          if (id !== null && id === mousePressedId) activate(l, id);
+          if (id !== null && id === mousePressedId) activate(l, id, raw.pointerX);
           mousePressedId = null;
         }
       }
@@ -116,7 +136,7 @@ export function createMenuController(): MenuController {
       } else if (touchActive[i] === 1) {
         touchActive[i] = 0;
         const id = hitTest(l, touchX[i]!, touchY[i]!);
-        if (id !== null && id === touchPressed[i] && nav.activated === null) activate(l, id);
+        if (id !== null && id === touchPressed[i] && nav.activated === null) activate(l, id, touchX[i]!);
         touchPressed[i] = null;
       }
     }
@@ -137,6 +157,8 @@ export function createMenuController(): MenuController {
     update(menu, raw, ui): MenuNavigation {
       nav.activated = null;
       nav.back = false;
+      nav.delta = 0;
+      nav.tab = 0;
       nav.focusedId = focusedId;
       const l = relayout(ui);
       if (l === null) return nav;
@@ -145,7 +167,7 @@ export function createMenuController(): MenuController {
         if (!menu.pressed(action)) continue;
         navigateMenu(l, focusedId, action, nav);
         focusedId = nav.focusedId;
-        if (nav.activated !== null || nav.back) return nav;
+        if (nav.activated !== null || nav.back || nav.tab !== 0) return nav;
       }
       pointer(l, raw);
       nav.focusedId = focusedId;

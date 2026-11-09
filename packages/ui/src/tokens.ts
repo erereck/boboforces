@@ -109,6 +109,21 @@ export const TYPE = {
 
 export type TypeToken = keyof typeof TYPE;
 
+/**
+ * M2 (fase 4a): linha de opção (`ButtonNode.value`): largura da área do valor, lado da seta (alvo de toque da seta, o
+ * layout garante `minTarget`), o desenho da seta (degraus de pixel-art) e o estilo do valor. Coluna com rolagem: a
+ * barrinha (largura e distância da coluna) e a folga do foco nas bordas da janela.
+ */
+export const OPTION = {
+  valueWidth: 260,
+  arrow: 44,
+  arrowSteps: 5,
+  value: { font: 'hud', size: 30, tracking: 0.02, uppercase: false },
+  scrollBar: 4,
+  scrollBarGap: 10,
+  scrollMargin: 10,
+} as const satisfies { readonly value: TypeStyle } & Readonly<Record<string, unknown>>;
+
 /** Botão: medidas em px de referência. O layout aplica `minTarget` por cima da altura. */
 export const BUTTON = {
   height: 60,

@@ -1,5 +1,6 @@
 import type { MenuAction } from '@boboforces/input';
 import type { LayoutResult } from './layout.ts';
+import { BUTTON, OPTION } from './tokens.ts';
 import type { ButtonNode, Rect } from './tree.ts';
 
 /**
@@ -89,14 +90,49 @@ export function moveFocus(layout: LayoutResult, currentId: string | null, action
   return best?.id ?? null;
 }
 
-/** Botão focável sob o ponto (px reais do alvo), ou `null`. O último desenhado ganha. */
+/**
+ * Botão focável sob o ponto (px reais do alvo), ou `null`. O último desenhado ganha. Dentro de uma coluna com rolagem
+ * (M2, fase 4a), só a parte à vista recebe o toque.
+ */
 export function hitTest(layout: LayoutResult, x: number, y: number): string | null {
   for (let i = layout.focusable.length - 1; i >= 0; i--) {
     const b = layout.focusable[i] as ButtonNode;
     const r = layout.rects.get(b) as Rect;
-    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return b.id as string;
+    if (x < r.x || x >= r.x + r.w || y < r.y || y >= r.y + r.h) continue;
+    const c = layout.clips.get(b);
+    if (c && (x < c.x || x >= c.x + c.w || y < c.y || y >= c.y + c.h)) continue;
+    return b.id as string;
   }
   return null;
+}
+
+/**
+ * M2 (fase 4a): as duas setas de uma linha de opção (px reais): a área do valor fica à direita, dentro do respiro do
+ * botão, com uma seta em cada ponta. Escreve [x da esquerda, x da direita, largura de cada] em `out`.
+ */
+export function optionArrows(layout: LayoutResult, node: ButtonNode, r: Rect, out: Float64Array): void {
+  const s = layout.scale;
+  const valueW = (node.valueWidth ?? OPTION.valueWidth) * s;
+  const arrow = OPTION.arrow * s;
+  const right = r.x + r.w - BUTTON.padX * s * 0.5;
+  out[0] = right - valueW;
+  out[1] = right - arrow;
+  out[2] = arrow;
+}
+
+const arrows = new Float64Array(3);
+
+/**
+ * M2 (fase 4a): o toque ou o clique em `x` caiu numa seta da linha de opção `id`? -1 na da esquerda, +1 na da direita,
+ * 0 fora delas (ou se não é linha de opção). O alvo de cada seta tem a altura do botão.
+ */
+export function hitOptionArrow(layout: LayoutResult, id: string, x: number): number {
+  const node = findFocusable(layout, id);
+  if (!node || node.value === undefined) return 0;
+  optionArrows(layout, node, layout.rects.get(node) as Rect, arrows);
+  if (x >= arrows[0]! && x < arrows[0]! + arrows[2]!) return -1;
+  if (x >= arrows[1]! && x < arrows[1]! + arrows[2]!) return 1;
+  return 0;
 }
 
 /** Resultado de uma ação de menu (objeto reaproveitável: sem alocação por toque). */
@@ -106,10 +142,17 @@ export interface MenuNavigation {
   activated: string | null;
   /** `back` foi pedido (a tela decide para onde voltar). */
   back: boolean;
+  /**
+   * M2 (fase 4a): numa linha de opção, -1 ou +1 (esquerda, direita ou as setas) junto com `activated`; 0 no confirmar
+   * comum (a tela decide: num alternador, inverte; num seletor, avança).
+   */
+  delta: number;
+  /** M2 (fase 4a): troca de aba pedida (-1 `tabPrev`, +1 `tabNext`, 0 nenhuma). */
+  tab: number;
 }
 
 export function createMenuNavigation(): MenuNavigation {
-  return { focusedId: null, activated: null, back: false };
+  return { focusedId: null, activated: null, back: false, delta: 0, tab: 0 };
 }
 
 /** Aplica uma ação de menu: move o foco, confirma o botão focado ou pede para voltar. Preenche e devolve `out`. */
@@ -121,6 +164,13 @@ export function navigateMenu(
 ): MenuNavigation {
   out.activated = null;
   out.back = false;
+  out.delta = 0;
+  out.tab = 0;
+  if (action === 'tabPrev' || action === 'tabNext') {
+    out.focusedId = focusedId;
+    out.tab = action === 'tabPrev' ? -1 : 1;
+    return out;
+  }
   const current = focusedId === null ? null : findFocusable(layout, focusedId);
   if (!current) {
     out.focusedId = defaultFocus(layout);
@@ -128,7 +178,11 @@ export function navigateMenu(
     return out;
   }
   out.focusedId = focusedId;
-  if (isDirection(action)) out.focusedId = moveFocus(layout, focusedId, action) ?? focusedId;
+  if ((action === 'left' || action === 'right') && current.value !== undefined) {
+    // Linha de opção: esquerda e direita mudam o valor; o foco fica.
+    out.activated = current.action;
+    out.delta = action === 'left' ? -1 : 1;
+  } else if (isDirection(action)) out.focusedId = moveFocus(layout, focusedId, action) ?? focusedId;
   else if (action === 'confirm') out.activated = current.action;
   else if (action === 'back') out.back = true;
   return out;

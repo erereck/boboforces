@@ -179,6 +179,12 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Prints da rodada 7:** página com capturas ao vivo (`local/m2/montar-pagina-r7.mjs`) do aviso do time, dos bots de
   fábrica e das regras no placar e na tela de morte, com as perguntas C1–C6. Aprovada no padrão (#67), o que fecha a
   fase 3.
+- **Fase 4a, peças de UI dos menus:**
+  - linha de opção ("NÍVEL ◀ Normal ▶"): esquerda e direita mudam o valor, e as setas respondem ao toque e ao mouse;
+    serve de seletor, alternador e passo numérico;
+  - abas (Q/E, LB/RB) com o sublinhado âmbar na selecionada;
+  - coluna com rolagem que segue o foco, recortada, com barrinha;
+  - tudo navegável só com o D-pad. 13 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

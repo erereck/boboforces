@@ -68,6 +68,11 @@ export interface StackNode extends NodeBase {
   readonly kind: 'row' | 'column';
   /** Alinhamento dos filhos no eixo cruzado (padrão `start`). */
   readonly align?: CrossAlign;
+  /**
+   * M2 (fase 4a): coluna com rolagem (precisa de `height` e de `id`): a janela segue o foco com o menor deslocamento,
+   * o que sai dela é recortado e não recebe toque, e uma barrinha à direita mostra onde está. Só coluna, sem aninhar.
+   */
+  readonly scroll?: boolean;
   readonly children: readonly UiNode[];
 }
 
@@ -86,7 +91,8 @@ export interface TextNode extends NodeBase {
   readonly textAlign?: 'left' | 'center' | 'right';
 }
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+/** `tab`: aba de uma barra de abas (M2, fase 4a); a selecionada ganha `selected`. */
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'tab';
 
 export interface ButtonNode extends NodeBase {
   readonly kind: 'button';
@@ -97,6 +103,16 @@ export interface ButtonNode extends NodeBase {
   readonly disabled?: boolean;
   /** Foco inicial da tela. */
   readonly autofocus?: boolean;
+  /**
+   * M2 (fase 4a): linha de opção: o rótulo à esquerda e este valor à direita, entre setas ("◀ Normal ▶"). Com o foco,
+   * esquerda e direita mudam o valor (`MenuNavigation.delta` ∓1) em vez de mover o foco; no toque e no mouse, as setas.
+   * Serve de seletor, alternador (Sim/Não) e passo numérico: quem muda o valor é a tela, ao receber a ação.
+   */
+  readonly value?: TextContent;
+  /** Largura da área do valor (setas incluídas), em px de referência (padrão `OPTION.valueWidth`). */
+  readonly valueWidth?: number;
+  /** M2 (fase 4a): aba selecionada (variante `tab`). */
+  readonly selected?: boolean;
   /** Exceções de foco declaradas: id do vizinho por direção. */
   readonly focusOverride?: Readonly<Partial<Record<'up' | 'down' | 'left' | 'right', string>>>;
 }
