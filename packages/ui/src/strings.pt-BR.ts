@@ -199,6 +199,11 @@ export const STRINGS_PT_BR = {
   'stats.lessThanMinute': 'menos de 1 min',
   'stats.minutes': '{m} min',
   'stats.hours': '{h} h {m} min',
+  // M2 (fase 4h): dicas de 1 linha (a tecla ou o botão vem antes, desenhado).
+  'tip.sprint': 'corre',
+  'tip.slide': 'agacha; correndo, desliza',
+  'tip.ads': 'mira com zoom',
+  'tip.reload': 'recarrega',
   'title.surprise': 'Surpreenda-me',
   'title.change': 'Mudar',
   'surprise.title': 'Surpreenda-me',
@@ -601,6 +606,7 @@ export const STRINGS_PT_BR = {
   'error.backToMenu': 'Voltar ao menu',
 
   'device.rotatePhone': 'Gire o celular',
+  'device.rotateHint': 'O BoboForces se joga com o celular deitado.',
   'device.pressToJoin': 'Aperte A ou Enter para entrar',
   'device.controllerDisconnected': 'Controle desconectado',
   'switch.needApplicationMode': 'Abra segurando R ou instale o NSP',

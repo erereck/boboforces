@@ -1546,3 +1546,28 @@ mudanças de contrato ficam registradas aqui.
 - **Resultado:** `ResultScreenData.record` troca o título dos números (sem linha nova: a tela já está cheia no
   640×360).
 - **Tamanho:** o menu foi a 325,4 KB (+1,4 KB).
+
+### 12.29 Fase 4h: onboarding opcional (09/11/2026)
+
+- **`scene/tips.ts`** (puro, sem alocação por frame):
+  - `TIPS` com a ação de cada dica (`reload`, `ads`, `slide`, `sprint`) e `TIP_RULES`;
+  - `createTips(ligadas, vistas)`, `stepTips(estado, sinais, dt, temTecla)` (devolve a dica que começou) e `tipAlpha`;
+  - uma por vez; 4 s na tela (o último meio segundo some) e 3 s de folga;
+  - prioridade: pente vazio, inimigo longe, correr, andar.
+- **Escolha (revisável):** o design pede "correr perto de cobertura" para a dica do agachar; por ora basta correr 1,5 s.
+  O "inimigo longe" usa o cone da assistência no nível 1 (só enquanto a dica do ADS espera).
+- **Contrato (integração):** `SceneStats` ganha `current` (o `stats@1` atual) e `tipSeen(id)` (`markTipSeen`, com o teto de
+  32 da lista).
+- **Cena:** dicas só na partida de verdade, com 1 jogador, com "Dicas" ligado e com menos de 2 partidas terminadas no
+  aparelho. O nome da tecla sai do perfil do dispositivo ativo (`bindingLabel`), refeito só quando a dica ou o
+  dispositivo mudam.
+- **ui:**
+  - `HudModel.tipKey`, `tipText` e `tipAlpha`: plaquinha a 66% da altura da vista, com a tecla num contorno âmbar;
+  - `rotateScreen` ("Gire o celular", um celular deitado feito de caixas);
+  - no toque, o nome do botão é o do controle da tela ("Recarga").
+- **game:**
+  - celular (`profileHint` `mobile`) em retrato: o aviso cobre tudo, a cena pausa e nenhuma tela anda;
+  - `checkMenuReady` sai do fim do frame para valer também por baixo do aviso. Sem isso, quem abria em retrato ficava
+    no splash para sempre: o `onMenuReady` nunca vinha.
+- **Fica para a fase 5:** a calibração da sensibilidade e o card do Laboratório.
+- **Tamanho:** o menu foi a 325,7 KB (+0,3 KB).

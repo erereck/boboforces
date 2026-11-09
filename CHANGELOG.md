@@ -291,6 +291,19 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     antigo, uma linha avisa quantos itens foram atualizados.
   - **Menu principal:** Partida Rápida, Modos, Ajustes e Novidades.
   - 5 testes novos.
+- **Fase 4h, onboarding opcional:**
+  - **Dicas de 1 linha** nas 2 primeiras partidas, sem pausar, cada uma no máximo uma vez:
+    - andar 5 s sem correr: "Shift esquerdo corre";
+    - correr 1,5 s: a do agachar e deslizar;
+    - mirar num inimigo a mais de 20 m sem o ADS: a da mira com zoom;
+    - pente vazio: a do recarregar.
+  - **A tecla da dica** é a que o jogador usa de verdade, remapeamento incluído: aparece desenhada (contorno âmbar) e
+    troca na hora se o dispositivo mudar (teclado, controle ou toque). Ação sem botão no dispositivo espera.
+  - **Quando aparece:** só com 1 jogador e com "Dicas" ligado nos Ajustes.
+  - **Gire o celular:** no celular em retrato, um aviso cobre tudo e a partida pausa; some quando o aparelho deita.
+  - **Correção:** com o celular em retrato desde o boot, o splash da web não saía.
+  - **Fica para a fase 5:** a calibração da sensibilidade (3 alvos) e o card "Conheça o Laboratório".
+  - 6 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

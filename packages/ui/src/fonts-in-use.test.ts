@@ -16,6 +16,7 @@ import { drawnCommands } from './test-fixtures.ts';
 import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
+import { rotateScreen } from './screens/rotate.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
 import { customMatchScreen } from './screens/custom-match.ts';
@@ -481,6 +482,14 @@ describe('estouro de texto com o atlas real', () => {
         }
       }
     }
+  });
+
+  it('Gire o celular (M2, fase 4h): cabe no celular em retrato', () => {
+    const portrait = [
+      web('celular em retrato 750×1334 (DPR 2)', 750, 1334, 2, true),
+      web('celular em retrato 360×640', 360, 640, 1, true),
+    ];
+    for (const target of portrait) expectNoOverflow(layoutFor(rotateScreen.build(null), target), target);
   });
 
   it('ajustes (as 6 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {

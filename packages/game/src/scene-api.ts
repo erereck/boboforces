@@ -1,4 +1,4 @@
-import type { BotLevel, MatchRecipe, SettingsDocument } from '@boboforces/format';
+import type { BotLevel, MatchRecipe, SettingsDocument, StatsDocument } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -78,7 +78,11 @@ export interface RecordBreaks {
 
 /** M2 (fase 4g): as estatísticas do aparelho; a cena entrega a partida no fim e o núcleo grava. */
 export interface SceneStats {
+  /** M2 (fase 4h): o documento atual (as dicas olham as partidas terminadas e as já vistas). */
+  readonly current: StatsDocument;
   record(match: MatchRecord): RecordBreaks;
+  /** M2 (fase 4h): a dica `id` apareceu (não volta mais). */
+  tipSeen(id: string): void;
 }
 
 /** O que o núcleo empresta para a cena. */

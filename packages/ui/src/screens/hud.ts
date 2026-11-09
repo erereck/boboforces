@@ -89,6 +89,13 @@ export interface HudModel {
    */
   readonly pings: Float32Array;
   pingCount: number;
+  /**
+   * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
+   * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
+   */
+  tipKey: string;
+  tipText: string;
+  tipAlpha: number;
 }
 
 /** M2 (fase 3e): máximo de avisos do time na vista. */
@@ -172,6 +179,9 @@ export function createHudModel(): HudModel {
     markerColor: COLORS.texto,
     pings: new Float32Array(MAX_TEAM_PINGS * 2),
     pingCount: 0,
+    tipKey: '',
+    tipText: '',
+    tipAlpha: 0,
   };
 }
 
@@ -659,6 +669,25 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       const y = Math.round(cy + crossGap + len + gap * 2);
       plate(out, cx - w / 2 - pad, y, w + pad * 2, capL + pad * 2, s);
       paintText(out, hud, tx.clickToAim, cx, y + pad, labelPx, COLORS.texto, 0, 0.5);
+    }
+    if (model.tipAlpha > 0.01 && model.tipKey !== '') {
+      // A dica: abaixo do meio (longe da retícula e do "Clique para mirar"), numa plaquinha.
+      const a = clamp01(model.tipAlpha);
+      const keyW = textWidth(hud, model.tipKey, labelPx);
+      const textW = textWidth(hud, model.tipText, labelPx);
+      // A tecla: contorno âmbar com respiro de `pad` em volta do nome; a plaquinha tem mais `capPad` por fora.
+      const capPad = Math.max(3, Math.round(pad * 0.6));
+      const capW = keyW + pad * 2;
+      const capH = capL + pad * 2;
+      const w = capW + gap * 2 + textW;
+      const h = capH + capPad * 2;
+      const x = Math.round(cx - w / 2);
+      const y = Math.round(view.y + view.height * 0.66);
+      pushShape(out, x - capPad * 2, y, w + capPad * 4, h, withAlpha(COLORS.hudFundo, 0.7 * a), Math.round(5 * s));
+      const ring = Math.max(1, Math.round(2 * s));
+      pushShape(out, x, y + capPad, capW, capH, withAlpha(COLORS.acao, a), 0, ring);
+      paintText(out, hud, model.tipKey, x + pad, y + capPad + pad, labelPx, withAlpha(COLORS.acao, a));
+      paintText(out, hud, model.tipText, x + capW + gap * 2, y + capPad + pad, labelPx, withAlpha(COLORS.texto, a));
     }
   } else {
     // Morto: a contagem no centro. Com o anel da primária (M2, fase 2c), ela vai em letra de rótulo, numa plaquinha

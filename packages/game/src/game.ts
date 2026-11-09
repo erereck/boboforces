@@ -47,6 +47,7 @@ import {
   MIN_TEXT,
   MIN_TOUCH_TARGET,
   resetDrawList,
+  rotateScreen,
   settingsScreen,
   SETTINGS_ACTION,
   SETTINGS_ROW_PREFIX,
@@ -92,7 +93,7 @@ import {
   type QuickSettings,
 } from './quick-match.ts';
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
-import { addMatch, markNewsSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
+import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
   type RendererFactory,
@@ -253,6 +254,10 @@ export function startGame(deps: GameDeps): GameHandle {
   }
   refreshTitle();
   mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings', 'news'] }));
+
+  // M2 (fase 4h): o aviso "Gire o celular" (celular em retrato).
+  const rotateMenu = createMenuController();
+  rotateMenu.setRoot(rotateScreen.build(null));
 
   // M2 (fase 4g): Novidades: uma vez depois de atualizar (no boot, antes do título) e sempre pelo menu principal.
   const newsMenu = createMenuController();
@@ -656,6 +661,10 @@ export function startGame(deps: GameDeps): GameHandle {
           save: (doc) => save.setSettings(doc),
         },
         stats: {
+          get current() {
+            return save.stats;
+          },
+          tipSeen: (id) => save.setStats(markTipSeen(save.stats, id)),
           record: (m) => {
             const r = addMatch(save.stats, m);
             save.setStats(r.doc);
@@ -727,6 +736,24 @@ export function startGame(deps: GameDeps): GameHandle {
     menuInput.update(raw, dt);
     const u = syncUi();
     resetDrawList(list, u.width, u.height);
+
+    // M2 (fase 4h): celular em retrato (gameplay.md §2.5): "Gire o celular" por cima de tudo; a partida pausa e
+    // nenhuma tela anda até o aparelho deitar.
+    if (
+      platform.features.profileHint === 'mobile' &&
+      u.height > u.width &&
+      screen !== 'loading' &&
+      screen !== 'error'
+    ) {
+      scene?.pause();
+      rotateMenu.draw(list, u);
+      renderer.renderViews(NO_VIEWS);
+      renderer.drawUi(list);
+      syncPointerLock();
+      frames++;
+      checkMenuReady();
+      return;
+    }
 
     switch (screen) {
       case 'loading':
@@ -954,16 +981,19 @@ export function startGame(deps: GameDeps): GameHandle {
     }
     syncPointerLock();
     frames++;
+    checkMenuReady();
+  }
 
-    if (!menuReady && screen === 'title') {
-      menuReady = true;
-      log(`${MENU_READY_MARKER} ${Math.round(platform.now() - bootAt)} ms`);
-      hooks.onMenuReady?.();
-      // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
-      // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
-      // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.
-      if (deps.bench) requestScene('bench', deps.bench);
-    }
+  /** O primeiro frame do título (ou do aviso de retrato por cima dele): o splash da casca pode sair. */
+  function checkMenuReady(): void {
+    if (menuReady || screen !== 'title') return;
+    menuReady = true;
+    log(`${MENU_READY_MARKER} ${Math.round(platform.now() - bootAt)} ms`);
+    hooks.onMenuReady?.();
+    // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
+    // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
+    // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.
+    if (deps.bench) requestScene('bench', deps.bench);
   }
 
   function onFrame(frameMs: number): void {

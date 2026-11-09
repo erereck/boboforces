@@ -1,7 +1,7 @@
 import { EMPTY_STATS, issue } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import type { MatchRecord } from './scene-api.ts';
-import { addMatch, markNewsSeen, migratedCount, newsOnBoot, playTimeText, statsLines } from './stats.ts';
+import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, playTimeText, statsLines } from './stats.ts';
 
 /** M2, fase 4g: estatísticas e recordes do aparelho, e quando a Novidades aparece. */
 
@@ -55,5 +55,11 @@ describe('estatísticas', () => {
     // Viu a anterior e atualizou: mostra, mesmo sem partida terminada.
     expect(newsOnBoot(markNewsSeen(EMPTY_STATS, '0.0.0'), '0.0.1')).toBe('show');
     expect(migratedCount([issue('bots[0].format', 'format.migrated'), issue('x', 'save.valueClamped')])).toBe(1);
+  });
+
+  it('dica vista entra uma vez na lista do onboarding', () => {
+    const a = markTipSeen(EMPTY_STATS, 'reload');
+    expect(a.onboarding.tipsSeen).toEqual(['reload']);
+    expect(markTipSeen(a, 'reload')).toBe(a);
   });
 });

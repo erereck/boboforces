@@ -18,6 +18,7 @@ import {
   profileBindings,
   rebind,
   REMAP_ACTIONS,
+  TOUCH_CONTROLS,
   type BindingSource,
   type ControlProfile,
   type RemapAction,
@@ -303,6 +304,9 @@ function boundProfile(doc: SettingsDocument, device: ControlDevice): ControlProf
   return applyBindings(defaultProfileFor(device), doc.controls[device].bindings);
 }
 
+/** Os controles de toque com nome na tabela (`touch.*`). */
+const TOUCH_LABELS: ReadonlySet<string> = new Set(TOUCH_CONTROLS);
+
 function nameOf(table: Readonly<Record<string, number>>, v: number): string {
   return Object.keys(table).find((k) => table[k] === v) ?? '';
 }
@@ -332,7 +336,8 @@ export function bindingLabel(s: BindingSource): string {
       name = t(`bind.axis.${nameOf(PAD_AXIS, s.axis)}` as StringKey);
       break;
     case 'touchControl':
-      name = t('bind.touch');
+      // O nome do botão desenhado na tela ("Recarga").
+      name = TOUCH_LABELS.has(s.control) ? t(`touch.${s.control}` as StringKey) : t('bind.touch');
       break;
   }
   return s.hold ? t('settings.bind.hold', { name }) : name;

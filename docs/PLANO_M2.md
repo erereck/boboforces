@@ -206,7 +206,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
 - **4g. Estatísticas e Novidades.** Pronta em 09/11 (`ARCHITECTURE.md` §12.28).
   - `stats@1` gravado no fim de cada partida, com "Recorde!" no resultado;
   - a tela de Novidades (codinome e até 5 itens), que aparece uma vez depois de atualizar e avisa as migrações.
-- **4h. Onboarding opcional:**
+- **4h. Onboarding opcional.** Pronta em 09/11 (`ARCHITECTURE.md` §12.29).
   - dicas de 1 linha nas 2 primeiras partidas, com os glifos do dispositivo ativo;
   - a troca de glifos ao mudar de dispositivo;
   - "Gire o celular" em retrato;

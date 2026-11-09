@@ -31,6 +31,7 @@ import {
   createGamepadProfile,
   createBindingCapture,
   createInputFrame,
+  profileBindings,
   createInputMapper,
   createKeyboardMouseProfile,
   createTouchProfile,
@@ -154,6 +155,7 @@ import {
 } from '@boboforces/ui';
 import { sampleLightGrid } from '@boboforces/world';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim } from './aim-assist.ts';
+import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
 import { formatBenchReport, type BenchReport } from '../bench/report.ts';
 import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
@@ -166,6 +168,7 @@ import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '.
 import {
   actionLabel,
   applyControls,
+  bindingLabel,
   bindRowAction,
   PAUSE_SETTINGS_TABS,
   rebindSettings,
@@ -1487,6 +1490,75 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
+  // M2 (fase 4h): dicas de 1 linha (gameplay.md §2.5): só na partida de verdade com 1 jogador, nas 2 primeiras
+  // partidas do aparelho e com "Dicas" ligado nos Ajustes; cada uma no máximo 1 vez (o `stats@1` lembra).
+  const tips = createTips(
+    request.kind === 'play' &&
+      humans === 1 &&
+      host.settings.current.accessibility.tips &&
+      host.stats.current.totals.matches < TIP_RULES.maxMatches,
+    host.stats.current.onboarding.tipsSeen,
+  );
+  const tipSignals = createTipSignals();
+  const tipAssist = createAimAssistState();
+  const tipCanShow = (id: TipId): boolean => profileBindings(profiles[device], TIPS[id].action).length > 0;
+  /** O nome da tecla da dica, refeito só quando a dica ou o dispositivo mudam (a troca de glifos é na hora). */
+  let tipLabelId: TipId | null = null;
+  let tipLabelDevice: DeviceKind | null = null;
+  let tipKey = '';
+  let tipText = '';
+  function refreshTipLabel(): void {
+    const id = tips.current;
+    if (id === null || (id === tipLabelId && device === tipLabelDevice)) return;
+    tipLabelId = id;
+    tipLabelDevice = device;
+    const sources = profileBindings(profiles[device], TIPS[id].action);
+    tipKey = sources.length > 0 ? bindingLabel(sources[0]!) : '';
+    tipText = t(TIPS[id].textKey);
+  }
+  function updateTips(dt: number): void {
+    if (tips.pending.size === 0 && tips.current === null) return;
+    const v = sim.view();
+    const e = entityIndex(sim.controllerEntity(0));
+    const fl = e >= 0 ? v.flags[e]! : 0;
+    tipSignals.alive = e >= 0 && v.alive[e] === 1 && (fl & ENTITY_FLAG.dead) === 0;
+    tipSignals.farEnemy = false;
+    tipSignals.magEmpty = false;
+    if (tipSignals.alive) {
+      const speed = Math.hypot(v.velocity[e * 3]!, v.velocity[e * 3 + 2]!);
+      tipSignals.moving = speed > 1 && (fl & ENTITY_FLAG.onGround) !== 0;
+      tipSignals.sprinting = (fl & ENTITY_FLAG.sprinting) !== 0;
+      const held = weaponDef(v.weapon[e]!);
+      tipSignals.magEmpty =
+        held !== null &&
+        held.clipSize > 0 &&
+        held.fire !== WEAPON_FIRE.thrown &&
+        heldClip(v, e) === 0 &&
+        heldReserve(v, e) > 0 &&
+        (fl & ENTITY_FLAG.reloading) === 0;
+      // Inimigo longe na mira (sem ADS): o cone da assistência no nível 1, só enquanto a dica do ADS espera.
+      if (tips.pending.has('ads') && (fl & ENTITY_FLAG.ads) === 0) {
+        const a = driver.alpha;
+        const o = e * 3;
+        const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
+        const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(fl);
+        const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
+        findAimAssist(v, e, ffa, ex, ey, ez, player.yaw, player.pitch, 1, a, far, tipAssist);
+        const j = tipAssist.target;
+        if (j >= 0) {
+          const dx = v.position[j * 3]! - ex;
+          const dz = v.position[j * 3 + 2]! - ez;
+          tipSignals.farEnemy = dx * dx + dz * dz > TIP_RULES.farM * TIP_RULES.farM;
+        }
+      }
+    }
+    const started = stepTips(tips, tipSignals, dt, tipCanShow);
+    if (started !== null) {
+      host.stats.tipSeen(started);
+      host.log(`[partida] dica: ${started}`);
+    }
+  }
+
   function pause(): void {
     if (paused || disposed || humans === 0 || resultShown) return;
     paused = true;
@@ -2281,6 +2353,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.spread = Math.min(1, hip * 0.7 + (speed / RUN_SPEED) * 0.6 + (recoil[e] ?? 0) * 0.5);
     m.clickToAim =
       humans > 0 && s === 0 && !paused && device === 'keyboardMouse' && platform.id === 'web' && !rawLocked;
+    m.tipAlpha = s === 0 ? tipAlpha(tips) : 0;
+    if (m.tipAlpha > 0) {
+      refreshTipLabel();
+      m.tipKey = tipKey;
+      m.tipText = tipText;
+    }
     drawHud(slot.hud, fonts, m, lay.views[s]!);
     desc.hud = slot.hud;
     void ui;
@@ -2835,6 +2913,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         trace('sim e IA');
         timeS += dt;
         decay(dt);
+        if (!resultShown && endedAt < 0) updateTips(dt);
         if (overrideRoute) routeTime += dt;
         if (benchState) benchState.t += dt;
       }

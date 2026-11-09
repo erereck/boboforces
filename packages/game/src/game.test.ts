@@ -716,7 +716,7 @@ describe('startGame (NullRenderer)', () => {
       uiAtlas: null,
       log: () => {},
       settings: { current: DEFAULT_SETTINGS, save: () => {} },
-      stats: { record: () => ({ mostKills: false, bestStreak: false }) },
+      stats: { current: EMPTY_STATS, record: () => ({ mostKills: false, bestStreak: false }), tipSeen: () => {} },
       benchReport: () => {},
     };
     const loader = createConstrutoLoader(host);

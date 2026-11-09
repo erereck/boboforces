@@ -1,4 +1,4 @@
-import type { StatsDocument, StatsTotals, ValidationIssue } from '@boboforces/format';
+import { STATS_RANGES, type StatsDocument, type StatsTotals, type ValidationIssue } from '@boboforces/format';
 import { t } from '@boboforces/ui';
 import type { MatchRecord, RecordBreaks } from './scene-api.ts';
 
@@ -80,6 +80,14 @@ export function newsOnBoot(doc: StatsDocument, version: string): 'show' | 'silen
 
 export function markNewsSeen(doc: StatsDocument, version: string): StatsDocument {
   return doc.onboarding.seenNews === version ? doc : { ...doc, onboarding: { ...doc.onboarding, seenNews: version } };
+}
+
+/** M2 (fase 4h): a dica `id` já apareceu (a lista tem teto; a mais antiga sai). */
+export function markTipSeen(doc: StatsDocument, id: string): StatsDocument {
+  const seen = doc.onboarding.tipsSeen;
+  if (seen.includes(id)) return doc;
+  const next = [...seen, id].slice(-STATS_RANGES.tips);
+  return { ...doc, onboarding: { ...doc.onboarding, tipsSeen: next } };
 }
 
 /** Quantos documentos do save vieram de um formato antigo e foram atualizados ao carregar. */

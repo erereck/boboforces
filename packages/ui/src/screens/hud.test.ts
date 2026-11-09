@@ -256,6 +256,37 @@ describe('HUD por vista: conteúdo', () => {
     expect(drawnCommands(list).filter((c) => c.color === withAlpha(COLORS.texto, 0.92)).length).toBe(0);
   });
 
+  it('M2 (fase 4h): a dica de 1 linha: a tecla em âmbar e o texto, dentro da vista, sem encostar nas plaquinhas', () => {
+    for (const size of SIZES) {
+      const v = layoutHudScreen(1, size.width, size.height, { minTextPx: size.single }).views[0]!;
+      const m = sampleModel();
+      m.tipKey = 'Clique no analógico esq.';
+      m.tipText = 'agacha; correndo, desliza';
+      m.tipAlpha = 1;
+      const list = createDrawList();
+      drawHud(list, fonts, m, v);
+      // A fonte sintética não desenha o espaço.
+      expect(syntheticGlyphText(list)).toContain('Cliquenoanalógicoesq.agacha;correndo,desliza');
+      const tipGlyphs = glyphs(list).filter((c) => c.color === COLORS.acao);
+      expect(tipGlyphs.length).toBeGreaterThan(0);
+      for (const c of drawnCommands(list)) expect(inside(c, v), `${size.width}×${size.height}`).toBe(true);
+      // A plaquinha da dica (fundo com 0,7 de alfa, a mesma cor) não encosta nas outras.
+      const all = plates(list);
+      const tipPlate = all.reduce((a, b) =>
+        b.y > a.y && b.x > v.x + v.width * 0.2 && b.x < v.x + v.width * 0.5 ? b : a,
+      );
+      for (const p of all)
+        if (p !== tipPlate) expect(overlaps(p, tipPlate), `${size.width}×${size.height}`).toBe(false);
+    }
+    // Sem alfa, nada.
+    const m = sampleModel();
+    m.tipKey = 'C';
+    m.tipText = 'agacha';
+    const list = createDrawList();
+    drawHud(list, fonts, m, view);
+    expect(syntheticGlyphText(list)).not.toContain('agacha');
+  });
+
   it('dano direcional na borda certa (positivo = à esquerda, como o yaw)', () => {
     const side = (angle: number): DrawnCommand => {
       const m = sampleModel();
