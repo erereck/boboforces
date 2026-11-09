@@ -1,4 +1,11 @@
-import { GAME_CODENAME, GAME_VERSION, type BotLevel } from '@boboforces/format';
+import {
+  DEBUT_PRESET,
+  GAME_CODENAME,
+  GAME_VERSION,
+  withPresetLevel,
+  type BotLevel,
+  type MatchRecipe,
+} from '@boboforces/format';
 import { stepLevel } from './pause.ts';
 import {
   confirmConventionFor,
@@ -8,18 +15,22 @@ import {
 } from '@boboforces/input';
 import type { Platform } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
-import type { Disposable, Unsubscribe } from '@boboforces/shared';
+import { createRng, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
   createDrawList,
   createLoadingModel,
   createTestScreenModel,
   drawLoadingScreen,
   drawTestScreen,
+  MAIN_MENU_ACTION,
+  mainMenuScreen,
   MIN_TEXT,
   MIN_TOUCH_TARGET,
   resetDrawList,
   settingsScreen,
   SETTINGS_ACTION,
+  SURPRISE_ACTION,
+  surpriseScreen,
   TITLE_ACTION,
   TITLE_ACTION_TEST_PREFIX,
   titleScreen,
@@ -34,6 +45,7 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { LocalDriver } from './local-driver.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
+import { presetLines, presetSummary, rollSurprise } from './presets-ui.ts';
 import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
@@ -101,7 +113,7 @@ export interface GameDeps {
   readonly playLevel?: BotLevel;
 }
 
-export type GameScreen = 'loading' | 'title' | 'settings' | 'scene' | 'test' | 'error';
+export type GameScreen = 'loading' | 'title' | 'main' | 'surprise' | 'settings' | 'scene' | 'test' | 'error';
 
 export interface GameHandle extends Disposable {
   /** Renderer em uso (o real ou o NullRenderer). M1: pode trocar (menu → cena completa; rotas do bench). */
@@ -163,15 +175,38 @@ export function startGame(deps: GameDeps): GameHandle {
     ...(platform.id === 'web' && deps.loadScene ? [{ id: VITRINE_ITEM_ID, labelKey: 'title.vitrine' as const }] : []),
     ...testItems.map((item) => ({ id: item.id, labelKey: item.labelKey })),
   ];
-  titleMenu.setRoot(
-    titleScreen.build({
-      version: GAME_VERSION,
-      codename: GAME_CODENAME,
-      canExit: platform.features.canExit,
-      ...(extraItems.length > 0 ? { extraItems } : {}),
-    }),
-  );
+  const mainMenu = createMenuController();
+  const surpriseMenu = createMenuController();
+  /**
+   * M2 (fase 4c): o que o JOGAR joga: o último preset (o save guarda os 5 últimos) ou, na primeira vez, a partida de
+   * estreia (gameplay.md §2.5). Os parâmetros de desenvolvimento da web (`?bots=fabrica`, `?nivel=`) ainda montam a
+   * partida do jeito antigo, até a Partida personalizada (fase 4e).
+   */
+  const devPlay = deps.playSquad !== undefined || deps.playLevel !== undefined;
+  const currentPreset = (): MatchRecipe => save.presets.recent[0] ?? DEBUT_PRESET;
+  /** O preset da partida em andamento (para De novo, Mais fácil e Mais difícil); `null` no caminho antigo. */
+  let playingPreset: MatchRecipe | null = null;
+  /** O sorteio na tela do Surpreenda-me. */
+  let surprise: MatchRecipe = DEBUT_PRESET;
+  const surpriseRng = createRng(Math.floor(platform.now()) >>> 0);
+  function refreshTitle(): void {
+    titleMenu.setRoot(
+      titleScreen.build({
+        version: GAME_VERSION,
+        codename: GAME_CODENAME,
+        canExit: platform.features.canExit,
+        ...(devPlay ? {} : { playSummary: presetSummary(currentPreset()) }),
+        ...(extraItems.length > 0 ? { extraItems } : {}),
+      }),
+    );
+  }
+  refreshTitle();
+  mainMenu.setRoot(mainMenuScreen.build({ items: ['settings'] }));
   settingsMenu.setRoot(settingsScreen.build(null));
+  function rollNewSurprise(): void {
+    surprise = rollSurprise(surpriseRng);
+    surpriseMenu.setRoot(surpriseScreen.build({ lines: presetLines(surprise) }));
+  }
 
   let screen: GameScreen = 'loading';
   let fonts: UiFonts | null = null;
@@ -277,7 +312,7 @@ export function startGame(deps: GameDeps): GameHandle {
   /** M2 (fase 2e): nível dos bots do próximo JOGAR (o resultado sobe e desce um passo). */
   let playLevel: BotLevel = deps.playLevel ?? 'normal';
 
-  function requestScene(kind: SceneKind, bench: BenchConfig | null): void {
+  function requestScene(kind: SceneKind, bench: BenchConfig | null, recipe: MatchRecipe | null = null): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
       return;
@@ -293,6 +328,7 @@ export function startGame(deps: GameDeps): GameHandle {
       gamepad: menuInput.lastGamepad,
       level: playLevel,
       ...(deps.playSquad ? { squad: deps.playSquad } : {}),
+      ...(recipe ? { recipe } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;
@@ -331,6 +367,24 @@ export function startGame(deps: GameDeps): GameHandle {
     scene = null;
     pendingScene = null;
     screen = 'title';
+    refreshTitle();
+    // De volta da partida, o foco é o JOGAR (revanche em 1 interação, arte-ux.md §6.4).
+    titleMenu.focus('play');
+  }
+
+  /** M2 (fase 4c): joga um preset: ele vira o último (o do JOGAR) e a partida começa com semente nova. */
+  function playPreset(preset: MatchRecipe): void {
+    playingPreset = preset;
+    save.pushRecent({ ...preset, seed: 0 });
+    requestScene('play', null, preset);
+  }
+
+  /** JOGAR do título: o último preset (ou o caminho antigo, com os parâmetros de desenvolvimento). */
+  function play(): void {
+    if (devPlay) {
+      playingPreset = null;
+      requestScene('play', null);
+    } else playPreset(currentPreset());
   }
 
   function startTest(item: TestItem): void {
@@ -378,8 +432,11 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'title': {
         const nav = titleMenu.update(menuInput, raw, u);
         const action = nav.activated;
-        if (action === TITLE_ACTION.play) requestScene('play', null);
-        else if (action === TITLE_ACTION.settings) screen = 'settings';
+        if (action === TITLE_ACTION.play) play();
+        else if (action === TITLE_ACTION.surprise) {
+          rollNewSurprise();
+          screen = 'surprise';
+        } else if (action === TITLE_ACTION.change) screen = 'main';
         else if (action === TITLE_ACTION.quit) platform.exit();
         else if (action !== null && action.startsWith(TITLE_ACTION_TEST_PREFIX)) {
           const id = action.slice(TITLE_ACTION_TEST_PREFIX.length);
@@ -396,9 +453,32 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         break;
       }
+      case 'main': {
+        const nav = mainMenu.update(menuInput, raw, u);
+        if (nav.back || nav.activated === MAIN_MENU_ACTION.back) screen = 'title';
+        else if (nav.activated === MAIN_MENU_ACTION.settings) screen = 'settings';
+        if (screen === 'main') {
+          mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'surprise': {
+        const nav = surpriseMenu.update(menuInput, raw, u);
+        if (nav.back || nav.activated === SURPRISE_ACTION.back) screen = 'title';
+        else if (nav.activated === SURPRISE_ACTION.reroll) rollNewSurprise();
+        else if (nav.activated === SURPRISE_ACTION.play) playPreset(surprise);
+        if (screen === 'surprise') {
+          surpriseMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
       case 'settings': {
         const nav = settingsMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === SETTINGS_ACTION.back) screen = 'title';
+        if (nav.back || nav.activated === SETTINGS_ACTION.back) screen = 'main';
         settingsMenu.draw(list, u);
         renderer.renderViews(NO_VIEWS);
         renderer.drawUi(list);
@@ -443,8 +523,11 @@ export function startGame(deps: GameDeps): GameHandle {
         // M2 (fase 2e): De novo / Mais fácil / Mais difícil: a mesma partida com semente nova, um passo de nível.
         const level = scene!.level;
         playLevel = signal === 'easier' ? stepLevel(level, -1) : signal === 'harder' ? stepLevel(level, 1) : level;
+        const preset = playingPreset;
         leaveScene();
-        requestScene('play', null);
+        // M2 (fase 4c): com preset, o nível novo vale para todos os bots de nível dele, e ele vira o último.
+        if (preset !== null) playPreset(withPresetLevel(preset, playLevel));
+        else requestScene('play', null);
       }
     }
     syncPointerLock();

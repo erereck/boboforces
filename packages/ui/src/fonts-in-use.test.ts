@@ -235,7 +235,7 @@ describe('estouro de texto com o atlas real', () => {
       expectNoOverflow(layout, t);
       expectTestsClear(layout, t);
       const ids = layout.focusable.map((b) => b.id as string);
-      expect(ids.length).toBe(12);
+      expect(ids.length).toBe(13);
       expect([...reachable(layout, 'play')].sort(), t.name).toEqual([...ids].sort());
       for (const id of ids) expect(reachable(layout, id).has('play'), `${t.name}: ${id} → JOGAR`).toBe(true);
     }

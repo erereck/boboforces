@@ -42,6 +42,8 @@ export interface MenuController {
   readonly focusedId: string | null;
   /** Troca a árvore (tela nova ou estado novo). O foco continua se o id ainda existir; senão vai para o inicial. */
   setRoot(root: UiNode): void;
+  /** M2 (fase 4c): põe o foco num id (vale no próximo `update`; id que não existe cai no foco inicial). */
+  focus(id: string | null): void;
   /** 1x por frame. A navegação devolvida é reaproveitada (não guarde). */
   update(menu: MenuInput, raw: Readonly<RawInputState>, ui: UiFrame): MenuNavigation;
   /** Desenha (refaz o layout antes, se o tamanho mudou desde o último `update`). */
@@ -148,6 +150,9 @@ export function createMenuController(): MenuController {
     },
     get focusedId(): string | null {
       return focusedId;
+    },
+    focus(id: string | null): void {
+      focusedId = id;
     },
     setRoot(next: UiNode): void {
       root = next;

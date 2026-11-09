@@ -178,7 +178,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - `backup@1` com tudo junto, versionados e com migração;
   - um `SaveStore` no `game` sobre `platform.storage`, que grava com debounce e lê com validação e migração;
   - exportar e importar o backup em arquivo (`platform.files`).
-- **4c. Título, menu principal e partida de estreia:**
+- **4c. Título, menu principal e partida de estreia.** Pronta em 09/11 (`ARCHITECTURE.md` §12.22).
   - **JOGAR** usa o último preset. Na primeira vez, a partida de estreia: TDM 4v4 no Construto, você com 3 aliados,
     todos no De boa, 5 min ou 30 abates (#21).
   - **Surpreenda-me:** card com o sorteio (modo, nível, bots), "Rolar de novo" e "Jogar".

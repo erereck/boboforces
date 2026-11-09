@@ -2,6 +2,7 @@ import { AI_BUDGET, type AiBudget } from '@boboforces/ai';
 import {
   BOT_LEVELS,
   builtinBotRef,
+  presetLevel,
   ENGINE_MAX_BOTS,
   FACE_EXPRESSION,
   FIGURE_BOT_ROTATION,
@@ -410,6 +411,9 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       match: { timeLimitS: 0 },
       teams: [{ humans: 'all', bots: [] }],
     };
+  } else if (request.kind === 'play' && request.recipe) {
+    // M2 (fase 4c): o preset pedido, com a semente desta partida (o validador abaixo corta no teto do aparelho).
+    recipe = { ...request.recipe, seed: request.seed >>> 0 };
   } else {
     const bots = Math.min(PLAY_BOTS, profile.maxBots);
     const enemies = Math.ceil(bots / 2);
@@ -613,7 +617,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M2 (fase 2e): pausa com páginas, nível dos bots adversários, Destravar e o resultado.
   let pausePage: 'main' | 'challenge' | 'settings' = 'main';
   const pauseState = { challenge: request.kind === 'play' };
-  let currentLevel: BotLevel = request.kind === 'play' ? (request.level ?? 'normal') : 'normal';
+  let currentLevel: BotLevel =
+    request.kind !== 'play'
+      ? 'normal'
+      : request.recipe
+        ? (presetLevel(request.recipe) ?? 'normal')
+        : (request.level ?? 'normal');
   /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
   const challengeTeam = ffa ? -1 : 1;
   let unstuckPending = false;

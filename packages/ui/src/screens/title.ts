@@ -3,14 +3,21 @@ import { COLORS } from '../tokens.ts';
 import type { Screen, UiNode } from '../tree.ts';
 
 /**
- * Tela de título do M0 (arte-ux.md §6.3, versão mínima): logotipo, JOGAR, Ajustes e o rodapé com crédito e versão.
- * Composição à esquerda, como um painel de comando: a direita fica livre para o fundo vitrine do M1 (arte-ux.md §5.6).
+ * Tela de título (arte-ux.md §6.3): logotipo, JOGAR (com o resumo do preset que ele vai jogar embaixo),
+ * Surpreenda-me, Mudar (o menu principal) e o rodapé com crédito e versão. Composição à esquerda, como um painel de
+ * comando: a direita fica livre para o fundo vitrine (arte-ux.md §5.6). M2 (fase 4c): os Ajustes foram para o menu
+ * principal.
  */
 
 export interface TitleState {
   /** `version.json` → `version` (o `game` lê pelo `format`). */
   readonly version: string;
   readonly codename: string;
+  /**
+   * M2 (fase 4c): o que o JOGAR vai jogar ("Times · De boa · 4 contra 4 · Construto"): o último preset ou a partida de
+   * estreia. Texto já montado pelo `game`; ausente = sem linha.
+   */
+  readonly playSummary?: string;
   /** A plataforma sabe sair (Switch): mostra "Sair". Na web não existe sair (regra 16). */
   readonly canExit?: boolean;
   /**
@@ -30,7 +37,7 @@ export interface TitleExtraItem {
 }
 
 /** Ações devolvidas por `navigateMenu` nesta tela. */
-export const TITLE_ACTION = { play: 'play', settings: 'settings', quit: 'quit' } as const;
+export const TITLE_ACTION = { play: 'play', surprise: 'surprise', change: 'change', quit: 'quit' } as const;
 /** M1: prefixo da ação de item extra (`test:bench`). */
 export const TITLE_ACTION_TEST_PREFIX = 'test:';
 
@@ -143,11 +150,29 @@ export const titleScreen: Screen<TitleState> = {
                   variant: 'primary',
                   autofocus: true,
                 },
+                ...(state.playSummary
+                  ? [
+                      {
+                        kind: 'text',
+                        id: 'playSummary',
+                        text: { literal: state.playSummary },
+                        style: 'caption',
+                        color: COLORS.textoBaixo,
+                      } as const,
+                    ]
+                  : []),
                 {
                   kind: 'button',
-                  id: 'settings',
-                  text: { key: 'menu.settings' },
-                  action: TITLE_ACTION.settings,
+                  id: 'surprise',
+                  text: { key: 'title.surprise' },
+                  action: TITLE_ACTION.surprise,
+                  variant: 'secondary',
+                },
+                {
+                  kind: 'button',
+                  id: 'change',
+                  text: { key: 'title.change' },
+                  action: TITLE_ACTION.change,
                   variant: 'secondary',
                 },
                 ...(state.canExit === true

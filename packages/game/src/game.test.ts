@@ -303,8 +303,8 @@ describe('startGame (NullRenderer)', () => {
     const match = game.match!;
     const sim = match.sim;
     const view = sim.view();
-    // TDM 6 × 6: o jogador (controlador 0) e 11 bots N0.
-    expect(match.director.botCount).toBe(11);
+    // M2 (fase 4c): sem nada salvo, o JOGAR é a partida de estreia (TDM 4v4: o jogador e 7 bots De boa).
+    expect(match.director.botCount).toBe(7);
     // M2 (fase 2d): o JOGAR começa com a contagem de 3 s, sem ninguém andar; os bots saem depois dela.
     expect([view.match.phase, view.match.countdownTicks > 0]).toEqual(['warmup', true]);
     platform.pump(view.match.countdownTicks + 5);
@@ -349,8 +349,9 @@ describe('startGame (NullRenderer)', () => {
     debug.setFrozen(false);
     debug.setCamera(null);
 
-    // Pausa pelo ciclo de vida congela a sim; Enter continua. M2 (fase 2e): P, Ajustar desafio → Suado (um abaixo do
-    // Normal, que vem com o foco) volta à pausa com o nível novo; 4 × baixo + Enter (Sair) volta ao título.
+    // Pausa pelo ciclo de vida congela a sim; Enter continua. M2 (fase 2e): P, Ajustar desafio → Normal (um abaixo do
+    // De boa da partida de estreia, que vem com o foco) volta à pausa com o nível novo; 4 × baixo + Enter (Sair) volta
+    // ao título.
     platform.firePause();
     expect(game.paused).toBe(true);
     platform.pump(1);
@@ -368,7 +369,7 @@ describe('startGame (NullRenderer)', () => {
     platform.tap('Enter');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    expect([game.scene!.level, game.paused]).toEqual(['sweaty', true]);
+    expect([game.scene!.level, game.paused]).toEqual(['normal', true]);
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('title');
@@ -757,6 +758,8 @@ describe('startGame (NullRenderer)', () => {
   it('no Switch o título tem "Sair", que chama platform.exit()', async () => {
     const { platform, game } = await bootToTitle('switch');
     // Convenção do Switch: o botão da direita confirma; no teclado do teste, Enter confirma do mesmo jeito.
+    // JOGAR, Surpreenda-me, Mudar, Sair.
+    platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1220,4 +1223,49 @@ describe('JOGAR com os bots de fábrica (M2, fase 3g)', () => {
     const { recipe: plain } = sceneRecipe({ ...request, squad: 'levels' }, profileFor('pc', 1, null));
     expect(plain.teams[1]!.bots).toEqual([{ ref: 'builtin:normal-bob', count: 6 }]);
   });
+});
+
+describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
+  it('Mudar abre o menu principal; Ajustes e Voltar andam pelas telas', async () => {
+    const { platform, game } = await bootToTitle();
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('main');
+    platform.tap('Enter');
+    expect(game.screen).toBe('settings');
+    platform.tap('Escape');
+    expect(game.screen).toBe('main');
+    platform.tap('Escape');
+    expect(game.screen).toBe('title');
+    game.dispose();
+  });
+
+  it('Surpreenda-me sorteia, Jogar começa a partida sorteada e o JOGAR seguinte repete o mesmo preset', async () => {
+    const { platform, game } = await bootToTitle();
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('surprise');
+    // Rolar de novo (à direita de Jogar) fica na tela; Jogar começa a partida.
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('surprise');
+    platform.tap('ArrowLeft');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    const rolled = game.save.presets.recent[0]!;
+    const bots = rolled.teams.reduce((n, team) => n + team.bots.reduce((m, b) => m + b.count, 0), 0);
+    expect(game.match!.director.botCount).toBe(bots);
+    // Sai pela pausa (P, 4 × baixo, Sair) e joga de novo pelo JOGAR: o mesmo jeito de partida.
+    platform.tap('KeyP');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('title');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(game.match!.director.botCount).toBe(bots);
+    expect(game.save.presets.recent).toHaveLength(1);
+    game.dispose();
+  }, 120_000);
 });

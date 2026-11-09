@@ -1356,3 +1356,33 @@ mudanças de contrato ficam registradas aqui.
   - Os presets guardados são validados com os tetos do motor; o corte ao aparelho é na hora de jogar.
 - **Mudança de contrato do game:** `GameHandle.save`.
 - **Tamanho:** o menu foi a 308,9 KB (+3,6 KB: os validadores e o save entram na carga do menu).
+
+### 12.22 Fase 4c: título, menu principal e partida de estreia (09/11/2026)
+
+- **`format/presets.ts`:**
+  - `DEBUT_PRESET`: TDM 4v4 De boa, 300 s ou 30 abates;
+  - `presetLevel`: o nível dos bots de nível do lado adversário;
+  - `withPresetLevel`: troca todos os bots de nível; especiais e embutidos ficam;
+  - `presetBotCounts`.
+- **Mudanças de contrato:**
+  - `SceneRequest.recipe` (game): a cena joga o preset com a semente do pedido, cortado ao aparelho pelo validador;
+    `level` e `squad` só valem sem ele;
+  - `TITLE_ACTION` (ui): `settings` saiu; entraram `surprise` e `change`. `TitleState.playSummary` é a linha
+    embaixo do JOGAR;
+  - `MenuController.focus` (game).
+- **Telas novas (ui):**
+  - `mainMenuScreen`: a lista de itens vem do `game` (por enquanto, Ajustes; `quickMatch`, `modes` e `news` já
+    têm ação);
+  - `surpriseScreen`: as linhas do sorteio, Jogar, Rolar de novo e Voltar.
+- **`game/presets-ui.ts`:**
+  - `presetSummary` e `presetLines`, pela tabela (`mode.short.*`, `map.*`, `summary.*`);
+  - `rollSurprise`: TDM 70% (3 a 6 por lado) ou FFA (5 a 9 bots), um dos 5 níveis, 5 ou 10 min com a meta de abates
+    do modo, sempre no teto do celular.
+- **`game.ts`:**
+  - telas `main` e `surprise`;
+  - `play()` usa o último preset, ou a estreia; `playPreset` grava o preset nos últimos (sem a semente);
+  - os sinais do resultado aplicam `withPresetLevel`;
+  - os Ajustes voltam para o menu principal;
+  - de volta da partida, o foco vai para o JOGAR;
+  - com `?bots=fabrica` ou `?nivel=`, o JOGAR monta a partida do jeito antigo até a 4e.
+- **Tamanho:** o menu foi a 311,6 KB (+2,7 KB).

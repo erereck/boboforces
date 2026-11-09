@@ -386,7 +386,8 @@ describe('título com itens de teste', () => {
       const layout = title(four, w, h);
       expect(layout.focusable.map((b) => b.id)).toEqual([
         'play',
-        'settings',
+        'surprise',
+        'change',
         'quit',
         'test:bench',
         'test:controllers',
@@ -409,8 +410,8 @@ describe('título com itens de teste', () => {
       const layout = title(nine, w, h);
       const rect = (id: string) => layout.rects.get(layout.byId.get(id)!)!;
       const ids = layout.focusable.map((b) => b.id!);
-      expect(ids.slice(0, 3)).toEqual(['play', 'settings', 'quit']);
-      expect(ids.slice(3)).toEqual(nine.map((i) => `test:${i.id}`));
+      expect(ids.slice(0, 4)).toEqual(['play', 'surprise', 'change', 'quit']);
+      expect(ids.slice(4)).toEqual(nine.map((i) => `test:${i.id}`));
       const cells = nine.map((i) => rect(`test:${i.id}`));
       // Duas colunas: ímpares à esquerda, pares à direita, linhas de 2.
       expect(new Set(cells.map((c) => c.x)).size).toBe(2);
@@ -425,7 +426,7 @@ describe('título com itens de teste', () => {
       for (const c of cells) expect(c.h).toBe(Math.round(48 * layout.scale));
       // Todos alcançáveis a partir de JOGAR, e de qualquer item de teste se volta a JOGAR.
       expect([...reachable(layout, 'play')].sort()).toEqual([...ids].sort());
-      for (const id of ids.slice(3)) expect(reachable(layout, id).has('play')).toBe(true);
+      for (const id of ids.slice(4)) expect(reachable(layout, id).has('play')).toBe(true);
     }
   });
 
@@ -437,6 +438,6 @@ describe('título com itens de teste', () => {
       h: 720,
     });
     expect(layout.byId.has('tests')).toBe(false);
-    expect(layout.focusable.map((b) => b.id)).toEqual(['play', 'settings']);
+    expect(layout.focusable.map((b) => b.id)).toEqual(['play', 'surprise', 'change']);
   });
 });

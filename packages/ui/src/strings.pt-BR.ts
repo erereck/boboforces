@@ -24,6 +24,21 @@ export const STRINGS_PT_BR = {
   'menu.settings': 'Ajustes',
   'menu.about': 'Sobre',
   'menu.quit': 'Sair',
+  // M2 (fase 4c): menu principal e o título novo.
+  'menu.main': 'Menu',
+  'menu.modes': 'Modos',
+  'menu.news': 'Novidades',
+  'title.surprise': 'Surpreenda-me',
+  'title.change': 'Mudar',
+  'surprise.title': 'Surpreenda-me',
+  'surprise.reroll': 'Rolar de novo',
+  // Resumo de um preset (título, sorteio, Partida Rápida).
+  'summary.separator': ' · ',
+  'summary.teams': '{a} contra {b}',
+  'summary.ffa': '{n} bobos',
+  'summary.timeOrScore': '{min} min ou {n} abates',
+  'summary.time': '{min} min',
+  'summary.score': 'até {n} abates',
   'menu.back': 'Voltar',
   'menu.confirm': 'Confirmar',
 
@@ -311,6 +326,9 @@ export const STRINGS_PT_BR = {
 
   'mode.warfare.tdm': 'Bobo Warfare: Times',
   'mode.warfare.ffa': 'Bobo Warfare: Todos contra todos',
+  'mode.short.warfare.tdm': 'Times',
+  'mode.short.warfare.ffa': 'Todos contra todos',
+  'map.construto': 'Construto',
   'mode.training': 'Bobo Training',
 
   'error.title': 'Algo deu errado',

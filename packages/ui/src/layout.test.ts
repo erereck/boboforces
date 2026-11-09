@@ -177,11 +177,11 @@ describe('telas nas resoluções de referência (regra 17)', () => {
     }
   }
 
-  it('título: logo acima dos botões, JOGAR acima de Ajustes, rodapé embaixo', () => {
+  it('título: logo acima dos botões, JOGAR acima de Mudar, rodapé embaixo', () => {
     const l = layoutTree(screens[0]!.tree, { x: 0, y: 0, w: 1280, h: 720 }, 1, { fonts });
     const logo = rectOf(l, 'logo');
     const play = rectOf(l, 'play');
-    const settings = rectOf(l, 'settings');
+    const settings = rectOf(l, 'change');
     const version = rectOf(l, 'version');
     expect(logo.y + logo.h).toBeLessThan(play.y);
     expect(play.y + play.h).toBeLessThan(settings.y);
@@ -190,6 +190,6 @@ describe('telas nas resoluções de referência (regra 17)', () => {
     expect(version.x + version.w).toBe(l.content.x + l.content.w);
     expect(l.texts.get(l.byId.get('version') as UiNode)?.text).toBe('v0.0.1 · Primeiro Bloco');
     expect(l.texts.get(l.byId.get('play') as UiNode)?.text).toBe('JOGAR');
-    expect(l.texts.get(l.byId.get('settings') as UiNode)?.text).toBe('AJUSTES');
+    expect(l.texts.get(l.byId.get('change') as UiNode)?.text).toBe('MUDAR');
   });
 });

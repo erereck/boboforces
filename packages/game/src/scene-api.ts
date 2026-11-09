@@ -1,4 +1,4 @@
-import type { BotLevel } from '@boboforces/format';
+import type { BotLevel, MatchRecipe } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
 // bench, prints; `@boboforces/game/scene`). Integração do M1: a cena (mundo, mesher, atores, VFX, navegação, IA) é a
 // parte pesada do código, e o menu da web tem 350 KB de orçamento (tecnico.md §16.4). Então a web só baixa a cena
@@ -52,6 +52,11 @@ export interface SceneRequest {
   readonly level?: BotLevel;
   /** M2 (fase 3g): quem joga no JOGAR (padrão `levels`). */
   readonly squad?: PlaySquad;
+  /**
+   * M2 (fase 4c): a receita do JOGAR (o preset: o último jogado, a partida de estreia, o sorteio do Surpreenda-me).
+   * Com ela, `level` e `squad` não valem; a semente da partida é `seed`, e o corte ao aparelho é o da cena.
+   */
+  readonly recipe?: MatchRecipe;
 }
 
 /** O que o núcleo empresta para a cena. */

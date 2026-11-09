@@ -123,7 +123,7 @@ describe('título do Switch com os 9 itens (atlas real)', () => {
       const layout = layoutTree(root, { x: 0, y: 0, w, h }, 1, { fonts, minTextPx });
       const ids = layout.focusable.map((b) => b.id ?? '');
       const testIds = extraItems.map((i) => TITLE_ACTION_TEST_PREFIX + i.id);
-      expect(ids.slice(0, 3)).toEqual(['play', 'settings', 'quit']);
+      expect(ids.slice(0, 4)).toEqual(['play', 'surprise', 'change', 'quit']);
       expect(ids.filter((id) => id.startsWith(TITLE_ACTION_TEST_PREFIX)).sort()).toEqual([...testIds].sort());
 
       // Peça a peça (logo, barra, coluna do menu, rodapé): a grade fica no vão entre o logo e os botões.

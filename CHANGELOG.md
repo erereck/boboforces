@@ -193,6 +193,17 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Save do jogador:** sobre o storage da plataforma; exporta e importa o backup, juntando ou substituindo. Já é
     criado ao abrir o jogo; as telas que o usam chegam nas próximas subfases.
   - 12 testes novos.
+- **Fase 4c, título, menu principal e partida de estreia:**
+  - **Título:**
+    - JOGAR mostra embaixo o que vai jogar ("Times · De boa · 4 contra 4 · Construto");
+    - Surpreenda-me e Mudar substituem o Ajustes, que foi para o menu principal.
+  - **JOGAR:** joga o último preset. Na primeira vez é a partida de estreia: TDM 4v4 no Construto, você com 3 aliados,
+    todos no De boa, 5 min ou 30 abates (#21).
+  - **Surpreenda-me:** sorteia modo, nível, tamanho e duração num card, com Jogar, Rolar de novo e Voltar.
+  - **Resultado:** De novo, Mais fácil e Mais difícil trocam o nível dos bots de nível do preset, e ele vira o último.
+  - **Foco:** de volta da partida, o foco fica no JOGAR.
+  - **Menu principal:** por enquanto, Ajustes e Voltar (a Partida Rápida e os Modos chegam na 4d).
+  - 7 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 
