@@ -9,21 +9,26 @@ import type { Screen, UiNode } from '../tree.ts';
 export const MAIN_MENU_ACTION = {
   quickMatch: 'quickMatch',
   modes: 'modes',
+  lab: 'lab',
   settings: 'settings',
   news: 'news',
   back: 'back',
 } as const;
+
+/** Altura da coluna dos itens (px de referência): cabem os 6 do M2 (com o Meu Bobo) e o Voltar. */
+export const MAIN_MENU_ITEMS_HEIGHT = 520;
 
 export interface MainMenuState {
   /** Itens que já existem, na ordem do menu (o `game` liga cada um quando a fase dele chega). */
   readonly items: readonly MainMenuItem[];
 }
 
-export type MainMenuItem = 'quickMatch' | 'modes' | 'settings' | 'news';
+export type MainMenuItem = 'quickMatch' | 'modes' | 'lab' | 'settings' | 'news';
 
 const LABEL = {
   quickMatch: 'menu.quickMatch',
   modes: 'menu.modes',
+  lab: 'menu.lab',
   settings: 'menu.settings',
   news: 'menu.news',
 } as const;
@@ -56,6 +61,9 @@ export const mainMenuScreen: Screen<MainMenuState> = {
             {
               kind: 'column',
               id: 'items',
+              // M2 (fase 5a): com 5 ou mais itens, a coluna rola nas telas pequenas (alvos de toque altos).
+              scroll: true,
+              height: MAIN_MENU_ITEMS_HEIGHT,
               gap: 14,
               align: 'stretch',
               width: 380,

@@ -308,6 +308,16 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   Rápida, Modos, Partida personalizada, Ajustes com a aba Botões e a pausa, Dados, Sobre, Novidades, resultado com
   recorde, dica e "Gire o celular") e as perguntas D1–D8, publicadas como versão 9 da página das rodadas. O gancho dos
   prints ganha `showResult(previewRecord)`, que mostra o título de recorde sem gravar nada.
+- **Fase 5a, Oficina:**
+  - **Menu principal:** ganha "Laboratório", que abre na Oficina. A coluna dos itens rola nas telas pequenas.
+  - **Biblioteca:** os favoritos, os seus bots e os 12 de fábrica, numa lista à esquerda.
+  - **Card do bot:** habilidade (o nível rápido ou "ajustada"), inteligência e personalidade, os números de mira e toda
+    regra ativa, em linhas curtas.
+  - **Ações:** duplicar (a cópia vai para os seus bots com o nome "Jorge the Immortal 2"), favoritar (até 6) e apagar,
+    com confirmação; os de fábrica não se apagam. O teto é de 500 bots na web e 100 no Switch.
+  - **Teste de estouro:** confere também que todo texto desenhado existe na fonte em que sai (a display só tem
+    maiúsculas).
+  - 5 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

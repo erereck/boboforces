@@ -1,10 +1,12 @@
 import {
+  BUILTIN_BOTS,
   DEBUT_PRESET,
   GAME_CODENAME,
   GAME_VERSION,
   selectPlatformProfile,
   withPresetLevel,
   type BackupDocument,
+  type BotDocument,
   type BotLevel,
   type ControlDevice,
   type MatchRecipe,
@@ -35,6 +37,9 @@ import {
   MAIN_MENU_ACTION,
   mainMenuScreen,
   MODES_ACTION,
+  WORKSHOP_ACTION,
+  WORKSHOP_BOT_PREFIX,
+  workshopScreen,
   NEWS_ACTION,
   NEWS_ITEMS,
   newsScreen,
@@ -82,6 +87,7 @@ import {
   stepSettings,
 } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
+import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import {
   factoryPresets,
   QUICK_MODES,
@@ -160,6 +166,7 @@ export type GameScreen =
   | 'title'
   | 'main'
   | 'news'
+  | 'workshop'
   | 'quick'
   | 'modes'
   | 'custom'
@@ -253,7 +260,82 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
   refreshTitle();
-  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings', 'news'] }));
+  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'settings', 'news'] }));
+
+  // M2 (fase 5a): a Oficina (a entrada do Laboratório): a biblioteca dos bots e o card do escolhido.
+  const workshopMenu = createMenuController();
+  const botRng = createRng((Math.floor(platform.now()) ^ 0x5bd1e995) >>> 0);
+  const factoryBots = Object.values(BUILTIN_BOTS);
+  let workshopSelected = factoryBots[0]!.id;
+  let workshopNote = '';
+  /** O bot que está esperando o "Confirmar" do Apagar. */
+  let workshopConfirm: string | null = null;
+  function findBot(id: string): BotDocument | null {
+    return save.bots.find((b) => b.id === id) ?? factoryBots.find((b) => b.id === id) ?? null;
+  }
+  function rebuildWorkshop(): void {
+    const item = (b: BotDocument) => ({ id: b.id, label: botDisplayName(b) });
+    const favorites = save.presets.botFavorites.map(findBot).filter((b): b is BotDocument => b !== null);
+    const bot = findBot(workshopSelected) ?? factoryBots[0]!;
+    workshopSelected = bot.id;
+    workshopMenu.setRoot(
+      workshopScreen.build({
+        groups: [
+          { id: 'fav', titleKey: 'workshop.favorites', items: favorites.map(item), empty: '' },
+          { id: 'mine', titleKey: 'workshop.mine', items: save.bots.map(item), empty: t('workshop.empty') },
+          { id: 'factory', titleKey: 'workshop.factory', items: factoryBots.map(item), empty: '' },
+        ],
+        selected: bot.id,
+        name: botDisplayName(bot),
+        lines: botCardLines(bot),
+        note: workshopNote,
+        canEdit: false,
+        canDelete: !isBuiltinBot(bot),
+        favorite: save.presets.botFavorites.includes(bot.id),
+        confirmDelete: workshopConfirm === bot.id,
+      }),
+    );
+  }
+  function openWorkshop(): void {
+    workshopNote = '';
+    workshopConfirm = null;
+    rebuildWorkshop();
+    screen = 'workshop';
+  }
+  function workshopAction(a: string): void {
+    const bot = findBot(workshopSelected);
+    if (a.startsWith(WORKSHOP_BOT_PREFIX)) {
+      // `bot:<grupo>:<id>`
+      workshopSelected = a.slice(a.indexOf(':', WORKSHOP_BOT_PREFIX.length) + 1);
+      workshopNote = '';
+      workshopConfirm = null;
+    } else if (bot === null) return;
+    else if (a === WORKSHOP_ACTION.duplicate) {
+      const ids = new Set([...save.bots.map((b) => b.id), ...factoryBots.map((b) => b.id)]);
+      const names = new Set([...save.bots, ...factoryBots].map(botDisplayName));
+      const copy: BotDocument = { ...bot, id: newBotId(botRng, ids), name: copyName(botDisplayName(bot), names) };
+      if (save.saveBot(copy)) {
+        workshopSelected = copy.id;
+        workshopNote = t('workshop.duplicated', { name: copy.name });
+        workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${copy.id}`);
+      } else workshopNote = t('workshop.full', { n: save.bots.length });
+      workshopConfirm = null;
+    } else if (a === WORKSHOP_ACTION.favorite) {
+      const on = !save.presets.botFavorites.includes(bot.id);
+      workshopNote = save.setBotFavorite(bot.id, on) ? '' : t('workshop.favoritesFull');
+    } else if (a === WORKSHOP_ACTION.delete && !isBuiltinBot(bot)) {
+      if (workshopConfirm === bot.id) {
+        save.deleteBot(bot.id);
+        workshopNote = t('workshop.deleted', { name: bot.name });
+        workshopConfirm = null;
+        workshopSelected = save.bots[0]?.id ?? factoryBots[0]!.id;
+      } else {
+        workshopConfirm = bot.id;
+        workshopNote = t('workshop.deleteAsk', { name: bot.name });
+      }
+    }
+    rebuildWorkshop();
+  }
 
   // M2 (fase 4h): o aviso "Gire o celular" (celular em retrato).
   const rotateMenu = createMenuController();
@@ -791,8 +873,20 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
         else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
         else if (nav.activated === MAIN_MENU_ACTION.news) openNews('main');
+        else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'workshop': {
+        const nav = workshopMenu.update(menuInput, raw, u);
+        if (nav.back || nav.activated === WORKSHOP_ACTION.back) screen = 'main';
+        else {
+          if (nav.activated !== null) workshopAction(nav.activated);
+          workshopMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

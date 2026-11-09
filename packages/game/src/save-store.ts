@@ -66,6 +66,12 @@ export interface SaveStore {
   deletePreset(name: string): void;
   /** Liga ou desliga o favorito de um salvo; `false` se não existe ou se já há 6 favoritos. */
   setFavorite(name: string, on: boolean): boolean;
+  /** M2 (fase 5a): salva um bot da Oficina pelo id (o mesmo id substitui); `false` se a biblioteca está cheia. */
+  saveBot(bot: BotDocument): boolean;
+  /** Apaga um bot salvo (e o favorito dele). */
+  deleteBot(id: string): void;
+  /** Favorito de um bot (de fábrica ou salvo); `false` se já há 6. */
+  setBotFavorite(id: string, on: boolean): boolean;
   /** O backup em texto (JSON), para baixar. `createdAt` vem de quem tem relógio (a casca). */
   exportBackup(createdAt: string, gameVersion: string): string;
   /** Lê um backup (texto do arquivo escolhido): validado, para o resumo antes de aplicar. */
@@ -199,6 +205,35 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       writePresets();
       return true;
     },
+    saveBot(bot) {
+      const i = bots.findIndex((b) => b.id === bot.id);
+      if (i < 0 && bots.length >= caps.bots) return false;
+      const next = bots.slice();
+      if (i >= 0) next[i] = bot;
+      else next.push(bot);
+      bots = next;
+      write(SAVE_KEYS.bots, bots);
+      return true;
+    },
+    deleteBot(id) {
+      bots = bots.filter((b) => b.id !== id);
+      write(SAVE_KEYS.bots, bots);
+      if (presets.botFavorites.includes(id)) {
+        presets = { ...presets, botFavorites: presets.botFavorites.filter((b) => b !== id) };
+        writePresets();
+      }
+    },
+    setBotFavorite(id, on) {
+      const has = presets.botFavorites.includes(id);
+      if (on === has) return true;
+      if (on && presets.botFavorites.length >= LIBRARY_LIMITS.favorites) return false;
+      presets = {
+        ...presets,
+        botFavorites: on ? [...presets.botFavorites, id] : presets.botFavorites.filter((b) => b !== id),
+      };
+      writePresets();
+      return true;
+    },
     exportBackup(createdAt, gameVersion) {
       return JSON.stringify(createBackup({ settings, stats, presets, bots }, createdAt, gameVersion), null, 2);
     },
@@ -224,6 +259,7 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
             recent: presets.recent,
             saved: [...presets.saved, ...backup.presets.saved],
             favorites: presets.favorites,
+            botFavorites: presets.botFavorites,
           },
           STORAGE_RECIPE_LIMITS,
           caps,

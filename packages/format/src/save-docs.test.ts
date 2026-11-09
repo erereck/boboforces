@@ -128,7 +128,7 @@ describe('backup@1', () => {
       {
         settings: DEFAULT_SETTINGS,
         stats: EMPTY_STATS,
-        presets: { recent: [preset('última')], saved: [preset('Sexta')], favorites: ['Sexta'] },
+        presets: { recent: [preset('última')], saved: [preset('Sexta')], favorites: ['Sexta'], botFavorites: [] },
         bots: [builtinBot('jorge-the-immortal')!],
       },
       '2026-11-09T05:00:00Z',

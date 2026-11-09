@@ -1212,9 +1212,8 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('main');
-    // Partida Rápida, Modos, Ajustes.
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
+    // Partida Rápida, Modos, Laboratório, Ajustes.
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     platform.tap('Escape');
@@ -1326,12 +1325,11 @@ describe('Partida personalizada (M2, fase 4e)', () => {
 describe('Ajustes (M2, fase 4f)', () => {
   it('menu: Ajustes → Vídeo (E) → Tamanho dos menus; na pausa, Acessibilidade → Reduzir tremor vale na hora', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (Partida Rápida, Modos, Ajustes).
+    // Título → Mudar → Ajustes (Partida Rápida, Modos, Laboratório, Ajustes).
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     // E E: Vídeo. Da aba (o foco vai junto) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
@@ -1394,11 +1392,11 @@ describe('Novidades (M2, fase 4g)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
-    // Título → Mudar → Novidades (o 4º item) → OK volta ao menu principal.
+    // Título → Mudar → Novidades (o 5º item) → OK volta ao menu principal.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('news');
     platform.tap('Escape');
@@ -1410,6 +1408,45 @@ describe('Novidades (M2, fase 4g)', () => {
     const { game } = await bootToTitle();
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
+    game.dispose();
+  }, 60_000);
+});
+
+describe('Oficina (M2, fase 5a)', () => {
+  it('Laboratório abre a Oficina; duplicar um de fábrica salva, favoritar e apagar (com confirmação)', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Laboratório (o 3º item).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('workshop');
+    // O foco começa no escolhido (o Vibe Bob, primeiro de fábrica). Desce 5 (Jorge the Immortal) e escolhe.
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    // Direita: a primeira ação do card (Duplicar, sem o Editar).
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.save.bots.map((b) => b.name)).toEqual(['Jorge the Immortal 2']);
+    expect(game.save.bots[0]!.rules.hp).toBe(500);
+    const id = game.save.bots[0]!.id;
+    expect(id).toMatch(/^[0-9a-f]{6}$/);
+    // O foco foi para a cópia na lista; direita (Duplicar), baixo (Favoritar), confirmar.
+    platform.tap('ArrowRight');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.save.presets.botFavorites).toEqual([id]);
+    // Apagar (à direita): o primeiro aperto só pede confirmação.
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.save.bots).toHaveLength(1);
+    platform.tap('Enter');
+    expect(game.save.bots).toHaveLength(0);
+    expect(game.save.presets.botFavorites).toEqual([]);
+    platform.tap('Escape');
+    expect(game.screen).toBe('main');
     game.dispose();
   }, 60_000);
 });

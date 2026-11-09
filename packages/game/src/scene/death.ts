@@ -1,4 +1,5 @@
-import { type BotRules, type MatchRecipe, resolveBot } from '@boboforces/format';
+import { type MatchRecipe, resolveBot } from '@boboforces/format';
+import { rulesText } from '../bot-card.ts';
 import { clamp, lerp, lerpAngle, smoothstep } from '@boboforces/shared';
 import {
   ENTITY_KIND,
@@ -269,27 +270,8 @@ export function controllerRules(recipe: MatchRecipe, humans: number): string[] {
   return out;
 }
 
-/** O texto das regras de um bot (`''` sem nenhuma). */
-export function rulesText(r: BotRules): string {
-  const tags: string[] = [];
-  if (r.hp !== 100) tags.push(t('rule.hp', { n: r.hp }));
-  if (r.damageMult !== 1) tags.push(t('rule.damage', { n: r.damageMult }));
-  if (r.speed !== 1) tags.push(t('rule.speed', { n: r.speed }));
-  if (r.weapons.length > 0) {
-    const list = r.weapons.map((id) => {
-      const def = WEAPONS.find((w) => w.id === id);
-      const name = def ? t(`weapon.category.${def.category}` as StringKey) : id;
-      // "só escopeta", mas "só SMG".
-      return name === name.toUpperCase() ? name : name.toLowerCase();
-    });
-    tags.push(t('rule.only', { list: list.join(t('rule.listSeparator')) }));
-  }
-  if (r.ammo === 'infiniteClip') tags.push(t('rule.infiniteClip'));
-  else if (r.ammo === 'infiniteReserve') tags.push(t('rule.infiniteReserve'));
-  if (r.headshotImmune) tags.push(t('rule.headshotImmune'));
-  if (r.explodeOnDeath) tags.push(t('rule.explodeOnDeath'));
-  return tags.join(t('rule.separator'));
-}
+// M2 (fase 5a): o texto das regras mora no `bot-card` (o menu da Oficina usa o mesmo).
+export { rulesText } from '../bot-card.ts';
 
 /**
  * Linha da contagem inicial (gameplay.md §2.2: "Hoje: 6 Jorges"): os bots do outro time (no FFA, todos), agrupados por

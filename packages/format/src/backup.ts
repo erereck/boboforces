@@ -20,6 +20,8 @@ export interface PresetLibrary {
   readonly recent: readonly MatchRecipe[];
   readonly saved: readonly MatchRecipe[];
   readonly favorites: readonly string[];
+  /** M2 (fase 5a): ids dos bots favoritos da Oficina (de fábrica ou salvos), na ordem em que entraram. */
+  readonly botFavorites: readonly string[];
 }
 
 /** Tetos da biblioteca (gameplay.md §10.4 e §6.7). */
@@ -33,7 +35,7 @@ export const LIBRARY_LIMITS = {
   nameLength: 40,
 } as const;
 
-export const EMPTY_PRESET_LIBRARY: PresetLibrary = { recent: [], saved: [], favorites: [] };
+export const EMPTY_PRESET_LIBRARY: PresetLibrary = { recent: [], saved: [], favorites: [], botFavorites: [] };
 
 export interface BackupDocument {
   readonly format: FormatId;
@@ -107,7 +109,11 @@ export function validatePresetLibrary(
   const favorites = r
     .strings(src, 'favorites', 'favorites', LIBRARY_LIMITS.favorites, LIBRARY_LIMITS.nameLength)
     .filter((n, i, all) => names.has(n) && all.indexOf(n) === i);
-  return { ok: true, value: { recent, saved, favorites }, warnings: r.warnings };
+  // Os bots não estão aqui: o id que sumiu só deixa de aparecer na Oficina.
+  const botFavorites = r
+    .strings(src, 'botFavorites', 'botFavorites', LIBRARY_LIMITS.favorites, LIBRARY_LIMITS.nameLength)
+    .filter((n, i, all) => all.indexOf(n) === i);
+  return { ok: true, value: { recent, saved, favorites, botFavorites }, warnings: r.warnings };
 }
 
 /** Monta o backup com o que o jogo tem agora. */

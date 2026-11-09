@@ -90,6 +90,28 @@ describe('save do jogador', () => {
     expect(sw.savePreset(preset('s3', 7))).toBe(true);
   });
 
+  it('M2 (fase 5a): bots da Oficina: o mesmo id substitui, teto do Switch, favoritos e apagar tira o favorito', () => {
+    const storage = memoryStorage();
+    const save = createSaveStore(storage, libraryCapsFor('switch'));
+    const jorge = builtinBot('jorge-the-immortal')!;
+    const bot = (id: string, name = id) => ({ ...jorge, id, name });
+    for (let i = 0; i < 100; i++) expect(save.saveBot(bot(`b${i}`))).toBe(true);
+    expect(save.saveBot(bot('mais um'))).toBe(false);
+    expect(save.saveBot(bot('b3', 'Renomeado'))).toBe(true);
+    expect(save.bots[3]!.name).toBe('Renomeado');
+    // Favoritos: de fábrica ou salvos, até 6.
+    expect(save.setBotFavorite('jorge-the-immortal', true)).toBe(true);
+    for (let i = 0; i < 5; i++) expect(save.setBotFavorite(`b${i}`, true)).toBe(true);
+    expect(save.setBotFavorite('b9', true)).toBe(false);
+    save.deleteBot('b0');
+    expect(save.bots).toHaveLength(99);
+    expect(save.presets.botFavorites).not.toContain('b0');
+    // Volta igual do storage.
+    const again = createSaveStore(storage, libraryCapsFor('switch'));
+    expect(again.bots).toHaveLength(99);
+    expect(again.presets.botFavorites).toEqual(['jorge-the-immortal', 'b1', 'b2', 'b3', 'b4']);
+  });
+
   it('save estragado: JSON quebrado e campo fora da faixa caem no padrão, com aviso por chave', () => {
     const save = createSaveStore(
       memoryStorage({

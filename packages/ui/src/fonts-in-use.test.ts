@@ -17,6 +17,7 @@ import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { rotateScreen } from './screens/rotate.ts';
+import { workshopScreen } from './screens/workshop.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
 import { customMatchScreen } from './screens/custom-match.ts';
@@ -309,6 +310,16 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
   for (const node of layout.order) {
     const r = layout.rects.get(node) as Rect;
     const text = layout.texts.get(node);
+    // M2 (fase 5a): todo texto desenhado (até o literal, como o nome de um bot) existe na fonte em que sai: a display só
+    // tem maiúsculas, e uma minúscula nela vira "?".
+    for (const resolved of [text, layout.values.get(node)]) {
+      if (!resolved) continue;
+      const font = fonts[resolved.font];
+      const missing = [...resolved.text.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch)].filter(
+        (ch) => font.glyphIndex(ch.codePointAt(0)!) < 0,
+      );
+      expect(missing, `${t.name}: "${resolved.text}" na ${resolved.font}`).toEqual([]);
+    }
     if (node.kind === 'button' && text) {
       // Linha de opção (M2, fase 4a): o rótulo divide o botão com a área do valor; o valor cabe entre as setas.
       const valueW = node.value !== undefined ? (node.valueWidth ?? OPTION.valueWidth) * layout.scale : 0;
@@ -405,7 +416,7 @@ describe('estouro de texto com o atlas real', () => {
 
   it('menus da fase 4 (menu principal, Novidades, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
     const screens: UiNode[] = [
-      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'settings', 'news'] }),
+      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'settings', 'news'] }),
       // M2 (fase 4g): Novidades com os 5 itens e o aviso de migração.
       newsScreen.build({
         version: '0.0.1',
@@ -481,6 +492,51 @@ describe('estouro de texto com o atlas real', () => {
           if (corner && r) expect(overlaps(corner, r), `${t.name}: buttons × ${other}`).toBe(false);
         }
       }
+    }
+  });
+
+  it('Oficina (M2, fase 5a): o pior card (nome longo, todas as regras) cabe e não encosta no Voltar', () => {
+    const names = ['Sergeant Noodle the Grea', 'Jorge the Immortal 2', 'Tryhard Bob'];
+    const tree = workshopScreen.build({
+      groups: [
+        { id: 'fav', titleKey: 'workshop.favorites', items: [{ id: 'a', label: names[0]! }], empty: '' },
+        { id: 'mine', titleKey: 'workshop.mine', items: [], empty: t('workshop.empty') },
+        {
+          id: 'factory',
+          titleKey: 'workshop.factory',
+          items: names.map((label, i) => ({ id: `f${i}`, label })),
+          empty: '',
+        },
+      ],
+      selected: 'a',
+      name: names[0]!,
+      // As linhas do card de um bot com todas as regras (o `bot-card` agrupa em até 40 caracteres).
+      lines: [
+        'Habilidade: ajustada',
+        'Inteligência N4 · Estrategista',
+        'Reação 1200 ms · erro 10° · cabeça 100%',
+        'Regras: 1000 de vida · dano ×0,25 ·',
+        'velocidade ×0,5 ·',
+        'só lança-foguetes, metralhadora ·',
+        'munição infinita ·',
+        'imune a tiro na cabeça ·',
+        'explode ao morrer',
+      ],
+      note: t('workshop.deleteAsk', { name: names[0]! }),
+      canEdit: true,
+      canDelete: true,
+      favorite: true,
+      confirmDelete: true,
+    });
+    for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      const layout = layoutFor(tree, target);
+      expectNoOverflow(layout, target);
+      expect(reachableScrolling(tree, target, layout.focusable[0]!.id!).size, `${target.name}: foco`).toBe(
+        layout.focusable.length,
+      );
+      const rectOf = (id: string): Rect => layout.rects.get(layout.byId.get(id)!)!;
+      expect(overlaps(rectOf('buttons'), rectOf('card')), `${target.name}: Voltar × card`).toBe(false);
+      expect(overlaps(rectOf('bots'), rectOf('card')), `${target.name}: lista × card`).toBe(false);
     }
   });
 

@@ -1578,3 +1578,28 @@ mudanças de contrato ficam registradas aqui.
   não passa pelo `SceneHost.stats`).
 - As capturas saem dos scripts locais de `local/m2/` (`capturar-*.ts`, Edge headless sobre o `npm run dev`); a página é
   montada por `local/m2/montar-pagina-r8.mjs`.
+
+### 12.31 Fase 5a: Oficina (09/11/2026)
+
+- **format:** `PresetLibrary.botFavorites`: ids dos bots favoritos (de fábrica ou salvos), até 6.
+  - **Escolha (revisável):** os favoritos ficam na biblioteca do jogador (a chave `presets` e o `backup@1`), e não no
+    `bot@1`, que é compartilhável;
+  - o id que sumiu só deixa de aparecer.
+- **SaveStore:** `saveBot` (o mesmo id substitui; teto da plataforma), `deleteBot` (tira o favorito) e
+  `setBotFavorite`.
+- **`game/bot-card.ts`** (puro, no pedaço do menu):
+  - `WEAPON_CATEGORY` (id da arma → categoria, conferido com a tabela da sim no teste, para não puxar a sim para o
+    menu);
+  - `rulesText` e `ruleTags`: saíram da tela de morte, que agora importa daqui;
+  - `botDisplayName`, `isBuiltinBot`, `botLevelOf` e `botCardLines` (as regras em linhas de até 40 caracteres, porque o
+    texto não quebra linha);
+  - `newBotId` (6 dígitos hex) e `copyName`.
+- **ui:**
+  - `workshopScreen`: a lista (botões compactos, o escolhido em âmbar) e o card (coluna com rolagem, para o toque 640×360);
+  - as ações em duas fileiras compactas;
+  - `focusOverride`: da lista, a direita entra pela primeira ação; das ações da ponta, a esquerda volta ao escolhido;
+  - o menu principal ganha `lab` e `MAIN_MENU_ITEMS_HEIGHT` (a coluna rola).
+- **Achado:** o nome do card em caixa baixa na display virava "?" (o atlas da display só tem maiúsculas). Agora sai na
+  fonte do HUD, e o teste de estouro confere todo texto desenhado contra a fonte usada.
+- **Tamanho:** o menu foi a 328,2 KB (+2,5 KB; teto 350). O Laboratório (5b) deve levar o menu perto de 335: se passar,
+  as telas de Ajustes, Partida personalizada e Laboratório vão para um pedaço sob demanda.

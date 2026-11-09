@@ -215,6 +215,42 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
 - **4i. Prints para o Erick.** Publicada em 09/11 (rodada 8, versão 9 da página das rodadas; perguntas D1–D8): título, menu principal, Partida Rápida, Partida personalizada, Ajustes, Novidades e o
   resultado com Salvar preset.
 
+## Fase 5 em detalhe: Laboratório, Oficina, Bobo Training e Ringue
+
+Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: primeiro os dados e as telas dos bots
+(sem mapa novo), depois o Ringue e o modo de treino, e por fim as pontes entre eles.
+
+- **5a. Oficina.** Pronta em 09/11 (`ARCHITECTURE.md` §12.31).
+  - a biblioteca dos bots: os 12 de fábrica e os seus;
+  - o card do bot, com toda regra ativa à vista (§6.5);
+  - duplicar, apagar e favoritar;
+  - o save ganha as operações dos bots, com o teto de 500 na web e 100 no Switch;
+  - o menu principal ganha "Laboratório", que abre na Oficina.
+- **5b. Laboratório:**
+  - edita um bot por vez, partindo de um da biblioteca;
+  - abas: Nível (os 5 níveis preenchem tudo), Habilidade, Inteligência (com o modo avançado), Personalidade, Regras e
+    Nome ("rolar nome", com o gerador de nomes bobos em inglês);
+  - salvar na Oficina;
+  - a aba Bots da Partida personalizada lista os seus bots, que vão embutidos no preset (`embedded:<id>`).
+- **5c. Ringue:**
+  - arena pequena, de 30×30 a 40×40 m, com alvos e estandes;
+  - a faixa listrada no limite da área jogável;
+  - entra nos seletores de mapa (Partida Rápida e personalizada).
+- **5d. Bobo Training:**
+  - o modo na sim, sem placar;
+  - bots do Laboratório em loop, de 1 a N;
+  - alvos fixos e móveis (bonecos de caixas com a skin de treino);
+  - a HUD mostra a precisão, o TTK médio e a % de cabeça.
+- **5e. Pontes:**
+  - **Testar:** do Laboratório para o Bobo Training em até 2 s; na volta, a precisão do bot, o seu K/D e o TTK médio;
+  - **Nêmesis:** "Salvar na Oficina" no resultado;
+  - **Conheça o Laboratório:** o card no fim da 1ª partida;
+  - **Tryhard:** no nível mais alto, "Mais difícil" vira "Abrir Laboratório".
+- **5f. Calibrar mira:**
+  - a estação do Bobo Training: 3 alvos, "Ajustei sua mira" com Desfazer;
+  - a contagem estendida da 1ª partida (gameplay.md §2.5), com Pular.
+- **5g. Prints para o Erick:** Oficina, Laboratório, Ringue, Bobo Training, Testar e calibração.
+
 ## Escolhas do Claude neste plano (revisáveis)
 
 - **Partida antes dos menus:** o combate e as regras são o que dá para jogar e medir; os menus vêm quando os dados da
