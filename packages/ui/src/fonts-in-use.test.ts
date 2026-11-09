@@ -448,7 +448,7 @@ describe('estouro de texto com o atlas real', () => {
           {
             id: 'factory',
             titleKey: 'quick.factory',
-            items: [{ label: 'Sexta do Jorge', caption: 'Times · 10 min ou 75 abates' }],
+            items: [{ label: 'Imortais', caption: 'Times · 10 min ou 75 abates' }],
           },
         ],
       }),

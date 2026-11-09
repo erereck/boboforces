@@ -68,15 +68,15 @@ describe('Partida Rápida', () => {
 });
 
 describe('presets de fábrica', () => {
-  it('Vibe, Tryhard e Sexta do Jorge: válidos, com nome e o atalho pelo nome', () => {
+  it('Vibe, Tryhard e Imortais: válidos, com nome e o atalho pelo nome', () => {
     const presets = factoryPresets();
-    expect(presets.map((p) => p.name)).toEqual(['Vibe', 'Tryhard', 'Sexta do Jorge']);
+    expect(presets.map((p) => p.name)).toEqual(['Vibe', 'Tryhard', 'Imortais']);
     for (const p of presets) {
       const r = validateMatchRecipe(p, { maxBots: PC, maxLocalHumans: 4, maxViewDistanceM: 140 });
       expect(r.ok && r.warnings).toEqual([]);
     }
     expect(presets[2]!.teams[1]!.bots).toEqual([{ ref: 'builtin:jorge-the-immortal', count: 6 }]);
-    expect(presetShortcut(presets[2]!)).toEqual({ label: 'Sexta do Jorge', caption: 'Times · 10 min ou 75 abates' });
+    expect(presetShortcut(presets[2]!)).toEqual({ label: 'Imortais', caption: 'Times · 10 min ou 75 abates' });
     expect(presetShortcut(DEBUT_PRESET)).toEqual({ label: '4×4 De boa', caption: 'Times · 5 min ou 30 abates' });
   });
 });

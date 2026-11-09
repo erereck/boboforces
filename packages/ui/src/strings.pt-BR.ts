@@ -237,7 +237,7 @@ export const STRINGS_PT_BR = {
   'mode.desc.warfare.ffa': 'Cada um por si, sem aliados.',
   'preset.name.vibe': 'Vibe',
   'preset.name.tryhard': 'Tryhard',
-  'preset.name.fridayJorge': 'Sexta do Jorge',
+  'preset.name.immortals': 'Imortais',
   // M2 (fase 4e): Partida personalizada.
   'menu.custom': 'Mais regras',
   'custom.title': 'Partida personalizada',

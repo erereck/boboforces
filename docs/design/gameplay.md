@@ -1025,7 +1025,7 @@ Vale para mapas, armas, nomes, textos e skins.
   - Onda máxima no Bobo Zombies por mapa e configuração.
   - Kills por arma, maior sequência, precisão média.
   - Bot que mais te derrotou e bot que você mais derrotou.
-  - Melhor resultado em cada preset de fábrica do tipo desafio (ex.: "Sexta do Jorge").
+  - Melhor resultado em cada preset de fábrica do tipo desafio (ex.: "Imortais").
   - Horas jogadas.
 - Nada disso libera nada.
 - **Fora:** moeda, loja, loot box, passe, XP, nível de perfil e anúncio. O projeto é gratuito e não comercial.
@@ -1076,7 +1076,7 @@ Por fim, tudo passa pelo **clamp aos tetos da plataforma** (bots, visão).
 - **Tela da partida:** radar, kill feed, nome sobre o inimigo (desligar deixa mais difícil), hitmarker.
 
 ### 10.4 Presets
-- **De fábrica**, uns 8 (nomes provisórios): Vibe, Tryhard, X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Sexta do Jorge, Paintball Relâmpago. Cada um só aparece quando o modo dele existe.
+- **De fábrica**, uns 8 (nomes provisórios): Vibe, Tryhard, X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Imortais, Paintball Relâmpago. Cada um só aparece quando o modo dele existe.
 - **Do jogador** [PADRÃO]:
   - Os **5 últimos** ficam salvos automaticamente; o último é o que o JOGAR usa.
   - Até **6 favoritos** viram atalhos no menu.
@@ -1087,7 +1087,7 @@ Por fim, tudo passa pelo **clamp aos tetos da plataforma** (bots, visão).
 ```json
 {
   "format": "boboforces/preset@1",
-  "name": "Sexta do Jorge",
+  "name": "Imortais",
   "mode": "warfare.tdm",
   "map": "construto",
   "match": { "timeLimitS": 600, "scoreLimit": 75, "viewDistanceM": 50 },

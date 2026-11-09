@@ -1,4 +1,5 @@
 import { ENTITY_KIND, entityIndex, NULL_ENTITY, type SimEvent, type SimView } from '@boboforces/sim';
+import type { MatchRecord } from '../scene-api.ts';
 
 /**
  * M2 (fase 2e): as contas do resultado (gameplay.md §2.2; arte-ux.md §6). Os números saem dos EVENTOS da partida
@@ -201,25 +202,34 @@ function best(
   return pick;
 }
 
+/** Vitória, derrota ou empate do bobo `human` (FFA: ele venceu; times: o time dele venceu). */
+function outcomeOf(view: SimView, human: number, ffa: boolean): MatchOutcome {
+  const m = view.match;
+  if (ffa) {
+    const winner = m.winnerEntity !== NULL_ENTITY ? entityIndex(m.winnerEntity) : -1;
+    return winner < 0 ? 'draw' : winner === human ? 'win' : 'loss';
+  }
+  const team = human >= 0 ? view.team[human]! : 0;
+  return m.winnerTeam < 0 ? 'draw' : m.winnerTeam === team ? 'win' : 'loss';
+}
+
 /** Monta o resumo no fim da partida. `human` = índice da entidade do jogador (-1 sem humano). */
 export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa: boolean): MatchSummary {
   const m = view.match;
   let ownScore = 0;
   let otherScore = 0;
-  let outcome: MatchOutcome = 'draw';
+  const outcome = outcomeOf(view, human, ffa);
   let winner = -1;
   if (ffa) {
     winner = m.winnerEntity !== NULL_ENTITY ? entityIndex(m.winnerEntity) : -1;
     ownScore = human >= 0 ? view.kills[human]! : 0;
     otherScore = winner >= 0 ? view.kills[winner]! : 0;
-    outcome = winner < 0 ? 'draw' : winner === human ? 'win' : 'loss';
   } else {
     const team = human >= 0 ? view.team[human]! : 0;
     ownScore = m.teamScore[team] ?? 0;
     for (let tIdx = 0; tIdx < m.teamScore.length; tIdx++) {
       if (tIdx !== team && m.teamScore[tIdx]! > otherScore) otherScore = m.teamScore[tIdx]!;
     }
-    outcome = m.winnerTeam < 0 ? 'draw' : m.winnerTeam === team ? 'win' : 'loss';
   }
   const mvp = best(
     view,
@@ -310,4 +320,42 @@ export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa
     prizes,
     uglyLoss: outcome === 'loss' && ownScore * 2 <= otherScore,
   };
+}
+
+const OUTCOME_RANK: Readonly<Record<MatchOutcome, number>> = { loss: 0, draw: 1, win: 2 };
+
+/**
+ * Rodada 8 (D5): o que a partida soma no `stats@1` com todos os jogadores locais (`humans` = índices de entidade): os
+ * números somados; o resultado é o melhor deles (nos times é o mesmo para todos; no FFA, vitória se um local venceu);
+ * os recordes olham o melhor jogador. Uma vez por partida.
+ */
+export function localMatchRecord(
+  st: MatchStats,
+  view: SimView,
+  humans: readonly number[],
+  ffa: boolean,
+  playTimeS: number,
+): MatchRecord {
+  let outcome: MatchOutcome = 'loss';
+  let kills = 0;
+  let deaths = 0;
+  let assists = 0;
+  let shots = 0;
+  let hits = 0;
+  let headshots = 0;
+  let bestKills = 0;
+  let bestStreak = 0;
+  for (const h of humans) {
+    const o = outcomeOf(view, h, ffa);
+    if (OUTCOME_RANK[o] > OUTCOME_RANK[outcome]) outcome = o;
+    kills += view.kills[h]!;
+    deaths += view.deaths[h]!;
+    assists += view.assists[h]!;
+    shots += st.shots[h]!;
+    hits += Math.min(st.hits[h]!, st.shots[h]!);
+    headshots += st.heads[h]!;
+    bestKills = Math.max(bestKills, view.kills[h]!);
+    bestStreak = Math.max(bestStreak, st.bestStreak[h]!);
+  }
+  return { outcome, kills, deaths, assists, shots, hits, headshots, bestKills, bestStreak, playTimeS };
 }

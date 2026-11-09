@@ -194,7 +194,7 @@ import {
   settingsRows,
   stepSettings,
 } from '../settings-menu.ts';
-import type { SceneHost, SceneRequest, SceneSignal, TrainingReport } from '../scene-api.ts';
+import type { RecordBreaks, SceneHost, SceneRequest, SceneSignal, TrainingReport } from '../scene-api.ts';
 import {
   beginDeath,
   controllerNames,
@@ -216,7 +216,14 @@ import {
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
 import { projectToView } from './markers.ts';
-import { createMatchStats, recordMatchEvent, summarizeMatch, trainingNumbers, type TrainingNumbers } from './result.ts';
+import {
+  createMatchStats,
+  localMatchRecord,
+  recordMatchEvent,
+  summarizeMatch,
+  trainingNumbers,
+  type TrainingNumbers,
+} from './result.ts';
 import { bareLookId, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
@@ -1813,21 +1820,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
     const sum = summarizeMatch(matchStats, v, human, ffa);
     resultNemesis = sum.nemesis;
-    // M2 (fase 4g): a partida vai para o `stats@1` (os números do jogador 1; o bench não tem humano).
-    const breaks =
-      record && human >= 0 && !benchState
-        ? host.stats.record({
-            outcome: sum.outcome,
-            kills: sum.kills,
-            deaths: sum.deaths,
-            assists: sum.assists,
-            shots: sum.shots,
-            hits: sum.hits,
-            headshots: sum.headshots,
-            bestStreak: sum.bestStreak,
-            playTimeS: Math.round(timeS),
-          })
-        : null;
+    // M2 (fase 4g): a partida vai para o `stats@1` (o bench não tem humano). Rodada 8 (D5): em tela dividida, todos os
+    // jogadores locais somados (os humanos são os controladores 0..humans-1).
+    let breaks: RecordBreaks | null = null;
+    if (record && human >= 0 && !benchState) {
+      const locals: number[] = [];
+      for (let p = 0; p < humans; p++) locals.push(entityIndex(sim.controllerEntity(p)));
+      breaks = host.stats.record(localMatchRecord(matchStats, v, locals, ffa, Math.round(timeS)));
+    }
     const recordKind =
       breaks === null
         ? previewRecord

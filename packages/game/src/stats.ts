@@ -14,7 +14,7 @@ const add = (a: number, b: number): number => Math.min(COUNT_MAX, a + Math.max(0
 
 /**
  * Soma a partida. Recorde só conta depois da primeira partida (a primeira marca a base, sem "Recorde!" por 2 abates)
- * e só com mais de zero.
+ * e só com mais de zero. Em tela dividida os totais já chegam somados e o recorde é do melhor jogador (rodada 8, D5).
  */
 export function addMatch(doc: StatsDocument, m: MatchRecord): { doc: StatsDocument; records: RecordBreaks } {
   const o = doc.totals;
@@ -33,7 +33,7 @@ export function addMatch(doc: StatsDocument, m: MatchRecord): { doc: StatsDocume
   };
   const veteran = o.matches > 0;
   const records: RecordBreaks = {
-    mostKills: veteran && m.kills > 0 && m.kills > doc.records.mostKills,
+    mostKills: veteran && m.bestKills > 0 && m.bestKills > doc.records.mostKills,
     bestStreak: veteran && m.bestStreak > 0 && m.bestStreak > doc.records.bestStreak,
   };
   return {
@@ -41,7 +41,7 @@ export function addMatch(doc: StatsDocument, m: MatchRecord): { doc: StatsDocume
       ...doc,
       totals,
       records: {
-        mostKills: Math.max(doc.records.mostKills, m.kills),
+        mostKills: Math.max(doc.records.mostKills, m.bestKills),
         bestStreak: Math.max(doc.records.bestStreak, m.bestStreak),
       },
     },

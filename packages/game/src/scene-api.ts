@@ -58,7 +58,10 @@ export interface SceneSettings {
   save(doc: SettingsDocument): void;
 }
 
-/** M2 (fase 4g): o que uma partida terminada soma no `stats@1` (os números do jogador 1). */
+/**
+ * M2 (fase 4g): o que uma partida terminada soma no `stats@1`. Rodada 8 (D5): em tela dividida, os números de todos os
+ * jogadores locais somados; os recordes olham o melhor deles (`bestKills`, `bestStreak`).
+ */
 export interface MatchRecord {
   readonly outcome: 'win' | 'loss' | 'draw';
   readonly kills: number;
@@ -67,6 +70,8 @@ export interface MatchRecord {
   readonly shots: number;
   readonly hits: number;
   readonly headshots: number;
+  /** Os abates do melhor jogador local (o recorde de abates é individual). */
+  readonly bestKills: number;
   readonly bestStreak: number;
   /** Tempo jogado (s). */
   readonly playTimeS: number;

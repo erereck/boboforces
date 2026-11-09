@@ -16,6 +16,7 @@ const match = (m: Partial<MatchRecord> = {}): MatchRecord => ({
   bestStreak: 3,
   playTimeS: 312,
   ...m,
+  bestKills: m.bestKills ?? m.kills ?? 5,
 });
 
 describe('estatísticas', () => {
@@ -31,6 +32,13 @@ describe('estatísticas', () => {
     expect(third.records).toEqual({ mostKills: false, bestStreak: true });
     expect(third.doc.totals.draws).toBe(1);
     expect(third.doc.records).toEqual({ mostKills: 6, bestStreak: 4 });
+  });
+
+  it('rodada 8 (D5): tela dividida soma os abates, mas o recorde é do melhor jogador', () => {
+    const first = addMatch(EMPTY_STATS, match({ kills: 10, bestKills: 6 }));
+    expect([first.doc.totals.kills, first.doc.records.mostKills]).toEqual([10, 6]);
+    const second = addMatch(first.doc, match({ kills: 12, bestKills: 7 }));
+    expect([second.doc.totals.kills, second.records.mostKills]).toEqual([22, true]);
   });
 
   it('as linhas da aba Dados e o tempo jogado', () => {

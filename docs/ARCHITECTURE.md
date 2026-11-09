@@ -1396,7 +1396,7 @@ mudanças de contrato ficam registradas aqui.
     (`sizeRange`); trocar o modo mantém a quantidade de bobos;
   - `scoreFor`: a meta de abates por duração (TDM 3/5/10/15/20 min = 20/30/75/100/125; FFA 10/15/25/30/40; sem
     limite, a de 10 min);
-  - `factoryPresets`: Vibe, Tryhard e Sexta do Jorge (6 Jorges), com o nome da tabela (`preset.name.*`).
+  - `factoryPresets`: Vibe, Tryhard e Imortais (6 Jorges; era "Sexta do Jorge" até a rodada 8, D2), com o nome da tabela (`preset.name.*`).
 - **`game/presets-ui.ts`:** `presetShortcut` (rótulo curto, "4×4 De boa" ou o nome, e a linha "Times · 5 min ou 30
   abates"; o mapa entra na linha quando houver mais de um).
 - **Telas novas (ui):**
@@ -1725,3 +1725,16 @@ mudanças de contrato ficam registradas aqui.
   refeita ao abrir.
 - **Fica para depois:** a calibração na contagem estendida da 1ª partida (§2.5); os prints dela entram na rodada 10.
 - **Tamanho:** o menu foi a 333,6 KB.
+
+### 12.38 Respostas das rodadas 8 e 9 (09/11/2026, decisões #68 e #69)
+
+- **D2:** o preset pronto "Sexta do Jorge" virou **Imortais** (chave `preset.name.immortals`). O nome é escolha minha
+  (revisável): curto como Vibe e Tryhard, e diz o que vem pela frente (6 Jorge the Immortal). O preset não tem id
+  gravado (os prontos se refazem a cada boot), então nada migra.
+- **D5:** em tela dividida, o `stats@1` soma **todos os jogadores locais** (`scene/result.ts`, `localMatchRecord`;
+  os humanos são os controladores 0..humans−1). **Escolhas (revisáveis):**
+  - abates, mortes, assistências, tiros, acertos e tiros na cabeça somam;
+  - a partida conta 1 vez, com o tempo de jogo dela;
+  - o resultado é o melhor dos locais (nos times é o mesmo para todos; no FFA, vitória se algum local venceu);
+  - os **recordes são do melhor jogador**: `MatchRecord.bestKills` (o maior número de abates de um local) e
+    `bestStreak`. Somar os abates de 2 jogadores num recorde de "abates numa partida" inflaria o número.

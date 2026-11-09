@@ -6,6 +6,7 @@ import { challengeLevel, stepLevel } from '../pause.ts';
 import {
   accuracyPct,
   createMatchStats,
+  localMatchRecord,
   PRIZE_RULES,
   recordMatchEvent,
   summarizeMatch,
@@ -151,6 +152,39 @@ describe('resumo do fim', () => {
     expect(summarizeMatch(st, v, 0, false).outcome).toBe('win');
     m.winnerTeam = -1;
     expect(summarizeMatch(st, v, 0, false).outcome).toBe('draw');
+  });
+
+  it('rodada 8 (D5): tela dividida soma os locais; o recorde é do melhor; o resultado, o melhor deles', () => {
+    const sim = duel();
+    const v = sim.view();
+    const m = v.match as unknown as { winnerTeam: number; winnerEntity: number };
+    m.winnerTeam = 0;
+    (v.kills as Uint16Array).set([4, 6, 15, 10]);
+    (v.deaths as Uint16Array).set([9, 7, 3, 8]);
+    (v.assists as Uint16Array).set([1, 4, 0, 2]);
+    const st = createMatchStats(v.capacity);
+    st.shots.set([40, 20]);
+    st.hits.set([10, 25]); // mais acertos que tiros: corta nos tiros
+    st.heads.set([3, 2]);
+    st.bestStreak.set([2, 5]);
+    // As entidades 0 e 1 como dois jogadores locais no mesmo time.
+    expect(localMatchRecord(st, v, [0, 1], false, 300)).toEqual({
+      outcome: 'win',
+      kills: 10,
+      deaths: 16,
+      assists: 5,
+      shots: 60,
+      hits: 30,
+      headshots: 5,
+      bestKills: 6,
+      bestStreak: 5,
+      playTimeS: 300,
+    });
+    // FFA: vitória se um dos locais venceu; senão, derrota.
+    m.winnerEntity = sim.controllerEntity(0);
+    expect(localMatchRecord(st, v, [1, 0], true, 300).outcome).toBe('win');
+    m.winnerEntity = NULL_ENTITY;
+    expect(localMatchRecord(st, v, [0, 1], true, 300).outcome).toBe('draw');
   });
 });
 

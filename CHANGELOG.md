@@ -382,6 +382,11 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Correção:** a pausa nascia com o estado padrão (sem o da partida) até ser reaberta.
   - **Fica para depois:** a calibração na contagem estendida da 1ª partida (gameplay.md §2.5).
   - 3 testes novos.
+- **Respostas das rodadas 8 e 9 (#68, #69):** tudo aprovado no padrão, com dois ajustes.
+  - O preset pronto "Sexta do Jorge" virou **Imortais**: o nome antigo saiu engraçado demais e fora do tom.
+  - Em **tela dividida**, as estatísticas somam todos os jogadores locais. O recorde de abates e o de sequência
+    continuam sendo do melhor jogador da partida.
+  - 2 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

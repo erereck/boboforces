@@ -562,7 +562,7 @@ Vale para mapas, armas, nomes, textos e skins.
 Mesmo boneco, **curvados (tronco a 20°), braços à frente, esverdeados e engraçados**, nunca assustadores. Pele verde-acinzentada em rampa própria (fora das cores de time), roupas desbotadas com rasgos, **remendos e curativos coloridos** no lugar de feridas; rostos próprios (olho em espiral, língua de fora, boca de "uuuh"). Cinco tipos (comum + os 4 especiais de 4.1.5), com escala uniforme para o pixel continuar quadrado: comum, Sprinter (agasalho, curvado e rápido), Chonker (1,3x, capacete de obra), Spitter (skin e pose próprias, inclinado para trás ao cuspir), Mega Bobo (1,8x, plaquinha de "chefe").
 
 ### 4.8 Presets e códigos
-- **Presets de fábrica** (~8, nomes provisórios): Vibe, Tryhard, X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Sexta do Jorge, Paintball Relâmpago. Cada um só aparece quando o modo dele existe.
+- **Presets de fábrica** (~8, nomes provisórios): Vibe, Tryhard, X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Imortais, Paintball Relâmpago. Cada um só aparece quando o modo dele existe.
 - **Do jogador** [PADRÃO]: os **5 últimos** ficam salvos sozinhos (o último é o que o JOGAR usa); até **6 favoritos** viram atalhos no menu; até 200 presets salvos na web e 50 no Switch. Um preset guarda modo, mapa, variação de luz, regras, times e bots, condição de vitória e seed.
 - **Formato** [PADRÃO]: JSON com chaves em inglês e textos em pt-BR, campo **`format: "boboforces/<tipo>@<n>"`** (`preset@1`, `bot@1`, `settings@1`, `stats@1`, `backup@1`, `replay@1`), validador e cadeia de migrações. Bots personalizados vão **embutidos** no preset, para quem recebe não precisar tê-los. Esquema único de `preset@1` e `bot@1` em `gameplay.md` 10.4 e 6.7: `viewDistanceM`, perfil de movimento `bobo`, refs `builtin:<id do bot de fábrica>` (ex.: `builtin:chill-bob`) ou `embedded:<id>`, e um `look` único `{ skin, skinTone, face, hair, hairColor, hat, hat3d, outfit, pattern, colors[2], back }` para bots e jogador.
 - **Códigos e links (Oficina com códigos, M6+):** bot = código **`BF1-`** + base64url(deflate(JSON)) e link **`#bot=`**; preset = código **`BFP1-`** e link **`#p=`**. O hash do link não vai para servidor nenhum.
@@ -575,7 +575,7 @@ Sem progressão: **nada libera nada** [DECIDIDO #16].
 - Onda máxima no Bobo Zombies por mapa e configuração.
 - Kills por arma, maior sequência, precisão média.
 - Bot que mais te derrotou e bot que você mais derrotou.
-- Melhor resultado em cada preset de fábrica do tipo desafio (ex.: "Sexta do Jorge").
+- Melhor resultado em cada preset de fábrica do tipo desafio (ex.: "Imortais").
 - Horas jogadas.
 - Fora, para sempre: moeda, loja, loot box, passe, XP, nível de perfil, anúncio.
 - Ficam no save local (`stats@1`) e entram no backup.

@@ -161,8 +161,8 @@ export function quickValue(q: QuickSettings, option: QuickOption): string {
 }
 
 /**
- * Presets de fábrica cujo modo já existe (gameplay.md §10.4): Vibe (Pela vibe, 4v4), Tryhard (6v6) e Sexta do Jorge
- * (você e 5 Normal Bob contra 6 Jorges). Os outros (X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Paintball) chegam
+ * Presets de fábrica cujo modo já existe (gameplay.md §10.4): Vibe (Pela vibe, 4v4), Tryhard (6v6) e Imortais
+ * (você e 5 Normal Bob contra 6 Jorge the Immortal; rodada 8, D2: era "Sexta do Jorge"). Os outros (X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Paintball) chegam
  * com o modo, o mapa ou o multijogador deles.
  */
 export function factoryPresets(): MatchRecipe[] {
@@ -185,6 +185,6 @@ export function factoryPresets(): MatchRecipe[] {
   return [
     tdm(t('preset.name.vibe'), builtinBotRef('vibe'), 3, builtinBotRef('vibe'), 4, 5),
     tdm(t('preset.name.tryhard'), builtinBotRef('tryhard'), 5, builtinBotRef('tryhard'), 6, 10),
-    tdm(t('preset.name.fridayJorge'), builtinBotRef('normal'), 5, 'builtin:jorge-the-immortal', 6, 10),
+    tdm(t('preset.name.immortals'), builtinBotRef('normal'), 5, 'builtin:jorge-the-immortal', 6, 10),
   ];
 }
