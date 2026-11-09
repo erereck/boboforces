@@ -491,6 +491,8 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - `npm run check` verde (1.623 testes), `size-check`, `smoke:web`, `portcheck --strict` e balance ok.
   - No PC, 60 fps com 40 bots na GPU integrada.
 - **Fase 8e:** roteiro do celular e do checkpoint no Switch para o Erick (`docs/ROTEIRO_M2.md`).
+- **Rodada 12 de prints:** a qualidade, o teste do sofá e o roteiro do celular e do Switch, com as perguntas H1–H3
+  (H3: publicar), na versão 14 da página das rodadas, junto com as rodadas 10 e 11.
 - **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
   em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
   - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.

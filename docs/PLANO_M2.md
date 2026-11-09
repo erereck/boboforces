@@ -329,7 +329,9 @@ o service worker (tecnico.md §19.1). Entram antes do portão final.
   - PC na GPU integrada com 40 bots: **60,01 fps** (critério 4). Com 4 vistas e 24 bots, 36,6 fps: limite da GPU, fica
     para o M3.
 - **8e. Roteiros.** Prontos em 09/11 (`docs/ROTEIRO_M2.md`): o checklist do celular e o checkpoint do Switch (1 a 2 h de jogo) para o Erick seguir.
-- **8f. Rodada 12 e publicação:** prints do que a 8a–8c mudaram e, com o OK do Erick, push e deploy.
+- **8f. Rodada 12 e publicação.** A rodada 12 foi publicada em 09/11 como versão 14 da página das rodadas, junto com as
+  10 e 11 ainda sem resposta (`local/m2/montar-pagina-r12.mjs`). Perguntas: H1 qualidade, H2 teste do sofá, H3 publicar;
+  o roteiro vai na seção 57. O push e o deploy esperam o OK do Erick.
 
 ## Escolhas do Claude neste plano (revisáveis)
 
