@@ -29,6 +29,7 @@ import {
 } from '@boboforces/format';
 import {
   createGamepadProfile,
+  createBindingCapture,
   createInputFrame,
   createInputMapper,
   createKeyboardMouseProfile,
@@ -37,12 +38,14 @@ import {
   keyIndex,
   MAX_GAMEPADS,
   WEAPON_SLOT_COUNT,
+  type CaptureResult,
   type ControlProfile,
   type DeviceBinding,
   type DeviceKind,
   type InputMapper,
   type MenuInput,
   type RawInputState,
+  type RemapAction,
 } from '@boboforces/input';
 import {
   ACTOR_KIND,
@@ -161,8 +164,11 @@ import { createMenuController, followTab, type UiFrame } from '../menu.ts';
 import { challengeLevel, challengeScreen, PAUSE_ACTION, pauseScreen } from '../pause.ts';
 import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '../result-screen.ts';
 import {
+  actionLabel,
   applyControls,
+  bindRowAction,
   PAUSE_SETTINGS_TABS,
+  rebindSettings,
   SETTINGS_TAB_LABELS,
   settingsRows,
   stepSettings,
@@ -1490,20 +1496,38 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     pauseMenu.setRoot(pauseScreen.build(pauseState));
   }
 
-  /** M2 (fase 2e): uma ação da pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair) ou das páginas dela. */
-  /** M2 (fase 4f): a página de Ajustes da pausa (Controles, Vídeo, Acessibilidade), que vale na hora. */
+  /** M2 (fase 4f): a página de Ajustes da pausa (Controles, Botões, Vídeo, Acessibilidade), que vale na hora. */
   let pauseSettingsTab = 0;
   let pauseSettingsDevice: DeviceKind = device;
+  let pauseNote = '';
+  /** M2 (fase 4f, parte 2): a captura do novo botão de uma ação (aba Botões). */
+  const capture = createBindingCapture();
+  let capturing: RemapAction | null = null;
   function pauseSettings(): void {
     const tab = PAUSE_SETTINGS_TABS[pauseSettingsTab]!;
     pauseMenu.setRoot(
       settingsScreen.build({
         tabs: PAUSE_SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
         tab: pauseSettingsTab,
-        rows: settingsRows(tab, host.settings.current, pauseSettingsDevice),
-        note: '',
+        rows: settingsRows(tab, host.settings.current, pauseSettingsDevice, capturing),
+        note: pauseNote,
       }),
     );
+  }
+  /** Fim da captura: liga a fonte nova e aplica na hora (com o aviso de troca, se houver) ou cancela. */
+  function finishCapture(result: CaptureResult): void {
+    if (capturing === null || result === 'none') return;
+    if (result === 'cancel') pauseNote = '';
+    else {
+      const next = rebindSettings(host.settings.current, pauseSettingsDevice, capturing, result);
+      if (next.doc !== host.settings.current) {
+        host.settings.save(next.doc);
+        applySettings();
+      }
+      pauseNote = next.note;
+    }
+    capturing = null;
+    pauseSettings();
   }
   /** Leva os ajustes novos para a partida: perfis, campo de visão e tremor. */
   function applySettings(): void {
@@ -1513,7 +1537,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     shakeMul = shakeFromSettings();
   }
 
-  function pauseAction(nav: MenuNavigation): SceneSignal {
+  /** M2 (fase 2e): uma ação da pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair) ou das páginas dela. */
+  function pauseAction(nav: MenuNavigation, raw: Readonly<RawInputState>): SceneSignal {
     const a = nav.activated;
     if (pausePage === 'main') {
       if (nav.back || a === PAUSE_ACTION.resume) resume();
@@ -1523,6 +1548,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === PAUSE_ACTION.settings) {
         pausePage = 'settings';
         pauseSettingsDevice = device;
+        pauseNote = '';
         pauseSettings();
       } else if (a === PAUSE_ACTION.unstuck) {
         unstuckPending = true;
@@ -1543,24 +1569,29 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (nav.tab !== 0) {
       pauseSettingsTab = (pauseSettingsTab + nav.tab + PAUSE_SETTINGS_TABS.length) % PAUSE_SETTINGS_TABS.length;
       followTab(pauseMenu, pauseSettingsTab);
+      pauseNote = '';
       pauseSettings();
     } else if (nav.back || a === SETTINGS_ACTION.back) pauseMain();
     else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
       pauseSettingsTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
+      pauseNote = '';
       pauseSettings();
     } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
       const tab = PAUSE_SETTINGS_TABS[pauseSettingsTab]!;
-      const next = stepSettings(
-        tab,
-        host.settings.current,
-        pauseSettingsDevice,
-        a.slice(SETTINGS_ROW_PREFIX.length),
-        nav.delta,
-      );
-      pauseSettingsDevice = next.device;
-      if (next.doc !== host.settings.current) {
-        host.settings.save(next.doc);
-        applySettings();
+      const id = a.slice(SETTINGS_ROW_PREFIX.length);
+      const bind = tab === 'buttons' ? bindRowAction(id, pauseSettingsDevice) : null;
+      if (bind !== null) {
+        capturing = bind;
+        capture.start(raw, pauseSettingsDevice === 'gamepad' ? 'gamepad' : 'keyboardMouse');
+        pauseNote = t('settings.bind.press', { action: t(actionLabel(bind)) });
+      } else {
+        const next = stepSettings(tab, host.settings.current, pauseSettingsDevice, id, nav.delta);
+        pauseSettingsDevice = next.device;
+        if (next.doc !== host.settings.current) {
+          host.settings.save(next.doc);
+          applySettings();
+        }
+        pauseNote = tab === 'buttons' && id === 'reset' ? t('settings.bind.resetDone') : '';
       }
       pauseSettings();
     }
@@ -2758,9 +2789,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const pitch = player.pitch;
           player.update(raw, 0);
           player.setAngles(yaw, pitch);
-          if (player.wasPressed('pause')) resume();
+          // Capturando um botão (e esperando soltar tudo depois): nem a pausa nem o menu andam.
+          if (capture.active) finishCapture(capture.update(raw));
+          else if (player.wasPressed('pause')) resume();
           else {
-            signal = pauseAction(pauseMenu.update(menu, raw, ui));
+            signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }
         }
       } else if (menu.pressed('back')) {

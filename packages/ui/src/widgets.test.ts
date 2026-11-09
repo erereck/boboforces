@@ -85,6 +85,29 @@ describe('linha de opção', () => {
     );
     expect(inNivel).toHaveLength(0);
   });
+
+  it('só leitura (M2, fase 4f): sem setas; esquerda e direita não mudam o valor; o toque não acerta seta', () => {
+    const ro: UiNode = {
+      kind: 'column',
+      gap: 16,
+      children: [option('pular', 'Espaço', { valueOnly: true }), btn('ok')],
+    };
+    const l = layoutTree(ro, viewport, 1, { fonts });
+    const nav = createMenuNavigation();
+    navigateMenu(l, 'pular', 'right', nav);
+    expect([nav.activated, nav.delta]).toEqual([null, 0]);
+    navigateMenu(l, 'pular', 'confirm', nav);
+    expect([nav.activated, nav.delta]).toEqual(['opt:pular', 0]);
+    const node = l.byId.get('pular') as ButtonNode;
+    const r = l.rects.get(node) as Rect;
+    expect(hitOptionArrow(l, 'pular', r.x + r.w - 10)).toBe(0);
+    const out = createDrawList();
+    drawTree(l, 'pular', out);
+    expect(syntheticGlyphText(out)).toContain('PULAREspaço');
+    // Só o anel de foco em âmbar (nada de setas).
+    const ambar = drawnCommands(out).filter((c) => c.op === DRAW_OP.rect && c.color === COLORS.acao);
+    expect(ambar.length).toBeLessThan(11);
+  });
 });
 
 describe('abas', () => {

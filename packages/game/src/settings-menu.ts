@@ -5,22 +5,40 @@ import {
   type DeviceControls,
   type SettingsDocument,
 } from '@boboforces/format';
-import { AIM_ASSIST_LEVELS, type ControlProfile } from '@boboforces/input';
+import {
+  AIM_ASSIST_LEVELS,
+  applyBindings,
+  defaultProfileFor,
+  isCtrlBinding,
+  isReservedSource,
+  KEY_CODES,
+  MOUSE_BUTTON,
+  PAD_AXIS,
+  PAD_BUTTON,
+  profileBindings,
+  rebind,
+  REMAP_ACTIONS,
+  type BindingSource,
+  type ControlProfile,
+  type RemapAction,
+} from '@boboforces/input';
 import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
 
 /**
  * M2 (fase 4f): os Ajustes (gameplay.md §10.5), lógica pura sobre o `settings@1`. As abas Controles (por dispositivo),
  * Vídeo e Acessibilidade são linhas de opção com passo; Dados e Sobre são montadas pelo `game` (precisam da
- * plataforma). A pausa mostra só as 3 primeiras. `applyControls` leva os controles salvos para o perfil do input.
+ * plataforma). A pausa mostra as 4 primeiras. `applyControls` leva os controles salvos para o perfil do input.
+ * Botões (parte 2): uma linha por ação remapeável; confirmar abre a captura (`createBindingCapture`, no `game`).
  */
 
-export const SETTINGS_TABS = ['controls', 'video', 'access', 'data', 'about'] as const;
+export const SETTINGS_TABS = ['controls', 'buttons', 'video', 'access', 'data', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 /** As abas que a pausa mostra (Dados e Sobre ficam no menu). */
-export const PAUSE_SETTINGS_TABS = ['controls', 'video', 'access'] as const satisfies readonly SettingsTab[];
+export const PAUSE_SETTINGS_TABS = ['controls', 'buttons', 'video', 'access'] as const satisfies readonly SettingsTab[];
 
 export const SETTINGS_TAB_LABELS: Readonly<Record<SettingsTab, StringKey>> = {
   controls: 'settings.tab.controls',
+  buttons: 'settings.tab.buttons',
   video: 'settings.tab.video',
   access: 'settings.tab.access',
   data: 'settings.tab.data',
@@ -186,16 +204,40 @@ function optionDefs(tab: SettingsTab, device: ControlDevice): readonly OptionDef
   return [];
 }
 
-/** As linhas de opção da aba (Controles começa pela escolha do dispositivo que se está ajustando). */
-export function settingsRows(tab: SettingsTab, doc: SettingsDocument, device: ControlDevice): TabbedRow[] {
+/**
+ * As linhas de opção da aba (Controles e Botões começam pela escolha do dispositivo que se está ajustando).
+ * `capturing`: a ação cuja linha mostra "Aperte..." enquanto a captura espera.
+ */
+export function settingsRows(
+  tab: SettingsTab,
+  doc: SettingsDocument,
+  device: ControlDevice,
+  capturing: RemapAction | null = null,
+): TabbedRow[] {
   const rows: TabbedRow[] = [];
-  if (tab === 'controls') {
+  if (tab === 'controls' || tab === 'buttons') {
     rows.push({
       kind: 'option',
       id: 'device',
       labelKey: 'settings.row.device',
       value: t(`settings.device.${device}` as StringKey),
     });
+  }
+  if (tab === 'buttons') {
+    if (device === 'touch') rows.push({ kind: 'text', id: 'touch', text: t('settings.bind.touch'), dim: true });
+    else {
+      const profile = boundProfile(doc, device);
+      for (const a of REMAP_ACTIONS[device]) {
+        rows.push({
+          kind: 'value',
+          id: `${BIND_ROW_PREFIX}${a}`,
+          labelKey: actionLabel(a),
+          value: a === capturing ? t('settings.bind.waiting') : bindingsText(profileBindings(profile, a)),
+        });
+      }
+      rows.push({ kind: 'action', id: 'reset', label: { key: 'settings.bind.reset' } });
+    }
+    return rows;
   }
   for (const r of optionDefs(tab, device)) {
     rows.push({ kind: 'option', id: r.id, labelKey: r.labelKey, value: r.value(doc, device) });
@@ -212,7 +254,8 @@ export function stepSettings(
   delta: number,
 ): { doc: SettingsDocument; device: ControlDevice } {
   const d = delta === 0 ? 1 : delta;
-  if (tab === 'controls' && id === 'device') {
+  if (tab === 'buttons' && id === 'reset') return { doc: withDevice(doc, device, { bindings: {} }), device };
+  if ((tab === 'controls' || tab === 'buttons') && id === 'device') {
     const i = CONTROL_DEVICES.indexOf(device);
     return { doc, device: CONTROL_DEVICES[(i + d + CONTROL_DEVICES.length) % CONTROL_DEVICES.length]! };
   }
@@ -220,10 +263,13 @@ export function stepSettings(
   return { doc: row ? row.step(doc, device, d) : doc, device };
 }
 
-/** Os controles salvos de um dispositivo sobre o perfil padrão dele (sensibilidades multiplicam o padrão). */
+/**
+ * Os controles salvos de um dispositivo sobre o perfil padrão dele (sensibilidades multiplicam o padrão; os botões
+ * salvos trocam os do perfil).
+ */
 export function applyControls(base: ControlProfile, c: DeviceControls): ControlProfile {
   return {
-    ...base,
+    ...applyBindings(base, c.bindings),
     lookSensitivity: base.lookSensitivity * c.sensitivity,
     lookSensitivityYMul: base.lookSensitivityYMul * c.sensitivityYMul,
     adsSensitivityMul: base.adsSensitivityMul * c.adsMul,
@@ -234,4 +280,91 @@ export function applyControls(base: ControlProfile, c: DeviceControls): ControlP
     toggleSprint: c.toggleSprint,
     ...(base.device === 'gamepad' ? { deadzoneInner: c.deadzoneInner, deadzoneOuter: c.deadzoneOuter } : {}),
   };
+}
+
+// --- Botões (M2, fase 4f, parte 2) ---
+
+/** As linhas de botão são `row:bind:<ação>`. */
+export const BIND_ROW_PREFIX = 'bind:';
+
+/** A ação de uma linha de botão (`bind:<ação>`), ou `null`. */
+export function bindRowAction(id: string, device: ControlDevice): RemapAction | null {
+  if (device === 'touch' || !id.startsWith(BIND_ROW_PREFIX)) return null;
+  const a = id.slice(BIND_ROW_PREFIX.length);
+  return (REMAP_ACTIONS[device] as readonly string[]).includes(a) ? (a as RemapAction) : null;
+}
+
+export function actionLabel(a: RemapAction): StringKey {
+  return `bind.action.${a}` as StringKey;
+}
+
+/** O perfil padrão do dispositivo com os botões salvos (só os botões importam aqui). */
+function boundProfile(doc: SettingsDocument, device: ControlDevice): ControlProfile {
+  return applyBindings(defaultProfileFor(device), doc.controls[device].bindings);
+}
+
+function nameOf(table: Readonly<Record<string, number>>, v: number): string {
+  return Object.keys(table).find((k) => table[k] === v) ?? '';
+}
+
+/** O nome de uma fonte na tela: letras e números direto; o resto pela tabela (os do controle, pela posição). */
+export function bindingLabel(s: BindingSource): string {
+  let name: string;
+  switch (s.device) {
+    case 'key': {
+      const code = KEY_CODES[s.key] ?? 'Unknown';
+      if (/^Key[A-Z]$/.test(code)) name = code.slice(3);
+      else if (/^Digit[0-9]$/.test(code)) name = code.slice(5);
+      else if (/^F[0-9]{1,2}$/.test(code)) name = code;
+      else name = t(`bind.key.${code}` as StringKey);
+      break;
+    }
+    case 'mouseButton':
+      name = t(`bind.mouse.${nameOf(MOUSE_BUTTON, s.button)}` as StringKey);
+      break;
+    case 'wheel':
+      name = t(s.direction > 0 ? 'bind.wheel.down' : 'bind.wheel.up');
+      break;
+    case 'padButton':
+      name = t(`bind.pad.${nameOf(PAD_BUTTON, s.button)}` as StringKey);
+      break;
+    case 'padAxis':
+      name = t(`bind.axis.${nameOf(PAD_AXIS, s.axis)}` as StringKey);
+      break;
+    case 'touchControl':
+      name = t('bind.touch');
+      break;
+  }
+  return s.hold ? t('settings.bind.hold', { name }) : name;
+}
+
+/** O valor da linha: a primeira fonte e "+N" para as outras; "Nenhum" sem nada. */
+export function bindingsText(list: readonly BindingSource[]): string {
+  if (list.length === 0) return t('settings.bind.none');
+  const first = bindingLabel(list[0]!);
+  return list.length === 1 ? first : t('settings.bind.more', { name: first, n: list.length - 1 });
+}
+
+/**
+ * Liga a ação à fonte capturada e devolve o documento novo e o aviso: a troca com outra ação, a ação que ficou sem
+ * botão, o Ctrl do navegador ou a recusa (a fonte é da pausa; o documento não muda).
+ */
+export function rebindSettings(
+  doc: SettingsDocument,
+  device: ControlDevice,
+  action: RemapAction,
+  source: BindingSource,
+): { doc: SettingsDocument; note: string } {
+  if (device === 'touch') return { doc, note: '' };
+  const base = defaultProfileFor(device);
+  const label = bindingLabel(source);
+  if (isReservedSource(base, source)) return { doc, note: t('settings.bind.reserved', { source: label }) };
+  const r = rebind(base, doc.controls[device].bindings, action, source);
+  const next = withDevice(doc, device, { bindings: r.bindings });
+  let note = '';
+  if (r.swapped !== null) {
+    const other = t(actionLabel(r.swapped));
+    note = t(r.orphaned ? 'settings.bind.orphaned' : 'settings.bind.swapped', { source: label, other });
+  } else if (isCtrlBinding(source)) note = t('binding.ctrlReserved');
+  return { doc: next, note };
 }

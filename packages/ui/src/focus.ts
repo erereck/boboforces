@@ -137,7 +137,7 @@ const arrows = new Float64Array(3);
  */
 export function hitOptionArrow(layout: LayoutResult, id: string, x: number): number {
   const node = findFocusable(layout, id);
-  if (!node || node.value === undefined) return 0;
+  if (!node || node.value === undefined || node.valueOnly) return 0;
   optionArrows(layout, node, layout.rects.get(node) as Rect, arrows);
   if (x >= arrows[0]! && x < arrows[0]! + arrows[2]!) return -1;
   if (x >= arrows[1]! && x < arrows[1]! + arrows[2]!) return 1;
@@ -187,7 +187,7 @@ export function navigateMenu(
     return out;
   }
   out.focusedId = focusedId;
-  if ((action === 'left' || action === 'right') && current.value !== undefined) {
+  if ((action === 'left' || action === 'right') && current.value !== undefined && !current.valueOnly) {
     // Linha de opção: esquerda e direita mudam o valor; o foco fica.
     out.activated = current.action;
     out.delta = action === 'left' ? -1 : 1;

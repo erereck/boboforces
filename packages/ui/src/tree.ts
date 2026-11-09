@@ -111,6 +111,11 @@ export interface ButtonNode extends NodeBase {
   readonly value?: TextContent;
   /** Largura da área do valor (setas incluídas), em px de referência (padrão `OPTION.valueWidth`). */
   readonly valueWidth?: number;
+  /**
+   * M2 (fase 4f): o valor é só para ler (sem setas; esquerda e direita movem o foco, confirmar ativa): a linha de um
+   * botão remapeável ("PULAR · Espaço").
+   */
+  readonly valueOnly?: boolean;
   /** M2 (fase 4a): aba selecionada (variante `tab`). */
   readonly selected?: boolean;
   /** M2 (fase 4e): botão compacto (texto menor, 48 de altura, sem largura mínima): abas e barras de ferramentas. */

@@ -12,9 +12,12 @@ import {
 import { stepLevel } from './pause.ts';
 import {
   confirmConventionFor,
+  createBindingCapture,
   createMenuInput,
   createRawInputState,
+  type CaptureResult,
   type MenuConfirmConvention,
+  type RemapAction,
 } from '@boboforces/input';
 import type { Platform } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
@@ -65,7 +68,15 @@ import type { LocalDriver } from './local-driver.ts';
 import { createMenuController, followTab, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
 import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
-import { SETTINGS_TAB_LABELS, SETTINGS_TABS, settingsRows, stepSettings } from './settings-menu.ts';
+import {
+  actionLabel,
+  bindRowAction,
+  rebindSettings,
+  SETTINGS_TAB_LABELS,
+  SETTINGS_TABS,
+  settingsRows,
+  stepSettings,
+} from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import {
   factoryPresets,
@@ -367,13 +378,30 @@ export function startGame(deps: GameDeps): GameHandle {
             ? dataRows()
             : tab === 'about'
               ? aboutRows()
-              : settingsRows(tab, save.settings, settingsDevice),
+              : settingsRows(tab, save.settings, settingsDevice, capturing),
         note: settingsNote,
       }),
     );
   }
+  /** M2 (fase 4f, parte 2): a captura do novo botão de uma ação (aba Botões). */
+  const capture = createBindingCapture();
+  let capturing: RemapAction | null = null;
+  /** Fim da captura: liga a fonte nova (com o aviso de troca, se houver) ou cancela. */
+  function finishCapture(result: CaptureResult): void {
+    if (capturing === null || result === 'none') return;
+    if (result === 'cancel') settingsNote = '';
+    else {
+      const next = rebindSettings(save.settings, settingsDevice, capturing, result);
+      if (next.doc !== save.settings) save.setSettings(next.doc);
+      settingsNote = next.note;
+    }
+    capturing = null;
+    rebuildSettings();
+  }
   function openSettings(): void {
     settingsTab = 0;
+    capture.stop();
+    capturing = null;
     settingsNote = '';
     pendingBackup = null;
     const last = menuInput.lastDevice;
@@ -774,6 +802,14 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
       }
       case 'settings': {
+        // Capturando um botão (e esperando soltar tudo depois): o menu não anda.
+        if (capture.active) {
+          finishCapture(capture.update(raw));
+          settingsMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+          break;
+        }
         const nav = settingsMenu.update(menuInput, raw, u);
         const a = nav.activated;
         if (nav.tab !== 0) {
@@ -789,12 +825,18 @@ export function startGame(deps: GameDeps): GameHandle {
         } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
           const id = a.slice(SETTINGS_ROW_PREFIX.length);
           const tab = SETTINGS_TABS[settingsTab]!;
+          const bind = tab === 'buttons' ? bindRowAction(id, settingsDevice) : null;
           if (tab === 'data' || tab === 'about') settingsAction(id);
-          else {
+          else if (bind !== null) {
+            capturing = bind;
+            capture.start(raw, settingsDevice === 'gamepad' ? 'gamepad' : 'keyboardMouse');
+            settingsNote = t('settings.bind.press', { action: t(actionLabel(bind)) });
+            rebuildSettings();
+          } else {
             const next = stepSettings(tab, save.settings, settingsDevice, id, nav.delta);
             settingsDevice = next.device;
             if (next.doc !== save.settings) save.setSettings(next.doc);
-            settingsNote = '';
+            settingsNote = tab === 'buttons' && id === 'reset' ? t('settings.bind.resetDone') : '';
             rebuildSettings();
           }
         }

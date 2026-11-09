@@ -265,6 +265,18 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
   - **Ficam para depois:** qualidade gráfica (com o item Web), cores para daltônico e tamanho do HUD (fase 6), volumes
     (fase 7) e o remapeamento (parte 2).
   - 7 testes novos.
+- **Fase 4f (parte 2), remapeamento:**
+  - **Aba Botões** nos Ajustes e na pausa: uma linha por ação (andar, atirar, mirar, pular, agachar, correr,
+    recarregar, interagir, faca, granada, trocar de arma, armas 1 a 4, ping, emote, placar), para o teclado e mouse e
+    para o controle. No toque, os botões ficam na tela da partida.
+  - **Trocar um botão:** confirmar na linha e apertar a tecla ou o botão novo; Esc ou + cancela.
+  - **Conflitos:** se o botão novo já era de outra ação, as duas trocam; quando não há o que trocar, a outra fica sem
+    botão, com aviso.
+  - **O que não muda:** a pausa (Esc, P e +) e os menus. Ligar uma ação ao Ctrl mostra o aviso do navegador.
+  - **Restaurar padrão** devolve os botões de fábrica do dispositivo.
+  - **Nomes:** o controle aparece pela posição, sem marcas ("Botão de baixo", "Ombro direito"); as teclas de símbolo
+    seguem o ABNT2.
+  - 8 testes novos.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

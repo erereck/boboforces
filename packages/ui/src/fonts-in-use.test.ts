@@ -8,6 +8,7 @@ import { layoutTree, type LayoutResult } from './layout.ts';
 import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
 import { settingsScreen } from './screens/settings.ts';
+import type { TabbedRow } from './screens/tabbed.ts';
 import { titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 import { t } from './text.ts';
@@ -172,9 +173,10 @@ function reachableScrolling(tree: UiNode, t: Target, start: string): Set<string>
   return seen;
 }
 
-/** M2 (fase 4f): as 5 abas dos Ajustes com os rótulos e os valores mais longos. */
+/** M2 (fase 4f): as 6 abas dos Ajustes com os rótulos e os valores mais longos. */
 const SETTINGS_TABS_FIXTURE = [
   'settings.tab.controls',
+  'settings.tab.buttons',
   'settings.tab.video',
   'settings.tab.access',
   'settings.tab.data',
@@ -196,6 +198,7 @@ function settingsFixtures(): UiNode[] {
       option('deadIn', 'settings.row.deadIn', '30%'),
       option('deadOut', 'settings.row.deadOut', '100%'),
     ],
+    bindingFixtureRows(),
     [option('fov', 'settings.row.fov', 'Padrão'), option('uiScale', 'settings.row.uiScale', '×1,3')],
     [option('shake', 'settings.row.reduceShake', 'Desligado'), option('tips', 'settings.row.tips', 'Desligado')],
     [
@@ -225,9 +228,53 @@ function settingsFixtures(): UiNode[] {
       tabs: SETTINGS_TABS_FIXTURE,
       tab,
       rows: r,
-      note: t('settings.data.exported', { name: 'boboforces-backup-2026-11-09.json' }),
+      // Na aba Botões, o aviso mais longo da troca.
+      note:
+        tab === 1
+          ? t('settings.bind.orphaned', { source: longestBindName(), other: t('bind.action.lastWeapon') })
+          : t('settings.data.exported', { name: 'boboforces-backup-2026-11-09.json' }),
     }),
   );
+}
+
+/** Os nomes das teclas e dos botões (`bind.*`, menos as ações), o mais longo com "(segurar)" e "+1". */
+function bindNames(): string[] {
+  const keys = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter(
+    (k) => k.startsWith('bind.') && !k.startsWith('bind.action.'),
+  );
+  return keys.map((k) => t(k));
+}
+function longestBindName(): string {
+  return bindNames().reduce((a, b) => (b.length > a.length ? b : a));
+}
+/** A aba Botões com todas as ações (rótulos) e todos os nomes (valores), cada um numa linha. */
+function bindingFixtureRows(): TabbedRow[] {
+  const actions = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter((k) => k.startsWith('bind.action.'));
+  const longest = longestBindName();
+  const values = [
+    ...bindNames(),
+    // Só o Interagir do controle segura (o botão da esquerda); +N só vem das listas de fábrica (Shift, agachar).
+    t('settings.bind.hold', { name: t('bind.pad.faceLeft') }),
+    t('settings.bind.more', { name: t('bind.pad.faceRight'), n: 1 }),
+    t('settings.bind.more', { name: t('bind.key.ShiftLeft'), n: 1 }),
+    t('settings.bind.waiting'),
+    t('settings.bind.none'),
+  ];
+  const rows: TabbedRow[] = [
+    { kind: 'option', id: 'device', labelKey: 'settings.row.device', value: 'Teclado e mouse' },
+  ];
+  const n = Math.max(actions.length, values.length);
+  for (let i = 0; i < n; i++) {
+    rows.push({
+      kind: 'value',
+      id: `bind:${i}`,
+      labelKey: actions[i % actions.length]!,
+      value: values[i % values.length]!,
+    });
+  }
+  rows.push({ kind: 'action', id: 'reset', label: { key: 'settings.bind.reset' } });
+  rows.push({ kind: 'text', id: 'touch', text: t('settings.bind.touch'), dim: true });
+  return rows;
 }
 
 function overlaps(a: Rect, b: Rect): boolean {
@@ -267,7 +314,8 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
       const room = r.w - 2 * padX * layout.scale - (valueW > 0 ? valueW + 16 * layout.scale : 0);
       const value = layout.values.get(node);
       if (value) {
-        const between = valueW - 2 * OPTION.arrow * layout.scale;
+        // Só leitura (M2, fase 4f): sem setas, o valor tem a área inteira.
+        const between = node.valueOnly ? valueW : valueW - 2 * OPTION.arrow * layout.scale;
         expect(
           value.width,
           `${t.name}: valor "${value.text}" ${value.width.toFixed(1)} px em ${between.toFixed(1)}`,
@@ -427,7 +475,7 @@ describe('estouro de texto com o atlas real', () => {
     }
   });
 
-  it('ajustes (as 5 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {
+  it('ajustes (as 6 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {
     for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
       for (const tree of settingsFixtures()) {
         const layout = layoutFor(tree, target);

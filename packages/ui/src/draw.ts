@@ -106,16 +106,20 @@ function drawButton(layout: LayoutResult, node: ButtonNode, r: Rect, focused: bo
   // M2 (fase 4a): linha de opção: rótulo à esquerda; valor centrado entre as setas, na área da direita.
   drawText(out, font, text.text, r.x + BUTTON.padX * s, r.y + (r.h - capH) / 2, text.px, l.text, text.tracking);
   optionArrows(layout, node, r, arrowX);
-  const arrowColor = node.disabled ? COLORS.linha : focused ? COLORS.acao : COLORS.textoBaixo;
-  const glyph = Math.round(r.h * 0.42);
-  drawArrow(out, arrowX[0]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, -1, arrowColor);
-  drawArrow(out, arrowX[1]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, 1, arrowColor);
+  if (!node.valueOnly) {
+    const arrowColor = node.disabled ? COLORS.linha : focused ? COLORS.acao : COLORS.textoBaixo;
+    const glyph = Math.round(r.h * 0.42);
+    drawArrow(out, arrowX[0]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, -1, arrowColor);
+    drawArrow(out, arrowX[1]! + arrowX[2]! / 2, r.y + r.h / 2, glyph, 1, arrowColor);
+  }
   const value = layout.values.get(node);
   const vfont = value ? layout.fonts?.[value.font] : undefined;
   if (!value || !vfont) return;
-  const left = arrowX[0]! + arrowX[2]!;
+  // Só leitura: o valor ocupa a área inteira (sem as setas).
+  const left = node.valueOnly ? arrowX[0]! : arrowX[0]! + arrowX[2]!;
+  const right = node.valueOnly ? arrowX[1]! + arrowX[2]! : arrowX[1]!;
   const vcap = (vfont.capHeight * value.px) / vfont.size;
-  const vx = left + (arrowX[1]! - left - value.width) / 2;
+  const vx = left + (right - left - value.width) / 2;
   drawText(out, vfont, value.text, vx, r.y + (r.h - vcap) / 2, value.px, l.text, value.tracking);
 }
 

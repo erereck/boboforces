@@ -195,7 +195,7 @@ chega) e o menu dentro de 350 KB (o `size-check` confere a cada subfase).
   - Salvar preset (nome do gerador, sem digitar) e o corte aos tetos da plataforma, com aviso do que mudou;
   - no resultado, "Mudar regras" e "Salvar preset" ligados;
   - `?bots=fabrica` e `?nivel=` saem da web (a aba Bots faz o mesmo).
-- **4f. Ajustes:** parte 1 pronta em 09/11 (`ARCHITECTURE.md` §12.26); o remapeamento é a parte 2.
+- **4f. Ajustes.** Pronta em 09/11 (`ARCHITECTURE.md` §12.26 e §12.27).
   - Controles: sensibilidade por dispositivo, multiplicador no ADS, Y invertido, assistência (Desligada, Leve, Média,
     Forte), alternar ou segurar, zonas mortas e remapeamento do teclado e do controle;
   - Vídeo: qualidade, escala da UI, FOV;

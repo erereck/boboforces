@@ -1496,3 +1496,30 @@ mudanças de contrato ficam registradas aqui.
   - remapeamento do teclado e do controle (parte 2).
 - **Teste de estouro:** as 5 abas nos 6 alvos e no Switch, com alcance pelo D-pad.
 - **Tamanho:** o menu foi a 320,6 KB (+3,2 KB; teto 350).
+
+### 12.27 Fase 4f, parte 2: remapeamento (09/11/2026)
+
+- **`input/remap.ts`** (puro):
+  - texto de cada fonte no `settings@1`: `key:<code>`, `mouse:<botão>`, `wheel:up|down`, `pad:<posição>[:hold]`,
+    `axis:<eixo>:+|-`, `touch:<controle>`; `encodeBinding` e `decodeBinding` (texto estranho vira `null`);
+  - `REMAP_ACTIONS` por dispositivo; a pausa, o Destravar e os menus ficam de fora (regras 12 e 16);
+  - `applyBindings(perfil, bindings)`: cada ação salva troca a lista inteira; fonte de outro dispositivo é ignorada;
+  - `rebind`: a ação fica só com a fonte nova; quem a usava perde ela e, se ficar sem nada, recebe as antigas (troca);
+    o save guarda só o que difere do padrão;
+  - `isReservedSource`: a fonte é da pausa (recusada);
+  - `createBindingCapture`: a próxima tecla, botão do mouse, roda ou botão do controle. O que estava apertado no
+    começo só vale depois de solto; Esc ou + cancelam; depois do resultado, segue ativa até tudo ser solto (o menu não
+    recebe a mesma tecla). Sem alocação por frame.
+- **ui:**
+  - `ButtonNode.valueOnly`: linha com valor só para ler (sem setas; esquerda e direita movem o foco);
+  - `TabbedRow` `value`;
+  - as strings `bind.*` (ações, teclas, mouse, controle por posição) e `settings.bind.*`; o "´" do ABNT2 virou "Tecla
+    do acento" (o atlas está a 0,4 KB do teto de 120 KB).
+- **game:**
+  - aba `buttons` nos Ajustes e na pausa (`settingsRows`, `bindRowAction`, `bindingLabel`, `bindingsText`,
+    `rebindSettings` com os avisos de troca, de ação sem botão, do Ctrl e da pausa);
+  - `applyControls` aplica os botões salvos; na pausa, vale na hora (`applySettings`);
+  - enquanto a captura está ativa, o menu (e a tecla de pausa) não anda.
+- **Teste de estouro:** a aba Botões com todas as ações e todos os nomes nos 6 alvos e no Switch.
+- **Tamanho:** o menu foi a 324,0 KB (+3,4 KB). Sobram 26 KB até o teto de 350; se a fase 4 apertar, as telas de
+  Ajustes e da Partida personalizada podem ir para um chunk carregado sob demanda.

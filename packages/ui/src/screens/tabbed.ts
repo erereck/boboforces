@@ -7,6 +7,7 @@ import type { ButtonVariant, UiNode } from '../tree.ts';
  * de resumo (ou o aviso, que toma o lugar dela), as abas em botões compactos (`tab:<i>`; também LB/RB e Q/E), as
  * linhas da aba numa coluna com rolagem e a fileira de botões no canto de baixo à direita. Cada linha é:
  * - `option`: linha de opção ("RÓTULO ◀ valor ▶"; ação `row:<id>`);
+ * - `value`: o rótulo e um valor só para ler, sem setas (um botão remapeável; confirmar abre a captura);
  * - `action`: botão de largura inteira (ação `row:<id>`), com o rótulo literal ou pela tabela;
  * - `text`: uma linha de texto (`Sobre`, avisos), sem foco.
  */
@@ -15,6 +16,7 @@ export const TABBED_ROW_PREFIX = 'row:';
 
 export type TabbedRow =
   | { readonly kind: 'option'; readonly id: string; readonly labelKey: StringKey; readonly value: string }
+  | { readonly kind: 'value'; readonly id: string; readonly labelKey: StringKey; readonly value: string }
   | {
       readonly kind: 'action';
       readonly id: string;
@@ -48,12 +50,14 @@ export const TABBED_LAYOUT = { rowsWidth: 800, rowsHeight: 348 } as const;
 function rowNode(row: TabbedRow): UiNode {
   switch (row.kind) {
     case 'option':
+    case 'value':
       return {
         kind: 'button',
         id: `${TABBED_ROW_PREFIX}${row.id}`,
         text: { key: row.labelKey },
         action: `${TABBED_ROW_PREFIX}${row.id}`,
         value: { literal: row.value },
+        ...(row.kind === 'value' ? { valueOnly: true } : {}),
         variant: 'secondary',
         width: TABBED_LAYOUT.rowsWidth,
       };
