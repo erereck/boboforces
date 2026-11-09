@@ -226,7 +226,7 @@ Escrito em 09/11/2026, com a fase 4 fechada e a rodada 8 publicada. Ordem: prime
   - duplicar, apagar e favoritar;
   - o save ganha as operações dos bots, com o teto de 500 na web e 100 no Switch;
   - o menu principal ganha "Laboratório", que abre na Oficina.
-- **5b. Laboratório:** o editor pronto em 09/11 (`ARCHITECTURE.md` §12.32); falta a personalizada usar os seus bots.
+- **5b. Laboratório.** Pronta em 09/11 (`ARCHITECTURE.md` §12.32 e §12.33).
   - edita um bot por vez, partindo de um da biblioteca;
   - abas: Nível (os 5 níveis preenchem tudo), Habilidade, Inteligência (com o modo avançado), Personalidade, Regras e
     Nome ("rolar nome", com o gerador de nomes bobos em inglês);

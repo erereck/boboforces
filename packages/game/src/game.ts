@@ -540,9 +540,13 @@ export function startGame(deps: GameDeps): GameHandle {
   let customTab = 0;
   let customNote = '';
   let customReturn: GameScreen = 'quick';
+  // M2 (fase 5b): os bots da Oficina entram na escolha do bot de cada time (lidos na hora: a Oficina muda).
   const customLimits = {
     maxBots,
     maxViewM: selectPlatformProfile(platform.features.profileHint, 1).maxViewDistanceM,
+    get savedBots(): readonly BotDocument[] {
+      return save.bots;
+    },
   };
   function rebuildCustom(): void {
     const tab = CUSTOM_TABS[customTab]!;

@@ -332,6 +332,9 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
     conhecimento.
   - **Abas:** de qualquer aba, "baixo" vai para a primeira linha (a aba da ponta caía nos botões do canto).
   - 6 testes novos.
+- **Fase 5b (parte 2), seus bots na partida:** a aba Bots da Partida personalizada passa a oferecer também os bots da
+  Oficina, depois dos de fábrica. O escolhido vai embutido no preset (`embedded:<id>`), que continua jogável mesmo se
+  o bot sair da Oficina; quando nenhum time usa mais, sai do preset. 1 teste novo.
 
 ### M1 Cena-vitrine + Teste Zero (concluído em 08/11/2026, #60)
 

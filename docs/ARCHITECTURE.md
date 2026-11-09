@@ -1623,3 +1623,11 @@ mudanças de contrato ficam registradas aqui.
 - **`bot-card`:** `ruleTags` ganha visão, alcance, audição e conhecimento (§6.5: toda regra ativa à vista).
 - **Tamanho:** o menu foi a 331,7 KB (+3,5 KB). Sobram 18,3 KB até o teto de 350; o Meu Bobo (fase 6) deve pedir o
   pedaço sob demanda das telas de edição.
+
+### 12.33 Fase 5b, parte 2: os bots da Oficina na Partida personalizada (09/11/2026)
+
+- `CustomLimits.savedBots` (o `game` passa um getter: a Oficina muda enquanto a tela está aberta).
+- A escolha do bot de cada time anda por: os de fábrica, os da Oficina e o embutido que já está no preset (mesmo que
+  tenha saído da Oficina).
+- `syncEmbedded`: o escolhido entra em `embeddedBots` e os que nenhum time usa saem (sem bloco vazio no preset).
+- O nome do embutido aparece pelo documento, na linha e na partida (`controllerNames` já lia assim).

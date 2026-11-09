@@ -1,4 +1,4 @@
-import { DEBUT_PRESET, presetBotCounts, validateMatchRecipe, type MatchRecipe } from '@boboforces/format';
+import { builtinBot, DEBUT_PRESET, presetBotCounts, validateMatchRecipe, type MatchRecipe } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import { CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
 
@@ -67,5 +67,25 @@ describe('Partida personalizada', () => {
     const taken = new Set(['Times 4×4 De boa']);
     expect(presetName('Times 4×4 Tryhard', (n) => taken.has(n))).toBe('Times 4×4 Tryhard');
     expect(presetName('Times 4×4 De boa', (n) => taken.has(n))).toBe('Times 4×4 De boa 2');
+  });
+
+  it('M2 (fase 5b): os bots da Oficina entram na escolha; o escolhido vai embutido e sai quando ninguém usa', () => {
+    const pickles = { ...builtinBot('jorge-the-immortal')!, id: 'a1b2c3', name: 'Private Pickles' };
+    const limits = { ...PC, savedBots: [pickles] };
+    // Do Normal Bob (padrão do time dos inimigos? o da estreia é o De boa), anda até depois dos 12 de fábrica.
+    let r: MatchRecipe = DEBUT_PRESET;
+    for (let i = 0; i < 12 && !value('bots', r, 'bot1').startsWith('Private'); i++)
+      r = stepCustom('bots', r, 'bot1', 1, limits);
+    expect(value('bots', r, 'bot1')).toBe('Private Pickles');
+    expect(r.teams[1]!.bots[0]!.ref).toBe('embedded:a1b2c3');
+    expect(r.embeddedBots).toEqual([pickles]);
+    expect(validateMatchRecipe(r, { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 }).ok).toBe(true);
+    // Mais um passo: volta ao primeiro de fábrica e o embutido sai do preset.
+    const back = stepCustom('bots', r, 'bot1', 1, limits);
+    expect(back.teams[1]!.bots[0]!.ref.startsWith('builtin:')).toBe(true);
+    expect(back.embeddedBots).toBeUndefined();
+    // Saiu da Oficina, mas o preset ainda tem: continua na escolha, com o nome dele.
+    expect(value('bots', r, 'bot1')).toBe('Private Pickles');
+    expect(stepCustom('bots', r, 'bot1', -1, PC).embeddedBots).toBeUndefined();
   });
 });

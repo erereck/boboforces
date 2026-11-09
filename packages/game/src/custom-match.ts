@@ -4,6 +4,7 @@ import {
   builtinBotRef,
   FRIENDLY_FIRE_LEVELS,
   REGEN_RULES,
+  type BotDocument,
   type BotRef,
   type MatchRecipe,
   type PlayerRules,
@@ -34,6 +35,8 @@ export const CUSTOM_TAB_LABELS: Readonly<Record<CustomTab, StringKey>> = {
 export interface CustomLimits {
   readonly maxBots: number;
   readonly maxViewM: number;
+  /** M2 (fase 5b): os bots da Oficina, que entram na escolha do bot de cada time (embutidos no preset). */
+  readonly savedBots?: readonly BotDocument[];
 }
 
 interface RowDef {
@@ -118,8 +121,41 @@ const ffa = (r: MatchRecipe): boolean => r.mode === 'warfare.ffa';
 const botsOf = (r: MatchRecipe, team: number): number => (r.teams[team]?.bots ?? []).reduce((n, b) => n + b.count, 0);
 const refOf = (r: MatchRecipe, team: number): BotRef => r.teams[team]?.bots[0]?.ref ?? builtinBotRef('normal');
 
-function botName(ref: BotRef): string {
+const EMBEDDED = 'embedded:';
+
+/** O nome do bot de uma ref: de fábrica pela tabela; embutido pelo nome dele (o Normal Bob se sumiu). */
+function botName(ref: BotRef, r: MatchRecipe): string {
+  if (ref.startsWith(EMBEDDED)) {
+    const doc = r.embeddedBots?.find((b) => b.id === ref.slice(EMBEDDED.length));
+    if (doc) return doc.name;
+    return t('bot.name.normal-bob');
+  }
   return t(`bot.name.${ref.slice('builtin:'.length)}` as StringKey);
+}
+
+/** As escolhas de bot: os de fábrica, os da Oficina e o embutido que já está no preset (mesmo se saiu da Oficina). */
+function botChoices(r: MatchRecipe, team: number, l: CustomLimits): BotRef[] {
+  const refs: BotRef[] = [...CUSTOM_BOTS, ...(l.savedBots ?? []).map((b): BotRef => `embedded:${b.id}`)];
+  const current = refOf(r, team);
+  if (!refs.includes(current)) refs.push(current);
+  return refs;
+}
+
+/** Põe o bot da Oficina no preset (`embeddedBots`) e tira os embutidos que nenhum time usa mais. */
+function syncEmbedded(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  const used = new Set(r.teams.flatMap((tm) => tm.bots.map((b) => b.ref)).filter((ref) => ref.startsWith(EMBEDDED)));
+  const docs: BotDocument[] = [];
+  for (const ref of used) {
+    const id = ref.slice(EMBEDDED.length);
+    const doc = l.savedBots?.find((b) => b.id === id) ?? r.embeddedBots?.find((b) => b.id === id);
+    if (doc) docs.push(doc);
+  }
+  if (docs.length === 0) {
+    if (r.embeddedBots === undefined) return r;
+    const { embeddedBots: _gone, ...rest } = r;
+    return rest;
+  }
+  return { ...r, embeddedBots: docs };
 }
 
 /** Troca um time inteiro por uma linha só de bots (o editor trabalha com um bot por time). */
@@ -286,10 +322,12 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
   const choose = (team: number): RowDef => ({
     id: `bot${team}`,
     labelKey: ffa(r) ? 'custom.row.bot' : team === 0 ? 'custom.row.allyBot' : 'custom.row.enemyBot',
-    value: (rr) => botName(refOf(rr, team)),
-    step: (rr, d) => {
-      const i = cycleIndex(CUSTOM_BOTS.length, Math.max(0, CUSTOM_BOTS.indexOf(refOf(rr, team))), d);
-      return setTeam(rr, team, CUSTOM_BOTS[i]!, Math.max(team === 0 && !ffa(rr) ? 0 : 1, botsOf(rr, team)));
+    value: (rr) => botName(refOf(rr, team), rr),
+    step: (rr, d, l) => {
+      const choices = botChoices(rr, team, l);
+      const i = cycleIndex(choices.length, Math.max(0, choices.indexOf(refOf(rr, team))), d);
+      const next = setTeam(rr, team, choices[i]!, Math.max(team === 0 && !ffa(rr) ? 0 : 1, botsOf(rr, team)));
+      return syncEmbedded(next, l);
     },
   });
   const count = (team: number): RowDef => ({
