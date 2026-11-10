@@ -1,7 +1,9 @@
 import type {
   MapCamera,
   MapCameraRoute,
+  MapBarricadeMarker,
   MapMannequin,
+  MapPaidDoorMarker,
   MapMeta,
   MapPointMarker,
   MapSpawnMarker,
@@ -105,6 +107,10 @@ export interface MapBuilder {
   camera(camera: MapCamera): void;
   route(route: MapCameraRoute): void;
   mannequin(mannequin: MapMannequin): void;
+  /** M3 (fase 3d): janela com barricada do Bobo Zombies (o vão precisa estar livre na grade; metros). */
+  barricade(window: MapBarricadeMarker): void;
+  /** M3 (fase 3d): porta paga do Bobo Zombies (a caixa que fecha a passagem livre na grade; metros). */
+  paidDoor(door: MapPaidDoorMarker): void;
   playArea(minX: number, minZ: number, maxX: number, maxZ: number, killPlaneY: number): void;
   sun(dirX: number, dirY: number, dirZ: number, timeOfDay: TimeOfDay): void;
   /** RNG com semente por domínio (decoração procedural determinística). */

@@ -16,6 +16,7 @@
     "models/modelos.bfmodel": "models/generated/modelos.bfmodel",
     "maps/construto.bfmap": "maps/generated/construto.bfmap",
     "maps/ringue.bfmap": "maps/generated/ringue.bfmap",
+    "maps/posto.bfmap": "maps/generated/posto.bfmap",
     "audio/t0-tiro.mp3": "audio/generated/t0-tiro.mp3",
     "audio/t0-impacto.mp3": "audio/generated/t0-impacto.mp3",
     "audio/t0-passo.mp3": "audio/generated/t0-passo.mp3",

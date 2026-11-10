@@ -53,6 +53,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   // Mapas
   'map:construto',
   'map:ringue',
+  // M3 (fase 3d): o mapa pequeno do Bobo Zombies com janelas e porta paga (só acrescentado, regra 20)
+  'map:posto',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',
@@ -155,6 +157,9 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:rocket-shell',
   // M2 (fase 2b): a caixinha de munição de quem morre (só acrescentado, regra 20)
   'model:ammo-box',
+  // M3 (fase 3d): a tábua das janelas e a porta paga do Bobo Zombies (só acrescentados, regra 20)
+  'model:zombie-plank',
+  'model:zombie-door',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

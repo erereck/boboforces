@@ -102,6 +102,7 @@ import {
   NO_TEAM,
   MAX_ZOMBIES,
   NULL_ENTITY,
+  ZOMBIE_BARRICADES,
   ZOMBIES_DOWN,
   heldClip,
   heldReserve,
@@ -151,6 +152,7 @@ import {
   HUD_AMMO,
   HUD_CROSSHAIR,
   HUD_DOWNED,
+  HUD_INTERACT,
   layoutHudScreen,
   measureText,
   MIN_TEXT,
@@ -303,7 +305,8 @@ const log = createLogger('partida');
 const PICKUP_SPIN_RAD_S = 1.2;
 /** M2: projéteis desenhados por frame (foguetes e granadas em voo). */
 /** Projéteis em voo e caixinhas no chão desenhados por frame (o resto fica de fora). */
-const MAX_DRAWN_PROJECTILES = 128;
+// M3 (fase 3d): + as tábuas das janelas (até 6 por janela) e as portas fechadas no mesmo buffer.
+const MAX_DRAWN_PROJECTILES = 384;
 const FLASH_GAIN = 0.35;
 const FLASH_DECAY_S = 0.08;
 /**
@@ -814,6 +817,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const rocketShellModel = modelIndex.get('rocket-shell') ?? NO_MODEL;
   // M2 (fase 2b): a caixinha de munição no chão.
   const ammoBoxModel = modelIndex.get('ammo-box') ?? NO_MODEL;
+  const plankModel = modelIndex.get('zombie-plank') ?? NO_MODEL;
+  const doorModel = modelIndex.get('zombie-door') ?? NO_MODEL;
   const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
   // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
   const modelOf = (code: number): number =>
@@ -2709,6 +2714,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       n++;
     }
     n = fillPickups(alpha, n);
+    n = fillMapObjects(n);
     projectiles.count = n;
   }
 
@@ -2741,6 +2747,75 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.light[n * 3 + 1] = lightScratch[1]!;
       projectiles.light[n * 3 + 2] = lightScratch[2]!;
       n++;
+    }
+    return n;
+  }
+
+  /**
+   * M3 (fase 3d): as tábuas das janelas (uma por fileira de 1 m de vão, de baixo para cima, com a inclinação alternada
+   * do cartoon; a de cima some quando o zumbi arranca) e as portas pagas fechadas, no mesmo buffer das caixinhas.
+   */
+  function fillMapObjects(first: number): number {
+    const mo = sim.view().mapObjects;
+    let n = first;
+    if (mo === null) return n;
+    const cap = projectiles.capacity;
+    if (plankModel !== NO_MODEL) {
+      for (let i = 0; i < mo.barricades; i++) {
+        const nx = mo.bnx[i]!;
+        const nz = mo.bnz[i]!;
+        const across = Math.max(1, Math.round(mo.bhw[i]! * 2));
+        for (let k = 0; k < mo.planks[i]! && n < cap; k++) {
+          for (let a = 0; a < across && n < cap; a++) {
+            const off = a - (across - 1) / 2;
+            const x = mo.bx[i]! + (nz !== 0 ? off : 0) + nx * 0.04;
+            const y = mo.by[i]! + 0.35 + k * 0.27;
+            const z = mo.bz[i]! + (nx !== 0 ? off : 0) + nz * 0.04;
+            projectiles.model[n] = plankModel;
+            projectiles.position[n * 3] = x;
+            projectiles.position[n * 3 + 1] = y;
+            projectiles.position[n * 3 + 2] = z;
+            projectiles.yaw[n] = nx !== 0 ? Math.PI / 2 : 0;
+            projectiles.pitch[n] = 0;
+            projectiles.roll[n] = (((i * 5 + k * 3 + a) % 3) - 1) * 0.13;
+            sampleLightGrid(loaded.lightGrid, x - nx * 0.3, y, z - nz * 0.3, lightScratch, 0);
+            projectiles.light[n * 3] = lightScratch[0]!;
+            projectiles.light[n * 3 + 1] = lightScratch[1]!;
+            projectiles.light[n * 3 + 2] = lightScratch[2]!;
+            n++;
+          }
+        }
+      }
+    }
+    if (doorModel !== NO_MODEL) {
+      for (let d = 0; d < mo.doors && n < cap; d++) {
+        if (mo.doorOpen[d] === 1) continue;
+        const o = d * 6;
+        const wx = mo.doorBox[o + 3]! - mo.doorBox[o]!;
+        const wz = mo.doorBox[o + 5]! - mo.doorBox[o + 2]!;
+        const alongX = wx >= wz;
+        const count = Math.max(1, Math.round(alongX ? wx : wz));
+        const cx = (mo.doorBox[o]! + mo.doorBox[o + 3]!) / 2;
+        const cz = (mo.doorBox[o + 2]! + mo.doorBox[o + 5]!) / 2;
+        for (let a = 0; a < count && n < cap; a++) {
+          const off = a - (count - 1) / 2;
+          const x = cx + (alongX ? off : 0);
+          const y = mo.doorBox[o + 1]!;
+          const z = cz + (alongX ? 0 : off);
+          projectiles.model[n] = doorModel;
+          projectiles.position[n * 3] = x;
+          projectiles.position[n * 3 + 1] = y;
+          projectiles.position[n * 3 + 2] = z;
+          projectiles.yaw[n] = alongX ? 0 : Math.PI / 2;
+          projectiles.pitch[n] = 0;
+          projectiles.roll[n] = 0;
+          sampleLightGrid(loaded.lightGrid, x, y + 1, z, lightScratch, 0);
+          projectiles.light[n * 3] = lightScratch[0]!;
+          projectiles.light[n * 3 + 1] = lightScratch[1]!;
+          projectiles.light[n * 3 + 2] = lightScratch[2]!;
+          n++;
+        }
+      }
     }
     return n;
   }
@@ -3053,6 +3128,34 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.downedValue = v.downTicks[e]! / sim.hz;
       }
     } else m.downed = HUD_DOWNED.none;
+    // M3 (fase 3d): o aviso de consertar a janela ou abrir a porta paga (as mesmas regras de `barricadesSystem`).
+    m.interact = HUD_INTERACT.none;
+    const mo = v.mapObjects;
+    if (zombiesMode && mo !== null && !m.dead && m.downed === HUD_DOWNED.none) {
+      const x = v.position[e * 3]!;
+      const y = v.position[e * 3 + 1]!;
+      const z = v.position[e * 3 + 2]!;
+      const B = ZOMBIE_BARRICADES;
+      for (let i = 0; i < mo.barricades && m.interact === HUD_INTERACT.none; i++) {
+        if (mo.planks[i]! >= B.planks || Math.abs(y - mo.by[i]!) > 1) continue;
+        const dx = x - mo.bx[i]!;
+        const dz = z - mo.bz[i]!;
+        const dn = dx * mo.bnx[i]! + dz * mo.bnz[i]!;
+        const dt = Math.abs(dx * mo.bnz[i]! - dz * mo.bnx[i]!);
+        if (dn < 0 && dn >= -B.repairReachM && dt <= mo.bhw[i]! + B.sideSlackM) m.interact = HUD_INTERACT.repair;
+      }
+      for (let d = 0; d < mo.doors && m.interact === HUD_INTERACT.none; d++) {
+        if (mo.doorOpen[d] === 1) continue;
+        const o = d * 6;
+        if (y < mo.doorBox[o + 1]! - 1 || y > mo.doorBox[o + 4]!) continue;
+        const ddx = Math.max(mo.doorBox[o]! - x, 0, x - mo.doorBox[o + 3]!);
+        const ddz = Math.max(mo.doorBox[o + 2]! - z, 0, z - mo.doorBox[o + 5]!);
+        if (ddx * ddx + ddz * ddz > B.doorReachM * B.doorReachM) continue;
+        m.interact = HUD_INTERACT.door;
+        m.interactCost = mo.doorCost[d]!;
+        m.interactAfford = v.points[e]! >= mo.doorCost[d]!;
+      }
+    }
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
     m.pingCount = 0;
     if (calibration !== null && slot.controller === 0) {

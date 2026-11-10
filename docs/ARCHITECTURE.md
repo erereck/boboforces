@@ -2383,3 +2383,23 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   faltando mais perto (até 20 m) e segura o usar; aparecendo um zumbi, atira primeiro.
 - **Falta (parte 2):** marcadores no `.bfmap` e no `mapc`, desenho das tábuas e das portas, avisos no HUD
   ("Segure para consertar", "Porta: 750") e um mapa de teste com janelas e portas até a Base Abandonada.
+
+### 13.16 Fase 3d, parte 2: o Posto Avançado, o desenho e o aviso no HUD (10/11/2026)
+
+- **Formato** (`map@1`, sem subir a versão): `MapMarkers.barricades` e `paidDoors`, opcionais no JSON da seção MARK
+  (um mapa sem nenhuma tem os mesmos bytes: o Construto e o Ringue não mudaram); o validador confere lado de fora, vão
+  (0,5 a 4 m), caixa e preço, e os tetos da sim (32 e 16). O `mapc` ganhou `barricade()` e `paidDoor()`, e o
+  `simMapFromMarkers` passa os dois para o `SimMap`.
+- **Mapa** `posto` (`assets-src/maps/posto.ts`, conteúdo novo `map:posto`; nome provisório "Posto Avançado"): um
+  cercado de muro de bloco de 3 m, sem teto, de 20×16 m, com duas salas, 3 janelas de 1 m em cada e uma porta paga de
+  750 pontos entre elas; os bobos nascem na sala 1 e os zumbis em 8 pontos fora. Só Bobo Zombies; o card dos Modos
+  agora abre nele (o Construto continua nos recentes). 1,9 KB, 2030 nós de navegação, linha de visão de 39,7 m. Os
+  vãos de 1 m começam em metro inteiro (o `mapc` recusa corredor desalinhado da grade de navegação).
+- **Desenho:** os modelos `zombie-plank` (tábua de 1,06 m) e `zombie-door` (porta de 1×2 m com faixas de aço e
+  cadeado), conteúdo novo, no buffer instanciado dos projéteis e das caixinhas (programa 4, sem programa novo; o buffer
+  foi de 128 para 384). Uma tábua por fileira de 1 m de vão, de baixo para cima, com a inclinação alternada; a de cima
+  some quando o zumbi arranca. A porta some quando é comprada.
+- **HUD:** embaixo da mira, "Segure Interagir para consertar" (do lado de dentro, com tábua faltando) ou "Interagir:
+  abrir por 750" (perto da porta fechada; o preço em vermelho sem pontos), pelas mesmas regras do `barricadesSystem`.
+- **Conferido no Edge** (`local/m3/capturar-zombies.ts`): a porta e as tábuas aparecem; parado na sala 1, os zumbis
+  arrancam as tábuas, entram e derrubam o jogador aos 30 s. O aviso do HUD não foi visto (precisa andar até a janela).

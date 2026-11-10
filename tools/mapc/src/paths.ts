@@ -9,4 +9,4 @@ import { join, resolve } from 'node:path';
 export const ROOT = resolve(import.meta.dirname, '../../..');
 export const MAPS_SOURCE_DIR = join(ROOT, 'assets-src', 'maps');
 export const MAPS_OUT_DIR = join(MAPS_SOURCE_DIR, 'generated');
-export const MAP_IDS = ['construto', 'ringue'] as const;
+export const MAP_IDS = ['construto', 'ringue', 'posto'] as const;

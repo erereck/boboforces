@@ -14,7 +14,9 @@ import {
   type MapGrid,
   type MapLight,
   type MapLightEmitter,
+  type MapBarricadeMarker,
   type MapMannequin,
+  type MapPaidDoorMarker,
   type MapMarkers,
   type MapMeta,
   type MapPointMarker,
@@ -130,6 +132,31 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
       pose: q.pose,
       weapon: q.weapon,
     })),
+    ...(m.barricades && m.barricades.length > 0
+      ? {
+          barricades: m.barricades.map((b) => ({
+            x: b.x,
+            y: b.y,
+            z: b.z,
+            outside: b.outside,
+            width: b.width,
+            height: b.height,
+          })),
+        }
+      : {}),
+    ...(m.paidDoors && m.paidDoors.length > 0
+      ? {
+          paidDoors: m.paidDoors.map((d) => ({
+            minX: d.minX,
+            minY: d.minY,
+            minZ: d.minZ,
+            maxX: d.maxX,
+            maxY: d.maxY,
+            maxZ: d.maxZ,
+            cost: d.cost,
+          })),
+        }
+      : {}),
     playArea: {
       minX: m.playArea.minX,
       minZ: m.playArea.minZ,
@@ -531,6 +558,40 @@ function parseMarkers(json: Json): MapMarkers {
       weapon: str(q['weapon'], p),
     };
   });
+  // M3 (fase 3d): opcionais (os mapas sem janela nem porta não têm as chaves).
+  const barricades =
+    m['barricades'] === undefined
+      ? []
+      : arr(m['barricades'], 'barricades').map((v, i): MapBarricadeMarker => {
+          const q = obj(v, `barricades[${i}]`);
+          const p = `barricades[${i}]`;
+          const outside = int(q['outside'], p);
+          if (outside !== 0 && outside !== 1 && outside !== 2 && outside !== 3) fail(`${p}.outside fora de 0..3`);
+          return {
+            x: num(q['x'], p),
+            y: num(q['y'], p),
+            z: num(q['z'], p),
+            outside,
+            width: num(q['width'], p),
+            height: num(q['height'], p),
+          };
+        });
+  const paidDoors =
+    m['paidDoors'] === undefined
+      ? []
+      : arr(m['paidDoors'], 'paidDoors').map((v, i): MapPaidDoorMarker => {
+          const q = obj(v, `paidDoors[${i}]`);
+          const p = `paidDoors[${i}]`;
+          return {
+            minX: num(q['minX'], p),
+            minY: num(q['minY'], p),
+            minZ: num(q['minZ'], p),
+            maxX: num(q['maxX'], p),
+            maxY: num(q['maxY'], p),
+            maxZ: num(q['maxZ'], p),
+            cost: int(q['cost'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
@@ -538,6 +599,8 @@ function parseMarkers(json: Json): MapMarkers {
     cameras,
     routes,
     mannequins,
+    ...(barricades.length > 0 ? { barricades } : {}),
+    ...(paidDoors.length > 0 ? { paidDoors } : {}),
     playArea: {
       minX: num(a['minX'], 'playArea.minX'),
       minZ: num(a['minZ'], 'playArea.minZ'),

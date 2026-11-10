@@ -143,6 +143,18 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_zombie_plank",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_zombie_door",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

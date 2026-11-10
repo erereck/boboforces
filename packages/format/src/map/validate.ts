@@ -231,6 +231,24 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     const n = mk.spawns.filter((s) => s.team === -1).length;
     if (n < MIN_FFA_SPAWNS) err(`FFA: ${n} spawns de qualquer time (mínimo ${MIN_FFA_SPAWNS})`);
   }
+  // M3 (fase 3d): janelas e portas do Bobo Zombies (os tetos são os da sim: 32 e 16).
+  const bars = mk.barricades ?? [];
+  const doors = mk.paidDoors ?? [];
+  if (bars.length > 32) err(`${bars.length} janelas com barricada (máximo 32)`);
+  if (doors.length > 16) err(`${doors.length} portas pagas (máximo 16)`);
+  bars.forEach((b, i) => {
+    if (!finite(b.x, b.y, b.z, b.width, b.height)) err(`janela ${i} com número não finito`);
+    else if (!inArea(b.x, b.z)) err(`janela ${i} fora da playArea`);
+    if (![0, 1, 2, 3].includes(b.outside)) err(`janela ${i} com lado de fora fora de 0..3`);
+    if (!(b.width >= 0.5 && b.width <= 4) || !(b.height >= 1 && b.height <= 4))
+      err(`janela ${i} com vão fora de 0,5..4 m`);
+  });
+  doors.forEach((d, i) => {
+    if (!finite(d.minX, d.minY, d.minZ, d.maxX, d.maxY, d.maxZ)) err(`porta ${i} com número não finito`);
+    else if (!(d.minX < d.maxX && d.minY < d.maxY && d.minZ < d.maxZ)) err(`porta ${i} com caixa vazia`);
+    else if (!inArea((d.minX + d.maxX) / 2, (d.minZ + d.maxZ) / 2)) err(`porta ${i} fora da playArea`);
+    if (!Number.isInteger(d.cost) || d.cost < 0 || d.cost > 100_000) err(`porta ${i} com preço inválido`);
+  });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
   }

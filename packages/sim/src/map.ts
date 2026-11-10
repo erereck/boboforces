@@ -9,8 +9,8 @@ import type { SimMap, SpawnPoint } from './sim.ts';
 export interface SimMapSource {
   readonly grid: WorldGrid;
   readonly blocks: BlockRegistry;
-  /** Marcadores do `.bfmap` (`MapDocument.markers`): spawns e área jogável. */
-  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea'>;
+  /** Marcadores do `.bfmap` (`MapDocument.markers`): spawns, área jogável e (M3) janelas e portas do Zombies. */
+  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors'>;
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
 }
@@ -46,5 +46,20 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     killPlaneY: area.killPlaneY,
     ...(source.colliders ? { colliders: source.colliders } : {}),
     ...(source.nav ? { nav: source.nav } : {}),
+    // M3 (fase 3d): janelas com barricada e portas pagas (só nos mapas do Bobo Zombies).
+    ...(source.markers.barricades?.length ? { barricades: source.markers.barricades } : {}),
+    ...(source.markers.paidDoors?.length
+      ? {
+          doors: source.markers.paidDoors.map((d) => ({
+            minX: d.minX,
+            minY: d.minY,
+            minZ: d.minZ,
+            maxX: d.maxX,
+            maxY: d.maxY,
+            maxZ: d.maxZ,
+            cost: d.cost,
+          })),
+        }
+      : {}),
   };
 }

@@ -440,3 +440,42 @@ describe('map@1: props no mundo', () => {
     expect(isPlayableProp({ dose: PROP_DOSE.double })).toBe(true);
   });
 });
+
+describe('map@1: janelas e portas do Bobo Zombies (M3, fase 3d)', () => {
+  const withObjects = (): MapDocument => {
+    const doc = syntheticMap();
+    return {
+      ...doc,
+      markers: {
+        ...doc.markers,
+        barricades: [{ x: 4.5, y: 0.5, z: 6.25, outside: 2, width: 1, height: 2 }],
+        paidDoors: [{ minX: 2, minY: 0.5, minZ: 6, maxX: 3, maxY: 2.5, maxZ: 6.5, cost: 750 }],
+      },
+    };
+  };
+
+  it('ida e volta; sem janela nem porta, os bytes do mapa sintético continuam os mesmos', () => {
+    const doc = withObjects();
+    expect(decodeMap(encodeMap(doc)).markers).toEqual(doc.markers);
+    expect(hashToHex(fnv1a32(encodeMap(syntheticMap())))).toBe('9912e4c5');
+    expect(decodeMap(encodeMap(syntheticMap())).markers.barricades).toBeUndefined();
+    expect(validateMap(doc)).toEqual([]);
+  });
+
+  it('validador aponta lado de fora, vão, caixa vazia e preço inválidos', () => {
+    const doc = withObjects();
+    const bad: MapDocument = {
+      ...doc,
+      markers: {
+        ...doc.markers,
+        barricades: [{ x: 4.5, y: 0.5, z: 6.25, outside: 5 as 0, width: 0.2, height: 2 }],
+        paidDoors: [{ minX: 3, minY: 0.5, minZ: 6, maxX: 3, maxY: 2.5, maxZ: 6.5, cost: -1 }],
+      },
+    };
+    const issues = validateMap(bad);
+    expect(issues).toContain('janela 0 com lado de fora fora de 0..3');
+    expect(issues).toContain('janela 0 com vão fora de 0,5..4 m');
+    expect(issues).toContain('porta 0 com caixa vazia');
+    expect(issues).toContain('porta 0 com preço inválido');
+  });
+});

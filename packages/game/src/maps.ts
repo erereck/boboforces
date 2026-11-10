@@ -4,12 +4,14 @@ import { t, type StringKey } from '@boboforces/ui';
  * M2 (fase 5c): os mapas dos menus e os modos de cada um (os mesmos do `meta.modes` do `.bfmap`, conferidos no teste:
  * o menu não carrega mapa). O Ringue é pequeno: TDM até 4 contra 4 (X1, 2v2) e o Bobo Training; FFA não.
  */
-export const MENU_MAPS = ['construto', 'ringue'] as const;
+export const MENU_MAPS = ['construto', 'ringue', 'posto'] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
 export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   construto: ['warfare.tdm', 'warfare.ffa', 'zombies'],
   ringue: ['warfare.tdm', 'training'],
+  // M3 (fase 3d): o Posto Avançado é só do Bobo Zombies (janelas e porta paga).
+  posto: ['zombies'],
 };
 
 /** Teto de bots do mapa (o do aparelho vale por cima): o Ringue cabe 8 bobos. */

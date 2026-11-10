@@ -398,6 +398,9 @@ export const STRINGS_PT_BR = {
   'hud.reviving': 'Levantando',
   'hud.selfUp': 'Levantando sozinho',
   'hud.waitWave': 'Volta na próxima onda',
+  // M3 (fase 3d): janela e porta paga do Bobo Zombies.
+  'hud.repair': 'Segure Interagir para consertar',
+  'hud.door': 'Interagir: abrir por {cost}',
   'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
   'hud.zombies.rest': 'Onda {wave} em {s} s',
   'hud.zombies.last': 'Onda {wave} · o último!',
@@ -975,6 +978,8 @@ export const STRINGS_PT_BR = {
   'mode.short.warfare.ffa': 'Todos contra todos',
   'map.construto': 'Construto',
   'map.ringue': 'Ringue',
+  // M3 (fase 3d): o mapa pequeno do Bobo Zombies (nome provisório).
+  'map.posto': 'Posto Avançado',
   'mode.training': 'Bobo Training',
   // M3 (fase 2d): Bobo Zombies.
   'mode.zombies': 'Bobo Zombies',

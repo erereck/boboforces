@@ -191,12 +191,42 @@ export interface MapMannequin {
   readonly weapon: string;
 }
 
+/**
+ * M3 (fase 3d): janela com barricada do Bobo Zombies (vão no chão; o `SimMap.barricades` da sim): centro nos pés em
+ * metros, lado de fora (de onde os zumbis vêm: 0 +X, 1 -X, 2 +Z, 3 -Z), largura e altura do vão.
+ */
+export interface MapBarricadeMarker {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly outside: 0 | 1 | 2 | 3;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** M3 (fase 3d): porta paga (ou escombro) do Bobo Zombies: a caixa que fecha a passagem (metros) e o preço. */
+export interface MapPaidDoorMarker {
+  readonly minX: number;
+  readonly minY: number;
+  readonly minZ: number;
+  readonly maxX: number;
+  readonly maxY: number;
+  readonly maxZ: number;
+  readonly cost: number;
+}
+
 export interface MapMarkers {
   readonly spawns: readonly MapSpawnMarker[];
   readonly domination: readonly MapPointMarker[];
   readonly cameras: readonly MapCamera[];
   readonly routes: readonly MapCameraRoute[];
   readonly mannequins: readonly MapMannequin[];
+  /**
+   * M3 (fase 3d): janelas com barricada e portas pagas (Bobo Zombies). Opcionais no JSON da seção MARK: um mapa sem
+   * nenhuma tem os mesmos bytes de antes.
+   */
+  readonly barricades?: readonly MapBarricadeMarker[];
+  readonly paidDoors?: readonly MapPaidDoorMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

@@ -108,10 +108,10 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **3c. Flow field** (feita em 10/11/2026, ARCHITECTURE §13.14): um campo de direções na navegação, a partir dos
   bobos de pé, conferido a cada 0,5 s (refeito quando alguém andou 2 m) e dividido por todos os zumbis (metade do custo
   de um A* por zumbi com 60 deles); o zumbi enroscado volta a um ponto de nascer.
-- **3d. Barricadas, janelas e portas:** entidades com estado na sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s;
-  segurar o usar repõe, 10 pontos por tábua até 50 por onda; porta paga que abre área), com colisão que muda,
-  marcadores no mapa (`mapc`) e um mapa de teste até a Base Abandonada. Parte 1 (sim, navegação e IA) feita em
-  10/11/2026 (ARCHITECTURE §13.15); falta a parte 2 (mapa, desenho e HUD).
+- **3d. Barricadas, janelas e portas** (feita em 10/11/2026, ARCHITECTURE §13.15 e §13.16): entidades com estado na
+  sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s; segurar o usar repõe, 10 pontos por tábua até 50 por onda; porta paga
+  que abre área), com colisão que muda, portões na navegação, marcadores no mapa (`mapc`) e o Posto Avançado, mapa de
+  teste até a Base Abandonada.
 - **3e. Medição:** robô das ondas e golden do modo com tudo isso.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

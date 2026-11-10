@@ -36,5 +36,85 @@ export function ammoBox(): BuiltModel {
   return m.build();
 }
 
+/**
+ * M3 (fase 3d): a tábua da barricada (1,06 × 0,19 × 0,06 m), origem no centro, comprida em X. O render desenha 6 por
+ * janela, uma em cima da outra, com uma inclinação alternada (cartoon), e tira a de cima quando o zumbi arranca.
+ */
+export function zombiePlank(): BuiltModel {
+  const m = new ModelBuilder('zombie-plank', 'pickup', { flags: 0, debrisColor: tone('madeira', 3), blocksNav: false });
+  const L = m.layer('mdl_zombie_plank', 'opaque', tone('madeira', 3));
+  const face = m.tile(L, 34, 6, (p) => {
+    p.fill(tone('madeira', 3));
+    for (let x = 0; x < p.w; x++) {
+      p.px(x, 0, tone('madeira', 4));
+      p.px(x, p.h - 1, tone('madeira', 2));
+    }
+    // Veio da madeira em traços soltos e um prego em cada ponta.
+    for (const [x, y, w] of [
+      [3, 2, 7],
+      [14, 3, 9],
+      [24, 2, 6],
+      [8, 4, 5],
+    ] as const) {
+      for (let k = 0; k < w; k++) p.px(x + k, y, tone('madeira', 2));
+    }
+    p.px(1, 2, tone('aco', 1));
+    p.px(p.w - 2, 3, tone('aco', 1));
+  });
+  const edge = m.tile(L, 34, 2, (p) => {
+    p.fill(tone('madeira', 2));
+  });
+  const end = m.tile(L, 2, 6, (p) => {
+    p.fill(tone('madeira', 1));
+  });
+  m.part('body').tiledBox([-17, -3, -1], [17, 3, 1], {
+    front: face,
+    back: face,
+    top: edge,
+    bottom: edge,
+    left: end,
+    right: end,
+  });
+  return m.build();
+}
+
+/**
+ * M3 (fase 3d): a porta paga (1,0 × 2,0 × 0,19 m), origem no centro do pé, larga em X: tábuas verticais com duas faixas
+ * de aço e um cadeado (fechada até alguém pagar). Porta mais larga = mais de uma lado a lado.
+ */
+export function zombieDoor(): BuiltModel {
+  const m = new ModelBuilder('zombie-door', 'pickup', { flags: 0, debrisColor: tone('madeira', 2), blocksNav: false });
+  const L = m.layer('mdl_zombie_door', 'opaque', tone('madeira', 2));
+  const panel = m.tile(L, 32, 32, (p) => {
+    p.fill(tone('madeira', 2));
+    for (let x = 0; x < p.w; x += 8) for (let y = 0; y < p.h; y++) p.px(x, y, tone('madeira', 1));
+    p.blotches(4, tone('madeira', 3), 1, 2);
+    // Faixa de aço com rebites no meio do ladrilho (repete a cada 1 m: duas faixas na porta).
+    for (let x = 0; x < p.w; x++) {
+      p.px(x, 14, tone('aco', 2));
+      p.px(x, 15, tone('aco', 1));
+      p.px(x, 16, tone('aco', 1));
+      p.px(x, 17, tone('aco', 0));
+    }
+    for (const x of [2, 10, 18, 26]) p.px(x, 15, tone('aco', 3));
+  });
+  const edge = m.tile(L, 6, 32, (p) => {
+    p.fill(tone('madeira', 1));
+  });
+  const top = m.tile(L, 32, 6, (p) => {
+    p.fill(tone('madeira', 1));
+  });
+  const lock = m.tile(L, 4, 4, (p) => {
+    p.fill(tone('amarelo', 2));
+    p.px(1, 1, tone('aco', 0));
+    p.px(1, 2, tone('aco', 0));
+  });
+  const body = m.part('body');
+  body.tiledBox([-16, 0, -3], [16, 64, 3], { front: panel, back: panel, left: edge, right: edge, top, bottom: top });
+  // Cadeado dos dois lados, na altura da mão.
+  body.tiledBox([-2, 30, -4], [2, 34, 4], lock);
+  return m.build();
+}
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
-export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [ammoBox];
+export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [ammoBox, zombiePlank, zombieDoor];

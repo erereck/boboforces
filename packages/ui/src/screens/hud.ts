@@ -84,6 +84,13 @@ export interface HudModel {
   downed: number;
   downedValue: number;
   waitWave: boolean;
+  /**
+   * M3 (fase 3d): o aviso de interagir embaixo da mira (`HUD_INTERACT`): consertar a janela ou abrir a porta paga por
+   * `interactCost` pontos (em vermelho sem `interactAfford`).
+   */
+  interact: number;
+  interactCost: number;
+  interactAfford: boolean;
   /** M2 (fase 2c): mostra a dica da derrota feia ("Tá puxado?") na tela de morte. */
   hardTimeHint: boolean;
   /**
@@ -200,6 +207,9 @@ export function createHudModel(): HudModel {
     downed: 0,
     downedValue: 0,
     waitWave: false,
+    interact: 0,
+    interactCost: 0,
+    interactAfford: true,
     hardTimeHint: false,
     primaryHit: { layout: PRIMARY_LAYOUT.none, count: 0, rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4) },
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
@@ -293,6 +303,9 @@ const HUD_CHIP_MAX_FRACTION = 0.36;
 /** M3 (fase 2d): o caído na HUD: sangrando (segundos), alguém levantando (%), levantando sozinho (segundos). */
 export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as const;
 
+/** M3 (fase 3d): o aviso de interagir do Bobo Zombies. */
+export const HUD_INTERACT = { none: 0, repair: 1, door: 2 } as const;
+
 interface HudTexts {
   readonly health: string;
   readonly kills: string;
@@ -318,6 +331,9 @@ interface HudTexts {
   readonly reviving: string;
   readonly selfUp: string;
   readonly waitWave: string;
+  /** M3 (fase 3d): consertar e `hud.door` cortado em [antes, depois] do preço. */
+  readonly repair: string;
+  readonly door: readonly string[];
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -346,6 +362,8 @@ function hudTexts(): HudTexts {
     reviving: t('hud.reviving').toUpperCase(),
     selfUp: t('hud.selfUp').toUpperCase(),
     waitWave: t('hud.waitWave').toUpperCase(),
+    repair: t('hud.repair').toUpperCase(),
+    door: templateParts('hud.door', ['cost']).map((p) => p.toUpperCase()),
   };
   return cachedTexts;
 }
@@ -838,6 +856,31 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     const color = model.downed === HUD_DOWNED.bleeding ? COLORS.perigo : COLORS.ok;
     paintText(out, hud, label, cx, y + pad, labelPx, color, M.labelTracking, 0.5);
     paintNumber(out, hud, value, 0, cx, y + pad + capL + gap, numberPx, COLORS.texto, 0.5);
+  }
+
+  if (!model.dead && model.downed === HUD_DOWNED.none && model.interact !== HUD_INTERACT.none) {
+    // M3 (fase 3d): consertar a janela / abrir a porta, numa plaquinha embaixo da mira.
+    const y = Math.round(cy + capN * 2);
+    const h = Math.round(pad * 2 + capL);
+    if (model.interact === HUD_INTERACT.repair) {
+      const w = textWidth(hud, tx.repair, labelPx, M.labelTracking);
+      plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
+      paintText(out, hud, tx.repair, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
+    } else {
+      const a = tx.door[0] as string;
+      const b = tx.door[1] as string;
+      const cost = model.interactCost;
+      const w =
+        textWidth(hud, a, labelPx, M.labelTracking) +
+        numberWidth(hud, cost, 0, labelPx) +
+        textWidth(hud, b, labelPx, M.labelTracking);
+      plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
+      const color = model.interactAfford ? COLORS.texto : COLORS.perigo;
+      let pen = cx - w / 2;
+      pen += paintText(out, hud, a, pen, y + pad, labelPx, color, M.labelTracking);
+      pen += paintNumber(out, hud, cost, 0, pen, y + pad, labelPx, model.interactAfford ? COLORS.acao : COLORS.perigo);
+      paintText(out, hud, b, pen, y + pad, labelPx, color, M.labelTracking);
+    }
   }
 
   if (model.damageAmount > 0.01) drawDamage(out, model.damageAngle, model.damageAmount, left, top, right, bottom, s);
