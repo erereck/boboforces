@@ -78,7 +78,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **1e. Por jogador** (feita em 09/11/2026, ARCHITECTURE §13.6; nome e cor fixos por número, volume "meus sons" para
   depois): perfil local por assento (nome, cor, sensibilidade, assistência, inverter Y), vibração por
   controle, cada som pelo ouvinte local mais perto e o volume "meus sons".
-- **1f. Rodada 13 de prints** (lobby e tela dividida 2–4P), publicada para o Erick revisar.
+- **1f. Rodada 13 de prints** (publicada em 09/11/2026 como versão 15 da página das rodadas, com as perguntas J1–J4 e
+  I1–I4) (lobby e tela dividida 2–4P), publicada para o Erick revisar.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
