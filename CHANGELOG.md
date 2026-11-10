@@ -10,6 +10,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 Plano em `docs/PLANO_M3.md`.
 
+- **Fase 2a, o Bobo Zombies na sim:** ondas pela fórmula do GDD (quantidade, vida, quem corre), intervalo entre elas,
+  o último zumbi correndo e marcado, vitória na última onda e derrota com todos mortos. O golden não mudou.
+
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
 - **Fase 1b, a tela "Jogar no sofá":** no menu principal; até 4 jogadores, cada um com o seu controle (o teclado conta

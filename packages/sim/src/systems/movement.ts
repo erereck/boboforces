@@ -11,6 +11,7 @@ import {
   type Aabb,
 } from '@boboforces/world';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
+import { ZOMBIE_TYPE } from '../config/zombie.ts';
 import { METRICS } from '../config/metrics.ts';
 import type { MovementProfile } from '../config/movement.ts';
 import { isBody, PART_TORSO, WEAPON_KILL_PLANE, WEAPON_NONE, type SimContext } from '../context.ts';
@@ -85,6 +86,8 @@ class ProfileTicks {
 
 const boboTicks = new ProfileTicks();
 const zombieTicks = new ProfileTicks();
+// M3 (fase 2a): o zumbi que corre (Bobo Zombies).
+const runnerTicks = new ProfileTicks();
 
 function setBox(b: Aabb, x: number, y: number, z: number, height: number): void {
   const hw = METRICS.aabbWidth / 2;
@@ -118,13 +121,15 @@ export function movementSystem(ctx: SimContext): void {
   const hw = METRICS.aabbWidth / 2;
   boboTicks.update(ctx.profile, ctx.hz);
   zombieTicks.update(ctx.zombieProfile, ctx.hz);
+  runnerTicks.update(ctx.zombieRunProfile, ctx.hz);
 
   for (let e = 0; e < s.count; e++) {
     const kind = s.kind[e]!;
     if (s.alive[e] === 0 || !isBody(kind)) continue;
     let fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) continue;
-    const pt = kind === ENTITY_KIND.zombie ? zombieTicks : boboTicks;
+    const pt =
+      kind === ENTITY_KIND.zombie ? (s.zombieType[e] === ZOMBIE_TYPE.runner ? runnerTicks : zombieTicks) : boboTicks;
     const p = pt.profile!;
     const g = p.gravity;
     const slide = p.slide;

@@ -129,6 +129,40 @@ export interface HudRules {
   readonly allyMarkers?: boolean;
 }
 
+/**
+ * M3 (fase 2a): o Bobo Zombies (GDD §4.1.5; gameplay.md "Bobo Zombies"). Só vale com `mode: 'zombies'`; ausente = os
+ * padrões (Curta, 10 ondas, tudo 1×, especiais e chefões ligados, 3 "levanta sozinho").
+ */
+export interface ZombiesRules {
+  /** Ondas até a vitória: 5 (Relâmpago), 10 (Curta, padrão) ou 0 (sem fim). */
+  readonly waves?: number;
+  /** Multiplicador da quantidade de zumbis por onda. */
+  readonly quantity?: number;
+  /** Multiplicador da vida dos zumbis. */
+  readonly hpMul?: number;
+  /** Zumbis especiais (Sprinter, Chonker, Spitter) e o chefão a cada 5 ondas. */
+  readonly specials?: boolean;
+  readonly bosses?: boolean;
+  /** Multiplicador dos pontos. */
+  readonly economy?: number;
+  /** "Levanta sozinho" no solo por partida; -1 = sem limite. */
+  readonly selfRevives?: number;
+}
+
+/** M3 (fase 2a): as durações do Bobo Zombies (Relâmpago, Curta, sem fim). */
+export const ZOMBIES_WAVE_CHOICES = [5, 10, 0] as const;
+
+/** M3 (fase 2a): os padrões do Bobo Zombies (`ZombiesRules` ausente ou incompleto). */
+export const ZOMBIES_DEFAULTS = {
+  waves: 10,
+  quantity: 1,
+  hpMul: 1,
+  specials: true,
+  bosses: true,
+  economy: 1,
+  selfRevives: 3,
+} as const;
+
 export interface MatchRecipe {
   readonly format: typeof MATCH_RECIPE_FORMAT;
   /** Só presets têm nome. */
@@ -144,6 +178,8 @@ export interface MatchRecipe {
   /** M2 (fase 4e): modificadores de arma e o que a HUD mostra. */
   readonly weapons?: WeaponRules;
   readonly hud?: HudRules;
+  /** M3 (fase 2a): as regras do Bobo Zombies (só com `mode: 'zombies'`). */
+  readonly zombies?: ZombiesRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -171,6 +207,11 @@ export const RECIPE_RANGES = {
   damageMul: { min: 0.25, max: 5 },
   maxTeams: ENGINE_MAX_TEAMS,
   maxBotEntriesPerTeam: 16,
+  // M3 (fase 2a): Bobo Zombies.
+  zombieQuantity: { min: 0.5, max: 3 },
+  zombieHpMul: { min: 0.25, max: 5 },
+  zombieEconomy: { min: 0.5, max: 3 },
+  selfRevives: { min: -1, max: 9 },
 } as const;
 
 /** Bot que entra quando a ref não existe nesta versão (fallback de conteúdo). */
@@ -186,6 +227,7 @@ const TOP_KEYS = [
   'players',
   'weapons',
   'hud',
+  'zombies',
   'teams',
   'embeddedBots',
 ] as const;
@@ -422,6 +464,31 @@ function readRange(
 ): void {
   const v = readNumber(ctx, src[key], `${block}.${key}`);
   if (v !== undefined) out[key] = clampWarn(ctx, v, range.min, range.max, `${block}.${key}`);
+}
+
+const ZOMBIES_KEYS = ['waves', 'quantity', 'hpMul', 'specials', 'bosses', 'economy', 'selfRevives'] as const;
+
+/** M3 (fase 2a): o bloco do Bobo Zombies (a duração só nas escolhas; o resto limitado à faixa). */
+function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'zombies', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  const waves = value['waves'];
+  if (waves !== undefined) {
+    if (typeof waves === 'number' && (ZOMBIES_WAVE_CHOICES as readonly number[]).includes(waves)) out['waves'] = waves;
+    else warn(ctx, 'zombies.waves', 'recipe.invalidField', describe(waves));
+  }
+  readRange(ctx, value, 'quantity', 'zombies', RECIPE_RANGES.zombieQuantity, out);
+  readRange(ctx, value, 'hpMul', 'zombies', RECIPE_RANGES.zombieHpMul, out);
+  readFlag(ctx, value, 'specials', 'zombies', out);
+  readFlag(ctx, value, 'bosses', 'zombies', out);
+  readRange(ctx, value, 'economy', 'zombies', RECIPE_RANGES.zombieEconomy, out);
+  readRange(ctx, value, 'selfRevives', 'zombies', RECIPE_RANGES.selfRevives, out);
+  if (typeof out['selfRevives'] === 'number') out['selfRevives'] = Math.round(out['selfRevives']);
+  return Object.assign(out, unknownFields(value, ZOMBIES_KEYS));
 }
 
 /** M2 (fase 4e): os modificadores de arma (gameplay.md §4.5). */
@@ -680,6 +747,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (weapons !== undefined) out['weapons'] = weapons;
   const hud = readHud(ctx, doc['hud']);
   if (hud !== undefined) out['hud'] = hud;
+  const zombies = readZombies(ctx, doc['zombies']);
+  if (zombies !== undefined) out['zombies'] = zombies;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

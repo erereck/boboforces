@@ -316,13 +316,15 @@ export function spawnSystem(ctx: SimContext): void {
     if (s.alive[e] === 0 || !isBody(s.kind[e]!)) continue;
     const fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) {
+      // M3 (fase 2a): no Bobo Zombies quem volta é o diretor de ondas (bobos na onda seguinte, zumbis do pool).
+      if (ctx.zombiesMode) continue;
       if (s.respawnTicks[e]! > 0) s.respawnTicks[e]!--;
       if (s.respawnTicks[e] === 0 && ctx.match.phase !== 'ended') respawn(ctx, e, pickSpawn(ctx, e));
       continue;
     }
     if (s.spawnProtectTicks[e]! > 0 && --s.spawnProtectTicks[e]! === 0) s.flags[e] = fl & ~F.spawnProtected;
     if (
-      ctx.warfare &&
+      (ctx.warfare || ctx.zombiesMode) &&
       s.kind[e] === ENTITY_KIND.bobo &&
       s.health[e]! < ctx.rules.maxHp[e]! &&
       ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks

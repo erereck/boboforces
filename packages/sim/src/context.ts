@@ -232,6 +232,47 @@ export interface SimContext {
   readonly rngWeapons: Rng;
   /** Hitboxes do boneco: a tabela de jogo da partida e o cache de caixas por corpo por tick (`hitbox.ts`). */
   readonly figures: FigureHitCache;
+  /** M3 (fase 2a): Bobo Zombies (`mode: 'zombies'`): o diretor de ondas, os renascimentos e o pool de zumbis. */
+  readonly zombiesMode: boolean;
+  readonly zombieRunProfile: MovementProfile;
+  /** As regras do modo já resolvidas (padrões do `ZOMBIES_DEFAULTS`) e os tempos em ticks. */
+  readonly zombieRules: ZombieModeRules;
+  /** Humanos da partida (a fórmula das ondas). */
+  readonly humans: number;
+  /** O estado do diretor de ondas (no snapshot e no hash só no Bobo Zombies). */
+  readonly waves: WaveState;
+  readonly rngZombies: Rng;
+}
+
+/** M3 (fase 2a): as regras do Bobo Zombies resolvidas para a sim. */
+export interface ZombieModeRules {
+  /** Ondas até a vitória (0 = sem fim). */
+  readonly waves: number;
+  readonly quantity: number;
+  readonly hpMul: number;
+  readonly firstWaveTicks: number;
+  readonly intermissionTicks: number;
+  readonly spawnIntervalTicks: number;
+}
+
+/** M3 (fase 2a): o diretor de ondas. Tudo número, para o snapshot. */
+export interface WaveState {
+  /** Onda atual (0 = antes da 1ª). */
+  wave: number;
+  /** 1 = no intervalo antes da próxima onda. */
+  resting: number;
+  /** Ticks que faltam do intervalo. */
+  restTicks: number;
+  /** Zumbis da onda ainda por soltar, e ticks até o próximo. */
+  toSpawn: number;
+  spawnTicks: number;
+  /** Vida dos zumbis desta onda e a chance (0..1) de cada um correr. */
+  waveHp: number;
+  runChance: number;
+  /** Zumbis que faltam (por soltar + vivos). */
+  left: number;
+  /** O último zumbi da onda (`NULL_ENTITY` = nenhum ainda). */
+  lastZombie: number;
 }
 
 /**

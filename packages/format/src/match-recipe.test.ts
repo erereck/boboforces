@@ -307,3 +307,27 @@ describe('validateMatchRecipe: normalização e fallback', () => {
     expect(codes).toEqual(['recipe.invalidField', 'recipe.invalidField']);
   });
 });
+
+describe('Bobo Zombies (M3, fase 2a)', () => {
+  it('o bloco zombies: escolhas da duração, faixas limitadas, liga/desliga e campo desconhecido guardado', () => {
+    const input = {
+      ...base(),
+      mode: 'zombies',
+      zombies: { waves: 5, quantity: 10, hpMul: 0.1, specials: false, economy: 2, selfRevives: 2.4, extra: 1 },
+    };
+    const { value, codes } = ok(validateMatchRecipe(input, PC));
+    expect(value.mode).toBe('zombies');
+    expect(value.zombies).toMatchObject({
+      waves: 5,
+      quantity: 3,
+      hpMul: 0.25,
+      specials: false,
+      economy: 2,
+      selfRevives: 2,
+    });
+    expect(codes.filter((c) => c === 'recipe.valueClamped')).toHaveLength(2);
+    const bad = ok(validateMatchRecipe({ ...base(), mode: 'zombies', zombies: { waves: 7, bosses: 'sim' } }, PC));
+    expect(bad.value.zombies).toEqual({});
+    expect(bad.codes).toEqual(['recipe.invalidField', 'recipe.invalidField']);
+  });
+});

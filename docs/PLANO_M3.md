@@ -81,6 +81,23 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **1f. Rodada 13 de prints** (publicada em 09/11/2026 como versão 15 da página das rodadas, com as perguntas J1–J4 e
   I1–I4) (lobby e tela dividida 2–4P), publicada para o Erick revisar.
 
+## Fase 2 em detalhe: Zombies na sim
+
+- **2a. Modo e ondas** (feita em 10/11/2026, ARCHITECTURE §13.7): `mode: 'zombies'` com o bloco `MatchRecipe.zombies` (ondas 5 / 10 / sem fim, quantidade
+  0,5–3×, vida ×, especiais e chefões ligados, economia ×, "levanta sozinho"). A sim aloca o pool de zumbis no teto do
+  aparelho (todos começam fora de jogo) e um diretor de ondas (o passo 8 da ordem fixa, que estava vago) solta cada
+  onda: total = (6 + 4 × onda) × (1 + 0,5 × (humanos − 1)) × quantidade; vida 100 + 60 por onda até a 10, depois ×1,1;
+  andando até a 4, misto da 5 à 9, correndo da 10 em diante; intervalo entre ondas; o último zumbi corre e é marcado.
+  Os bobos mortos voltam no começo da onda seguinte; todos mortos ao mesmo tempo = derrota; passar da última = vitória.
+  `MatchView.zombies` (onda, restantes, intervalo, último zumbi), evento `wave`, snapshot novo, testes.
+- **2b. Pontos:** por bobo (acerto 10, abate 60, na cabeça 100, de faca 130), no estado e na vista.
+- **2c. Caído e reviver:** em vez de morrer, o bobo cai (30 s, rasteja a 1 m/s só com a pistola); outro segura o usar
+  por 3 s perto para levantar; no solo, 3 "levanta sozinho" por partida (configurável); todos caídos = derrota.
+- **2d. No jogo:** o Zombies nos Modos (no Construto, enquanto a Base Abandonada não chega), o teto de zumbis do
+  aparelho, uma linha mínima na HUD (onda, zumbis, pontos) e o resultado com a onda alcançada.
+- **2e. Robô das ondas e golden:** partidas sem humanos (bots de apoio N0) medem até que onda o time chega; golden do
+  modo no CI.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

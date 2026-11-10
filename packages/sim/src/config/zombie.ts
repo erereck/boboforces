@@ -50,3 +50,60 @@ export const MOVEMENT_ZOMBIE: MovementProfile = {
   wallJump: false,
   doubleJump: false,
 };
+
+/**
+ * M3 (fase 2a): o Bobo Zombies (GDD §4.1.5; gameplay.md "Bobo Zombies"). As fórmulas das ondas e os tempos do diretor.
+ * Os números da onda vêm do GDD; o intervalo e o ritmo de soltar zumbis são escolhas minhas (revisáveis).
+ */
+export const ZOMBIES_MODE = {
+  /** Antes da 1ª onda (depois da contagem) e entre as ondas, s. */
+  firstWaveS: 5,
+  intermissionS: 10,
+  /** Um zumbi novo a cada tanto, s (enquanto a onda ainda tem zumbis para soltar e há lugar no pool). */
+  spawnIntervalS: 0.6,
+  /** Total da onda = (base + porOnda × onda) × (1 + porHumano × (humanos − 1)) × quantidade. */
+  baseCount: 6,
+  perWave: 4,
+  perExtraHuman: 0.5,
+  /** Vida: base + porOnda × (onda − 1) até a onda `linearUntil`; depois × `growth` por onda. */
+  hpBase: 100,
+  hpPerWave: 60,
+  hpLinearUntil: 10,
+  hpGrowth: 1.1,
+  /** Andando até a onda `runnersFrom − 1`, misto até `allRunFrom − 1`, todos correndo dali em diante. */
+  runnersFrom: 5,
+  allRunFrom: 10,
+  /** O zumbi nasce a pelo menos isto (m, no plano) de todo bobo vivo, se algum ponto deixar. */
+  minSpawnDistM: 12,
+  /** Pool quando a partida não diz (o teto do aparelho é do `game`). */
+  poolDefault: 24,
+} as const;
+
+/** M3 (fase 2a): o tipo de cada zumbi (`SimState.zombieType`). Os especiais e o chefão chegam na fase 3. */
+export const ZOMBIE_TYPE = { walker: 0, runner: 1 } as const;
+
+/** M3 (fase 2a): o zumbi que corre (da onda 5 em diante, e o último de cada onda). Mais rápido que o andar do bobo. */
+export const MOVEMENT_ZOMBIE_RUNNER: MovementProfile = { ...MOVEMENT_ZOMBIE, walk: 5.2, sprint: 5.2, accel: 40 };
+
+/** Quantos zumbis a onda `wave` (1..) solta. */
+export function zombiesInWave(wave: number, humans: number, quantity: number): number {
+  const Z = ZOMBIES_MODE;
+  const base = Z.baseCount + Z.perWave * wave;
+  return Math.max(1, Math.round(base * (1 + Z.perExtraHuman * (Math.max(1, humans) - 1)) * quantity));
+}
+
+/** Vida dos zumbis da onda `wave` (1..), com o multiplicador da partida. */
+export function zombieWaveHp(wave: number, hpMul: number): number {
+  const Z = ZOMBIES_MODE;
+  const linear = Z.hpBase + Z.hpPerWave * (Math.min(wave, Z.hpLinearUntil) - 1);
+  const grown = wave > Z.hpLinearUntil ? linear * Z.hpGrowth ** (wave - Z.hpLinearUntil) : linear;
+  return Math.max(1, Math.round(grown * hpMul));
+}
+
+/** Chance de um zumbi da onda `wave` correr: 0 até a 4, cresce até a 9, 1 da 10 em diante. */
+export function runnerChance(wave: number): number {
+  const Z = ZOMBIES_MODE;
+  if (wave < Z.runnersFrom) return 0;
+  if (wave >= Z.allRunFrom) return 1;
+  return (wave - Z.runnersFrom + 1) / (Z.allRunFrom - Z.runnersFrom + 1);
+}

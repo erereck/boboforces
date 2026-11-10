@@ -2228,3 +2228,28 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Conferido:** `save-docs.test` (padrão, limite e tipo errado), o `game.test` do sofá (o ombro sobe a mira e o botão
   de cima inverte o Y) e no Edge (`local/m3/conferir-vibracao.ts`): o cartão do P2 e 3 vibrações (2 de dano e a da
   morte) em 41 s com o P2 parado no meio dos bots.
+
+### 13.7 Fase 2a: o Bobo Zombies na sim, modo e ondas (10/11/2026)
+
+- **Receita (format):** `MatchRecipe.zombies` (`ZombiesRules`): `waves` só 5, 10 ou 0 (sem fim), `quantity` 0,5–3,
+  `hpMul` 0,25–5, `specials`, `bosses`, `economy` 0,5–3 e `selfRevives` −1–9; ausente = `ZOMBIES_DEFAULTS`
+  (Curta, 10 ondas). O id `mode:zombies` já estava registrado desde a fase 1.
+- **Sim:** `mode: 'zombies'` liga `SimContext.zombiesMode`. O `SimConfig.zombies` vira o **pool** (o `game` passa o
+  teto do aparelho; sem ele, 24): os zumbis começam fora de jogo (mortos, sem contagem de renascer). O **diretor de
+  ondas** (`systems/zombies.ts`) ocupa o passo 8 da ordem fixa, que estava vago:
+  - intervalo de 5 s antes da 1ª onda e de 10 s entre ondas; ao abrir a onda, os bobos mortos voltam;
+  - um zumbi a cada 0,6 s enquanto a onda tem zumbis por soltar e o pool tem lugar; total, vida e quem corre pelas
+    fórmulas do GDD (`zombiesInWave`, `zombieWaveHp`, `runnerChance`); o que corre usa
+    `MOVEMENT_ZOMBIE_RUNNER` (5,2 m/s, mais que o andar do bobo, `SimState.zombieType`);
+  - o zumbi nasce num ponto sem time do mapa, sorteado entre os que ficam a 12 m ou mais de todo bobo vivo (senão o
+    mais longe); o `pickSpawn` do M1 não serve: sorteia entre os 3 mais longe, o que pode cair em cima dos bobos;
+  - o último zumbi da onda corre e fica marcado (`MatchView.lastZombie`);
+  - todos os bobos mortos = derrota; passar da última onda = vitória (`phase: 'ended'`, `winnerTeam` 0 ou −1).
+  Os bobos regeneram como no Warfare; quem morre espera a próxima onda (o caído e o reviver são da 2c).
+- **Vista e eventos:** `MatchView.zombieWave`, `zombiesLeft`, `zombieRestTicks` (−1 no meio da onda) e `lastZombie`;
+  `SimView.zombieType`; evento `wave` (`start`/`clear`).
+- **Snapshot 8:** o diretor, o `rng` dos zumbis (`fork('zombies')`) e o `zombieType` entram no snapshot e no hash
+  **só no Bobo Zombies** (`SimState.zombieFields`): o golden dos outros modos não mudou.
+- **Conferido:** `zombies.test` (as fórmulas; o pool fora de jogo e a 1ª onda; vitória em 5 ondas com zumbis que
+  caem no vazio; derrota com os zumbis dirigidos à mão, porque a sim não tem a IA; o último zumbi corre e é marcado;
+  o snapshot vai e volta) e o bloco no `match-recipe.test`.

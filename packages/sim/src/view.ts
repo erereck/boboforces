@@ -39,6 +39,8 @@ export interface SimView {
   readonly prevPitch: Float64Array;
 
   readonly health: Float32Array;
+  /** M3 (fase 2a): o tipo de cada zumbi do Bobo Zombies (`ZOMBIE_TYPE`; 0 fora do modo). */
+  readonly zombieType: Uint8Array;
   /** M2: código da arma na mão (`WEAPON_CODE`, índice em `WEAPONS`), ou `WEAPON_NONE` (zumbi). */
   readonly weapon: Uint8Array;
   /** M2: slot ativo do loadout (0..3: primária, pistola, faca, granada). */
@@ -154,6 +156,15 @@ export interface MatchView {
   readonly winnerTeam: number;
   /** M2: no FFA, o bobo vencedor quando `phase === 'ended'` (`NULL_ENTITY` no empate e nos modos de time). */
   readonly winnerEntity: number;
+  /**
+   * M3 (fase 2a): Bobo Zombies (0 e -1 nos outros modos): a onda atual (0 = antes da 1ª), os zumbis que faltam (por
+   * soltar + vivos), os ticks do intervalo antes da próxima onda (-1 = no meio de uma onda) e o último zumbi da onda
+   * (`NULL_ENTITY` = nenhum). No fim, `winnerTeam` 0 = vitória, -1 = derrota.
+   */
+  readonly zombieWave: number;
+  readonly zombiesLeft: number;
+  readonly zombieRestTicks: number;
+  readonly lastZombie: number;
 }
 
 /** M2: pente da arma na mão de `e` (`slotClip` do slot ativo; na granada, quantas sobram). */

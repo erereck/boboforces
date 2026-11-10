@@ -1,6 +1,7 @@
 import {
   createFigureGameTable,
   DEFAULT_BOT_RULES,
+  ZOMBIES_DEFAULTS,
   resolveBot,
   type FigureGameTable,
   type MatchRecipe,
@@ -22,7 +23,7 @@ import { BASE_HP, METRICS } from './config/metrics.ts';
 import { resolveMovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
-import { ZOMBIE_RULES, MOVEMENT_ZOMBIE } from './config/zombie.ts';
+import { ZOMBIE_RULES, MOVEMENT_ZOMBIE, MOVEMENT_ZOMBIE_RUNNER, ZOMBIES_MODE } from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
   MAX_ENTITIES,
@@ -50,6 +51,7 @@ import { expandRecipe, isFfaMode, isWarfareMode } from './recipe.ts';
 import { hashState, readState, writeState } from './snapshot.ts';
 import { SimState } from './state.ts';
 import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
+import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
 import { movementSystem } from './systems/movement.ts';
@@ -306,7 +308,9 @@ function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean,
  */
 export function createSim(config: SimConfig): Sim {
   const { recipe, map, humans } = config;
-  const zombies = config.zombies ?? 0;
+  // M3 (fase 2a): no Bobo Zombies, `zombies` é o pool (o teto do aparelho); os zumbis começam fora de jogo.
+  const zombiesMode = recipe.mode === 'zombies';
+  const zombies = config.zombies ?? (zombiesMode ? ZOMBIES_MODE.poolDefault : 0);
   assert(map.spawns.length > 0, 'sim: o mapa precisa de pelo menos 1 spawn');
   assert(Number.isInteger(zombies) && zombies >= 0 && zombies <= MAX_ZOMBIES, `sim: 0 a ${MAX_ZOMBIES} zumbis`);
   const slots = expandRecipe(recipe, humans);
@@ -372,6 +376,29 @@ export function createSim(config: SimConfig): Sim {
     rngWeapons: root.fork('weapons'),
     // Um slot de caixas por controlador (todo corpo de bobo ou zumbi tem um).
     figures: new FigureHitCache(figureTable, MAX_CONTROLLERS_WITH_ZOMBIES),
+    zombiesMode,
+    zombieRunProfile: MOVEMENT_ZOMBIE_RUNNER,
+    zombieRules: {
+      waves: recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves,
+      quantity: recipe.zombies?.quantity ?? ZOMBIES_DEFAULTS.quantity,
+      hpMul: recipe.zombies?.hpMul ?? ZOMBIES_DEFAULTS.hpMul,
+      firstWaveTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.firstWaveS, hz)),
+      intermissionTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.intermissionS, hz)),
+      spawnIntervalTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.spawnIntervalS, hz)),
+    },
+    humans,
+    waves: {
+      wave: 0,
+      resting: 1,
+      restTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.firstWaveS, hz)),
+      toSpawn: 0,
+      spawnTicks: 0,
+      waveHp: ZOMBIE_RULES.hp,
+      runChance: 0,
+      left: 0,
+      lastZombie: NULL_ENTITY,
+    },
+    rngZombies: root.fork('zombies'),
   };
 
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -399,7 +426,12 @@ export function createSim(config: SimConfig): Sim {
       const id = s.allocate(ENTITY_KIND.zombie, NO_TEAM, controller);
       assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
       s.controllerEntity[controller] = id;
-      respawn(ctx, id & 0xffff, order[i % order.length]!);
+      if (zombiesMode) {
+        // Fora de jogo até o diretor de ondas soltar (morto e sem contagem de renascer).
+        const e = id & 0xffff;
+        s.flags[e] = ENTITY_FLAG.dead;
+        s.respawnTicks[e] = 0;
+      } else respawn(ctx, id & 0xffff, order[i % order.length]!);
       controllerCount = controller + 1;
     }
   }
@@ -413,6 +445,10 @@ export function createSim(config: SimConfig): Sim {
     teamScore: match.teamScore,
     winnerTeam: match.winnerTeam,
     winnerEntity: match.winnerEntity,
+    zombieWave: 0,
+    zombiesLeft: 0,
+    zombieRestTicks: -1,
+    lastZombie: NULL_ENTITY,
   };
   const projView: Mutable<ProjectileView> = {
     count: 0,
@@ -449,6 +485,7 @@ export function createSim(config: SimConfig): Sim {
     pitch: s.pitch,
     prevPitch: s.prevPitch,
     health: s.health,
+    zombieType: s.zombieType,
     weapon: s.weapon,
     slot: s.slot,
     loadout: s.loadout,
@@ -482,6 +519,13 @@ export function createSim(config: SimConfig): Sim {
     matchView.countdownTicks = match.countdownTicks;
     matchView.winnerTeam = match.winnerTeam;
     matchView.winnerEntity = match.winnerEntity;
+    if (zombiesMode) {
+      const w = ctx.waves;
+      matchView.zombieWave = w.wave;
+      matchView.zombiesLeft = w.left;
+      matchView.zombieRestTicks = w.resting === 1 ? w.restTicks : -1;
+      matchView.lastZombie = w.lastZombie;
+    }
   };
 
   const hasher = new StateHasher();
@@ -539,7 +583,7 @@ export function createSim(config: SimConfig): Sim {
         s.prevPitch[e] = s.pitch[e]!;
       }
       for (let p = 0; p < s.projCount * 3; p++) s.projPrevPosition[p] = s.projPosition[p]!;
-      // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (8) diretor ainda não existe.
+      // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (8) o diretor de ondas do Bobo Zombies.
       applyInputs(inputs);
       unstuckSystem(ctx);
       movementSystem(ctx);
@@ -550,6 +594,7 @@ export function createSim(config: SimConfig): Sim {
       damageSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
+      zombiesSystem(ctx);
       ctx.tick++;
       syncView();
     },

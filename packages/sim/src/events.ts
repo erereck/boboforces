@@ -189,6 +189,13 @@ export interface MatchPhaseEvent extends EventBase {
   readonly phase: MatchPhase;
 }
 
+/** M3 (fase 2a): o Bobo Zombies abriu (`start`) ou limpou (`clear`) a onda `wave`. */
+export interface WaveEvent extends EventBase {
+  readonly type: 'wave';
+  readonly wave: number;
+  readonly action: 'start' | 'clear';
+}
+
 export type SimEvent =
   | ShotEvent
   | HitEvent
@@ -199,6 +206,7 @@ export type SimEvent =
   | WeaponEvent
   | MeleeEvent
   | MatchPhaseEvent
+  | WaveEvent
   | ProjectileEvent
   | ExplosionEvent
   | PickupEvent

@@ -9,6 +9,7 @@ import type {
   ImpactEvent,
   KillEvent,
   MatchPhaseEvent,
+  WaveEvent,
   MoveEvent,
   PickupEvent,
   ProjectileEvent,
@@ -141,6 +142,10 @@ export class EventQueue {
     () => ({ type: 'matchPhase', tick: 0, phase: 'playing' }),
     2,
   );
+  private readonly waves = new EventPool<Mutable<WaveEvent>>(
+    () => ({ type: 'wave', tick: 0, wave: 0, action: 'start' }),
+    2,
+  );
   private readonly projectiles = new EventPool<Mutable<ProjectileEvent>>(
     () => ({
       type: 'projectile',
@@ -197,6 +202,7 @@ export class EventQueue {
     this.weapons.reset();
     this.melees.reset();
     this.phases.reset();
+    this.waves.reset();
     this.projectiles.reset();
     this.explosions.reset();
     this.pickups.reset();
@@ -456,6 +462,15 @@ export class EventQueue {
     const e = this.phases.acquire();
     e.tick = tick;
     e.phase = phase;
+    this.push(e);
+  }
+
+  /** M3 (fase 2a). */
+  wave(tick: number, wave: number, action: 'start' | 'clear'): void {
+    const e = this.waves.acquire();
+    e.tick = tick;
+    e.wave = wave;
+    e.action = action;
     this.push(e);
   }
 }

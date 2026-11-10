@@ -18,7 +18,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 5 (M2): granada cozinhando e o pool de projéteis (fase 1b).
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
-const SNAPSHOT_VERSION = 7;
+const SNAPSHOT_VERSION = 8;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -41,6 +41,17 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   h.u32(s.pickCount);
   for (const f of s.pickupFields) h.bytes(f.array.subarray(0, s.pickCount * f.stride));
   h.bytes(s.controllerEntity);
+  // M3 (fase 2a): só no Bobo Zombies (o hash dos outros modos não muda).
+  if (ctx.zombiesMode) {
+    const w = ctx.waves;
+    h.i32(w.wave).i32(w.resting).i32(w.restTicks).i32(w.toSpawn).i32(w.spawnTicks).i32(w.waveHp);
+    h.i32(Math.round(w.runChance * 1e6))
+      .i32(w.left)
+      .u32(w.lastZombie);
+    ctx.rngZombies.saveState(rngScratch);
+    h.bytes(rngScratch);
+    for (const f of s.zombieFields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  }
   return h.digest();
 }
 
@@ -85,6 +96,16 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
   w.writeU16(s.pickCount);
   for (const f of s.pickupFields) writeArray(w, f.array, s.pickCount * f.stride);
   writeArray(w, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
+  if (ctx.zombiesMode) {
+    const v = ctx.waves;
+    for (const n of [v.wave, v.resting, v.restTicks, v.toSpawn, v.spawnTicks, v.waveHp, v.left, v.lastZombie]) {
+      w.writeBits(n >>> 0, 32);
+    }
+    w.writeF64(v.runChance);
+    ctx.rngZombies.saveState(rngScratch);
+    writeArray(w, rngScratch, RNG_STATE_WORDS);
+    for (const f of s.zombieFields) writeArray(w, f.array, s.count * f.stride);
+  }
 }
 
 /**
@@ -123,4 +144,19 @@ export function readState(ctx: SimContext, r: BitReader): void {
   s.pickCount = pickCount;
   for (const f of s.pickupFields) readArray(r, f.array, pickCount * f.stride);
   readArray(r, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
+  if (ctx.zombiesMode) {
+    const v = ctx.waves;
+    v.wave = r.readBits(32) | 0;
+    v.resting = r.readBits(32) | 0;
+    v.restTicks = r.readBits(32) | 0;
+    v.toSpawn = r.readBits(32) | 0;
+    v.spawnTicks = r.readBits(32) | 0;
+    v.waveHp = r.readBits(32) | 0;
+    v.left = r.readBits(32) | 0;
+    v.lastZombie = r.readBits(32) >>> 0;
+    v.runChance = r.readF64();
+    readArray(r, rngScratch, RNG_STATE_WORDS);
+    ctx.rngZombies.loadState(rngScratch);
+    for (const f of s.zombieFields) readArray(r, f.array, s.count * f.stride);
+  }
 }
