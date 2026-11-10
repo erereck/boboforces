@@ -250,6 +250,8 @@ export interface ZombieModeRules {
   readonly waves: number;
   readonly quantity: number;
   readonly hpMul: number;
+  /** M3 (fase 2b): multiplicador dos pontos. */
+  readonly economy: number;
   readonly firstWaveTicks: number;
   readonly intermissionTicks: number;
   readonly spawnIntervalTicks: number;

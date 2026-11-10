@@ -148,6 +148,8 @@ export class SimState {
   readonly pickupFields: readonly StateField[];
   /** M3 (fase 2a): o tipo de cada zumbi do Bobo Zombies (`ZOMBIE_TYPE`). */
   readonly zombieType = new Uint8Array(MAX_ENTITIES);
+  /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies. */
+  readonly points = new Int32Array(MAX_ENTITIES);
   /**
    * M3 (fase 2a): os campos que só existem no Bobo Zombies. Entram no snapshot e no hash só nesse modo (o golden dos
    * outros modos não muda).
@@ -227,7 +229,7 @@ export class SimState {
       f('pickVelY', this.pickVelY),
       f('pickTicks', this.pickTicks),
     ];
-    this.zombieFields = [f('zombieType', this.zombieType)];
+    this.zombieFields = [f('zombieType', this.zombieType), f('points', this.points)];
   }
 
   /** Projétil num slot livre (`projAlive` ligado); -1 = pool cheio. */

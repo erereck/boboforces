@@ -41,6 +41,8 @@ export interface SimView {
   readonly health: Float32Array;
   /** M3 (fase 2a): o tipo de cada zumbi do Bobo Zombies (`ZOMBIE_TYPE`; 0 fora do modo). */
   readonly zombieType: Uint8Array;
+  /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */
+  readonly points: Int32Array;
   /** M2: código da arma na mão (`WEAPON_CODE`, índice em `WEAPONS`), ou `WEAPON_NONE` (zumbi). */
   readonly weapon: Uint8Array;
   /** M2: slot ativo do loadout (0..3: primária, pistola, faca, granada). */

@@ -23,7 +23,7 @@ import { BASE_HP, METRICS } from './config/metrics.ts';
 import { resolveMovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
-import { ZOMBIE_RULES, MOVEMENT_ZOMBIE, MOVEMENT_ZOMBIE_RUNNER, ZOMBIES_MODE } from './config/zombie.ts';
+import { ZOMBIE_POINTS, ZOMBIE_RULES, MOVEMENT_ZOMBIE, MOVEMENT_ZOMBIE_RUNNER, ZOMBIES_MODE } from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
   MAX_ENTITIES,
@@ -382,6 +382,7 @@ export function createSim(config: SimConfig): Sim {
       waves: recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves,
       quantity: recipe.zombies?.quantity ?? ZOMBIES_DEFAULTS.quantity,
       hpMul: recipe.zombies?.hpMul ?? ZOMBIES_DEFAULTS.hpMul,
+      economy: recipe.zombies?.economy ?? ZOMBIES_DEFAULTS.economy,
       firstWaveTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.firstWaveS, hz)),
       intermissionTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.intermissionS, hz)),
       spawnIntervalTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.spawnIntervalS, hz)),
@@ -408,6 +409,8 @@ export function createSim(config: SimConfig): Sim {
     assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
     s.controllerEntity[slot.controller] = id;
     s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
+    // M3 (fase 2b): os pontos do começo no Bobo Zombies.
+    if (zombiesMode) s.points[id & 0xffff] = ZOMBIE_POINTS.start;
     if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, ctx.maxHp);
     applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
     const k = perTeam[slot.team]!;
@@ -486,6 +489,7 @@ export function createSim(config: SimConfig): Sim {
     prevPitch: s.prevPitch,
     health: s.health,
     zombieType: s.zombieType,
+    points: s.points,
     weapon: s.weapon,
     slot: s.slot,
     loadout: s.loadout,

@@ -90,7 +90,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   andando até a 4, misto da 5 à 9, correndo da 10 em diante; intervalo entre ondas; o último zumbi corre e é marcado.
   Os bobos mortos voltam no começo da onda seguinte; todos mortos ao mesmo tempo = derrota; passar da última = vitória.
   `MatchView.zombies` (onda, restantes, intervalo, último zumbi), evento `wave`, snapshot novo, testes.
-- **2b. Pontos:** por bobo (acerto 10, abate 60, na cabeça 100, de faca 130), no estado e na vista.
+- **2b. Pontos** (feita em 10/11/2026, ARCHITECTURE §13.8; começa com 500): por bobo (acerto 10, abate 60, na cabeça 100, de faca 130), no estado e na vista.
 - **2c. Caído e reviver:** em vez de morrer, o bobo cai (30 s, rasteja a 1 m/s só com a pistola); outro segura o usar
   por 3 s perto para levantar; no solo, 3 "levanta sozinho" por partida (configurável); todos caídos = derrota.
 - **2d. No jogo:** o Zombies nos Modos (no Construto, enquanto a Base Abandonada não chega), o teto de zumbis do

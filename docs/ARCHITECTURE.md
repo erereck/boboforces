@@ -2253,3 +2253,11 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Conferido:** `zombies.test` (as fórmulas; o pool fora de jogo e a 1ª onda; vitória em 5 ondas com zumbis que
   caem no vazio; derrota com os zumbis dirigidos à mão, porque a sim não tem a IA; o último zumbi corre e é marcado;
   o snapshot vai e volta) e o bloco no `match-recipe.test`.
+
+### 13.8 Fase 2b: os pontos do Bobo Zombies (10/11/2026)
+
+- `SimState.points` (só no Bobo Zombies, junto do `zombieType` no snapshot e no hash) e `SimView.points`. Cada bobo
+  começa com 500 (escolha minha: o GDD não diz), ganha 10 por acerto que tira vida de um zumbi e o bônus do abate: 60,
+  100 na cabeça, 130 de faca (`ZOMBIE_POINTS`). Tudo × a `economy` da receita, arredondado. O conserto de tábua, os
+  pontos em dobro e as compras chegam com as barricadas e a economia (fases 3 e 4).
+- Conferido no `zombies.test`: a soma bate com os acertos e os abates do humano, e a economia 2× dobra o que se ganhou.

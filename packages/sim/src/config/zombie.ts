@@ -79,6 +79,18 @@ export const ZOMBIES_MODE = {
   poolDefault: 24,
 } as const;
 
+/**
+ * M3 (fase 2b): os pontos do Bobo Zombies (GDD §4.1.5): por acerto que tira vida de um zumbi e o bônus do abate (na
+ * cabeça e de faca valem mais). Tudo × a economia da partida. Começar com 500 é escolha minha (o GDD não diz).
+ */
+export const ZOMBIE_POINTS = {
+  start: 500,
+  hit: 10,
+  kill: 60,
+  headshotKill: 100,
+  knifeKill: 130,
+} as const;
+
 /** M3 (fase 2a): o tipo de cada zumbi (`SimState.zombieType`). Os especiais e o chefão chegam na fase 3. */
 export const ZOMBIE_TYPE = { walker: 0, runner: 1 } as const;
 

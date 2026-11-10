@@ -179,3 +179,40 @@ describe('Bobo Zombies: o diretor de ondas (M3, fase 2a)', () => {
     expect(b.view().match.zombieWave).toBe(1);
   });
 });
+
+describe('Bobo Zombies: pontos (M3, fase 2b)', () => {
+  /** O humano olha para −Z (onde os zumbis nascem) e atira sem parar; devolve os pontos e os eventos que contam. */
+  function shoot(economy: number): { points: number; hits: number; kills: number; heads: number } {
+    const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 10, yaw: 0, team: -1 };
+    const sim = createSim({ recipe: zombies({ economy }), map: map([human, far]), humans: 1, zombies: 4 });
+    const f = createInputFrames();
+    f[0]!.buttons = BUTTON.fire;
+    const me = sim.controllerEntity(0);
+    let hits = 0;
+    let kills = 0;
+    let heads = 0;
+    const events: SimEvent[] = [];
+    for (let t = 0; t < 14 * SIM_HZ; t++) {
+      sim.step(f);
+      events.length = 0;
+      sim.drainEvents(events);
+      for (const ev of events) {
+        if (ev.type === 'hit' && ev.shooter === me && ev.damage > 0) hits++;
+        if (ev.type === 'kill' && ev.killer === me) {
+          kills++;
+          if (ev.headshot) heads++;
+        }
+      }
+    }
+    return { points: sim.view().points[me & 0xffff]!, hits, kills, heads };
+  }
+
+  it('começa com 500; acerto 10, abate 60 (na cabeça 100); a economia multiplica', () => {
+    const one = shoot(1);
+    expect(one.kills).toBeGreaterThan(0);
+    expect(one.points).toBe(500 + 10 * one.hits + 60 * (one.kills - one.heads) + 100 * one.heads);
+    const two = shoot(2);
+    expect(two.hits).toBe(one.hits);
+    expect(two.points - 500).toBe(2 * (one.points - 500));
+  });
+});

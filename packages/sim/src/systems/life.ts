@@ -2,12 +2,14 @@ import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
+import { ZOMBIE_POINTS } from '../config/zombie.ts';
 import { MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
   DEFAULT_LOADOUT_REST,
   DEFAULT_PRIMARY,
   isPrimaryWeapon,
+  WEAPON_CODE,
   WEAPON_ROCKET,
   WEAPONS,
   weaponDef,
@@ -72,11 +74,22 @@ export function damageSystem(ctx: SimContext): void {
       s.lastDamageTick[t] = ctx.tick;
       s.lastAttacker[t] = attacker;
       if (source !== NULL_ENTITY) noteAttacker(ctx, t, source, amount);
+      // M3 (fase 2b): o bobo que tira vida de um zumbi ganha os pontos do acerto.
+      if (ctx.zombiesMode && s.kind[t] === ENTITY_KIND.zombie) award(ctx, attacker, ZOMBIE_POINTS.hit);
     }
     ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, bodyPart, amount, q.point, q.dir, i);
     if (s.health[t]! <= 0) kill(ctx, t, attacker, q.weapon[i]!, part === PART_HEAD, bodyPart, i);
   }
   q.count = 0;
+}
+
+/** M3 (fase 2b): pontos para o bobo `who` (× a economia da partida); zumbi, morto ou ninguém não ganha. */
+function award(ctx: SimContext, who: EntityId, base: number): void {
+  const s = ctx.s;
+  if (who === NULL_ENTITY || !s.isCurrent(who)) return;
+  const e = who & 0xffff;
+  if (s.kind[e] !== ENTITY_KIND.bobo) return;
+  s.points[e] = s.points[e]! + Math.round(base * ctx.zombieRules.economy);
 }
 
 /**
@@ -196,6 +209,16 @@ function kill(
   s.recoilPitch[t] = 0;
   s.recoilYaw[t] = 0;
   s.deaths[t] = s.deaths[t]! + 1;
+  // M3 (fase 2b): o bônus do abate de zumbi (na cabeça e de faca valem mais).
+  if (ctx.zombiesMode && zombie) {
+    const bonus =
+      weapon === WEAPON_CODE.knife
+        ? ZOMBIE_POINTS.knifeKill
+        : headshot
+          ? ZOMBIE_POINTS.headshotKill
+          : ZOMBIE_POINTS.kill;
+    award(ctx, killer, bonus);
+  }
   if (killer !== NULL_ENTITY && s.isCurrent(killer)) {
     const k = killer & 0xffff;
     if (hostile(ctx, k, t)) {
