@@ -49,6 +49,7 @@ import {
   BUTTON,
   keyIndex,
   MAX_GAMEPADS,
+  PAD_BUTTON,
   WEAPON_SLOT_COUNT,
   type CaptureResult,
   type ControlProfile,
@@ -530,6 +531,8 @@ interface ViewSlot {
   readonly desc: ViewDesc;
   readonly hud: DrawList;
   readonly model: HudModel;
+  /** M3 (fase 1c): o jogador desta vista (0 = P1): a cor e o símbolo dela, estáveis quando alguém sai. */
+  seat: number;
   /** Controlador seguido (humano 0 ou um bot); -1 = nenhum. */
   controller: number;
   eye: number;
@@ -642,9 +645,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       : platform.features.touch && !platform.features.keyboardMouse
         ? 'touch'
         : 'keyboardMouse';
-  // M3 (fase 1a): no sofá, cada assento fica preso ao seu dispositivo (o P1 também).
+  // M3 (fase 1a): no sofá, cada assento fica preso ao seu dispositivo (o P1 também). Fase 1c: da tela do sofá, mesmo
+  // com 1 jogador, para os outros poderem entrar no meio.
   const seats: readonly LocalSeat[] =
-    request.kind === 'play' && humans >= 2 ? (request.seats ?? []).slice(0, humans) : [];
+    request.kind === 'play' && (request.seats?.length ?? 0) >= 1 ? request.seats!.slice(0, Math.max(1, humans)) : [];
+  /** A partida veio da tela do sofá: quem segura A num controle livre entra no meio (fase 1c). */
+  const couch = seats.length >= 1 && humans > 0;
   const p1Seat = seats[0];
   let device: DeviceKind = p1Seat ? p1Seat.device.kind : (request.device ?? fallbackDevice);
   let padIndex = p1Seat?.device.kind === 'gamepad' ? p1Seat.device.index : Math.max(0, request.gamepad);
@@ -656,17 +662,32 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * assento. `seatControllers[k]` é o controlador da sim do assento `k` (o P1 é o 0; os do time adversário vêm depois
    * dos do time do P1).
    */
-  const seatControllers = setup.recipe.seatControllers;
+  /**
+   * O controlador da sim de cada assento (o 0 é o P1). Fase 1c: cresce quando alguém entra no meio, no lugar de um bot.
+   */
+  const seatCtrl: number[] = humans > 0 ? setup.recipe.seatControllers.slice(0, Math.max(1, seats.length)) : [];
   const extras: InputMapper[] = seats.slice(1).map((s) => createInputMapper(s.device, profiles[s.device.kind]));
+  const extraDevices: DeviceBinding[] = seats.slice(1).map((s) => s.device);
   const extraAssists = extras.map(() => createAimAssistState());
-  /** Os mapeadores por assento (o 0 é o P1). */
-  const localMappers: readonly InputMapper[] = [player, ...extras];
-  /** O assento de cada controlador humano (-1 = nenhum). */
-  const seatOfController = new Int8Array(Math.max(1, humans)).fill(-1);
-  for (let k = 0; k < seatControllers.length && k < localMappers.length; k++) seatOfController[seatControllers[k]!] = k;
-  /** Mapeador do controlador `c` se ele for um humano local; `null` para bots. */
-  const mapperOf = (c: number): InputMapper | null =>
-    c >= 0 && c < humans && seatOfController[c]! >= 0 ? localMappers[seatOfController[c]!]! : null;
+  /** O número de jogador de cada assento (0 = P1): quem entra no meio pega o menor livre. */
+  const seatNum: number[] = seatCtrl.map((_, k) => k);
+  /** Id do controle de cada assento (para achar o mesmo controle se ele voltar em outro índice); '' = ainda não visto. */
+  const seatPadId: string[] = seatCtrl.map(() => '');
+  /** O assento cujo controle caiu (-1 = nenhum) e o que pausou (0 = o P1). */
+  let lostSeat = -1;
+  let pausedBy = 0;
+  /** O `MenuInput` do frame (a pausa do P2–P4 passa os menus para o dispositivo dele). */
+  let frameMenu: MenuInput | null = null;
+  /** O assento do controlador `c` (0 = o P1), ou -1 (bot). */
+  const seatOf = (c: number): number => {
+    for (let k = 0; k < seatCtrl.length; k++) if (seatCtrl[k] === c) return k;
+    return -1;
+  };
+  /** Mapeador do controlador `c` se ele for um jogador local; `null` para bots. */
+  const mapperOf = (c: number): InputMapper | null => {
+    const k = seatOf(c);
+    return k === 0 ? player : k > 0 ? extras[k - 1]! : null;
+  };
   /** M2 (fase 3h): assistência de mira do humano (controle e toque; o nível vem do perfil do dispositivo). */
   const assist = createAimAssistState();
   const assistAngles = new Float64Array(2);
@@ -787,16 +808,19 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let velCur = new Float32Array(3);
 
   // --- vistas ---
-  const viewCount = bench ? bench.views : 1 + extras.length;
+  /** Fase 1c: cresce quando alguém entra no meio (o layout da HUD é refeito). */
+  let viewCount = bench ? bench.views : 1 + extras.length;
   const slots: ViewSlot[] = [];
   const descs: ViewDesc[] = [];
-  for (let i = 0; i < viewCount; i++) {
+  for (let i = 0; i < viewCount; i++) addViewSlot();
+  function addViewSlot(): ViewSlot {
     const desc = createViewDesc();
     const hud = createDrawList(1024);
     slots.push({
       desc,
       hud,
       model: createHudModel(),
+      seat: slots.length,
       controller: -1,
       eye: -1,
       adsBlend: 0,
@@ -811,6 +835,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       camOffZ: 0,
     });
     descs.push(desc);
+    return slots[slots.length - 1]!;
   }
   const sharedHud = createHudSharedModel();
   // M2 (fase 5d): Bobo Training: sem placar nem relógio; a linha dos números, refeita só quando eles mudam.
@@ -1343,7 +1368,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           velPrev.fill(0, i * 3, i * 3 + 3);
           velCur.fill(0, i * 3, i * 3 + 3);
           reloadStart[i] = -1;
-          for (let h = 0; h < humans; h++) {
+          for (let k = 0; k < seatCtrl.length; k++) {
+            const h = seatCtrl[k]!;
             const m = mapperOf(h);
             if (m === null || ev.entity !== s.controllerEntity(h)) continue;
             m.setAngles(v.yaw[i]!, 0);
@@ -1360,7 +1386,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (i >= reloadStart.length) break;
           // A sim trocou de slot sozinha (acabou a granada): o mapeador do humano passa a pedir o slot da mão.
           if (ev.action === 'switch') {
-            for (let h = 0; h < humans; h++) {
+            for (let k = 0; k < seatCtrl.length; k++) {
+              const h = seatCtrl[k]!;
               const m = mapperOf(h);
               if (m !== null && ev.entity === s.controllerEntity(h) && m.weapon !== v.slot[i]) m.setWeapon(v.slot[i]!);
             }
@@ -1372,7 +1399,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           } else if (ev.action === 'reloadEnd') {
             reloadStart[i] = -1;
           } else if (ev.action === 'switch') {
-            for (let h = 0; h < humans; h++) {
+            for (let k = 0; k < seatCtrl.length; k++) {
+              const h = seatCtrl[k]!;
               const m = mapperOf(h);
               if (m !== null && ev.entity === s.controllerEntity(h)) m.setWeapon(ev.weapon);
             }
@@ -1433,10 +1461,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     recipe,
     map: loaded.simMap,
     humans,
+    // M3 (fase 1c): os jogadores 2–4 do sofá ganham um cérebro de reserva (um bot assume quem sai).
+    ...(seatCtrl.length > 1 ? { standby: seatCtrl.slice(1) } : {}),
     writeHumanFrame: (slot, out, seq) => {
-      if (seatOfController[slot] !== 0) {
+      const seat = seatOf(slot);
+      if (seat !== 0) {
         // Sofá: os jogadores 2..4 só pelo dispositivo de cada um (sem 3ª pessoa, toque nem Destravar).
-        (mapperOf(slot) ?? player).writeFrame(out, seq);
+        if (seat > 0) extras[seat - 1]!.writeFrame(out, seq);
         return;
       }
       player.writeFrame(out, seq);
@@ -1483,12 +1514,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const e = entityIndex(sim.controllerEntity(0));
     player.setAngles(v.yaw[e]!, 0);
     player.setWeapon(v.weapon[e]!);
-    for (let k = 1; k < localMappers.length; k++) {
-      const c = seatControllers[k]!;
+    for (let k = 1; k <= extras.length; k++) {
+      const c = seatCtrl[k]!;
       slots[k]!.controller = c;
       const eh = entityIndex(sim.controllerEntity(c));
-      localMappers[k]!.setAngles(v.yaw[eh]!, 0);
-      localMappers[k]!.setWeapon(v.weapon[eh]!);
+      extras[k - 1]!.setAngles(v.yaw[eh]!, 0);
+      extras[k - 1]!.setWeapon(v.weapon[eh]!);
     }
   } else {
     const byTeam: number[][] = [[], [], [], []];
@@ -1794,12 +1825,168 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
+  // --- M3 (fase 1c): entrar no meio ---
+  /** Segundos segurando o confirmar em cada controle livre (o último índice é o Enter do teclado); -1 = já entrou. */
+  const joinHold = new Float32Array(MAX_GAMEPADS + 1);
+  const JOIN_HOLD_S = 1;
+  const KEY_ENTER = keyIndex('Enter');
+  const joinButton = request.convention === 'right' ? PAD_BUTTON.faceRight : PAD_BUTTON.faceDown;
+  const recipeSlots = expandRecipe(recipe, humans);
+  let p1Device: DeviceBinding | null = seats[0]?.device ?? null;
+
+  function seated(kind: DeviceKind, pad: number): boolean {
+    const same = (d: DeviceBinding | null): boolean =>
+      d !== null && d.kind === kind && (d.kind !== 'gamepad' || d.index === pad);
+    if (same(p1Device)) return true;
+    for (let k = 0; k < extraDevices.length; k++) if (same(extraDevices[k]!)) return true;
+    return false;
+  }
+
+  /** Segurar A (o confirmar) por 1 s num controle livre, ou o Enter com o teclado livre, entra no meio (até 4). */
+  function checkMidJoin(raw: Readonly<RawInputState>, dt: number): void {
+    if (extras.length >= 3 || resultShown) return;
+    for (let i = 0; i <= MAX_GAMEPADS; i++) {
+      let held: boolean;
+      if (i < MAX_GAMEPADS) {
+        const p = raw.gamepads[i];
+        held = p !== undefined && p.connected && (p.buttons[joinButton] ?? 0) >= 0.5 && !seated('gamepad', i);
+      } else held = raw.keys[KEY_ENTER] === 1 && !seated('keyboardMouse', -1);
+      const t = joinHold[i]!;
+      joinHold[i] = !held ? 0 : t < 0 ? t : t + dt;
+      if (joinHold[i]! >= JOIN_HOLD_S) {
+        joinHold[i] = -1;
+        joinMidMatch(i < MAX_GAMEPADS ? pads[i]! : keyboard);
+      }
+    }
+  }
+
+  /** O jogador novo assume um bot do time com menos humanos locais (no FFA, qualquer um) e ganha uma vista. */
+  function joinMidMatch(d: DeviceBinding): void {
+    const v = sim.view();
+    const humansIn = [0, 0, 0, 0];
+    for (let k = 0; k < seatCtrl.length; k++) {
+      const e = entityIndex(sim.controllerEntity(seatCtrl[k]!));
+      if (e >= 0) humansIn[v.team[e]!]!++;
+    }
+    let pick = -1;
+    let best = Number.POSITIVE_INFINITY;
+    for (const s of recipeSlots) {
+      if (s.bot === null || seatOf(s.controller) >= 0) continue;
+      const n = ffa ? 0 : (humansIn[s.team] ?? 0);
+      if (n < best) {
+        best = n;
+        pick = s.controller;
+      }
+    }
+    if (pick < 0) return;
+    const m = createInputMapper(d, profiles[d.kind]);
+    const e = entityIndex(sim.controllerEntity(pick));
+    if (e >= 0) {
+      m.setAngles(v.yaw[e]!, 0);
+      m.setWeapon(v.slot[e]!);
+    }
+    let num = 0;
+    while (seatNum.includes(num)) num++;
+    extras.push(m);
+    extraDevices.push(d);
+    extraAssists.push(createAimAssistState());
+    seatCtrl.push(pick);
+    seatNum.push(num);
+    seatPadId.push('');
+    const view = addViewSlot();
+    view.controller = pick;
+    view.seat = num;
+    viewCount = slots.length;
+    layout = null;
+    driver.setHumanControlled(pick, true);
+    const name = names[pick] ?? '?';
+    const label = d.kind === 'gamepad' ? `controle ${d.index + 1}` : 'teclado';
+    host.log(`[partida] sofá: P${num + 1} entrou no meio (${label}) no lugar de ${name}`);
+  }
+
+  /** M3 (fase 1c): o assento `k` (P2–P4) sai do sofá: um bot assume o lugar e a vista dele some. */
+  function leaveSeat(k: number): void {
+    if (k <= 0 || k >= seatCtrl.length) return;
+    const num = seatNum[k]!;
+    driver.setHumanControlled(seatCtrl[k]!, false);
+    seatCtrl.splice(k, 1);
+    seatNum.splice(k, 1);
+    seatPadId.splice(k, 1);
+    extras.splice(k - 1, 1);
+    extraDevices.splice(k - 1, 1);
+    extraAssists.splice(k - 1, 1);
+    slots.splice(k, 1);
+    descs.splice(k, 1);
+    viewCount = slots.length;
+    layout = null;
+    if (lostSeat === k) lostSeat = -1;
+    else if (lostSeat > k) lostSeat--;
+    host.log(`[partida] sofá: P${num + 1} saiu; um bot assume`);
+  }
+
+  /** O dispositivo do assento `k` (0 = o P1). */
+  function seatDevice(k: number): DeviceBinding | null {
+    return k === 0 ? p1Device : (extraDevices[k - 1] ?? null);
+  }
+
+  /**
+   * M3 (fase 1c): controle de um assento caiu: pausa e avisa; o assento fica guardado. Volta sozinho no mesmo índice
+   * ou, pelo id, em outro índice livre (o mapeador passa a ler o novo).
+   */
+  function checkLostPads(raw: Readonly<RawInputState>): void {
+    let lost = -1;
+    for (let k = 0; k < seatCtrl.length; k++) {
+      const d = seatDevice(k);
+      if (d === null || d.kind !== 'gamepad') continue;
+      const p = raw.gamepads[d.index];
+      if (p !== undefined && p.connected) {
+        if (seatPadId[k] === '') seatPadId[k] = p.id;
+        continue;
+      }
+      let moved = -1;
+      for (let i = 0; i < MAX_GAMEPADS && seatPadId[k] !== ''; i++) {
+        const q = raw.gamepads[i];
+        if (q !== undefined && q.connected && q.id === seatPadId[k] && !seated('gamepad', i)) moved = i;
+      }
+      if (moved >= 0) {
+        const nd = pads[moved]!;
+        if (k === 0) {
+          p1Device = nd;
+          padIndex = moved;
+          player.setDevice(nd);
+        } else {
+          extraDevices[k - 1] = nd;
+          extras[k - 1]!.setDevice(nd);
+        }
+        host.log(`[partida] sofá: o controle do P${seatNum[k]! + 1} voltou (controle ${moved + 1})`);
+        menuOwnerFor(paused ? pausedBy : 0);
+        continue;
+      }
+      if (lost < 0) lost = k;
+    }
+    if (lost === lostSeat) return;
+    const was = lostSeat;
+    lostSeat = lost;
+    if (lost >= 0) {
+      host.log(`[partida] sofá: controle do P${seatNum[lost]! + 1} desconectado`);
+      if (!paused) pause();
+      else if (pausePage === 'main') pauseMain();
+    } else if (was >= 0 && paused && pausePage === 'main') pauseMain();
+  }
+
+  /** M3 (fase 1c): o assento que pausou passa a ser o dono dos menus; ao continuar, volta o P1. */
+  function menuOwnerFor(k: number): void {
+    if (!couch || frameMenu === null) return;
+    const d = seatDevice(k) ?? p1Device;
+    if (d !== null) frameMenu.setOwner(d);
+  }
+
   /**
    * Teste do sofá: os jogadores 2..4 no quadro (mira, assistência e o `+` que pausa). Pausado, só os botões: a mira
    * fica onde estava. Devolve se algum deles apertou pausa.
    */
-  function updateExtras(raw: RawInputState, dt: number, frozen: boolean, pausedNow: boolean): boolean {
-    let pausePressed = false;
+  function updateExtras(raw: RawInputState, dt: number, frozen: boolean, pausedNow: boolean): number {
+    let pauser = -1;
     for (let k = 0; k < extras.length; k++) {
       const m = extras[k]!;
       const yaw0 = m.yaw;
@@ -1809,13 +1996,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.setAngles(yaw0, pitch0);
       } else {
         const st = extraAssists[k]!;
-        const scale = aimAssistBefore(m, seatControllers[k + 1]!, st);
+        const scale = aimAssistBefore(m, seatCtrl[k + 1]!, st);
         m.update(raw, dt, scale);
         aimAssistAfter(dt, m.yaw !== yaw0 || m.pitch !== pitch0, m, st);
       }
-      if (m.wasPressed('pause')) pausePressed = true;
+      if (m.wasPressed('pause') && pauser < 0) pauser = k + 1;
     }
-    return pausePressed;
+    return pauser;
   }
 
   // M2 (fase 4h): dicas de 1 linha (gameplay.md §2.5): só na partida de verdade com 1 jogador, nas 2 primeiras
@@ -1887,9 +2074,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
-  function pause(): void {
+  function pause(seat = 0): void {
     if (paused || disposed || humans === 0 || resultShown) return;
     paused = true;
+    pausedBy = seat > 0 && seat < seatCtrl.length ? seat : 0;
+    menuOwnerFor(pausedBy);
     matchSound.silence();
     // M2 (fase 5f): refeita ao abrir (calibrando, o item é "Pular calibração").
     if (pausePage === 'main') pauseMain();
@@ -1897,7 +2086,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   function pauseMain(): void {
     pausePage = 'main';
-    pauseMenu.setRoot(pauseScreen.build({ ...pauseState, calibrating: calibration !== null }));
+    pauseMenu.setRoot(
+      pauseScreen.build({
+        ...pauseState,
+        calibrating: calibration !== null,
+        player: seatNum[pausedBy] ?? 0,
+        lost: lostSeat >= 0 ? (seatNum[lostSeat] ?? -1) : -1,
+      }),
+    );
   }
 
   function startCalibration(): void {
@@ -1974,7 +2170,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function applySettings(): void {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
-    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles[seats[k + 1]!.device.kind]);
+    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles[extraDevices[k]!.kind]);
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
     thirdPerson = thirdFromSettings();
@@ -2066,6 +2262,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === PAUSE_ACTION.unstuck) {
         unstuckPending = true;
         resume();
+      } else if (a === PAUSE_ACTION.leave) {
+        const k = pausedBy;
+        resume();
+        leaveSeat(k);
       } else if (a === PAUSE_ACTION.quit) return 'quit';
       return 'none';
     }
@@ -2185,6 +2385,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function resume(): void {
     if (!paused || disposed) return;
     paused = false;
+    pausedBy = 0;
+    menuOwnerFor(0);
     if (pausePage !== 'main') pauseMain();
     // Botões apertados no menu de pausa (o clique em "Continuar") não podem virar tiro no primeiro tick.
     player.writeFrame(drain, 0);
@@ -2812,7 +3014,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.primaryNames = NO_PRIMARIES;
       m.hardTimeHint = false;
     }
-    m.playerSlot = s;
+    m.playerSlot = slot.seat;
     m.team = ffa ? 255 : v.team[e]!;
     const held = weaponDef(v.weapon[e]!);
     m.weaponName = held ? (weaponNames[held.code] ?? '') : '';
@@ -3347,6 +3549,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     nemesisBot,
     frame(dt, raw, menu, ui, list, rawFrameMs): SceneSignal {
       if (disposed) return 'none';
+      frameMenu = menu;
+      if (couch) checkLostPads(raw);
       const t0 = now();
       // F2 (borda de subida): painel de depuração.
       const f2 = F2_KEY >= 0 && raw.keys[F2_KEY] === 1;
@@ -3358,8 +3562,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       let signal: SceneSignal = 'none';
       if (humans > 0) {
         const last = menu.lastDevice;
-        if (last !== null && extras.length === 0)
-          useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
+        if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
         if (resultShown) {
           // M2 (fase 2e): o resultado é um menu (D-pad, mouse, toque); o jogador não anda por trás dele.
           const nav = resultMenu.update(menu, raw, ui);
@@ -3413,7 +3616,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             if (stepCalibration(calibration, player.yaw, player.pitch, player.wasPressed('fire'), dt))
               finishCalibration();
           }
-          if (updateExtras(raw, dt, frozen, false)) pause();
+          if (couch) checkMidJoin(raw, dt);
+          const pauser = updateExtras(raw, dt, frozen, false);
+          if (pauser > 0) pause(pauser);
           else if (player.wasPressed('pause')) pause();
         } else {
           // Pausado: a sim não anda e a mira não gira (o mapeador lê só os botões).
@@ -3424,7 +3629,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const extraPause = updateExtras(raw, 0, false, true);
           // Capturando um botão (e esperando soltar tudo depois): nem a pausa nem o menu andam.
           if (capture.active) finishCapture(capture.update(raw));
-          else if (player.wasPressed('pause') || extraPause) resume();
+          else if (player.wasPressed('pause') || extraPause > 0) resume();
           else {
             signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }

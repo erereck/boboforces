@@ -374,6 +374,9 @@ export const STRINGS_PT_BR = {
   'pause.challenge': 'Ajustar desafio',
   'pause.challengeHint': 'Nível dos bots adversários, valendo agora',
   'pause.quitMatch': 'Sair da partida',
+  // M3 (fase 1c): a pausa do sofá.
+  'pause.leaveCouch': 'Sair do sofá',
+  'pause.lost': 'Controle do P{n} desconectado',
 
   'hud.health': 'Vida',
   'hud.ammo': '{clip} / {reserve}',

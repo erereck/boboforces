@@ -69,7 +69,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   P3 ■ ou P4 ◆ na cor do jogador, o dispositivo e o time (cada um troca o seu com ◀ ▶); B sai. O P1 escolhe a partida
   (o preset do JOGAR, com troca entre os prontos) e o Start (ou COMEÇAR) inicia. Enquanto houver sofá, só o P1 navega
   nos menus. No Switch o teste do sofá automático sai e entra esta tela.
-- **1c. Na partida:** entrar no meio segurando A por 1 s num controle livre (assume um bot do time com menos humanos; a
+- **1c. Na partida** (feita em 09/11/2026, ARCHITECTURE §13.3; só nas partidas da tela do sofá): entrar no meio segurando A por 1 s num controle livre (assume um bot do time com menos humanos; a
   tela se redivide); sair pela pausa (um bot assume); controle desconectado pausa e reserva o assento até ele voltar;
   pausa, tela de morte e radial da arma em cada vista.
 - **1d. Vistas:** borda e símbolo na cor do jogador, anel no chão sob cada humano local, 2 jogadores lado a lado como

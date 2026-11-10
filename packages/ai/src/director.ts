@@ -43,6 +43,12 @@ export interface BotDirector extends Disposable {
    * da partida. Devolve quantos mudaram.
    */
   setLevel(level: BotLevel, team: number): number;
+  /**
+   * M3 (fase 1c): um jogador local pilota (`true`) ou devolve (`false`) o controlador: enquanto pilota, o cérebro dele
+   * não pensa nem escreve o frame. Vale para um bot que alguém assumiu no meio e para os humanos do sofá com cérebro de
+   * reserva (`BotDirectorConfig.standby`), que começam pilotados. Controlador sem cérebro: nada.
+   */
+  setHumanControlled(controller: number, human: boolean): void;
 }
 
 export interface BotDirectorConfig {
@@ -62,6 +68,12 @@ export interface BotDirectorConfig {
    * Ausente = `AI_BUDGET` (o golden e o robô de balanceamento usam o padrão).
    */
   readonly budget?: AiBudget;
+  /**
+   * M3 (fase 1c): humanos do sofá (controladores em 0..humans-1) que ganham um cérebro de reserva, um Normal Bob do
+   * time deles: começa parado e assume quando o jogador sai (`setHumanControlled(c, false)`). Fluxo de RNG próprio
+   * (`fork('standby', c)`): os bots da receita não mudam. Não conta em `botCount`.
+   */
+  readonly standby?: readonly number[];
 }
 
 /** Estatísticas acumuladas do diretor (bench headless e painel F2). */
@@ -139,6 +151,25 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     soldierTeams.push(slot.team);
     maxController = Math.max(maxController, slot.controller);
   }
+  const recipeBots = soldiers.length;
+  for (const slot of expandRecipe(recipe, config.humans)) {
+    if (slot.bot !== null || !(config.standby ?? []).includes(slot.controller)) continue;
+    const follower = new PathFollower(followers.length);
+    followers.push(follower);
+    const brain = new SoldierBrain(
+      soldiers.length,
+      slot.controller,
+      'normal',
+      root.fork('standby', slot.controller),
+      soldierTiming,
+      follower,
+    );
+    soldiers.push(brain);
+    soldierTeams.push(slot.team);
+    maxController = Math.max(maxController, slot.controller);
+  }
+  /** M3 (fase 1c): 1 = um jogador pilota este soldado (o cérebro não pensa). Os de reserva começam pilotados. */
+  const piloted = new Uint8Array(soldiers.length).fill(0, 0, recipeBots).fill(1, recipeBots);
   for (let i = 0; i < zombies; i++) {
     const follower = new PathFollower(followers.length);
     followers.push(follower);
@@ -155,7 +186,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
 
   let disposed = false;
   return {
-    botCount: soldiers.length,
+    botCount: recipeBots,
     think(view, frames): void {
       assert(!disposed, 'ai: think depois do dispose');
       assert(frames.length > maxController, 'ai: frames precisa cobrir todos os controladores de bot e zumbi');
@@ -170,6 +201,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       for (let k = 0; k < total; k++) {
         const i = (start + k) % total;
         if (i < soldiers.length) {
+          if (piloted[i] === 1) continue;
           const b = soldiers[i]!;
           thinkSoldier(ctx, b, frames[b.controller]!, soldierTiming);
         } else {
@@ -191,6 +223,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
         n++;
       }
       return n;
+    },
+    setHumanControlled(controller, human): void {
+      for (let i = 0; i < soldiers.length; i++) if (soldiers[i]!.controller === controller) piloted[i] = human ? 1 : 0;
     },
     setLevel(level, team): number {
       let n = 0;

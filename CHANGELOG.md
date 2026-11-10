@@ -15,6 +15,9 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 1b, a tela "Jogar no sofá":** no menu principal; até 4 jogadores, cada um com o seu controle (o teclado conta
   como um). Cada um entra com o A, escolhe o lado e sai com o voltar; o P1 escolhe a partida e começa. No Switch, o
   mesmo caminho substitui o teste do sofá automático.
+- **Fase 1c, entrar no meio e sair:** numa partida do sofá, segurar A por 1 s num controle livre entra no lugar de um
+  bot (a tela se divide); o + de cada jogador abre a pausa dele, com Sair do sofá (um bot assume). Controle
+  desconectado pausa e avisa até voltar.
 
 ### M2 MVP web solo (em construção)
 

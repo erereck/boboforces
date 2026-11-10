@@ -200,3 +200,33 @@ describe('BotDirector', () => {
     expect(run()).toBe(run());
   });
 });
+
+describe('cérebro de reserva do sofá (M3, fase 1c)', () => {
+  it('o humano 1 com reserva: parado enquanto pilotado, a IA assume quando ele sai; o bot assumido para de pensar', () => {
+    const recipe: MatchRecipe = {
+      ...humanVsBot('normal'),
+      teams: [{ humans: 2, bots: [] }, { bots: [{ ref: builtinBotRef('normal'), count: 1 }] }],
+    };
+    const sim = createSim({ recipe, map: corridor(20), humans: 2 });
+    const bots = createBotDirector({ recipe, humans: 2, standby: [1] });
+    // A reserva não conta como bot da receita.
+    expect(bots.botCount).toBe(1);
+    const frames = createInputFrames();
+    for (let t = 0; t < SIM_HZ; t++) {
+      bots.think(sim.view(), frames);
+      sim.step(frames);
+    }
+    expect(frames[1]!.seq).toBe(0);
+    expect(frames[BOT_CONTROLLER_BASE]!.seq).toBeGreaterThan(0);
+    // O P2 sai: o cérebro dele passa a escrever o frame. O bot da receita é assumido: o frame dele para.
+    bots.setHumanControlled(1, false);
+    bots.setHumanControlled(BOT_CONTROLLER_BASE, true);
+    const botSeq = frames[BOT_CONTROLLER_BASE]!.seq;
+    for (let t = 0; t < SIM_HZ; t++) {
+      bots.think(sim.view(), frames);
+      sim.step(frames);
+    }
+    expect(frames[1]!.seq).toBeGreaterThan(0);
+    expect(frames[BOT_CONTROLLER_BASE]!.seq).toBe(botSeq);
+  });
+});

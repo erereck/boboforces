@@ -1129,7 +1129,7 @@ export function startGame(deps: GameDeps): GameHandle {
         `[game] sofá: ${seats.length} jogadores (${seats.map((s) => couchDeviceLabel(s.device) + (s.side === 1 ? ' contra' : '')).join(', ')})`,
       );
     }
-    const p1 = seats.length >= 2 ? seats[0]!.device : null;
+    const p1 = seats.length >= 1 ? seats[0]!.device : null;
     pendingScene = {
       kind,
       bench,
@@ -1140,7 +1140,7 @@ export function startGame(deps: GameDeps): GameHandle {
       gamepad: p1?.kind === 'gamepad' ? p1.index : menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
       ...(calibrate ? { calibrate: true } : {}),
-      ...(seats.length >= 2 ? { seats } : {}),
+      ...(seats.length >= 1 ? { seats } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;

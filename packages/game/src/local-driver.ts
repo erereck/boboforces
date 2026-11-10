@@ -56,6 +56,8 @@ export interface LocalDriverConfig {
   readonly primaries?: ReadonlyArray<number>;
   /** M2 (fase 2d): contagem antes da partida (`SimConfig.countdownS`); ausente = sem contagem. */
   readonly countdownS?: number;
+  /** M3 (fase 1c): humanos do sofá com cérebro de reserva (`BotDirectorConfig.standby`): um bot assume quem sai. */
+  readonly standby?: readonly number[];
 }
 
 export interface LocalDriver extends MatchDriver {
@@ -65,6 +67,12 @@ export interface LocalDriver extends MatchDriver {
   /** ms gastos no último `update` na IA (`think`) e na sim (o resto do passo); 0 sem `now`. */
   readonly lastAiMs: number;
   readonly lastSimMs: number;
+  /**
+   * M3 (fase 1c): um jogador local pilota (ou devolve) um controlador: o de um bot que ele assumiu no meio (o
+   * `writeHumanFrame` passa a escrever o quadro dele) ou o seu, de humano do sofá com reserva (devolver = sair: o
+   * cérebro de reserva assume). Enquanto pilotado, a IA não pensa por ele.
+   */
+  setHumanControlled(controller: number, on: boolean): void;
 }
 
 /**
@@ -88,11 +96,20 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     ...(config.countdownS !== undefined ? { countdownS: config.countdownS } : {}),
   });
   const director = createBotDirectorWithPaths(
-    { recipe, humans, hz: sim.hz, zombies, ...(config.budget ? { budget: config.budget } : {}) },
+    {
+      recipe,
+      humans,
+      hz: sim.hz,
+      zombies,
+      ...(config.budget ? { budget: config.budget } : {}),
+      ...(config.standby ? { standby: config.standby } : {}),
+    },
     NAV_PATH_API,
   );
   const frames = createInputFrames();
   const now = config.now ?? null;
+  /** M3 (fase 1c): controladores de bot que um jogador local assumiu. */
+  const taken: number[] = [];
   let seq = 0;
   let aiMs = 0;
   let lastAiMs = 0;
@@ -103,6 +120,7 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     beforeTick: (s, f) => {
       seq = (seq + 1) & 0xffff;
       for (let h = 0; h < humans; h++) writeHumanFrame(h, f[h]!, seq);
+      for (let i = 0; i < taken.length; i++) writeHumanFrame(taken[i]!, f[taken[i]!]!, seq);
       if (now) {
         const t0 = now();
         director.think(s.view(), f);
@@ -126,6 +144,12 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     },
     get lastSimMs(): number {
       return lastSimMs;
+    },
+    setHumanControlled(controller, on) {
+      director.setHumanControlled(controller, on);
+      const i = taken.indexOf(controller);
+      if (on && i < 0 && controller >= humans) taken.push(controller);
+      else if (!on && i >= 0) taken.splice(i, 1);
     },
     update(frameSeconds: number): number {
       if (disposed) return 0;

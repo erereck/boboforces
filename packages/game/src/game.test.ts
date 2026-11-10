@@ -1764,6 +1764,41 @@ describe('sofá (M3, fase 1b)', () => {
       true,
     );
     await untilRunning(platform, game);
+    // Fase 1c: o controle 3, livre, segura A por 1 s e entra no meio, no lugar de um bot do time com menos humanos
+    // locais (aqui 1 a 1: o primeiro bot da lista). Antes de 1 s, nada.
+    const pad3 = platform.rawNext.gamepads[2]!;
+    pad3.connected = true;
+    pad3.id = 'controle 3 de teste';
+    pad3.buttons[PAD_BUTTON.faceDown] = 1;
+    platform.pump(30);
+    expect(platform.logLines.some((l) => l.includes('entrou no meio'))).toBe(false);
+    platform.pump(40);
+    pad3.buttons[PAD_BUTTON.faceDown] = 0;
+    platform.pump(2);
+    const joinedLine = platform.logLines.find((l) => l.includes('[partida] sofá: P3 entrou no meio (controle 3)'));
+    expect(joinedLine).toBeDefined();
+    // O Start do P3 pausa: a pausa é dele (Continuar e Sair do sofá); baixo e A saem, e um bot assume.
+    const tap3 = (button: number): void => {
+      pad3.buttons[button] = 1;
+      platform.pump(1);
+      pad3.buttons[button] = 0;
+      platform.pump(1);
+    };
+    tap3(PAD_BUTTON.start);
+    expect(game.scene?.paused).toBe(true);
+    tap3(PAD_BUTTON.dpadDown);
+    tap3(PAD_BUTTON.faceDown);
+    expect(platform.logLines.some((l) => l.includes('[partida] sofá: P3 saiu; um bot assume'))).toBe(true);
+    expect(game.scene?.paused).toBe(false);
+    // O controle do P2 cai: pausa e avisa; ele volta no mesmo índice e o P1 continua.
+    pad.connected = false;
+    platform.pump(2);
+    expect(platform.logLines.some((l) => l.includes('[partida] sofá: controle do P2 desconectado'))).toBe(true);
+    expect(game.scene?.paused).toBe(true);
+    pad.connected = true;
+    platform.pump(2);
+    platform.tap('Enter');
+    expect(game.scene?.paused).toBe(false);
     // Sai pela pausa (P, 4 × baixo, Sair): volta para o sofá, com os mesmos jogadores; o Esc do P1 fecha.
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');

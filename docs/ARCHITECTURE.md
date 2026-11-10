@@ -2156,3 +2156,29 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Conferido:** `menu-input.test`, `couch.test`, o teste do fluxo no `game.test` (entra, lado, sai, Começar, volta
   da partida) e no Edge (`local/m3/capturar-sofa-tela.ts`): teclado como P1, o controle 2 contra e o 3 com o P1, e a
   partida em 3 vistas com o P2 no time azul.
+
+### 13.3 Fase 1c: entrar no meio, sair e controle desconectado (09/11/2026)
+
+- **Só nas partidas da tela do sofá** (mesmo com 1 jogador): lá o P1 fica preso ao dispositivo dele. Na partida solo do
+  JOGAR, apertar um controle passa esse controle para o P1 (como desde o M0), então segurar A nele não pode significar
+  "entrar".
+- **Entrar no meio:** segurar o confirmar (A) por 1 s num controle livre, ou o Enter com o teclado livre. O jogador
+  assume um bot do time com menos humanos locais (no FFA, o primeiro bot livre) e ganha uma vista; o layout da HUD é
+  refeito. Pega o menor número de jogador livre (P2 a P4). A sim não muda: o controlador continua sendo de bot, e o
+  driver escreve o quadro do jogador nele antes da IA.
+- **Contrato (ai):** `BotDirector.setHumanControlled(controller, human)`: enquanto um jogador pilota, o cérebro não
+  pensa. `BotDirectorConfig.standby`: os humanos 2–4 do sofá ganham um cérebro de reserva (Normal Bob do time,
+  `fork('standby', c)`, fora do `botCount`), que começa pilotado. **Sair = devolver o controlador**: o bot assumido
+  volta para a IA dele, e o humano do sofá passa para a reserva. Os bots da receita, o golden e o balance não mudam.
+- **Contrato (game):** `LocalDriver.setHumanControlled` (avisa o diretor e escreve o quadro do bot assumido com os
+  humanos, antes da IA).
+- **Pausa de quem apertou:** o + do P2–P4 pausa e passa os menus para o dispositivo dele (`MenuInput.setOwner`): a
+  pausa mostra o jogador e só Continuar e **Sair do sofá**. Sair: um bot assume, a vista some e os outros mantêm a cor e
+  o símbolo (`ViewSlot.seat`). Ao continuar, os menus voltam para o P1.
+- **Controle desconectado:** pausa, avisa "Controle do P2 desconectado" na pausa e guarda o assento. Voltou no mesmo
+  índice: segue; voltou em outro índice (mesmo id): o mapeador passa a ler o índice novo.
+- **Fora (para depois):** quem entra no meio aparece no placar e no kill feed com o nome do bot; o resultado e as
+  estatísticas contam os humanos do começo da partida.
+- **Conferido:** teste da reserva no `director.test`; no `game.test`, o controle 3 entra no meio, pausa, sai, e o do
+  P2 cai e volta; no Edge (`local/m3/capturar-entrar-meio.ts`): o P1 sozinho, o controle entra como P2 no time azul
+  (o sem humanos), pausa com a pausa dele e sai.

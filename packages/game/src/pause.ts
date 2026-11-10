@@ -1,5 +1,5 @@
 import { BOT_LEVELS, type BotLevel } from '@boboforces/format';
-import { COLORS, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
+import { COLORS, PLAYER_COLORS, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
 
 /** Ações da tela de pausa (gameplay.md §2.2: Continuar · Ajustar desafio · Ajustes · Destravar · Sair). */
 export const PAUSE_ACTION = {
@@ -8,6 +8,8 @@ export const PAUSE_ACTION = {
   settings: 'settings',
   unstuck: 'unstuck',
   quit: 'quit',
+  /** M3 (fase 1c): o jogador 2–4 que pausou sai do sofá (um bot assume o lugar dele). */
+  leave: 'leave',
   /** M2 (fase 5f): no Bobo Training, no lugar do "Ajustar desafio". */
   calibrate: 'calibrate',
 } as const;
@@ -25,6 +27,13 @@ export interface PauseState {
   readonly calibrate?: boolean;
   /** Calibrando agora (o item vira "Pular calibração"). */
   readonly calibrating?: boolean;
+  /**
+   * M3 (fase 1c): o jogador (0 = P1) que pausou. Do P2 ao P4, a pausa é dele: Continuar e Sair do sofá (o resto é do
+   * P1). Ausente = o P1.
+   */
+  readonly player?: number;
+  /** M3 (fase 1c): o controle deste jogador (0 = P1) caiu; a linha avisa até ele voltar. Ausente ou -1 = nenhum. */
+  readonly lost?: number;
 }
 
 function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
@@ -57,24 +66,58 @@ export const pauseScreen: Screen<PauseState | null> = {
               color: COLORS.texto,
               textAlign: 'center',
             },
+            ...couchLines(state),
             { kind: 'box', height: 18 },
             button('resume', 'pause.resume', PAUSE_ACTION.resume, { variant: 'primary', autofocus: true }),
-            state?.calibrate
-              ? button(
-                  'calibrate',
-                  state.calibrating ? 'pause.calibrateSkip' : 'pause.calibrate',
-                  PAUSE_ACTION.calibrate,
-                )
-              : button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
-            button('settings', 'menu.settings', PAUSE_ACTION.settings),
-            button('unstuck', 'pause.unstuck', PAUSE_ACTION.unstuck),
-            button('quit', 'pause.quitMatch', PAUSE_ACTION.quit, { variant: 'danger' }),
+            ...((state?.player ?? 0) > 0
+              ? [button('leave', 'pause.leaveCouch', PAUSE_ACTION.leave, { variant: 'danger' })]
+              : mainItems(state, challenge)),
           ],
         },
       ],
     };
   },
 };
+
+/** M3 (fase 1c): quem pausou (P2–P4) e o aviso de controle desconectado. */
+function couchLines(state: PauseState | null): UiNode[] {
+  const out: UiNode[] = [];
+  const player = state?.player ?? 0;
+  if (player > 0) {
+    out.push({
+      kind: 'text',
+      id: 'player',
+      text: { key: 'couch.player', params: { n: player + 1 } },
+      style: 'heading',
+      color: PLAYER_COLORS[player] as number,
+      textAlign: 'center',
+    });
+  }
+  const lost = state?.lost ?? -1;
+  if (lost >= 0) {
+    out.push({
+      kind: 'text',
+      id: 'lost',
+      text: { key: 'pause.lost', params: { n: lost + 1 } },
+      style: 'body',
+      color: COLORS.perigo,
+      textAlign: 'center',
+    });
+  }
+  return out;
+}
+
+/** Os itens do P1 (e da partida solo). */
+function mainItems(state: PauseState | null, challenge: boolean): UiNode[] {
+  return [
+    state?.calibrate
+      ? button('calibrate', state.calibrating ? 'pause.calibrateSkip' : 'pause.calibrate', PAUSE_ACTION.calibrate)
+      : button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
+    button('settings', 'menu.settings', PAUSE_ACTION.settings),
+    button('unstuck', 'pause.unstuck', PAUSE_ACTION.unstuck),
+    button('quit', 'pause.quitMatch', PAUSE_ACTION.quit, { variant: 'danger' }),
+  ];
+}
 
 /**
  * "Ajustar desafio": os 5 níveis rápidos (#21), o atual em destaque e com o foco. Vale na hora para os bots
