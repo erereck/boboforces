@@ -10,6 +10,7 @@ import {
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import type { TeamBoard } from './team.ts';
 import { AI_BUDGET, AI_LOD, AI_PATH, AI_SOLDIER } from './config.ts';
+import type { ZombieFlow } from './flow.ts';
 import type { PathService } from './paths.ts';
 
 const F = ENTITY_FLAG;
@@ -33,6 +34,8 @@ export class AiContext {
   zombiesMode = false;
   readonly viewDistance: number;
   readonly paths: PathService;
+  /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */
+  flow: ZombieFlow | null = null;
   readonly ctrlToEntity = new Int32Array(MAX_CONTROLLERS_WITH_ZOMBIES);
   /** Raios de percepção que ainda cabem neste tick. */
   raysLeft = 0;

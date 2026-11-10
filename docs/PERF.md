@@ -212,6 +212,23 @@ da sonda, registra aqui.
 |---|---|---|---|---|
 | Edge headless (`npm run dev`), 1280×720, DPR 1 | Intel UHD (ANGLE D3D11) | **Média** | 0 de 601 quadros acima de 25 ms em 10 s: fica | Leve = buffer 1088×612 (0,85); Média e Alta = 1280×720 com DPR 1 |
 
+## 1h. Flow field dos zumbis (M3, fase 3c; 10/11/2026, 0.0.1 local, i5-12450H)
+
+`local/m3/estresse-flow.ts`: Construto, 4 bots Normal e a horda cheia (teste de estresse do M1, os zumbis renascem),
+semente 7, com o A* por zumbi e com o flow field. "jitless" = Node 26.7 `--jitless` sobre bundle do esbuild.
+
+| Zumbis | Onde | Partida | A* por zumbi (fila) | Flow field (campo + fila dos bots) | Campos |
+|---|---|---|---|---|---|
+| 24 | JIT, 60 s | 555 → 426 ms | 119 ms (1.207 pedidos) | 103 + 14 ms (134 pedidos) | 117 |
+| 60 | JIT, 60 s | 1.160 → 941 ms | 253 ms (2.846 pedidos) | 101 + 24 ms (172 pedidos) | 105 |
+| 24 | jitless, 30 s | 4.068 → 3.884 ms | 761 ms | 514 + 126 ms | 60 |
+| 60 | jitless, 30 s | 10.288 → 9.122 ms | 1.854 ms | 448 + 265 ms | 53 |
+
+Um campo no Construto (7161 nós, 45.975 ligações) custa **0,76 ms** inteiro no JIT (`local/m3/medir-flow.ts`), em 6
+fatias de 800 nós; criar (CSR invertido e buffers) 2,7 ms no loading. No jitless, ~8,6 ms por campo (~1 ms por fatia
+de 800). Nas primeiras ondas (poucos zumbis vivos) o A* por zumbi sai mais barato, mas é no pico, com a horda cheia, que
+o orçamento aperta.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

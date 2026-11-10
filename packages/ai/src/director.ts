@@ -20,6 +20,7 @@ import {
 } from '@boboforces/sim';
 import { AiContext } from './context.ts';
 import { AI_BUDGET, type AiBudget } from './config.ts';
+import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
 import { SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
 import { TeamBoard } from './team.ts';
@@ -85,6 +86,8 @@ export interface BotDirectorStats {
   readonly pathsServed: number;
   /** Escolhas da mira visível (`visibleAimOffset`) desde o começo. */
   readonly visibleAims: number;
+  /** M3 (fase 3c): flow fields dos zumbis prontos. */
+  readonly flowBuilds: number;
 }
 
 /** O diretor com as estatísticas (o que `createBotDirectorWithPaths` devolve). */
@@ -183,6 +186,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const paths = new PathService(api, followers, budget);
   const ctx = new AiContext(hz, isFfaMode(recipe.mode), viewDistance, paths, budget.raysPerTick);
   ctx.zombiesMode = recipe.mode === 'zombies';
+  const createFlow = api.createFlowField;
+  const flow = zombies > 0 && createFlow !== undefined ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick) : null;
+  ctx.flow = flow;
   const total = soldiers.length + zombieBrains.length;
 
   let disposed = false;
@@ -193,6 +199,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       assert(frames.length > maxController, 'ai: frames precisa cobrir todos os controladores de bot e zumbi');
       ctx.begin(view);
       paths.service();
+      flow?.update(ctx);
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
       ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa);
@@ -238,7 +245,13 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       return n;
     },
     stats(): BotDirectorStats {
-      return { rays: ctx.raysTotal, pathCalls: paths.calls, pathsServed: paths.served, visibleAims: ctx.aimsTotal };
+      return {
+        rays: ctx.raysTotal,
+        pathCalls: paths.calls,
+        pathsServed: paths.served,
+        visibleAims: ctx.aimsTotal,
+        flowBuilds: flow?.builds ?? 0,
+      };
     },
     dispose(): void {
       disposed = true;

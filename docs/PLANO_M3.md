@@ -105,8 +105,9 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **3b. Especiais e chefão** (feita em 10/11/2026, ARCHITECTURE §13.13): Sprinter (rápido, pouca vida), Chonker
   (maior; ao morrer explode em gosma verde, 40 de dano em 3 m), Spitter (cospe um projétil lento) e o Mega Bobo a cada 5
   ondas (3000 × humanos de vida, 1,8× maior), respeitando os liga/desliga da receita; a IA de cada um.
-- **3c. Flow field:** um campo de direções na navegação, a partir dos bobos de pé, refeito a cada 0,5 s e dividido por
-  todos os zumbis (mais barato que um A* por zumbi com 60 deles).
+- **3c. Flow field** (feita em 10/11/2026, ARCHITECTURE §13.14): um campo de direções na navegação, a partir dos
+  bobos de pé, conferido a cada 0,5 s (refeito quando alguém andou 2 m) e dividido por todos os zumbis (metade do custo
+  de um A* por zumbi com 60 deles); o zumbi enroscado volta a um ponto de nascer.
 - **3d. Barricadas, janelas e portas:** entidades com estado na sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s; segurar
   o usar repõe, 10 pontos por tábua até 50 por onda; porta paga que abre área), com colisão que muda, marcadores no
   mapa (`mapc`) e um mapa de teste até a Base Abandonada.

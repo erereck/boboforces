@@ -1,9 +1,11 @@
 import {
+  createFlowField,
   createNavPath,
   findPath,
   isReachable,
   NAV_LINK,
   NO_NAV_NODE,
+  type FlowField,
   type NavGrid,
   type NavNode,
   type NavPath,
@@ -26,10 +28,12 @@ import { AI_BUDGET, AI_PATH, type AiBudget } from './config.ts';
 export interface NavPathApi {
   createNavPath(nav: NavGrid, capacity?: number): NavPath;
   findPath(nav: NavGrid, from: NavNode, to: NavNode, out: NavPath, budget: number): PathStatus;
+  /** M3 (fase 3c): o flow field dos zumbis; ausente (navegação de teste da sim) = cada zumbi pelo A*. */
+  createFlowField?(nav: NavGrid): FlowField;
 }
 
 /** O `@boboforces/nav` de verdade. */
-export const NAV_PATH_API: NavPathApi = { createNavPath, findPath };
+export const NAV_PATH_API: NavPathApi = { createNavPath, findPath, createFlowField };
 
 /** Direção no plano (unitária, ou zero) e o que fazer para seguir a rota neste tick. */
 export interface Steer {

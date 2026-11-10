@@ -10,12 +10,14 @@
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 import { buildNavGridImpl, type NavGridImpl } from './build.ts';
 import { NO_NAV_NODE, type NavNode } from './constants.ts';
+import { FlowFieldImpl } from './flow.ts';
 import { createNavPathImpl, findPathImpl, type NavPathImpl } from './search.ts';
 
 export { NAV_LINK, NAV_NODE_CELLS, NAV_NODE_SIZE_M, NO_NAV_NODE } from './constants.ts';
 export type { NavLinkKind, NavNode } from './constants.ts';
 export { NAV_COST, type NavGridImpl } from './build.ts';
 export { SEARCH_SLOTS, SMOOTH_LOOKAHEAD } from './search.ts';
+export { FLOW_TARGET_MARGIN } from './flow.ts';
 
 /**
  * Medidas do corpo que a navegação respeita. Vêm da tabela única de métricas da sim (`BOBO_NAV_METRICS` em
@@ -116,4 +118,38 @@ export function createNavPath(nav: NavGrid, capacity?: number): NavPath {
  */
 export function findPath(nav: NavGrid, from: NavNode, to: NavNode, out: NavPath, budget: number): PathStatus {
   return findPathImpl(nav as NavGridImpl, from, to, out as NavPathImpl, budget);
+}
+
+/**
+ * M3 (fase 3c): campo de direções compartilhado (flow field): um Dijkstra de várias fontes sobre as ligações ao
+ * contrário. Para cada nó, o próximo nó do caminho mais curto até a fonte mais perto (os bobos de pé, para os zumbis).
+ * Fatiado por orçamento e com buffer duplo: o campo pronto vale até o próximo terminar. Ver `flow.ts`.
+ */
+export interface FlowField {
+  /** Campos que já ficaram prontos (0 = nenhum: quem consome usa outro jeito, como o A*). */
+  readonly ready: number;
+  /** Um cálculo está em andamento (nas costas do campo pronto). */
+  readonly building: boolean;
+  /** Próximo nó rumo à fonte mais perto, no campo pronto; `NO_NAV_NODE` = é fonte, sem caminho ou nenhum campo. */
+  next(node: NavNode): NavNode;
+  /** Ligação de `node` até `next(node)` (`NAV_LINK`), para pular ou agachar. */
+  link(node: NavNode): number;
+  /** Custo (metros equivalentes, como o do A*) até a fonte mais perto; `Infinity` = sem caminho. */
+  distance(node: NavNode): number;
+  /** Começa outro cálculo, sem fontes (o campo pronto continua valendo até este terminar). */
+  begin(): void;
+  /** Fonte do cálculo em andamento (custo 0). */
+  addSource(node: NavNode): void;
+  /**
+   * Nó que precisa ficar no campo (o de cada zumbi). Com alvos, o cálculo para quando todos fecharam, mais uma folga
+   * (`FLOW_TARGET_MARGIN`), em vez de cobrir o mapa todo; sem nenhum, cobre tudo o que alcança.
+   */
+  addTarget(node: NavNode): void;
+  /** Avança o cálculo fechando até `budget` nós; devolve `true` ao terminar (o novo campo passa a valer). */
+  run(budget: number): boolean;
+}
+
+/** Cria o flow field de `nav` (no loading: aloca as ligações invertidas e os dois buffers). */
+export function createFlowField(nav: NavGrid): FlowField {
+  return new FlowFieldImpl(nav as NavGridImpl);
 }

@@ -2337,3 +2337,25 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Medido:** robô das ondas com 4 bots Normal: onda média **4,0** (4 nas 6 sementes; o Sprinter da onda 3 pesa).
   Golden do modo: `9ee60f97`. Conferido no Edge (com o chefão e os Chonkers forçados na onda 1, numa edição
   temporária): o chefão aparece 1,8× maior e o cuspe voa até o jogador.
+
+### 13.14 Fase 3c: flow field dos zumbis (10/11/2026)
+
+- **No `nav`** (`flow.ts`, `createFlowField`): Dijkstra de várias fontes sobre as ligações ao contrário (CSR invertido
+  montado uma vez), com o mesmo custo das ligações do A*. Para cada nó: o próximo nó até a fonte mais perto, a ligação
+  (para pular ou agachar) e o custo. Fatiado (`run(budget)` fecha até `budget` nós), buffer duplo (o campo pronto vale
+  até o novo terminar) e sem alocação depois de criado. **Alvos** (`addTarget`, os nós dos zumbis): o cálculo para
+  quando o último alvo fecha e o custo passa dele mais `FLOW_TARGET_MARGIN` (8 m); os nós que ficaram na fila guardam um
+  próximo nó válido. Contrato novo do `nav` (só acrescenta; nada mudou no A*).
+- **Na IA** (`ai/flow.ts`, `ZombieFlow`): um campo por diretor (só com zumbis), conferido a cada 0,5 s e refeito só
+  quando um bobo de pé andou mais de 2 m desde o último, caiu, levantou ou morreu, ou quando um zumbi ficou fora do
+  campo; orçamento por tick = o de nós do A* do perfil (`aiPathNodesPerTick`, 600 a 800; o tecnico.md §8.3 permite até
+  3.000 células). O zumbi lê o próximo nó a partir do nó onde está; perto do alvo (4 m, mesma altura) continua indo
+  direto, e sem campo pronto, fora da navegação ou sem caminho, volta ao A* do M1. A `NavPathApi` ganhou o
+  `createFlowField` opcional: a navegação de teste da sim não tem e os testes antigos seguem no A*.
+- **Destravar do zumbi** (`unstuckSystem`): a IA aperta depois de 8 s sem andar 2 m perseguindo (sem bater nem
+  cuspir), e a sim leva o zumbi a um ponto de nascer de zumbi com a vida e o tipo que tinha. Achado pelo robô das ondas:
+  um Sprinter enroscado na quina de uma cerca, no ar e sem chão para pular, segurava a onda para sempre.
+- **Medido** (`local/m3/estresse-flow.ts`, Construto, 4 bots e a horda cheia renascendo, i5-12450H; ver PERF.md §1h):
+  com 24 zumbis o flow empata com o A* por zumbi no JIT e ganha um pouco no `--jitless`; com 60, gasta a metade (JIT)
+  ou um terço (`--jitless`). Robô das ondas: média **4,0** (igual; os pedidos de A* caíram de ~950 para ~210 por
+  partida, os que sobram são dos bots). Golden do modo: `4f85c2b3`.

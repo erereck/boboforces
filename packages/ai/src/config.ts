@@ -355,6 +355,14 @@ export const AI_SUPPORT = {
   kiteM: 6,
 } as const;
 
+/** M3 (fase 3c): o flow field dos zumbis (`flow.ts`); o orçamento por tick é o de nós do A* (`AiBudget`). */
+export const AI_FLOW = {
+  /** Confere a cada (s) se o campo precisa ser refeito a partir dos bobos de pé. */
+  rebuildS: 0.5,
+  /** Refaz quando algum bobo de pé andou mais que isto (m) desde o último campo (perto, o zumbi vai direto). */
+  sourceMoveM: 2,
+} as const;
+
 export const AI_ZOMBIE = {
   /** Reavalia o alvo (o bobo vivo mais perto) a cada (s), no LOD A e no B. */
   retargetSA: 0.5,

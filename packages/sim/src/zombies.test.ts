@@ -330,3 +330,39 @@ describe('Bobo Zombies: especiais e chefão (M3, fase 3b)', () => {
     expect(bosses).toEqual([]);
   }, 60_000);
 });
+
+describe('Bobo Zombies: zumbi preso (M3, fase 3c)', () => {
+  it('Destravar leva o zumbi a um ponto de nascer, com a vida e o tipo que tinha', () => {
+    const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 5, yaw: Math.PI, team: -1 };
+    const sim = createSim({ recipe: zombies(), map: map([human, far]), humans: 1, zombies: 6 });
+    const v = sim.view();
+    run(sim, (ZOMBIES_MODE.firstWaveS + 1) * SIM_HZ);
+    const id = sim.controllerEntity(ZOMBIE_CONTROLLER_BASE);
+    const e = id & 0xffff;
+    expect(v.flags[e]! & ENTITY_FLAG.dead).toBe(0);
+    const f = createInputFrames();
+    const zf = f[ZOMBIE_CONTROLLER_BASE]!;
+    // Anda 2 s para o sul (longe do ponto de nascer).
+    zf.yaw = yawToU16(Math.PI);
+    zf.moveY = quantizeAxis(1);
+    for (let t = 0; t < 2 * SIM_HZ; t++) sim.step(f);
+    expect(v.position[e * 3 + 2]!).toBeGreaterThan(far.z + 3);
+    const hp = v.health[e];
+    const type = v.zombieType[e];
+    const events: SimEvent[] = [];
+    zf.moveY = 0;
+    zf.buttons = BUTTON.unstuck;
+    sim.step(f);
+    sim.drainEvents(events);
+    expect(v.position[e * 3]).toBeCloseTo(far.x, 5);
+    expect(v.position[e * 3 + 2]).toBeCloseTo(far.z, 5);
+    expect(v.health[e]).toBe(hp);
+    expect(v.zombieType[e]).toBe(type);
+    expect(events.some((ev) => ev.type === 'unstuck' && ev.entity === id && ev.respawned)).toBe(true);
+    // Segurar o botão não destrava de novo (só na borda).
+    zf.yaw = yawToU16(Math.PI);
+    zf.moveY = quantizeAxis(1);
+    for (let t = 0; t < SIM_HZ; t++) sim.step(f);
+    expect(v.position[e * 3 + 2]!).toBeGreaterThan(far.z + 1);
+  });
+});

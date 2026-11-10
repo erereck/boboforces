@@ -234,7 +234,7 @@ function endZombies(ctx: SimContext, won: boolean): void {
  * `minSpawnDistM` ou mais de todo bobo vivo; nenhum serve, o mais longe. Nunca em cima dos bobos (o `pickSpawn` do M1
  * sorteia entre os 3 mais longe, e num mapa de 2 pontos isso inclui o deles).
  */
-function pickZombieSpawn(ctx: SimContext): number {
+export function pickZombieSpawn(ctx: SimContext): number {
   const spawns = ctx.spawns;
   let neutral = false;
   for (let i = 0; i < spawns.length; i++) if (spawns[i]!.team < 0) neutral = true;

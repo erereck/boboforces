@@ -7,6 +7,7 @@ import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
 import { isLivePhase } from '../view.ts';
 import { pickSpawn, respawn } from './life.ts';
+import { pickZombieSpawn } from './zombies.ts';
 
 /**
  * M2 (fase 2b): Destravar (GDD §3.8, gameplay.md §11). Na borda de `BUTTON.unstuck`, o bobo vai para o nó de
@@ -14,7 +15,8 @@ import { pickSpawn, respawn } from './life.ts';
  * O bot prefere um nó fora da vista dos humanos (testa os 8 mais perto, em ordem); se todos estão à vista, fica com o
  * mais perto. Na `botUnstuckRespawnAt`-ésima vez na mesma vida, o bot renasce num spawn (sem contar morte). Sem
  * navegação no mapa, o bobo renasce num spawn. Offline vale na hora; a regra do online PvP (3 s parado, recarga de
- * 30 s) é do M5.
+ * 30 s) é do M5. M3 (fase 3c): o zumbi preso (a IA aperta depois de `AI_PATH.unstuckS` sem andar) vai para um ponto
+ * de nascer de zumbi, com a vida e o tipo que tinha (como nos jogos do gênero: some o zumbi enroscado num canto).
  */
 
 const F = ENTITY_FLAG;
@@ -28,10 +30,35 @@ export function unstuckSystem(ctx: SimContext): void {
   if (!isLivePhase(ctx.match.phase)) return;
   const s = ctx.s;
   for (let e = 0; e < s.count; e++) {
-    if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) !== 0) continue;
+    const kind = s.kind[e];
+    if (s.alive[e] === 0 || (kind !== ENTITY_KIND.bobo && kind !== ENTITY_KIND.zombie) || (s.flags[e]! & F.dead) !== 0)
+      continue;
     if ((s.inButtons[e]! & BUTTON.unstuck) === 0 || (s.prevButtons[e]! & BUTTON.unstuck) !== 0) continue;
-    unstuck(ctx, e);
+    if (kind === ENTITY_KIND.zombie) unstuckZombie(ctx, e);
+    else unstuck(ctx, e);
   }
+}
+
+/** M3 (fase 3c): o zumbi vai para um ponto de nascer (longe dos bobos no Bobo Zombies), sem mudar vida nem tipo. */
+function unstuckZombie(ctx: SimContext, e: number): void {
+  const s = ctx.s;
+  const e3 = e * 3;
+  from[0] = s.position[e3]!;
+  from[1] = s.position[e3 + 1]!;
+  from[2] = s.position[e3 + 2]!;
+  const sp = ctx.spawns[ctx.zombiesMode ? pickZombieSpawn(ctx) : pickSpawn(ctx, e)]!;
+  s.position[e3] = sp.x;
+  s.position[e3 + 1] = sp.y;
+  s.position[e3 + 2] = sp.z;
+  s.prevPosition[e3] = sp.x;
+  s.prevPosition[e3 + 1] = sp.y;
+  s.prevPosition[e3 + 2] = sp.z;
+  s.velocity[e3] = 0;
+  s.velocity[e3 + 1] = 0;
+  s.velocity[e3 + 2] = 0;
+  s.airPeakY[e] = sp.y;
+  s.slideTicks[e] = 0;
+  ctx.events.unstuck(ctx.tick, s.idOf(e), from, 0, sp.x, sp.y, sp.z, true);
 }
 
 function unstuck(ctx: SimContext, e: number): void {

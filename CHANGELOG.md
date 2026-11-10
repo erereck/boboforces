@@ -24,6 +24,8 @@ Plano em `docs/PLANO_M3.md`.
   bots, a onda média foi de 3,7 para 4,3.
 - **Fase 3b, especiais e chefão:** Sprinter (rápido), Chonker (maior, explode em gosma ao morrer), Spitter (cospe de
   longe) e o Mega Bobo a cada 5 ondas (1,8× maior, 3000 de vida por humano); a hitbox cresce com o corpo.
+- **Fase 3c, flow field:** os zumbis seguem um campo de direções compartilhado até o bobo de pé mais perto (com 60
+  zumbis, metade do custo do A* por zumbi); o zumbi enroscado num canto volta a um ponto de nascer depois de 8 s.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

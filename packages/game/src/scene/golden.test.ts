@@ -167,9 +167,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * CHANGELOG. Gravado na fase 2e (10/11/2026): `eea4c1c8` (os bots caem na onda 3: 32 abates, 7 quedas; a IA ainda não
  * sabe reviver nem fugir das ondas, fase 3). Fase 3a (10/11/2026): `5a793de3` (zumbis ignoram os caídos; os bots recuam
  * atirando e levantam os colegas: aos 7.200 ticks ainda na onda 3, com 34 abates e 3 quedas). Fase 3b: `9ee60f97` (o
- * sorteio dos especiais consome o RNG dos zumbis desde a onda 1: onda 3, 34 abates, 5 quedas).
+ * sorteio dos especiais consome o RNG dos zumbis desde a onda 1: onda 3, 34 abates, 5 quedas). Fase 3c: `4f85c2b3`
+ * (os zumbis seguem o flow field e o preso aperta Destravar: onda 3, 33 abates, 5 quedas).
  */
-const GOLDEN_ZOMBIES_HASH = '9ee60f97';
+const GOLDEN_ZOMBIES_HASH = '4f85c2b3';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
