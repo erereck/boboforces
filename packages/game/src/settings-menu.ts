@@ -9,6 +9,7 @@ import {
 import {
   AIM_ASSIST_LEVELS,
   applyBindings,
+  createKeyboardMouseProfile,
   defaultProfileFor,
   isCtrlBinding,
   isReservedSource,
@@ -299,13 +300,15 @@ function optionDefs(tab: SettingsTab, device: ControlDevice): readonly OptionDef
 
 /**
  * As linhas de opção da aba (Controles e Botões começam pela escolha do dispositivo que se está ajustando).
- * `capturing`: a ação cuja linha mostra "Aperte..." enquanto a captura espera.
+ * `capturing`: a ação cuja linha mostra "Aperte..." enquanto a captura espera. `mouse` = `false` no teclado sem mouse
+ * (Switch, #73): os botões padrão são os dele.
  */
 export function settingsRows(
   tab: SettingsTab,
   doc: SettingsDocument,
   device: ControlDevice,
   capturing: RemapAction | null = null,
+  mouse = true,
 ): TabbedRow[] {
   const rows: TabbedRow[] = [];
   if (tab === 'controls' || tab === 'buttons') {
@@ -319,7 +322,7 @@ export function settingsRows(
   if (tab === 'buttons') {
     if (device === 'touch') rows.push({ kind: 'text', id: 'touch', text: t('settings.bind.touch'), dim: true });
     else {
-      const profile = boundProfile(doc, device);
+      const profile = boundProfile(doc, device, mouse);
       for (const a of REMAP_ACTIONS[device]) {
         rows.push({
           kind: 'value',
@@ -364,6 +367,7 @@ export function applyControls(base: ControlProfile, c: DeviceControls): ControlP
   return {
     ...applyBindings(base, c.bindings),
     lookSensitivity: base.lookSensitivity * c.sensitivity,
+    keyLookRate: base.keyLookRate * c.sensitivity,
     lookSensitivityYMul: base.lookSensitivityYMul * c.sensitivityYMul,
     adsSensitivityMul: base.adsSensitivityMul * c.adsMul,
     invertY: c.invertY,
@@ -393,9 +397,16 @@ export function actionLabel(a: RemapAction): StringKey {
   return `bind.action.${a}` as StringKey;
 }
 
+/** O perfil padrão do dispositivo (o teclado sem mouse tem o seu, #73). */
+function baseProfile(device: ControlDevice, mouse: boolean): ControlProfile {
+  return device === 'keyboardMouse' && !mouse
+    ? createKeyboardMouseProfile({ mouse: false })
+    : defaultProfileFor(device);
+}
+
 /** O perfil padrão do dispositivo com os botões salvos (só os botões importam aqui). */
-function boundProfile(doc: SettingsDocument, device: ControlDevice): ControlProfile {
-  return applyBindings(defaultProfileFor(device), doc.controls[device].bindings);
+function boundProfile(doc: SettingsDocument, device: ControlDevice, mouse: boolean): ControlProfile {
+  return applyBindings(baseProfile(device, mouse), doc.controls[device].bindings);
 }
 
 /** Os controles de toque com nome na tabela (`touch.*`). */
@@ -446,16 +457,18 @@ export function bindingsText(list: readonly BindingSource[]): string {
 
 /**
  * Liga a ação à fonte capturada e devolve o documento novo e o aviso: a troca com outra ação, a ação que ficou sem
- * botão, o Ctrl do navegador ou a recusa (a fonte é da pausa; o documento não muda).
+ * botão, o Ctrl do navegador ou a recusa (a fonte é da pausa; o documento não muda). Sem mouse (Switch) não há navegador
+ * e o Ctrl não avisa nada.
  */
 export function rebindSettings(
   doc: SettingsDocument,
   device: ControlDevice,
   action: RemapAction,
   source: BindingSource,
+  mouse = true,
 ): { doc: SettingsDocument; note: string } {
   if (device === 'touch') return { doc, note: '' };
-  const base = defaultProfileFor(device);
+  const base = baseProfile(device, mouse);
   const label = bindingLabel(source);
   if (isReservedSource(base, source)) return { doc, note: t('settings.bind.reserved', { source: label }) };
   const r = rebind(base, doc.controls[device].bindings, action, source);
@@ -464,6 +477,6 @@ export function rebindSettings(
   if (r.swapped !== null) {
     const other = t(actionLabel(r.swapped));
     note = t(r.orphaned ? 'settings.bind.orphaned' : 'settings.bind.swapped', { source: label, other });
-  } else if (isCtrlBinding(source)) note = t('binding.ctrlReserved');
+  } else if (mouse && isCtrlBinding(source)) note = t('binding.ctrlReserved');
   return { doc: next, note };
 }

@@ -782,11 +782,11 @@ export function startGame(deps: GameDeps): GameHandle {
               ? aboutRows()
               : tab === 'controls'
                 ? [
-                    ...settingsRows(tab, save.settings, settingsDevice, capturing),
+                    ...settingsRows(tab, save.settings, settingsDevice, capturing, platform.features.keyboardMouse),
                     // M2 (fase 5f): abre o Bobo Training já calibrando a mira.
                     { kind: 'action', id: 'calibrate', label: { key: 'settings.row.calibrate' } },
                   ]
-                : settingsRows(tab, save.settings, settingsDevice, capturing),
+                : settingsRows(tab, save.settings, settingsDevice, capturing, platform.features.keyboardMouse),
         note: settingsNote,
       }),
     );
@@ -799,7 +799,7 @@ export function startGame(deps: GameDeps): GameHandle {
     if (capturing === null || result === 'none') return;
     if (result === 'cancel') settingsNote = '';
     else {
-      const next = rebindSettings(save.settings, settingsDevice, capturing, result);
+      const next = rebindSettings(save.settings, settingsDevice, capturing, result, platform.features.keyboardMouse);
       if (next.doc !== save.settings) save.setSettings(next.doc);
       settingsNote = next.note;
     }

@@ -45,7 +45,8 @@ homebrew menu **segurando R**), ou o NSP, se você preferir gerar com as suas ch
 | 9 | Partida Rápida: FFA, Bobo Training, Ringue | Todos abrem e terminam |
 | 10 | Jogar 1 a 2 h, como der | Sem fechar sozinho, sem travar; anote se esquentar muito |
 | 11 | **Sofá (opcional):** 2 a 4 controles completos conectados antes do JOGAR | Uma vista por controle (a luz do controle = a vista) |
-| 12 | Mandar o `runtime.log` | Tem o boot, os sons (`[audio]`), o loading e qualquer erro |
+| 12 | **Teclado USB (opcional, #73):** na dock, plugar um teclado e jogar | WASD anda, as **setas miram**, **Ctrl direito** ou **F** atira, **Shift direito** ou **Z** mira; Enter e Esc nos menus; mexer no controle volta para ele |
+| 13 | Mandar o `runtime.log` | Tem o boot, os sons (`[audio]`), o loading e qualquer erro |
 
 O que ainda é risco conhecido: o atraso do decodificador de MP3 do nx.js (a emenda da música foi medida no Edge) e o
 tempo de sintetizar os 19 sons (se passar de ~1 s no loading, eles viram MP3 no RomFS).

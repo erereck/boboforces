@@ -202,6 +202,56 @@ describe('teclado e mouse', () => {
     m.update(raw, DT);
     expect(m.active).toBe(true);
   });
+
+  it('as setas giram a mira sem pointer lock, com rampa até o giro máximo', () => {
+    const raw = createRawInputState();
+    const m = kbm();
+    const rate = createKeyboardMouseProfile().keyLookRate;
+    press(raw, 'ArrowRight');
+    m.update(raw, DT);
+    // 1º quadro: 35% do giro mais a rampa de 1 quadro em 0,3 s; para a direita o yaw diminui.
+    const first = -rate * DT * (0.35 + 0.65 * (DT / 0.3));
+    expect(m.yaw).toBeCloseTo(first, 9);
+    for (let i = 0; i < 30; i++) m.update(raw, DT);
+    const before = m.yaw;
+    m.update(raw, DT);
+    expect(m.yaw - before).toBeCloseTo(-rate * DT, 9);
+    // Soltou: para e a rampa recomeça.
+    release(raw, 'ArrowRight');
+    const stopped = m.yaw;
+    m.update(raw, DT);
+    expect(m.yaw).toBe(stopped);
+    press(raw, 'ArrowUp');
+    m.update(raw, DT);
+    expect(m.pitch).toBeCloseTo(rate * DT * (0.35 + 0.65 * (DT / 0.3)), 9);
+  });
+
+  it('sem mouse: Ctrl direito ou F atira, Shift direito ou Z mira, Shift esquerdo corre', () => {
+    const raw = createRawInputState();
+    const m = kbm(createKeyboardMouseProfile({ mouse: false }));
+    press(raw, 'ControlRight', 'ShiftRight', 'ShiftLeft');
+    m.update(raw, DT);
+    const f = frameOf(m);
+    expect(f.buttons & BUTTON.fire).not.toBe(0);
+    expect(f.buttons & BUTTON.ads).not.toBe(0);
+    expect(f.buttons & BUTTON.sprint).not.toBe(0);
+    release(raw, 'ControlRight', 'ShiftRight', 'ShiftLeft');
+    press(raw, 'KeyF', 'KeyZ');
+    m.update(raw, DT);
+    const g = frameOf(m, 1);
+    expect(g.buttons & BUTTON.fire).not.toBe(0);
+    expect(g.buttons & BUTTON.ads).not.toBe(0);
+    expect(g.buttons & BUTTON.sprint).toBe(0);
+    // Com mouse, o Shift direito continua correndo (e o Ctrl não atira: Ctrl+W fecha a aba).
+    const web = kbm();
+    web.update(raw, DT);
+    release(raw, 'KeyF', 'KeyZ');
+    press(raw, 'ControlRight', 'ShiftRight');
+    web.update(raw, DT);
+    const h = frameOf(web, 2);
+    expect(h.buttons & BUTTON.fire).toBe(0);
+    expect(h.buttons & BUTTON.sprint).not.toBe(0);
+  });
 });
 
 describe('controle', () => {

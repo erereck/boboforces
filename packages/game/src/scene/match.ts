@@ -38,6 +38,7 @@ import {
   shouldLowerQuality,
 } from '@boboforces/format';
 import {
+  AIM_ASSIST_LEVELS,
   createGamepadProfile,
   createBindingCapture,
   createInputFrame,
@@ -602,8 +603,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M2 (fase 4f): os perfis com os controles dos Ajustes (refeitos quando a pausa muda um ajuste).
   const buildProfiles = (): Readonly<Record<DeviceKind, ControlProfile>> => {
     const c = host.settings.current.controls;
+    // #73: sem mouse (o teclado USB do Switch) o teclado mira nas setas e usa a assistência do controle.
+    const keyboardMouse = platform.features.keyboardMouse
+      ? applyControls(createKeyboardMouseProfile(), c.keyboardMouse)
+      : {
+          ...applyControls(createKeyboardMouseProfile({ mouse: false }), c.keyboardMouse),
+          aimAssist: AIM_ASSIST_LEVELS[c.gamepad.aimAssist],
+        };
     return {
-      keyboardMouse: applyControls(createKeyboardMouseProfile(), c.keyboardMouse),
+      keyboardMouse,
       gamepad: applyControls(createGamepadProfile(request.convention), c.gamepad),
       touch: applyControls(createTouchProfile(), c.touch),
     };
@@ -1912,7 +1920,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       settingsScreen.build({
         tabs: PAUSE_SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
         tab: pauseSettingsTab,
-        rows: settingsRows(tab, host.settings.current, pauseSettingsDevice, capturing),
+        rows: settingsRows(tab, host.settings.current, pauseSettingsDevice, capturing, platform.features.keyboardMouse),
         note: pauseNote,
       }),
     );
@@ -1922,7 +1930,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (capturing === null || result === 'none') return;
     if (result === 'cancel') pauseNote = '';
     else {
-      const next = rebindSettings(host.settings.current, pauseSettingsDevice, capturing, result);
+      const next = rebindSettings(
+        host.settings.current,
+        pauseSettingsDevice,
+        capturing,
+        result,
+        platform.features.keyboardMouse,
+      );
       if (next.doc !== host.settings.current) {
         host.settings.save(next.doc);
         applySettings();

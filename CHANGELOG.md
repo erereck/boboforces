@@ -493,6 +493,10 @@ Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 
 - **Fase 8e:** roteiro do celular e do checkpoint no Switch para o Erick (`docs/ROTEIRO_M2.md`).
 - **Rodada 12 de prints:** a qualidade, o teste do sofá e o roteiro do celular e do Switch, com as perguntas H1–H3
   (H3: publicar), na versão 14 da página das rodadas, junto com as rodadas 10 e 11.
+- **Teclado no Switch (pedido do Erick, #73):** o teclado USB joga no Switch, com a mira nas setas, o tiro no Ctrl
+  direito ou no F e a mira (ADS) no Shift direito ou no Z; usa a assistência de mira do controle. Mouse não dá (o nx.js
+  não lê mouse USB). No PC, as setas também miram.
+- **Rodadas 10 a 12 aprovadas no padrão** (#70–#72); o M2 foi publicado com o OK do Erick.
 - **Teste do sofá no Switch (pedido do Erick, antes do M3):** cada controle completo conectado vira um jogador local
   em tela dividida no JOGAR e na Partida Rápida, de 2 a 4.
   - Par de Joy-Con, Pro ou portátil; a ordem segue o número do controle.

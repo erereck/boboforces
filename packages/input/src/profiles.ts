@@ -3,6 +3,7 @@ import {
   MENU_ACTIONS,
   MOVE_DIRECTIONS,
   type GameAction,
+  type LookDirection,
   type MenuAction,
   type MenuConfirmConvention,
   type MoveDirection,
@@ -38,6 +39,12 @@ export interface ControlProfile {
   readonly lookStick: StickId | null;
   /** Mouse e toque: radianos por px de layout. Gamepad: radianos por segundo com o stick no máximo. */
   readonly lookSensitivity: number;
+  /**
+   * Mira por teclas (as setas): gira como um stick digital até `keyLookRate` rad/s, com uma rampa curta para o toque
+   * fino. Vazio = nenhuma. O teclado sem mouse (Switch) mira só por elas.
+   */
+  readonly lookKeys: Readonly<Partial<Record<LookDirection, readonly BindingSource[]>>>;
+  readonly keyLookRate: number;
   /** Multiplicador da sensibilidade vertical (sensibilidade X/Y separada). */
   readonly lookSensitivityYMul: number;
   /** Multiplicador da sensibilidade durante o ADS. */
@@ -69,6 +76,8 @@ export const AIM_ASSIST_LEVELS = { off: 0, light: 0.25, medium: 0.4, strong: 0.6
 
 /** Campos numéricos comuns aos perfis padrão. */
 const COMMON = {
+  lookKeys: {},
+  keyLookRate: 2.4,
   lookSensitivityYMul: 1,
   adsSensitivityMul: 0.7,
   invertY: false,
@@ -85,11 +94,39 @@ const COMMON = {
   toggleSprint: false,
 } as const;
 
+/** Opções do perfil de teclado. */
+export interface KeyboardProfileOptions {
+  /**
+   * `false` = teclado sem mouse (o Switch: o nx.js não lê mouse USB). Atira no Ctrl direito ou no F e mira (ADS) no
+   * Shift direito ou no Z, com a mão direita nas setas; ali não há aba para o Ctrl+W fechar.
+   */
+  readonly mouse?: boolean;
+}
+
 /**
  * Teclado e mouse (arte-ux.md §7.1). Agachar no C, NUNCA no Ctrl (Ctrl+W fecha a aba). A pausa também vem do
- * `pointerlockchange` (o Esc com pointer lock nem chega à página), por isso o Esc aqui é só reserva sem lock.
+ * `pointerlockchange` (o Esc com pointer lock nem chega à página), por isso o Esc aqui é só reserva sem lock. As setas
+ * também miram (acessibilidade no PC; o único jeito de mirar no teclado do Switch).
  */
-export function createKeyboardMouseProfile(): ControlProfile {
+export function createKeyboardMouseProfile(options: KeyboardProfileOptions = {}): ControlProfile {
+  const base = keyboardMouseProfile();
+  if (options.mouse !== false) return base;
+  return {
+    ...base,
+    id: 'keyboard.noMouse',
+    game: {
+      ...base.game,
+      fire: [key('ControlRight'), key('KeyF')],
+      ads: [key('ShiftRight'), key('KeyZ')],
+      sprint: [key('ShiftLeft')],
+      ping: [key('KeyN')],
+      nextWeapon: [key('Period')],
+      prevWeapon: [key('Comma')],
+    },
+  };
+}
+
+function keyboardMouseProfile(): ControlProfile {
   return {
     ...COMMON,
     id: 'keyboardMouse.default',
@@ -135,6 +172,12 @@ export function createKeyboardMouseProfile(): ControlProfile {
       tabPrev: [key('KeyQ')],
       tabNext: [key('KeyE')],
       secondary: [key('KeyX')],
+    },
+    lookKeys: {
+      left: [key('ArrowLeft')],
+      right: [key('ArrowRight')],
+      up: [key('ArrowUp')],
+      down: [key('ArrowDown')],
     },
     moveStick: null,
     lookStick: null,

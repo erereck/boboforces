@@ -79,6 +79,11 @@ export const MOVE_DIRECTIONS = ['forward', 'back', 'left', 'right'] as const;
 
 export type MoveDirection = (typeof MOVE_DIRECTIONS)[number];
 
+/** Direções da mira por teclas (as setas; sem mouse, como no teclado USB do Switch). */
+export const LOOK_DIRECTIONS = ['left', 'right', 'up', 'down'] as const;
+
+export type LookDirection = (typeof LOOK_DIRECTIONS)[number];
+
 /**
  * Ações de menu: conjunto à parte. Todo fluxo precisa funcionar só com D-pad + confirmar/voltar (regra 12).
  * `secondary` é a ação extra da tela (ex.: "editar"); abas com `tabPrev`/`tabNext`.

@@ -2092,3 +2092,27 @@ Escrito à mão, sem o vite-plugin-pwa do tecnico.md §19.1 (seria dependência 
   - Com um `sw.js` novo no disco, a versão nova espera durante a partida; ao sair para o título, a página recarrega
     nela e sobra 1 cache.
   - `smoke:web` ok. Menu em 345,7 de 350 KB (fases 8a–8c e o teste do sofá somam 1,7 KB).
+
+### 12.53 Teclado no Switch e mira pelas setas (#73, 09/11/2026)
+
+Pedido do Erick: mouse e teclado no Switch. **Mouse não dá:** o runtime do nx.js 1.0.0-beta.7 só liga do HID o teclado,
+a tela de toque e a vibração (`hidGetKeyboardStates`, `hidGetTouchScreenStates`); não há leitura de mouse em nenhuma
+versão publicada nem no código do repositório. O teclado USB já chegava ao jogo pelo `keydown`/`keyup` (casca do M0).
+
+- **Contrato (input):** `ControlProfile.lookKeys` (direções `LOOK_DIRECTIONS`: left, right, up, down) e
+  `keyLookRate` (rad/s, padrão 2,4). O mapeador gira a mira pelas teclas como um stick digital: começa em 35% e chega
+  ao máximo em 0,3 s segurando (`KEY_LOOK_RAMP`), com a sensibilidade, o Y invertido, o ADS e a fricção da assistência
+  valendo igual. A sensibilidade dos Ajustes multiplica o `keyLookRate` também.
+- **Perfil do teclado:** as **setas miram** em todo lugar (no PC é acessibilidade; nada do jogo usava as setas).
+  `createKeyboardMouseProfile({ mouse: false })` é o teclado sem mouse (`keyboard.noMouse`): atira no **Ctrl
+  direito** ou no **F**, mira (ADS) no **Shift direito** ou no **Z**, corre no Shift esquerdo, aviso no N e troca de arma
+  no ponto e na vírgula. Ali não há navegador para o Ctrl+W fechar a aba.
+- **Jogo:** sem `platform.features.keyboardMouse` (o Switch), a partida usa o perfil sem mouse com a **assistência de
+  mira do controle** (o nível salvo do controle); a aba Botões dos Ajustes mostra esses botões e não avisa do Ctrl
+  (`settingsRows`/`rebindSettings` com `mouse = false`). O dispositivo segue o último usado, como no PC: apertou
+  uma tecla, o jogador 1 passa para o teclado; mexeu no controle, volta.
+- **Fora:** no teste do sofá o teclado não vira jogador (a tela "aperte A" do M3 resolve, com o teclado contando como 1
+  slot, como na tabela do DECISOES).
+- **Conferido:** testes do mapeador e da aba Botões; na web, as setas giram a mira na partida
+  (`local/m2/conferir-setas.ts`). No Eden não dá: o teclado USB emulado está desligado na config do Erick (não
+  mexemos nela); o console decide.

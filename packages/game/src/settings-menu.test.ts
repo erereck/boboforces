@@ -75,6 +75,15 @@ describe('Ajustes: botões (parte 2)', () => {
     expect(reset.controls.keyboardMouse.bindings).toEqual({});
   });
 
+  it('teclado sem mouse (Switch): os botões padrão são os dele e o Ctrl não avisa nada', () => {
+    const kb = settingsRows('buttons', DEFAULT_SETTINGS, 'keyboardMouse', null, false);
+    const fire = kb.find((r) => r.id === 'bind:fire');
+    expect(fire?.kind === 'value' ? fire.value : '').toBe('Ctrl direito +1');
+    const ctrl = rebindSettings(DEFAULT_SETTINGS, 'keyboardMouse', 'crouch', key('ControlLeft'), false);
+    expect(ctrl.note).toBe('');
+    expect(ctrl.doc.controls.keyboardMouse.bindings['crouch']).toEqual(['key:ControlLeft']);
+  });
+
   it('remapear avisa a troca, a ação sem botão, o Ctrl e recusa a pausa; o perfil da partida usa os botões', () => {
     const swap = rebindSettings(DEFAULT_SETTINGS, 'keyboardMouse', 'grenade', key('KeyQ'));
     expect(swap.note).toBe('Q era de Última arma usada: trocados.');

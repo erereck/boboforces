@@ -6,6 +6,7 @@ import {
   GAME_ACTIONS,
   MENU_ACTION_INDEX,
   MENU_ACTIONS,
+  LOOK_DIRECTIONS,
   MOVE_DIRECTIONS,
   WEAPON_SLOT_COUNT,
   type GameAction,
@@ -104,6 +105,7 @@ const SRC_TOUCH = 5;
 const TGT_GAME = 0;
 const TGT_MENU = 1;
 const TGT_MOVE = 2;
+const TGT_LOOK = 3;
 // Papel de um dedo.
 const ROLE_NONE = 0;
 const ROLE_IGNORED = 1;
@@ -118,6 +120,13 @@ const MOVE_FORWARD = 0;
 const MOVE_BACK = 1;
 const MOVE_LEFT = 2;
 const MOVE_RIGHT = 3;
+const LOOK_COUNT = LOOK_DIRECTIONS.length;
+const LOOK_LEFT = 0;
+const LOOK_RIGHT = 1;
+const LOOK_UP = 2;
+const LOOK_DOWN = 3;
+/** Mira por teclas: começa em 35% do giro e chega ao máximo em 0,3 s segurando (o toque curto acerta o fino). */
+const KEY_LOOK_RAMP = { start: 0.35, seconds: 0.3 } as const;
 /** As 4 primeiras ações de menu são as direções (`up`, `down`, `left`, `right`): só elas repetem. */
 const MENU_DIRECTION_COUNT = 4;
 
@@ -177,6 +186,7 @@ function compile(profile: ControlProfile): CompiledBindings {
   GAME_ACTIONS.forEach((a, i) => profile.game[a]?.forEach((s) => rows.push([TGT_GAME, i, s])));
   MENU_ACTIONS.forEach((a, i) => profile.menu[a]?.forEach((s) => rows.push([TGT_MENU, i, s])));
   MOVE_DIRECTIONS.forEach((d, i) => profile.move[d]?.forEach((s) => rows.push([TGT_MOVE, i, s])));
+  LOOK_DIRECTIONS.forEach((d, i) => profile.lookKeys[d]?.forEach((s) => rows.push([TGT_LOOK, i, s])));
   const n = rows.length;
   const c: CompiledBindings = {
     count: n,
@@ -225,6 +235,7 @@ class Mapper implements InputMapper {
   private readonly gamePulse = new Uint8Array(GAME_COUNT);
   private readonly menuValue = new Float32Array(MENU_COUNT);
   private readonly moveValue = new Float32Array(MOVE_COUNT);
+  private readonly lookValue = new Float32Array(LOOK_COUNT);
 
   // Estado das ações de jogo.
   private readonly physicalPrev = new Uint8Array(GAME_COUNT);
@@ -243,6 +254,8 @@ class Mapper implements InputMapper {
 
   // Mira no stick.
   private edgeTime = 0;
+  /** Segundos com alguma tecla de mira apertada (a rampa do giro por teclas). */
+  private keyLookTime = 0;
   private readonly stickOut = new Float64Array(2);
 
   // Toque: um registro por posição de `RawInputState.touches`.
@@ -358,6 +371,7 @@ class Mapper implements InputMapper {
     this.gamePulse.fill(0);
     this.menuValue.fill(0);
     this.moveValue.fill(0);
+    this.lookValue.fill(0);
     const b = this.bindings;
     const kind = this.device.kind;
     const threshold = this.profile.pressThreshold;
@@ -398,6 +412,8 @@ class Mapper implements InputMapper {
         if (pulse) this.gamePulse[idx] = 1;
       } else if (tgt === TGT_MENU) {
         if (v > this.menuValue[idx]!) this.menuValue[idx] = v;
+      } else if (tgt === TGT_LOOK) {
+        if (v > this.lookValue[idx]!) this.lookValue[idx] = v;
       } else if (v > this.moveValue[idx]!) this.moveValue[idx] = v;
     }
     // M2 (fase 6e): no toque, o joystick empurrado até a borda e para a frente corre (não há botão de correr).
@@ -504,6 +520,17 @@ class Mapper implements InputMapper {
         dYaw = -raw.mouseDX * s;
         dPitch = -raw.mouseDY * s * p.lookSensitivityYMul * ySign;
       }
+      // As setas giram como um stick digital (o teclado sem mouse do Switch mira só por elas).
+      const kx = this.lookValue[LOOK_RIGHT]! - this.lookValue[LOOK_LEFT]!;
+      const ky = this.lookValue[LOOK_DOWN]! - this.lookValue[LOOK_UP]!;
+      if (kx !== 0 || ky !== 0) {
+        this.keyLookTime += dt;
+        const t = this.keyLookTime / KEY_LOOK_RAMP.seconds;
+        const ramp = t >= 1 ? 1 : KEY_LOOK_RAMP.start + (1 - KEY_LOOK_RAMP.start) * t;
+        const rate = p.keyLookRate * scale * dt * ramp;
+        dYaw -= kx * rate;
+        dPitch -= ky * rate * p.lookSensitivityYMul * ySign;
+      } else this.keyLookTime = 0;
     } else if (this.device.kind === 'gamepad') {
       if (p.lookStick !== null) {
         const ax = p.lookStick === 'right' ? PAD_AXIS.rightX : PAD_AXIS.leftX;
