@@ -43,6 +43,7 @@ import {
   AI_PISTOL_HYSTERESIS_M,
   AI_SENSES,
   AI_SOLDIER,
+  AI_SUPPORT,
   AI_WEAPON_USE,
   type AiWeaponUse,
 } from './config.ts';
@@ -271,6 +272,8 @@ export class SoldierBrain {
   lastKnownY = 0;
   lastKnownZ = 0;
   hasGoal = false;
+  /** M3 (fase 3a): o colega caído que este bot vai levantar (índice), ou -1. */
+  reviveTarget = -1;
   goalX = 0;
   goalY = 0;
   goalZ = 0;
@@ -994,7 +997,13 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     }
   }
   const scouting = !b.hasLastKnown;
-  if (b.coverPhase === COVER_PHASE.going) {
+  if (b.reviveTarget >= 0) {
+    // M3 (fase 3a): indo levantar o colega caído.
+    const r3 = b.reviveTarget * 3;
+    gx = view.position[r3]!;
+    gy = view.position[r3 + 1]!;
+    gz = view.position[r3 + 2]!;
+  } else if (b.coverPhase === COVER_PHASE.going) {
     // M2 (fase 3c): indo para a cobertura.
     gx = b.coverX;
     gy = b.coverY;
@@ -1189,6 +1198,52 @@ function holdCover(view: SimView, b: SoldierBrain, e: number): number {
 }
 
 /** Um tick de um soldado: escreve o frame do controlador dele. */
+/** M3 (fase 3a): o colega do mesmo time caído (e não levantando sozinho) mais perto, até `reviveSeekM`; senão -1. */
+function downedAlly(c: AiContext, e: number): number {
+  const view = c.view!;
+  const e3 = e * 3;
+  let best = -1;
+  let bestD2 = AI_SUPPORT.reviveSeekM * AI_SUPPORT.reviveSeekM;
+  for (let j = 0; j < view.count; j++) {
+    if (j === e || view.kind[j] !== ENTITY_KIND.bobo || !c.living(j) || view.team[j] !== view.team[e]) continue;
+    if ((view.flags[j]! & F.downed) === 0 || view.selfUp[j] === 1) continue;
+    const dx = view.position[j * 3]! - view.position[e3]!;
+    const dy = view.position[j * 3 + 1]! - view.position[e3 + 1]!;
+    const dz = view.position[j * 3 + 2]! - view.position[e3 + 2]!;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = j;
+    }
+  }
+  return best;
+}
+
+/** M3 (fase 3a): o alvo visível é um zumbi a menos de `fightM` (atira em vez de ir levantar alguém). */
+function zombieClose(view: SimView, b: SoldierBrain, e: number): boolean {
+  if (b.target < 0 || !b.targetVisible || view.kind[b.target] !== ENTITY_KIND.zombie) return false;
+  return targetDistance(view, e, b.target) < AI_SUPPORT.fightM;
+}
+
+/** M3 (fase 3a): vai até o colega caído e, colado, olha para ele e segura o usar (a sim conta os 3 s). */
+function reviveStep(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  t: SoldierTiming,
+  local: { x: number; y: number },
+): number {
+  const view = c.view!;
+  const r = b.reviveTarget;
+  const dx = view.position[r * 3]! - view.position[e * 3]!;
+  const dz = view.position[r * 3 + 2]! - view.position[e * 3 + 2]!;
+  if (dx * dx + dz * dz > AI_SUPPORT.reviveReachM * AI_SUPPORT.reviveReachM) return travel(c, b, e, t);
+  b.aimYaw = turnToward(b.aimYaw, Math.atan2(-dx, -dz), b.turnStep);
+  local.x = 0;
+  local.y = 0;
+  return BUTTON.use;
+}
+
 export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: SoldierTiming): void {
   const view = c.view!;
   f.seq = (f.seq + 1) & 0xffff;
@@ -1270,9 +1325,15 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   let buttons: number;
   updateCover(view, b, e, tick, t);
   const closeFight = b.targetVisible && b.target >= 0 && targetDistance(view, e, b.target) < AI_COVER.fightBelowM;
+  // M3 (fase 3a): no Bobo Zombies, o colega caído mais perto (sem zumbi colado: aí atira primeiro).
+  b.reviveTarget =
+    c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(view, b, e) ? downedAlly(c, e) : -1;
   // M2 (fase 3g): fingir de morto e a dancinha tomam o tick inteiro.
-  const override = personaOverride(view, b, e, tick, t, local);
-  if (override >= 0) {
+  const override = b.reviveTarget >= 0 ? -1 : personaOverride(view, b, e, tick, t, local);
+  if (b.reviveTarget >= 0) {
+    buttons = reviveStep(c, b, e, t, local);
+    b.progressTick = tick;
+  } else if (override >= 0) {
     buttons = override;
     b.progressTick = tick;
   } else if (b.grenadePhase !== GRENADE_PHASE.none) {
@@ -1285,6 +1346,15 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     b.progressTick = tick;
   } else if (b.target >= 0 && b.targetVisible) {
     buttons = combat(c, b, e, tick, t);
+    // M3 (fase 3a): no Bobo Zombies, zumbi perto: recua atirando (o golpe dele é de perto) e sem correr.
+    if (
+      c.zombiesMode &&
+      view.kind[b.target] === ENTITY_KIND.zombie &&
+      targetDistance(view, e, b.target) < AI_SUPPORT.kiteM
+    ) {
+      local.y = -1;
+      buttons &= ~BUTTON.sprint;
+    }
     // Trocando tiro não é estar preso.
     b.progressTick = tick;
     if (b.coverPhase === COVER_PHASE.holding) {

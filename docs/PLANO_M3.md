@@ -98,6 +98,20 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **2e. Robô das ondas e golden** (feita em 10/11/2026, ARCHITECTURE §13.11; fecha a fase 2): partidas sem humanos (bots de apoio N0) medem até que onda o time chega; golden do
   modo no CI.
 
+## Fase 3 em detalhe: a IA do Zombies
+
+- **3a. Caídos e apoio** (feita em 10/11/2026, ARCHITECTURE §13.12): o zumbi ignora quem está caído; os bots de apoio
+  recuam atirando quando o zumbi chega perto e vão levantar o colega caído.
+- **3b. Especiais e chefão:** Sprinter (rápido, pouca vida), Chonker (maior; ao morrer explode em gosma verde, 40 de
+  dano em 3 m), Spitter (cospe um projétil lento) e o Mega Bobo a cada 5 ondas (3000 × humanos de vida, 1,8× maior),
+  respeitando os liga/desliga da receita; a IA de cada um.
+- **3c. Flow field:** um campo de direções na navegação, a partir dos bobos de pé, refeito a cada 0,5 s e dividido por
+  todos os zumbis (mais barato que um A* por zumbi com 60 deles).
+- **3d. Barricadas, janelas e portas:** entidades com estado na sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s; segurar
+  o usar repõe, 10 pontos por tábua até 50 por onda; porta paga que abre área), com colisão que muda, marcadores no
+  mapa (`mapc`) e um mapa de teste até a Base Abandonada.
+- **3e. Medição:** robô das ondas e golden do modo com tudo isso.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

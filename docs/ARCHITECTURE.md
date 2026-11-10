@@ -2305,3 +2305,15 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   de apoio (reviver e fugir das ondas, fase 3): 4 bots Normal chegam em média à **onda 3,7** (3 a 5, sementes 1–6;
   36 a 80 abates); 1 bot chega à **onda 2** (sementes 1–4). Cada partida leva 0,1–0,5 s sem tela. É a régua para a
   fase 3: com os zumbis ignorando os caídos e os bots revivendo e recuando, a média tem que subir.
+
+### 13.12 Fase 3a: caídos e bots de apoio (10/11/2026)
+
+- **Zumbi:** quem está caído não é presa (`nearestPrey` e a validade do alvo pulam `ENTITY_FLAG.downed`): ele vai
+  atrás de quem está de pé. Antes, o zumbi perdia tempo batendo em quem estava caído e imune, o que protegia o time sem
+  querer.
+- **Bot de apoio** (`AiContext.zombiesMode`): sem zumbi à vista a menos de 4 m, vai até o colega caído mais perto
+  (até 30 m, que não esteja levantando sozinho) e, a 1,1 m, olha para ele e segura o usar (`AI_SUPPORT`); com zumbi a
+  menos de 6 m, recua atirando, sem correr. Nada disso vale fora do Bobo Zombies (o golden do Warfare não mudou).
+- **Medido** (`local/m3/robo-ondas.ts`, 4 bots Normal, sementes 1–6): a onda média foi de 3,7 (fase 2e) para **4,3**
+  (3 a 5). Só ignorar os caídos derrubava para 3,3; recuar atirando é o que mais pesa (0 a 3 colegas levantados por
+  partida). Golden do modo: `5a793de3`.

@@ -343,6 +343,18 @@ export const AI_KNIFE = { switchM: 1.6, backM: 3 } as const;
 export const AI_PISTOL_HYSTERESIS_M = 2;
 
 /** Zumbi do estresse (N0 puro: sabe onde estão os bobos, persegue pelo caminho e bate). */
+/**
+ * M3 (fase 3a): os bots de apoio do Bobo Zombies. Vão levantar o colega caído até esta distância (m) e seguram o usar
+ * colados nele; com um zumbi à vista a menos de `fightM`, atiram primeiro.
+ */
+export const AI_SUPPORT = {
+  reviveSeekM: 30,
+  reviveReachM: 1.1,
+  fightM: 4,
+  /** Zumbi mais perto que isto (m): o bot recua atirando. */
+  kiteM: 6,
+} as const;
+
 export const AI_ZOMBIE = {
   /** Reavalia o alvo (o bobo vivo mais perto) a cada (s), no LOD A e no B. */
   retargetSA: 0.5,

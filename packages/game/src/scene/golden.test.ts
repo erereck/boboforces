@@ -165,9 +165,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * 24, semente 42, até 2 min. Confere o hash, a onda alcançada e que houve combate (abates de zumbi e quedas). O hash
  * MUDA quando a sim, a IA (dos bots ou dos zumbis) ou o mapa mudam: atualize no mesmo commit e diga o motivo no
  * CHANGELOG. Gravado na fase 2e (10/11/2026): `eea4c1c8` (os bots caem na onda 3: 32 abates, 7 quedas; a IA ainda não
- * sabe reviver nem fugir das ondas, fase 3).
+ * sabe reviver nem fugir das ondas, fase 3). Fase 3a (10/11/2026): `5a793de3` (zumbis ignoram os caídos; os bots recuam
+ * atirando e levantam os colegas: aos 7.200 ticks ainda na onda 3, com 34 abates e 3 quedas).
  */
-const GOLDEN_ZOMBIES_HASH = 'eea4c1c8';
+const GOLDEN_ZOMBIES_HASH = '5a793de3';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {

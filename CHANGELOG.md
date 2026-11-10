@@ -20,6 +20,8 @@ Plano em `docs/PLANO_M3.md`.
   pontos na plaquinha, o aviso de caído e o resultado com a onda alcançada.
 - **Fase 2e:** golden do Bobo Zombies (`eea4c1c8`) e o robô das ondas: 4 bots Normal chegam em média à onda 3,7, 1 bot
   à onda 2 (antes da IA de apoio da fase 3).
+- **Fase 3a, caídos e apoio:** os zumbis ignoram quem está caído; os bots recuam atirando e levantam os colegas. Com 4
+  bots, a onda média foi de 3,7 para 4,3.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

@@ -182,6 +182,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   assert(budget.raysPerTick >= 0 && budget.pathNodesPerTick > 0 && budget.pathSlice > 0, 'ai: orçamento inválido');
   const paths = new PathService(api, followers, budget);
   const ctx = new AiContext(hz, isFfaMode(recipe.mode), viewDistance, paths, budget.raysPerTick);
+  ctx.zombiesMode = recipe.mode === 'zombies';
   const total = soldiers.length + zombieBrains.length;
 
   let disposed = false;

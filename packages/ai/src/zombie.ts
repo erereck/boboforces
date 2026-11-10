@@ -10,7 +10,8 @@ import { turnToward } from './soldier.ts';
  * Zumbi do teste de estresse (tecnico.md §8.3: "zumbi é mais barato que soldado"): N0 puro, sem percepção por raio.
  * Sabe onde estão os bobos (como no Bobo Zombies), escolhe o vivo mais perto a cada 0,5 s (1 s longe dos humanos),
  * persegue pela rota do A* (a mesma fila com orçamento dos soldados; o flow field compartilhado é do M3), vai direto
- * nos últimos metros e segura o golpe quando está colado. Pula nas ligações de pulo e quando empaca.
+ * nos últimos metros e segura o golpe quando está colado. Pula nas ligações de pulo e quando empaca. M3 (fase 3a): no
+ * Bobo Zombies, quem está caído não é presa.
  */
 
 const F = ENTITY_FLAG;
@@ -68,7 +69,8 @@ function nearestPrey(c: AiContext, x: number, y: number, z: number): number {
   let best = -1;
   let bestD2 = Infinity;
   for (let j = 0; j < v.count; j++) {
-    if (v.kind[j] !== ENTITY_KIND.bobo || !c.living(j)) continue;
+    // M3 (fase 3a): quem está caído não é presa (não toma dano; o zumbi vai atrás de quem está de pé).
+    if (v.kind[j] !== ENTITY_KIND.bobo || !c.living(j) || (v.flags[j]! & F.downed) !== 0) continue;
     const dx = v.position[j * 3]! - x;
     const dy = v.position[j * 3 + 1]! - y;
     const dz = v.position[j * 3 + 2]! - z;
@@ -118,7 +120,8 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
     zb.target >= 0 &&
     c.living(zb.target) &&
     v.generation[zb.target] === zb.targetGen &&
-    v.kind[zb.target] === ENTITY_KIND.bobo;
+    v.kind[zb.target] === ENTITY_KIND.bobo &&
+    (v.flags[zb.target]! & F.downed) === 0;
   // Alvo morreu: procura outro já; sem ninguém vivo, só no próximo intervalo (não varre todo tick).
   if ((zb.target >= 0 && !valid) || tick >= zb.nextRetargetTick) {
     zb.lodA = c.nearObserver(x, z);

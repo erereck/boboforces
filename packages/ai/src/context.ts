@@ -29,6 +29,8 @@ export class AiContext {
   tick = 0;
   readonly hz: number;
   readonly ffa: boolean;
+  /** M3 (fase 3a): Bobo Zombies (zumbis ignoram os caídos; os bots levantam os colegas). */
+  zombiesMode = false;
   readonly viewDistance: number;
   readonly paths: PathService;
   readonly ctrlToEntity = new Int32Array(MAX_CONTROLLERS_WITH_ZOMBIES);
