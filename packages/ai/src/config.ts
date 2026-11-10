@@ -353,6 +353,13 @@ export const AI_SUPPORT = {
   fightM: 4,
   /** Zumbi mais perto que isto (m): o bot recua atirando. */
   kiteM: 6,
+  /**
+   * M3 (fase 3d): sem alvo à vista e sem colega caído, conserta a janela com tábua faltando mais perto, até
+   * `repairSeekM`: fica `repairSpotM` para dentro do vão, olhando para fora, e segura o usar.
+   */
+  repairSeekM: 20,
+  repairSpotM: 0.8,
+  repairReachM: 0.5,
 } as const;
 
 /** M3 (fase 3c): o flow field dos zumbis (`flow.ts`); o orçamento por tick é o de nós do A* (`AiBudget`). */

@@ -11,6 +11,7 @@ import {
 } from '../config/zombie.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
+import { barricadesSystem } from './barricades.ts';
 import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
 
 const F = ENTITY_FLAG;
@@ -31,6 +32,7 @@ export function zombiesSystem(ctx: SimContext): void {
   const s = ctx.s;
   const w = ctx.waves;
   updateDowned(ctx);
+  barricadesSystem(ctx);
   let bobos = 0;
   let bobosUp = 0;
   let selfComing = false;
@@ -153,6 +155,8 @@ function startWave(ctx: SimContext): void {
   // M3 (fase 3b): o chefão sai primeiro, a cada `bossEvery` ondas (a mais no total da onda).
   w.bossPending = r.bosses && w.wave % ZOMBIE_SPECIALS.bossEvery === 0 ? 1 : 0;
   w.toSpawn += w.bossPending;
+  // M3 (fase 3d): o teto dos pontos de conserto é por onda.
+  s.repairPoints.fill(0);
   // Quem caiu na onda passada volta agora.
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) === 0) continue;

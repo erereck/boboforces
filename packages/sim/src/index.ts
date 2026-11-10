@@ -15,6 +15,7 @@ export * from './sim.ts';
 export * from './fixed-step.ts';
 export * from './loop.ts';
 export * from './map.ts';
+export { MAX_BARRICADES, MAX_DOORS, type BarricadeDef, type BarricadeOutside, type DoorDef } from './map-objects.ts';
 export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './recipe.ts';
 export {
   aimPointLocal,

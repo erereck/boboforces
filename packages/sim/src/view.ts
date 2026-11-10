@@ -97,6 +97,8 @@ export interface SimView {
   readonly colliders: StaticColliders | null;
   /** M1: navegação do mapa (`SimMap.nav`), ou `null` (M0 e testes: a IA anda reto). */
   readonly nav: NavGrid | null;
+  /** M3 (fase 3d): janelas com barricada e portas pagas (estado ao vivo), ou `null` sem nenhuma no mapa. */
+  readonly mapObjects: MapObjectsView | null;
   /**
    * M1 (integração): área jogável em metros (`SimMap.playArea`; paredes invisíveis em X/Z), ou `null` = a grade
    * inteira. A IA não escolhe destino fora dela.
@@ -188,4 +190,25 @@ export function heldClip(view: SimView, e: number): number {
 /** M2: reserva da arma na mão de `e`. */
 export function heldReserve(view: SimView, e: number): number {
   return view.slotReserve[e * WEAPON_SLOT_COUNT + view.slot[e]!]!;
+}
+
+/**
+ * M3 (fase 3d): janelas e portas para o render, o HUD e a IA (SOMENTE LEITURA). Janela `i`: centro do vão nos pés
+ * (`bx/by/bz`), normal para fora (`bnx/bnz`), meia largura (`bhw`), altura (`bh`) e tábuas (`planks`, 0..6).
+ * Porta `d`: caixa (`doorBox[d*6..]`), preço e aberta.
+ */
+export interface MapObjectsView {
+  readonly barricades: number;
+  readonly doors: number;
+  readonly bx: Float32Array;
+  readonly by: Float32Array;
+  readonly bz: Float32Array;
+  readonly bnx: Float32Array;
+  readonly bnz: Float32Array;
+  readonly bhw: Float32Array;
+  readonly bh: Float32Array;
+  readonly planks: Uint8Array;
+  readonly doorBox: Float32Array;
+  readonly doorCost: Int32Array;
+  readonly doorOpen: Uint8Array;
 }

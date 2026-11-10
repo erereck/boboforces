@@ -24,6 +24,7 @@ import {
   weaponDef,
   visibleAimOffset,
   weaponGrip,
+  ZOMBIE_BARRICADES,
   type AimPoint,
   type SimView,
 } from '@boboforces/sim';
@@ -274,6 +275,8 @@ export class SoldierBrain {
   hasGoal = false;
   /** M3 (fase 3a): o colega caído que este bot vai levantar (índice), ou -1. */
   reviveTarget = -1;
+  /** M3 (fase 3d): a janela que este bot vai consertar (índice), ou -1. */
+  repairWindow = -1;
   goalX = 0;
   goalY = 0;
   goalZ = 0;
@@ -1003,6 +1006,13 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     gx = view.position[r3]!;
     gy = view.position[r3 + 1]!;
     gz = view.position[r3 + 2]!;
+  } else if (b.repairWindow >= 0) {
+    // M3 (fase 3d): indo consertar a janela (o ponto do lado de dentro).
+    const mo = view.mapObjects!;
+    const w = b.repairWindow;
+    gx = mo.bx[w]! - mo.bnx[w]! * AI_SUPPORT.repairSpotM;
+    gy = mo.by[w]!;
+    gz = mo.bz[w]! - mo.bnz[w]! * AI_SUPPORT.repairSpotM;
   } else if (b.coverPhase === COVER_PHASE.going) {
     // M2 (fase 3c): indo para a cobertura.
     gx = b.coverX;
@@ -1219,6 +1229,47 @@ function downedAlly(c: AiContext, e: number): number {
   return best;
 }
 
+/** M3 (fase 3d): a janela com tábua faltando mais perto (pelo ponto de conserto, até `repairSeekM`), ou -1. */
+function brokenWindow(view: SimView, e: number): number {
+  const mo = view.mapObjects;
+  if (mo === null) return -1;
+  const e3 = e * 3;
+  let best = -1;
+  let bestD2 = AI_SUPPORT.repairSeekM * AI_SUPPORT.repairSeekM;
+  for (let w = 0; w < mo.barricades; w++) {
+    if (mo.planks[w]! >= ZOMBIE_BARRICADES.planks) continue;
+    const dx = mo.bx[w]! - mo.bnx[w]! * AI_SUPPORT.repairSpotM - view.position[e3]!;
+    const dy = mo.by[w]! - view.position[e3 + 1]!;
+    const dz = mo.bz[w]! - mo.bnz[w]! * AI_SUPPORT.repairSpotM - view.position[e3 + 2]!;
+    const d2 = dx * dx + dy * dy * 4 + dz * dz;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = w;
+    }
+  }
+  return best;
+}
+
+/** M3 (fase 3d): vai até o ponto de conserto e, lá, olha para fora da janela e segura o usar (a sim repõe). */
+function repairStep(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  t: SoldierTiming,
+  local: { x: number; y: number },
+): number {
+  const view = c.view!;
+  const mo = view.mapObjects!;
+  const w = b.repairWindow;
+  const dx = mo.bx[w]! - mo.bnx[w]! * AI_SUPPORT.repairSpotM - view.position[e * 3]!;
+  const dz = mo.bz[w]! - mo.bnz[w]! * AI_SUPPORT.repairSpotM - view.position[e * 3 + 2]!;
+  if (dx * dx + dz * dz > AI_SUPPORT.repairReachM * AI_SUPPORT.repairReachM) return travel(c, b, e, t);
+  b.aimYaw = turnToward(b.aimYaw, Math.atan2(-mo.bnx[w]!, -mo.bnz[w]!), b.turnStep);
+  local.x = 0;
+  local.y = 0;
+  return BUTTON.use;
+}
+
 /** M3 (fase 3a): o alvo visível é um zumbi a menos de `fightM` (atira em vez de ir levantar alguém). */
 function zombieClose(view: SimView, b: SoldierBrain, e: number): boolean {
   if (b.target < 0 || !b.targetVisible || view.kind[b.target] !== ENTITY_KIND.zombie) return false;
@@ -1328,10 +1379,20 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   // M3 (fase 3a): no Bobo Zombies, o colega caído mais perto (sem zumbi colado: aí atira primeiro).
   b.reviveTarget =
     c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(view, b, e) ? downedAlly(c, e) : -1;
+  // M3 (fase 3d): sem ninguém para levantar e sem alvo à vista, conserta a janela mais perto.
+  const repairWindow =
+    c.zombiesMode && b.reviveTarget < 0 && !b.targetVisible && (view.flags[e]! & F.downed) === 0
+      ? brokenWindow(view, e)
+      : -1;
+  if (repairWindow !== b.repairWindow) b.follower.invalidate();
+  b.repairWindow = repairWindow;
   // M2 (fase 3g): fingir de morto e a dancinha tomam o tick inteiro.
-  const override = b.reviveTarget >= 0 ? -1 : personaOverride(view, b, e, tick, t, local);
+  const override = b.reviveTarget >= 0 || b.repairWindow >= 0 ? -1 : personaOverride(view, b, e, tick, t, local);
   if (b.reviveTarget >= 0) {
     buttons = reviveStep(c, b, e, t, local);
+    b.progressTick = tick;
+  } else if (b.repairWindow >= 0) {
+    buttons = repairStep(c, b, e, t, local);
     b.progressTick = tick;
   } else if (override >= 0) {
     buttons = override;

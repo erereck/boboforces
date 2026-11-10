@@ -69,6 +69,7 @@ import { pickupSystem } from './systems/pickups.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
 import type { MatchView, PickupView, ProjectileView, SimView } from './view.ts';
+import { MapObjects, type BarricadeDef, type DoorDef } from './map-objects.ts';
 
 /** Ponto de spawn declarado pelo mapa (metros, radianos). `team` = -1 para FFA/qualquer time. */
 export interface SpawnPoint {
@@ -95,6 +96,10 @@ export interface SimMap {
   readonly killPlaneY?: number;
   /** M1: área jogável (paredes invisíveis em X/Z, metros); ausente = a grade inteira. */
   readonly playArea?: { readonly minX: number; readonly minZ: number; readonly maxX: number; readonly maxZ: number };
+  /** M3 (fase 3d): janelas com barricada do Bobo Zombies (ausente = nenhuma). */
+  readonly barricades?: readonly BarricadeDef[];
+  /** M3 (fase 3d): portas pagas do Bobo Zombies (ausente = nenhuma). */
+  readonly doors?: readonly DoorDef[];
 }
 
 export interface SimConfig {
@@ -339,6 +344,11 @@ export function createSim(config: SimConfig): Sim {
   const countdownS = config.countdownS ?? 0;
   assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
   const countdownTicks = secondsToTicks(countdownS, hz);
+  // M3 (fase 3d): janelas e portas montam os dois conjuntos de colisão (bobos e zumbis) e os portões da navegação.
+  const mapObjects =
+    (map.barricades?.length ?? 0) + (map.doors?.length ?? 0) > 0
+      ? new MapObjects(map.colliders ?? null, map.nav ?? null, map.barricades ?? [], map.doors ?? [])
+      : null;
   const match: MatchState = {
     phase: countdownTicks > 0 ? 'warmup' : 'playing',
     ticksLeft: timeLimitS > 0 ? Math.max(1, secondsToTicks(timeLimitS, hz)) : -1,
@@ -354,7 +364,9 @@ export function createSim(config: SimConfig): Sim {
     match,
     grid: map.grid,
     blocks: map.blocks,
-    colliders: map.colliders ?? null,
+    colliders: mapObjects?.boboColliders ?? map.colliders ?? null,
+    zombieColliders: mapObjects?.zombieColliders ?? map.colliders ?? null,
+    mapObjects,
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
     profile: resolveMovementProfile(recipe.players),
@@ -538,8 +550,9 @@ export function createSim(config: SimConfig): Sim {
     match: matchView,
     world: map.grid,
     blocks: map.blocks,
-    colliders: map.colliders ?? null,
+    colliders: ctx.colliders,
     nav: map.nav ?? null,
+    mapObjects,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
   };
@@ -652,6 +665,8 @@ export function createSim(config: SimConfig): Sim {
     },
     readSnapshot(r): void {
       readState(ctx, r);
+      // M3 (fase 3d): tábuas e portas do snapshot voltam para a colisão e a navegação.
+      mapObjects?.sync();
       // O tick volta e as posições mudam: as caixas guardadas do tick não valem mais.
       ctx.figures.invalidate();
       events.clear();

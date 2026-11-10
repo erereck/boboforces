@@ -129,7 +129,6 @@ function zombieTicksFor(type: number): ProfileTicks {
 export function movementSystem(ctx: SimContext): void {
   const s = ctx.s;
   const dt = ctx.dt;
-  const colliders = ctx.colliders;
   const area = ctx.playArea;
   const hw = METRICS.aabbWidth / 2;
   boboTicks.update(ctx.profile, ctx.hz);
@@ -144,6 +143,8 @@ export function movementSystem(ctx: SimContext): void {
     if (s.alive[e] === 0 || !isBody(kind)) continue;
     let fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) continue;
+    // M3 (fase 3d): o zumbi bate nas tábuas da janela; o bobo, na janela inteira (as portas valem para os dois).
+    const colliders = kind === ENTITY_KIND.zombie ? ctx.zombieColliders : ctx.colliders;
     const pt =
       kind === ENTITY_KIND.zombie ? zombieTicksFor(s.zombieType[e]!) : (fl & F.downed) !== 0 ? downedTicks : boboTicks;
     const p = pt.profile!;

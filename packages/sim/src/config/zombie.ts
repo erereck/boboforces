@@ -198,3 +198,28 @@ export function runnerChance(wave: number): number {
   if (wave >= Z.allRunFrom) return 1;
   return (wave - Z.runnersFrom + 1) / (Z.allRunFrom - Z.runnersFrom + 1);
 }
+
+/**
+ * M3 (fase 3d): janelas com barricada e portas pagas (GDD §4.1.5, gameplay.md §8.7). 6 tábuas; o zumbi do lado de fora
+ * arranca 1 a cada 1,5 s (o chefão, todas de uma vez); o bobo do lado de dentro segurando o usar repõe 1 por
+ * `repairS`, com 10 pontos por tábua até 50 por onda. A porta abre com o usar (na borda) a até `doorReachM` dela, se
+ * o bobo tem os pontos. O tempo do conserto, os alcances e as medidas da caixa são escolhas minhas (revisáveis).
+ */
+export const ZOMBIE_BARRICADES = {
+  planks: 6,
+  tearS: 1.5,
+  repairS: 1,
+  repairPoints: 10,
+  repairPointsPerWave: 50,
+  /** Do plano da janela até o centro do zumbi, do lado de fora, para arrancar (m). */
+  tearReachM: 0.9,
+  /** Do plano da janela até o centro do bobo, do lado de dentro, para consertar (m). */
+  repairReachM: 1.5,
+  /** Folga além da meia largura do vão, no plano da parede (m). */
+  sideSlackM: 0.4,
+  /** Da caixa da porta até o centro do bobo, no plano, para comprar (m). */
+  doorReachM: 1.5,
+  /** Espessura da caixa das tábuas e altura padrão do vão (m). */
+  thicknessM: 0.2,
+  heightM: 2,
+} as const;

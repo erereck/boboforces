@@ -7,6 +7,7 @@ import type { MovementProfile } from './config/movement.ts';
 import { ENTITY_KIND, type EntityId } from './entity.ts';
 import type { EventQueue } from './event-queue.ts';
 import type { FigureHitCache } from './hitbox.ts';
+import type { MapObjects } from './map-objects.ts';
 import type { SpawnPoint } from './sim.ts';
 import type { SimState } from './state.ts';
 import type { MatchPhase } from './view.ts';
@@ -185,6 +186,13 @@ export interface SimContext {
   readonly blocks: BlockRegistry;
   /** Caixas das props (colisão e raios), ou `null` (só a grade). */
   readonly colliders: StaticColliders | null;
+  /**
+   * M3 (fase 3d): colisão dos zumbis (com as tábuas no lugar das janelas); sem janelas nem portas no mapa, a mesma das
+   * props. O `colliders` acima é o dos bobos, dos tiros e da visão.
+   */
+  readonly zombieColliders: StaticColliders | null;
+  /** M3 (fase 3d): janelas com barricada e portas pagas do mapa (null = nenhuma). */
+  readonly mapObjects: MapObjects | null;
   readonly spawns: readonly SpawnPoint[];
   /** Perfil de movimento do bobo (da receita) e do zumbi. */
   readonly profile: MovementProfile;

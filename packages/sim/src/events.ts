@@ -207,6 +207,27 @@ export interface WaveEvent extends EventBase {
   readonly action: 'start' | 'clear';
 }
 
+/**
+ * M3 (fase 3d): janela `index`: um zumbi arrancou uma tábua (`tear`), o chefão arrancou todas (`break`) ou um bobo
+ * repôs uma (`repair`); `planks` = quantas sobraram; `by` = quem.
+ */
+export interface BarricadeEvent extends EventBase {
+  readonly type: 'barricade';
+  readonly index: number;
+  readonly action: 'tear' | 'break' | 'repair';
+  readonly planks: number;
+  readonly by: EntityId;
+}
+
+/** M3 (fase 3d): porta `index`: `by` comprou (`open`) ou tentou sem pontos (`denied`); `cost` = o preço. */
+export interface DoorEvent extends EventBase {
+  readonly type: 'door';
+  readonly index: number;
+  readonly action: 'open' | 'denied';
+  readonly cost: number;
+  readonly by: EntityId;
+}
+
 export type SimEvent =
   | ShotEvent
   | HitEvent
@@ -222,6 +243,8 @@ export type SimEvent =
   | ProjectileEvent
   | ExplosionEvent
   | PickupEvent
-  | UnstuckEvent;
+  | UnstuckEvent
+  | BarricadeEvent
+  | DoorEvent;
 
 export type SimEventType = SimEvent['type'];

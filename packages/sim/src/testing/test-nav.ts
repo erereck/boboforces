@@ -318,6 +318,9 @@ export function buildTestNav(world: NavWorld, metrics: NavMetrics): TestNavGrid 
       out[offset + 1] = floorY[node]!;
       out[offset + 2] = (c - cx) / columnsX + 0.5;
     },
+    // M3 (fase 3d): a navegação de teste não tem portões (as barricadas e portas só valem na de verdade).
+    assignGates() {},
+    setGateBlock() {},
   };
 }
 

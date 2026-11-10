@@ -1,5 +1,5 @@
 import type { NavGridImpl } from './build.ts';
-import { NO_NAV_NODE, type NavNode } from './constants.ts';
+import { NAV_GATE_BLOCK, NO_NAV_NODE, type NavNode } from './constants.ts';
 import type { FlowField } from './index.ts';
 
 /**
@@ -130,6 +130,8 @@ export class FlowFieldImpl implements FlowField {
     const inLink = this.inLink;
     const pos = this.heapPos;
     const target = this.target;
+    const linkGate = nav.linkGate;
+    const gateBlock = nav.gateBlock;
     let closed = 0;
     while (this.heapSize > 0 && closed < budget) {
       const v = this.pop();
@@ -149,6 +151,9 @@ export class FlowFieldImpl implements FlowField {
         const u = inFrom[k]!;
         if (pos[u] === CLOSED) continue;
         const l = inLink[k]!;
+        // M3 (fase 3d): portão fechado para os zumbis (porta paga fechada).
+        const gate = linkGate[l]!;
+        if (gate >= 0 && (gateBlock[gate]! & NAV_GATE_BLOCK.zombie) !== 0) continue;
         const nd = dv + cost[l]!;
         if (nd >= dist[u]!) continue;
         dist[u] = nd;

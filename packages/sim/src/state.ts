@@ -150,6 +150,8 @@ export class SimState {
   readonly zombieType = new Uint8Array(MAX_ENTITIES);
   /** M3 (fase 3b): escala do corpo (Chonker 1,3, chefão 1,8): a hitbox e o desenho crescem juntos; 1 = normal. */
   readonly bodyScale = new Float32Array(MAX_ENTITIES).fill(1);
+  /** M3 (fase 3d): pontos de conserto de barricada ganhos nesta onda (o teto é `repairPointsPerWave`). */
+  readonly repairPoints = new Uint8Array(MAX_ENTITIES);
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies. */
   readonly points = new Int32Array(MAX_ENTITIES);
   /**
@@ -247,6 +249,7 @@ export class SimState {
       f('selfUp', this.selfUp),
       f('reviveTicks', this.reviveTicks),
       f('reviver', this.reviver),
+      f('repairPoints', this.repairPoints),
     ];
   }
 

@@ -10,6 +10,8 @@ import type {
   KillEvent,
   MatchPhaseEvent,
   WaveEvent,
+  BarricadeEvent,
+  DoorEvent,
   DownEvent,
   MoveEvent,
   PickupEvent,
@@ -151,6 +153,14 @@ export class EventQueue {
     () => ({ type: 'wave', tick: 0, wave: 0, action: 'start' }),
     2,
   );
+  private readonly barricades = new EventPool<Mutable<BarricadeEvent>>(
+    () => ({ type: 'barricade', tick: 0, index: 0, action: 'tear', planks: 0, by: 0 }),
+    4,
+  );
+  private readonly doors = new EventPool<Mutable<DoorEvent>>(
+    () => ({ type: 'door', tick: 0, index: 0, action: 'open', cost: 0, by: 0 }),
+    2,
+  );
   private readonly projectiles = new EventPool<Mutable<ProjectileEvent>>(
     () => ({
       type: 'projectile',
@@ -208,6 +218,8 @@ export class EventQueue {
     this.melees.reset();
     this.phases.reset();
     this.waves.reset();
+    this.barricades.reset();
+    this.doors.reset();
     this.downs.reset();
     this.projectiles.reset();
     this.explosions.reset();
@@ -478,6 +490,28 @@ export class EventQueue {
     e.entity = entity;
     e.by = by;
     e.action = action;
+    this.push(e);
+  }
+
+  /** M3 (fase 3d). */
+  barricade(tick: number, index: number, action: 'tear' | 'break' | 'repair', planks: number, by: EntityId): void {
+    const e = this.barricades.acquire();
+    e.tick = tick;
+    e.index = index;
+    e.action = action;
+    e.planks = planks;
+    e.by = by;
+    this.push(e);
+  }
+
+  /** M3 (fase 3d). */
+  door(tick: number, index: number, action: 'open' | 'denied', cost: number, by: EntityId): void {
+    const e = this.doors.acquire();
+    e.tick = tick;
+    e.index = index;
+    e.action = action;
+    e.cost = cost;
+    e.by = by;
     this.push(e);
   }
 

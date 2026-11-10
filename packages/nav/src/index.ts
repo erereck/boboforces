@@ -13,7 +13,7 @@ import { NO_NAV_NODE, type NavNode } from './constants.ts';
 import { FlowFieldImpl } from './flow.ts';
 import { createNavPathImpl, findPathImpl, type NavPathImpl } from './search.ts';
 
-export { NAV_LINK, NAV_NODE_CELLS, NAV_NODE_SIZE_M, NO_NAV_NODE } from './constants.ts';
+export { MAX_NAV_GATES, NAV_GATE_BLOCK, NAV_LINK, NAV_NODE_CELLS, NAV_NODE_SIZE_M, NO_NAV_NODE } from './constants.ts';
 export type { NavLinkKind, NavNode } from './constants.ts';
 export { NAV_COST, type NavGridImpl } from './build.ts';
 export { SEARCH_SLOTS, SMOOTH_LOOKAHEAD } from './search.ts';
@@ -65,6 +65,13 @@ export interface NavGrid {
   nearestNode(x: number, y: number, z: number): NavNode;
   /** Centro do nó em metros (pés), escrito em `out[offset..offset+2]`. */
   nodePosition(node: NavNode, out: Float32Array | Float64Array, offset?: number): void;
+  /**
+   * M3 (fase 3d): prende ao portão `g` (0..count-1, até `MAX_NAV_GATES`) as ligações que atravessam a caixa `g`
+   * (`boxes[g*6..]`: minX, minY, minZ, maxX, maxY, maxZ em metros) e solta todos (bloqueio 0). Na criação da sim.
+   */
+  assignGates(boxes: Float32Array, count: number): void;
+  /** M3 (fase 3d): quem não passa pelo portão `g` (bits de `NAV_GATE_BLOCK`; 0 = todos passam). */
+  setGateBlock(gate: number, block: number): void;
 }
 
 /** Monta a grade de navegação a partir do mundo. Só no loading e no `mapc`. */

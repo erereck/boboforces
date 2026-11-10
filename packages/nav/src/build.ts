@@ -13,7 +13,7 @@ import {
   shapeFloorHeight,
   type ShapeId,
 } from '@boboforces/world';
-import { NAV_LINK, NAV_NODE_CELLS, NAV_NODE_SIZE_M, NO_NAV_NODE, type NavNode } from './constants.ts';
+import { MAX_NAV_GATES, NAV_LINK, NAV_NODE_CELLS, NAV_NODE_SIZE_M, NO_NAV_NODE, type NavNode } from './constants.ts';
 import type { NavGrid, NavMetrics, NavWorld } from './index.ts';
 import { createSearchPool, type SearchPool } from './search.ts';
 
@@ -69,6 +69,9 @@ export interface NavGridImpl extends NavGrid {
   readonly linkKind: Uint8Array;
   readonly linkCost: Float32Array;
   readonly componentCount: number;
+  /** M3 (fase 3d): portão de cada ligação (-1 = nenhum) e o bloqueio de cada portão (`NAV_GATE_BLOCK`). */
+  readonly linkGate: Int16Array;
+  readonly gateBlock: Uint8Array;
   /** Caminhos criados (`createNavPath`) e as áreas de trabalho do A* compartilhadas. */
   pathCount: number;
   readonly search: SearchPool;
@@ -607,6 +610,8 @@ export function buildNavGridImpl(world: NavWorld, metrics: NavMetrics): NavGridI
     linkKind,
     linkCost,
     componentCount,
+    linkGate: new Int16Array(linkTarget.length).fill(-1),
+    gateBlock: new Uint8Array(MAX_NAV_GATES),
     pathCount: 0,
     search: createSearchPool(nodeCount),
     nearestNode(x, y, z) {
@@ -645,6 +650,73 @@ export function buildNavGridImpl(world: NavWorld, metrics: NavMetrics): NavGridI
       out[offset + 1] = floorY[node]!;
       out[offset + 2] = (k + 0.5) * NAV_NODE_SIZE_M;
     },
+    assignGates(boxes, count) {
+      assignGatesImpl(nav, boxes, count);
+    },
+    setGateBlock(gate, block) {
+      if (gate >= 0 && gate < MAX_NAV_GATES) nav.gateBlock[gate] = block;
+    },
   };
   return nav;
+}
+
+/**
+ * M3 (fase 3d): a ligação u → v atravessa a caixa do portão se o segmento entre os centros dos nós, na altura do peito
+ * (piso + 1 m), corta a caixa (teste de placas). Recalcula todas as ligações e solta todos os bloqueios.
+ */
+function assignGatesImpl(nav: NavGridImpl, boxes: Float32Array, count: number): void {
+  const n = Math.min(count, MAX_NAV_GATES);
+  nav.linkGate.fill(-1);
+  nav.gateBlock.fill(0);
+  if (n <= 0) return;
+  const a = new Float32Array(3);
+  const b = new Float32Array(3);
+  for (let u = 0; u < nav.nodeCount; u++) {
+    nav.nodePosition(u, a);
+    for (let l = nav.linkStart[u]!; l < nav.linkStart[u + 1]!; l++) {
+      nav.nodePosition(nav.linkTarget[l]!, b);
+      for (let g = 0; g < n; g++) {
+        if (segmentHitsBox(a[0]!, a[1]! + 1, a[2]!, b[0]!, b[1]! + 1, b[2]!, boxes, g * 6)) {
+          nav.linkGate[l] = g;
+          break;
+        }
+      }
+    }
+  }
+}
+
+/** O segmento a → b corta a caixa `boxes[o..o+5]` (placas, sem alocação). */
+function segmentHitsBox(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  boxes: Float32Array,
+  o: number,
+): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  for (let k = 0; k < 3; k++) {
+    const min = boxes[o + k]!;
+    const max = boxes[o + 3 + k]!;
+    const p = k === 0 ? ax : k === 1 ? ay : az;
+    const d = (k === 0 ? bx : k === 1 ? by : bz) - p;
+    if (Math.abs(d) < 1e-9) {
+      if (p < min || p > max) return false;
+      continue;
+    }
+    let ta = (min - p) / d;
+    let tb = (max - p) / d;
+    if (ta > tb) {
+      const t = ta;
+      ta = tb;
+      tb = t;
+    }
+    if (ta > t0) t0 = ta;
+    if (tb < t1) t1 = tb;
+    if (t0 > t1) return false;
+  }
+  return true;
 }

@@ -1,6 +1,14 @@
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import { DEG_TO_RAD, pitchToI16, yawToU16, type Rng } from '@boboforces/shared';
-import { ENTITY_FLAG, ENTITY_KIND, secondsToTicks, ZOMBIE_SPECIALS, ZOMBIE_TYPE } from '@boboforces/sim';
+import {
+  ENTITY_FLAG,
+  ENTITY_KIND,
+  secondsToTicks,
+  ZOMBIE_BARRICADES,
+  ZOMBIE_SPECIALS,
+  ZOMBIE_TYPE,
+  type SimView,
+} from '@boboforces/sim';
 import { AI_PATH, AI_ZOMBIE } from './config.ts';
 import type { AiContext } from './context.ts';
 import { createSteer, type PathFollower } from './paths.ts';
@@ -89,6 +97,24 @@ function nearestPrey(c: AiContext, x: number, y: number, z: number): number {
     }
   }
   return best;
+}
+
+/** M3 (fase 3d): a janela com tábua de cujo lado de fora o zumbi está colado (a sim deixa ele arrancar), ou -1. */
+function windowAhead(v: SimView, x: number, y: number, z: number, scale: number): number {
+  const mo = v.mapObjects;
+  if (mo === null) return -1;
+  const reach = ZOMBIE_BARRICADES.tearReachM * scale;
+  for (let w = 0; w < mo.barricades; w++) {
+    if (mo.planks[w] === 0) continue;
+    const dx = x - mo.bx[w]!;
+    const dz = z - mo.bz[w]!;
+    const dn = dx * mo.bnx[w]! + dz * mo.bnz[w]!;
+    const dt = Math.abs(dx * mo.bnz[w]! - dz * mo.bnx[w]!);
+    if (dn > 0 && dn <= reach && dt <= mo.bhw[w]! + ZOMBIE_BARRICADES.sideSlackM && Math.abs(y - mo.by[w]!) <= 1) {
+      return w;
+    }
+  }
+  return -1;
 }
 
 export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: ZombieTiming): void {
@@ -201,6 +227,21 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
       buttons |= BUTTON.fire;
       wx *= 0.3;
       wz *= 0.3;
+    }
+
+    // M3 (fase 3d): colado do lado de fora de uma janela com tábua: bate nelas (a sim arranca uma a cada 1,5 s),
+    // virado para dentro, e continua empurrando. Não está preso.
+    const w = windowAhead(v, x, y, z, v.bodyScale[e]!);
+    if (w >= 0) {
+      const mo = v.mapObjects!;
+      buttons |= BUTTON.melee;
+      zb.aimYaw = turnToward(zb.aimYaw, Math.atan2(mo.bnx[w]!, mo.bnz[w]!), t.turnStep);
+      zb.progressTick = tick;
+      zb.progressX = x;
+      zb.progressZ = z;
+      zb.stuckTick = tick;
+      zb.stuckX = x;
+      zb.stuckZ = z;
     }
 
     // M3 (fase 3c): preso de vez (enroscado numa quina, no ar): Destravar (a sim leva a um ponto de nascer).

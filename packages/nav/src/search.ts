@@ -1,4 +1,4 @@
-import { NAV_LINK, NAV_NODE_SIZE_M, NO_NAV_NODE, type NavNode } from './constants.ts';
+import { NAV_GATE_BLOCK, NAV_LINK, NAV_NODE_SIZE_M, NO_NAV_NODE, type NavNode } from './constants.ts';
 import type { NavGridImpl } from './build.ts';
 import type { NavPath, PathStatus } from './index.ts';
 
@@ -266,6 +266,8 @@ export function findPathImpl(
   const linkStart = nav.linkStart;
   const linkTarget = nav.linkTarget;
   const linkCost = nav.linkCost;
+  const linkGate = nav.linkGate;
+  const gateBlock = nav.gateBlock;
   for (let work = 0; work < budget; work++) {
     if (slot.heapSize === 0) return finish(nav, out, 'unreachable');
     const cur = heapPop(slot);
@@ -277,6 +279,9 @@ export function findPathImpl(
     slot.heapPos[cur] = CLOSED;
     const gCur = slot.g[cur]!;
     for (let l = linkStart[cur]!; l < linkStart[cur + 1]!; l++) {
+      // M3 (fase 3d): portão fechado para os bobos (janela com barricada, porta paga fechada).
+      const gate = linkGate[l]!;
+      if (gate >= 0 && (gateBlock[gate]! & NAV_GATE_BLOCK.bobo) !== 0) continue;
       const nb = linkTarget[l]!;
       const cost = gCur + linkCost[l]!;
       if (slot.stamp[nb] !== gen) {
@@ -325,6 +330,8 @@ function walkLinkToColumn(nav: NavGridImpl, a: number, ci: number, ck: number): 
   for (let l = nav.linkStart[a]!; l < nav.linkStart[a + 1]!; l++) {
     const kind = nav.linkKind[l]!;
     if (kind !== NAV_LINK.walk && kind !== NAV_LINK.step) continue;
+    const gate = nav.linkGate[l]!;
+    if (gate >= 0 && (nav.gateBlock[gate]! & NAV_GATE_BLOCK.bobo) !== 0) continue;
     const b = nav.linkTarget[l]!;
     if (nav.nodeColumn[b] === col) return b;
   }

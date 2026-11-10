@@ -2359,3 +2359,27 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   com 24 zumbis o flow empata com o A* por zumbi no JIT e ganha um pouco no `--jitless`; com 60, gasta a metade (JIT)
   ou um terço (`--jitless`). Robô das ondas: média **4,0** (igual; os pedidos de A* caíram de ~950 para ~210 por
   partida, os que sobram são dos bots). Golden do modo: `4f85c2b3`.
+
+### 13.15 Fase 3d, parte 1: janelas com barricada e portas pagas na sim, na navegação e na IA (10/11/2026)
+
+- **Entidades com estado** (`sim/map-objects.ts`, `SimMap.barricades` e `SimMap.doors`; até 32 janelas e 16 portas):
+  janela = vão no chão (centro nos pés, lado de fora em ±X/±Z, largura; altura padrão 2 m) com 6 tábuas; porta = caixa
+  e preço. Tábuas, conserto em andamento, porta aberta e os pontos de conserto da onda vão no snapshot (versão 9) e no
+  hash; mapa sem janela nem porta não muda nada (o golden do Warfare é o mesmo).
+- **Colisão em dois conjuntos**, montados na criação a partir das props (mesmos índices: o `ImpactEvent.prop` continua
+  valendo): o dos bobos (`SimContext.colliders`, também tiros e visão) com as portas fechadas e as janelas (bobo não
+  atravessa; tiro e visão passam), e o dos zumbis (`zombieColliders`) com as portas e as tábuas (a janela fecha
+  enquanto sobra tábua). Mudar o estado só troca os bits `solid`; o movimento escolhe o conjunto pelo tipo.
+- **Navegação:** portões no `nav` (`NavGrid.assignGates` e `setGateBlock`, contrato novo; a navegação de teste da
+  sim ignora): a ligação que atravessa a caixa de uma janela ou porta fica presa a ela. Janela: fechada para os bobos (o
+  A* dos bots); porta fechada: para todos (o flow field dos zumbis também); comprada: aberta.
+- **Regras** (`systems/barricades.ts`, dentro do diretor de ondas; `ZOMBIE_BARRICADES`): o zumbi colado do lado de
+  fora arranca 1 tábua a cada 1,5 s (o chefão, todas de uma vez); o bobo de pé do lado de dentro segurando o usar repõe
+  1 por segundo, com 10 pontos até 50 por onda; o usar (na borda) a até 1,5 m de uma porta fechada compra, se o bobo tem
+  os pontos (senão, o evento `door` `denied`). Eventos novos: `barricade` (`tear`, `break`, `repair`) e
+  `door` (`open`, `denied`). O tempo do conserto, os alcances e a caixa (0,2 m de espessura) são escolhas minhas.
+- **IA:** o zumbi colado na janela com tábua bate nelas, virado para dentro (não conta como preso); o flow field passa
+  pela janela. O bot de apoio, sem colega caído e sem alvo à vista, vai até 0,8 m para dentro da janela com tábua
+  faltando mais perto (até 20 m) e segura o usar; aparecendo um zumbi, atira primeiro.
+- **Falta (parte 2):** marcadores no `.bfmap` e no `mapc`, desenho das tábuas e das portas, avisos no HUD
+  ("Segure para consertar", "Porta: 750") e um mapa de teste com janelas e portas até a Base Abandonada.

@@ -18,7 +18,8 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 5 (M2): granada cozinhando e o pool de projéteis (fase 1b).
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
-const SNAPSHOT_VERSION = 8;
+// 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
+const SNAPSHOT_VERSION = 9;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -53,6 +54,11 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     ctx.rngZombies.saveState(rngScratch);
     h.bytes(rngScratch);
     for (const f of s.zombieFields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  }
+  // M3 (fase 3d): janelas e portas (só nos mapas que têm: o hash dos outros não muda).
+  const mo = ctx.mapObjects;
+  if (mo !== null) {
+    h.bytes(mo.planks).bytes(mo.tearTicks).bytes(mo.repairTicks).bytes(mo.repairer).bytes(mo.doorOpen);
   }
   return h.digest();
 }
@@ -119,6 +125,14 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
     writeArray(w, rngScratch, RNG_STATE_WORDS);
     for (const f of s.zombieFields) writeArray(w, f.array, s.count * f.stride);
   }
+  const mo = ctx.mapObjects;
+  if (mo !== null) {
+    writeArray(w, mo.planks, mo.barricades);
+    writeArray(w, mo.tearTicks, mo.barricades);
+    writeArray(w, mo.repairTicks, mo.barricades);
+    writeArray(w, mo.repairer, mo.barricades);
+    writeArray(w, mo.doorOpen, mo.doors);
+  }
 }
 
 /**
@@ -173,5 +187,14 @@ export function readState(ctx: SimContext, r: BitReader): void {
     readArray(r, rngScratch, RNG_STATE_WORDS);
     ctx.rngZombies.loadState(rngScratch);
     for (const f of s.zombieFields) readArray(r, f.array, s.count * f.stride);
+  }
+  // M3 (fase 3d): quem chama aplica na colisão e na navegação (`MapObjects.sync`).
+  const mo = ctx.mapObjects;
+  if (mo !== null) {
+    readArray(r, mo.planks, mo.barricades);
+    readArray(r, mo.tearTicks, mo.barricades);
+    readArray(r, mo.repairTicks, mo.barricades);
+    readArray(r, mo.repairer, mo.barricades);
+    readArray(r, mo.doorOpen, mo.doors);
   }
 }

@@ -26,6 +26,9 @@ Plano em `docs/PLANO_M3.md`.
   longe) e o Mega Bobo a cada 5 ondas (1,8× maior, 3000 de vida por humano); a hitbox cresce com o corpo.
 - **Fase 3c, flow field:** os zumbis seguem um campo de direções compartilhado até o bobo de pé mais perto (com 60
   zumbis, metade do custo do A* por zumbi); o zumbi enroscado num canto volta a um ponto de nascer depois de 8 s.
+- **Fase 3d, parte 1 (janelas e portas na sim):** janelas com 6 tábuas (o zumbi arranca 1 a cada 1,5 s, o chefão todas;
+  segurar o usar de dentro repõe, 10 pontos por tábua até 50 por onda) e portas pagas que abrem colisão e caminho; os
+  bots de apoio consertam janela quando não tem zumbi à vista. Ainda sem mapa nem desenho.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
