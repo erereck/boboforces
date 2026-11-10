@@ -2136,3 +2136,23 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Switch:** continua automático (um assento por controle completo, todos com o P1) até a tela "Jogar no sofá" (1b).
 - **Conferido:** `seats.test.ts`; no Edge, 3 controles falsos com o P2 contra (portão da web aberto só durante o
   teste): o P2 joga no time azul, os outros dois no laranja, e o Start do P3 pausa.
+
+### 13.2 Fase 1b: a tela "Jogar no sofá" (09/11/2026)
+
+- **Onde:** no menu principal, depois de Modos (o JOGAR do título continua solo: quem pega outro controle não vira P2
+  sem querer). No Switch o teste do sofá automático saiu; o caminho é o mesmo (Mudar → Jogar no sofá).
+- **Quem é o P1:** o dispositivo que abriu a tela (`menuInput.lastDevice`). Ele passa a ser o **dono dos menus**
+  (`MenuInput.setOwner`): só ele navega até o sofá acabar. Os outros entram pelo `LocalPlayers` do M0 (A, botão da
+  direita ou Start no controle; Enter ou Espaço no teclado), trocam o próprio lado com esquerda e direita e saem com o
+  voltar, lidos por dispositivo (`MenuInput.pressedBy`).
+- **Lado:** só nos presets de times (TDM): "Com o P1" ou "Contra o P1" (a 1a põe o "contra" no time 1).
+- **Partida:** o P1 escolhe entre o último preset (o do JOGAR) e os de fábrica; Começar (ou o Start dele) joga com os
+  assentos. Sair da partida volta para a tela do sofá com os mesmos jogadores; Voltar fecha o sofá. Mudar regras e
+  Abrir Laboratório também fecham o sofá (as telas de edição são do P1 sozinho).
+- **UI:** `couchScreen` (`ui/screens/couch.ts`), 4 cartões com o símbolo e a cor do jogador. `BoxNode.icon`
+  desenha o símbolo do HUD (▲ ● ■ ◆) numa caixa, sem glifo novo no atlas (que está cheio).
+- **Tamanho:** o menu foi a 348,3 de 350 KB (+2,6 KB). A próxima tela de menu pede antes o chunk preguiçoso das telas de
+  edição (pendência do M2).
+- **Conferido:** `menu-input.test`, `couch.test`, o teste do fluxo no `game.test` (entra, lado, sai, Começar, volta
+  da partida) e no Edge (`local/m3/capturar-sofa-tela.ts`): teclado como P1, o controle 2 contra e o 3 com o P1, e a
+  partida em 3 vistas com o P2 no time azul.

@@ -61,6 +61,12 @@ export interface BoxNode extends NodeBase {
   readonly chamfer?: boolean;
   /** Faixa zebrada diagonal (só avisos e "sair da partida"). */
   readonly stripes?: boolean;
+  /**
+   * M3 (fase 1b): o símbolo de um jogador local no centro da caixa (0 ▲, 1 ●, 2 ■, 3 ◆; o mesmo do HUD), do tamanho do
+   * menor lado, na cor `iconColor` (padrão `texto`).
+   */
+  readonly icon?: number;
+  readonly iconColor?: number;
   readonly children?: readonly UiNode[];
 }
 

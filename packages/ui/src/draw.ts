@@ -1,6 +1,7 @@
 import { popClip, pushClip, pushRect, pushShape, type DrawList } from './draw-list.ts';
 import { optionArrows } from './focus.ts';
 import { drawText } from './font.ts';
+import { paintIcon } from './paint.ts';
 import type { LayoutResult, ScrollInfo } from './layout.ts';
 import { BUTTON, CHAMFER, COLORS, OPTION, withAlpha } from './tokens.ts';
 import type { ButtonNode, Rect, TextNode, UiNode } from './tree.ts';
@@ -169,6 +170,10 @@ function drawNode(layout: LayoutResult, node: UiNode, focusedId: string | null, 
       if (node.borderColor !== undefined) {
         const stroke = Math.max(1, Math.round((node.border ?? 1) * s));
         pushShape(out, r.x, r.y, r.w, r.h, node.borderColor, chamfer, stroke);
+      }
+      if (node.icon !== undefined) {
+        const size = Math.min(r.w, r.h);
+        paintIcon(out, node.icon, r.x + (r.w - size) / 2, r.y + (r.h - size) / 2, size, node.iconColor ?? COLORS.texto);
       }
       return;
     }

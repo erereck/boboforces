@@ -22,14 +22,17 @@ import { stepLevel } from './pause.ts';
 import {
   confirmConventionFor,
   createBindingCapture,
+  createLocalPlayers,
   createMenuInput,
   createRawInputState,
+  PAD_BUTTON,
   type CaptureResult,
+  type DeviceBinding,
   type MenuConfirmConvention,
   type RawInputState,
   type RemapAction,
 } from '@boboforces/input';
-import type { ControllerInfo, Platform, TextInputSession } from '@boboforces/platform-api';
+import type { Platform, TextInputSession } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
 import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
@@ -44,6 +47,9 @@ import {
   customMatchScreen,
   MAIN_MENU_ACTION,
   mainMenuScreen,
+  COUCH_ACTION,
+  couchScreen,
+  type CouchSeatView,
   LAB_ACTION,
   LAB_INTRO_ACTION,
   labIntroScreen,
@@ -87,6 +93,7 @@ import {
 import { loadGameAssets } from './assets.ts';
 import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/types.ts';
 import type { LocalDriver } from './local-driver.ts';
+import type { LocalSeat } from './scene/seats.ts';
 import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
 import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
@@ -139,7 +146,6 @@ import {
 /** Menus não têm mundo: `renderViews` vazio só zera as estatísticas do frame (o F2 mostra o custo da UI). */
 const NO_VIEWS: readonly ViewDesc[] = [];
 /** Teste do sofá: jogadores locais no máximo (decisão #1: até 4 em tela dividida). */
-const SOFA_MAX_PLAYERS = 4;
 
 /** Linha que o `game` grava no log da plataforma no primeiro frame do menu (o portcheck e o Teste Zero procuram). */
 export const MENU_READY_MARKER = '[boot] menu-ready';
@@ -212,6 +218,7 @@ export type GameScreen =
   | 'modes'
   | 'custom'
   | 'surprise'
+  | 'couch'
   | 'settings'
   | 'scene'
   | 'test'
@@ -398,7 +405,9 @@ export function startGame(deps: GameDeps): GameHandle {
   }
   refreshTitle();
   // M2 (fase 6c): o Meu Bobo entre o Laboratório e os Ajustes (GDD §2.2).
-  mainMenu.setRoot(mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'bobo', 'settings', 'news'] }));
+  mainMenu.setRoot(
+    mainMenuScreen.build({ items: ['quickMatch', 'modes', 'couch', 'lab', 'bobo', 'settings', 'news'] }),
+  );
 
   // M2 (fase 5a): a Oficina (a entrada do Laboratório): a biblioteca dos bots e o card do escolhido.
   const workshopMenu = createMenuController();
@@ -977,23 +986,128 @@ export function startGame(deps: GameDeps): GameHandle {
     }
   }
 
-  /** Rascunho do `describeControllers` (o teste do sofá lê os controles ao abrir a partida). */
-  const controllerInfos: ControllerInfo[] = [];
-  /**
-   * Teste do sofá (antes do M3, que traz o "aperte A"): no Switch, cada controle completo conectado (par de Joy-Con,
-   * Pro ou portátil) vira um jogador local, na ordem do número do controle (a luz dele). Devolve os índices; com menos
-   * de 2, a partida é de 1 jogador como antes.
-   */
-  function sofaPads(): number[] {
-    if (platform.id !== 'switch' || !platform.input.describeControllers) return [];
-    const n = platform.input.describeControllers(controllerInfos);
-    const found: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const c = controllerInfos[i]!;
-      if (c.complete && !found.includes(c.index)) found.push(c.index);
+  // --- M3 (fase 1b): a tela do sofá ---
+  /** Os assentos (P1 a P4) da tela do sofá; o P1 é quem abriu a tela. */
+  const locals = createLocalPlayers();
+  /** O lado de cada assento: 0 = com o P1, 1 = contra (o do P1 é sempre 0). */
+  const couchSides = new Uint8Array(4);
+  let couchActive = false;
+  let couchPresets: MatchRecipe[] = [];
+  let couchPreset = 0;
+  /** Assinatura do que a tela mostra (refaz a árvore só quando muda). */
+  let couchSig = -1;
+  let couchStartPrev = false;
+  const couchMenu = createMenuController();
+  const KEYBOARD_DEVICE: DeviceBinding = { kind: 'keyboardMouse' };
+  const TOUCH_DEVICE: DeviceBinding = { kind: 'touch' };
+
+  function couchDeviceLabel(d: DeviceBinding): string {
+    if (d.kind === 'gamepad') return t('couch.device.pad', { n: d.index + 1 });
+    if (d.kind === 'touch') return t('couch.device.touch');
+    return t(platform.features.keyboardMouse ? 'couch.device.keyboard' : 'couch.device.keyboardOnly');
+  }
+
+  /** O preset escolhido tem dois lados (TDM): os jogadores 2 a 4 escolhem com ou contra o P1. */
+  function couchTeams(): boolean {
+    const r = couchPresets[couchPreset];
+    return r !== undefined && r.mode !== 'warfare.ffa' && r.mode !== 'training' && r.teams.length >= 2;
+  }
+
+  function couchSeats(): LocalSeat[] {
+    const teams = couchTeams();
+    const out: LocalSeat[] = [];
+    for (const s of locals.slots) {
+      if (s.device === null) continue;
+      out.push({ device: s.device, side: s.index > 0 && teams && couchSides[s.index] === 1 ? 1 : 0 });
     }
-    found.sort((a, b) => a - b);
-    return found.slice(0, SOFA_MAX_PLAYERS);
+    return out;
+  }
+
+  function rebuildCouch(): void {
+    let sig = couchPreset << 16;
+    for (const s of locals.slots) {
+      if (s.device !== null) sig |= (1 + (s.connected ? 2 : 0) + couchSides[s.index]! * 4) << (s.index * 4);
+    }
+    if (locals.slotOf(KEYBOARD_DEVICE) >= 0) sig |= 1 << 24;
+    if (sig === couchSig) return;
+    couchSig = sig;
+    const teams = couchTeams();
+    const seats: CouchSeatView[] = locals.slots.map((s) => ({
+      device: s.device ? couchDeviceLabel(s.device) : null,
+      side: s.index > 0 && teams && s.device !== null ? (couchSides[s.index] === 1 ? 1 : 0) : null,
+      disconnected: s.device !== null && !s.connected,
+    }));
+    const preset = couchPresets[couchPreset];
+    couchMenu.setRoot(
+      couchScreen.build({
+        seats,
+        match: preset ? presetSummary(preset) : '',
+        keyboardFree: locals.slotOf(KEYBOARD_DEVICE) < 0,
+      }),
+    );
+  }
+
+  /** Abre a tela: quem abriu é o P1 e passa a ser o único que navega nos menus (gameplay.md §10.6). */
+  function openCouch(raw: Readonly<RawInputState>): void {
+    const last = menuInput.lastDevice;
+    const pad = Math.max(0, menuInput.lastGamepad);
+    const p1: DeviceBinding =
+      last === 'gamepad' ? { kind: 'gamepad', index: pad } : last === 'touch' ? TOUCH_DEVICE : KEYBOARD_DEVICE;
+    locals.clear();
+    couchSides.fill(0);
+    locals.join(p1, p1.kind === 'gamepad' ? (raw.gamepads[pad]?.id ?? '') : '');
+    menuInput.setOwner(p1);
+    // A partida: o último preset (o do JOGAR) e os de fábrica.
+    const current = currentPreset();
+    couchPresets = [current, ...factoryPresets().filter((p) => p.name !== current.name)];
+    couchPreset = 0;
+    couchActive = true;
+    couchSig = -1;
+    couchStartPrev = true;
+    rebuildCouch();
+    couchMenu.focus('start');
+    screen = 'couch';
+    log(`[game] sofá aberto (P1: ${couchDeviceLabel(p1)})`);
+  }
+
+  function closeCouch(): void {
+    locals.clear();
+    menuInput.setOwner(null);
+    couchActive = false;
+  }
+
+  /** Um frame da tela: entradas e saídas de cada dispositivo, o lado de cada um e os botões do P1. */
+  function couchFrame(raw: Readonly<RawInputState>, u: UiFrame): void {
+    const joined = locals.update(raw, true);
+    if (joined >= 0) log(`[game] sofá: P${joined + 1} entrou (${couchDeviceLabel(locals.slots[joined]!.device!)})`);
+    for (let k = 1; k < locals.slots.length; k++) {
+      const d = locals.slots[k]!.device;
+      if (d === null || k === joined) continue;
+      if (menuInput.pressedBy(d, 'back')) {
+        locals.leave(k);
+        couchSides[k] = 0;
+        log(`[game] sofá: P${k + 1} saiu`);
+      } else if (couchTeams() && (menuInput.pressedBy(d, 'left') || menuInput.pressedBy(d, 'right'))) {
+        couchSides[k] = couchSides[k] === 1 ? 0 : 1;
+      }
+    }
+    rebuildCouch();
+    const nav = couchMenu.update(menuInput, raw, u);
+    // O Start (o +) do P1 também começa.
+    const p1 = locals.slots[0]!.device;
+    const startDown = p1?.kind === 'gamepad' && (raw.gamepads[p1.index]?.buttons[PAD_BUTTON.start] ?? 0) >= 0.5;
+    const start = startDown && !couchStartPrev;
+    couchStartPrev = startDown;
+    if (nav.back || nav.activated === COUCH_ACTION.back) {
+      closeCouch();
+      screen = 'main';
+    } else if (nav.activated === COUCH_ACTION.match && couchPresets.length > 0) {
+      const n = couchPresets.length;
+      couchPreset = (couchPreset + (nav.delta === 0 ? 1 : nav.delta) + n) % n;
+      rebuildCouch();
+    } else if ((nav.activated === COUCH_ACTION.start || start) && couchPresets[couchPreset]) {
+      playPreset(couchPresets[couchPreset]!);
+    }
   }
 
   function requestScene(
@@ -1007,22 +1121,26 @@ export function startGame(deps: GameDeps): GameHandle {
       return;
     }
     matches++;
-    // O Bobo Training (e a calibração) é de 1 jogador: o treino lê só o humano 0.
-    const sofa = kind === 'play' && !calibrate && recipe?.mode !== 'training' ? sofaPads() : [];
-    if (sofa.length >= 2) log(`[game] teste do sofá: ${sofa.length} jogadores (controles ${sofa.join(', ')})`);
+    // M3 (fase 1b): os assentos da tela do sofá. O Bobo Training (e a calibração) é de 1 jogador: o treino lê só o
+    // humano 0.
+    const seats = kind === 'play' && couchActive && !calibrate && recipe?.mode !== 'training' ? couchSeats() : [];
+    if (seats.length >= 2) {
+      log(
+        `[game] sofá: ${seats.length} jogadores (${seats.map((s) => couchDeviceLabel(s.device) + (s.side === 1 ? ' contra' : '')).join(', ')})`,
+      );
+    }
+    const p1 = seats.length >= 2 ? seats[0]!.device : null;
     pendingScene = {
       kind,
       bench,
       benchWarnings: bench ? (deps.benchWarnings ?? []) : [],
       seed: bench ? bench.seed : (0x6b0b0 + matches * 0x9e37) >>> 0,
       convention,
-      device: sofa.length >= 2 ? 'gamepad' : menuInput.lastDevice,
-      gamepad: sofa.length >= 2 ? sofa[0]! : menuInput.lastGamepad,
+      device: p1 ? p1.kind : menuInput.lastDevice,
+      gamepad: p1?.kind === 'gamepad' ? p1.index : menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
       ...(calibrate ? { calibrate: true } : {}),
-      ...(sofa.length >= 2
-        ? { seats: sofa.map((index) => ({ device: { kind: 'gamepad' as const, index }, side: 0 as const })) }
-        : {}),
+      ...(seats.length >= 2 ? { seats } : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;
@@ -1110,6 +1228,14 @@ export function startGame(deps: GameDeps): GameHandle {
             });
       rebuildLab();
       screen = 'lab';
+      return;
+    }
+    if (couchActive) {
+      // M3 (fase 1b): do sofá, a volta é para a tela do sofá, com os mesmos jogadores.
+      couchSig = -1;
+      couchStartPrev = true;
+      rebuildCouch();
+      screen = 'couch';
       return;
     }
     screen = 'title';
@@ -1262,6 +1388,7 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (nav.activated === MAIN_MENU_ACTION.settings) openSettings();
         else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
         else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
+        else if (nav.activated === MAIN_MENU_ACTION.couch) openCouch(raw);
         else if (nav.activated === MAIN_MENU_ACTION.news) openNews('main');
         else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
         else if (nav.activated === MAIN_MENU_ACTION.bobo) {
@@ -1271,6 +1398,15 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'main') {
           mainMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'couch': {
+        couchFrame(raw, u);
+        if (screen === 'couch') {
+          couchMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
@@ -1494,14 +1630,16 @@ export function startGame(deps: GameDeps): GameHandle {
         // M2 (fase 4c): o nível novo vale para todos os bots de nível do preset, e ele vira o último.
         playPreset(withPresetLevel(preset, next));
       } else if (signal === 'rules') {
-        // M2 (fase 4e): Mudar regras abre a Partida personalizada com o preset desta partida.
+        // M2 (fase 4e): Mudar regras abre a Partida personalizada com o preset desta partida (e o sofá acaba).
         const preset = playingPreset ?? currentPreset();
+        closeCouch();
         leaveScene();
         openCustom(preset, 'title');
       } else if (signal === 'save') saveCustomPreset(playingPreset ?? currentPreset());
       else if (signal === 'nemesis') saveNemesis();
       else if (signal === 'lab') {
-        // M2 (fase 5e): Abrir Laboratório (no Tryhard): sai da partida para a Oficina.
+        // M2 (fase 5e): Abrir Laboratório (no Tryhard): sai da partida para a Oficina (e o sofá acaba).
+        closeCouch();
         leaveScene();
         openWorkshop();
       }

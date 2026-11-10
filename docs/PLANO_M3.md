@@ -60,11 +60,11 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 
 ## Fase 1 em detalhe: sofá
 
-- **1a. Assentos na partida:** `SceneRequest.seats` (dispositivo e time de cada jogador local, até 4) no lugar do
-  `localPads` do teste do sofá. A partida cria um mapeador por assento (controle ou teclado), cada humano no time do
+- **1a. Assentos na partida** (feita em 09/11/2026, ARCHITECTURE §13.1): `SceneRequest.seats` (dispositivo e time
+  de cada jogador local, até 4) no lugar do `localPads` do teste do sofá. A partida cria um mapeador por assento (controle ou teclado), cada humano no time do
   seu assento (a receita ganha os `humans` por time) e o P1 também fica preso ao dispositivo dele. O Switch continua
   automático (um assento por controle completo) até a 1b.
-- **1b. Tela "Jogar no sofá":** entrada no menu principal (no título, o JOGAR continua solo, para ninguém virar P2 sem
+- **1b. Tela "Jogar no sofá"** (feita em 09/11/2026, ARCHITECTURE §13.2): entrada no menu principal (no título, o JOGAR continua solo, para ninguém virar P2 sem
   querer ao pegar outro controle). Quatro cartões: "Aperte A para entrar" (Enter no teclado); entrou, mostra P1 ▲, P2 ●,
   P3 ■ ou P4 ◆ na cor do jogador, o dispositivo e o time (cada um troca o seu com ◀ ▶); B sai. O P1 escolhe a partida
   (o preset do JOGAR, com troca entre os prontos) e o Start (ou COMEÇAR) inicia. Enquanto houver sofá, só o P1 navega

@@ -44,7 +44,7 @@ homebrew menu **segurando R**), ou o NSP, se você preferir gerar com as suas ch
 | 8 | Laboratório: dar nome a um bot | Abre o teclado do sistema |
 | 9 | Partida Rápida: FFA, Bobo Training, Ringue | Todos abrem e terminam |
 | 10 | Jogar 1 a 2 h, como der | Sem fechar sozinho, sem travar; anote se esquentar muito |
-| 11 | **Sofá (opcional):** 2 a 4 controles completos conectados antes do JOGAR | Uma vista por controle (a luz do controle = a vista) |
+| 11 | **Sofá (opcional):** Mudar → Jogar no sofá; cada amigo aperta A no controle dele, escolhe o lado (esquerda e direita) e o P1 começa | Uma vista por jogador; B tira o jogador; sair da partida volta para a tela do sofá |
 | 12 | **Teclado USB (opcional, #73):** na dock, plugar um teclado e jogar | WASD anda, as **setas miram**, **Ctrl direito** ou **F** atira, **Shift direito** ou **Z** mira; Enter e Esc nos menus; mexer no controle volta para ele |
 | 13 | Mandar o `runtime.log` | Tem o boot, os sons (`[audio]`), o loading e qualquer erro |
 

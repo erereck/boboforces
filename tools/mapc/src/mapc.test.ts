@@ -823,7 +823,7 @@ describe('mapc: Construto', () => {
     }
     // O densidade também pelo contrato novo (sem o 0,25 fixo).
     expect(mans.get('densidade')!.z - FIGURE_HEAD_HALF_M).toBeCloseTo(66, 6);
-  }, 30000);
+  }, 60_000); // Pesado: com o portão inteiro em paralelo passava dos 30 s (M3, 09/11).
 
   it('o .bfmap gravado é um map@1 de verdade (não o provisório)', () => {
     const doc = decodeMap(new Uint8Array(readFileSync(join(MAPS_OUT_DIR, 'construto.bfmap'))));

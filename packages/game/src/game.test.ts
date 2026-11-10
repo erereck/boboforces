@@ -35,6 +35,7 @@ import {
   createRawInputState,
   DEFAULT_TOUCH_LAYOUT,
   keyIndex,
+  PAD_BUTTON,
   placeTouchButton,
   type RawInputState,
   type TouchButtonRect,
@@ -199,6 +200,15 @@ function createFakePlatform(
         out.surfaceWidth = rawNext.surfaceWidth;
         out.surfaceHeight = rawNext.surfaceHeight;
         out.pixelRatio = 1;
+        // M3 (fase 1b): os controles que o teste liga (o sofá).
+        for (let i = 0; i < rawNext.gamepads.length; i++) {
+          const src = rawNext.gamepads[i]!;
+          const dst = out.gamepads[i]!;
+          dst.connected = src.connected;
+          dst.id = src.id;
+          dst.buttons.set(src.buttons);
+          dst.axes.set(src.axes);
+        }
         rawNext.mouseDX = 0;
         rawNext.mouseDY = 0;
       },
@@ -1217,8 +1227,8 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('main');
-    // Partida Rápida, Modos, Laboratório, Meu Bobo, Ajustes.
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    // Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo, Ajustes.
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     platform.tap('Escape');
@@ -1335,8 +1345,8 @@ describe('Meu Bobo (M2, fase 6c)', () => {
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    // Partida Rápida, Modos, Laboratório, Meu Bobo.
-    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    // Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo.
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);
@@ -1383,11 +1393,11 @@ describe('3ª pessoa (M2, fase 6b)', () => {
 describe('Ajustes (M2, fase 4f)', () => {
   it('menu: Ajustes → Vídeo (E) → Tamanho dos menus; na pausa, Acessibilidade → Reduzir tremor vale na hora', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (Partida Rápida, Modos, Laboratório, Meu Bobo, Ajustes).
+    // Título → Mudar → Ajustes (Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo, Ajustes).
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     // E E: Vídeo. Da aba (o foco vai junto) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
@@ -1452,11 +1462,11 @@ describe('Novidades (M2, fase 4g)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
-    // Título → Mudar → Novidades (o 6º item) → OK volta ao menu principal.
+    // Título → Mudar → Novidades (o 7º item) → OK volta ao menu principal.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 6; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('news');
     platform.tap('Escape');
@@ -1475,10 +1485,11 @@ describe('Novidades (M2, fase 4g)', () => {
 describe('Oficina (M2, fase 5a)', () => {
   it('Laboratório abre a Oficina; duplicar um de fábrica salva, favoritar e apagar (com confirmação)', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Laboratório (o 3º item).
+    // Título → Mudar → Laboratório (o 4º item).
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1519,6 +1530,7 @@ describe('Laboratório (M2, fase 5b)', () => {
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1628,6 +1640,7 @@ describe('Pontes do Laboratório (M2, fase 5e)', () => {
     platform.tap('Enter');
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
     platform.tap('Enter');
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1689,11 +1702,11 @@ describe('Conheça o Laboratório (M2, fase 5e)', () => {
 describe('Calibrar mira (M2, fase 5f)', () => {
   it('Ajustes → Controles → Calibrar mira abre o treino calibrando; a pausa oferece Pular calibração', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (5º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
+    // Título → Mudar → Ajustes (6º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
     for (let i = 0; i < 10; i++) platform.tap('ArrowDown');
@@ -1709,6 +1722,55 @@ describe('Calibrar mira (M2, fase 5f)', () => {
     platform.tap('Enter');
     expect(platform.logLines.some((l) => l.includes('[partida] calibrar mira: pulou'))).toBe(true);
     expect(game.scene?.paused).toBe(false);
+    game.dispose();
+  }, 120_000);
+});
+
+describe('sofá (M3, fase 1b)', () => {
+  it('Jogar no sofá: o teclado é o P1; o controle 2 entra, troca de lado e sai; Começar joga com os assentos', async () => {
+    const { platform, game } = await bootToTitle();
+    // Título → Mudar → Jogar no sofá (3º item).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('couch');
+    const pad = platform.rawNext.gamepads[1]!;
+    pad.connected = true;
+    pad.id = 'controle de teste';
+    const tapPad = (button: number): void => {
+      pad.buttons[button] = 1;
+      platform.pump(1);
+      pad.buttons[button] = 0;
+      platform.pump(1);
+    };
+    // O A do controle 2 entra (e não aperta o Começar, que é do P1).
+    tapPad(PAD_BUTTON.faceDown);
+    expect(game.screen).toBe('couch');
+    expect(platform.logLines.some((l) => l.includes('sofá: P2 entrou (Controle 2)'))).toBe(true);
+    // Direita: contra o P1; o voltar dele (botão da direita na web) sai; o Start entra de novo.
+    tapPad(PAD_BUTTON.dpadRight);
+    tapPad(PAD_BUTTON.faceRight);
+    expect(platform.logLines.some((l) => l.includes('sofá: P2 saiu'))).toBe(true);
+    tapPad(PAD_BUTTON.start);
+    tapPad(PAD_BUTTON.dpadLeft);
+    expect(game.screen).toBe('couch');
+    // O Enter do P1 começa (o foco abre no Começar).
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    expect(platform.logLines.some((l) => l.includes('sofá: 2 jogadores (Teclado e mouse, Controle 2 contra)'))).toBe(
+      true,
+    );
+    await untilRunning(platform, game);
+    // Sai pela pausa (P, 4 × baixo, Sair): volta para o sofá, com os mesmos jogadores; o Esc do P1 fecha.
+    platform.tap('KeyP');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('couch');
+    platform.tap('Escape');
+    expect(game.screen).toBe('main');
     game.dispose();
   }, 120_000);
 });

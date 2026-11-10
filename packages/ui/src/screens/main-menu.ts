@@ -9,6 +9,7 @@ import type { Screen, UiNode } from '../tree.ts';
 export const MAIN_MENU_ACTION = {
   quickMatch: 'quickMatch',
   modes: 'modes',
+  couch: 'couch',
   lab: 'lab',
   bobo: 'bobo',
   settings: 'settings',
@@ -24,11 +25,12 @@ export interface MainMenuState {
   readonly items: readonly MainMenuItem[];
 }
 
-export type MainMenuItem = 'quickMatch' | 'modes' | 'lab' | 'bobo' | 'settings' | 'news';
+export type MainMenuItem = 'quickMatch' | 'modes' | 'couch' | 'lab' | 'bobo' | 'settings' | 'news';
 
 const LABEL = {
   quickMatch: 'menu.quickMatch',
   modes: 'menu.modes',
+  couch: 'menu.couch',
   lab: 'menu.lab',
   bobo: 'menu.bobo',
   settings: 'menu.settings',

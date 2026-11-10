@@ -6,6 +6,16 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M3 Sofá e Bobo Zombies (em construção)
+
+Plano em `docs/PLANO_M3.md`.
+
+- **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
+  tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
+- **Fase 1b, a tela "Jogar no sofá":** no menu principal; até 4 jogadores, cada um com o seu controle (o teclado conta
+  como um). Cada um entra com o A, escolhe o lado e sai com o voltar; o P1 escolhe a partida e começa. No Switch, o
+  mesmo caminho substitui o teste do sofá automático.
+
 ### M2 MVP web solo (em construção)
 
 Plano em `docs/PLANO_M2.md`; escolhas do Erick nas #61 (nomes como estão), #62 (Meu Bobo militar + fantasias bobas),
