@@ -2,7 +2,7 @@ import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { ZOMBIE_POINTS, ZOMBIES_DOWN } from '../config/zombie.ts';
+import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN } from '../config/zombie.ts';
 import { MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
@@ -11,6 +11,7 @@ import {
   isPrimaryWeapon,
   WEAPON_CODE,
   WEAPON_ROCKET,
+  ZOMBIE_GOO,
   WEAPONS,
   weaponDef,
 } from '../config/weapons.ts';
@@ -304,6 +305,10 @@ function kill(
         if (team < MAX_TEAMS) ctx.match.teamScore[team] = ctx.match.teamScore[team]! + 1;
       }
     }
+  }
+  // M3 (fase 3b): o Chonker explode em gosma ao morrer (machuca os bobos perto; no vazio, não).
+  if (ctx.zombiesMode && zombie && s.zombieType[t] === ZOMBIE_TYPE.chonker && weapon !== WEAPON_KILL_PLANE) {
+    explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, ZOMBIE_GOO, s.idOf(t), -1);
   }
   // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
   if (ctx.warfare && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);

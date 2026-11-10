@@ -245,6 +245,9 @@ export interface SimContext {
   readonly waves: WaveState;
   readonly rngZombies: Rng;
   readonly downedProfile: MovementProfile;
+  /** M3 (fase 3b): o Sprinter e o devagar (Chonker e chefão). */
+  readonly sprinterProfile: MovementProfile;
+  readonly slowProfile: MovementProfile;
 }
 
 /** M3 (fase 2a): as regras do Bobo Zombies resolvidas para a sim. */
@@ -263,6 +266,9 @@ export interface ZombieModeRules {
   readonly reviveTicks: number;
   readonly selfReviveTicks: number;
   readonly selfRevives: number;
+  /** M3 (fase 3b): especiais e chefões ligados. */
+  readonly specials: boolean;
+  readonly bosses: boolean;
 }
 
 /** M3 (fase 2a): o diretor de ondas. Tudo número, para o snapshot. */
@@ -285,6 +291,8 @@ export interface WaveState {
   lastZombie: number;
   /** M3 (fase 2c): "levanta sozinho" que sobram (-1 = sem limite). */
   selfRevivesLeft: number;
+  /** M3 (fase 3b): 1 = o chefão desta onda ainda não saiu. */
+  bossPending: number;
 }
 
 /**

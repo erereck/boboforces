@@ -148,6 +148,8 @@ export class SimState {
   readonly pickupFields: readonly StateField[];
   /** M3 (fase 2a): o tipo de cada zumbi do Bobo Zombies (`ZOMBIE_TYPE`). */
   readonly zombieType = new Uint8Array(MAX_ENTITIES);
+  /** M3 (fase 3b): escala do corpo (Chonker 1,3, chefão 1,8): a hitbox e o desenho crescem juntos; 1 = normal. */
+  readonly bodyScale = new Float32Array(MAX_ENTITIES).fill(1);
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies. */
   readonly points = new Int32Array(MAX_ENTITIES);
   /**
@@ -239,6 +241,7 @@ export class SimState {
     ];
     this.zombieFields = [
       f('zombieType', this.zombieType),
+      f('bodyScale', this.bodyScale),
       f('points', this.points),
       f('downTicks', this.downTicks),
       f('selfUp', this.selfUp),

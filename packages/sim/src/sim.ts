@@ -27,6 +27,8 @@ import {
   MOVEMENT_DOWNED,
   MOVEMENT_ZOMBIE,
   MOVEMENT_ZOMBIE_RUNNER,
+  MOVEMENT_ZOMBIE_SLOW,
+  MOVEMENT_ZOMBIE_SPRINTER,
   ZOMBIE_POINTS,
   ZOMBIE_RULES,
   ZOMBIES_DOWN,
@@ -402,6 +404,8 @@ export function createSim(config: SimConfig): Sim {
       reviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.reviveS, hz)),
       selfReviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.selfReviveS, hz)),
       selfRevives: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
+      specials: recipe.zombies?.specials ?? ZOMBIES_DEFAULTS.specials,
+      bosses: recipe.zombies?.bosses ?? ZOMBIES_DEFAULTS.bosses,
     },
     humans,
     waves: {
@@ -415,9 +419,12 @@ export function createSim(config: SimConfig): Sim {
       left: 0,
       lastZombie: NULL_ENTITY,
       selfRevivesLeft: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
+      bossPending: 0,
     },
     rngZombies: root.fork('zombies'),
     downedProfile: MOVEMENT_DOWNED,
+    sprinterProfile: MOVEMENT_ZOMBIE_SPRINTER,
+    slowProfile: MOVEMENT_ZOMBIE_SLOW,
   };
 
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -508,6 +515,7 @@ export function createSim(config: SimConfig): Sim {
     prevPitch: s.prevPitch,
     health: s.health,
     zombieType: s.zombieType,
+    bodyScale: s.bodyScale,
     points: s.points,
     downTicks: s.downTicks,
     selfUp: s.selfUp,

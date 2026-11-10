@@ -107,6 +107,7 @@ import {
   heldReserve,
   MAX_CONTROLLERS,
   WEAPON_CODE,
+  WEAPON_SPIT,
   WEAPON_FIRE,
   WEAPON_KILL_PLANE,
   WEAPON_NONE,
@@ -814,7 +815,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M2 (fase 2b): a caixinha de munição no chão.
   const ammoBoxModel = modelIndex.get('ammo-box') ?? NO_MODEL;
   const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
-  const modelOf = (code: number): number => (code >= 0 && code < weaponModel.length ? weaponModel[code]! : NO_MODEL);
+  // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
+  const modelOf = (code: number): number =>
+    code === WEAPON_SPIT
+      ? weaponModel[WEAPON_CODE.grenade]!
+      : code >= 0 && code < weaponModel.length
+        ? weaponModel[code]!
+        : NO_MODEL;
 
   // --- estado por entidade (fora da sim: cosmético) ---
   let flash = new Float32Array(1);
@@ -2527,7 +2534,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.localSlot[n] = local >= 0 ? local : 255;
       actors.entity[n] = id;
       actors.kind[n] = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
-      actors.scale[n] = 1;
+      // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto).
+      actors.scale[n] = v.bodyScale[i]!;
       let expression: number = FACE_EXPRESSION.neutral;
       if (flash[i]! > 0.3) expression = FACE_EXPRESSION.pain;
       else if (zombie) expression = FACE_EXPRESSION.angry;

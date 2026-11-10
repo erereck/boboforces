@@ -1,7 +1,9 @@
 import { FIGURE_BONE } from '@boboforces/format';
 import { BUTTON } from '@boboforces/input';
 import { DEG_TO_RAD } from '@boboforces/shared';
-import { ZOMBIE_RULES } from '../config/zombie.ts';
+import { ZOMBIE_KINDS, ZOMBIE_RULES, ZOMBIE_SPECIALS, ZOMBIE_TYPE } from '../config/zombie.ts';
+import { ZOMBIE_SPIT } from '../config/weapons.ts';
+import { launchProjectile } from './projectiles.ts';
 import { canHurt, hostile, isBody, PART_TORSO, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, type AimPoint } from '../hitbox.ts';
@@ -18,7 +20,6 @@ import { isLivePhase } from '../view.ts';
 const F = ENTITY_FLAG;
 const READY_EPS = 1e-6;
 const CONE_COS = Math.cos(ZOMBIE_RULES.meleeHalfAngleDeg * DEG_TO_RAD);
-const RANGE2 = ZOMBIE_RULES.meleeRangeM * ZOMBIE_RULES.meleeRangeM;
 const point: AimPoint = { x: 0, y: 0, z: 0 };
 
 export function meleeSystem(ctx: SimContext): void {
@@ -33,16 +34,23 @@ export function meleeSystem(ctx: SimContext): void {
     }
     if (s.fireCooldownS[e]! > READY_EPS) s.fireCooldownS[e] = s.fireCooldownS[e]! - ctx.dt;
     const btn = s.inButtons[e]!;
+    const kind = ZOMBIE_KINDS[s.zombieType[e]!] ?? ZOMBIE_KINDS[0]!;
     if (playing && (btn & (BUTTON.melee | BUTTON.fire)) !== 0 && s.fireCooldownS[e]! <= READY_EPS) {
-      s.fireCooldownS[e] = ZOMBIE_RULES.meleeIntervalS;
+      // M3 (fase 3b): o Spitter cospe com o atirar (o golpe continua no corpo a corpo).
+      if (s.zombieType[e] === ZOMBIE_TYPE.spitter && (btn & BUTTON.melee) === 0) {
+        s.fireCooldownS[e] = ZOMBIE_SPECIALS.spitCooldownS;
+        spit(ctx, e);
+      } else {
+        s.fireCooldownS[e] = kind.intervalS;
+        swing(ctx, e, kind.damage, kind.rangeM * kind.rangeM);
+      }
       fl |= F.firing;
-      swing(ctx, e);
     }
     s.flags[e] = fl;
   }
 }
 
-function swing(ctx: SimContext, e: number): void {
+function swing(ctx: SimContext, e: number, damage: number, range2: number): void {
   const s = ctx.s;
   const e3 = e * 3;
   const ex = s.position[e3]!;
@@ -51,7 +59,7 @@ function swing(ctx: SimContext, e: number): void {
   const fx = -Math.sin(s.yaw[e]!);
   const fz = -Math.cos(s.yaw[e]!);
   let best = -1;
-  let bestD2 = RANGE2;
+  let bestD2 = range2;
   for (let j = 0; j < s.count; j++) {
     if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0 || !canHurt(ctx, e, j)) continue;
     const j3 = j * 3;
@@ -89,7 +97,7 @@ function swing(ctx: SimContext, e: number): void {
   const i = ctx.damage.push(
     best,
     attacker,
-    ZOMBIE_RULES.meleeDamage,
+    damage,
     PART_TORSO,
     FIGURE_BONE.torso,
     WEAPON_NONE,
@@ -98,4 +106,26 @@ function swing(ctx: SimContext, e: number): void {
     point.z,
   );
   ctx.damage.setDirection(i, dx, 0, dz, ZOMBIE_RULES.meleeForce);
+}
+
+/** M3 (fase 3b): o cuspe do Spitter: projétil lento da boca, na direção da mira. */
+function spit(ctx: SimContext, e: number): void {
+  const s = ctx.s;
+  const e3 = e * 3;
+  const yaw = s.yaw[e]!;
+  const pitch = s.pitch[e]!;
+  const cp = Math.cos(pitch);
+  const v = ZOMBIE_SPECIALS.spitSpeed;
+  launchProjectile(
+    ctx,
+    s.idOf(e),
+    ZOMBIE_SPIT,
+    s.position[e3]!,
+    s.position[e3 + 1]! + 1.5 * s.bodyScale[e]!,
+    s.position[e3 + 2]!,
+    -Math.sin(yaw) * cp * v,
+    Math.sin(pitch) * v,
+    -Math.cos(yaw) * cp * v,
+    0,
+  );
 }

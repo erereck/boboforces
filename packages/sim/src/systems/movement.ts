@@ -90,6 +90,9 @@ const zombieTicks = new ProfileTicks();
 const runnerTicks = new ProfileTicks();
 // M3 (fase 2c): o bobo caído rastejando.
 const downedTicks = new ProfileTicks();
+// M3 (fase 3b): o Sprinter e o devagar (Chonker e chefão).
+const sprinterTicks = new ProfileTicks();
+const slowTicks = new ProfileTicks();
 
 function setBox(b: Aabb, x: number, y: number, z: number, height: number): void {
   const hw = METRICS.aabbWidth / 2;
@@ -115,6 +118,14 @@ function onSlope(ctx: SimContext, x: number, y: number, z: number): boolean {
   return false;
 }
 
+/** M3 (fase 3b): o perfil de cada tipo de zumbi. */
+function zombieTicksFor(type: number): ProfileTicks {
+  if (type === ZOMBIE_TYPE.runner) return runnerTicks;
+  if (type === ZOMBIE_TYPE.sprinter) return sprinterTicks;
+  if (type === ZOMBIE_TYPE.chonker || type === ZOMBIE_TYPE.boss) return slowTicks;
+  return zombieTicks;
+}
+
 export function movementSystem(ctx: SimContext): void {
   const s = ctx.s;
   const dt = ctx.dt;
@@ -125,6 +136,8 @@ export function movementSystem(ctx: SimContext): void {
   zombieTicks.update(ctx.zombieProfile, ctx.hz);
   runnerTicks.update(ctx.zombieRunProfile, ctx.hz);
   downedTicks.update(ctx.downedProfile, ctx.hz);
+  sprinterTicks.update(ctx.sprinterProfile, ctx.hz);
+  slowTicks.update(ctx.slowProfile, ctx.hz);
 
   for (let e = 0; e < s.count; e++) {
     const kind = s.kind[e]!;
@@ -132,13 +145,7 @@ export function movementSystem(ctx: SimContext): void {
     let fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) continue;
     const pt =
-      kind === ENTITY_KIND.zombie
-        ? s.zombieType[e] === ZOMBIE_TYPE.runner
-          ? runnerTicks
-          : zombieTicks
-        : (fl & F.downed) !== 0
-          ? downedTicks
-          : boboTicks;
+      kind === ENTITY_KIND.zombie ? zombieTicksFor(s.zombieType[e]!) : (fl & F.downed) !== 0 ? downedTicks : boboTicks;
     const p = pt.profile!;
     const g = p.gravity;
     const slide = p.slide;

@@ -501,8 +501,41 @@ export const WEAPONS: readonly WeaponDef[] = [
 
 /** Arma do código, ou `null` (sem arma: `WEAPON_NONE`, código desconhecido). */
 export function weaponDef(code: number): WeaponDef | null {
-  return code < WEAPONS.length ? WEAPONS[code]! : null;
+  if (code < WEAPONS.length) return WEAPONS[code]!;
+  return code === WEAPON_GOO ? ZOMBIE_GOO : code === WEAPON_SPIT ? ZOMBIE_SPIT : null;
 }
+
+/**
+ * M3 (fase 3b): as "armas" dos zumbis especiais, fora de `WEAPONS` (não são do jogador: sem nome, modelo nem loadout).
+ * A gosma do Chonker é só a explosão ao morrer; o cuspe do Spitter é um projétil lento que estoura pequeno no acerto.
+ */
+export const WEAPON_GOO = 9;
+export const WEAPON_SPIT = 10;
+
+export const ZOMBIE_GOO: WeaponDef = {
+  ...WEAPON_ROCKET,
+  id: 'goo',
+  code: WEAPON_GOO,
+  damage: 0,
+  blastDamage: 40,
+  blastRadiusM: 3,
+  selfDamageMul: 0,
+  killForce: 4,
+};
+
+export const ZOMBIE_SPIT: WeaponDef = {
+  ...WEAPON_ROCKET,
+  id: 'spit',
+  code: WEAPON_SPIT,
+  damage: 20,
+  minDamage: 20,
+  rangeM: 30,
+  projectileSpeed: 12,
+  blastDamage: 6,
+  blastRadiusM: 0.8,
+  selfDamageMul: 0,
+  killForce: 3,
+};
 
 /** Primária padrão (sem escolha no `InputFrame.primary` nem em `SimConfig.primaries`). */
 export const DEFAULT_PRIMARY: WeaponCode = WEAPON_CODE.rifle;

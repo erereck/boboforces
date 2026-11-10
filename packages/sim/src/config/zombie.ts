@@ -115,8 +115,63 @@ export const MOVEMENT_DOWNED: MovementProfile = {
   mantleHeight: 0,
 };
 
-/** M3 (fase 2a): o tipo de cada zumbi (`SimState.zombieType`). Os especiais e o chefão chegam na fase 3. */
-export const ZOMBIE_TYPE = { walker: 0, runner: 1 } as const;
+/**
+ * O tipo de cada zumbi (`SimState.zombieType`): M3 (fase 2a) o que anda e o que corre; fase 3b os especiais (GDD
+ * §4.1.5): Sprinter (rápido, pouca vida), Chonker (maior; explode em gosma ao morrer), Spitter (cospe) e o chefão Mega
+ * Bobo (1,8× maior).
+ */
+export const ZOMBIE_TYPE = { walker: 0, runner: 1, sprinter: 2, chonker: 3, spitter: 4, boss: 5 } as const;
+
+/** M3 (fase 3b): o que muda por tipo: vida (× a da onda), escala do corpo (e da hitbox) e o golpe. */
+export interface ZombieKind {
+  readonly hpMul: number;
+  readonly scale: number;
+  readonly damage: number;
+  readonly rangeM: number;
+  readonly intervalS: number;
+}
+
+/**
+ * M3 (fase 3b): os tipos, no índice do `ZOMBIE_TYPE`. O que anda e o que corre são o zumbi do M1 (`ZOMBIE_RULES`); os
+ * números dos especiais são escolhas minhas (revisáveis). A vida do chefão é `bossHpPerHuman` × humanos (não a da onda).
+ */
+export const ZOMBIE_KINDS: readonly ZombieKind[] = [
+  { hpMul: 1, scale: 1, damage: 25, rangeM: 1.1, intervalS: 1 },
+  { hpMul: 1, scale: 1, damage: 25, rangeM: 1.1, intervalS: 1 },
+  { hpMul: 0.5, scale: 0.9, damage: 20, rangeM: 1.1, intervalS: 0.8 },
+  { hpMul: 1.6, scale: 1.3, damage: 30, rangeM: 1.3, intervalS: 1.2 },
+  { hpMul: 0.9, scale: 1, damage: 20, rangeM: 1.1, intervalS: 1 },
+  { hpMul: 1, scale: 1.8, damage: 60, rangeM: 1.8, intervalS: 1.5 },
+];
+
+/**
+ * M3 (fase 3b): quando os especiais aparecem (da onda `*From` em diante, com a chance por zumbi solto), o chefão (uma
+ * vez a cada `bossEvery` ondas), a gosma do Chonker e o cuspe do Spitter. Escolhas minhas (revisáveis).
+ */
+export const ZOMBIE_SPECIALS = {
+  sprinterFrom: 3,
+  sprinterChance: 0.08,
+  chonkerFrom: 4,
+  chonkerChance: 0.07,
+  spitterFrom: 6,
+  spitterChance: 0.07,
+  bossEvery: 5,
+  bossHpPerHuman: 3000,
+  /** Gosma do Chonker: dano no centro e raio (m). */
+  gooDamage: 40,
+  gooRadiusM: 3,
+  /** Cuspe do Spitter: dano no acerto, velocidade (m/s), espera entre cuspes (s) e alcance para cuspir (m). */
+  spitDamage: 20,
+  spitSpeed: 12,
+  spitCooldownS: 3,
+  spitRangeM: 15,
+} as const;
+
+/** M3 (fase 3b): o Sprinter (mais rápido que o bobo correndo, por pouco). */
+export const MOVEMENT_ZOMBIE_SPRINTER: MovementProfile = { ...MOVEMENT_ZOMBIE, walk: 6.4, sprint: 6.4, accel: 45 };
+
+/** M3 (fase 3b): o Chonker e o chefão (devagar). */
+export const MOVEMENT_ZOMBIE_SLOW: MovementProfile = { ...MOVEMENT_ZOMBIE, walk: 2.7, sprint: 2.7 };
 
 /** M3 (fase 2a): o zumbi que corre (da onda 5 em diante, e o último de cada onda). Mais rápido que o andar do bobo. */
 export const MOVEMENT_ZOMBIE_RUNNER: MovementProfile = { ...MOVEMENT_ZOMBIE, walk: 5.2, sprint: 5.2, accel: 40 };

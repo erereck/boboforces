@@ -37,7 +37,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
 import { weaponDamageAt, WEAPON_RIFLE } from './config/weapons.ts';
-import { ENTITY_FLAG, ENTITY_KIND } from './entity.ts';
+import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM } from './entity.ts';
+import { SimState } from './state.ts';
 import {
   aimPointLocal,
   aimPointWorld,
@@ -1004,5 +1005,31 @@ describe('hitboxes do boneco do FutBobo (#56): 12 OBB pela tabela de jogo', () =
     expect(weaponDamageAt(WEAPON_RIFLE, 10)).toBe(28);
     expect(weaponDamageAt(WEAPON_RIFLE, 47.5)).toBeCloseTo(24);
     expect(weaponDamageAt(WEAPON_RIFLE, 100)).toBe(20);
+  });
+});
+
+describe('corpo em escala (M3, fase 3b)', () => {
+  it('a hitbox cresce em volta dos pés com o bodyScale (Chonker, chefão)', () => {
+    const s = new SimState();
+    const id = s.allocate(ENTITY_KIND.zombie, NO_TEAM, 0);
+    const e = id & 0xffff;
+    const cache = new FigureHitCache(table, 1);
+    let tick = 1;
+    const shoot = (h: number): number => {
+      cache.beginRay(0, h, -10, 0, 0, 1, 100);
+      return cache.testEntity(s, e, STAND, tick++);
+    };
+    // 2,6 m: acima da cabeça do bobo de 1,75 m, dentro do de 1,8× (3,15 m).
+    expect(shoot(2.6)).toBe(-1);
+    s.bodyScale[e] = 1.8;
+    expect(shoot(2.6)).toBeGreaterThanOrEqual(0);
+    // No peito, o corpo maior é acertado antes (a frente dele chega mais perto de quem atira).
+    s.bodyScale[e] = 1;
+    shoot(1.2);
+    const t1 = cache.bestT();
+    s.bodyScale[e] = 1.8;
+    shoot(1.2);
+    expect(cache.bestT()).toBeLessThan(t1);
+    cache.release();
   });
 });

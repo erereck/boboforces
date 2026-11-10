@@ -285,3 +285,48 @@ describe('Bobo Zombies: pontos (M3, fase 2b)', () => {
     expect(two.points - 500).toBe(2 * (one.points - 500));
   });
 });
+
+describe('Bobo Zombies: especiais e chefão (M3, fase 3b)', () => {
+  /** Joga as 10 ondas da Curta com os zumbis caindo no vazio e conta o tipo de cada um que entra. */
+  function census(rules: MatchRecipe['zombies']): {
+    types: number[];
+    bosses: { wave: number; hp: number; scale: number }[];
+  } {
+    const void5: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 5, yaw: 0, team: -1 };
+    const sim = createSim({ recipe: zombies(rules), map: map([human, void5], 30), humans: 1, zombies: 8 });
+    const v = sim.view();
+    const types = [0, 0, 0, 0, 0, 0];
+    const bosses: { wave: number; hp: number; scale: number }[] = [];
+    run(sim, 400 * SIM_HZ, (evs) => {
+      for (const ev of evs) {
+        if (ev.type !== 'spawn') continue;
+        const e = ev.entity & 0xffff;
+        if (v.kind[e] !== ENTITY_KIND.zombie) continue;
+        const type = v.zombieType[e]!;
+        types[type]!++;
+        if (type === ZOMBIE_TYPE.boss)
+          bosses.push({ wave: v.match.zombieWave, hp: v.health[e]!, scale: v.bodyScale[e]! });
+      }
+    });
+    expect(v.match.phase).toBe('ended');
+    return { types, bosses };
+  }
+
+  it('Sprinter, Chonker e Spitter aparecem pelas ondas; o Mega Bobo na 5 e na 10, com 3000 de vida e 1,8×', () => {
+    const { types, bosses } = census({});
+    expect(types[ZOMBIE_TYPE.sprinter]).toBeGreaterThan(0);
+    expect(types[ZOMBIE_TYPE.chonker]).toBeGreaterThan(0);
+    expect(types[ZOMBIE_TYPE.spitter]).toBeGreaterThan(0);
+    expect(bosses).toEqual([
+      { wave: 5, hp: 3000, scale: expect.closeTo(1.8, 5) },
+      { wave: 10, hp: 3000, scale: expect.closeTo(1.8, 5) },
+    ]);
+  }, 60_000);
+
+  it('com especiais e chefões desligados, só os que andam e os que correm', () => {
+    const { types, bosses } = census({ specials: false, bosses: false });
+    expect(types[ZOMBIE_TYPE.walker]! + types[ZOMBIE_TYPE.runner]!).toBeGreaterThan(200);
+    expect(types[ZOMBIE_TYPE.sprinter]! + types[ZOMBIE_TYPE.chonker]! + types[ZOMBIE_TYPE.spitter]!).toBe(0);
+    expect(bosses).toEqual([]);
+  }, 60_000);
+});

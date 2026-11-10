@@ -1,6 +1,6 @@
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
-import { DEG_TO_RAD, yawToU16, type Rng } from '@boboforces/shared';
-import { ENTITY_FLAG, ENTITY_KIND, secondsToTicks } from '@boboforces/sim';
+import { DEG_TO_RAD, pitchToI16, yawToU16, type Rng } from '@boboforces/shared';
+import { ENTITY_FLAG, ENTITY_KIND, secondsToTicks, ZOMBIE_SPECIALS, ZOMBIE_TYPE } from '@boboforces/sim';
 import { AI_PATH, AI_ZOMBIE } from './config.ts';
 import type { AiContext } from './context.ts';
 import { createSteer, type PathFollower } from './paths.ts';
@@ -134,6 +134,9 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
   let buttons = 0;
   let wx = 0;
   let wz = 0;
+  /** M3 (fase 3b): o Spitter mirando para cuspir (vira para o alvo em vez do caminho) e o pitch da mira. */
+  let spitting = false;
+  let pitch = 0;
   if (zb.target >= 0) {
     const t3 = zb.target * 3;
     const tx = v.position[t3]!;
@@ -169,6 +172,20 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
       wx *= 0.2;
       wz *= 0.2;
     }
+    // M3 (fase 3b): o Spitter cospe de longe, mais devagar (a sim espera o intervalo entre cuspes).
+    if (
+      v.zombieType[e] === ZOMBIE_TYPE.spitter &&
+      dist > AI_ZOMBIE.attackM * 2 &&
+      dist < ZOMBIE_SPECIALS.spitRangeM &&
+      Math.abs(dy) < 3
+    ) {
+      spitting = true;
+      zb.aimYaw = turnToward(zb.aimYaw, Math.atan2(-dx, -dz), t.turnStep);
+      pitch = Math.atan2(ty + 1 - (y + 1.5), dist);
+      buttons |= BUTTON.fire;
+      wx *= 0.3;
+      wz *= 0.3;
+    }
 
     // Empacou: pula; de novo, pede outra rota.
     if (tick - zb.stuckTick >= t.stuck) {
@@ -196,7 +213,8 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
       wx /= wl;
       wz /= wl;
     }
-    if ((buttons & BUTTON.melee) === 0) zb.aimYaw = turnToward(zb.aimYaw, Math.atan2(-wx, -wz), t.turnStep);
+    if ((buttons & BUTTON.melee) === 0 && !spitting)
+      zb.aimYaw = turnToward(zb.aimYaw, Math.atan2(-wx, -wz), t.turnStep);
   }
   // Pulo com borda (a sim só pula ao apertar).
   if ((buttons & BUTTON.jump) !== 0) {
@@ -211,5 +229,5 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
   f.moveX = quantizeAxis(co * wx - s * wz);
   f.moveY = quantizeAxis(-s * wx - co * wz);
   f.yaw = yawToU16(zb.aimYaw);
-  f.pitch = 0;
+  f.pitch = pitchToI16(pitch);
 }

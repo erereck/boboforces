@@ -41,6 +41,8 @@ export interface SimView {
   readonly health: Float32Array;
   /** M3 (fase 2a): o tipo de cada zumbi do Bobo Zombies (`ZOMBIE_TYPE`; 0 fora do modo). */
   readonly zombieType: Uint8Array;
+  /** M3 (fase 3b): escala do corpo (o render desenha nela; a hitbox cresce junto). */
+  readonly bodyScale: Float32Array;
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */
   readonly points: Int32Array;
   /**

@@ -1,6 +1,8 @@
 import { BUTTON } from '@boboforces/input';
 import {
   runnerChance,
+  ZOMBIE_KINDS,
+  ZOMBIE_SPECIALS,
   ZOMBIE_TYPE,
   ZOMBIES_DOWN,
   ZOMBIES_MODE,
@@ -73,7 +75,7 @@ export function zombiesSystem(ctx: SimContext): void {
     const id = s.idOf(last);
     if (w.lastZombie !== id) {
       w.lastZombie = id;
-      s.zombieType[last] = ZOMBIE_TYPE.runner;
+      if (s.zombieType[last] === ZOMBIE_TYPE.walker) s.zombieType[last] = ZOMBIE_TYPE.runner;
     }
   } else if (alive !== 1) w.lastZombie = NULL_ENTITY;
   if (w.left === 0) waveCleared(ctx);
@@ -148,6 +150,9 @@ function startWave(ctx: SimContext): void {
   w.waveHp = zombieWaveHp(w.wave, r.hpMul);
   w.runChance = runnerChance(w.wave);
   w.lastZombie = NULL_ENTITY;
+  // M3 (fase 3b): o chefão sai primeiro, a cada `bossEvery` ondas (a mais no total da onda).
+  w.bossPending = r.bosses && w.wave % ZOMBIE_SPECIALS.bossEvery === 0 ? 1 : 0;
+  w.toSpawn += w.bossPending;
   // Quem caiu na onda passada volta agora.
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) === 0) continue;
@@ -175,11 +180,45 @@ function spawnZombie(ctx: SimContext): boolean {
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.zombie || (s.flags[e]! & F.dead) === 0) continue;
     respawn(ctx, e, pickZombieSpawn(ctx));
-    s.health[e] = w.waveHp;
-    s.zombieType[e] = ctx.rngZombies.next() < w.runChance ? ZOMBIE_TYPE.runner : ZOMBIE_TYPE.walker;
+    const type = rollType(ctx);
+    const kind = ZOMBIE_KINDS[type]!;
+    s.zombieType[e] = type;
+    s.bodyScale[e] = kind.scale;
+    s.health[e] =
+      type === ZOMBIE_TYPE.boss
+        ? Math.round(ZOMBIE_SPECIALS.bossHpPerHuman * Math.max(1, ctx.humans) * ctx.zombieRules.hpMul)
+        : Math.max(1, Math.round(w.waveHp * kind.hpMul));
     return true;
   }
   return false;
+}
+
+/** M3 (fase 3b): o tipo do próximo zumbi: o chefão pendente; senão um especial (pela onda e pela chance); senão anda ou corre. */
+function rollType(ctx: SimContext): number {
+  const w = ctx.waves;
+  const Z = ZOMBIE_SPECIALS;
+  if (w.bossPending === 1) {
+    w.bossPending = 0;
+    return ZOMBIE_TYPE.boss;
+  }
+  const rng = ctx.rngZombies;
+  if (ctx.zombieRules.specials) {
+    const roll = rng.next();
+    let edge = 0;
+    if (w.wave >= Z.sprinterFrom) {
+      edge += Z.sprinterChance;
+      if (roll < edge) return ZOMBIE_TYPE.sprinter;
+    }
+    if (w.wave >= Z.chonkerFrom) {
+      edge += Z.chonkerChance;
+      if (roll < edge) return ZOMBIE_TYPE.chonker;
+    }
+    if (w.wave >= Z.spitterFrom) {
+      edge += Z.spitterChance;
+      if (roll < edge) return ZOMBIE_TYPE.spitter;
+    }
+  }
+  return rng.next() < w.runChance ? ZOMBIE_TYPE.runner : ZOMBIE_TYPE.walker;
 }
 
 function endZombies(ctx: SimContext, won: boolean): void {

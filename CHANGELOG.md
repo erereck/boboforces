@@ -22,6 +22,8 @@ Plano em `docs/PLANO_M3.md`.
   à onda 2 (antes da IA de apoio da fase 3).
 - **Fase 3a, caídos e apoio:** os zumbis ignoram quem está caído; os bots recuam atirando e levantam os colegas. Com 4
   bots, a onda média foi de 3,7 para 4,3.
+- **Fase 3b, especiais e chefão:** Sprinter (rápido), Chonker (maior, explode em gosma ao morrer), Spitter (cospe de
+  longe) e o Mega Bobo a cada 5 ondas (1,8× maior, 3000 de vida por humano); a hitbox cresce com o corpo.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

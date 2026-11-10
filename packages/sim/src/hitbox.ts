@@ -300,7 +300,37 @@ export class FigureHitCache {
   testEntity(s: SimState, e: number, posture: number, tick: number): number {
     const c = s.controller[e]!;
     const slot = c >= 0 && c < this.spare ? c : this.spare;
-    return this.test(posture, s.position, e * 3, s.yaw, s.pitch, e, slot, e * KEY_POSTURES + posture, tick);
+    const sc = s.bodyScale[e]!;
+    if (sc === 1)
+      return this.test(posture, s.position, e * 3, s.yaw, s.pitch, e, slot, e * KEY_POSTURES + posture, tick);
+    // M3 (fase 3b): corpo em escala (Chonker, chefão): o raio vai para o espaço do corpo em tamanho 1, em volta dos pés
+    // (origem e direção ÷ escala); o `t` do acerto continua o do raio do mundo.
+    const r = this.ray;
+    const e3 = e * 3;
+    const px = s.position[e3]!;
+    const py = s.position[e3 + 1]!;
+    const pz = s.position[e3 + 2]!;
+    const ox = r[R_OX]!;
+    const oy = r[R_OY]!;
+    const oz = r[R_OZ]!;
+    const dx = r[R_DX]!;
+    const dy = r[R_DY]!;
+    const dz = r[R_DZ]!;
+    const inv = 1 / sc;
+    r[R_OX] = px + (ox - px) * inv;
+    r[R_OY] = py + (oy - py) * inv;
+    r[R_OZ] = pz + (oz - pz) * inv;
+    r[R_DX] = dx * inv;
+    r[R_DY] = dy * inv;
+    r[R_DZ] = dz * inv;
+    const hit = this.test(posture, s.position, e3, s.yaw, s.pitch, e, slot, e * KEY_POSTURES + posture, tick);
+    r[R_OX] = ox;
+    r[R_OY] = oy;
+    r[R_OZ] = oz;
+    r[R_DX] = dx;
+    r[R_DY] = dy;
+    r[R_DZ] = dz;
+    return hit;
   }
 
   /**

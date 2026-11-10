@@ -102,9 +102,9 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 
 - **3a. Caídos e apoio** (feita em 10/11/2026, ARCHITECTURE §13.12): o zumbi ignora quem está caído; os bots de apoio
   recuam atirando quando o zumbi chega perto e vão levantar o colega caído.
-- **3b. Especiais e chefão:** Sprinter (rápido, pouca vida), Chonker (maior; ao morrer explode em gosma verde, 40 de
-  dano em 3 m), Spitter (cospe um projétil lento) e o Mega Bobo a cada 5 ondas (3000 × humanos de vida, 1,8× maior),
-  respeitando os liga/desliga da receita; a IA de cada um.
+- **3b. Especiais e chefão** (feita em 10/11/2026, ARCHITECTURE §13.13): Sprinter (rápido, pouca vida), Chonker
+  (maior; ao morrer explode em gosma verde, 40 de dano em 3 m), Spitter (cospe um projétil lento) e o Mega Bobo a cada 5
+  ondas (3000 × humanos de vida, 1,8× maior), respeitando os liga/desliga da receita; a IA de cada um.
 - **3c. Flow field:** um campo de direções na navegação, a partir dos bobos de pé, refeito a cada 0,5 s e dividido por
   todos os zumbis (mais barato que um A* por zumbi com 60 deles).
 - **3d. Barricadas, janelas e portas:** entidades com estado na sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s; segurar

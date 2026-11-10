@@ -2317,3 +2317,23 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Medido** (`local/m3/robo-ondas.ts`, 4 bots Normal, sementes 1–6): a onda média foi de 3,7 (fase 2e) para **4,3**
   (3 a 5). Só ignorar os caídos derrubava para 3,3; recuar atirando é o que mais pesa (0 a 3 colegas levantados por
   partida). Golden do modo: `5a793de3`.
+
+### 13.13 Fase 3b: especiais e o chefão (10/11/2026)
+
+- **Tipos** (`ZOMBIE_TYPE`, `ZOMBIE_KINDS`): além do que anda e do que corre, o **Sprinter** (6,4 m/s, metade da vida,
+  golpe 20), o **Chonker** (1,3×, 2,7 m/s, 1,6× a vida, golpe 30; ao morrer explode em gosma: 40 de dano em 3 m, que
+  não sai no vazio), o **Spitter** (cospe um projétil de 12 m/s, 20 de dano, a cada 3 s, de 4 a 15 m) e o **Mega Bobo**
+  (1,8×, 2,7 m/s, 3000 × humanos de vida, golpe 60 com 1,8 m de alcance). Os números dos especiais são escolhas minhas.
+- **Quando:** o Sprinter da onda 3 (8% por zumbi), o Chonker da 4 (7%), o Spitter da 6 (7%) e o chefão uma vez a cada
+  5 ondas, o primeiro a sair, a mais no total; os liga/desliga `specials` e `bosses` da receita valem.
+- **Escala do corpo** (`SimState.bodyScale`, só no snapshot e no hash do Bobo Zombies): a hitbox cresce em volta dos
+  pés sem montar caixas novas (`FigureHitCache.testEntity` leva o raio para o espaço do corpo em tamanho 1; o `t` do
+  acerto continua o do mundo) e o render desenha na mesma escala (`ActorBuffer.scale`, previsto desde o M1).
+- **As "armas" dos zumbis** (`WEAPON_GOO` 9 e `WEAPON_SPIT` 10) ficam fora de `WEAPONS` (não são do jogador: sem nome,
+  modelo nem loadout); o `weaponDef` devolve as duas, e o sistema de projéteis serve o cuspe como serve o foguete. O
+  cuspe usa o modelo da granada até a arte dos zumbis (fase 5).
+- **IA:** o Spitter mira e cospe quando o alvo está de 4 a 15 m (anda mais devagar enquanto isso); os outros
+  perseguem como o zumbi do M1, cada um no seu perfil de movimento.
+- **Medido:** robô das ondas com 4 bots Normal: onda média **4,0** (4 nas 6 sementes; o Sprinter da onda 3 pesa).
+  Golden do modo: `9ee60f97`. Conferido no Edge (com o chefão e os Chonkers forçados na onda 1, numa edição
+  temporária): o chefão aparece 1,8× maior e o cuspe voa até o jogador.
