@@ -44,7 +44,6 @@ import {
   CUSTOM_ACTION,
   CUSTOM_ROW_PREFIX,
   CUSTOM_TAB_PREFIX,
-  customMatchScreen,
   MAIN_MENU_ACTION,
   mainMenuScreen,
   COUCH_ACTION,
@@ -53,11 +52,9 @@ import {
   LAB_ACTION,
   LAB_INTRO_ACTION,
   labIntroScreen,
-  labScreen,
   MODES_ACTION,
   WORKSHOP_ACTION,
   WORKSHOP_BOT_PREFIX,
-  workshopScreen,
   NEWS_ACTION,
   NEWS_ITEMS,
   newsScreen,
@@ -96,7 +93,6 @@ import type { LocalDriver } from './local-driver.ts';
 import type { LocalSeat } from './scene/seats.ts';
 import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
-import { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
 import {
   actionLabel,
   bindRowAction,
@@ -108,7 +104,7 @@ import {
 } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
-import { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotName, stepLab } from './lab.ts';
+import type * as EditorsModule from './editors.ts';
 import { trainingPreset } from './training.ts';
 import {
   factoryPresets,
@@ -193,7 +189,15 @@ export interface GameDeps {
    * renderer completo; Switch e testes: o módulo direto. Ausente = JOGAR não abre nada (só registra no log).
    */
   readonly loadScene?: () => Promise<SceneBundle>;
+  /**
+   * M3: as telas de edição (`@boboforces/game/editors`): web por `import()` (fora do menu), Switch e testes direto. O
+   * jogo pede logo depois do menu pronto. Ausente = Laboratório, Oficina e Partida personalizada não abrem.
+   */
+  readonly loadEditors?: () => Promise<Editors>;
 }
+
+/** M3: o módulo das telas de edição (`editors.ts`). */
+export type Editors = typeof EditorsModule;
 
 /** Alguma tecla, botão do mouse ou do controle ainda apertado. */
 function anyInputHeld(raw: Readonly<RawInputState>): boolean {
@@ -426,7 +430,7 @@ export function startGame(deps: GameDeps): GameHandle {
     const bot = findBot(workshopSelected) ?? factoryBots[0]!;
     workshopSelected = bot.id;
     workshopMenu.setRoot(
-      workshopScreen.build({
+      editors!.workshopScreen.build({
         groups: [
           { id: 'fav', titleKey: 'workshop.favorites', items: favorites.map(item), empty: '' },
           { id: 'mine', titleKey: 'workshop.mine', items: save.bots.map(item), empty: t('workshop.empty') },
@@ -462,11 +466,11 @@ export function startGame(deps: GameDeps): GameHandle {
   const allBotNames = (): Set<string> => new Set([...save.bots, ...factoryBots].map(botDisplayName));
   function rebuildLab(): void {
     labMenu.setRoot(
-      labScreen.build({
-        tabs: LAB_TABS.map((id) => LAB_TAB_LABELS[id]),
+      editors!.labScreen.build({
+        tabs: editors!.LAB_TABS.map((id) => editors!.LAB_TAB_LABELS[id]),
         tab: labTab,
-        rows: labRows(LAB_TABS[labTab]!, labDoc, platform.textInput.available),
-        summary: labSummary(labDoc),
+        rows: editors!.labRows(editors!.LAB_TABS[labTab]!, labDoc, platform.textInput.available),
+        summary: editors!.labSummary(labDoc),
         note: labNote,
       }),
     );
@@ -508,11 +512,11 @@ export function startGame(deps: GameDeps): GameHandle {
       { initial: labDoc.name, maxLength: BOT_RANGES.nameMaxLength, kind: 'name' },
       {
         onChange: (value) => {
-          labDoc = { ...labDoc, name: cleanBotName(value) };
+          labDoc = { ...labDoc, name: editors!.cleanBotName(value) };
           labDirty = true;
           rebuildLab();
         },
-        onSubmit: (value) => done(cleanBotName(value)),
+        onSubmit: (value) => done(editors!.cleanBotName(value)),
         onCancel: () => done(labTypingFrom),
       },
     );
@@ -521,7 +525,7 @@ export function startGame(deps: GameDeps): GameHandle {
   function labAction(nav: MenuNavigation): void {
     const a = nav.activated;
     if (nav.tab !== 0) {
-      labTab = (labTab + nav.tab + LAB_TABS.length) % LAB_TABS.length;
+      labTab = (labTab + nav.tab + editors!.LAB_TABS.length) % editors!.LAB_TABS.length;
       followTab(labMenu, labTab);
       labNote = '';
     } else if (nav.back || a === LAB_ACTION.back) {
@@ -552,15 +556,15 @@ export function startGame(deps: GameDeps): GameHandle {
       labNote = '';
     } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
       const id = a.slice(SETTINGS_ROW_PREFIX.length);
-      const tab = LAB_TABS[labTab]!;
+      const tab = editors!.LAB_TABS[labTab]!;
       labNote = '';
       labDiscard = false;
       if (tab === 'name' && id === 'roll') {
-        labDoc = { ...labDoc, name: rollBotName(botRng, allBotNames()) };
+        labDoc = { ...labDoc, name: editors!.rollBotName(botRng, allBotNames()) };
         labDirty = true;
       } else if (tab === 'name' && id === 'name') startTyping();
       else {
-        const next = stepLab(tab, labDoc, id, nav.delta);
+        const next = editors!.stepLab(tab, labDoc, id, nav.delta);
         if (next !== labDoc) {
           labDoc = next;
           labDirty = true;
@@ -571,10 +575,12 @@ export function startGame(deps: GameDeps): GameHandle {
   }
 
   function openWorkshop(): void {
-    workshopNote = '';
-    workshopConfirm = null;
-    rebuildWorkshop();
-    screen = 'workshop';
+    withEditors(() => {
+      workshopNote = '';
+      workshopConfirm = null;
+      rebuildWorkshop();
+      screen = 'workshop';
+    });
   }
   function workshopAction(a: string): void {
     const bot = findBot(workshopSelected);
@@ -691,12 +697,13 @@ export function startGame(deps: GameDeps): GameHandle {
     },
   };
   function rebuildCustom(): void {
-    const tab = CUSTOM_TABS[customTab]!;
+    const ed = editors!;
+    const tab = ed.CUSTOM_TABS[customTab]!;
     customMenu.setRoot(
-      customMatchScreen.build({
-        tabs: CUSTOM_TABS.map((id) => CUSTOM_TAB_LABELS[id]),
+      ed.customMatchScreen.build({
+        tabs: ed.CUSTOM_TABS.map((id) => ed.CUSTOM_TAB_LABELS[id]),
         tab: customTab,
-        rows: customRows(tab, customRecipe).map((r) => ({
+        rows: ed.customRows(tab, customRecipe).map((r) => ({
           id: r.id,
           labelKey: r.labelKey,
           value: r.value(customRecipe),
@@ -707,19 +714,49 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
   function openCustom(recipe: MatchRecipe, back: GameScreen): void {
-    customRecipe = recipe;
-    customTab = 0;
-    customNote = '';
-    customReturn = back;
-    rebuildCustom();
-    customMenu.focus('start');
-    screen = 'custom';
+    withEditors(() => {
+      customRecipe = recipe;
+      customTab = 0;
+      customNote = '';
+      customReturn = back;
+      rebuildCustom();
+      customMenu.focus('start');
+      screen = 'custom';
+    });
+  }
+
+  // --- M3: as telas de edição chegam à parte (`GameDeps.loadEditors`) ---
+  let editors: Editors | null = null;
+  let editorsPromise: Promise<void> | null = null;
+  /** O que ficou esperando o módulo (abrir a tela pedida); roda no primeiro frame depois que ele chega. */
+  let editorsAfter: (() => void) | null = null;
+  function loadEditors(): void {
+    if (editorsPromise !== null || !deps.loadEditors) return;
+    editorsPromise = deps.loadEditors().then(
+      (m) => {
+        editors = m;
+      },
+      (error: unknown) => fail(error),
+    );
+  }
+  /** Roda agora, se as telas de edição já chegaram; senão pede e roda quando chegarem. */
+  function withEditors(then: () => void): void {
+    if (editors !== null) {
+      then();
+      return;
+    }
+    if (!deps.loadEditors) {
+      log('[game] telas de edição indisponíveis nesta casca (sem loadEditors)');
+      return;
+    }
+    editorsAfter = then;
+    loadEditors();
   }
   /** Salva o preset com nome do gerador ("Times 4×4 De boa"; repetido, " 2"); devolve o aviso para a tela. */
   function saveCustomPreset(recipe: MatchRecipe): string {
     const short = presetShortcut({ ...recipe, name: '' }).label;
     const base = `${t(`mode.short.${recipe.mode}` as StringKey)} ${short}`;
-    const name = presetName(base, (n) => save.presets.saved.some((p) => p.name === n));
+    const name = editors!.presetName(base, (n) => save.presets.saved.some((p) => p.name === n));
     const ok = save.savePreset({ ...recipe, name, seed: 0 });
     return ok ? t('custom.saved', { name }) : t('custom.full');
   }
@@ -1329,6 +1366,12 @@ export function startGame(deps: GameDeps): GameHandle {
       log('[game] versão nova: aplicando no título');
       platform.updates.apply();
     }
+    // M3: a tela de edição pedida antes de o módulo chegar abre agora.
+    if (editors !== null && editorsAfter !== null) {
+      const then = editorsAfter;
+      editorsAfter = null;
+      then();
+    }
     updateMusic();
     platform.input.poll(raw);
     menuInput.update(raw, dt);
@@ -1487,7 +1530,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const nav = customMenu.update(menuInput, raw, u);
         const a = nav.activated;
         if (nav.tab !== 0) {
-          customTab = (customTab + nav.tab + CUSTOM_TABS.length) % CUSTOM_TABS.length;
+          customTab = (customTab + nav.tab + editors!.CUSTOM_TABS.length) % editors!.CUSTOM_TABS.length;
           followTab(customMenu, customTab);
           rebuildCustom();
         } else if (nav.back || a === CUSTOM_ACTION.back) screen = customReturn;
@@ -1500,7 +1543,13 @@ export function startGame(deps: GameDeps): GameHandle {
           rebuildCustom();
         } else if (a !== null && a.startsWith(CUSTOM_ROW_PREFIX)) {
           const id = a.slice(CUSTOM_ROW_PREFIX.length);
-          customRecipe = stepCustom(CUSTOM_TABS[customTab]!, customRecipe, id, nav.delta, customLimits);
+          customRecipe = editors!.stepCustom(
+            editors!.CUSTOM_TABS[customTab]!,
+            customRecipe,
+            id,
+            nav.delta,
+            customLimits,
+          );
           customNote = '';
           rebuildCustom();
         }
@@ -1635,8 +1684,10 @@ export function startGame(deps: GameDeps): GameHandle {
         closeCouch();
         leaveScene();
         openCustom(preset, 'title');
-      } else if (signal === 'save') saveCustomPreset(playingPreset ?? currentPreset());
-      else if (signal === 'nemesis') saveNemesis();
+      } else if (signal === 'save') {
+        const preset = playingPreset ?? currentPreset();
+        withEditors(() => void saveCustomPreset(preset));
+      } else if (signal === 'nemesis') saveNemesis();
       else if (signal === 'lab') {
         // M2 (fase 5e): Abrir Laboratório (no Tryhard): sai da partida para a Oficina (e o sofá acaba).
         closeCouch();
@@ -1657,6 +1708,7 @@ export function startGame(deps: GameDeps): GameHandle {
     hooks.onMenuReady?.();
     void startSoundFiles();
     pickAutoQuality();
+    loadEditors();
     // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
     // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
     // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.

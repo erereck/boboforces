@@ -6,6 +6,7 @@
 // M1 (Teste Zero, docs/TESTE_ZERO.md): antes do renderer, as sondas de plataforma e de GL gravam linhas `[t0]` no
 // runtime.log; o título ganha os itens de teste (presets do bench, controles, teclado, áudio) e o relatório do bench
 // vai para o log linha a linha com `[bench] `.
+import * as EDITORS from '@boboforces/game/editors';
 import { BENCH_LOG_PREFIX, startGame, type GameHandle, type RendererRoutes } from '@boboforces/game';
 import { SCENE_MODULE } from '@boboforces/game/scene';
 import { createMsdfUiPass, createRenderer, type Renderer } from '@boboforces/render';
@@ -103,6 +104,7 @@ try {
     testItems: createSwitchTestItems(),
     // Um arquivo só (esbuild): a cena já está no bundle.
     loadScene: () => Promise.resolve({ module: SCENE_MODULE }),
+    loadEditors: () => Promise.resolve(EDITORS),
     ...(autoBench ? { bench: autoBench } : {}),
     hooks: {
       onError: (error) => {

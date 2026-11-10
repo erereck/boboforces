@@ -72,6 +72,8 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
     ...(switchTitle
       ? { testItems: SWITCH_TITLE_ITEMS }
       : { loadScene: () => import('./scene.ts').then((m) => m.sceneBundle(options)) }),
+    // M3: as telas de edição num chunk à parte (o jogo pede logo depois do menu pronto).
+    loadEditors: () => import('@boboforces/game/editors'),
     hooks: {
       onProgress: (fraction) => boot.setProgress(fraction),
       onMenuReady: () => boot.reveal(),

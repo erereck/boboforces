@@ -1,3 +1,4 @@
+import * as EDITORS from './editors.ts';
 import { readFileSync } from 'node:fs';
 import { createMixer } from '@boboforces/audio';
 import { dirname, join } from 'node:path';
@@ -72,7 +73,7 @@ import { describe, expect, it } from 'vitest';
 import { GAME_ASSETS, loadGameAssets } from './assets.ts';
 import { BENCH_DEFAULTS, type BenchConfig, type TestItem } from './bench/types.ts';
 import { verticalFov } from './camera.ts';
-import { MENU_READY_MARKER, startGame, type GameDeps, type GameHandle } from './game.ts';
+import { MENU_READY_MARKER, startGame, type Editors, type GameDeps, type GameHandle } from './game.ts';
 import { createLocalDriver } from './local-driver.ts';
 import { createNullRenderer } from './null-renderer.ts';
 import { pauseScreen } from './pause.ts';
@@ -263,6 +264,8 @@ async function settle(): Promise<void> {
 
 /** A cena vem direto (como no Switch: um arquivo só). */
 const loadScene = (): Promise<SceneBundle> => Promise.resolve({ module: SCENE_MODULE });
+/** M3: as telas de edição direto (como no Switch). */
+const loadEditors = (): Promise<Editors> => Promise.resolve(EDITORS);
 
 async function bootToTitle(
   id: PlatformId = 'web',
@@ -275,6 +278,7 @@ async function bootToTitle(
     platform,
     createRenderer: null,
     loadScene,
+    loadEditors,
     ...extra,
     hooks: {
       onMenuReady: () => events.push('menuReady'),
@@ -409,6 +413,7 @@ describe('startGame (NullRenderer)', () => {
       platform,
       createRenderer: null,
       loadScene,
+      loadEditors,
       bench,
       benchWarnings: ['parâmetro desconhecido: foo'],
       hooks: { onBenchReport: (text) => reports.push(text) },
@@ -443,6 +448,7 @@ describe('startGame (NullRenderer)', () => {
       platform,
       createRenderer,
       loadScene,
+      loadEditors,
       bench,
       hooks: { onBenchReport: (text) => reports.push(text) },
     });

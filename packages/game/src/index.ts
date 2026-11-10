@@ -6,6 +6,7 @@ export {
   startGame,
   MENU_READY_MARKER,
   VITRINE_ITEM_ID,
+  type Editors,
   type GameDeps,
   type GameHandle,
   type GameHooks,

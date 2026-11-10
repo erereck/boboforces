@@ -2199,3 +2199,15 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   Abandonada (fase 5), onde a planta do mapa faz mais diferença.
 - **Conferido:** teste da HUD (marcador do jogador) e do `settings@1`; no Edge (`local/m3/capturar-lado-a-lado.ts`):
   Ajustes → Vídeo → Lado a lado e a partida de 2 dividida ao meio.
+
+### 13.5 As telas de edição fora do menu (09/11/2026)
+
+- **Por quê:** o menu estava em 348,6 de 350 KB e o M3 ainda tem telas pela frente.
+- **Como:** `@boboforces/game/editors` (`editors.ts`) junta a Partida personalizada, o Laboratório e a Oficina (as
+  linhas, os passos e as três telas da UI). O jogo recebe o módulo por `GameDeps.loadEditors` (regra 15: o `import()`
+  fica no `apps/web`; o Switch e os testes ligam direto) e o pede logo depois do menu pronto, junto com os sons. Abrir
+  uma dessas telas antes de ele chegar guarda o pedido e abre no primeiro frame depois (`withEditors`). Salvar o preset
+  pelo resultado também espera o módulo (o nome do preset é dele).
+- **Resultado:** menu em 344,3 KB (−4,3 KB); o chunk `editors-*.js` chega depois do menu e entra no precache do service
+  worker como os outros. Conferido no `vite preview` (`local/m3/conferir-editors.ts`): o chunk chega depois do título e
+  as duas telas abrem.
