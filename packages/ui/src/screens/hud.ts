@@ -91,6 +91,11 @@ export interface HudModel {
   markerCount: number;
   markerColor: number;
   /**
+   * M3 (fase 1d): o jogador local dono de cada marcador (0..3 = P1..P4: o símbolo e a cor dele no lugar do chevron do
+   * time); -1 = um bot (o chevron).
+   */
+  readonly markerSeat: Int8Array;
+  /**
    * M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui", gameplay.md §6.3): 2 valores por aviso (x, y em px da
    * superfície), desenhados como um losango âmbar através das paredes.
    */
@@ -187,6 +192,7 @@ export function createHudModel(): HudModel {
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
     markerCount: 0,
     markerColor: COLORS.texto,
+    markerSeat: new Int8Array(MAX_ALLY_MARKERS).fill(-1),
     pings: new Float32Array(MAX_TEAM_PINGS * 2),
     pingCount: 0,
     tipKey: '',
@@ -362,6 +368,20 @@ function drawAllyMarker(out: DrawList, x: number, y: number, unit: number, color
     const rw = unit * (7 - 2 * k);
     pushRect(out, cx - rw / 2, top + k * unit, rw, unit, color);
   }
+}
+
+/**
+ * M3 (fase 1d): um jogador local do mesmo time visto por outra vista: o símbolo dele (▲ ● ■ ◆) na cor dele, com sombra,
+ * a ponta de baixo em (x, y). Fora da vista, nada.
+ */
+function drawPlayerMarker(out: DrawList, x: number, y: number, unit: number, seat: number, view: HudViewport): void {
+  const size = unit * 7;
+  if (x - size / 2 < view.x || x + size / 2 > view.x + view.width || y - size < view.y || y > view.y + view.height)
+    return;
+  const left = Math.round(x - size / 2);
+  const top = Math.round(y) - size;
+  paintIcon(out, seat, left + unit / 2, top + unit / 2, size, withAlpha(COLORS.bunker, 0.55));
+  paintIcon(out, seat, left, top, size, PLAYER_COLORS[seat] as number);
 }
 
 /** Aviso do time (fase 3e): losango âmbar de 7 units com borda escura, centrado em (x, y). Fora da vista, nada. */
@@ -563,7 +583,11 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
   if (!model.dead && !scoped) {
     const unit = Math.max(2, Math.round(1.5 * s));
     for (let i = 0; i < model.markerCount && i < MAX_ALLY_MARKERS; i++) {
-      drawAllyMarker(out, model.markers[i * 2]!, model.markers[i * 2 + 1]!, unit, model.markerColor, view);
+      const x = model.markers[i * 2]!;
+      const y = model.markers[i * 2 + 1]!;
+      const seat = model.markerSeat[i]!;
+      if (seat >= 0) drawPlayerMarker(out, x, y, unit, seat, view);
+      else drawAllyMarker(out, x, y, unit, model.markerColor, view);
     }
     for (let i = 0; i < model.pingCount && i < MAX_TEAM_PINGS; i++) {
       drawPing(out, model.pings[i * 2]!, model.pings[i * 2 + 1]!, unit, view);

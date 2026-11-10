@@ -225,6 +225,16 @@ const VIDEO_ROWS: readonly OptionDef[] = [
     value: (doc) => t(doc.video.fpsCap === 30 ? 'settings.fps.30' : 'settings.fps.60'),
     step: (doc) => ({ ...doc, video: { ...doc.video, fpsCap: doc.video.fpsCap === 30 ? 60 : 30 } }),
   },
+  // M3 (fase 1d): com 2 jogadores no sofá, cima e baixo ou lado a lado.
+  {
+    id: 'split2',
+    labelKey: 'settings.row.split2',
+    value: (doc) => t(doc.video.split2 === 'sideBySide' ? 'settings.split2.sideBySide' : 'settings.split2.stacked'),
+    step: (doc) => ({
+      ...doc,
+      video: { ...doc.video, split2: doc.video.split2 === 'sideBySide' ? 'stacked' : 'sideBySide' },
+    }),
+  },
   // M2 (fase 8b): a qualidade (arte-ux.md §1.12). A Automática mostra o nível que a escolha da 1ª abertura deu.
   {
     id: 'quality',

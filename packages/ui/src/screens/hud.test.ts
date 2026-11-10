@@ -133,6 +133,29 @@ describe('HUD por vista: conteúdo', () => {
     expect(text).not.toContain('P1');
   });
 
+  it('marcador de jogador local (M3, fase 1d): o símbolo na cor dele no lugar do chevron do time', () => {
+    const bot = sampleModel();
+    bot.markerCount = 1;
+    bot.markers[0] = 640;
+    bot.markers[1] = 300;
+    bot.markerColor = TEAM_COLORS[0]!;
+    bot.markerSeat[0] = -1;
+    const local = sampleModel();
+    local.markerCount = 1;
+    local.markers[0] = 640;
+    local.markers[1] = 300;
+    local.markerColor = TEAM_COLORS[0]!;
+    local.markerSeat[0] = 2;
+    const count = (m: HudModel, color: number): number => {
+      const list = createDrawList();
+      drawHud(list, fonts, m, view);
+      return drawnCommands(list).filter((c) => c.op === DRAW_OP.rect && c.color === color).length;
+    };
+    expect(count(bot, PLAYER_COLORS[2]!)).toBe(0);
+    expect(count(local, PLAYER_COLORS[2]!)).toBeGreaterThan(0);
+    expect(count(local, TEAM_COLORS[0]!)).toBeLessThan(count(bot, TEAM_COLORS[0]!));
+  });
+
   it('3–4P compacto: P2 na cor do jogador, vida só com número, munição só com o pente', () => {
     const list = createDrawList();
     drawHud(list, fonts, sampleModel(1), quad);

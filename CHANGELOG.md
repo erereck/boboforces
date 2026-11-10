@@ -18,6 +18,8 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 1c, entrar no meio e sair:** numa partida do sofá, segurar A por 1 s num controle livre entra no lugar de um
   bot (a tela se divide); o + de cada jogador abre a pausa dele, com Sair do sofá (um bot assume). Controle
   desconectado pausa e avisa até voltar.
+- **Fase 1d, as vistas:** o colega de time local aparece com o símbolo e a cor dele em cima da cabeça; o radial da arma
+  vale para todos; com 2 jogadores, dá para dividir lado a lado (Ajustes → Vídeo → Sofá com 2).
 
 ### M2 MVP web solo (em construção)
 

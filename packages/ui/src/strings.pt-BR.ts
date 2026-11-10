@@ -68,6 +68,9 @@ export const STRINGS_PT_BR = {
   'settings.fps.60': '60 por segundo',
   /** M2 (fase 8b): a qualidade (arte-ux.md §1.12). */
   'settings.row.quality': 'Qualidade',
+  'settings.row.split2': 'Sofá com 2',
+  'settings.split2.stacked': 'Cima e baixo',
+  'settings.split2.sideBySide': 'Lado a lado',
   'settings.quality.auto': 'Automática',
   'settings.quality.autoIs': 'Automática: {level}',
   'settings.quality.low': 'Leve',

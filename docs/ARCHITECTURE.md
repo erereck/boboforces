@@ -2182,3 +2182,20 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Conferido:** teste da reserva no `director.test`; no `game.test`, o controle 3 entra no meio, pausa, sai, e o do
   P2 cai e volta; no Edge (`local/m3/capturar-entrar-meio.ts`): o P1 sozinho, o controle entra como P2 no time azul
   (o sem humanos), pausa com a pausa dele e sai.
+
+### 13.4 Fase 1d: as vistas do sofá (09/11/2026)
+
+- **Identificação:** a borda e o símbolo na cor do jogador em cada vista já existiam (M1). O **anel no chão** virou um
+  **marcador em cima da cabeça**: nas vistas dos colegas de time, o jogador local aparece com o símbolo dele (▲ ● ■ ◆)
+  na cor dele, a qualquer distância, no lugar do chevron do time (`HudModel.markerSeat`). Escolha minha: o anel pedia
+  um caminho novo de desenho no render (teto de 7 programas); o marcador usa a HUD. No versus, o adversário local não
+  ganha marcador (como os bots inimigos).
+- **Radial da arma para todos:** a tela de morte de cada vista local mostra o radial e lê o mapeador daquele jogador; a
+  escolha fica por jogador (`seatPrimary`, pelo número do jogador) e vai no `InputFrame.primary` dele.
+- **2 jogadores lado a lado:** `settings.video.split2` (`stacked` padrão, `sideBySide`), linha "Sofá com 2" em
+  Ajustes → Vídeo; a HUD já sabia (`HudScreenOptions.vertical`). A troca no meio da partida refaz o layout. A arma na
+  mão usa a escala do 3–4P na vista estreita.
+- **Fica para depois:** o minimapa no 4º quadrante (com 3 jogadores, hoje o placar e o relógio); entra com a Base
+  Abandonada (fase 5), onde a planta do mapa faz mais diferença.
+- **Conferido:** teste da HUD (marcador do jogador) e do `settings@1`; no Edge (`local/m3/capturar-lado-a-lado.ts`):
+  Ajustes → Vídeo → Lado a lado e a partida de 2 dividida ao meio.

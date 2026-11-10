@@ -727,8 +727,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const primaryNames = PRIMARY_ORDER.map((code) => weaponNames[code] ?? '');
   const primaryCategories = PRIMARY_ORDER.map((code) => weaponCategories[code] ?? '');
   const NO_PRIMARIES: readonly string[] = [];
-  /** Escolha do humano no radial (índice em `PRIMARY_ORDER`; começa no fuzil, a primária padrão). */
-  let humanPrimary = 0;
+  /**
+   * Escolha de cada jogador local no radial (índice em `PRIMARY_ORDER`; começa no fuzil, a primária padrão), por
+   * assento (M3, fase 1d: o radial vale para o P2–P4 também).
+   */
+  const seatPrimary: number[] = [0, 0, 0, 0];
   /** Derrota feia (GDD §3.8): mortes seguidas do humano sem abate e se a dica já saiu nesta partida. */
   let deathsWithoutKill = 0;
   let hardHintUsed = false;
@@ -894,6 +897,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let layout: HudScreenLayout | null = null;
   /** Entradas do último `layoutHudScreen` (comparadas número a número: nada de chave em string por frame). */
   const layoutKey = new Float64Array(7).fill(-1);
+  let layoutVertical = false;
 
   const far = Math.min(
     recipe.match?.viewDistanceM ?? MATCH_DEFAULTS.viewDistanceM,
@@ -2534,6 +2538,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         : (ui.options.minTextPx ?? MIN_TEXT.phone);
     const safe = g.safeArea;
     const key = layoutKey;
+    // M3 (fase 1d): com 2 jogadores, lado a lado se o Ajuste pedir (a troca no meio da partida refaz o layout).
+    const vertical = viewCount === 2 && host.settings.current.video.split2 === 'sideBySide';
+    if (layoutVertical !== vertical) layout = null;
+    layoutVertical = vertical;
     if (
       layout &&
       key[0] === ui.width &&
@@ -2557,6 +2565,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       minTextPx: minText,
       safeArea: { top: safe.top, right: safe.right, bottom: safe.bottom, left: safe.left },
       viewLocal: true,
+      vertical,
     });
     return layout;
   }
@@ -2745,22 +2754,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const st = slots[sIdx]!.death;
       if (st.t < 0) continue;
       st.t += dt;
-      if (sIdx !== 0 || humans === 0 || slots[sIdx]!.controller !== 0 || paused) continue;
+      const seat = humans > 0 ? seatOf(slots[sIdx]!.controller) : -1;
+      if (seat < 0 || paused) continue;
+      const m = seat === 0 ? player : extras[seat - 1]!;
+      const current = seatPrimary[seatNum[seat]!]!;
       const n = PRIMARY_ORDER.length;
       const hit = slots[sIdx]!.model.primaryHit;
       let pick = -1;
       // O formato é o que a HUD desenhou no quadro anterior: anel pela direção; fileira e linha passo a passo.
       if (hit.layout === PRIMARY_LAYOUT.ring) {
-        moveRadialCursor(st, wrapAngle(player.yaw), player.pitch);
+        moveRadialCursor(st, wrapAngle(m.yaw), m.pitch);
         pick = radialIndex(st.cursorX, st.cursorY, n);
       } else {
-        const step = stepCursor(st, wrapAngle(player.yaw));
-        if (step !== 0) pick = (humanPrimary + step + n) % n;
+        const step = stepCursor(st, wrapAngle(m.yaw));
+        if (step !== 0) pick = (current + step + n) % n;
       }
-      player.setAngles(0, 0);
-      if (player.wasPressed('nextWeapon')) pick = (humanPrimary + 1) % n;
-      if (player.wasPressed('prevWeapon')) pick = (humanPrimary + n - 1) % n;
-      if (device === 'touch') {
+      m.setAngles(0, 0);
+      if (m.wasPressed('nextWeapon')) pick = (current + 1) % n;
+      if (m.wasPressed('prevWeapon')) pick = (current + n - 1) % n;
+      if (seat === 0 && device === 'touch') {
         for (let k = 0; k < raw.touches.length; k++) {
           const touch = raw.touches[k]!;
           if (!touch.active) continue;
@@ -2768,9 +2780,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (tapped >= 0) pick = tapped;
         }
       }
-      if (pick >= 0 && pick !== humanPrimary) {
-        humanPrimary = pick;
-        player.setPrimary(PRIMARY_ORDER[pick]! + 1);
+      if (pick >= 0 && pick !== current) {
+        seatPrimary[seatNum[seat]!] = pick;
+        m.setPrimary(PRIMARY_ORDER[pick]! + 1);
       }
     }
   }
@@ -2906,7 +2918,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     vm.skin = skinLayer[e] !== 0xffff ? skinLayer[e]! : 0;
     // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
     // 0,6 em 3–4P deixam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P).
-    vm.scale = (viewCount >= 3 ? 0.6 : 0.8) * (tweak ? tweak.scale : 1);
+    // M3 (fase 1d): a vista estreita do lado a lado usa a escala do 3–4P.
+    vm.scale = (viewCount >= 3 || layoutVertical ? 0.6 : 0.8) * (tweak ? tweak.scale : 1);
     sampleLightGrid(loaded.lightGrid, c.x, c.y, c.z, lightScratch, 0);
     vm.lightSky = lightScratch[0]!;
     vm.lightSun = lightScratch[1]!;
@@ -2991,12 +3004,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       for (let j = 0; j < v.count && m.markerCount < MAX_ALLY_MARKERS; j++) {
         if (j === e || v.alive[j] !== 1 || v.kind[j] !== ENTITY_KIND.bobo || v.team[j] !== team) continue;
         if ((v.flags[j]! & ENTITY_FLAG.dead) !== 0) continue;
+        // M3 (fase 1d): um jogador local leva o símbolo e a cor dele (e aparece a qualquer distância).
+        let seat = -1;
+        for (let k = 0; k < seatCtrl.length; k++) {
+          if (entityIndex(sim.controllerEntity(seatCtrl[k]!)) === j) seat = seatNum[k]!;
+        }
         const o = j * 3;
         const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M;
         if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
-        if (projected[2]! > ALLY_MARKER_MAX_M) continue;
+        if (seat < 0 && projected[2]! > ALLY_MARKER_MAX_M) continue;
         m.markers[m.markerCount * 2] = projected[0]!;
         m.markers[m.markerCount * 2 + 1] = projected[1]!;
+        m.markerSeat[m.markerCount] = seat;
         m.markerCount++;
       }
     }
@@ -3004,10 +3023,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const st = slot.death;
     if (m.dead && st.t >= 0) {
       fillDeathBanner(m, st, v, names, weaponNames, deathTx, ruleTexts);
-      const human = humans > 0 && s === 0 && slot.controller === 0;
+      const seat = humans > 0 ? seatOf(slot.controller) : -1;
+      const human = seat >= 0;
       m.primaryNames = human ? primaryNames : NO_PRIMARIES;
       m.primaryCategories = human ? primaryCategories : NO_PRIMARIES;
-      m.primarySelected = humanPrimary;
+      m.primarySelected = human ? seatPrimary[seatNum[seat]!]! : 0;
       m.hardTimeHint = st.hint;
     } else {
       m.deathName = '';

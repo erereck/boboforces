@@ -72,7 +72,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **1c. Na partida** (feita em 09/11/2026, ARCHITECTURE §13.3; só nas partidas da tela do sofá): entrar no meio segurando A por 1 s num controle livre (assume um bot do time com menos humanos; a
   tela se redivide); sair pela pausa (um bot assume); controle desconectado pausa e reserva o assento até ele voltar;
   pausa, tela de morte e radial da arma em cada vista.
-- **1d. Vistas:** borda e símbolo na cor do jogador, anel no chão sob cada humano local, 2 jogadores lado a lado como
+- **1d. Vistas** (feita em 09/11/2026, ARCHITECTURE §13.4: o anel virou marcador em cima da cabeça; o minimapa ficou
+  para a fase 5): borda e símbolo na cor do jogador, anel no chão sob cada humano local, 2 jogadores lado a lado como
   opção (Ajustes → Tela), placar e minimapa no 4º quadrante com 3 jogadores.
 - **1e. Por jogador:** perfil local por assento (nome, cor, sensibilidade, assistência, inverter Y), vibração por
   controle, cada som pelo ouvinte local mais perto e o volume "meus sons".

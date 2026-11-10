@@ -74,6 +74,7 @@ describe('settings@1', () => {
       view: 'first',
       shoulder: 'right',
       fpsCap: 60,
+      split2: 'stacked',
     });
     expect(r.value.accessibility).toEqual(DEFAULT_SETTINGS.accessibility);
     expect(r.value.controls.touch).toEqual(DEFAULT_SETTINGS.controls.touch);

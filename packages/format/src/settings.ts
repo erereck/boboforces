@@ -24,6 +24,10 @@ export type QualityName = (typeof QUALITY_NAMES)[number];
 export const AUTO_QUALITY_NAMES = ['none', 'low', 'medium', 'high'] as const;
 export type AutoQualityName = (typeof AUTO_QUALITY_NAMES)[number];
 
+/** M3 (fase 1d): a tela dividida com 2 jogadores: cima e baixo (padrão, GDD §3.6) ou lado a lado. */
+export const SPLIT2_MODES = ['stacked', 'sideBySide'] as const;
+export type Split2Mode = (typeof SPLIT2_MODES)[number];
+
 /** Os três tipos de dispositivo com controles próprios. */
 export const CONTROL_DEVICES = ['keyboardMouse', 'gamepad', 'touch'] as const;
 export type ControlDevice = (typeof CONTROL_DEVICES)[number];
@@ -71,6 +75,7 @@ export interface VideoSettings {
   readonly view: ViewMode;
   readonly shoulder: Shoulder;
   readonly fpsCap: FpsCap;
+  readonly split2: Split2Mode;
 }
 
 export interface AccessibilitySettings {
@@ -149,7 +154,16 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     gamepad: deviceDefaults('medium'),
     touch: deviceDefaults('medium'),
   },
-  video: { quality: 'auto', autoQuality: 'none', uiScale: 1, fovDeg: 0, view: 'first', shoulder: 'right', fpsCap: 60 },
+  video: {
+    quality: 'auto',
+    autoQuality: 'none',
+    uiScale: 1,
+    fovDeg: 0,
+    view: 'first',
+    shoulder: 'right',
+    fpsCap: 60,
+    split2: 'stacked',
+  },
   audio: { master: 9, sfx: 10, music: 7, ui: 8, mono: false, musicInMatch: false, soundIndicator: false },
   accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
 };
@@ -257,6 +271,7 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
       view: r.pick(v, 'view', 'video.view', D.video.view, VIEW_MODES),
       shoulder: r.pick(v, 'shoulder', 'video.shoulder', D.video.shoulder, SHOULDERS),
       fpsCap: readFpsCap(r, v['fpsCap']),
+      split2: r.pick(v, 'split2', 'video.split2', D.video.split2, SPLIT2_MODES),
     },
     audio: {
       master: vol('master'),
