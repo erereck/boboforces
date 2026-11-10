@@ -6,6 +6,7 @@ import {
   effectiveQuality,
   GAME_CODENAME,
   GAME_VERSION,
+  MATCH_RECIPE_FORMAT,
   guessQuality,
   qualityKnobs,
   selectPlatformProfile,
@@ -659,9 +660,20 @@ export function startGame(deps: GameDeps): GameHandle {
         })),
         // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
         { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
+        // M3 (fase 2d): o Bobo Zombies começa direto (no Construto, enquanto a Base Abandonada não chega).
+        { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
       ],
     }),
   );
+  /** M3 (fase 2d): o Bobo Zombies dos Modos: a Curta (10 ondas) no Construto, só os humanos contra as ondas. */
+  const ZOMBIES_PRESET: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'zombies',
+    map: 'construto',
+    seed: 0,
+    match: { timeLimitS: 0, scoreLimit: 0 },
+    teams: [{ humans: 'all', bots: [] }],
+  };
   /** Teto de bots do aparelho com 1 jogador local (a Partida Rápida não deixa passar). */
   const maxBots = selectPlatformProfile(platform.features.profileHint, 1).maxBots;
   let quick: QuickSettings = quickFromPreset(DEBUT_PRESET, maxBots);
@@ -1601,6 +1613,7 @@ export function startGame(deps: GameDeps): GameHandle {
           const id = a.slice(MODES_PREFIX.length);
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
           else if (id === 'training') playTraining(trainingPreset());
+          else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);
@@ -1716,7 +1729,9 @@ export function startGame(deps: GameDeps): GameHandle {
         const preset = playingPreset ?? currentPreset();
         closeCouch();
         leaveScene();
-        openCustom(preset, 'title');
+        // M3 (fase 2d): a Partida personalizada ainda não sabe o Bobo Zombies (a tela dele é da fase 6): vai aos Modos.
+        if (preset.mode === 'zombies') screen = 'modes';
+        else openCustom(preset, 'title');
       } else if (signal === 'save') {
         const preset = playingPreset ?? currentPreset();
         withEditors(() => void saveCustomPreset(preset));

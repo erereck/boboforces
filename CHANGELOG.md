@@ -16,6 +16,8 @@ Plano em `docs/PLANO_M3.md`.
   economia da partida.
 - **Fase 2c, caído e reviver:** o bobo cai em vez de morrer, rasteja só com a pistola e sangra 30 s; o colega levanta
   segurando o usar por 3 s; sozinho, 3 "levanta sozinho" por partida; todos caídos = derrota.
+- **Fase 2d, o Bobo Zombies no jogo:** card nos Modos (no Construto por enquanto), a onda e os zumbis no alto, os
+  pontos na plaquinha, o aviso de caído e o resultado com a onda alcançada.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

@@ -953,7 +953,8 @@ const construto: MapScript = {
     b.size(160, 48, 160);
     b.meta({
       nameKey: 'map.construto.name',
-      modes: ['warfare.tdm', 'warfare.ffa'],
+      // M3 (fase 2d): o Bobo Zombies roda aqui enquanto a Base Abandonada não chega.
+      modes: ['warfare.tdm', 'warfare.ffa', 'zombies'],
       players: { min: 2, ideal: 12, max: 16 },
       maxSightLineM: 50,
       botCaps: { switch34p: 12 },

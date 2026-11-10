@@ -2279,3 +2279,20 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   passar a ignorar quem está no chão.
 - **Conferido** (`zombies.test`, com os zumbis dirigidos pelo teste): sozinho, o humano gasta os 3 "levanta sozinho" e
   perde na 4ª queda; com um colega a 1 m segurando o usar, levanta em 3 s com 50 de vida.
+
+### 13.10 Fase 2d: o Bobo Zombies no jogo (10/11/2026)
+
+- **Onde:** um card nos Modos (o 4º, "Bobo Zombies"), que joga a Curta (10 ondas) no Construto, só os humanos contra
+  as ondas. O Construto ganhou `zombies` nos modos do `.bfmap` e do `MAP_MODES` até a Base Abandonada chegar (fase 5).
+  Pelo sofá também funciona: o preset tem um time só, então ninguém escolhe lado.
+- **Pool:** o teto de zumbis do aparelho (`PlatformProfile.maxZombies`: 60 no PC, 40 no PC dividido, 24 no celular,
+  30/24 no Switch), passado ao driver como `zombies`. A IA dos zumbis é a do M1 (persegue pela navegação e bate).
+- **HUD:** a linha do Bobo Training no lugar do placar vira "Onda 3 · 12 zumbis", "Onda 4 em 7 s" ou "Onda 3 · o
+  último!"; a plaquinha do alto mostra PONTOS (em âmbar) e ABATES; caído, uma plaquinha abaixo da retícula mostra
+  CAÍDO e os segundos (vermelho), LEVANTANDO e a porcentagem, ou LEVANTANDO SOZINHO (verde); morto, "Volta na próxima
+  onda" no lugar do "Renascendo".
+- **Resultado:** vitória ou derrota (sem empate), "Sobreviveram às 10 ondas!" ou "Caíram na onda 7", e "Onda N" no
+  lugar do placar. Os botões do Warfare continuam (nível dos bots, Mudar regras); Mudar regras leva aos Modos, porque a
+  Partida personalizada ainda não sabe o Zombies (fase 6).
+- **Conferido** no Edge (`local/m3/capturar-zombies.ts`): o card abre a partida, a onda 1 solta 10 zumbis, o jogador
+  parado cai, gasta os 3 "levanta sozinho" e perde ("Caíram na onda 1").

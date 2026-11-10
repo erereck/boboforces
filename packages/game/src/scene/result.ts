@@ -205,6 +205,8 @@ function best(
 /** Vitória, derrota ou empate do bobo `human` (FFA: ele venceu; times: o time dele venceu). */
 function outcomeOf(view: SimView, human: number, ffa: boolean): MatchOutcome {
   const m = view.match;
+  // M3 (fase 2d): Bobo Zombies (já abriu alguma onda): passou da última ou caiu; não existe empate.
+  if (m.zombieWave > 0) return m.winnerTeam === 0 ? 'win' : 'loss';
   if (ffa) {
     const winner = m.winnerEntity !== NULL_ENTITY ? entityIndex(m.winnerEntity) : -1;
     return winner < 0 ? 'draw' : winner === human ? 'win' : 'loss';

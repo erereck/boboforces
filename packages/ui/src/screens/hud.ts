@@ -75,6 +75,15 @@ export interface HudModel {
   primaryNames: readonly string[];
   primaryCategories: readonly string[];
   primarySelected: number;
+  /**
+   * M3 (fase 2d): Bobo Zombies. `points` ≥ 0 troca a plaquinha do alto para "PONTOS n · ABATES n" (-1 = os outros
+   * modos). `downed` (`HUD_DOWNED`) mostra no centro o caído e `downedValue` (segundos até sangrar ou levantar
+   * sozinho, ou a porcentagem do reviver). `waitWave`: morto, volta na próxima onda (no lugar do "Renascendo").
+   */
+  points: number;
+  downed: number;
+  downedValue: number;
+  waitWave: boolean;
   /** M2 (fase 2c): mostra a dica da derrota feia ("Tá puxado?") na tela de morte. */
   hardTimeHint: boolean;
   /**
@@ -187,6 +196,10 @@ export function createHudModel(): HudModel {
     primaryNames: [],
     primaryCategories: [],
     primarySelected: 0,
+    points: -1,
+    downed: 0,
+    downedValue: 0,
+    waitWave: false,
     hardTimeHint: false,
     primaryHit: { layout: PRIMARY_LAYOUT.none, count: 0, rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4) },
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
@@ -277,6 +290,9 @@ function drawSoundBlip(out: DrawList, cx: number, cy: number, angle: number, alp
 /** A plaquinha do alto à esquerda não passa desta fração da largura da vista (o meio é do placar). */
 const HUD_CHIP_MAX_FRACTION = 0.36;
 
+/** M3 (fase 2d): o caído na HUD: sangrando (segundos), alguém levantando (%), levantando sozinho (segundos). */
+export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as const;
+
 interface HudTexts {
   readonly health: string;
   readonly kills: string;
@@ -296,6 +312,12 @@ interface HudTexts {
   readonly cyclePrev: string;
   readonly cycleNext: string;
   readonly suddenDeath: string;
+  /** M3 (fase 2d): Bobo Zombies. */
+  readonly points: string;
+  readonly downed: string;
+  readonly reviving: string;
+  readonly selfUp: string;
+  readonly waitWave: string;
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -319,6 +341,11 @@ function hudTexts(): HudTexts {
     cyclePrev: t('death.cyclePrev'),
     cycleNext: t('death.cycleNext'),
     suddenDeath: t('hud.suddenDeath').toUpperCase(),
+    points: t('hud.points').toUpperCase(),
+    downed: t('hud.downed').toUpperCase(),
+    reviving: t('hud.reviving').toUpperCase(),
+    selfUp: t('hud.selfUp').toUpperCase(),
+    waitWave: t('hud.waitWave').toUpperCase(),
   };
   return cachedTexts;
 }
@@ -600,12 +627,17 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     const icon = Math.round(capL);
     let w = pad;
     if (multi) w += icon + gap / 2 + textWidth(hud, tx.players[slot] as string, labelPx) + gap * 1.5;
-    w += textWidth(hud, tx.kills, labelPx, M.labelTracking) + gap + numberWidth(hud, model.kills, 0, labelPx);
+    const zm = model.points >= 0;
+    const firstLabel = zm ? tx.points : tx.kills;
+    const firstValue = zm ? model.points : model.kills;
+    const secondLabel = zm ? tx.kills : tx.deaths;
+    const secondValue = zm ? model.kills : model.deaths;
+    w += textWidth(hud, firstLabel, labelPx, M.labelTracking) + gap + numberWidth(hud, firstValue, 0, labelPx);
     const deathsW =
       gap * 1.5 +
-      textWidth(hud, tx.deaths, labelPx, M.labelTracking) +
+      textWidth(hud, secondLabel, labelPx, M.labelTracking) +
       gap +
-      numberWidth(hud, model.deaths, 0, labelPx);
+      numberWidth(hud, secondValue, 0, labelPx);
     const showDeaths = !compact && left + w + deathsW + pad <= view.x + view.width * HUD_CHIP_MAX_FRACTION;
     if (showDeaths) w += deathsW;
     w += pad;
@@ -618,12 +650,12 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       x += icon + gap / 2;
       x += paintText(out, hud, tx.players[slot] as string, x, y, labelPx, playerColor) + gap * 1.5;
     }
-    x += paintText(out, hud, tx.kills, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
-    x += paintNumber(out, hud, model.kills, 0, x, y, labelPx, COLORS.texto);
+    x += paintText(out, hud, firstLabel, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
+    x += paintNumber(out, hud, firstValue, 0, x, y, labelPx, zm ? COLORS.acao : COLORS.texto);
     if (showDeaths) {
       x += gap * 1.5;
-      x += paintText(out, hud, tx.deaths, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
-      paintNumber(out, hud, model.deaths, 0, x, y, labelPx, COLORS.texto);
+      x += paintText(out, hud, secondLabel, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
+      paintNumber(out, hud, secondValue, 0, x, y, labelPx, COLORS.texto);
     }
   }
 
@@ -750,28 +782,29 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
   } else {
     // Morto: a contagem no centro. Com o anel da primária (M2, fase 2c), ela vai em letra de rótulo, numa plaquinha
     // baixa que cabe no meio do anel; sem anel, no título grande de antes.
-    const showCount = model.respawnS > 0;
+    const showCount = model.respawnS > 0 && !model.waitWave;
     const count = Math.ceil(model.respawnS);
+    const respawning = model.waitWave ? tx.waitWave : tx.respawning;
     const smallH = Math.round(pad * 2 + capL + (showCount ? gap + capN : 0));
     const r =
       model.primaryNames.length > 0 && !compact ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s) : 0;
     let y: number;
     let h: number;
     if (r > 0) {
-      const w = Math.max(textWidth(hud, tx.respawning, labelPx, M.labelTracking), numberWidth(hud, count, 0, numberPx));
+      const w = Math.max(textWidth(hud, respawning, labelPx, M.labelTracking), numberWidth(hud, count, 0, numberPx));
       h = smallH;
       y = Math.round(cy - h / 2);
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
-      paintText(out, hud, tx.respawning, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
+      paintText(out, hud, respawning, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
       if (showCount) paintNumber(out, hud, count, 0, cx, y + pad + capL + gap, numberPx, COLORS.acao, 0.5);
     } else {
       const headPx = Math.max(M.headingPx * s, view.minTextPx);
       const capH = capHeightPx(display, headPx);
-      const w = Math.max(textWidth(display, tx.respawning, headPx, 0.02), numberWidth(hud, count, 0, numberPx));
+      const w = Math.max(textWidth(display, respawning, headPx, 0.02), numberWidth(hud, count, 0, numberPx));
       h = Math.round(pad * 2 + capH + (showCount ? gap + capN : 0));
       y = Math.round(cy - h / 2);
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
-      paintText(out, display, tx.respawning, cx, y + pad, headPx, COLORS.texto, 0.02, 0.5);
+      paintText(out, display, respawning, cx, y + pad, headPx, COLORS.texto, 0.02, 0.5);
       if (showCount) paintNumber(out, hud, count, 0, cx, y + pad + capH + gap, numberPx, COLORS.acao, 0.5);
     }
     // M2 (fase 2c): o menu da primária e, embaixo dele, quem matou e a dica da derrota feia (no alto ficam o placar e
@@ -792,6 +825,19 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
         ? below + gap * 2
         : view.y + view.height * (compact ? 0.18 : 0.14);
     drawDeathBanner(out, hud, model, tx, cx, bannerTop, labelPx, pad, gap, s);
+  }
+
+  if (!model.dead && model.downed !== HUD_DOWNED.none) {
+    const label =
+      model.downed === HUD_DOWNED.reviving ? tx.reviving : model.downed === HUD_DOWNED.selfUp ? tx.selfUp : tx.downed;
+    const value = Math.max(0, Math.ceil(model.downedValue));
+    const w = Math.max(textWidth(hud, label, labelPx, M.labelTracking), numberWidth(hud, value, 0, numberPx));
+    const h = Math.round(pad * 2 + capL + gap + capN);
+    const y = Math.round(cy + capN * 2);
+    plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
+    const color = model.downed === HUD_DOWNED.bleeding ? COLORS.perigo : COLORS.ok;
+    paintText(out, hud, label, cx, y + pad, labelPx, color, M.labelTracking, 0.5);
+    paintNumber(out, hud, value, 0, cx, y + pad + capL + gap, numberPx, COLORS.texto, 0.5);
   }
 
   if (model.damageAmount > 0.01) drawDamage(out, model.damageAngle, model.damageAmount, left, top, right, bottom, s);

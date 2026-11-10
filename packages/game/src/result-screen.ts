@@ -20,6 +20,8 @@ export interface ResultScreenData {
   readonly titleColor: number;
   readonly own: number;
   readonly other: number;
+  /** M3 (fase 2d): no lugar do placar ("Onda 7"); ausente = o placar `own × other`. */
+  readonly scoreLine?: string;
   readonly mvp: string;
   /** `''` = ninguém. */
   readonly nemesis: string;
@@ -107,7 +109,10 @@ export const resultScreen: Screen<ResultScreenData> = {
             {
               kind: 'text',
               id: 'score',
-              text: { key: 'result.score', params: { own: d.own, other: d.other } },
+              text:
+                d.scoreLine !== undefined
+                  ? { literal: d.scoreLine }
+                  : { key: 'result.score', params: { own: d.own, other: d.other } },
               style: 'heading',
               color: COLORS.texto,
             },

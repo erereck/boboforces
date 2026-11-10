@@ -2,6 +2,7 @@ import {
   BOT_LEVELS,
   builtinBotRef,
   MATCH_RECIPE_FORMAT,
+  ZOMBIES_DEFAULTS,
   presetBotCounts,
   presetLevel,
   type MatchRecipe,
@@ -52,8 +53,20 @@ function levelName(recipe: MatchRecipe): string {
   return level === null ? '' : t(`level.${level}` as StringKey);
 }
 
+/** M3 (fase 2d): "10 ondas" ou "Sem fim" no Bobo Zombies; `''` nos outros modos. */
+function zombieWaves(recipe: MatchRecipe): string {
+  if (recipe.mode !== 'zombies') return '';
+  const waves = recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves;
+  return waves > 0 ? t('summary.zombieWaves', { n: waves }) : t('summary.zombieEndless');
+}
+
 /** Resumo de uma linha para o título: "Times · De boa · 4 contra 4 · Construto". */
 export function presetSummary(recipe: MatchRecipe): string {
+  if (recipe.mode === 'zombies') {
+    return [t('mode.short.zombies'), zombieWaves(recipe), t(`map.${recipe.map}` as StringKey)].join(
+      t('summary.separator'),
+    );
+  }
   const parts = [
     t(`mode.short.${recipe.mode}` as StringKey),
     levelName(recipe),
@@ -65,6 +78,7 @@ export function presetSummary(recipe: MatchRecipe): string {
 
 /** As linhas do card do sorteio: o modo (em destaque), o mapa, o nível, os times e a duração. */
 export function presetLines(recipe: MatchRecipe): string[] {
+  if (recipe.mode === 'zombies') return [t('mode.zombies'), t(`map.${recipe.map}` as StringKey), zombieWaves(recipe)];
   return [
     t(`mode.${recipe.mode}` as StringKey),
     t(`map.${recipe.map}` as StringKey),

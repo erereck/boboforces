@@ -392,6 +392,15 @@ export const STRINGS_PT_BR = {
   'hud.kills': 'Abates',
   'hud.deaths': 'Mortes',
   'hud.respawning': 'Renascendo…',
+  // M3 (fase 2d): Bobo Zombies.
+  'hud.points': 'Pontos',
+  'hud.downed': 'Caído',
+  'hud.reviving': 'Levantando',
+  'hud.selfUp': 'Levantando sozinho',
+  'hud.waitWave': 'Volta na próxima onda',
+  'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
+  'hud.zombies.rest': 'Onda {wave} em {s} s',
+  'hud.zombies.last': 'Onda {wave} · o último!',
   'hud.clickToAim': 'Clique para mirar com o mouse',
   /** Rótulo da vista no 2–4P (com o ícone e a cor do jogador). */
   'hud.player': 'P{n}',
@@ -967,6 +976,16 @@ export const STRINGS_PT_BR = {
   'map.construto': 'Construto',
   'map.ringue': 'Ringue',
   'mode.training': 'Bobo Training',
+  // M3 (fase 2d): Bobo Zombies.
+  'mode.zombies': 'Bobo Zombies',
+  'mode.short.zombies': 'Zombies',
+  'mode.name.zombies': 'Bobo Zombies',
+  'mode.desc.zombies': 'Ondas de bobos-zumbi. Caiu? O colega levanta.',
+  'summary.zombieWaves': '{n} ondas',
+  'summary.zombieEndless': 'Sem fim',
+  'result.zombiesWin': 'Sobreviveram às {waves} ondas!',
+  'result.zombiesLoss': 'Caíram na onda {wave}',
+  'result.zombiesWave': 'Onda {wave}',
 
   'error.title': 'Algo deu errado',
   'error.copyReport': 'Copiar relatório',

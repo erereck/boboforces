@@ -100,7 +100,9 @@ import {
   MATCH_DEFAULTS,
   METRICS,
   NO_TEAM,
+  MAX_ZOMBIES,
   NULL_ENTITY,
+  ZOMBIES_DOWN,
   heldClip,
   heldReserve,
   MAX_CONTROLLERS,
@@ -147,6 +149,7 @@ import {
   drawText,
   HUD_AMMO,
   HUD_CROSSHAIR,
+  HUD_DOWNED,
   layoutHudScreen,
   measureText,
   MIN_TEXT,
@@ -865,6 +868,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const sharedHud = createHudSharedModel();
   // M2 (fase 5d): Bobo Training: sem placar nem relógio; a linha dos números, refeita só quando eles mudam.
   const training = recipe.mode === 'training';
+  /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
+  const zombiesMode = recipe.mode === 'zombies';
+  const zombieLineKey = new Int32Array(3).fill(-2);
   const trainingNow: TrainingNumbers = { accuracy: -1, headPct: -1, ttkS: -1, kills: 0 };
   let lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
   /** M2 (fase 5e): os números do treino para o Testar (a precisão é a dos bots que não são Alvo). */
@@ -899,6 +905,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
     }
     return null;
+  }
+
+  /** M3 (fase 2d): "Onda 3 · 12 zumbis", "Onda 4 em 7 s" ou "Onda 3 · o último!". */
+  function refreshZombieLine(): void {
+    const mv = sim.view().match;
+    const rest = mv.zombieRestTicks >= 0 ? Math.ceil(mv.zombieRestTicks / sim.hz) : -1;
+    const last = mv.lastZombie !== NULL_ENTITY ? 1 : 0;
+    const k = zombieLineKey;
+    if (k[0] === mv.zombieWave && k[1] === (rest >= 0 ? rest : mv.zombiesLeft) && k[2] === (rest >= 0 ? -1 : last))
+      return;
+    k[0] = mv.zombieWave;
+    k[1] = rest >= 0 ? rest : mv.zombiesLeft;
+    k[2] = rest >= 0 ? -1 : last;
+    sharedHud.trainingLine =
+      rest >= 0
+        ? t('hud.zombies.rest', { wave: mv.zombieWave + 1, s: rest })
+        : last === 1
+          ? t('hud.zombies.last', { wave: mv.zombieWave })
+          : t('hud.zombies.wave', { wave: mv.zombieWave, left: mv.zombiesLeft });
   }
 
   function refreshTrainingLine(): void {
@@ -1522,6 +1547,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     },
     onEvents,
     ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
+    // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11).
+    ...(!bench && zombiesMode ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) } : {}),
     budget: aiBudgetFor(profile),
     now,
     // A MESMA tabela que o render recebeu no `setFigures` (a hitbox e a pose de 3ª pessoa saem dela).
@@ -2400,8 +2427,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               ? 'streak'
               : null;
     const nm = (i: number): string => (i >= 0 ? nameOf(v, i) : '');
-    const title =
-      sum.outcome === 'win'
+    const wave = v.match.zombieWave;
+    const title = zombiesMode
+      ? sum.outcome === 'win'
+        ? t('result.zombiesWin', { waves: wave })
+        : t('result.zombiesLoss', { wave })
+      : sum.outcome === 'win'
         ? t('result.win')
         : sum.outcome === 'draw'
           ? t('result.draw')
@@ -2413,6 +2444,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       titleColor: sum.outcome === 'win' ? COLORS.acao : sum.outcome === 'loss' ? COLORS.perigo : COLORS.texto,
       own: sum.ownScore,
       other: sum.otherScore,
+      ...(zombiesMode ? { scoreLine: t('result.zombiesWave', { wave }) } : {}),
       mvp: nm(sum.mvp),
       nemesis: nm(sum.nemesis),
       ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
@@ -2998,6 +3030,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.deaths = v.deaths[e]!;
     m.dead = (flags & ENTITY_FLAG.dead) !== 0;
     m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
+    // M3 (fase 2d): Bobo Zombies.
+    m.points = zombiesMode ? v.points[e]! : -1;
+    m.waitWave = zombiesMode && m.dead;
+    if (zombiesMode && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
+      if (v.selfUp[e] === 1) {
+        m.downed = HUD_DOWNED.selfUp;
+        m.downedValue = v.downTicks[e]! / sim.hz;
+      } else if (v.reviveTicks[e]! > 0) {
+        m.downed = HUD_DOWNED.reviving;
+        m.downedValue = (100 * v.reviveTicks[e]!) / (ZOMBIES_DOWN.reviveS * sim.hz);
+      } else {
+        m.downed = HUD_DOWNED.bleeding;
+        m.downedValue = v.downTicks[e]! / sim.hz;
+      }
+    } else m.downed = HUD_DOWNED.none;
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
     m.pingCount = 0;
     if (calibration !== null && slot.controller === 0) {
@@ -3784,6 +3831,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             sharedHud.teamCount = 0;
             if (calibration !== null) sharedHud.trainingLine = calibrationLines[calibration.index] ?? '';
             else refreshTrainingLine();
+          } else if (zombiesMode) {
+            sharedHud.teamCount = 0;
+            refreshZombieLine();
           } else if (!ffa && request.kind === 'play') {
             sharedHud.teamCount = 2;
             const score = sim.view().match.teamScore;
@@ -3796,7 +3846,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
           sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
-          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training) {
+          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training || zombiesMode) {
             drawHudShared(list, fonts, sharedHud, sharedArea);
           }
           const hs = Math.min(ui.width / 640, ui.height / 360);

@@ -93,7 +93,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **2b. Pontos** (feita em 10/11/2026, ARCHITECTURE §13.8; começa com 500): por bobo (acerto 10, abate 60, na cabeça 100, de faca 130), no estado e na vista.
 - **2c. Caído e reviver** (feita em 10/11/2026, ARCHITECTURE §13.9): em vez de morrer, o bobo cai (30 s, rasteja a 1 m/s só com a pistola); outro segura o usar
   por 3 s perto para levantar; no solo, 3 "levanta sozinho" por partida (configurável); todos caídos = derrota.
-- **2d. No jogo:** o Zombies nos Modos (no Construto, enquanto a Base Abandonada não chega), o teto de zumbis do
+- **2d. No jogo** (feita em 10/11/2026, ARCHITECTURE §13.10): o Zombies nos Modos (no Construto, enquanto a Base Abandonada não chega), o teto de zumbis do
   aparelho, uma linha mínima na HUD (onda, zumbis, pontos) e o resultado com a onda alcançada.
 - **2e. Robô das ondas e golden:** partidas sem humanos (bots de apoio N0) medem até que onda o time chega; golden do
   modo no CI.

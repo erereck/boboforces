@@ -8,7 +8,7 @@ export const MENU_MAPS = ['construto', 'ringue'] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
 export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
-  construto: ['warfare.tdm', 'warfare.ffa'],
+  construto: ['warfare.tdm', 'warfare.ffa', 'zombies'],
   ringue: ['warfare.tdm', 'training'],
 };
 
