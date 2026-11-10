@@ -75,7 +75,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **1d. Vistas** (feita em 09/11/2026, ARCHITECTURE §13.4: o anel virou marcador em cima da cabeça; o minimapa ficou
   para a fase 5): borda e símbolo na cor do jogador, anel no chão sob cada humano local, 2 jogadores lado a lado como
   opção (Ajustes → Tela), placar e minimapa no 4º quadrante com 3 jogadores.
-- **1e. Por jogador:** perfil local por assento (nome, cor, sensibilidade, assistência, inverter Y), vibração por
+- **1e. Por jogador** (feita em 09/11/2026, ARCHITECTURE §13.6; nome e cor fixos por número, volume "meus sons" para
+  depois): perfil local por assento (nome, cor, sensibilidade, assistência, inverter Y), vibração por
   controle, cada som pelo ouvinte local mais perto e o volume "meus sons".
 - **1f. Rodada 13 de prints** (lobby e tela dividida 2–4P), publicada para o Erick revisar.
 

@@ -2211,3 +2211,20 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Resultado:** menu em 344,3 KB (−4,3 KB); o chunk `editors-*.js` chega depois do menu e entra no precache do service
   worker como os outros. Conferido no `vite preview` (`local/m3/conferir-editors.ts`): o chunk chega depois do título e
   as duas telas abrem.
+
+### 13.6 Fase 1e: por jogador (09/11/2026)
+
+- **Ajuste do P2 ao P4:** `settings.couch.p2..p4` (sensibilidade 0,3–3× em passos de 0,1 e Y invertido), mudado na
+  tela do sofá pelo controle de cada um (ombros: mira; botão de cima: inverte o Y) e mostrado no cartão ("Mira 1,2× ·
+  Y invertido"). Fica guardado por número de jogador. Na partida, o perfil do jogador é o do dispositivo com a mira e o
+  Y dele (`seatProfile`); o P1 continua com os Controles dos Ajustes. Nome e cor seguem fixos por número (P2 ●
+  ciano…); o visual próprio de cada jogador fica para quando o Meu Bobo tiver perfis.
+- **Vibração:** `settings.accessibility.vibration` (ligada por padrão; Ajustes → Acessibilidade). Vibra o controle do
+  jogador ao levar dano (força pelo dano, 120 ms, no máximo 1 a cada 120 ms), ao morrer (320 ms) e com explosão perto
+  (pela distância, 220 ms), por `platform.input.vibrate`, só em controle. Era previsto desde o GDD e não existia.
+- **Som:** "os meus sons" (prioridade, sem cooldown) passam a ser os de todos os assentos, inclusive quem entrou no meio
+  (`MatchSoundDeps.humans` vira um getter). O ouvinte local mais perto já era da fase 7b do M2.
+- **Fica para depois:** o volume "meus sons" por jogador (hoje, com 3 ou mais, os seus tocam a 70%, como no M2).
+- **Conferido:** `save-docs.test` (padrão, limite e tipo errado), o `game.test` do sofá (o ombro sobe a mira e o botão
+  de cima inverte o Y) e no Edge (`local/m3/conferir-vibracao.ts`): o cartão do P2 e 3 vibrações (2 de dano e a da
+  morte) em 41 s com o P2 parado no meio dos bots.

@@ -87,6 +87,24 @@ export interface AccessibilitySettings {
   readonly tips: boolean;
   /** Tamanho do HUD. */
   readonly hudScale: number;
+  /** M3 (fase 1e): vibração dos controles (dano, morte, explosão perto). */
+  readonly vibration: boolean;
+}
+
+/**
+ * M3 (fase 1e): o ajuste de um jogador 2–4 do sofá (o P1 usa os Controles dos Ajustes): multiplica a sensibilidade do
+ * dispositivo e inverte o Y. Muda na tela do sofá, pelo controle de cada um, e fica guardado por número de jogador.
+ */
+export interface CouchPlayerSettings {
+  readonly sensitivity: number;
+  readonly invertY: boolean;
+}
+
+/** M3 (fase 1e): os jogadores 2, 3 e 4 do sofá. */
+export interface CouchSettings {
+  readonly p2: CouchPlayerSettings;
+  readonly p3: CouchPlayerSettings;
+  readonly p4: CouchPlayerSettings;
 }
 
 /**
@@ -110,6 +128,7 @@ export interface SettingsDocument {
   readonly video: VideoSettings;
   readonly audio: AudioSettings;
   readonly accessibility: AccessibilitySettings;
+  readonly couch: CouchSettings;
 }
 
 /** Faixas dos números (o validador limita e avisa). */
@@ -165,8 +184,24 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     split2: 'stacked',
   },
   audio: { master: 9, sfx: 10, music: 7, ui: 8, mono: false, musicInMatch: false, soundIndicator: false },
-  accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1 },
+  accessibility: { reduceShake: false, colorblindTeams: false, tips: true, hudScale: 1, vibration: true },
+  couch: {
+    p2: { sensitivity: 1, invertY: false },
+    p3: { sensitivity: 1, invertY: false },
+    p4: { sensitivity: 1, invertY: false },
+  },
 };
+
+/** Os jogadores do sofá com ajuste próprio (o índice do P2 é 1, como o número do jogador menos 1). */
+export const COUCH_PLAYER_KEYS = ['p2', 'p3', 'p4'] as const;
+
+function readCouchPlayer(r: DocReader, src: Record<string, unknown>, path: string): CouchPlayerSettings {
+  const R = SETTINGS_RANGES;
+  return {
+    sensitivity: r.num(src, 'sensitivity', `${path}.sensitivity`, 1, R.sensitivity.min, R.sensitivity.max),
+    invertY: r.bool(src, 'invertY', `${path}.invertY`, false),
+  };
+}
 
 function readDevice(r: DocReader, src: Record<string, unknown>, path: string, d: DeviceControls): DeviceControls {
   const R = SETTINGS_RANGES;
@@ -247,6 +282,7 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
   const v = r.obj(doc, 'video', 'video');
   const a = r.obj(doc, 'accessibility', 'accessibility');
   const s = r.obj(doc, 'audio', 'audio');
+  const k = r.obj(doc, 'couch', 'couch');
   const vol = (key: keyof AudioSettings & ('master' | 'sfx' | 'music' | 'ui')): number =>
     Math.round(r.num(s, key, `audio.${key}`, D.audio[key], R.volume.min, R.volume.max));
   const fov = r.num(v, 'fovDeg', 'video.fovDeg', D.video.fovDeg, 0, R.fovDeg.max);
@@ -294,6 +330,12 @@ export function validateSettings(input: unknown): ValidationResult<SettingsDocum
         R.hudScale.min,
         R.hudScale.max,
       ),
+      vibration: r.bool(a, 'vibration', 'accessibility.vibration', D.accessibility.vibration),
+    },
+    couch: {
+      p2: readCouchPlayer(r, r.obj(k, 'p2', 'couch.p2'), 'couch.p2'),
+      p3: readCouchPlayer(r, r.obj(k, 'p3', 'couch.p3'), 'couch.p3'),
+      p4: readCouchPlayer(r, r.obj(k, 'p4', 'couch.p4'), 'couch.p4'),
     },
   };
   return { ok: true, value, warnings: r.warnings };

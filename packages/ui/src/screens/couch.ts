@@ -15,6 +15,8 @@ export interface CouchSeatView {
   readonly side: 0 | 1 | null;
   /** O controle do assento caiu (o assento fica guardado até ele voltar). */
   readonly disconnected: boolean;
+  /** M3 (fase 1e): o ajuste do jogador ("Mira 1,2× · Y invertido"); `null` no P1 (usa os Ajustes) e nos vagos. */
+  readonly tune?: string | null;
 }
 
 export interface CouchState {
@@ -27,7 +29,7 @@ export interface CouchState {
 }
 
 /** Largura e altura de um cartão (px de referência): os 4 lado a lado cabem em 1280. */
-export const COUCH_CARD = { width: 268, height: 214 } as const;
+export const COUCH_CARD = { width: 268, height: 290 } as const;
 
 function seatCard(seat: CouchSeatView, k: number, keyboardFree: boolean): UiNode {
   const color = PLAYER_COLORS[k] as number;
@@ -43,7 +45,9 @@ function seatCard(seat: CouchSeatView, k: number, keyboardFree: boolean): UiNode
     else if (seat.side !== null) {
       line('Side', { key: seat.side === 0 ? 'couch.side.with' : 'couch.side.against' }, COLORS.acao);
     }
+    if (seat.tune) line('Tune', { literal: seat.tune }, COLORS.texto);
     if (k > 0 && seat.side !== null) line('HintSide', { key: 'couch.hint.side' }, COLORS.textoBaixo);
+    if (k > 0 && seat.tune) line('HintTune', { key: 'couch.hint.tune' }, COLORS.textoBaixo);
     if (k > 0) line('HintLeave', { key: 'couch.hint.leave' }, COLORS.textoBaixo);
   } else {
     line('Join', { key: 'couch.join' }, COLORS.texto);

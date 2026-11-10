@@ -69,6 +69,7 @@ export const STRINGS_PT_BR = {
   /** M2 (fase 8b): a qualidade (arte-ux.md §1.12). */
   'settings.row.quality': 'Qualidade',
   'settings.row.split2': 'Sofá com 2',
+  'settings.row.vibration': 'Vibração',
   'settings.split2.stacked': 'Cima e baixo',
   'settings.split2.sideBySide': 'Lado a lado',
   'settings.quality.auto': 'Automática',
@@ -227,6 +228,10 @@ export const STRINGS_PT_BR = {
   'couch.side.against': 'Contra o P1',
   'couch.hint.side': 'Esquerda e direita: lado',
   'couch.hint.leave': 'Voltar: sai',
+  'couch.tune': 'Mira {sens}× · {y}',
+  'couch.tune.normal': 'Y normal',
+  'couch.tune.inverted': 'Y invertido',
+  'couch.hint.tune': 'Ombros: mira · Cima: Y',
   'couch.disconnected': 'Controle desconectado',
   'couch.device.keyboard': 'Teclado e mouse',
   'couch.device.keyboardOnly': 'Teclado',

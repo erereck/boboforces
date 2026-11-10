@@ -1762,6 +1762,10 @@ describe('sofá (M3, fase 1b)', () => {
     expect(platform.logLines.some((l) => l.includes('sofá: P2 saiu'))).toBe(true);
     tapPad(PAD_BUTTON.start);
     tapPad(PAD_BUTTON.dpadLeft);
+    // Fase 1e: o ombro direito sobe a mira do P2 em 0,1× e o botão de cima inverte o Y (fica guardado).
+    tapPad(PAD_BUTTON.bumperRight);
+    tapPad(PAD_BUTTON.faceUp);
+    expect(game.save.settings.couch.p2).toEqual({ sensitivity: 1.1, invertY: true });
     expect(game.screen).toBe('couch');
     // O Enter do P1 começa (o foco abre no Começar).
     platform.tap('Enter');

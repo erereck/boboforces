@@ -9,7 +9,7 @@ import {
   validatePresetLibrary,
 } from './backup.ts';
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
-import { DEFAULT_SETTINGS, SETTINGS_FORMAT, validateSettings } from './settings.ts';
+import { DEFAULT_SETTINGS, SETTINGS_FORMAT, SETTINGS_RANGES, validateSettings } from './settings.ts';
 import { EMPTY_STATS, STATS_FORMAT, validateStats } from './stats.ts';
 import { BOBO_FORMAT, DEFAULT_BOBO, validateBobo } from './bobo.ts';
 import { FIGURE_PRESETS } from './model/figure-presets.ts';
@@ -38,6 +38,21 @@ function codesKnown(warnings: readonly { code: string }[]): void {
 }
 
 describe('settings@1', () => {
+  it('o ajuste dos jogadores 2–4 do sofá e a vibração (M3, fase 1e): padrão, limite e tipo errado', () => {
+    const r = validateSettings({
+      format: SETTINGS_FORMAT,
+      couch: { p2: { sensitivity: 1.4, invertY: true }, p3: { sensitivity: 99 }, p4: 'x' },
+      accessibility: { vibration: false },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.couch.p2).toEqual({ sensitivity: 1.4, invertY: true });
+    expect(r.value.couch.p3).toEqual({ sensitivity: SETTINGS_RANGES.sensitivity.max, invertY: false });
+    expect(r.value.couch.p4).toEqual(DEFAULT_SETTINGS.couch.p4);
+    expect(r.value.accessibility.vibration).toBe(false);
+    expect(DEFAULT_SETTINGS.accessibility.vibration).toBe(true);
+  });
+
   it('o padrão passa limpo e ida e volta por JSON não muda nada', () => {
     const r = validateSettings(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
     expect(r.ok && r.warnings).toEqual([]);

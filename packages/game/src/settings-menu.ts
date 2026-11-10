@@ -292,6 +292,13 @@ const ACCESS_ROWS: readonly OptionDef[] = [
     value: (doc) => onOff(doc.accessibility.reduceShake),
     step: (doc) => ({ ...doc, accessibility: { ...doc.accessibility, reduceShake: !doc.accessibility.reduceShake } }),
   },
+  // M3 (fase 1e): a vibração dos controles (dano, morte, explosão perto).
+  {
+    id: 'vibration',
+    labelKey: 'settings.row.vibration',
+    value: (doc) => onOff(doc.accessibility.vibration),
+    step: (doc) => ({ ...doc, accessibility: { ...doc.accessibility, vibration: !doc.accessibility.vibration } }),
+  },
   {
     id: 'tips',
     labelKey: 'settings.row.tips',

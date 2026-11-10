@@ -20,6 +20,10 @@ Plano em `docs/PLANO_M3.md`.
   desconectado pausa e avisa até voltar.
 - **Fase 1d, as vistas:** o colega de time local aparece com o símbolo e a cor dele em cima da cabeça; o radial da arma
   vale para todos; com 2 jogadores, dá para dividir lado a lado (Ajustes → Vídeo → Sofá com 2).
+- **Telas de edição fora do menu:** Partida personalizada, Laboratório e Oficina chegam num pedaço à parte, logo depois
+  do menu (o menu baixou 4,3 KB).
+- **Fase 1e, por jogador:** cada jogador 2–4 ajusta a mira e o Y invertido na tela do sofá, pelo próprio controle; os
+  controles vibram com dano, morte e explosão perto (Ajustes → Acessibilidade → Vibração).
 
 ### M2 MVP web solo (em construção)
 

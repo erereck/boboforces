@@ -1,6 +1,7 @@
 import {
   BOT_RANGES,
   BUILTIN_BOTS,
+  COUCH_PLAYER_KEYS,
   DEBUT_PRESET,
   effectiveQuality,
   GAME_CODENAME,
@@ -12,6 +13,7 @@ import {
   type BackupDocument,
   type BotDocument,
   type BotLevel,
+  type CouchPlayerSettings,
   type ControlDevice,
   type MatchRecipe,
   type QualityLevel,
@@ -37,6 +39,7 @@ import type { Renderer, ViewDesc } from '@boboforces/render/data';
 import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
   createDrawList,
+  formatDecimal,
   createLoadingModel,
   createTestScreenModel,
   drawLoadingScreen,
@@ -1060,6 +1063,26 @@ export function startGame(deps: GameDeps): GameHandle {
     return out;
   }
 
+  /** M3 (fase 1e): muda e guarda o ajuste do jogador `k` (1 = P2) e refaz a tela. */
+  function tuneCouchPlayer(k: number, f: (p: CouchPlayerSettings) => CouchPlayerSettings): void {
+    const key = COUCH_PLAYER_KEYS[k - 1];
+    if (key === undefined) return;
+    const couch = save.settings.couch;
+    save.setSettings({ ...save.settings, couch: { ...couch, [key]: f(couch[key]) } });
+    couchSig = -1;
+  }
+
+  /** O ajuste do jogador `k` (1 = P2) para o cartão: "Mira 1,2× · Y invertido". */
+  function couchTune(k: number): string | null {
+    const key = COUCH_PLAYER_KEYS[k - 1];
+    if (key === undefined) return null;
+    const p = save.settings.couch[key];
+    return t('couch.tune', {
+      sens: formatDecimal(p.sensitivity, 1),
+      y: t(p.invertY ? 'couch.tune.inverted' : 'couch.tune.normal'),
+    });
+  }
+
   function rebuildCouch(): void {
     let sig = couchPreset << 16;
     for (const s of locals.slots) {
@@ -1073,6 +1096,7 @@ export function startGame(deps: GameDeps): GameHandle {
       device: s.device ? couchDeviceLabel(s.device) : null,
       side: s.index > 0 && teams && s.device !== null ? (couchSides[s.index] === 1 ? 1 : 0) : null,
       disconnected: s.device !== null && !s.connected,
+      tune: s.index > 0 && s.device !== null ? couchTune(s.index) : null,
     }));
     const preset = couchPresets[couchPreset];
     couchMenu.setRoot(
@@ -1126,6 +1150,15 @@ export function startGame(deps: GameDeps): GameHandle {
         log(`[game] sofá: P${k + 1} saiu`);
       } else if (couchTeams() && (menuInput.pressedBy(d, 'left') || menuInput.pressedBy(d, 'right'))) {
         couchSides[k] = couchSides[k] === 1 ? 0 : 1;
+      } else if (menuInput.pressedBy(d, 'tabPrev') || menuInput.pressedBy(d, 'tabNext')) {
+        // M3 (fase 1e): os ombros mudam a mira deste jogador em 0,1×; o botão de cima inverte o Y. Fica guardado.
+        const dir = menuInput.pressedBy(d, 'tabNext') ? 1 : -1;
+        tuneCouchPlayer(k, (p) => ({
+          ...p,
+          sensitivity: Math.round(Math.min(3, Math.max(0.3, p.sensitivity + dir * 0.1)) * 10) / 10,
+        }));
+      } else if (menuInput.pressedBy(d, 'secondary')) {
+        tuneCouchPlayer(k, (p) => ({ ...p, invertY: !p.invertY }));
       }
     }
     rebuildCouch();

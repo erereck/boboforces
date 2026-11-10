@@ -31,6 +31,7 @@ import {
   type SettingsDocument,
   resolveBot,
   SETTINGS_RANGES,
+  COUCH_PLAYER_KEYS,
   effectiveQuality,
   lowerQuality,
   QUALITY_PROBE,
@@ -666,7 +667,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * O controlador da sim de cada assento (o 0 é o P1). Fase 1c: cresce quando alguém entra no meio, no lugar de um bot.
    */
   const seatCtrl: number[] = humans > 0 ? setup.recipe.seatControllers.slice(0, Math.max(1, seats.length)) : [];
-  const extras: InputMapper[] = seats.slice(1).map((s) => createInputMapper(s.device, profiles[s.device.kind]));
+  /**
+   * M3 (fase 1e): o perfil do jogador de número `num` (0 = P1, que usa os Ajustes): o do dispositivo com a mira e o Y do
+   * ajuste dele (`settings.couch`, mudado na tela do sofá).
+   */
+  const seatProfile = (num: number, kind: DeviceKind): ControlProfile => {
+    const base = profiles[kind];
+    const key = COUCH_PLAYER_KEYS[num - 1];
+    if (key === undefined) return base;
+    const c = host.settings.current.couch[key];
+    return {
+      ...base,
+      lookSensitivity: base.lookSensitivity * c.sensitivity,
+      keyLookRate: base.keyLookRate * c.sensitivity,
+      invertY: c.invertY,
+    };
+  };
+  const extras: InputMapper[] = seats
+    .slice(1)
+    .map((s, i) => createInputMapper(s.device, seatProfile(i + 1, s.device.kind)));
   const extraDevices: DeviceBinding[] = seats.slice(1).map((s) => s.device);
   const extraAssists = extras.map(() => createAimAssistState());
   /** O número de jogador de cada assento (0 = P1): quem entra no meio pega o menor livre. */
@@ -716,8 +735,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 7b): os sons da partida (o `sim` só existe depois do driver; as funções só rodam com a partida viva). */
   const matchSound = createMatchSound({
     mixer: host.audio.mixer,
-    humans,
-    localEntity: (p) => (p < humans ? sim.controllerEntity(p) : NULL_ENTITY),
+    // M3 (fase 1e): os jogadores locais são os assentos (quem entrou no meio também).
+    get humans(): number {
+      return seatCtrl.length;
+    },
+    localEntity: (p) => (p < seatCtrl.length ? sim.controllerEntity(seatCtrl[p]!) : NULL_ENTITY),
     hitmarker: showHitmarker,
     ffa,
   });
@@ -1326,6 +1348,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               else slot.model.hitMarker = 1;
             }
             if (mine === ev.target) {
+              rumble(sIdx, Math.min(1, ev.damage / 60), 0.35, 120);
               // De onde veio o tiro (o contrário da direção), relativo à mira (positivo = à esquerda, como o yaw).
               const from = Math.atan2(ev.dirX, ev.dirZ);
               slot.model.damageAngle = wrapAngle(from - slot.desc.camera.yaw);
@@ -1338,6 +1361,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         case 'kill': {
           const i = entityIndex(ev.victim);
           if (i >= v.count) break;
+          for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+            const c = slots[sIdx]!.controller;
+            if (c >= 0 && s.controllerEntity(c) === ev.victim) rumble(sIdx, 0.9, 0.6, 320, true);
+          }
           const o = i * 3;
           const zombie = v.kind[i] === ENTITY_KIND.zombie;
           const d = deathScratch;
@@ -1423,7 +1450,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const slot = slots[sIdx]!;
             const c = slot.desc.camera;
             const d = Math.hypot(c.x - ev.x, c.y - ev.y, c.z - ev.z);
-            if (d < SHAKE_RANGE_M) slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M) * shakeMul);
+            if (d < SHAKE_RANGE_M) {
+              slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M) * shakeMul);
+              rumble(sIdx, (1 - d / SHAKE_RANGE_M) * 0.8, 0.5, 220);
+            }
           }
           break;
         }
@@ -1883,14 +1913,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
     }
     if (pick < 0) return;
-    const m = createInputMapper(d, profiles[d.kind]);
+    let num = 0;
+    while (seatNum.includes(num)) num++;
+    const m = createInputMapper(d, seatProfile(num, d.kind));
     const e = entityIndex(sim.controllerEntity(pick));
     if (e >= 0) {
       m.setAngles(v.yaw[e]!, 0);
       m.setWeapon(v.slot[e]!);
     }
-    let num = 0;
-    while (seatNum.includes(num)) num++;
     extras.push(m);
     extraDevices.push(d);
     extraAssists.push(createAimAssistState());
@@ -1926,6 +1956,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (lostSeat === k) lostSeat = -1;
     else if (lostSeat > k) lostSeat--;
     host.log(`[partida] sofá: P${num + 1} saiu; um bot assume`);
+  }
+
+  /** M3 (fase 1e): até quando (s da partida) cada vista não vibra de novo: o dano em rajada não vira zumbido. */
+  const rumbleUntil = new Float64Array(4);
+  /**
+   * M3 (fase 1e): vibra o controle do jogador da vista `s` (se for controle e a Vibração estiver ligada). `force` passa
+   * por cima da espera (a morte).
+   */
+  function rumble(s: number, strong: number, weak: number, ms: number, force = false): void {
+    if (humans === 0 || !host.settings.current.accessibility.vibration || s >= rumbleUntil.length) return;
+    const slot = slots[s];
+    if (!slot || slot.controller < 0) return;
+    const k = seatOf(slot.controller);
+    if (k < 0) return;
+    const d = k === 0 ? (device === 'gamepad' ? pads[padIndex]! : null) : (extraDevices[k - 1] ?? null);
+    if (d === null || d.kind !== 'gamepad') return;
+    if (!force && timeS < rumbleUntil[s]!) return;
+    rumbleUntil[s] = timeS + ms / 1000;
+    platform.input.vibrate(d.index, strong, weak, ms);
   }
 
   /** O dispositivo do assento `k` (0 = o P1). */
@@ -2174,7 +2223,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function applySettings(): void {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
-    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles[extraDevices[k]!.kind]);
+    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(seatProfile(seatNum[k + 1]!, extraDevices[k]!.kind));
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
     thirdPerson = thirdFromSettings();
