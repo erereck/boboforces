@@ -18,6 +18,8 @@ Plano em `docs/PLANO_M3.md`.
   segurando o usar por 3 s; sozinho, 3 "levanta sozinho" por partida; todos caídos = derrota.
 - **Fase 2d, o Bobo Zombies no jogo:** card nos Modos (no Construto por enquanto), a onda e os zumbis no alto, os
   pontos na plaquinha, o aviso de caído e o resultado com a onda alcançada.
+- **Fase 2e:** golden do Bobo Zombies (`eea4c1c8`) e o robô das ondas: 4 bots Normal chegam em média à onda 3,7, 1 bot
+  à onda 2 (antes da IA de apoio da fase 3).
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

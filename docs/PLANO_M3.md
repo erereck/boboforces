@@ -95,7 +95,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   por 3 s perto para levantar; no solo, 3 "levanta sozinho" por partida (configurável); todos caídos = derrota.
 - **2d. No jogo** (feita em 10/11/2026, ARCHITECTURE §13.10): o Zombies nos Modos (no Construto, enquanto a Base Abandonada não chega), o teto de zumbis do
   aparelho, uma linha mínima na HUD (onda, zumbis, pontos) e o resultado com a onda alcançada.
-- **2e. Robô das ondas e golden:** partidas sem humanos (bots de apoio N0) medem até que onda o time chega; golden do
+- **2e. Robô das ondas e golden** (feita em 10/11/2026, ARCHITECTURE §13.11; fecha a fase 2): partidas sem humanos (bots de apoio N0) medem até que onda o time chega; golden do
   modo no CI.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

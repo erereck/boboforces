@@ -2296,3 +2296,12 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   Partida personalizada ainda não sabe o Zombies (fase 6).
 - **Conferido** no Edge (`local/m3/capturar-zombies.ts`): o card abre a partida, a onda 1 solta 10 zumbis, o jogador
   parado cai, gasta os 3 "levanta sozinho" e perde ("Caíram na onda 1").
+
+### 13.11 Fase 2e: o golden do Bobo Zombies e o robô das ondas (10/11/2026)
+
+- **Golden do modo** (`golden.test.ts`): 4 bots Normal de apoio, sem humanos, no Construto real, pool de 24, semente
+  42, até 7.200 ticks: `eea4c1c8` (os bots caem na onda 3, com 32 abates e 7 quedas). O golden do Warfare não mudou.
+- **Robô das ondas** (`local/m3/robo-ondas.ts`, fora do CI): partidas sem tela do modo em várias sementes. Antes da IA
+  de apoio (reviver e fugir das ondas, fase 3): 4 bots Normal chegam em média à **onda 3,7** (3 a 5, sementes 1–6;
+  36 a 80 abates); 1 bot chega à **onda 2** (sementes 1–4). Cada partida leva 0,1–0,5 s sem tela. É a régua para a
+  fase 3: com os zumbis ignorando os caídos e os bots revivendo e recuando, a média tem que subir.
