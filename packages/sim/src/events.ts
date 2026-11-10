@@ -189,6 +189,17 @@ export interface MatchPhaseEvent extends EventBase {
   readonly phase: MatchPhase;
 }
 
+/**
+ * M3 (fase 2c): o bobo `entity` caiu (`down`, por `by`), foi levantado (`revive`, por `by`) ou levantou sozinho
+ * (`selfRevive`). Sangrar até morrer sai como um `kill` com a arma `WEAPON_BLEED_OUT`.
+ */
+export interface DownEvent extends EventBase {
+  readonly type: 'down';
+  readonly entity: EntityId;
+  readonly by: EntityId;
+  readonly action: 'down' | 'revive' | 'selfRevive';
+}
+
 /** M3 (fase 2a): o Bobo Zombies abriu (`start`) ou limpou (`clear`) a onda `wave`. */
 export interface WaveEvent extends EventBase {
   readonly type: 'wave';
@@ -207,6 +218,7 @@ export type SimEvent =
   | MeleeEvent
   | MatchPhaseEvent
   | WaveEvent
+  | DownEvent
   | ProjectileEvent
   | ExplosionEvent
   | PickupEvent

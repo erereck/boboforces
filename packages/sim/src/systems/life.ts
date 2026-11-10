@@ -2,7 +2,7 @@ import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { ZOMBIE_POINTS } from '../config/zombie.ts';
+import { ZOMBIE_POINTS, ZOMBIES_DOWN } from '../config/zombie.ts';
 import { MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
@@ -21,7 +21,9 @@ import {
   hostile,
   isBody,
   PART_HEAD,
+  PART_TORSO,
   RULE_FLAG,
+  WEAPON_BLEED_OUT,
   WEAPON_KILL_PLANE,
   WEAPON_NONE,
   type SimContext,
@@ -48,6 +50,9 @@ export function damageSystem(ctx: SimContext): void {
   for (let i = 0; i < q.count; i++) {
     const t = q.target[i]!;
     if (s.alive[t] === 0 || (s.flags[t]! & F.dead) !== 0) continue;
+    // M3 (fase 2c): caído não toma dano; só sangrar até o fim e o plano de morte acabam com ele.
+    const weaponOf = q.weapon[i]!;
+    if ((s.flags[t]! & F.downed) !== 0 && weaponOf !== WEAPON_BLEED_OUT && weaponOf !== WEAPON_KILL_PLANE) continue;
     const source = q.attacker[i]!;
     let amount = q.amount[i]!;
     // M2 (fase 3b): multiplicador de dano de quem atacou (regra do bot).
@@ -78,9 +83,79 @@ export function damageSystem(ctx: SimContext): void {
       if (ctx.zombiesMode && s.kind[t] === ENTITY_KIND.zombie) award(ctx, attacker, ZOMBIE_POINTS.hit);
     }
     ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, bodyPart, amount, q.point, q.dir, i);
-    if (s.health[t]! <= 0) kill(ctx, t, attacker, q.weapon[i]!, part === PART_HEAD, bodyPart, i);
+    if (s.health[t]! <= 0) {
+      // M3 (fase 2c): no Bobo Zombies, o bobo cai em vez de morrer (menos no vazio e quando já sangrou).
+      const canFall =
+        ctx.zombiesMode &&
+        s.kind[t] === ENTITY_KIND.bobo &&
+        (s.flags[t]! & F.downed) === 0 &&
+        weaponOf !== WEAPON_KILL_PLANE &&
+        weaponOf !== WEAPON_BLEED_OUT;
+      if (canFall) knockDown(ctx, t, attacker);
+      else kill(ctx, t, attacker, weaponOf, part === PART_HEAD, bodyPart, i);
+    }
   }
   q.count = 0;
+}
+
+/**
+ * M3 (fase 2c): o bobo `t` cai. Sem ninguém de pé no time para levantar ele e com "levanta sozinho" sobrando, gasta
+ * um e volta em `selfReviveTicks`; senão sangra por `bleedTicks`. Solta a granada que cozinhava (ela some).
+ */
+function knockDown(ctx: SimContext, t: number, by: EntityId): void {
+  const s = ctx.s;
+  const r = ctx.zombieRules;
+  const w = ctx.waves;
+  s.health[t] = 0;
+  s.flags[t] = (s.flags[t]! & ~(F.sprinting | F.sliding | F.ads | F.firing | F.reloading)) | F.downed;
+  s.cookTicks[t] = -1;
+  s.reviveTicks[t] = 0;
+  s.reviver[t] = NULL_ENTITY;
+  let helper = false;
+  for (let e = 0; e < s.count; e++) {
+    if (e === t || s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    if ((s.flags[e]! & (F.dead | F.downed)) === 0 && s.team[e] === s.team[t]) helper = true;
+  }
+  if (!helper && w.selfRevivesLeft !== 0) {
+    if (w.selfRevivesLeft > 0) w.selfRevivesLeft--;
+    s.selfUp[t] = 1;
+    s.downTicks[t] = r.selfReviveTicks;
+  } else {
+    s.selfUp[t] = 0;
+    s.downTicks[t] = r.bleedTicks;
+  }
+  ctx.events.down(ctx.tick, s.idOf(t), by, 'down');
+}
+
+/** M3 (fase 2c): o bobo caído `t` levanta (por `by`, ou sozinho) com uma parte da vida. */
+export function standUp(ctx: SimContext, t: number, by: EntityId): void {
+  const s = ctx.s;
+  const self = s.selfUp[t] === 1;
+  s.flags[t] = s.flags[t]! & ~F.downed;
+  s.health[t] = Math.max(1, Math.round(ctx.rules.maxHp[t]! * ZOMBIES_DOWN.revivedHpFrac));
+  s.downTicks[t] = 0;
+  s.selfUp[t] = 0;
+  s.reviveTicks[t] = 0;
+  s.reviver[t] = NULL_ENTITY;
+  s.lastDamageTick[t] = ctx.tick;
+  ctx.events.down(ctx.tick, s.idOf(t), self ? s.idOf(t) : by, self ? 'selfRevive' : 'revive');
+}
+
+/** M3 (fase 2c): sangrou até o fim: o golpe final sai pela fila de dano (o abate não é de ninguém). */
+export function bleedOut(ctx: SimContext, t: number): void {
+  const s = ctx.s;
+  const t3 = t * 3;
+  ctx.damage.push(
+    t,
+    NULL_ENTITY,
+    1e9,
+    PART_TORSO,
+    1 as FigurePart,
+    WEAPON_BLEED_OUT,
+    s.position[t3]!,
+    s.position[t3 + 1]!,
+    s.position[t3 + 2]!,
+  );
 }
 
 /** M3 (fase 2b): pontos para o bobo `who` (× a economia da partida); zumbi, morto ou ninguém não ganha. */

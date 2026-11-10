@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { runnerChance, ZOMBIE_TYPE, ZOMBIES_MODE, zombiesInWave, zombieWaveHp } from './config/zombie.ts';
 import { SIM_HZ, ZOMBIE_CONTROLLER_BASE } from './constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from './entity.ts';
-import type { SimEvent, WaveEvent } from './events.ts';
+import type { DownEvent, SimEvent, WaveEvent } from './events.ts';
 import { createInputFrames } from './loop.ts';
 import { createSim, type Sim, type SimMap, type SpawnPoint } from './sim.ts';
 
@@ -39,6 +39,41 @@ function run(sim: Sim, ticks: number, onEvents?: (events: SimEvent[]) => void): 
   const f = createInputFrames();
   const events: SimEvent[] = [];
   for (let i = 0; i < ticks && sim.view().match.phase !== 'ended'; i++) {
+    sim.step(f);
+    events.length = 0;
+    sim.drainEvents(events);
+    onEvents?.(events);
+  }
+}
+
+/**
+ * Roda a partida com os zumbis indo atrás de `target` e batendo (a sim não tem a IA: os quadros são escritos aqui). Para
+ * no fim da partida, depois de `ticks` ou quando `stop` disser.
+ */
+function chase(
+  sim: Sim,
+  target: number,
+  ticks: number,
+  onEvents?: (events: SimEvent[]) => void,
+  setup?: (f: ReturnType<typeof createInputFrames>) => void,
+  stop?: () => boolean,
+): void {
+  const f = createInputFrames();
+  const v = sim.view();
+  const events: SimEvent[] = [];
+  for (let t = 0; t < ticks && v.match.phase !== 'ended' && !(stop?.() ?? false); t++) {
+    const te = target & 0xffff;
+    for (let i = 0; i < 10; i++) {
+      const id = sim.controllerEntity(ZOMBIE_CONTROLLER_BASE + i);
+      const e = id & 0xffff;
+      const dx = v.position[te * 3]! - v.position[e * 3]!;
+      const dz = v.position[te * 3 + 2]! - v.position[e * 3 + 2]!;
+      const zf = f[ZOMBIE_CONTROLLER_BASE + i]!;
+      zf.yaw = yawToU16(Math.atan2(-dx, -dz));
+      zf.moveY = quantizeAxis(dx * dx + dz * dz > 1 ? 1 : 0);
+      zf.buttons = BUTTON.melee;
+    }
+    setup?.(f);
     sim.step(f);
     events.length = 0;
     sim.drainEvents(events);
@@ -132,21 +167,55 @@ describe('Bobo Zombies: o diretor de ondas (M3, fase 2a)', () => {
     expect(m.zombiesLeft).toBe(0);
   }, 60_000);
 
-  it('derrota: com o único bobo morto, a partida acaba em derrota (sem IA aqui: os zumbis andam e batem à mão)', () => {
+  it('derrota: o humano sozinho gasta os 3 "levanta sozinho" e, caído de novo sem ninguém, perde', () => {
     const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 10, yaw: Math.PI, team: -1 };
     const sim = createSim({ recipe: zombies(), map: map([human, far]), humans: 1, zombies: 10 });
-    const f = createInputFrames();
-    for (let i = 0; i < 10; i++) {
-      const zf = f[ZOMBIE_CONTROLLER_BASE + i]!;
-      zf.yaw = yawToU16(Math.PI); // olha para +Z (o humano)
-      zf.moveY = quantizeAxis(1);
-      zf.buttons = BUTTON.melee;
-    }
-    for (let t = 0; t < 120 * SIM_HZ && sim.view().match.phase !== 'ended'; t++) sim.step(f);
+    const target = sim.controllerEntity(0);
+    const actions: string[] = [];
+    chase(sim, target, 120 * SIM_HZ, (evs) => {
+      for (const ev of evs) if (ev.type === 'down') actions.push((ev as DownEvent).action);
+    });
     const m = sim.view().match;
     expect(m.phase).toBe('ended');
     expect(m.winnerTeam).toBe(-1);
     expect(m.zombieWave).toBe(1);
+    expect(m.selfRevivesLeft).toBe(0);
+    expect(actions).toEqual(['down', 'selfRevive', 'down', 'selfRevive', 'down', 'selfRevive', 'down']);
+  }, 60_000);
+
+  it('reviver: o colega de pé a 1 m segurando o usar levanta o caído em 3 s, com metade da vida', () => {
+    const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 10, yaw: Math.PI, team: -1 };
+    const p2: SpawnPoint = { ...human, z: human.z + 1 };
+    const sim = createSim({ recipe: zombies(), map: map([human, p2, far]), humans: 2, zombies: 10 });
+    const p1 = sim.controllerEntity(0);
+    const helper = sim.controllerEntity(1);
+    let downAt = -1;
+    let revivedAt = -1;
+    let by = 0;
+    let hpAfter = -1;
+    chase(
+      sim,
+      p1,
+      60 * SIM_HZ,
+      (evs) => {
+        for (const ev of evs) {
+          if (ev.type !== 'down' || ev.entity !== p1) continue;
+          if (ev.action === 'down' && downAt < 0) downAt = ev.tick;
+          if (ev.action === 'revive' && revivedAt < 0) {
+            revivedAt = ev.tick;
+            by = ev.by;
+            hpAfter = sim.view().health[p1 & 0xffff]!;
+          }
+        }
+      },
+      (f) => (f[1]!.buttons = BUTTON.use),
+      () => revivedAt >= 0,
+    );
+    expect(downAt).toBeGreaterThan(0);
+    expect(by).toBe(helper);
+    // 3 s segurando: o colega já segurava, e o próprio tick da queda conta como o primeiro.
+    expect(revivedAt - downAt).toBe(3 * SIM_HZ - 1);
+    expect(hpAfter).toBe(50);
   }, 60_000);
 
   it('o último zumbi da onda corre e fica marcado', () => {

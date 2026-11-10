@@ -46,6 +46,8 @@ export const ENTITY_FLAG = {
   reloading: 1 << 6,
   dead: 1 << 7,
   spawnProtected: 1 << 8,
+  /** M3 (fase 2c): caído (Bobo Zombies): rasteja, só a pistola, não toma dano; sangra até morrer ou alguém levanta. */
+  downed: 1 << 9,
 } as const;
 
 /** Sem time (FFA usa um time só; isto é para props, projéteis neutros etc.). */

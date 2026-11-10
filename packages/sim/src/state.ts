@@ -151,6 +151,14 @@ export class SimState {
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies. */
   readonly points = new Int32Array(MAX_ENTITIES);
   /**
+   * M3 (fase 2c): o bobo caído: ticks até sangrar (ou até levantar sozinho, com `selfUp` 1), o progresso do reviver e
+   * quem está levantando.
+   */
+  readonly downTicks = new Int32Array(MAX_ENTITIES);
+  readonly selfUp = new Uint8Array(MAX_ENTITIES);
+  readonly reviveTicks = new Int32Array(MAX_ENTITIES);
+  readonly reviver = new Uint32Array(MAX_ENTITIES);
+  /**
    * M3 (fase 2a): os campos que só existem no Bobo Zombies. Entram no snapshot e no hash só nesse modo (o golden dos
    * outros modos não muda).
    */
@@ -229,7 +237,14 @@ export class SimState {
       f('pickVelY', this.pickVelY),
       f('pickTicks', this.pickTicks),
     ];
-    this.zombieFields = [f('zombieType', this.zombieType), f('points', this.points)];
+    this.zombieFields = [
+      f('zombieType', this.zombieType),
+      f('points', this.points),
+      f('downTicks', this.downTicks),
+      f('selfUp', this.selfUp),
+      f('reviveTicks', this.reviveTicks),
+      f('reviver', this.reviver),
+    ];
   }
 
   /** Projétil num slot livre (`projAlive` ligado); -1 = pool cheio. */

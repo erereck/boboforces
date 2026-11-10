@@ -88,6 +88,8 @@ const boboTicks = new ProfileTicks();
 const zombieTicks = new ProfileTicks();
 // M3 (fase 2a): o zumbi que corre (Bobo Zombies).
 const runnerTicks = new ProfileTicks();
+// M3 (fase 2c): o bobo caído rastejando.
+const downedTicks = new ProfileTicks();
 
 function setBox(b: Aabb, x: number, y: number, z: number, height: number): void {
   const hw = METRICS.aabbWidth / 2;
@@ -122,6 +124,7 @@ export function movementSystem(ctx: SimContext): void {
   boboTicks.update(ctx.profile, ctx.hz);
   zombieTicks.update(ctx.zombieProfile, ctx.hz);
   runnerTicks.update(ctx.zombieRunProfile, ctx.hz);
+  downedTicks.update(ctx.downedProfile, ctx.hz);
 
   for (let e = 0; e < s.count; e++) {
     const kind = s.kind[e]!;
@@ -129,7 +132,13 @@ export function movementSystem(ctx: SimContext): void {
     let fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) continue;
     const pt =
-      kind === ENTITY_KIND.zombie ? (s.zombieType[e] === ZOMBIE_TYPE.runner ? runnerTicks : zombieTicks) : boboTicks;
+      kind === ENTITY_KIND.zombie
+        ? s.zombieType[e] === ZOMBIE_TYPE.runner
+          ? runnerTicks
+          : zombieTicks
+        : (fl & F.downed) !== 0
+          ? downedTicks
+          : boboTicks;
     const p = pt.profile!;
     const g = p.gravity;
     const slide = p.slide;

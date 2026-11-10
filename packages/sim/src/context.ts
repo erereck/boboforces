@@ -96,6 +96,8 @@ export class DamageQueue {
  * abate a quem feriu a vítima pouco antes (GDD §3.8), e o kill feed mostra a queda.
  */
 export const WEAPON_KILL_PLANE = 254;
+/** M3 (fase 2c): o "golpe" de quem sangrou até morrer caído (Bobo Zombies); o abate não é de ninguém. */
+export const WEAPON_BLEED_OUT = 253;
 
 /**
  * M2 (fase 3b): regras de cada bobo (gameplay.md §6.5), uma por índice de entidade, montadas na criação a partir dos
@@ -242,6 +244,7 @@ export interface SimContext {
   /** O estado do diretor de ondas (no snapshot e no hash só no Bobo Zombies). */
   readonly waves: WaveState;
   readonly rngZombies: Rng;
+  readonly downedProfile: MovementProfile;
 }
 
 /** M3 (fase 2a): as regras do Bobo Zombies resolvidas para a sim. */
@@ -255,6 +258,11 @@ export interface ZombieModeRules {
   readonly firstWaveTicks: number;
   readonly intermissionTicks: number;
   readonly spawnIntervalTicks: number;
+  /** M3 (fase 2c): caído e reviver em ticks, e o "levanta sozinho" da partida (-1 = sem limite). */
+  readonly bleedTicks: number;
+  readonly reviveTicks: number;
+  readonly selfReviveTicks: number;
+  readonly selfRevives: number;
 }
 
 /** M3 (fase 2a): o diretor de ondas. Tudo número, para o snapshot. */
@@ -275,6 +283,8 @@ export interface WaveState {
   left: number;
   /** O último zumbi da onda (`NULL_ENTITY` = nenhum ainda). */
   lastZombie: number;
+  /** M3 (fase 2c): "levanta sozinho" que sobram (-1 = sem limite). */
+  selfRevivesLeft: number;
 }
 
 /**

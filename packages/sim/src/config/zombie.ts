@@ -91,6 +91,30 @@ export const ZOMBIE_POINTS = {
   knifeKill: 130,
 } as const;
 
+/**
+ * M3 (fase 2c): caído e reviver (GDD §4.1.5; gameplay.md §5.4). O bobo que levaria o golpe final cai: rasteja só com a
+ * pistola e não toma mais dano; sangra até morrer em `bleedS`; um colega de pé segurando o usar por `reviveS` a até
+ * `reviveRangeM` levanta ele com uma parte da vida. Sem ninguém de pé para ajudar, gasta um "levanta sozinho" e volta
+ * em `selfReviveS`. Os 4 s do levanta sozinho e a metade da vida são escolhas minhas.
+ */
+export const ZOMBIES_DOWN = {
+  bleedS: 30,
+  reviveS: 3,
+  reviveRangeM: 1.5,
+  selfReviveS: 4,
+  revivedHpFrac: 0.5,
+} as const;
+
+/** M3 (fase 2c): rastejando (caído): 1 m/s, sem pulo nem escalada. */
+export const MOVEMENT_DOWNED: MovementProfile = {
+  ...MOVEMENT_ZOMBIE,
+  walk: 1,
+  sprint: 1,
+  crouch: 1,
+  jump: 0,
+  mantleHeight: 0,
+};
+
 /** M3 (fase 2a): o tipo de cada zumbi (`SimState.zombieType`). Os especiais e o chefão chegam na fase 3. */
 export const ZOMBIE_TYPE = { walker: 0, runner: 1 } as const;
 

@@ -14,6 +14,8 @@ Plano em `docs/PLANO_M3.md`.
   o último zumbi correndo e marcado, vitória na última onda e derrota com todos mortos. O golden não mudou.
 - **Fase 2b, pontos:** 500 no começo, 10 por acerto em zumbi, 60 por abate (100 na cabeça, 130 de faca), × a
   economia da partida.
+- **Fase 2c, caído e reviver:** o bobo cai em vez de morrer, rasteja só com a pistola e sangra 30 s; o colega levanta
+  segurando o usar por 3 s; sozinho, 3 "levanta sozinho" por partida; todos caídos = derrota.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

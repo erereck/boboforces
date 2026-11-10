@@ -47,7 +47,8 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     h.i32(w.wave).i32(w.resting).i32(w.restTicks).i32(w.toSpawn).i32(w.spawnTicks).i32(w.waveHp);
     h.i32(Math.round(w.runChance * 1e6))
       .i32(w.left)
-      .u32(w.lastZombie);
+      .u32(w.lastZombie)
+      .i32(w.selfRevivesLeft);
     ctx.rngZombies.saveState(rngScratch);
     h.bytes(rngScratch);
     for (const f of s.zombieFields) h.bytes(f.array.subarray(0, s.count * f.stride));
@@ -98,7 +99,17 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
   writeArray(w, s.controllerEntity, MAX_CONTROLLERS_WITH_ZOMBIES);
   if (ctx.zombiesMode) {
     const v = ctx.waves;
-    for (const n of [v.wave, v.resting, v.restTicks, v.toSpawn, v.spawnTicks, v.waveHp, v.left, v.lastZombie]) {
+    for (const n of [
+      v.wave,
+      v.resting,
+      v.restTicks,
+      v.toSpawn,
+      v.spawnTicks,
+      v.waveHp,
+      v.left,
+      v.lastZombie,
+      v.selfRevivesLeft,
+    ]) {
       w.writeBits(n >>> 0, 32);
     }
     w.writeF64(v.runChance);
@@ -154,6 +165,7 @@ export function readState(ctx: SimContext, r: BitReader): void {
     v.waveHp = r.readBits(32) | 0;
     v.left = r.readBits(32) | 0;
     v.lastZombie = r.readBits(32) >>> 0;
+    v.selfRevivesLeft = r.readBits(32) | 0;
     v.runChance = r.readF64();
     readArray(r, rngScratch, RNG_STATE_WORDS);
     ctx.rngZombies.loadState(rngScratch);

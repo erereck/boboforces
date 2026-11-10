@@ -1,7 +1,15 @@
-import { runnerChance, ZOMBIE_TYPE, ZOMBIES_MODE, zombiesInWave, zombieWaveHp } from '../config/zombie.ts';
+import { BUTTON } from '@boboforces/input';
+import {
+  runnerChance,
+  ZOMBIE_TYPE,
+  ZOMBIES_DOWN,
+  ZOMBIES_MODE,
+  zombiesInWave,
+  zombieWaveHp,
+} from '../config/zombie.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
-import { pickSpawn, respawn } from './life.ts';
+import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
 
 const F = ENTITY_FLAG;
 
@@ -10,7 +18,8 @@ const F = ENTITY_FLAG;
  * - Intervalo: conta até a próxima onda; ao abrir, todos os bobos mortos voltam.
  * - Onda: solta um zumbi do pool a cada `spawnIntervalTicks` (no ponto mais longe dos bobos) com a vida da onda e, pela
  *   chance da onda, correndo; o último zumbi corre e fica marcado; acabou a onda, intervalo (ou vitória na última).
- * - Todos os bobos mortos ao mesmo tempo = derrota (o caído e o reviver chegam na fase 2c).
+ * - Fase 2c: os caídos sangram, levantam sozinhos ou pelo colega (`updateDowned`). Ninguém de pé e nenhum "levanta
+ *   sozinho" a caminho = derrota.
  * O fim usa a fase `ended` da partida: `winnerTeam` 0 = vitória, -1 = derrota.
  */
 export function zombiesSystem(ctx: SimContext): void {
@@ -19,8 +28,10 @@ export function zombiesSystem(ctx: SimContext): void {
   if (m.phase !== 'playing') return;
   const s = ctx.s;
   const w = ctx.waves;
+  updateDowned(ctx);
   let bobos = 0;
   let bobosUp = 0;
+  let selfComing = false;
   let alive = 0;
   let last = -1;
   for (let e = 0; e < s.count; e++) {
@@ -28,13 +39,15 @@ export function zombiesSystem(ctx: SimContext): void {
     const dead = (s.flags[e]! & F.dead) !== 0;
     if (s.kind[e] === ENTITY_KIND.bobo) {
       bobos++;
-      if (!dead) bobosUp++;
+      const down = (s.flags[e]! & F.downed) !== 0;
+      if (!dead && !down) bobosUp++;
+      if (down && s.selfUp[e] === 1) selfComing = true;
     } else if (s.kind[e] === ENTITY_KIND.zombie && !dead) {
       alive++;
       last = e;
     }
   }
-  if (bobos > 0 && bobosUp === 0) {
+  if (bobos > 0 && bobosUp === 0 && !selfComing) {
     endZombies(ctx, false);
     return;
   }
@@ -64,6 +77,63 @@ export function zombiesSystem(ctx: SimContext): void {
     }
   } else if (alive !== 1) w.lastZombie = NULL_ENTITY;
   if (w.left === 0) waveCleared(ctx);
+}
+
+/**
+ * M3 (fase 2c): cada bobo caído. O "levanta sozinho" conta até voltar; senão, o colega de pé do mesmo time mais perto
+ * (até `reviveRangeM`) que segura o usar enche o reviver (trocar de quem levanta recomeça; enquanto alguém levanta, o
+ * sangramento para); sem ninguém, sangra até o golpe final.
+ */
+function updateDowned(ctx: SimContext): void {
+  const s = ctx.s;
+  const r = ctx.zombieRules;
+  const range2 = ZOMBIES_DOWN.reviveRangeM * ZOMBIES_DOWN.reviveRangeM;
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    const fl = s.flags[e]!;
+    if ((fl & F.downed) === 0 || (fl & F.dead) !== 0) continue;
+    if (s.selfUp[e] === 1) {
+      if (s.downTicks[e]! > 0) s.downTicks[e]!--;
+      if (s.downTicks[e] === 0) standUp(ctx, e, NULL_ENTITY);
+      continue;
+    }
+    let helper = -1;
+    let best = range2;
+    const e3 = e * 3;
+    for (let o = 0; o < s.count; o++) {
+      if (o === e || s.alive[o] === 0 || s.kind[o] !== ENTITY_KIND.bobo || s.team[o] !== s.team[e]) continue;
+      if ((s.flags[o]! & (F.dead | F.downed)) !== 0 || (s.inButtons[o]! & BUTTON.use) === 0) continue;
+      const o3 = o * 3;
+      const dx = s.position[o3]! - s.position[e3]!;
+      const dy = s.position[o3 + 1]! - s.position[e3 + 1]!;
+      const dz = s.position[o3 + 2]! - s.position[e3 + 2]!;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d <= best) {
+        best = d;
+        helper = o;
+      }
+    }
+    if (helper >= 0) {
+      const id = s.idOf(helper);
+      if (s.reviver[e] !== id) {
+        s.reviver[e] = id;
+        s.reviveTicks[e] = 0;
+      }
+      s.reviveTicks[e] = s.reviveTicks[e]! + 1;
+      if (s.reviveTicks[e]! >= r.reviveTicks) standUp(ctx, e, id);
+      continue;
+    }
+    s.reviver[e] = NULL_ENTITY;
+    s.reviveTicks[e] = 0;
+    if (s.downTicks[e]! > 0) {
+      s.downTicks[e]!--;
+      // -1: o golpe final já foi para a fila (entra no dano do próximo tick).
+      if (s.downTicks[e] === 0) {
+        s.downTicks[e] = -1;
+        bleedOut(ctx, e);
+      }
+    }
+  }
 }
 
 function startWave(ctx: SimContext): void {

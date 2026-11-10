@@ -43,6 +43,13 @@ export interface SimView {
   readonly zombieType: Uint8Array;
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */
   readonly points: Int32Array;
+  /**
+   * M3 (fase 2c): caído (`ENTITY_FLAG.downed`): ticks até sangrar ou levantar sozinho (`selfUp` 1) e o progresso do
+   * reviver em ticks (0 = ninguém levantando).
+   */
+  readonly downTicks: Int32Array;
+  readonly selfUp: Uint8Array;
+  readonly reviveTicks: Int32Array;
   /** M2: código da arma na mão (`WEAPON_CODE`, índice em `WEAPONS`), ou `WEAPON_NONE` (zumbi). */
   readonly weapon: Uint8Array;
   /** M2: slot ativo do loadout (0..3: primária, pistola, faca, granada). */
@@ -167,6 +174,8 @@ export interface MatchView {
   readonly zombiesLeft: number;
   readonly zombieRestTicks: number;
   readonly lastZombie: number;
+  /** M3 (fase 2c): "levanta sozinho" que sobram (-1 = sem limite; 0 fora do modo). */
+  readonly selfRevivesLeft: number;
 }
 
 /** M2: pente da arma na mão de `e` (`slotClip` do slot ativo; na granada, quantas sobram). */

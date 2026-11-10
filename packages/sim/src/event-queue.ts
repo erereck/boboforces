@@ -10,6 +10,7 @@ import type {
   KillEvent,
   MatchPhaseEvent,
   WaveEvent,
+  DownEvent,
   MoveEvent,
   PickupEvent,
   ProjectileEvent,
@@ -142,6 +143,10 @@ export class EventQueue {
     () => ({ type: 'matchPhase', tick: 0, phase: 'playing' }),
     2,
   );
+  private readonly downs = new EventPool<Mutable<DownEvent>>(
+    () => ({ type: 'down', tick: 0, entity: 0, by: 0, action: 'down' }),
+    4,
+  );
   private readonly waves = new EventPool<Mutable<WaveEvent>>(
     () => ({ type: 'wave', tick: 0, wave: 0, action: 'start' }),
     2,
@@ -203,6 +208,7 @@ export class EventQueue {
     this.melees.reset();
     this.phases.reset();
     this.waves.reset();
+    this.downs.reset();
     this.projectiles.reset();
     this.explosions.reset();
     this.pickups.reset();
@@ -462,6 +468,16 @@ export class EventQueue {
     const e = this.phases.acquire();
     e.tick = tick;
     e.phase = phase;
+    this.push(e);
+  }
+
+  /** M3 (fase 2c). */
+  down(tick: number, entity: EntityId, by: EntityId, action: 'down' | 'revive' | 'selfRevive'): void {
+    const e = this.downs.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    e.by = by;
+    e.action = action;
     this.push(e);
   }
 

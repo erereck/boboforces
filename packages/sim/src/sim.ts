@@ -6,7 +6,7 @@ import {
   type FigureGameTable,
   type MatchRecipe,
 } from '@boboforces/format';
-import { dequantizeAxis, type InputFrame } from '@boboforces/input';
+import { BUTTON, dequantizeAxis, type InputFrame } from '@boboforces/input';
 import {
   assert,
   createRng,
@@ -23,7 +23,15 @@ import { BASE_HP, METRICS } from './config/metrics.ts';
 import { resolveMovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
-import { ZOMBIE_POINTS, ZOMBIE_RULES, MOVEMENT_ZOMBIE, MOVEMENT_ZOMBIE_RUNNER, ZOMBIES_MODE } from './config/zombie.ts';
+import {
+  MOVEMENT_DOWNED,
+  MOVEMENT_ZOMBIE,
+  MOVEMENT_ZOMBIE_RUNNER,
+  ZOMBIE_POINTS,
+  ZOMBIE_RULES,
+  ZOMBIES_DOWN,
+  ZOMBIES_MODE,
+} from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
   MAX_ENTITIES,
@@ -301,6 +309,10 @@ function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean,
   return list[k % list.length]!;
 }
 
+/** M3 (fase 2c): caído, só a pistola (o slot 1 do loadout) e só atirar, mirar e recarregar. */
+const DOWNED_SLOT = 1;
+const DOWNED_BUTTONS = BUTTON.fire | BUTTON.ads | BUTTON.reload;
+
 /**
  * Cria a sim de uma partida. Tudo é alocado aqui (typed arrays com capacidade fixa, pools de eventos, fila de dano);
  * `step()` não aloca. Os bobos (um por controlador da receita) nascem já no construtor, com os eventos `spawn` e
@@ -386,6 +398,10 @@ export function createSim(config: SimConfig): Sim {
       firstWaveTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.firstWaveS, hz)),
       intermissionTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.intermissionS, hz)),
       spawnIntervalTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.spawnIntervalS, hz)),
+      bleedTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.bleedS, hz)),
+      reviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.reviveS, hz)),
+      selfReviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.selfReviveS, hz)),
+      selfRevives: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
     },
     humans,
     waves: {
@@ -398,8 +414,10 @@ export function createSim(config: SimConfig): Sim {
       runChance: 0,
       left: 0,
       lastZombie: NULL_ENTITY,
+      selfRevivesLeft: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
     },
     rngZombies: root.fork('zombies'),
+    downedProfile: MOVEMENT_DOWNED,
   };
 
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -452,6 +470,7 @@ export function createSim(config: SimConfig): Sim {
     zombiesLeft: 0,
     zombieRestTicks: -1,
     lastZombie: NULL_ENTITY,
+    selfRevivesLeft: 0,
   };
   const projView: Mutable<ProjectileView> = {
     count: 0,
@@ -490,6 +509,9 @@ export function createSim(config: SimConfig): Sim {
     health: s.health,
     zombieType: s.zombieType,
     points: s.points,
+    downTicks: s.downTicks,
+    selfUp: s.selfUp,
+    reviveTicks: s.reviveTicks,
     weapon: s.weapon,
     slot: s.slot,
     loadout: s.loadout,
@@ -529,6 +551,7 @@ export function createSim(config: SimConfig): Sim {
       matchView.zombiesLeft = w.left;
       matchView.zombieRestTicks = w.resting === 1 ? w.restTicks : -1;
       matchView.lastZombie = w.lastZombie;
+      matchView.selfRevivesLeft = w.selfRevivesLeft;
     }
   };
 
@@ -557,6 +580,10 @@ export function createSim(config: SimConfig): Sim {
       s.inMoveX[e] = frozen ? 0 : dequantizeAxis(f.moveX);
       s.inMoveY[e] = frozen ? 0 : dequantizeAxis(f.moveY);
       if (!frozen) s.inWeapon[e] = f.weapon & 0xff;
+      if ((s.flags[e]! & ENTITY_FLAG.downed) !== 0) {
+        s.inWeapon[e] = DOWNED_SLOT;
+        s.inButtons[e] = (s.inButtons[e]! & DOWNED_BUTTONS) | BUTTON.crouch;
+      }
       // Primária do próximo spawn: código + 1 (0 = manter); código que não é primária é ignorado.
       const p = (f.primary & 0xff) - 1;
       if (p >= 0 && isPrimaryWeapon(p)) s.primaryChoice[e] = p;

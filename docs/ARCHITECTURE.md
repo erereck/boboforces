@@ -2261,3 +2261,21 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   100 na cabeça, 130 de faca (`ZOMBIE_POINTS`). Tudo × a `economy` da receita, arredondado. O conserto de tábua, os
   pontos em dobro e as compras chegam com as barricadas e a economia (fases 3 e 4).
 - Conferido no `zombies.test`: a soma bate com os acertos e os abates do humano, e a economia 2× dobra o que se ganhou.
+
+### 13.9 Fase 2c: caído e reviver (10/11/2026)
+
+- **Cair:** no Bobo Zombies, o golpe que mataria um bobo derruba (`ENTITY_FLAG.downed`, `knockDown`): rasteja a 1 m/s
+  (`MOVEMENT_DOWNED`, sem pulo nem escalada, sempre agachado), só com a pistola (o slot 1; só atirar, mirar e recarregar)
+  e não toma dano. O vazio continua matando na hora.
+- **Levantar:** o colega de pé do mesmo time mais perto, a até 1,5 m, segurando o usar enche o reviver em 3 s
+  (trocar de quem levanta recomeça; enquanto alguém levanta, o sangramento para). Volta com metade da vida (escolha
+  minha). Sem ninguém de pé para ajudar na hora da queda, gasta um "levanta sozinho" (`ZombiesRules.selfRevives`,
+  3 por padrão, −1 sem limite) e volta em 4 s (escolha minha). Senão sangra 30 s e morre: o golpe final sai pela fila de
+  dano com a arma `WEAPON_BLEED_OUT` (253), sem matador, e o bobo espera a próxima onda.
+- **Derrota:** ninguém de pé e nenhum "levanta sozinho" a caminho.
+- **Estado (só no Bobo Zombies):** `downTicks`, `selfUp`, `reviveTicks`, `reviver` e `WaveState.selfRevivesLeft`;
+  vista: os mesmos campos, `MatchView.selfRevivesLeft`; evento `down` (`down`, `revive`, `selfRevive`).
+- **Para a fase 3:** a IA dos zumbis ainda bate no caído (ele não toma dano, mas o zumbi perde tempo); os zumbis vão
+  passar a ignorar quem está no chão.
+- **Conferido** (`zombies.test`, com os zumbis dirigidos pelo teste): sozinho, o humano gasta os 3 "levanta sozinho" e
+  perde na 4ª queda; com um colega a 1 m segurando o usar, levanta em 3 s com 50 de vida.
