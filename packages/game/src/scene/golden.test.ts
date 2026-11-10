@@ -89,11 +89,11 @@ const recipe: MatchRecipe = {
   ],
 };
 
-function loadWorld() {
+function loadWorld(id = 'construto') {
   const manifest = parseLayerManifest(JSON.parse(text('textures/blocos16.json')) as unknown);
   const layers = new Map(manifest.layers.map((l, i) => [l.name, i] as const));
   const world = buildMapWorld({
-    map: decodeMap(asset('maps/construto.bfmap')),
+    map: decodeMap(asset(`maps/${id}.bfmap`)),
     blockDefs: parseBlockDefs(JSON.parse(text('blocks/blocks.json')) as unknown),
     blockLayer: (name) => layers.get(name),
     models: decodeModelPack(asset('models/modelos.bfmodel')).models,
@@ -211,5 +211,79 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
     expect(a.wave).toBeGreaterThanOrEqual(2);
     expect(a.kills).toBeGreaterThan(10);
     expect(a.hash, `onda ${a.wave}, abates ${a.kills}, quedas ${a.downs}, fase ${a.phase}`).toBe(GOLDEN_ZOMBIES_HASH);
+  }, 180_000);
+});
+
+/**
+ * M3 (fase 3e): o golden do Bobo Zombies no Posto Avançado (janelas com barricada e porta paga): 4 bots Normal de
+ * apoio, pool de 24, semente 42, até 2 min. Confere o hash, a onda, que os zumbis arrancaram tábuas e que os bots
+ * repuseram. Gravado na fase 3e (10/11/2026): `9e25b203` (onda 3, 38 abates, 5 quedas, 51 tábuas arrancadas e 33
+ * repostas).
+ * MUDA com a sim, a IA, o mapa ou as regras das janelas: atualize no mesmo commit e diga o motivo no CHANGELOG.
+ */
+const GOLDEN_POSTO_HASH = '9e25b203';
+
+function runPostoGolden(): {
+  hash: string;
+  wave: number;
+  kills: number;
+  downs: number;
+  tears: number;
+  repairs: number;
+  phase: string;
+} {
+  const { map } = loadWorld('posto');
+  let kills = 0;
+  let downs = 0;
+  let tears = 0;
+  let repairs = 0;
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'posto',
+      seed: 42,
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 4 }] }],
+    },
+    map,
+    humans: 0,
+    zombies: 24,
+    onEvents: (events) => {
+      for (const ev of events) {
+        if (ev.type === 'kill') kills++;
+        else if (ev.type === 'down' && ev.action === 'down') downs++;
+        else if (ev.type === 'barricade' && ev.action === 'repair') repairs++;
+        else if (ev.type === 'barricade') tears++;
+      }
+    },
+  });
+  for (let t = 0; t < GOLDEN_ZOMBIES_TICKS && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const m = match.sim.view().match;
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    wave: m.zombieWave,
+    kills,
+    downs,
+    tears,
+    repairs,
+    phase: m.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e porta, semente 42, até 7.200 ticks', () => {
+  it('hash estável entre execuções e igual ao gravado; tábuas arrancadas e repostas', () => {
+    const a = runPostoGolden();
+    const b = runPostoGolden();
+    expect(b.hash).toBe(a.hash);
+    expect(a.wave).toBeGreaterThanOrEqual(2);
+    expect(a.kills).toBeGreaterThan(10);
+    expect(a.tears).toBeGreaterThan(6);
+    expect(a.repairs).toBeGreaterThan(0);
+    expect(
+      a.hash,
+      `onda ${a.wave}, abates ${a.kills}, quedas ${a.downs}, tábuas ${a.tears}/${a.repairs}, fase ${a.phase}`,
+    ).toBe(GOLDEN_POSTO_HASH);
   }, 180_000);
 });

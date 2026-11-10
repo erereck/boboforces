@@ -32,6 +32,8 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 3d, parte 2 (o Posto Avançado):** mapa pequeno do Bobo Zombies (nome provisório) com 6 janelas e uma porta
   paga de 750 pontos; as tábuas e a porta aparecem no jogo, e o HUD avisa "Segure Interagir para consertar" e o preço da
   porta. O card do Bobo Zombies nos Modos agora abre nele.
+- **Fase 3e, medição:** com 4 bots, a onda média é 4,0 no Construto e no Posto; golden novo do Bobo Zombies no Posto.
+  Fecha a fase 3 (IA do Zombies).
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

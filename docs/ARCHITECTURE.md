@@ -2403,3 +2403,14 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   abrir por 750" (perto da porta fechada; o preço em vermelho sem pontos), pelas mesmas regras do `barricadesSystem`.
 - **Conferido no Edge** (`local/m3/capturar-zombies.ts`): a porta e as tábuas aparecem; parado na sala 1, os zumbis
   arrancam as tábuas, entram e derrubam o jogador aos 30 s. O aviso do HUD não foi visto (precisa andar até a janela).
+
+### 13.17 Fase 3e: medição e golden da IA do Zombies (10/11/2026)
+
+- **Robô das ondas** (`local/m3/robo-ondas.ts`, agora com `MAPA=posto` e a contagem de tábuas), 4 bots Normal,
+  sementes 1–6: no Construto, onda média **4,0** (igual à 3b e à 3c); no Posto Avançado, **4,0** também, com 36 a 63
+  tábuas arrancadas e 15 a 33 repostas pelos bots por partida, e partidas mais curtas (128–149 s contra 154–204 s no
+  Construto: sala pequena, menos espaço para recuar atirando).
+- **Goldens do modo:** Construto `deecab03` (fase 3d) e o novo do Posto, `9e25b203` (onda 3, 38 abates, 5 quedas,
+  51 tábuas arrancadas e 33 repostas em 2 min). O do Warfare continua `5ee925a0`.
+- **Fecha a fase 3** (a IA do Zombies). O balanço das ondas (os bots param na onda 4) fica para a fase 4, com a
+  economia: armas na parede, Caixa Misteriosa e vantagens mudam a conta.

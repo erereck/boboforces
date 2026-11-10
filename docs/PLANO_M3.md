@@ -112,7 +112,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   sim (6 tábuas; o zumbi arranca 1 a cada 1,5 s; segurar o usar repõe, 10 pontos por tábua até 50 por onda; porta paga
   que abre área), com colisão que muda, portões na navegação, marcadores no mapa (`mapc`) e o Posto Avançado, mapa de
   teste até a Base Abandonada.
-- **3e. Medição:** robô das ondas e golden do modo com tudo isso.
+- **3e. Medição** (feita em 10/11/2026, ARCHITECTURE §13.17): robô das ondas (onda 4,0 no Construto e no Posto) e o
+  golden do modo no Posto (`9e25b203`). Fecha a fase 3.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
