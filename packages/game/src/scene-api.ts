@@ -18,6 +18,7 @@ import type { Renderer, TextureMode, VertexAttributeMode } from '@boboforces/ren
 import type { Disposable } from '@boboforces/shared';
 import type { DrawList, UiAtlasImage, UiFonts } from '@boboforces/ui';
 import type { BenchConfig, GameDebugApi } from './bench/types.ts';
+import type { LocalSeat } from './scene/seats.ts';
 import type { LocalDriver } from './local-driver.ts';
 import type { UiFrame } from './menu.ts';
 
@@ -60,10 +61,10 @@ export interface SceneRequest {
   /** M2 (fase 5f): começa com a calibração da mira (o "Calibrar mira" dos Ajustes abre o Bobo Training assim). */
   readonly calibrate?: boolean;
   /**
-   * Teste do sofá (antes do M3, que traz o "aperte A"): controles dos jogadores locais 2..4 no JOGAR, em tela dividida.
-   * O jogador 1 fica no `gamepad`. Vazio ou ausente = 1 jogador.
+   * M3 (fase 1a): os jogadores locais do sofá, um por assento (o 1º é o P1), em tela dividida. Com 2 ou mais, cada um
+   * fica preso ao dispositivo do seu assento; vazio ou ausente = 1 jogador, que segue o último dispositivo usado.
    */
-  readonly localPads?: readonly number[];
+  readonly seats?: readonly LocalSeat[];
 }
 
 /**

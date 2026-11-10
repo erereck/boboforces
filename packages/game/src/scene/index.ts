@@ -49,7 +49,7 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
   const views =
     request.kind === 'bench' && request.bench
       ? request.bench.views
-      : 1 + (request.kind === 'play' ? (request.localPads?.length ?? 0) : 0);
+      : Math.max(1, Math.min(4, request.kind === 'play' ? (request.seats?.length ?? 0) : 0));
   const profile = profileFor(platform.features.profileHint, views, request.bench);
   const recipe = sceneRecipe(request, profile);
   // M2 (fase 5c): o mapa da receita (Construto ou Ringue).

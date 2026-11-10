@@ -2116,3 +2116,23 @@ versão publicada nem no código do repositório. O teclado USB já chegava ao j
 - **Conferido:** testes do mapeador e da aba Botões; na web, as setas giram a mira na partida
   (`local/m2/conferir-setas.ts`). No Eden não dá: o teclado USB emulado está desligado na config do Erick (não
   mexemos nela); o console decide.
+
+## 13. M3: Sofá e Bobo Zombies (a partir de 09/11/2026)
+
+Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáveis.
+
+### 13.1 Fase 1a: assentos na partida (09/11/2026)
+
+- **Contrato:** `SceneRequest.seats?: readonly LocalSeat[]` (`game/src/scene/seats.ts`) no lugar do `localPads` do
+  teste do sofá. `LocalSeat` = dispositivo (`DeviceBinding`: controle ou teclado) e lado (0 = com o P1, 1 = contra).
+  Com 2 ou mais assentos, cada jogador fica preso ao seu dispositivo, o P1 também.
+- **O P1 é sempre o controlador 0 e joga no time 0**, porque o resultado, as estatísticas e o Nêmesis falam
+  com ele. Quem escolhe "contra" vai para o time 1. Assim a sim não muda: `expandRecipe` já põe os humanos do time 0
+  primeiro, e `seatRecipe` devolve o controlador de cada assento (`SceneRecipe.seatControllers`).
+- **Os times mantêm o tamanho:** os presets são feitos para 1 humano no time com `humans: 'all'`; cada humano a mais
+  toma o lugar de um bot do próprio time, cortado do fim da lista (no FFA, de qualquer bot). No treino os alvos ficam.
+- **Partida:** um mapeador por assento (`localMappers`, o 0 é o P1) e `seatOfController` para achar o mapeador de um
+  controlador; a vista `k` segue o controlador do assento `k`.
+- **Switch:** continua automático (um assento por controle completo, todos com o P1) até a tela "Jogar no sofá" (1b).
+- **Conferido:** `seats.test.ts`; no Edge, 3 controles falsos com o P2 contra (portão da web aberto só durante o
+  teste): o P2 joga no time azul, os outros dois no laranja, e o Start do P3 pausa.

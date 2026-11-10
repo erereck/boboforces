@@ -58,6 +58,26 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 7. **Fechamento:** bench com 4 controles no PC, NRO com 4 controles e o Zombies no Switch, roteiro, prints e
    publicação (com o OK do Erick).
 
+## Fase 1 em detalhe: sofá
+
+- **1a. Assentos na partida:** `SceneRequest.seats` (dispositivo e time de cada jogador local, até 4) no lugar do
+  `localPads` do teste do sofá. A partida cria um mapeador por assento (controle ou teclado), cada humano no time do
+  seu assento (a receita ganha os `humans` por time) e o P1 também fica preso ao dispositivo dele. O Switch continua
+  automático (um assento por controle completo) até a 1b.
+- **1b. Tela "Jogar no sofá":** entrada no menu principal (no título, o JOGAR continua solo, para ninguém virar P2 sem
+  querer ao pegar outro controle). Quatro cartões: "Aperte A para entrar" (Enter no teclado); entrou, mostra P1 ▲, P2 ●,
+  P3 ■ ou P4 ◆ na cor do jogador, o dispositivo e o time (cada um troca o seu com ◀ ▶); B sai. O P1 escolhe a partida
+  (o preset do JOGAR, com troca entre os prontos) e o Start (ou COMEÇAR) inicia. Enquanto houver sofá, só o P1 navega
+  nos menus. No Switch o teste do sofá automático sai e entra esta tela.
+- **1c. Na partida:** entrar no meio segurando A por 1 s num controle livre (assume um bot do time com menos humanos; a
+  tela se redivide); sair pela pausa (um bot assume); controle desconectado pausa e reserva o assento até ele voltar;
+  pausa, tela de morte e radial da arma em cada vista.
+- **1d. Vistas:** borda e símbolo na cor do jogador, anel no chão sob cada humano local, 2 jogadores lado a lado como
+  opção (Ajustes → Tela), placar e minimapa no 4º quadrante com 3 jogadores.
+- **1e. Por jogador:** perfil local por assento (nome, cor, sensibilidade, assistência, inverter Y), vibração por
+  controle, cada som pelo ouvinte local mais perto e o volume "meus sons".
+- **1f. Rodada 13 de prints** (lobby e tela dividida 2–4P), publicada para o Erick revisar.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

@@ -165,6 +165,7 @@ import {
   type UiFonts,
 } from '@boboforces/ui';
 import { sampleLightGrid } from '@boboforces/world';
+import { seatRecipe, type LocalSeat } from './seats.ts';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
 import {
@@ -433,6 +434,8 @@ export interface SceneRecipe {
   readonly recipe: MatchRecipe;
   readonly humans: number;
   readonly warnings: readonly string[];
+  /** M3 (fase 1a): o controlador da sim de cada assento local (o P1 é o 0); `[0]` com 1 jogador. */
+  readonly seatControllers: readonly number[];
 }
 
 /**
@@ -445,10 +448,11 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   const ref = builtinBotRef(request.kind === 'play' ? (request.level ?? 'normal') : 'normal');
   const bench = request.bench;
   let recipe: MatchRecipe;
-  // Teste do sofá (antes do M3): no JOGAR, um humano por controle de `localPads` além do jogador 1.
-  let humans = 1 + (request.kind === 'play' ? (request.localPads?.length ?? 0) : 0);
+  let humans = 1;
+  let seatControllers: readonly number[] = [0];
   if (request.kind === 'bench' && bench) {
     humans = 0;
+    seatControllers = [];
     let bots = bench.bots;
     if (bench.views + bots > ENGINE_MAX_BOTS) {
       bots = ENGINE_MAX_BOTS - bench.views;
@@ -469,6 +473,7 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   } else if (request.kind === 'wardrobe') {
     // M2 (fase 6c): o Meu Bobo: o Ringue sem ninguém (o bobo é um manequim).
     humans = 0;
+    seatControllers = [];
     recipe = {
       format: MATCH_RECIPE_FORMAT,
       mode: 'training',
@@ -507,9 +512,17 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
     request.kind === 'bench'
       ? { maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4, maxViewDistanceM: PLATFORM_PROFILES.pc.maxViewDistanceM }
       : recipeLimitsFor(profile);
+  // M3 (fase 1a): o sofá, até o teto de humanos locais do aparelho.
+  const seats = request.kind === 'play' ? (request.seats ?? []).slice(0, limits.maxLocalHumans) : [];
+  if (seats.length >= 2) {
+    const seated = seatRecipe(recipe, seats);
+    recipe = seated.recipe;
+    seatControllers = seated.controllers;
+    humans = seats.length;
+  }
   const checked = validateMatchRecipe(recipe, limits);
   if (!checked.ok) throw new Error(`cena: receita recusada (${checked.errors.map((e) => e.code).join(', ')})`);
-  return { recipe: checked.value, humans, warnings };
+  return { recipe: checked.value, humans, warnings, seatControllers };
 }
 
 /** Uma vista local: a câmera, a HUD dela e o que ela segue. */
@@ -629,21 +642,31 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       : platform.features.touch && !platform.features.keyboardMouse
         ? 'touch'
         : 'keyboardMouse';
-  let device: DeviceKind = request.device ?? fallbackDevice;
-  let padIndex = Math.max(0, request.gamepad);
+  // M3 (fase 1a): no sofá, cada assento fica preso ao seu dispositivo (o P1 também).
+  const seats: readonly LocalSeat[] =
+    request.kind === 'play' && humans >= 2 ? (request.seats ?? []).slice(0, humans) : [];
+  const p1Seat = seats[0];
+  let device: DeviceKind = p1Seat ? p1Seat.device.kind : (request.device ?? fallbackDevice);
+  let padIndex = p1Seat?.device.kind === 'gamepad' ? p1Seat.device.index : Math.max(0, request.gamepad);
   const bindingFor = (kind: DeviceKind, pad: number): DeviceBinding =>
     kind === 'gamepad' ? pads[pad]! : kind === 'touch' ? touch : keyboard;
   const player: InputMapper = createInputMapper(bindingFor(device, padIndex), profiles[device]);
   /**
-   * Teste do sofá (antes do M3): os jogadores locais 2..4, um controle fixo cada (`SceneRequest.localPads`); o humano
-   * `h` usa `extras[h - 1]`. Com eles, o jogador 1 também fica preso ao controle dele (não segue o último usado).
+   * M3 (fase 1a): os jogadores locais 2..4 do sofá (`SceneRequest.seats`), um mapeador preso ao dispositivo de cada
+   * assento. `seatControllers[k]` é o controlador da sim do assento `k` (o P1 é o 0; os do time adversário vêm depois
+   * dos do time do P1).
    */
-  const extraPads = request.kind === 'play' ? (request.localPads ?? []).slice(0, Math.max(0, humans - 1)) : [];
-  const extras: InputMapper[] = extraPads.map((pad) => createInputMapper(pads[pad]!, profiles.gamepad));
+  const seatControllers = setup.recipe.seatControllers;
+  const extras: InputMapper[] = seats.slice(1).map((s) => createInputMapper(s.device, profiles[s.device.kind]));
   const extraAssists = extras.map(() => createAimAssistState());
+  /** Os mapeadores por assento (o 0 é o P1). */
+  const localMappers: readonly InputMapper[] = [player, ...extras];
+  /** O assento de cada controlador humano (-1 = nenhum). */
+  const seatOfController = new Int8Array(Math.max(1, humans)).fill(-1);
+  for (let k = 0; k < seatControllers.length && k < localMappers.length; k++) seatOfController[seatControllers[k]!] = k;
   /** Mapeador do controlador `c` se ele for um humano local; `null` para bots. */
   const mapperOf = (c: number): InputMapper | null =>
-    c === 0 && humans > 0 ? player : c > 0 && c <= extras.length ? extras[c - 1]! : null;
+    c >= 0 && c < humans && seatOfController[c]! >= 0 ? localMappers[seatOfController[c]!]! : null;
   /** M2 (fase 3h): assistência de mira do humano (controle e toque; o nível vem do perfil do dispositivo). */
   const assist = createAimAssistState();
   const assistAngles = new Float64Array(2);
@@ -1411,9 +1434,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     map: loaded.simMap,
     humans,
     writeHumanFrame: (slot, out, seq) => {
-      if (slot > 0) {
-        // Teste do sofá: os jogadores 2..4 só pelo controle de cada um (sem 3ª pessoa, toque nem Destravar).
-        (extras[slot - 1] ?? player).writeFrame(out, seq);
+      if (seatOfController[slot] !== 0) {
+        // Sofá: os jogadores 2..4 só pelo dispositivo de cada um (sem 3ª pessoa, toque nem Destravar).
+        (mapperOf(slot) ?? player).writeFrame(out, seq);
         return;
       }
       player.writeFrame(out, seq);
@@ -1460,11 +1483,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const e = entityIndex(sim.controllerEntity(0));
     player.setAngles(v.yaw[e]!, 0);
     player.setWeapon(v.weapon[e]!);
-    for (let h = 1; h <= extras.length; h++) {
-      slots[h]!.controller = h;
-      const eh = entityIndex(sim.controllerEntity(h));
-      extras[h - 1]!.setAngles(v.yaw[eh]!, 0);
-      extras[h - 1]!.setWeapon(v.weapon[eh]!);
+    for (let k = 1; k < localMappers.length; k++) {
+      const c = seatControllers[k]!;
+      slots[k]!.controller = c;
+      const eh = entityIndex(sim.controllerEntity(c));
+      localMappers[k]!.setAngles(v.yaw[eh]!, 0);
+      localMappers[k]!.setWeapon(v.weapon[eh]!);
     }
   } else {
     const byTeam: number[][] = [[], [], [], []];
@@ -1785,7 +1809,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.setAngles(yaw0, pitch0);
       } else {
         const st = extraAssists[k]!;
-        const scale = aimAssistBefore(m, k + 1, st);
+        const scale = aimAssistBefore(m, seatControllers[k + 1]!, st);
         m.update(raw, dt, scale);
         aimAssistAfter(dt, m.yaw !== yaw0 || m.pitch !== pitch0, m, st);
       }
@@ -1950,7 +1974,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function applySettings(): void {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
-    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles.gamepad);
+    for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(profiles[seats[k + 1]!.device.kind]);
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
     thirdPerson = thirdFromSettings();

@@ -1020,7 +1020,9 @@ export function startGame(deps: GameDeps): GameHandle {
       gamepad: sofa.length >= 2 ? sofa[0]! : menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
       ...(calibrate ? { calibrate: true } : {}),
-      ...(sofa.length >= 2 ? { localPads: sofa.slice(1) } : {}),
+      ...(sofa.length >= 2
+        ? { seats: sofa.map((index) => ({ device: { kind: 'gamepad' as const, index }, side: 0 as const })) }
+        : {}),
     };
     screen = 'scene';
     pendingLoading.current = 0;
