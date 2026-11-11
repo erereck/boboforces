@@ -8,7 +8,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ### M3 Sofá e Bobo Zombies (em construção)
 
-Plano em `docs/PLANO_M3.md`.
+Plano em `docs/PLANO_M3.md`. Publicado no Pages em 11/11/2026 (até a fase 7e), antes do roteiro com controles e do
+checkpoint do Switch.
 
 - **Fase 2a, o Bobo Zombies na sim:** ondas pela fórmula do GDD (quantidade, vida, quem corre), intervalo entre elas,
   o último zumbi correndo e marcado, vitória na última onda e derrota com todos mortos. O golden não mudou.

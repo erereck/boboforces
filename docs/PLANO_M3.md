@@ -3,6 +3,11 @@
 > Fonte: `docs/GDD.md` §3.6, §4.1.5 e §7; `docs/design/gameplay.md` §5.4, §6.11 e "Bobo Zombies (M3)";
 > `docs/design/tecnico.md` §10 e §24; `docs/design/arte-ux.md`. `docs/DECISOES.md` manda sobre este plano. O M2 foi
 > publicado em 09/11/2026 (#72); o roteiro do celular e o checkpoint do Switch dele correm em paralelo, com o Erick.
+>
+> **Publicado em 11/11/2026** com o OK do Erick no chat ("Pode publicar", resposta à M4 da rodada 16), antes do roteiro:
+> push `293ce38..153bcce` (40 commits), CI e deploy no Pages verdes, `smoke:web` no site ok e o service worker
+> conferido (70 arquivos, joga sem rede). O fechamento do critério ainda espera o roteiro (`docs/ROTEIRO_M3.md`) e
+> as respostas das rodadas 13 a 16.
 
 ## Objetivo
 
