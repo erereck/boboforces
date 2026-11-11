@@ -140,6 +140,8 @@ export interface ZombiesRules {
   readonly quantity?: number;
   /** Multiplicador da vida dos zumbis. */
   readonly hpMul?: number;
+  /** M3 (fase 6a): multiplicador da velocidade dos zumbis (todos os tipos). */
+  readonly speed?: number;
   /** Zumbis especiais (Sprinter, Chonker, Spitter) e o chefão a cada 5 ondas. */
   readonly specials?: boolean;
   readonly bosses?: boolean;
@@ -157,6 +159,7 @@ export const ZOMBIES_DEFAULTS = {
   waves: 10,
   quantity: 1,
   hpMul: 1,
+  speed: 1,
   specials: true,
   bosses: true,
   economy: 1,
@@ -210,6 +213,7 @@ export const RECIPE_RANGES = {
   // M3 (fase 2a): Bobo Zombies.
   zombieQuantity: { min: 0.5, max: 3 },
   zombieHpMul: { min: 0.25, max: 5 },
+  zombieSpeed: { min: 0.5, max: 2 },
   zombieEconomy: { min: 0.5, max: 3 },
   selfRevives: { min: -1, max: 9 },
 } as const;
@@ -466,7 +470,7 @@ function readRange(
   if (v !== undefined) out[key] = clampWarn(ctx, v, range.min, range.max, `${block}.${key}`);
 }
 
-const ZOMBIES_KEYS = ['waves', 'quantity', 'hpMul', 'specials', 'bosses', 'economy', 'selfRevives'] as const;
+const ZOMBIES_KEYS = ['waves', 'quantity', 'hpMul', 'speed', 'specials', 'bosses', 'economy', 'selfRevives'] as const;
 
 /** M3 (fase 2a): o bloco do Bobo Zombies (a duração só nas escolhas; o resto limitado à faixa). */
 function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
@@ -483,6 +487,7 @@ function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   }
   readRange(ctx, value, 'quantity', 'zombies', RECIPE_RANGES.zombieQuantity, out);
   readRange(ctx, value, 'hpMul', 'zombies', RECIPE_RANGES.zombieHpMul, out);
+  readRange(ctx, value, 'speed', 'zombies', RECIPE_RANGES.zombieSpeed, out);
   readFlag(ctx, value, 'specials', 'zombies', out);
   readFlag(ctx, value, 'bosses', 'zombies', out);
   readRange(ctx, value, 'economy', 'zombies', RECIPE_RANGES.zombieEconomy, out);

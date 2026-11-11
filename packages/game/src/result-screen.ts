@@ -188,6 +188,138 @@ export const resultScreen: Screen<ResultScreenData> = {
   },
 };
 
+/** M3 (fase 6a): uma linha da tabela do resultado do Bobo Zombies, já em texto. */
+export interface ZombiesResultRow {
+  readonly name: string;
+  readonly color: number;
+  readonly points: number;
+  readonly kills: number;
+  readonly headKills: number;
+  readonly downs: number;
+  readonly revives: number;
+}
+
+/** M3 (fase 6a): o que o resultado do Bobo Zombies mostra. */
+export interface ZombiesResultData {
+  /** "Sobreviveram às 10 ondas!" ou "Caíram na onda 7". */
+  readonly title: string;
+  readonly titleColor: number;
+  /** "Base Abandonada · 10 ondas · 2 jogadores". */
+  readonly config: string;
+  /** "Recorde nesta configuração: onda 9", "Novo recorde! Antes: onda 6" ou "Primeira partida nesta configuração". */
+  readonly record: string;
+  /** O recorde caiu agora (a linha fica em âmbar). */
+  readonly newRecord: boolean;
+  readonly rows: readonly ZombiesResultRow[];
+  readonly presetSaved?: boolean;
+}
+
+/** As colunas da tabela: largura (px de referência) e o título. */
+const ZOMBIES_COLUMNS = [
+  { id: 'name', width: 230, key: 'result.zombies.col.name' },
+  { id: 'points', width: 100, key: 'result.zombies.col.points' },
+  { id: 'kills', width: 90, key: 'result.zombies.col.kills' },
+  { id: 'heads', width: 110, key: 'result.zombies.col.heads' },
+  { id: 'downs', width: 80, key: 'result.zombies.col.downs' },
+  { id: 'revives', width: 100, key: 'result.zombies.col.revives' },
+] as const satisfies readonly { id: string; width: number; key: StringKey }[];
+
+function cell(id: string, width: number, text: string, color: number, left: boolean): UiNode {
+  return {
+    kind: 'text',
+    id,
+    width,
+    text: { literal: text },
+    style: 'body',
+    color,
+    textAlign: left ? 'left' : 'center',
+  } as UiNode;
+}
+
+/**
+ * M3 (fase 6a): o resultado do Bobo Zombies (gameplay.md "Bobo Zombies": recorde de onda por mapa e configuração): a
+ * onda, a configuração, o recorde e uma linha por bobo do time (pontos, abates, na cabeça, caídas, quantos levantou);
+ * embaixo, De novo · Mudar regras · Salvar preset · Sair. Sem Nêmesis, prêmios nem nível (não há bot adversário).
+ */
+export const zombiesResultScreen: Screen<ZombiesResultData> = {
+  id: 'result-zombies',
+  build(d) {
+    const header: UiNode = {
+      kind: 'row',
+      id: 'tableHead',
+      gap: 4,
+      children: ZOMBIES_COLUMNS.map((c, i) => cell(`h-${c.id}`, c.width, t(c.key), COLORS.textoBaixo, i === 0)),
+    } as UiNode;
+    const rows: UiNode[] = d.rows.map(
+      (r, k) =>
+        ({
+          kind: 'row',
+          id: `row${k}`,
+          gap: 4,
+          children: [
+            cell(`r${k}-name`, ZOMBIES_COLUMNS[0].width, r.name, r.color, true),
+            cell(`r${k}-points`, ZOMBIES_COLUMNS[1].width, String(r.points), COLORS.acao, false),
+            cell(`r${k}-kills`, ZOMBIES_COLUMNS[2].width, String(r.kills), COLORS.texto, false),
+            cell(`r${k}-heads`, ZOMBIES_COLUMNS[3].width, String(r.headKills), COLORS.texto, false),
+            cell(`r${k}-downs`, ZOMBIES_COLUMNS[4].width, String(r.downs), COLORS.texto, false),
+            cell(`r${k}-revives`, ZOMBIES_COLUMNS[5].width, String(r.revives), COLORS.texto, false),
+          ],
+        }) as UiNode,
+    );
+    return {
+      kind: 'box',
+      id: 'root',
+      color: COLORS.veu,
+      children: [
+        {
+          kind: 'column',
+          id: 'main',
+          anchor: 'center',
+          align: 'center',
+          width: 760,
+          gap: 10,
+          children: [
+            { kind: 'text', id: 'title', text: { literal: d.title }, style: 'title', color: d.titleColor },
+            {
+              kind: 'text',
+              id: 'config',
+              text: { literal: d.config },
+              style: 'body',
+              color: COLORS.textoBaixo,
+              textAlign: 'center',
+            },
+            {
+              kind: 'text',
+              id: 'record',
+              text: { literal: d.record },
+              style: 'heading',
+              color: d.newRecord ? COLORS.acao : COLORS.texto,
+              textAlign: 'center',
+            },
+            { kind: 'box', height: 6 },
+            header,
+            ...rows,
+            { kind: 'box', height: 10 },
+            {
+              kind: 'row',
+              id: 'actions',
+              gap: 12,
+              children: [
+                button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: true }),
+                button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                d.presetSaved
+                  ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
+                  : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
+                button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  },
+};
+
 /** "Mira torta: Normal Bob" (montado uma vez, no fim da partida). */
 export function prizeLine(prize: string, name: string): string {
   return t('result.prizeLine', { prize: t(`prize.${prize}` as StringKey), name });

@@ -54,7 +54,7 @@ function levelName(recipe: MatchRecipe): string {
 }
 
 /** M3 (fase 2d): "10 ondas" ou "Sem fim" no Bobo Zombies; `''` nos outros modos. */
-function zombieWaves(recipe: MatchRecipe): string {
+export function zombieWaves(recipe: MatchRecipe): string {
   if (recipe.mode !== 'zombies') return '';
   const waves = recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves;
   return waves > 0 ? t('summary.zombieWaves', { n: waves }) : t('summary.zombieEndless');

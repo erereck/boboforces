@@ -31,6 +31,10 @@ export interface MatchStats {
    */
   readonly humanFirstHit: Int32Array;
   readonly ttk: Float64Array;
+  /** M3 (fase 6a): Bobo Zombies: abates na cabeça, vezes que caiu e colegas que levantou, por bobo. */
+  readonly headKills: Uint16Array;
+  readonly downs: Uint16Array;
+  readonly revives: Uint16Array;
 }
 
 export function createMatchStats(capacity: number): MatchStats {
@@ -49,6 +53,9 @@ export function createMatchStats(capacity: number): MatchStats {
     killedByHuman: new Uint16Array(capacity),
     humanFirstHit: new Int32Array(capacity).fill(-1),
     ttk: new Float64Array(2),
+    headKills: new Uint16Array(capacity),
+    downs: new Uint16Array(capacity),
+    revives: new Uint16Array(capacity),
   };
 }
 
@@ -95,11 +102,22 @@ export function recordMatchEvent(st: MatchStats, ev: SimEvent, human: number): v
       }
       const k = entityIndex(ev.killer);
       if (k >= st.capacity) break;
+      if (ev.headshot) st.headKills[k] = st.headKills[k]! + 1;
       st.streak[k] = st.streak[k]! + 1;
       if (st.streak[k]! > st.bestStreak[k]!) st.bestStreak[k] = st.streak[k]!;
       if (human !== NULL_ENTITY && ev.victim === human) st.killedHuman[k] = st.killedHuman[k]! + 1;
       if (human !== NULL_ENTITY && ev.killer === human && v < st.capacity) {
         st.killedByHuman[v] = st.killedByHuman[v]! + 1;
+      }
+      break;
+    }
+    case 'down': {
+      // M3 (fase 6a): caiu, e quem levantou um colega (levantar sozinho não conta).
+      const e = entityIndex(ev.entity);
+      if (ev.action === 'down' && e < st.capacity) st.downs[e] = st.downs[e]! + 1;
+      if (ev.action === 'revive' && ev.by !== NULL_ENTITY) {
+        const b = entityIndex(ev.by);
+        if (b < st.capacity) st.revives[b] = st.revives[b]! + 1;
       }
       break;
     }
@@ -337,6 +355,7 @@ export function localMatchRecord(
   humans: readonly number[],
   ffa: boolean,
   playTimeS: number,
+  zombies?: { readonly key: string; readonly wave: number },
 ): MatchRecord {
   let outcome: MatchOutcome = 'loss';
   let kills = 0;
@@ -359,5 +378,43 @@ export function localMatchRecord(
     bestKills = Math.max(bestKills, view.kills[h]!);
     bestStreak = Math.max(bestStreak, st.bestStreak[h]!);
   }
+  // M3 (fase 6a): no Bobo Zombies os recordes de abates e de sequência ficam como estão (são do Warfare: uma onda de
+  // zumbis passaria de qualquer partida); vale o recorde de onda.
+  if (zombies !== undefined) {
+    return { outcome, kills, deaths, assists, shots, hits, headshots, bestKills: 0, bestStreak: 0, playTimeS, zombies };
+  }
   return { outcome, kills, deaths, assists, shots, hits, headshots, bestKills, bestStreak, playTimeS };
+}
+
+/** M3 (fase 6a): uma linha do resultado do Bobo Zombies (índice da entidade; o nome sai da tabela do `game`). */
+export interface ZombiesRow {
+  readonly entity: number;
+  readonly points: number;
+  readonly kills: number;
+  readonly headKills: number;
+  readonly downs: number;
+  readonly revives: number;
+}
+
+/** Quantas linhas o resultado do Bobo Zombies mostra (os humanos primeiro; o robô das ondas tem mais bots). */
+export const ZOMBIES_RESULT_ROWS = 8;
+
+/**
+ * M3 (fase 6a): as linhas do resultado do Bobo Zombies: os bobos do time 0 (humanos e bots de apoio), na ordem dos
+ * controladores (os jogadores locais são os primeiros), até `ZOMBIES_RESULT_ROWS`.
+ */
+export function zombiesRows(st: MatchStats, view: SimView): ZombiesRow[] {
+  const ids: number[] = [];
+  for (let i = 0; i < view.count; i++) {
+    if (view.alive[i] === 1 && view.kind[i] === ENTITY_KIND.bobo && view.team[i] === 0) ids.push(i);
+  }
+  ids.sort((a, b) => view.controller[a]! - view.controller[b]!);
+  return ids.slice(0, ZOMBIES_RESULT_ROWS).map((i) => ({
+    entity: i,
+    points: view.points[i]!,
+    kills: view.kills[i]!,
+    headKills: i < st.capacity ? st.headKills[i]! : 0,
+    downs: i < st.capacity ? st.downs[i]! : 0,
+    revives: i < st.capacity ? st.revives[i]! : 0,
+  }));
 }

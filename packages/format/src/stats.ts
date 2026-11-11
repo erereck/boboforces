@@ -1,4 +1,5 @@
 import { DocReader } from './doc-read.ts';
+import { ZOMBIES_DEFAULTS, type MatchRecipe } from './match-recipe.ts';
 import { formatId, type FormatId } from './format-id.ts';
 import { migrateDocument } from './migrations.ts';
 import type { ValidationResult } from './validation.ts';
@@ -29,6 +30,17 @@ export interface StatsRecords {
   /** Mais abates numa partida e a maior sequência sem morrer. */
   readonly mostKills: number;
   readonly bestStreak: number;
+  /**
+   * M3 (fase 6a): a onda máxima do Bobo Zombies por mapa, configuração e jogadores locais (gameplay.md §9), do mais
+   * antigo ao mais recente (a lista tem teto; o mais antigo sai).
+   */
+  readonly zombieWaves: readonly ZombieWaveRecord[];
+}
+
+/** M3 (fase 6a): um recorde de onda; `key` sai de `zombieRecordKey`. */
+export interface ZombieWaveRecord {
+  readonly key: string;
+  readonly wave: number;
 }
 
 export interface StatsOnboarding {
@@ -45,7 +57,39 @@ export interface StatsDocument {
   readonly onboarding: StatsOnboarding;
 }
 
-export const STATS_RANGES = { tips: 32, tipLength: 40, versionLength: 32 } as const;
+export const STATS_RANGES = {
+  tips: 32,
+  tipLength: 40,
+  versionLength: 32,
+  // M3 (fase 6a): recordes de onda do Bobo Zombies.
+  zombieRecords: 64,
+  zombieKeyLength: 96,
+  maxWave: 9999,
+} as const;
+
+/**
+ * M3 (fase 6a): a chave do recorde de onda (gameplay.md §9, "por mapa e configuração"): o mapa, as regras do modo que
+ * mudam a dificuldade (padrões preenchidos, para a receita sem o bloco e a com os padrões darem a mesma chave) e os
+ * jogadores locais (4 no sofá não apaga o recorde solo). Ex.: `base|w10|q1|h1|v1|s11|e1|r3|p1`.
+ */
+export function zombieRecordKey(recipe: MatchRecipe, players: number): string {
+  const z = recipe.zombies ?? {};
+  const D = ZOMBIES_DEFAULTS;
+  const flags = `${(z.specials ?? D.specials) ? 1 : 0}${(z.bosses ?? D.bosses) ? 1 : 0}`;
+  return [
+    recipe.map,
+    `w${z.waves ?? D.waves}`,
+    `q${z.quantity ?? D.quantity}`,
+    `h${z.hpMul ?? D.hpMul}`,
+    `v${z.speed ?? D.speed}`,
+    `s${flags}`,
+    `e${z.economy ?? D.economy}`,
+    `r${z.selfRevives ?? D.selfRevives}`,
+    `p${Math.max(1, Math.round(players))}`,
+  ]
+    .join('|')
+    .slice(0, STATS_RANGES.zombieKeyLength);
+}
 
 export const EMPTY_STATS: StatsDocument = {
   format: STATS_FORMAT,
@@ -62,7 +106,7 @@ export const EMPTY_STATS: StatsDocument = {
     headshots: 0,
     playTimeS: 0,
   },
-  records: { mostKills: 0, bestStreak: 0 },
+  records: { mostKills: 0, bestStreak: 0, zombieWaves: [] },
   onboarding: { tipsSeen: [], seenNews: '' },
 };
 
@@ -101,6 +145,7 @@ export function validateStats(input: unknown): ValidationResult<StatsDocument> {
       records: {
         mostKills: r.count(rec, 'mostKills', 'records.mostKills'),
         bestStreak: r.count(rec, 'bestStreak', 'records.bestStreak'),
+        zombieWaves: readZombieWaves(r, rec),
       },
       onboarding: {
         tipsSeen: r.strings(o, 'tipsSeen', 'onboarding.tipsSeen', S.tips, S.tipLength),
@@ -109,4 +154,34 @@ export function validateStats(input: unknown): ValidationResult<StatsDocument> {
     },
     warnings: r.warnings,
   };
+}
+
+/** M3 (fase 6a): os recordes de onda; item torto sai com aviso, chave repetida fica a de onda maior. */
+function readZombieWaves(r: DocReader, rec: Record<string, unknown>): ZombieWaveRecord[] {
+  const v = rec['zombieWaves'];
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) {
+    r.warn('records.zombieWaves', 'save.invalidField');
+    return [];
+  }
+  const S = STATS_RANGES;
+  const out: ZombieWaveRecord[] = [];
+  for (const item of v) {
+    const ok =
+      typeof item === 'object' &&
+      item !== null &&
+      typeof (item as { key?: unknown }).key === 'string' &&
+      typeof (item as { wave?: unknown }).wave === 'number';
+    const key = ok ? (item as { key: string }).key : '';
+    const wave = ok ? (item as { wave: number }).wave : -1;
+    if (!ok || key.length === 0 || key.length > S.zombieKeyLength || !Number.isInteger(wave) || wave < 0) {
+      r.warn('records.zombieWaves', 'save.invalidField');
+      continue;
+    }
+    const at = out.findIndex((x) => x.key === key);
+    const best = Math.min(S.maxWave, Math.max(wave, at >= 0 ? out[at]!.wave : 0));
+    if (at >= 0) out.splice(at, 1);
+    out.push({ key, wave: best });
+  }
+  return out.slice(-S.zombieRecords);
 }

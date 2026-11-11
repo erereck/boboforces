@@ -2541,3 +2541,26 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   modelos pequenos do Bobo Zombies (tábua, moeda x2, raio do Desmontador e giz) passaram a dividir uma camada
   (`createPickupLayers`, criada a cada geração como a de brilho das props): 30 camadas.
 - **Conferido no Edge** (Base, nascimento temporário no QG): o giz em volta da Buzzer e a caixa clara no escuro.
+
+### 13.26 Fase 6a: resultado e recordes do Bobo Zombies (10/11/2026)
+
+- **Tela própria** (`zombiesResultScreen` em `game/src/result-screen.ts`): o título com a onda, a configuração
+  ("Base Abandonada · 10 ondas · 2 jogadores", mais "regras próprias" quando alguma regra do modo sai do padrão), a
+  linha do recorde e uma tabela com os bobos do time 0 (humanos primeiro, na cor do jogador; depois os bots de apoio;
+  até 8 linhas): pontos, abates, na cabeça, caídas e quantos levantou. Botões De novo · Mudar regras · Salvar preset ·
+  Sair. Sem Nêmesis, prêmios, nível nem "Mais fácil/difícil" (não existe bot adversário no modo).
+- **As contas** (`scene/result.ts`): o `MatchStats` ganha `headKills`, `downs` e `revives` (do `kill` com
+  `headshot` e do evento `down`: `down` conta para quem caiu, `revive` para quem levantou; levantar sozinho não
+  conta); `zombiesRows` monta a tabela.
+- **Recorde de onda** (gameplay.md §9: "por mapa e configuração"): `stats@1` ganha `records.zombieWaves` (lista de
+  `{ key, wave }`, até 64, do mais antigo ao mais recente; aditivo, sem migração). A chave sai de `zombieRecordKey`
+  (format): mapa, duração, quantidade, vida, velocidade, especiais/chefões, economia, "levanta sozinho" e os
+  **jogadores locais** (escolha minha, revisável: 4 no sofá não apaga o recorde solo), com os padrões preenchidos.
+  Como nos outros recordes, a primeira partida numa configuração só marca a base ("Primeira partida nesta
+  configuração"); depois, "Novo recorde! Antes: onda N" em âmbar ou "Recorde nesta configuração: onda N".
+- **O Zombies fora dos recordes do Warfare:** a partida do Zombies soma nos totais (partidas, abates, tempo), mas não
+  mexe no recorde de abates nem no de sequência (uma onda de zumbis passaria de qualquer partida). Antes desta fase ela
+  mexia.
+- **Aba Dados:** a linha "Melhor onda no Bobo Zombies: N (mapa)", a maior de todas as configurações.
+- **Receita:** `zombies.speed` (0,5–2×; padrão 1) entra no formato agora para a chave do recorde já nascer com ela;
+  a sim passa a usar na 6b.

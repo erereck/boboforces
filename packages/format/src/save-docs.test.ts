@@ -10,7 +10,7 @@ import {
 } from './backup.ts';
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { DEFAULT_SETTINGS, SETTINGS_FORMAT, SETTINGS_RANGES, validateSettings } from './settings.ts';
-import { EMPTY_STATS, STATS_FORMAT, validateStats } from './stats.ts';
+import { EMPTY_STATS, STATS_FORMAT, validateStats, zombieRecordKey } from './stats.ts';
 import { BOBO_FORMAT, DEFAULT_BOBO, validateBobo } from './bobo.ts';
 import { FIGURE_PRESETS } from './model/figure-presets.ts';
 import { cloneJson, ISSUE_CODES, type RecipeLimits } from './validation.ts';
@@ -131,9 +131,50 @@ describe('stats@1', () => {
     expect([r.value.totals.matches, r.value.totals.kills, r.value.totals.deaths, r.value.totals.playTimeS]).toEqual([
       3, 0, 0, 600,
     ]);
-    expect(r.value.records).toEqual({ mostKills: 12, bestStreak: 0 });
+    expect(r.value.records).toEqual({ mostKills: 12, bestStreak: 0, zombieWaves: [] });
     expect(r.value.onboarding).toEqual({ tipsSeen: ['sprint', 'ads'], seenNews: '0.0.1' });
     codesKnown(r.warnings);
+  });
+
+  it('M3 (fase 6a): recordes de onda do Bobo Zombies: item torto sai, chave repetida fica a maior', () => {
+    const r = validateStats({
+      format: STATS_FORMAT,
+      totals: {},
+      records: {
+        zombieWaves: [
+          { key: 'base|p1', wave: 4 },
+          { key: 'base|p2', wave: 2.5 },
+          'x',
+          { key: '', wave: 3 },
+          { key: 'base|p1', wave: 7 },
+          { key: 'posto|p1', wave: 3 },
+        ],
+      },
+      onboarding: {},
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.records.zombieWaves).toEqual([
+      { key: 'base|p1', wave: 7 },
+      { key: 'posto|p1', wave: 3 },
+    ]);
+    expect(r.warnings.filter((w) => w.path === 'records.zombieWaves')).toHaveLength(3);
+    codesKnown(r.warnings);
+  });
+
+  it('M3 (fase 6a): a chave do recorde: padrões preenchidos, regras e jogadores locais', () => {
+    const recipe: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'base',
+      seed: 0,
+      teams: [{ humans: 'all' as const, bots: [] }],
+    };
+    expect(zombieRecordKey(recipe, 1)).toBe('base|w10|q1|h1|v1|s11|e1|r3|p1');
+    expect(zombieRecordKey({ ...recipe, zombies: { waves: 10, quantity: 1 } }, 1)).toBe(zombieRecordKey(recipe, 1));
+    expect(zombieRecordKey({ ...recipe, zombies: { quantity: 1.5, speed: 1.25, bosses: false } }, 3)).toBe(
+      'base|w10|q1.5|h1|v1.25|s10|e1|r3|p3',
+    );
   });
 });
 

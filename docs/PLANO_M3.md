@@ -139,6 +139,23 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **5d. Prints da rodada 14** (feita em 10/11/2026: v16 da página das rodadas, perguntas K1–K7 junto com as J e I
   ainda abertas; montada por `local/m2/montar-pagina-r14.mjs`). Fecha a fase 5.
 
+## Fase 6 em detalhe: menus, dados e áudio do Zombies
+
+- **6a. Resultado e recordes** (feita em 10/11/2026, ARCHITECTURE §13.26): uma tela de resultado própria do Bobo Zombies (a onda, o recorde e uma linha por bobo
+  do time: pontos, abates, na cabeça, caídas e quantos levantou; De novo · Mudar regras · Salvar preset · Sair, sem
+  Nêmesis nem "Mais difícil"); o `stats@1` guarda a onda máxima por mapa, configuração e número de jogadores locais.
+- **6b. Partida personalizada do Zombies:** o modo da Partida personalizada ganha o Zombies; com ele, as abas trocam
+  para as regras do modo (mapa, duração, quantidade, velocidade, vida, especiais, chefões, economia, "levanta
+  sozinho", bots de apoio); "Mudar regras" do resultado abre aqui. A velocidade entra na receita (`zombies.speed`).
+- **6c. Presets de fábrica:** Sofá Zombies (Base Abandonada, Curta, os bots de apoio completam até 4) e Zombies
+  Relâmpago (5 ondas), nos cards da Partida Rápida e na lista do sofá.
+- **6d. Sons do Zombies:** zumbis (gemido, ataque, tábua arrancada, chefão, gosma, cuspe), compras (parede, porta,
+  caixa, vantagem, sem pontos), drops, ondas (começo e fim), caído e levantado. Dos 3 pacotes da Kenney já baixados
+  (#63) e da síntese em código.
+- **6e. Música em camadas:** a trilha das ondas em 2 camadas (calma no intervalo, horda durante a onda), sintetizada
+  em código enquanto o Erick não escolhe uma faixa CC0 (I3: o download pede o OK com nome, origem e tamanho).
+- **6f. Medição e prints da rodada 15.** Fecha a fase 6.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

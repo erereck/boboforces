@@ -53,6 +53,10 @@ Plano em `docs/PLANO_M3.md`.
   Chonker em cubinhos verdes e faíscas verdes no raio do Desmontador.
 - **Fase 5d, rodada 14 dos prints:** o Bobo Zombies (Base Abandonada, janelas e portas, compras, os zumbis por tipo,
   leitura à noite), com as perguntas K1–K7. Fecha a fase 5.
+- **Fase 6a, resultado e recordes do Bobo Zombies:** tela de resultado própria, com a onda, a configuração, o recorde
+  de onda (por mapa, regras e número de jogadores) e uma linha por bobo do time (pontos, abates, na cabeça, quantas
+  vezes caiu e quantos levantou). A aba Dados mostra a melhor onda. O Zombies não mexe mais nos recordes de abates e
+  de sequência.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

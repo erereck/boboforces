@@ -100,12 +100,16 @@ export interface MatchRecord {
   readonly bestStreak: number;
   /** Tempo jogado (s). */
   readonly playTimeS: number;
+  /** M3 (fase 6a): Bobo Zombies: a chave da configuração (`zombieRecordKey`) e a onda alcançada. */
+  readonly zombies?: { readonly key: string; readonly wave: number };
 }
 
 /** Os recordes que a partida bateu (a primeira partida só marca a base: não bate nada). */
 export interface RecordBreaks {
   readonly mostKills: boolean;
   readonly bestStreak: boolean;
+  /** M3 (fase 6a): passou a onda máxima desta configuração (a primeira partida nela só marca a base). */
+  readonly zombieWave: boolean;
 }
 
 /** M2 (fase 6c): o Meu Bobo: a partida veste o jogador 1 com ele; o editor muda e grava. */

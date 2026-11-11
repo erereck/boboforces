@@ -37,6 +37,8 @@ import {
   QUALITY_PROBE,
   qualityKnobs,
   shouldLowerQuality,
+  ZOMBIES_DEFAULTS,
+  zombieRecordKey,
 } from '@boboforces/format';
 import {
   AIM_ASSIST_LEVELS,
@@ -209,7 +211,16 @@ import {
   PAUSE_ACTION,
   pauseScreen,
 } from '../pause.ts';
-import { prizeLine, RESULT_ACTION, resultScreen, type ResultScreenData } from '../result-screen.ts';
+import {
+  prizeLine,
+  RESULT_ACTION,
+  resultScreen,
+  zombiesResultScreen,
+  type ResultScreenData,
+  type ZombiesResultData,
+} from '../result-screen.ts';
+import { zombieWaves } from '../presets-ui.ts';
+import { zombieRecord } from '../stats.ts';
 import {
   actionLabel,
   applyControls,
@@ -249,6 +260,7 @@ import {
   recordMatchEvent,
   summarizeMatch,
   trainingNumbers,
+  zombiesRows,
   type TrainingNumbers,
 } from './result.ts';
 import { bareLookId, botLookIndices, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
@@ -2526,10 +2538,19 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M2 (fase 4g): a partida vai para o `stats@1` (o bench não tem humano). Rodada 8 (D5): em tela dividida, todos os
     // jogadores locais somados (os humanos são os controladores 0..humans-1).
     let breaks: RecordBreaks | null = null;
+    // M3 (fase 6a): a onda máxima desta configuração antes da partida (o recorde é por mapa, regras e jogadores).
+    const zombieKey = zombiesMode ? zombieRecordKey(recipe, humans) : '';
+    const previousWave = zombiesMode ? zombieRecord(host.stats.current, zombieKey) : 0;
     if (record && human >= 0 && !benchState) {
       const locals: number[] = [];
       for (let p = 0; p < humans; p++) locals.push(entityIndex(sim.controllerEntity(p)));
-      breaks = host.stats.record(localMatchRecord(matchStats, v, locals, ffa, Math.round(timeS)));
+      const zombies = zombiesMode ? { key: zombieKey, wave: v.match.zombieWave } : undefined;
+      breaks = host.stats.record(localMatchRecord(matchStats, v, locals, ffa, Math.round(timeS), zombies));
+    }
+    if (zombiesMode) {
+      showZombiesResult(sum.outcome === 'win', previousWave, breaks !== null, breaks?.zombieWave === true);
+      host.log(`[partida] fim do Bobo Zombies: ${sum.outcome} onda=${v.match.zombieWave} recorde=${previousWave}`);
+      return;
     }
     const recordKind =
       breaks === null
@@ -2580,6 +2601,57 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     resultMenu.setRoot(resultScreen.build(data));
     resultShown = true;
     host.log(`[partida] fim: ${sum.outcome} ${sum.ownScore}×${sum.otherScore} abates=${sum.kills}`);
+  }
+
+  /** M3 (fase 6a): o resultado do Bobo Zombies (a tabela do time e o recorde de onda). */
+  let zombiesData: ZombiesResultData | null = null;
+  function showZombiesResult(win: boolean, previousWave: number, recorded: boolean, newRecord: boolean): void {
+    const v = sim.view();
+    const wave = v.match.zombieWave;
+    const z = recipe.zombies ?? {};
+    const D = ZOMBIES_DEFAULTS;
+    const customRules =
+      (z.quantity ?? D.quantity) !== D.quantity ||
+      (z.hpMul ?? D.hpMul) !== D.hpMul ||
+      (z.speed ?? D.speed) !== D.speed ||
+      (z.specials ?? D.specials) !== D.specials ||
+      (z.bosses ?? D.bosses) !== D.bosses ||
+      (z.economy ?? D.economy) !== D.economy ||
+      (z.selfRevives ?? D.selfRevives) !== D.selfRevives;
+    const config = [
+      t(`map.${recipe.map}` as StringKey),
+      zombieWaves(recipe),
+      humans === 1 ? t('result.zombies.onePlayer') : t('result.zombies.players', { n: humans }),
+      ...(customRules ? [t('result.zombies.customRules')] : []),
+    ].join(' · ');
+    const best = recorded ? Math.max(previousWave, wave) : previousWave;
+    const recordLine = newRecord
+      ? t('result.zombies.newRecord', { wave: previousWave })
+      : best === 0 || (recorded && previousWave === 0)
+        ? t('result.zombies.firstRecord')
+        : t('result.zombies.record', { wave: best });
+    const data: ZombiesResultData = {
+      title: win ? t('result.zombiesWin', { waves: wave }) : t('result.zombiesLoss', { wave }),
+      titleColor: win ? COLORS.acao : COLORS.perigo,
+      config,
+      record: recordLine,
+      newRecord,
+      rows: zombiesRows(matchStats, v).map((r) => {
+        const c = v.controller[r.entity]!;
+        return {
+          name: nameOf(v, r.entity),
+          color: c < humans ? (PLAYER_COLORS[c] ?? COLORS.texto) : COLORS.texto,
+          points: r.points,
+          kills: r.kills,
+          headKills: r.headKills,
+          downs: r.downs,
+          revives: r.revives,
+        };
+      }),
+    };
+    zombiesData = data;
+    resultMenu.setRoot(zombiesResultScreen.build(data));
+    resultShown = true;
   }
 
   function resume(): void {
@@ -4080,6 +4152,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             signal = 'save';
             resultData = { ...resultData, presetSaved: true };
             resultMenu.setRoot(resultScreen.build(resultData));
+          } else if (a === RESULT_ACTION.savePreset && zombiesData !== null && !zombiesData.presetSaved) {
+            // M3 (fase 6a): o mesmo no resultado do Bobo Zombies.
+            signal = 'save';
+            zombiesData = { ...zombiesData, presetSaved: true };
+            resultMenu.setRoot(zombiesResultScreen.build(zombiesData));
           }
         } else if (!paused) {
           const yaw0 = player.yaw;

@@ -313,7 +313,16 @@ describe('Bobo Zombies (M3, fase 2a)', () => {
     const input = {
       ...base(),
       mode: 'zombies',
-      zombies: { waves: 5, quantity: 10, hpMul: 0.1, specials: false, economy: 2, selfRevives: 2.4, extra: 1 },
+      zombies: {
+        waves: 5,
+        quantity: 10,
+        hpMul: 0.1,
+        speed: 1.25,
+        specials: false,
+        economy: 2,
+        selfRevives: 2.4,
+        extra: 1,
+      },
     };
     const { value, codes } = ok(validateMatchRecipe(input, PC));
     expect(value.mode).toBe('zombies');
@@ -321,6 +330,7 @@ describe('Bobo Zombies (M3, fase 2a)', () => {
       waves: 5,
       quantity: 3,
       hpMul: 0.25,
+      speed: 1.25,
       specials: false,
       economy: 2,
       selfRevives: 2,

@@ -735,7 +735,11 @@ describe('startGame (NullRenderer)', () => {
       uiAtlas: null,
       log: () => {},
       settings: { current: DEFAULT_SETTINGS, save: () => {} },
-      stats: { current: EMPTY_STATS, record: () => ({ mostKills: false, bestStreak: false }), tipSeen: () => {} },
+      stats: {
+        current: EMPTY_STATS,
+        record: () => ({ mostKills: false, bestStreak: false, zombieWave: false }),
+        tipSeen: () => {},
+      },
       bobo: { current: DEFAULT_BOBO, save: () => {} },
       audio: { mixer: createMixer(null), files: Promise.resolve() },
       benchReport: () => {},
