@@ -1209,10 +1209,29 @@ export interface HudSharedModel {
    * normal). O `game` só refaz a string quando os números mudam.
    */
   trainingLine: string;
+  /** M3 (fase 7a): o minimapa ocupa o quadrante livre (o placar sobe para o alto, no tamanho normal). */
+  spareMap: boolean;
 }
 
 export function createHudSharedModel(): HudSharedModel {
-  return { timeLeftS: -1, teamCount: 0, teamScores: [0, 0, 0, 0], suddenDeath: false, trainingLine: '' };
+  return {
+    timeLeftS: -1,
+    teamCount: 0,
+    teamScores: [0, 0, 0, 0],
+    suddenDeath: false,
+    trainingLine: '',
+    spareMap: false,
+  };
+}
+
+/**
+ * M3 (fase 7a): a faixa do alto do quadrante livre que o placar ocupa quando o minimapa está lá (px; 0 = sem placar):
+ * o minimapa desenha embaixo dela.
+ */
+export function hudSpareTopBand(area: HudSharedArea, model: Readonly<HudSharedModel>): number {
+  if (model.timeLeftS < 0 && model.teamCount <= 0) return 0;
+  const s = area.scale > 0 ? area.scale : 1;
+  return hudSharedPlateHeight(s, area.minTextPx) + Math.max(3, Math.round(HUD_METRICS.gap * s)) * 2;
 }
 
 export type HudSharedMode = 'top' | 'center' | 'spare';
@@ -1357,6 +1376,19 @@ export function drawHudShared(
       COLORS.bunker,
     );
     if (!hasContent) return;
+    if (model.spareMap) {
+      // M3 (fase 7a): com o minimapa embaixo, o placar no alto do quadrante, no tamanho normal.
+      const numberPx = hudNumberPx(s, area.minTextPx);
+      const capN = capHeightPx(font, numberPx);
+      const icon = Math.round(capN * 0.8);
+      const w = sharedContentWidth(font, model, numberPx, icon, gap, tx) + pad * 2;
+      const h = hudSharedPlateHeight(s, area.minTextPx);
+      const x = Math.round(area.x + (area.width - w) / 2);
+      const y = Math.round(area.y + gap);
+      plate(out, x, y, w, h, s);
+      paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
+      return;
+    }
     // Quadrante livre: o mesmo placar, em dobro, centrado.
     const numberPx = hudNumberPx(s, area.minTextPx) * 2;
     const icon = Math.round(capHeightPx(font, numberPx) * 0.8);

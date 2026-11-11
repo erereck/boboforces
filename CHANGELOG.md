@@ -72,6 +72,8 @@ Plano em `docs/PLANO_M3.md`.
   conforme os zumbis chegam perto (e enche com o chefão). No resultado volta a música do menu.
 - **Fase 6f, rodada 15 dos prints:** o resultado, a Partida personalizada e os presets do Bobo Zombies, com os sons e a
   música para ouvir, e as perguntas L1–L6. Fecha a fase 6.
+- **Fase 7a, minimapa:** na tela dividida de 3, o quadrante livre mostra o mapa visto de cima, com as portas
+  fechadas, a caixa, os zumbis, os aliados e cada jogador na sua cor; o placar sobe para o alto do quadrante.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

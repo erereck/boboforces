@@ -2643,3 +2643,21 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Medido:** `npm run check` verde (1.711 testes); menu em 347,7 de 350 KB (era 344,3 no começo da fase 5; os textos
   do Zombies, o banco de sons e a camada do mixer); MP3 do jogo 142 KB; a música do Zombies 2 × 115 KB, sob demanda.
   NRO de 60,2 MB (zip de 24,0 MB) abriu no Eden até o menu em 2.007 ms.
+
+### 13.32 Fase 7a: o minimapa do quadrante livre (11/11/2026)
+
+- **Onde:** na tela dividida de 3, o 4º quadrante (antes só o placar em dobro, e vazio no Zombies) mostra o minimapa;
+  o placar e o relógio, quando há, sobem para o alto do quadrante no tamanho normal (`HudSharedModel.spareMap`,
+  `hudSpareTopBand`).
+- **Como** (`scene/minimap.ts`, só retângulos da UI: nenhum caminho novo no render nem programa de shader): a
+  planta sai da grade na 1ª vez que o quadrante aparece: o chão do mapa é a altura mais comum do topo das colunas
+  (amostra 1 a cada 4×4), parede é bloco que tapa a vista entre 1 e 1,5 m acima dele, e as paredes se juntam em
+  retângulos pelo guloso do mesher (corrida na linha, crescendo para baixo); as props de colisão do mapa com 0,9 m ou
+  mais entram por cima (janelas e portas, sem dono, ficam de fora). Teto de 420 retângulos. Base: 40 paredes e 10
+  props em 8,4 ms; Construto: 114 e 20 em 15,1 ms (no Edge, uma vez).
+- **A cada quadro:** o chão da área de jogo, a planta, as portas pagas fechadas (âmbar), a posição ativa da caixa
+  (branco), os zumbis (verde, só no Zombies), os aliados do time dos locais (no FFA e no versus do sofá, ninguém) e
+  os jogadores locais na cor de cada um, com contorno e um risquinho para onde olham. Norte para cima, fixo. Sem
+  alocar.
+- **Conferido no Edge** (`local/m3/capturar-minimapa.ts`, teclado e 2 controles falsos pela tela do sofá): o Sofá
+  Zombies na Base e os Times no Construto.

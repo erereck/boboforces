@@ -159,6 +159,8 @@ import {
   drawFontSpecimen,
   drawHud,
   drawHudShared,
+  hudSpareTopBand,
+  type HudSharedArea,
   hitPrimaryOption,
   PRIMARY_LAYOUT,
   drawText,
@@ -279,6 +281,7 @@ import {
 import { createSamples } from './stats.ts';
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
+import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
@@ -954,6 +957,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
   const zombieMusic = zombiesMode ? createZombieMusic(host.audio.mixer, host.platform.assets, host.log) : null;
   const musicLocals: number[] = [];
+  // M3 (fase 7a): o minimapa do quadrante livre (3 jogadores): a planta sai na 1ª vez que o quadrante aparece.
+  let minimapPlan: MinimapPlan | null = null;
+  const minimapLocals: number[] = [];
+  const minimapColors: number[] = [];
   const zombieLineKey = new Int32Array(6).fill(-2);
   /** M3 (fase 4d): o anúncio do último drop pego (tipo e até quando, em s de relógio da cena). */
   let dropAnnounce = 0;
@@ -2607,6 +2614,43 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     resultMenu.setRoot(resultScreen.build(data));
     resultShown = true;
     host.log(`[partida] fim: ${sum.outcome} ${sum.ownScore}×${sum.otherScore} abates=${sum.kills}`);
+  }
+
+  /** M3 (fase 7a): o minimapa no quadrante livre, embaixo do placar (se houver). */
+  function drawSpareMinimap(list: DrawList, area: HudSharedArea): void {
+    const v = sim.view();
+    if (minimapPlan === null) {
+      const t0 = now();
+      minimapPlan = buildMinimapPlan(v.world, v.blocks, v.playArea, v.colliders);
+      host.log(
+        `[partida] minimapa: ${minimapPlan.walls} paredes e ${minimapPlan.count - minimapPlan.walls} props em ${(now() - t0).toFixed(1)} ms`,
+      );
+    }
+    minimapLocals.length = 0;
+    minimapColors.length = 0;
+    let team = -2;
+    for (let s = 0; s < slots.length; s++) {
+      const c = slots[s]!.controller;
+      const i = entityIndex(sim.controllerEntity(c));
+      minimapLocals.push(i);
+      minimapColors.push(PLAYER_COLORS[Math.max(0, seatOf(c))] ?? COLORS.texto);
+      const t = i < v.count ? v.team[i]! : -1;
+      team = team === -2 || team === t ? t : -1;
+    }
+    const top = hudSpareTopBand(area, sharedHud);
+    const hs = Math.min(area.width / 320, area.height / 180);
+    drawMinimap(list, minimapPlan, v, {
+      x: area.x,
+      y: area.y + top,
+      width: area.width,
+      height: area.height - top,
+      scale: Math.max(0.75, hs),
+      locals: minimapLocals,
+      localColors: minimapColors,
+      // Aliados: o time dos locais (no versus do sofá, ninguém; no FFA também não).
+      allyTeam: ffa ? -1 : team,
+      zombies: zombiesMode,
+    });
   }
 
   /** M3 (fase 6a): o resultado do Bobo Zombies (a tabela do time e o recorde de onda). */
@@ -4327,9 +4371,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
           sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
+          sharedHud.spareMap = viewCount === 3 && sharedArea.mode === 'spare';
           if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training || zombiesMode) {
             drawHudShared(list, fonts, sharedHud, sharedArea);
           }
+          if (sharedHud.spareMap) drawSpareMinimap(list, sharedArea);
           const hs = Math.min(ui.width / 640, ui.height / 360);
           const minText = ui.options.minTextPx ?? 0;
           const v0 = lay.views[0]!;

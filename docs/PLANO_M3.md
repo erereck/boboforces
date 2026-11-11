@@ -158,6 +158,19 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   as K, J e I ainda abertas, com os sons e a música para ouvir; montada por `local/m2/montar-pagina-r15.mjs`). Fecha a
   fase 6.
 
+## Fase 7 em detalhe: fechamento
+
+- **7a. Minimapa** (feita em 11/11/2026, ARCHITECTURE §13.32; K7): no quadrante livre da tela dividida de 3, a planta
+  do mapa vista de cima com as portas fechadas, a caixa, os zumbis, os aliados e os jogadores locais; o placar sobe
+  para o alto do quadrante.
+- **7b. Bench com 4 vistas:** o bench passa a conhecer o Bobo Zombies na Base (zumbis no teto do `pcSplit`) e mede
+  as 4 vistas no PC; o resultado vai para o PERF.
+- **7c. 10 ondas do começo ao fim:** o robô das ondas leva partidas até a vitória na 10ª (com 1 e com 4 bots, em
+  regras que deixam chegar), conferindo especiais, os dois chefões e que nada trava.
+- **7d. Portão e roteiro:** `npm run check`, builds, `portcheck --strict`, `smoke:web`, golden, balance e
+  size-check; `docs/ROTEIRO_M3.md` com o teste de 4 controles na web e o checkpoint do Switch.
+- **7e. Prints da rodada 16 e o NRO do M3.** Publicar só com o OK do Erick.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |
