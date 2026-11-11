@@ -404,7 +404,7 @@ describe('mapc: validações com o mundo', () => {
       );
       expect([r.checks.lowCover, r.checks.highCover]).toEqual([0, 0]);
     }
-  });
+  }, 30_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M3, fase 6e).
 
   it('braço armado e corpo no deslize através de barreira: medida com sonda fixa (J-M4, risco 14 do PLANO)', () => {
     // Sondas sintéticas (a conta não depende da tabela da frente "figura"): a mão com o mesmo alcance em todas as

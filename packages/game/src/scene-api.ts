@@ -173,6 +173,8 @@ export interface Scene extends Disposable {
   readonly wantsPointerLock: boolean;
   /** M2 (fase 7d): a cena quer a música do menu agora (o resultado; GDD §5.10). Fora disso, só com o Ajuste. */
   readonly wantsMusic?: boolean;
+  /** M3 (fase 6e): a cena toca a própria música agora (o Bobo Zombies); o núcleo não mexe nela. */
+  readonly ownsMusic?: boolean;
   /** Partida em andamento (testes, F2, `window.__bfDebug.simTick`); `null` durante o loading. */
   readonly driver: LocalDriver | null;
   /** Gancho dos prints (`GameHandle.debug`): não nulo quando o Construto carregou. */

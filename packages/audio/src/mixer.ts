@@ -110,6 +110,13 @@ export interface Mixer extends Disposable {
   readonly music: string | null;
   /** Abaixa a música `db` dB (negativo) em 50 ms e volta em `releaseS` (arte-ux §10.4: −6 dB nas explosões). */
   duckMusic(db: number, releaseS: number): void;
+  /**
+   * M3 (fase 6e): a 2ª camada da música (o Zombies em 2 camadas): `name` em loop junto com a faixa tocando, no mesmo
+   * ponto do loop dela (as duas têm o mesmo tamanho), com ganho `gain` em rampa de `fadeS`. Muda só o ganho se já
+   * estiver tocando. `null` solta a camada. Sem música, ou som desconhecido: `false`. Trocar ou parar a música
+   * solta a camada.
+   */
+  setMusicLayer(name: string | null, gain?: number, fadeS?: number): boolean;
 }
 
 interface Voice {
@@ -170,6 +177,7 @@ function createSilentMixer(): Mixer {
     stopMusic: () => {},
     music: null,
     duckMusic: () => {},
+    setMusicLayer: () => false,
     dispose: () => {},
   };
 }
@@ -223,6 +231,18 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
   let musicActive = -1;
   /** Quando a voz que saiu termina o fade (relógio do contexto); a liberação acontece na próxima chamada ao mixer. */
   const musicReleaseAt = [Infinity, Infinity];
+  // M3 (fase 6e): quando cada voz começou (a camada entra no mesmo ponto do loop) e a camada, com o fim do fade dela.
+  const musicStartedAt = [0, 0];
+  const layer: MusicVoice = { fade: ctx.createGain(), source: null, name: null, mono: false };
+  layer.fade.gain.value = 0;
+  layer.fade.connect(duck);
+  let layerReleaseAt = Infinity;
+  /** Solta a camada com fade (a voz sai no próximo `reclaimMusic` depois do fim). */
+  const dropLayer = (fadeS: number): void => {
+    if (!layer.source || layerReleaseAt !== Infinity) return;
+    fadeTo(layer, 0, fadeS);
+    layerReleaseAt = ctx.currentTime + fadeS + 0.05;
+  };
   const stopMusicVoice = (m: MusicVoice): void => {
     const src = m.source;
     m.source = null;
@@ -255,6 +275,10 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       if (i === musicActive || now < musicReleaseAt[i]!) continue;
       musicReleaseAt[i] = Infinity;
       stopMusicVoice(music[i]!);
+    }
+    if (now >= layerReleaseAt) {
+      layerReleaseAt = Infinity;
+      stopMusicVoice(layer);
     }
   };
 
@@ -297,7 +321,10 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     m.fade.gain.value = 0;
     fadeTo(m, 1, fadeS);
     source.start();
+    musicStartedAt[next] = ctx.currentTime;
     musicActive = next;
+    // A camada era da faixa que saiu: sai junto (quem quiser a camada na faixa nova pede de novo).
+    dropLayer(fadeS);
     if (old >= 0) {
       fadeTo(music[old]!, 0, fadeS);
       releaseAfter(old, fadeS);
@@ -514,6 +541,40 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       musicActive = -1;
       fadeTo(music[i]!, 0, fadeS);
       releaseAfter(i, fadeS);
+      dropLayer(fadeS);
+    },
+    setMusicLayer(name, gain = 1, fadeS = MUSIC_FADE_S) {
+      if (disposed) return false;
+      const now = ctx.currentTime;
+      reclaimMusic(now);
+      if (name === null) {
+        dropLayer(fadeS);
+        return true;
+      }
+      if (musicActive < 0) return false;
+      const stereo = sounds.get(name);
+      if (!stereo) {
+        stats.unknown++;
+        return false;
+      }
+      if (layer.name !== name || !layer.source || layerReleaseAt !== Infinity) {
+        stopMusicVoice(layer);
+        layerReleaseAt = Infinity;
+        const buffer = mono && stereo.numberOfChannels > 1 ? monoOf(name, stereo) : stereo;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        source.connect(layer.fade);
+        layer.source = source;
+        layer.name = name;
+        layer.fade.gain.value = 0;
+        // O mesmo ponto do loop da faixa tocando (o relógio do contexto desde que ela começou).
+        const d = buffer.duration;
+        const offset = d > 0 ? (now - musicStartedAt[musicActive]!) % d : 0;
+        source.start(0, offset > 0 ? offset : 0);
+      }
+      fadeTo(layer, Math.max(0, Math.min(1, gain)), fadeS);
+      return true;
     },
     duckMusic(db, releaseS) {
       if (disposed) return;
@@ -531,6 +592,8 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
         stopMusicVoice(music[i]!);
         music[i]!.fade.disconnect();
       }
+      stopMusicVoice(layer);
+      layer.fade.disconnect();
       musicActive = -1;
       duck.disconnect();
       for (let i = 0; i < MAX_VOICES; i++) {

@@ -3,6 +3,7 @@
 //   npm run audioconv            converte o que `assets-src/audio/sounds.json` lista
 //   npm run audioconv -- --check só confere a tabela e as licenças (sem Edge)
 //   npm run audioconv -- --musica  converte a música (`assets-src/audio/music.json`): loop estéreo + manifesto loop@1
+//   npm run audioconv -- --zumbis  grava a música do Bobo Zombies (2 camadas compostas em código, M3 fase 6e)
 //
 // Etapas: (1) decodificar o OGG no Edge instalado (playwright-core, `OfflineAudioContext`), já reamostrado para
 // 44,1 kHz e somado em mono; (2) cortar silêncio inicial, limitar a duração com fade e normalizar o pico
@@ -16,9 +17,14 @@ import { cutLoop, findOffset, LOOP_PAD_SAMPLES, loopSamples, readMusicTable, sou
 import { AUDIO_OUT_DIR, AUDIO_SOURCE_DIR, MUSIC_OUT_DIR, MUSIC_TABLE, ROOT, SOUND_TABLE } from './paths.ts';
 import { processPcm } from './process.ts';
 import { readSoundTable } from './sounds.ts';
+import { loopLength, renderCalm, renderHorde, ZOMBIE_MUSIC } from './zombie-music.ts';
 
 if (process.argv.includes('--musica')) {
   await convertMusic();
+  process.exit(0);
+}
+if (process.argv.includes('--zumbis')) {
+  await renderZombieMusic();
   process.exit(0);
 }
 
@@ -95,6 +101,45 @@ async function convertMusic(): Promise<void> {
         `  music/${t.out}.mp3  ${(length / t.sampleRate).toFixed(3)} s (${t.bars} compassos a ${t.bpm} BPM)  ` +
           `${(mp3.length / 1024).toFixed(1)} KB  atraso ${offset} amostras (correlação ${correlation.toFixed(4)})  ` +
           `← ${t.title}, ${t.author} (${src.sourceChannels} canais, ${src.sourceRate} Hz)`,
+      );
+    }
+  } finally {
+    await decoder.close();
+  }
+}
+
+/**
+ * M3 (fase 6e): as 2 camadas da música do Bobo Zombies, compostas em `zombie-music.ts`: o loop com folga circular em
+ * MP3 mono e o manifesto `loop@1` com o atraso do decodificador medido no Edge (como a música do menu).
+ */
+async function renderZombieMusic(): Promise<void> {
+  mkdirSync(MUSIC_OUT_DIR, { recursive: true });
+  const rate = ZOMBIE_MUSIC.sampleRate;
+  const length = loopLength(rate);
+  const decoder = await createDecoder();
+  try {
+    for (const [out, render] of [
+      ['zombies-calma', renderCalm],
+      ['zombies-horda', renderHorde],
+    ] as const) {
+      const loop = render(rate);
+      if (loop.length !== length) throw new Error(`${out}: loop de ${loop.length} amostras (esperava ${length})`);
+      const pad = LOOP_PAD_SAMPLES;
+      const mp3 = encodeMp3(wrapPad(loop, pad), rate, ZOMBIE_MUSIC.kbps);
+      writeFileSync(join(MUSIC_OUT_DIR, `${out}.mp3`), mp3);
+      const back = await decoder.decodeStereo(mp3, rate);
+      const { offset, correlation } = findOffset(loop, back.left, pad + 4 * 1152, Math.round(0.25 * rate));
+      if (correlation < 0.9) throw new Error(`${out}: atraso incerto (correlação ${correlation.toFixed(3)})`);
+      if (back.left.length < offset + length) throw new Error(`${out}: o MP3 decodificado é curto demais`);
+      const manifest = {
+        format: 'boboforces/loop@1',
+        loopStartS: Number((offset / rate).toFixed(6)),
+        loopS: Number((length / rate).toFixed(6)),
+      };
+      writeFileSync(join(MUSIC_OUT_DIR, `${out}.json`), JSON.stringify(manifest, null, 2) + '\n');
+      console.log(
+        `  music/${out}.mp3  ${(length / rate).toFixed(3)} s (${ZOMBIE_MUSIC.bars} compassos a ${ZOMBIE_MUSIC.bpm} BPM)  ` +
+          `${(mp3.length / 1024).toFixed(1)} KB  atraso ${offset} amostras (correlação ${correlation.toFixed(4)})`,
       );
     }
   } finally {

@@ -62,6 +62,7 @@ function fakeMixer(): Mixer & { played: Played[]; synthesized: string[]; stops: 
     stopMusic: () => {},
     music: null,
     duckMusic: () => {},
+    setMusicLayer: () => false,
     dispose: () => {},
   };
   return m;

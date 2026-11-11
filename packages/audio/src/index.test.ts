@@ -71,8 +71,36 @@ describe('música (M2, fase 7d)', () => {
     mixer.dispose();
   });
 
+  it('M3 (fase 6e): a camada entra no mesmo ponto do loop da faixa e sai quando a música troca ou para', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('calma', mp3(20));
+    await mixer.decode('horda', mp3(20));
+    expect(mixer.setMusicLayer('horda')).toBe(false);
+    (ctx as { currentTime: number }).currentTime = 1;
+    mixer.playMusic('calma');
+    (ctx as { currentTime: number }).currentTime = 3.5;
+    const before = ctx.sources.length;
+    expect(mixer.setMusicLayer('horda', 0.5)).toBe(true);
+    const layer = ctx.sources[before]!;
+    // A faixa tem 2 s (mp3(20) = 20 décimos): 2,5 s depois de começar, a camada entra em 0,5 s do loop.
+    expect([layer.loop, layer.started, layer.startOffset]).toEqual([true, true, 0.5]);
+    // Mudar só o ganho não cria fonte nova.
+    expect(mixer.setMusicLayer('horda', 1)).toBe(true);
+    expect(ctx.sources.length).toBe(before + 1);
+    expect(mixer.setMusicLayer('nada')).toBe(false);
+    // Parar a música solta a camada no fim do fade.
+    mixer.stopMusic(0.2);
+    expect(layer.stopped).toBe(false);
+    (ctx as { currentTime: number }).currentTime = 4;
+    mixer.setMusicLayer(null);
+    expect(layer.stopped).toBe(true);
+    mixer.dispose();
+  });
+
   it('sem áudio, nada toca e nada quebra', () => {
     const mixer = createMixer(null);
+    expect(mixer.setMusicLayer('horda')).toBe(false);
     expect(mixer.playMusic('menu')).toBe(false);
     mixer.stopMusic();
     mixer.duckMusic(-6, 1);
@@ -150,7 +178,8 @@ describe('mixer', () => {
     const ctx = createFakeAudioContext();
     const mixer = createMixer(surface(ctx));
     expect(ctx.created.panner).toBe(MAX_VOICES);
-    expect(ctx.created.gain).toBe(MAX_VOICES + 4 + 3); // vozes + master + sfx + music + ui + duck e 2 fades da música
+    // vozes + master + sfx + music + ui + duck, 2 fades da música e o da camada (M3, fase 6e)
+    expect(ctx.created.gain).toBe(MAX_VOICES + 4 + 4);
     const info = await mixer.decode('t0-tiro', mp3(3));
     expect(info.durationS).toBeCloseTo(0.3, 3);
     expect(mixer.has('t0-tiro')).toBe(true);

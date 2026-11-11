@@ -278,6 +278,7 @@ import {
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
 import { createMatchSound } from './sound.ts';
+import { createZombieMusic } from './zombie-music.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
@@ -607,6 +608,8 @@ export interface ConstrutoMatch {
   readonly wantsPointerLock: boolean;
   /** M2 (fase 7d): no resultado, a música do menu volta (GDD §5.10). */
   readonly wantsMusic: boolean;
+  /** M3 (fase 6e): o Bobo Zombies toca a própria música (a do menu só volta no resultado). */
+  readonly ownsMusic: boolean;
   /** M2 (fase 2e): nível rápido dos bots adversários agora. */
   readonly level: BotLevel;
   pause(): void;
@@ -948,6 +951,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
   const zombiesMode = recipe.mode === 'zombies';
+  // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
+  const zombieMusic = zombiesMode ? createZombieMusic(host.audio.mixer, host.platform.assets, host.log) : null;
+  const musicLocals: number[] = [];
   const zombieLineKey = new Int32Array(6).fill(-2);
   /** M3 (fase 4d): o anúncio do último drop pego (tipo e até quando, em s de relógio da cena). */
   let dropAnnounce = 0;
@@ -4103,6 +4109,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     get wantsMusic(): boolean {
       return resultShown;
     },
+    get ownsMusic(): boolean {
+      return zombieMusic?.owns ?? false;
+    },
     get wantsPointerLock(): boolean {
       return (
         humans > 0 &&
@@ -4268,6 +4277,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         matchSound.setListener(s, c.x, c.y, c.z, c.yaw);
       }
       if (running) matchSound.frame(sim.view(), dt, timeS);
+      if (zombieMusic !== null) {
+        const zv = sim.view();
+        musicLocals.length = 0;
+        for (let p = 0; p < humans; p++) musicLocals.push(entityIndex(sim.controllerEntity(p)));
+        zombieMusic.frame(zv, running ? dt : 0, {
+          live: zv.match.phase !== 'ended',
+          result: resultShown,
+          musicInMatch: host.settings.current.audio.musicInMatch,
+          locals: musicLocals,
+        });
+      }
       trace('vfx e câmeras');
       const fonts = host.fonts;
       const tUi0 = now();
@@ -4390,6 +4410,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       waiters.length = 0;
       driver.dispose();
       matchSound.dispose();
+      zombieMusic?.dispose();
       actors.count = 0;
       renderer.setActors(actors);
       renderer.setProjectiles(null);

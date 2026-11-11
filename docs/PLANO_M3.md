@@ -152,7 +152,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **6d. Sons do Zombies** (feita em 11/11/2026, ARCHITECTURE §13.29): zumbis (gemido, ataque, tábua arrancada, chefão, gosma, cuspe), compras (parede, porta,
   caixa, vantagem, sem pontos), drops, ondas (começo e fim), caído e levantado. Dos 3 pacotes da Kenney já baixados
   (#63) e da síntese em código.
-- **6e. Música em camadas:** a trilha das ondas em 2 camadas (calma no intervalo, horda durante a onda), sintetizada
+- **6e. Música em camadas** (feita em 11/11/2026, ARCHITECTURE §13.30): a trilha das ondas em 2 camadas (calma no intervalo, horda durante a onda), sintetizada
   em código enquanto o Erick não escolhe uma faixa CC0 (I3: o download pede o OK com nome, origem e tamanho).
 - **6f. Medição e prints da rodada 15.** Fecha a fase 6.
 

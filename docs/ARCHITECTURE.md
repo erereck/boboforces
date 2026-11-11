@@ -2610,3 +2610,25 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   vozes (de 24), nenhum roubado, nenhum desconhecido. MP3 do jogo: 142 KB no total (o sino cortado em 1,1 s).
 - **Testes:** o banco aceita até 80 sons e 150 KB de MP3 (era 60 e 120 KB de folga); a caixa de música é o único som
   sintetizado acima de 1,6 s.
+
+### 13.30 Fase 6e: a música do Bobo Zombies em 2 camadas (11/11/2026)
+
+- **A regra** (GDD §5.10): música desligada por padrão durante a partida, mas tocando entre as ondas e no resultado;
+  o Zombies em 2 camadas pela intensidade. Então: a **calma** toca sempre no intervalo (e na contagem antes da 1ª
+  onda); durante a onda, só com "Música na partida", e aí a **horda** entra por cima pelos zumbis a até 15 m dos
+  jogadores locais (6 = cheia; piso de 30%; o chefão vivo enche); no resultado volta a música do menu.
+- **Mixer** (`setMusicLayer`, no contrato do `audio`): uma 3ª voz de música, a camada, que entra no mesmo ponto do
+  loop da faixa tocando (`(agora − início da faixa) mod duração` no `start(0, offset)`) e só muda o ganho depois.
+  Trocar ou parar a faixa solta a camada. +1 nó de ganho no grafo.
+- **A cena manda na música** (`Scene.ownsMusic`): `scene/zombie-music.ts` (chunk da cena) carrega as 2 faixas
+  sob demanda no começo da partida e decide o que toca; o `updateMusic` do núcleo sai cedo enquanto a cena mandar.
+- **A trilha provisória** (#38) é minha, composta em código (`tools/audioconv/src/zombie-music.ts`): ré menor,
+  100 BPM, 8 compassos (19,2 s). Calma: bordão grave, caixinha de música assombrada, baixo pinçado e um "coração" no
+  1 e no 3. Horda: marcha de brinquedo (caixa clara no 2 e no 4, notas fantasma, rufo nos compassos 4 e 8, surdo no
+  1) e um ostinato de baixo em colcheias. Gravada por `npm run audioconv -- --zumbis`: mono, 22,05 kHz, 48 kbps,
+  115 KB por camada, com a folga circular e o atraso do MP3 medido no Edge (correlação 0,9994 e 1,0000), como a do
+  menu. As notas que passam do fim do loop voltam somadas no começo, e o bordão fecha um número inteiro de ciclos:
+  a emenda não estala. Fica até o Erick escolher uma CC0 (I3).
+- **Conferido no Edge** (`local/m3/capturar-som-zombies.ts`, amostras a cada 2 s): a calma na contagem, nada
+  durante a onda com o Ajuste desligado (o padrão), a do menu no resultado. A horda com o Ajuste ligado ficou só nos
+  testes.

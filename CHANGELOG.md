@@ -67,6 +67,9 @@ Plano em `docs/PLANO_M3.md`.
   Mega Bobo, a gosma e o cuspe, tábuas arrancadas e repostas, a porta paga, a compra e o "sem pontos", a caixa de
   música da Caixa Misteriosa e o ursinho, a vantagem, os drops, o sino do começo da onda e a vinheta do fim, e o som de
   quem levantou.
+- **Fase 6e, a música do Bobo Zombies:** duas camadas provisórias compostas em código, uma marcha de brinquedo
+  assombrada. A calma toca entre as ondas. Durante a onda, com "Música na partida" ligada, a horda entra por cima
+  conforme os zumbis chegam perto (e enche com o chefão). No resultado volta a música do menu.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

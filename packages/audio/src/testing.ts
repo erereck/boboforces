@@ -18,6 +18,8 @@ export interface FakeNode extends AudioNodeLike {
 export interface FakeSource extends AudioBufferSourceNodeLike, FakeNode {
   started: boolean;
   stopped: boolean;
+  /** M3 (fase 6e): de onde (s) a fonte começou (`start(when, offset)`). */
+  startOffset: number;
   /** Dispara o `onended` como o navegador faria ao fim do som. */
   end(): void;
 }
@@ -110,8 +112,10 @@ export function createFakeAudioContext(sampleRate = 48000): FakeAudioContext {
         onended: null,
         started: false,
         stopped: false,
-        start() {
+        startOffset: 0,
+        start(_when?: number, offset?: number) {
           s.started = true;
+          s.startOffset = offset ?? 0;
         },
         stop() {
           s.stopped = true;

@@ -202,6 +202,9 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
     get wantsMusic(): boolean {
       return match?.wantsMusic ?? false;
     },
+    get ownsMusic(): boolean {
+      return match?.ownsMusic ?? false;
+    },
     get driver() {
       return match?.driver ?? null;
     },

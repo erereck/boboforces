@@ -366,6 +366,7 @@ export function startGame(deps: GameDeps): GameHandle {
   }
   /** 1x por frame: a música do menu segue a tela (menus e resultado) e o Ajuste "Música na partida". */
   function updateMusic(): void {
+    if (screen === 'scene' && scene?.ownsMusic === true) return;
     if (!mixer.has(MENU_MUSIC_ID)) return;
     const want = wantsMusic(screen === 'scene', scene?.wantsMusic ?? false, save.settings.audio.musicInMatch);
     if (want && mixer.music !== MENU_MUSIC_ID) mixer.playMusic(MENU_MUSIC_ID);

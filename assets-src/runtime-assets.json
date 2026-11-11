@@ -64,7 +64,11 @@
     "audio/drop-aparece.mp3": "audio/generated/drop-aparece.mp3",
     "audio/gosma.mp3": "audio/generated/gosma.mp3",
     "music/menu.mp3": "audio/generated/music/menu.mp3",
-    "music/menu.json": "audio/generated/music/menu.json"
+    "music/menu.json": "audio/generated/music/menu.json",
+    "music/zombies-calma.mp3": "audio/generated/music/zombies-calma.mp3",
+    "music/zombies-calma.json": "audio/generated/music/zombies-calma.json",
+    "music/zombies-horda.mp3": "audio/generated/music/zombies-horda.mp3",
+    "music/zombies-horda.json": "audio/generated/music/zombies-horda.json"
   },
   "local": {},
   "arrays": {
