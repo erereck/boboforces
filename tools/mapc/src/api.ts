@@ -2,6 +2,7 @@ import type {
   MapCamera,
   MapCameraRoute,
   MapBarricadeMarker,
+  MapBoxSpotMarker,
   MapMannequin,
   MapPaidDoorMarker,
   MapWallBuyMarker,
@@ -114,6 +115,8 @@ export interface MapBuilder {
   paidDoor(door: MapPaidDoorMarker): void;
   /** M3 (fase 4a): arma na parede do Bobo Zombies (ponto na face da parede, na altura do chão; metros). */
   wallBuy(buy: MapWallBuyMarker): void;
+  /** M3 (fase 4b): posição da Caixa Misteriosa (a 1ª chamada é onde ela começa; até 3). */
+  boxSpot(spot: MapBoxSpotMarker): void;
   playArea(minX: number, minZ: number, maxX: number, maxZ: number, killPlaneY: number): void;
   sun(dirX: number, dirY: number, dirZ: number, timeOfDay: TimeOfDay): void;
   /** RNG com semente por domínio (decoração procedural determinística). */

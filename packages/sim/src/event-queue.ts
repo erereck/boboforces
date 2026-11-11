@@ -13,6 +13,7 @@ import type {
   BarricadeEvent,
   DoorEvent,
   PurchaseEvent,
+  BoxEvent,
   DownEvent,
   MoveEvent,
   PickupEvent,
@@ -162,6 +163,10 @@ export class EventQueue {
     () => ({ type: 'door', tick: 0, index: 0, action: 'open', cost: 0, by: 0 }),
     2,
   );
+  private readonly boxes = new EventPool<Mutable<BoxEvent>>(
+    () => ({ type: 'box', tick: 0, index: 0, action: 'open', weapon: 0, by: 0 }),
+    2,
+  );
   private readonly purchases = new EventPool<Mutable<PurchaseEvent>>(
     () => ({ type: 'purchase', tick: 0, index: 0, kind: 'weapon', action: 'ok', item: 0, cost: 0, by: 0 }),
     2,
@@ -226,6 +231,7 @@ export class EventQueue {
     this.barricades.reset();
     this.doors.reset();
     this.purchases.reset();
+    this.boxes.reset();
     this.downs.reset();
     this.projectiles.reset();
     this.explosions.reset();
@@ -517,6 +523,23 @@ export class EventQueue {
     e.index = index;
     e.action = action;
     e.cost = cost;
+    e.by = by;
+    this.push(e);
+  }
+
+  /** M3 (fase 4b). */
+  box(
+    tick: number,
+    index: number,
+    action: 'open' | 'denied' | 'offer' | 'take' | 'expire' | 'move',
+    weapon: number,
+    by: EntityId,
+  ): void {
+    const e = this.boxes.acquire();
+    e.tick = tick;
+    e.index = index;
+    e.action = action;
+    e.weapon = weapon;
     e.by = by;
     this.push(e);
   }

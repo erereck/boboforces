@@ -20,6 +20,10 @@ import { ZOMBIE_BARRICADES } from './config/zombie.ts';
 export const MAX_BARRICADES = 32;
 export const MAX_DOORS = 16;
 export const MAX_WALL_BUYS = 16;
+export const MAX_BOX_SPOTS = 3;
+
+/** M3 (fase 4b): posições de `MapObjects.boxState`. */
+export const BOX = { active: 0, phase: 1, ticks: 2, weapon: 3, uses: 4, moveAt: 5 } as const;
 
 /** Lado de fora da janela (de onde os zumbis vêm): +X, -X, +Z, -Z. */
 export type BarricadeOutside = 0 | 1 | 2 | 3;
@@ -59,6 +63,17 @@ export interface WallBuyDef {
   readonly cost: number;
 }
 
+/**
+ * M3 (fase 4b): posição da Caixa Misteriosa: centro do pé da caixa (metros) e o lado da frente (`facing`: 0 +X, 1 -X,
+ * 2 +Z, 3 -Z), onde fica quem compra. A primeira é onde ela começa.
+ */
+export interface BoxSpotDef {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: BarricadeOutside;
+}
+
 const OUTSIDE_NX = [1, -1, 0, 0] as const;
 const OUTSIDE_NZ = [0, 0, 1, -1] as const;
 const DOOR_FLAGS = COLLIDER_FLAG.solid | COLLIDER_FLAG.blocksBullets | COLLIDER_FLAG.blocksSight;
@@ -86,7 +101,18 @@ export class MapObjects {
   readonly wbnz: Float32Array;
   readonly wbWeapon: Uint8Array;
   readonly wbCost: Int32Array;
+  /** M3 (fase 4b): posições da Caixa Misteriosa (estáticas). */
+  readonly boxSpots: number;
+  readonly boxX: Float32Array;
+  readonly boxY: Float32Array;
+  readonly boxZ: Float32Array;
+  readonly boxNx: Float32Array;
+  readonly boxNz: Float32Array;
   // --- Estado (snapshot e hash) ---
+  /** M3 (fase 4b): a caixa (índices em `BOX`: posição ativa, fase, ticks da fase, arma, usos, usos até o ursinho). */
+  readonly boxState: Int32Array;
+  /** Quem pagou o giro em andamento (`EntityId`). */
+  readonly boxUser: Uint32Array;
   /** Tábuas de cada janela (0..6). */
   readonly planks: Uint8Array;
   /** Ticks até o zumbi arrancar a próxima tábua (0 = ninguém arrancando). */
@@ -109,6 +135,7 @@ export class MapObjects {
     barricades: readonly BarricadeDef[],
     doors: readonly DoorDef[],
     wallBuys: readonly WallBuyDef[] = [],
+    boxSpots: readonly BoxSpotDef[] = [],
   ) {
     const nb = barricades.length;
     const nd = doors.length;
@@ -145,6 +172,27 @@ export class MapObjects {
       this.wbWeapon[i] = w.weapon;
       this.wbCost[i] = w.cost;
     });
+    const ns = boxSpots.length;
+    assert(ns <= MAX_BOX_SPOTS, `sim: até ${MAX_BOX_SPOTS} posições da caixa`);
+    this.boxSpots = ns;
+    this.boxX = new Float32Array(ns);
+    this.boxY = new Float32Array(ns);
+    this.boxZ = new Float32Array(ns);
+    this.boxNx = new Float32Array(ns);
+    this.boxNz = new Float32Array(ns);
+    boxSpots.forEach((b, i) => {
+      assert(
+        Number.isFinite(b.x) && Number.isFinite(b.y) && Number.isFinite(b.z),
+        `sim: posição da caixa ${i} inválida`,
+      );
+      this.boxX[i] = b.x;
+      this.boxY[i] = b.y;
+      this.boxZ[i] = b.z;
+      this.boxNx[i] = OUTSIDE_NX[b.facing];
+      this.boxNz[i] = OUTSIDE_NZ[b.facing];
+    });
+    this.boxState = new Int32Array(6);
+    this.boxUser = new Uint32Array(1);
     this.planks = new Uint8Array(nb);
     this.tearTicks = new Int32Array(nb);
     this.repairTicks = new Int32Array(nb);
@@ -210,6 +258,9 @@ export class MapObjects {
     this.repairTicks.fill(0);
     this.repairer.fill(0);
     this.doorOpen.fill(0);
+    // A caixa começa na 1ª posição, parada; os usos até o ursinho são sorteados no 1º giro.
+    this.boxState.fill(0);
+    this.boxUser[0] = 0;
     this.sync();
   }
 

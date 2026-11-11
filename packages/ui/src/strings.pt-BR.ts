@@ -404,6 +404,9 @@ export const STRINGS_PT_BR = {
   // M3 (fase 4a): arma na parede.
   'hud.buy': 'Interagir: {weapon} por {cost}',
   'hud.buyAmmo': 'Interagir: munição por {cost}',
+  // M3 (fase 4b): a Caixa Misteriosa.
+  'hud.box': 'Interagir: Caixa Misteriosa por {cost}',
+  'hud.boxTake': 'Interagir: pegar {weapon}',
   'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
   'hud.zombies.rest': 'Onda {wave} em {s} s',
   'hud.zombies.last': 'Onda {wave} · o último!',

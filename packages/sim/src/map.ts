@@ -11,7 +11,7 @@ export interface SimMapSource {
   readonly grid: WorldGrid;
   readonly blocks: BlockRegistry;
   /** Marcadores do `.bfmap` (`MapDocument.markers`): spawns, área jogável e (M3) janelas e portas do Zombies. */
-  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys'>;
+  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys' | 'boxSpots'>;
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
 }
@@ -71,6 +71,10 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
             return { x: w.x, y: w.y, z: w.z, facing: w.facing, weapon, cost: w.cost };
           }),
         }
+      : {}),
+    // M3 (fase 4b): posições da Caixa Misteriosa.
+    ...(source.markers.boxSpots?.length
+      ? { boxSpots: source.markers.boxSpots.map((b) => ({ x: b.x, y: b.y, z: b.z, facing: b.facing })) }
       : {}),
   };
 }

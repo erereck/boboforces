@@ -4,9 +4,10 @@ import { yawToU16 } from '@boboforces/shared';
 import { BLOCK_FLAG, createBlockRegistry, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { WEAPON_CODE, weaponDef } from './config/weapons.ts';
-import { ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
+import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
 import { SIM_HZ } from './constants.ts';
-import type { PurchaseEvent, SimEvent } from './events.ts';
+import type { BoxEvent, PurchaseEvent, SimEvent } from './events.ts';
+import { BOX } from './map-objects.ts';
 import { createInputFrames } from './loop.ts';
 import { simMapFromMarkers } from './map.ts';
 import { createSim, type Sim, type SimMap } from './sim.ts';
@@ -36,6 +37,10 @@ function shopMap(): SimMap {
       ],
       playArea: { minX: 0, minZ: 0, maxX: 20, maxZ: 30, killPlaneY: -10 },
       wallBuys: [{ x: 10, y: FLOOR, z: 15, facing: 3, weapon: 'smg', cost: 1000 }],
+      boxSpots: [
+        { x: 4, y: FLOOR, z: 14.5, facing: 3 },
+        { x: 16, y: FLOOR, z: 14.5, facing: 3 },
+      ],
     },
   });
 }
@@ -113,5 +118,92 @@ describe('Bobo Zombies: armas na parede (M3, fase 4a)', () => {
     f[0]!.moveY = 0;
     expect(sim.view().position[(sim.controllerEntity(0) & 0xffff) * 3 + 2]).toBeLessThan(13);
     expect(press(sim, f, events)).toBeUndefined();
+  });
+});
+
+describe('Bobo Zombies: Caixa Misteriosa (M3, fase 4b)', () => {
+  /** O humano vai para a frente da caixa ativa (de lado, na mão: teste) e devolve os eventos da caixa. */
+  function atBox(sim: Sim, spot: number): void {
+    const v = sim.view();
+    const h = sim.controllerEntity(0) & 0xffff;
+    const mo = v.mapObjects!;
+    (v.position as Float64Array)[h * 3] = mo.boxX[spot]!;
+    (v.position as Float64Array)[h * 3 + 2] = mo.boxZ[spot]! - 1;
+  }
+  // Cópias: os eventos vêm de um pool que o próximo tick reaproveita.
+  const boxEvents = (out: SimEvent[]): BoxEvent[] =>
+    out.filter((e): e is BoxEvent => e.type === 'box').map((e) => ({ ...e }));
+
+  it('paga 950, gira 4 s, oferece uma primária que ele não tem; só ele pega, e ela vai para a mão', () => {
+    const sim = createSim({ recipe, map: shopMap(), humans: 1, zombies: 1 });
+    const v = sim.view();
+    const h = sim.controllerEntity(0) & 0xffff;
+    const st = v.mapObjects!.boxState;
+    const f = createInputFrames();
+    const events: SimEvent[] = [];
+    atBox(sim, 0);
+    // 500 de 950: negado.
+    press(sim, f, events);
+    expect(boxEvents(events)[0]?.action).toBe('denied');
+    (v.points as Int32Array)[h] = 2000;
+    press(sim, f, events);
+    expect(boxEvents(events)[0]?.action).toBe('open');
+    expect(v.points[h]).toBe(2000 - ZOMBIE_BOX.cost);
+    expect(st[BOX.phase]).toBe(BOX_PHASE.rolling);
+    const offers: BoxEvent[] = [];
+    for (let t = 0; t < ZOMBIE_BOX.rollS * SIM_HZ; t++) {
+      events.length = 0;
+      sim.step(f);
+      sim.drainEvents(events);
+      offers.push(...boxEvents(events));
+    }
+    expect(offers.map((e) => e.action)).toEqual(['offer']);
+    const offered = offers[0]!.weapon;
+    expect(weaponDef(offered)!.slot).toBe(0);
+    expect(st[BOX.phase]).toBe(BOX_PHASE.offering);
+    press(sim, f, events);
+    expect(boxEvents(events)[0]?.action).toBe('take');
+    expect(v.weapon[h]).toBe(offered);
+    expect(v.loadout[h * WEAPON_SLOT_COUNT]).toBe(offered);
+    expect(st[BOX.phase]).toBe(BOX_PHASE.idle);
+  });
+
+  it('ninguém pega em 10 s: fecha; no ursinho, devolve os pontos e muda de posição', () => {
+    const sim = createSim({ recipe, map: shopMap(), humans: 1, zombies: 1 });
+    const v = sim.view();
+    const h = sim.controllerEntity(0) & 0xffff;
+    const st = v.mapObjects!.boxState as Int32Array;
+    const f = createInputFrames();
+    const events: SimEvent[] = [];
+    (v.points as Int32Array)[h] = 5000;
+    atBox(sim, 0);
+    press(sim, f, events);
+    const all: BoxEvent[] = [];
+    for (let t = 0; t < (ZOMBIE_BOX.rollS + ZOMBIE_BOX.offerS) * SIM_HZ + 2; t++) {
+      events.length = 0;
+      sim.step(f);
+      sim.drainEvents(events);
+      all.push(...boxEvents(events));
+    }
+    expect(all.map((e) => e.action)).toEqual(['offer', 'expire']);
+    // Ursinho (teste: os usos já chegaram na conta).
+    st[BOX.moveAt] = 1;
+    const before = v.points[h]!;
+    press(sim, f, events);
+    expect(v.points[h]).toBe(before - ZOMBIE_BOX.cost);
+    const moved: BoxEvent[] = [];
+    for (let t = 0; t < ZOMBIE_BOX.rollS * SIM_HZ; t++) {
+      events.length = 0;
+      sim.step(f);
+      sim.drainEvents(events);
+      moved.push(...boxEvents(events));
+    }
+    expect(moved.map((e) => e.action)).toEqual(['move']);
+    expect(moved[0]!.index).toBe(1);
+    expect(st[BOX.active]).toBe(1);
+    expect(v.points[h]).toBe(before);
+    // Na posição velha não abre mais.
+    press(sim, f, events);
+    expect(boxEvents(events)).toEqual([]);
   });
 });

@@ -236,3 +236,21 @@ export const ZOMBIE_SHOP = {
   wallSideM: 0.9,
   ammoCostFrac: 0.5,
 } as const;
+
+/**
+ * M3 (fase 4b): a Caixa Misteriosa (GDD §4.1.5): 950 pontos; gira `rollS` e oferece uma primária sorteada por
+ * `offerS` (só quem pagou pega, com o usar); depois de `moveAfterMin`..`moveAfterMax` usos sorteados, sai o ursinho:
+ * devolve os pontos e a caixa muda para outra posição. Tempos, alcance e a contagem do ursinho são escolhas minhas.
+ */
+export const ZOMBIE_BOX = {
+  cost: 950,
+  rollS: 4,
+  offerS: 10,
+  reachM: 1.6,
+  sideM: 1.1,
+  moveAfterMin: 4,
+  moveAfterMax: 8,
+} as const;
+
+/** M3 (fase 4b): fases da caixa (`MapObjects.boxState[BOX.phase]`). */
+export const BOX_PHASE = { idle: 0, rolling: 1, offering: 2 } as const;

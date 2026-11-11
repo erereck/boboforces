@@ -59,6 +59,7 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   const mo = ctx.mapObjects;
   if (mo !== null) {
     h.bytes(mo.planks).bytes(mo.tearTicks).bytes(mo.repairTicks).bytes(mo.repairer).bytes(mo.doorOpen);
+    if (mo.boxSpots > 0) h.bytes(mo.boxState).bytes(mo.boxUser);
   }
   return h.digest();
 }
@@ -132,6 +133,10 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
     writeArray(w, mo.repairTicks, mo.barricades);
     writeArray(w, mo.repairer, mo.barricades);
     writeArray(w, mo.doorOpen, mo.doors);
+    if (mo.boxSpots > 0) {
+      writeArray(w, mo.boxState, mo.boxState.length);
+      writeArray(w, mo.boxUser, 1);
+    }
   }
 }
 
@@ -196,5 +201,9 @@ export function readState(ctx: SimContext, r: BitReader): void {
     readArray(r, mo.repairTicks, mo.barricades);
     readArray(r, mo.repairer, mo.barricades);
     readArray(r, mo.doorOpen, mo.doors);
+    if (mo.boxSpots > 0) {
+      readArray(r, mo.boxState, mo.boxState.length);
+      readArray(r, mo.boxUser, 1);
+    }
   }
 }

@@ -220,4 +220,16 @@ export interface MapObjectsView {
   readonly wbnz: Float32Array;
   readonly wbWeapon: Uint8Array;
   readonly wbCost: Int32Array;
+  /**
+   * M3 (fase 4b): a Caixa Misteriosa: as posições (pé da caixa e a frente) e o estado (`boxState` nos índices de
+   * `BOX`: posição ativa, fase `BOX_PHASE`, ticks da fase, arma oferecida, usos, usos até o ursinho) e quem pagou.
+   */
+  readonly boxSpots: number;
+  readonly boxX: Float32Array;
+  readonly boxY: Float32Array;
+  readonly boxZ: Float32Array;
+  readonly boxNx: Float32Array;
+  readonly boxNz: Float32Array;
+  readonly boxState: Int32Array;
+  readonly boxUser: Uint32Array;
 }

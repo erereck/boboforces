@@ -15,6 +15,7 @@ import {
   type MapLight,
   type MapLightEmitter,
   type MapBarricadeMarker,
+  type MapBoxSpotMarker,
   type MapMannequin,
   type MapPaidDoorMarker,
   type MapWallBuyMarker,
@@ -169,6 +170,9 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
             cost: w.cost,
           })),
         }
+      : {}),
+    ...(m.boxSpots && m.boxSpots.length > 0
+      ? { boxSpots: m.boxSpots.map((b) => ({ x: b.x, y: b.y, z: b.z, facing: b.facing })) }
       : {}),
     playArea: {
       minX: m.playArea.minX,
@@ -622,6 +626,16 @@ function parseMarkers(json: Json): MapMarkers {
             cost: int(q['cost'], p),
           };
         });
+  const boxSpots =
+    m['boxSpots'] === undefined
+      ? []
+      : arr(m['boxSpots'], 'boxSpots').map((v, i): MapBoxSpotMarker => {
+          const q = obj(v, `boxSpots[${i}]`);
+          const p = `boxSpots[${i}]`;
+          const facing = int(q['facing'], p);
+          if (facing !== 0 && facing !== 1 && facing !== 2 && facing !== 3) fail(`${p}.facing fora de 0..3`);
+          return { x: num(q['x'], p), y: num(q['y'], p), z: num(q['z'], p), facing };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
@@ -632,6 +646,7 @@ function parseMarkers(json: Json): MapMarkers {
     ...(barricades.length > 0 ? { barricades } : {}),
     ...(paidDoors.length > 0 ? { paidDoors } : {}),
     ...(wallBuys.length > 0 ? { wallBuys } : {}),
+    ...(boxSpots.length > 0 ? { boxSpots } : {}),
     playArea: {
       minX: num(a['minX'], 'playArea.minX'),
       minZ: num(a['minZ'], 'playArea.minZ'),

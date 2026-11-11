@@ -160,6 +160,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   // M3 (fase 3d): a tábua das janelas e a porta paga do Bobo Zombies (só acrescentados, regra 20)
   'model:zombie-plank',
   'model:zombie-door',
+  // M3 (fase 4b): a Caixa Misteriosa (só acrescentado, regra 20)
+  'model:mystery-box',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

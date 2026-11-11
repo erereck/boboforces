@@ -3,7 +3,7 @@
  * das armas (`weapons.ts`): caixas a 32 px/m, tamanhos inteiros em texels, uma camada 64×64. O render desenha no
  * conjunto instanciado do modelo (programa 4, sem programa novo). Origem no centro do fundo (os pés da caixinha na sim).
  */
-import { ModelBuilder, shaded, type BuiltModel } from '../../tools/modelgen/src/builder.ts';
+import { ModelBuilder, shaded, type BuiltModel, type Painter } from '../../tools/modelgen/src/builder.ts';
 import { tone } from '../../tools/skingen/src/palette.ts';
 
 const OLIVE = tone('metal', 3);
@@ -116,5 +116,64 @@ export function zombieDoor(): BuiltModel {
   return m.build();
 }
 
+/**
+ * M3 (fase 4b): a Caixa Misteriosa (1,0 × 0,56 × 0,56 m), origem no centro do pé, comprida em X: baú de madeira escura
+ * com cantos de aço e um "?" amarelo em cada face (a arma sorteada aparece flutuando em cima, desenhada à parte).
+ */
+export function mysteryBox(): BuiltModel {
+  const m = new ModelBuilder('mystery-box', 'pickup', { flags: 0, debrisColor: tone('madeira', 1), blocksNav: false });
+  const L = m.layer('mdl_mystery_box', 'opaque', tone('madeira', 1));
+  const question = (p: Painter, x0: number, y0: number): void => {
+    const Y = tone('amarelo', 2);
+    // "?" de 5 × 8 texels.
+    for (const [x, y] of [
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [0, 1],
+      [4, 1],
+      [4, 2],
+      [3, 3],
+      [2, 4],
+      [2, 5],
+      [2, 7],
+    ] as const) {
+      p.px(x0 + x, y0 + y, Y);
+    }
+  };
+  const side = m.tile(L, 32, 18, (p) => {
+    p.fill(tone('madeira', 1));
+    for (let x = 0; x < p.w; x += 8) for (let y = 0; y < p.h; y++) p.px(x, y, tone('madeira', 0));
+    for (let x = 0; x < p.w; x++) {
+      p.px(x, 0, tone('aco', 1));
+      p.px(x, p.h - 1, tone('aco', 1));
+    }
+    question(p, 6, 5);
+    question(p, 21, 5);
+  });
+  const end = m.tile(L, 18, 18, (p) => {
+    p.fill(tone('madeira', 1));
+    for (let y = 0; y < p.h; y++) {
+      p.px(0, y, tone('aco', 1));
+      p.px(p.w - 1, y, tone('aco', 1));
+    }
+    question(p, 7, 5);
+  });
+  const lid = m.tile(L, 32, 18, (p) => {
+    p.fill(tone('madeira', 2));
+    for (let x = 0; x < p.w; x++) p.px(x, 9, tone('aco', 1));
+    question(p, 14, 1);
+  });
+  m.part('body').tiledBox([-16, 0, -9], [16, 18, 9], {
+    front: side,
+    back: side,
+    left: end,
+    right: end,
+    top: lid,
+    bottom: lid,
+  });
+  return m.build();
+}
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
-export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [ammoBox, zombiePlank, zombieDoor];
+export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [ammoBox, zombiePlank, zombieDoor, mysteryBox];

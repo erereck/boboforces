@@ -218,10 +218,10 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
  * M3 (fase 3e): o golden do Bobo Zombies no Posto Avançado (janelas com barricada e porta paga): 4 bots Normal de
  * apoio, pool de 24, semente 42, até 2 min. Confere o hash, a onda, que os zumbis arrancaram tábuas e que os bots
  * repuseram. Gravado na fase 3e (10/11/2026): `9e25b203` (onda 3, 38 abates, 5 quedas, 51 tábuas arrancadas e 33
- * repostas).
+ * repostas). Fase 4b: `9524ad53` (o estado da Caixa Misteriosa entra no hash; a partida é a mesma).
  * MUDA com a sim, a IA, o mapa ou as regras das janelas: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_POSTO_HASH = '9e25b203';
+const GOLDEN_POSTO_HASH = '9524ad53';
 
 function runPostoGolden(): {
   hash: string;

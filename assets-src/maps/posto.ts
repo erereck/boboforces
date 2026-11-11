@@ -108,6 +108,10 @@ function objects(b: MapBuilder): void {
   b.wallBuy({ x: 16.5, y: G, z: Z1 - 0.5, facing: 3, weapon: 'shotgun', cost: 900 });
   b.wallBuy({ x: 26.5, y: G, z: Z0 + 0.5, facing: 2, weapon: 'rifle', cost: 1200 });
   b.wallBuy({ x: X1 - 0.5, y: G, z: 28.5, facing: 1, weapon: 'lmg', cost: 1500 });
+  // M3 (fase 4b): a Caixa Misteriosa começa na sala 1 (encostada no muro sul) e pode ir para 2 cantos da sala 2.
+  b.boxSpot({ x: 21.5, y: G, z: Z1 - 0.8, facing: 3 });
+  b.boxSpot({ x: 31.5, y: G, z: Z1 - 0.8, facing: 3 });
+  b.boxSpot({ x: 32, y: G, z: Z0 + 0.8, facing: 2 });
   const zc = DOOR_Z;
   b.paidDoor({
     minX: XM,

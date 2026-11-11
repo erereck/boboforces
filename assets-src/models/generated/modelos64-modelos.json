@@ -155,6 +155,12 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_mystery_box",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

@@ -126,6 +126,7 @@ const LOCKED_IDS = [
   'model:ammo-box',
   'model:zombie-plank',
   'model:zombie-door',
+  'model:mystery-box',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',

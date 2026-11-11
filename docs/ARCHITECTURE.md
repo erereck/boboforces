@@ -2430,3 +2430,19 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   na sala 2, atrás da porta.
 - **Jogo:** o modelo da arma deitado na face da parede a 1,3 m do chão (buffer instanciado); aviso
   "Interagir: Buzzer por 1.000" (ou "munição por 500"), com o preço em vermelho sem pontos. Conferido no Edge.
+
+### 13.19 Fase 4b: a Caixa Misteriosa (10/11/2026)
+
+- **Regras** (`mysteryBoxSystem` em `systems/shop.ts`, `ZOMBIE_BOX`; `SimMap.boxSpots`, até 3, a 1ª é onde ela
+  começa): parada, o bobo de pé na frente dela aperta o usar e paga 950 (sem pontos, `denied`); ela gira 4 s e
+  sorteia uma primária que ele não tem; oferece por 10 s e só quem pagou pega (vai para a primária, cheia, e para a
+  mão); ninguém pegou, fecha. Depois de 4 a 8 usos sorteados (no 1º giro de cada posição), sai o ursinho: devolve os
+  950 e a caixa vai para outra posição. O sorteio usa o RNG dos zumbis; o estado (`boxState`, `boxUser`) vai no
+  snapshot e no hash. Evento novo `box` (`open`, `denied`, `offer`, `take`, `expire`, `move`). Tempos,
+  alcance e a conta do ursinho são escolhas minhas; a arma maravilha entra no sorteio na 4e.
+- **Mapa:** marcador `boxSpots` no `map@1` (opcional) e `boxSpot()` no `mapc`. No Posto: começa na sala 1,
+  encostada no muro sul; as outras duas ficam na sala 2.
+- **Jogo:** modelo novo `mystery-box` (baú escuro com "?" amarelos); girando, as primárias passam em cima dela
+  (troca a cada 0,12 s, só desenho) e sobem; oferecendo, a sorteada flutua no alto, mais clara. Avisos
+  "Interagir: Caixa Misteriosa por 950" e, para quem pagou, "Interagir: pegar Lawnmower". Sem colisão por enquanto (a
+  caixa muda de lugar; o colisor dinâmico fica para a arte da fase 5). Golden do Posto: `9524ad53` (só o hash).

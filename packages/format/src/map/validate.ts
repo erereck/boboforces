@@ -259,6 +259,14 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     if (!isKnownContentId(`weapon:${w.weapon}`)) err(`arma na parede ${i}: arma não registrada: weapon:${w.weapon}`);
     if (!Number.isInteger(w.cost) || w.cost < 0 || w.cost > 100_000) err(`arma na parede ${i} com preço inválido`);
   });
+  // M3 (fase 4b): posições da Caixa Misteriosa (teto da sim: 3).
+  const spots = mk.boxSpots ?? [];
+  if (spots.length > 3) err(`${spots.length} posições da caixa (máximo 3)`);
+  spots.forEach((b, i) => {
+    if (!finite(b.x, b.y, b.z)) err(`posição da caixa ${i} com número não finito`);
+    else if (!inArea(b.x, b.z)) err(`posição da caixa ${i} fora da playArea`);
+    if (![0, 1, 2, 3].includes(b.facing)) err(`posição da caixa ${i} com frente fora de 0..3`);
+  });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
   }

@@ -69,7 +69,7 @@ import { pickupSystem } from './systems/pickups.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
 import type { MatchView, PickupView, ProjectileView, SimView } from './view.ts';
-import { MapObjects, type BarricadeDef, type DoorDef, type WallBuyDef } from './map-objects.ts';
+import { MapObjects, type BarricadeDef, type BoxSpotDef, type DoorDef, type WallBuyDef } from './map-objects.ts';
 
 /** Ponto de spawn declarado pelo mapa (metros, radianos). `team` = -1 para FFA/qualquer time. */
 export interface SpawnPoint {
@@ -102,6 +102,8 @@ export interface SimMap {
   readonly doors?: readonly DoorDef[];
   /** M3 (fase 4a): armas na parede do Bobo Zombies (ausente = nenhuma). */
   readonly wallBuys?: readonly WallBuyDef[];
+  /** M3 (fase 4b): posições da Caixa Misteriosa (até 3; a 1ª é onde ela começa; ausente = sem caixa). */
+  readonly boxSpots?: readonly BoxSpotDef[];
 }
 
 export interface SimConfig {
@@ -348,13 +350,18 @@ export function createSim(config: SimConfig): Sim {
   const countdownTicks = secondsToTicks(countdownS, hz);
   // M3 (fase 3d): janelas e portas montam os dois conjuntos de colisão (bobos e zumbis) e os portões da navegação.
   const mapObjects =
-    (map.barricades?.length ?? 0) + (map.doors?.length ?? 0) + (map.wallBuys?.length ?? 0) > 0
+    (map.barricades?.length ?? 0) +
+      (map.doors?.length ?? 0) +
+      (map.wallBuys?.length ?? 0) +
+      (map.boxSpots?.length ?? 0) >
+    0
       ? new MapObjects(
           map.colliders ?? null,
           map.nav ?? null,
           map.barricades ?? [],
           map.doors ?? [],
           map.wallBuys ?? [],
+          map.boxSpots ?? [],
         )
       : null;
   const match: MatchState = {

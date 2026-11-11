@@ -102,7 +102,10 @@ import {
   NO_TEAM,
   MAX_ZOMBIES,
   NULL_ENTITY,
+  BOX,
+  BOX_PHASE,
   ZOMBIE_BARRICADES,
+  ZOMBIE_BOX,
   ZOMBIE_SHOP,
   ZOMBIES_DOWN,
   heldClip,
@@ -822,6 +825,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const ammoBoxModel = modelIndex.get('ammo-box') ?? NO_MODEL;
   const plankModel = modelIndex.get('zombie-plank') ?? NO_MODEL;
   const doorModel = modelIndex.get('zombie-door') ?? NO_MODEL;
+  const boxModel = modelIndex.get('mystery-box') ?? NO_MODEL;
+  /** M3 (fase 4b): as armas que passam em cima da caixa enquanto ela gira (só o desenho; o sorteio é da sim). */
+  const boxReel = WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code);
   const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
   // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
   const modelOf = (code: number): number =>
@@ -2812,6 +2818,51 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.light[n * 3 + 2] = lightScratch[2]!;
       n++;
     }
+    // M3 (fase 4b): a Caixa Misteriosa na posição ativa e, girando ou oferecendo, a arma flutuando em cima.
+    if (boxModel !== NO_MODEL && mo.boxSpots > 0 && n + 1 < cap) {
+      const st = mo.boxState;
+      const i = st[BOX.active]!;
+      const x = mo.boxX[i]!;
+      const y = mo.boxY[i]!;
+      const z = mo.boxZ[i]!;
+      const yaw = mo.boxNx[i] !== 0 ? Math.PI / 2 : 0;
+      sampleLightGrid(loaded.lightGrid, x + mo.boxNx[i]! * 0.6, y + 0.5, z + mo.boxNz[i]! * 0.6, lightScratch, 0);
+      projectiles.model[n] = boxModel;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = yaw;
+      projectiles.pitch[n] = 0;
+      projectiles.roll[n] = 0;
+      projectiles.light[n * 3] = lightScratch[0]!;
+      projectiles.light[n * 3 + 1] = lightScratch[1]!;
+      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      n++;
+      const phase = st[BOX.phase]!;
+      if (phase !== BOX_PHASE.idle) {
+        const rollTicks = ZOMBIE_BOX.rollS * sim.hz;
+        // Girando: troca de arma a cada 0,12 s e sobe; oferecendo: a sorteada, parada no alto, girando devagar.
+        const code =
+          phase === BOX_PHASE.rolling ? boxReel[Math.floor(timeS / 0.12) % boxReel.length]! : st[BOX.weapon]!;
+        const rise = phase === BOX_PHASE.rolling ? 1 - st[BOX.ticks]! / rollTicks : 1;
+        const model = modelOf(code);
+        if (model !== NO_MODEL) {
+          projectiles.model[n] = model;
+          projectiles.position[n * 3] = x;
+          projectiles.position[n * 3 + 1] = y + 0.7 + rise * 0.35;
+          projectiles.position[n * 3 + 2] = z;
+          projectiles.yaw[n] =
+            phase === BOX_PHASE.offering ? yaw + Math.PI / 2 + Math.sin(timeS * 1.5) * 0.4 : yaw + Math.PI / 2;
+          projectiles.pitch[n] = 0;
+          projectiles.roll[n] = 0;
+          // A arma brilha um pouco (leitura de "pegue-me" no escuro).
+          projectiles.light[n * 3] = Math.min(1.5, lightScratch[0]! * 1.4 + 0.2);
+          projectiles.light[n * 3 + 1] = Math.min(1.5, lightScratch[1]! * 1.4 + 0.2);
+          projectiles.light[n * 3 + 2] = Math.min(1.5, lightScratch[2]! * 1.4 + 0.2);
+          n++;
+        }
+      }
+    }
     if (doorModel !== NO_MODEL) {
       for (let d = 0; d < mo.doors && n < cap; d++) {
         if (mo.doorOpen[d] === 1) continue;
@@ -3197,6 +3248,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.interactCost = cost;
         m.interactAfford = v.points[e]! >= cost;
         m.interactName = weaponNamesUpper[code] ?? '';
+      }
+      // M3 (fase 4b): a Caixa Misteriosa (as regras do `mysteryBoxSystem`): pagar, ou pegar a arma de quem pagou.
+      if (mo.boxSpots > 0 && m.interact === HUD_INTERACT.none) {
+        const st = mo.boxState;
+        const i = st[BOX.active]!;
+        const dx = x - mo.boxX[i]!;
+        const dz = z - mo.boxZ[i]!;
+        const dn = dx * mo.boxNx[i]! + dz * mo.boxNz[i]!;
+        const dt = Math.abs(dx * mo.boxNz[i]! - dz * mo.boxNx[i]!);
+        if (dn >= 0 && dn <= ZOMBIE_BOX.reachM && dt <= ZOMBIE_BOX.sideM && Math.abs(y - mo.boxY[i]!) <= 1) {
+          if (st[BOX.phase] === BOX_PHASE.idle) {
+            m.interact = HUD_INTERACT.box;
+            m.interactCost = ZOMBIE_BOX.cost;
+            m.interactAfford = v.points[e]! >= ZOMBIE_BOX.cost;
+          } else if (st[BOX.phase] === BOX_PHASE.offering && mo.boxUser[0] === entity) {
+            m.interact = HUD_INTERACT.boxTake;
+            m.interactName = weaponNamesUpper[st[BOX.weapon]!] ?? '';
+          }
+        }
       }
     }
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.

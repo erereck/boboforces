@@ -229,6 +229,14 @@ export interface MapWallBuyMarker {
   readonly cost: number;
 }
 
+/** M3 (fase 4b): posição da Caixa Misteriosa: centro do pé da caixa (metros) e o lado da frente (0 +X, 1 -X, 2 +Z, 3 -Z). */
+export interface MapBoxSpotMarker {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: 0 | 1 | 2 | 3;
+}
+
 export interface MapMarkers {
   readonly spawns: readonly MapSpawnMarker[];
   readonly domination: readonly MapPointMarker[];
@@ -243,6 +251,8 @@ export interface MapMarkers {
   readonly paidDoors?: readonly MapPaidDoorMarker[];
   /** M3 (fase 4a): armas na parede (opcional, como as janelas). */
   readonly wallBuys?: readonly MapWallBuyMarker[];
+  /** M3 (fase 4b): posições da Caixa Misteriosa (até 3; a 1ª é onde ela começa). */
+  readonly boxSpots?: readonly MapBoxSpotMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

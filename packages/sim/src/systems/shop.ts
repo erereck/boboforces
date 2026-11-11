@@ -1,8 +1,10 @@
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { weaponDef } from '../config/weapons.ts';
-import { ZOMBIE_SHOP } from '../config/zombie.ts';
+import { WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
+import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_SHOP } from '../config/zombie.ts';
+import { secondsToTicks } from '../constants.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
+import { BOX } from '../map-objects.ts';
 
 const F = ENTITY_FLAG;
 
@@ -77,4 +79,132 @@ function buy(ctx: SimContext, e: number, w: number): void {
   s.fireCooldownS[e] = 0;
   s.cookTicks[e] = -1;
   ctx.events.purchase(ctx.tick, w, 'weapon', 'ok', code, cost, id);
+}
+
+/** M3 (fase 4b): o que a caixa pode dar (as primárias; a arma maravilha entra na 4e). */
+const BOX_POOL: readonly number[] = WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code);
+
+/**
+ * M3 (fase 4b): a Caixa Misteriosa (`ZOMBIE_BOX`). Parada: o bobo de pé na frente dela aperta o usar (na borda) e paga
+ * (sem pontos, `denied`); gira `rollS` e sorteia uma primária que ele não tem, ou, passados os usos até o ursinho (e
+ * com mais de uma posição), o ursinho: devolve os pontos e a caixa vai para outra posição. Oferecendo: só quem pagou
+ * pega com o usar (na borda), e a arma vai para a primária, cheia; passado `offerS`, fecha (`expire`). O sorteio usa o
+ * RNG dos zumbis (no snapshot).
+ */
+export function mysteryBoxSystem(ctx: SimContext): void {
+  const mo = ctx.mapObjects;
+  if (mo === null || mo.boxSpots === 0) return;
+  const s = ctx.s;
+  const st = mo.boxState;
+  const i = st[BOX.active]!;
+  if (st[BOX.phase] === BOX_PHASE.rolling) {
+    st[BOX.ticks]!--;
+    if (st[BOX.ticks]! > 0) return;
+    const user = mo.boxUser[0]!;
+    if (st[BOX.uses]! >= st[BOX.moveAt]! && mo.boxSpots > 1) {
+      // O ursinho: devolve os pontos e muda de posição.
+      if (s.isCurrent(user)) s.points[user & 0xffff] = s.points[user & 0xffff]! + ZOMBIE_BOX.cost;
+      let next = ctx.rngZombies.int(0, mo.boxSpots - 1);
+      if (next >= i) next++;
+      st[BOX.active] = next;
+      st[BOX.phase] = BOX_PHASE.idle;
+      st[BOX.uses] = 0;
+      st[BOX.moveAt] = 0;
+      ctx.events.box(ctx.tick, next, 'move', 0, user);
+      return;
+    }
+    st[BOX.weapon] = rollWeapon(ctx, user);
+    st[BOX.phase] = BOX_PHASE.offering;
+    st[BOX.ticks] = Math.max(1, secondsToTicks(ZOMBIE_BOX.offerS, ctx.hz));
+    ctx.events.box(ctx.tick, i, 'offer', st[BOX.weapon]!, user);
+    return;
+  }
+  if (st[BOX.phase] === BOX_PHASE.offering) {
+    const user = mo.boxUser[0]!;
+    if (s.isCurrent(user)) {
+      const e = user & 0xffff;
+      if (usePressed(s, e) && atBox(mo, i, s, e)) {
+        giveWeapon(ctx, e, st[BOX.weapon]!);
+        st[BOX.phase] = BOX_PHASE.idle;
+        ctx.events.box(ctx.tick, i, 'take', st[BOX.weapon]!, user);
+        return;
+      }
+    }
+    st[BOX.ticks]!--;
+    if (st[BOX.ticks]! <= 0) {
+      st[BOX.phase] = BOX_PHASE.idle;
+      ctx.events.box(ctx.tick, i, 'expire', st[BOX.weapon]!, user);
+    }
+    return;
+  }
+  for (let e = 0; e < s.count; e++) {
+    if (!usePressed(s, e) || !atBox(mo, i, s, e)) continue;
+    const id = s.idOf(e);
+    if (s.points[e]! < ZOMBIE_BOX.cost) {
+      ctx.events.box(ctx.tick, i, 'denied', 0, id);
+      continue;
+    }
+    s.points[e] = s.points[e]! - ZOMBIE_BOX.cost;
+    if (st[BOX.moveAt] === 0) st[BOX.moveAt] = ctx.rngZombies.int(ZOMBIE_BOX.moveAfterMin, ZOMBIE_BOX.moveAfterMax + 1);
+    st[BOX.uses]!++;
+    st[BOX.phase] = BOX_PHASE.rolling;
+    st[BOX.ticks] = Math.max(1, secondsToTicks(ZOMBIE_BOX.rollS, ctx.hz));
+    mo.boxUser[0] = id;
+    ctx.events.box(ctx.tick, i, 'open', 0, id);
+    return;
+  }
+}
+
+/** Bobo de pé que apertou o usar neste tick (na borda). */
+function usePressed(s: SimContext['s'], e: number): boolean {
+  if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & (F.dead | F.downed)) !== 0) return false;
+  return (s.inButtons[e]! & BUTTON.use) !== 0 && (s.prevButtons[e]! & BUTTON.use) === 0;
+}
+
+/** O bobo `e` está na frente da caixa na posição `i`. */
+function atBox(mo: NonNullable<SimContext['mapObjects']>, i: number, s: SimContext['s'], e: number): boolean {
+  const e3 = e * 3;
+  const dx = s.position[e3]! - mo.boxX[i]!;
+  const dz = s.position[e3 + 2]! - mo.boxZ[i]!;
+  const dn = dx * mo.boxNx[i]! + dz * mo.boxNz[i]!;
+  const dt = Math.abs(dx * mo.boxNz[i]! - dz * mo.boxNx[i]!);
+  return (
+    dn >= 0 && dn <= ZOMBIE_BOX.reachM && dt <= ZOMBIE_BOX.sideM && Math.abs(s.position[e3 + 1]! - mo.boxY[i]!) <= 1
+  );
+}
+
+/** Uma primária do sorteio que `user` não tem (se tem todas, qualquer uma). */
+function rollWeapon(ctx: SimContext, user: number): number {
+  const s = ctx.s;
+  const k = (user & 0xffff) * WEAPON_SLOT_COUNT;
+  const owns = (code: number): boolean => {
+    if (!s.isCurrent(user)) return false;
+    for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) if (s.loadout[k + slot] === code) return true;
+    return false;
+  };
+  let free = 0;
+  for (const code of BOX_POOL) if (!owns(code)) free++;
+  let pick = ctx.rngZombies.int(0, free > 0 ? free : BOX_POOL.length);
+  for (const code of BOX_POOL) {
+    if (free > 0 && owns(code)) continue;
+    if (pick-- === 0) return code;
+  }
+  return BOX_POOL[0]!;
+}
+
+/** Arma nova na primária, cheia, direto para a mão (a mesma troca da parede). */
+function giveWeapon(ctx: SimContext, e: number, code: number): void {
+  const s = ctx.s;
+  const def = weaponDef(code);
+  if (def === null) return;
+  const k = e * WEAPON_SLOT_COUNT;
+  s.loadout[k] = code;
+  s.slotClip[k] = def.clipSize;
+  s.slotReserve[k] = def.reserve;
+  s.slot[e] = 0;
+  s.weapon[e] = code;
+  s.reloadTicks[e] = 0;
+  s.switchTicks[e] = 0;
+  s.fireCooldownS[e] = 0;
+  s.cookTicks[e] = -1;
 }

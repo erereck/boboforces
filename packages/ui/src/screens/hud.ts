@@ -307,7 +307,7 @@ const HUD_CHIP_MAX_FRACTION = 0.36;
 export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as const;
 
 /** M3 (fase 3d): o aviso de interagir do Bobo Zombies. */
-export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4 } as const;
+export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4, box: 5, boxTake: 6 } as const;
 
 interface HudTexts {
   readonly health: string;
@@ -340,6 +340,9 @@ interface HudTexts {
   /** M3 (fase 4a): `hud.buy` cortado em [antes, entre, depois] do nome e do preço; `hud.buyAmmo` como a porta. */
   readonly buy: readonly string[];
   readonly buyAmmo: readonly string[];
+  /** M3 (fase 4b): `hud.box` [antes, depois] do preço e `hud.boxTake` [antes, depois] do nome. */
+  readonly box: readonly string[];
+  readonly boxTake: readonly string[];
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -372,6 +375,8 @@ function hudTexts(): HudTexts {
     door: templateParts('hud.door', ['cost']).map((p) => p.toUpperCase()),
     buy: templateParts('hud.buy', ['weapon', 'cost']).map((p) => p.toUpperCase()),
     buyAmmo: templateParts('hud.buyAmmo', ['cost']).map((p) => p.toUpperCase()),
+    box: templateParts('hud.box', ['cost']).map((p) => p.toUpperCase()),
+    boxTake: templateParts('hud.boxTake', ['weapon']).map((p) => p.toUpperCase()),
   };
   return cachedTexts;
 }
@@ -874,10 +879,29 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       const w = textWidth(hud, tx.repair, labelPx, M.labelTracking);
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
       paintText(out, hud, tx.repair, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
+    } else if (model.interact === HUD_INTERACT.boxTake) {
+      // Pegar a arma da caixa: [antes, depois] do nome.
+      const a = tx.boxTake[0] as string;
+      const b = tx.boxTake[1] as string;
+      const w =
+        textWidth(hud, a, labelPx, M.labelTracking) +
+        textWidth(hud, model.interactName, labelPx, M.labelTracking) +
+        textWidth(hud, b, labelPx, M.labelTracking);
+      plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
+      let pen = cx - w / 2;
+      pen += paintText(out, hud, a, pen, y + pad, labelPx, COLORS.texto, M.labelTracking);
+      pen += paintText(out, hud, model.interactName, pen, y + pad, labelPx, COLORS.acao, M.labelTracking);
+      paintText(out, hud, b, pen, y + pad, labelPx, COLORS.texto, M.labelTracking);
     } else {
-      // Porta, munição: [antes, depois] do preço; arma: [antes, entre, depois] com o nome no meio.
+      // Porta, munição, caixa: [antes, depois] do preço; arma: [antes, entre, depois] com o nome no meio.
       const parts =
-        model.interact === HUD_INTERACT.door ? tx.door : model.interact === HUD_INTERACT.buy ? tx.buy : tx.buyAmmo;
+        model.interact === HUD_INTERACT.door
+          ? tx.door
+          : model.interact === HUD_INTERACT.buy
+            ? tx.buy
+            : model.interact === HUD_INTERACT.box
+              ? tx.box
+              : tx.buyAmmo;
       const named = model.interact === HUD_INTERACT.buy;
       const a = parts[0] as string;
       const mid = named ? model.interactName : '';

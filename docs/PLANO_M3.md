@@ -119,7 +119,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 
 - **4a. Equipamento e armas na parede** (feita em 10/11/2026, ARCHITECTURE §13.18): o humano nasce de pistola, faca e
   granadas; arma na parede (nova vai para a primária; a que já tem, munição pela metade); aviso de compra no HUD.
-- **4b. Caixa Misteriosa:** 950 pontos; gira 4 s e oferece uma arma aleatória por 10 s (inclusive a arma maravilha,
+- **4b. Caixa Misteriosa** (feita em 10/11/2026, ARCHITECTURE §13.19): 950 pontos; gira 4 s e oferece uma arma aleatória por 10 s (inclusive a arma maravilha,
   mais rara); depois de alguns usos, muda para outra das 3 posições.
 - **4c. Vantagens:** máquinas no mapa: Chonky Cola (vida 150), Speedy Soda (recarga rápida) e Buddy Brew (reviver
   rápido); perdidas ao cair; ícones no HUD.

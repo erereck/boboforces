@@ -242,6 +242,19 @@ export interface PurchaseEvent extends EventBase {
   readonly by: EntityId;
 }
 
+/**
+ * M3 (fase 4b): a Caixa Misteriosa na posição `index`: `by` pagou (`open`; sem pontos, `denied`), saiu a arma
+ * `weapon` (`offer`), `by` pegou (`take`), ninguém pegou a tempo (`expire`) ou saiu o ursinho e ela foi para a
+ * posição `index` (`move`; `by` recebeu os pontos de volta).
+ */
+export interface BoxEvent extends EventBase {
+  readonly type: 'box';
+  readonly index: number;
+  readonly action: 'open' | 'denied' | 'offer' | 'take' | 'expire' | 'move';
+  readonly weapon: number;
+  readonly by: EntityId;
+}
+
 export type SimEvent =
   | ShotEvent
   | HitEvent
@@ -260,6 +273,7 @@ export type SimEvent =
   | UnstuckEvent
   | BarricadeEvent
   | DoorEvent
-  | PurchaseEvent;
+  | PurchaseEvent
+  | BoxEvent;
 
 export type SimEventType = SimEvent['type'];
