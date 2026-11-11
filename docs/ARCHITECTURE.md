@@ -2592,3 +2592,21 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   sofá e no Surpreenda-me não (ele sorteia só o Warfare).
 - **Atalho do Zombies:** o card sem nome mostra o mapa ("Base Abandonada") e a linha "Zombies · 10 ondas" (antes saía
   "0 bots", porque o atalho contava o tamanho do time).
+
+### 13.29 Fase 6d: os sons do Bobo Zombies (11/11/2026)
+
+- **De onde vêm:** 8 arquivos dos mesmos 3 pacotes CC0 da Kenney do M2 (os zips de 09/11, com o mesmo SHA-256: nenhum
+  download novo): tábua arrancada e reposta, porta paga, tampa da caixa, sino do começo da onda, "sem pontos", drop
+  caindo e a gosma do Chonker. Mais 12 sintetizados em `audio/src/synth-game.ts`: 3 gemidos de zumbi e o rugido do
+  Mega Bobo (tabela de onda de 1024 pontos com formantes de "uuuh", tom que cai, tremor e ronco: barato no Switch),
+  o cuspe do Spitter, a compra (chiado e dois sininhos), a caixa de música do giro (4 s, freando no fim como roleta),
+  o ursinho (corneta que desce), a vantagem (três goles e um arpejo), o drop pego, o fim da onda e o "levantou".
+- **Na partida** (`scene/sound.ts`): cada evento do modo toca no lugar dele (janela, porta, caixa, quem comprou);
+  quem comprou ou levantou sendo local ouve "na cabeça"; "sem pontos" só para quem tentou; o drop pego e as ondas são
+  para todos. O Chonker estoura em gosma no lugar do estrondo. Os gemidos: cada zumbi a cada 3–8 s (sorteio por hash,
+  sem `Math.random`), só até 22 m de um ouvinte e no máximo um a cada 0,45 s na partida; o Sprinter mais agudo, o
+  Chonker mais grave; o chefão ruge ao chegar e a cada 6–11 s.
+- **Medido no Edge** (`local/m3/capturar-som-zombies.ts`, 60 s na Base): 41 MP3 prontos, 230 sons tocados, pico de 10
+  vozes (de 24), nenhum roubado, nenhum desconhecido. MP3 do jogo: 142 KB no total (o sino cortado em 1,1 s).
+- **Testes:** o banco aceita até 80 sons e 150 KB de MP3 (era 60 e 120 KB de folga); a caixa de música é o único som
+  sintetizado acima de 1,6 s.

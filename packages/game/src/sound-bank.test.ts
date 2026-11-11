@@ -31,7 +31,8 @@ const synthIds = SOUND_IDS.filter((id) => SOUNDS[id].src === 'synth');
 describe('banco de sons (fase 7a)', () => {
   it('cerca de 40 sons, como pede o arte-ux §10.5', () => {
     expect(SOUND_IDS.length).toBeGreaterThanOrEqual(40);
-    expect(SOUND_IDS.length).toBeLessThanOrEqual(60);
+    // M3 (fase 6d): mais 20 do Bobo Zombies.
+    expect(SOUND_IDS.length).toBeLessThanOrEqual(80);
   });
 
   it('todo MP3 está no runtime-assets.json e na tabela do audioconv', () => {
@@ -62,7 +63,8 @@ describe('banco de sons (fase 7a)', () => {
   it('os MP3 do jogo cabem com folga nos sons essenciais da primeira partida (≤ 150 KB)', () => {
     let bytes = 0;
     for (const id of fileIds) bytes += statSync(join(ROOT, 'assets-src', runtime.files[soundPath(id)]!)).size;
-    expect(bytes).toBeLessThan(120_000);
+    // M3 (fase 6d): com os do Bobo Zombies, ~130 KB (o teto do título; antes a folga era 120 KB).
+    expect(bytes).toBeLessThan(150_000);
   });
 
   it('carrega só os MP3 que faltam, e um erro não para o resto', async () => {

@@ -14,6 +14,11 @@ import {
   SIM_HZ,
   WEAPON_CODE,
   WEAPON_DESMONTADOR,
+  ENTITY_KIND,
+  PICKUP_KIND,
+  WEAPON_GOO,
+  WEAPON_SPIT,
+  ZOMBIE_TYPE,
   type MatchPhase,
   type SimEvent,
   type SimView,
@@ -55,7 +60,25 @@ export const MATCH_SOUND = {
   /** Altura aproximada dos olhos e das mãos acima dos pés (m). */
   eyeM: 1.5,
   handsM: 1.2,
+  /**
+   * M3 (fase 6d): gemidos dos zumbis: cada zumbi a cada `groanMinS`..`groanMaxS` (sorteio por hash), só até
+   * `groanRangeM` do ouvinte e no máximo um a cada `groanGapS` na partida (o teto de 24 vozes é de todo mundo).
+   */
+  groanMinS: 3,
+  groanMaxS: 8,
+  groanRangeM: 22,
+  groanGapS: 0.45,
+  /** O chefão ruge mais espaçado. */
+  roarMinS: 6,
+  roarMaxS: 11,
 } as const;
+
+/** M3 (fase 6d): as 3 vozes dos zumbis comuns. */
+const GROAN_SOUNDS: readonly SoundId[] = ['zumbi-gemido-1', 'zumbi-gemido-2', 'zumbi-gemido-3'];
+
+/** Hash inteiro de 2 números (variação de tom e de intervalo sem `Math.random`, para os testes repetirem). */
+const hash2 = (a: number, b: number): number => Math.imul((a * 0x9e3779b1) ^ (b * 0x85ebca6b), 0xc2b2ae35) >>> 0;
+const unit = (h: number): number => (h >>> 8) / 0xffffff;
 
 /** Família de som do `stepSound` do bloco (arte-ux §10.5: cada material declara a sua). */
 const FAMILY = { concrete: 0, metal: 1, wood: 2, glass: 3, soft: 4, canvas: 5 } as const;
@@ -207,6 +230,10 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
   const nearD2 = new Float64Array(MATCH_SOUND.stepNearest);
   const heartT = new Float64Array(4);
   let familyOf: Uint8Array | null = null;
+  // M3 (fase 6d): o relógio do próximo gemido de cada zumbi (NaN = ainda não sorteado) e o último gemido da partida.
+  let groanT = new Float32Array(0);
+  let groanN = new Uint32Array(0);
+  let lastGroanS = -1e9;
   let lastCount = -1;
   let lastPhase: MatchPhase | null = null;
   let disposed = false;
@@ -216,6 +243,72 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     stepAcc = new Float32Array(capacity);
     stepCount = new Uint32Array(capacity);
     nearMark = new Uint8Array(capacity);
+    groanT = new Float32Array(capacity).fill(Number.NaN);
+    groanN = new Uint32Array(capacity);
+  };
+
+  /** M3 (fase 6d): som de um bobo local "na cabeça"; de outro, no mundo onde ele está. */
+  const playBy = (v: SimView, id: SoundId, entity: number, nowS: number, volume = 1): void => {
+    if (localIndex(entity) >= 0) {
+      playFlat(id, nowS, volume);
+      return;
+    }
+    const i = at(v, entity);
+    if (i < 0) return;
+    const o = i * 3;
+    playAt(
+      v,
+      id,
+      null,
+      v.position[o]!,
+      v.position[o + 1]! + MATCH_SOUND.handsM,
+      v.position[o + 2]!,
+      nowS,
+      rankOf(v, entity),
+      volume,
+    );
+  };
+
+  /** M3 (fase 6d): o gemido (ou o rugido do chefão) de cada zumbi perto de algum ouvinte, espaçado. */
+  const groans = (v: SimView, dt: number, nowS: number): void => {
+    const range2 = MATCH_SOUND.groanRangeM * MATCH_SOUND.groanRangeM;
+    for (let i = 0; i < v.count; i++) {
+      if (v.kind[i] !== ENTITY_KIND.zombie || v.alive[i] !== 1 || v.flags[i]! & ENTITY_FLAG.dead) {
+        groanT[i] = Number.NaN;
+        continue;
+      }
+      const boss = v.zombieType[i] === ZOMBIE_TYPE.boss;
+      if (Number.isNaN(groanT[i]!)) {
+        // Recém-nascido: o primeiro gemido sai num ponto sorteado do intervalo (os da onda não gemem juntos).
+        groanT[i] = unit(hash2(i, groanN[i]!)) * (boss ? MATCH_SOUND.roarMinS : MATCH_SOUND.groanMaxS);
+        continue;
+      }
+      groanT[i] = groanT[i]! - dt;
+      if (groanT[i]! > 0) continue;
+      const n = groanN[i]!++;
+      const h = hash2(i + 7919, n);
+      const lo = boss ? MATCH_SOUND.roarMinS : MATCH_SOUND.groanMinS;
+      const hi = boss ? MATCH_SOUND.roarMaxS : MATCH_SOUND.groanMaxS;
+      groanT[i] = lo + unit(h) * (hi - lo);
+      if (!boss && nowS - lastGroanS < MATCH_SOUND.groanGapS) continue;
+      const o = i * 3;
+      const x = v.position[o]!;
+      const y = v.position[o + 1]! + MATCH_SOUND.eyeM;
+      const z = v.position[o + 2]!;
+      let near = false;
+      for (let l = 0; l < listeners && !near; l++) {
+        const dx = x - lx[l]!;
+        const dz = z - lz[l]!;
+        near = dx * dx + dz * dz <= range2;
+      }
+      if (!near) continue;
+      if (!boss) lastGroanS = nowS;
+      const id = boss ? 'chefao-rugido' : GROAN_SOUNDS[h % GROAN_SOUNDS.length]!;
+      // Tom ±10% (o Sprinter mais agudo, o Chonker mais grave).
+      const type = v.zombieType[i]!;
+      const pitch = type === ZOMBIE_TYPE.sprinter ? 1.18 : type === ZOMBIE_TYPE.chonker ? 0.82 : 1;
+      playAt(v, id, null, x, y, z, nowS, SOUND_RANK.world, 1, pitch * (0.9 + unit(h >>> 3) * 0.2));
+    }
   };
 
   /** Família de cada bloco do registro (uma vez por partida). */
@@ -524,6 +617,9 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
             // M3 (fase 4e): o raio do Desmontador: o sopro do foguete, bem mais agudo.
             if (rank === SOUND_RANK.own) playFlat('foguete', nowS, ownGain(), rank, 1.9);
             else playAt(v, 'foguete', null, ev.x, ev.y, ev.z, nowS, rank, 1, 1.9);
+          } else if (ev.weapon === WEAPON_SPIT) {
+            // M3 (fase 6d): o cuspe do Spitter.
+            playAt(v, 'cuspe', null, ev.x, ev.y, ev.z, nowS, rank);
           } else if (ev.weapon === WEAPON_CODE.grenade) {
             // Arremesso: o mesmo sopro da faca, mais grave.
             if (rank === SOUND_RANK.own) playFlat('faca-golpe', nowS, 0.8, rank, 0.75);
@@ -535,19 +631,22 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           // A música abaixa 6 dB nas explosões (arte-ux §10.4), se estiver tocando na partida.
           if (listenerDistance(ev.x, ev.y, ev.z) < MAX_DISTANCE_M)
             mixer.duckMusic(MATCH_SOUND.duckDb, MATCH_SOUND.duckS);
-          playAt(
-            v,
-            'explosao',
-            'explosao-longe',
-            ev.x,
-            ev.y,
-            ev.z,
-            nowS,
-            Math.max(rankOf(v, ev.owner), SOUND_RANK.enemy),
-            1,
-            1,
-            1,
-          );
+          // M3 (fase 6d): o Chonker estoura em gosma, sem o estrondo.
+          if (ev.weapon === WEAPON_GOO) playAt(v, 'gosma', null, ev.x, ev.y, ev.z, nowS, SOUND_RANK.enemy, 1, 1, 1);
+          else
+            playAt(
+              v,
+              'explosao',
+              'explosao-longe',
+              ev.x,
+              ev.y,
+              ev.z,
+              nowS,
+              Math.max(rankOf(v, ev.owner), SOUND_RANK.enemy),
+              1,
+              1,
+              1,
+            );
           break;
         case 'weapon': {
           const i = at(v, ev.entity);
@@ -605,8 +704,100 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           break;
         }
         case 'pickup':
-          if (ev.action === 'take' && localIndex(ev.entity) >= 0) playFlat('municao', nowS);
+          if (ev.kind === PICKUP_KIND.ammoBox) {
+            if (ev.action === 'take' && localIndex(ev.entity) >= 0) playFlat('municao', nowS);
+            break;
+          }
+          // M3 (fase 6d): os drops do Zombies: o brilho onde caiu e, ao pegar, a fanfarra para o time todo (a bomba
+          // ainda estoura).
+          if (ev.action === 'drop') playAt(v, 'drop-aparece', null, ev.x, ev.y + 0.5, ev.z, nowS, SOUND_RANK.world);
+          else {
+            playFlat('drop-pega', nowS);
+            if (ev.kind === PICKUP_KIND.nuke) playFlat('explosao', nowS, 0.8, SOUND_RANK.ui);
+          }
           break;
+        case 'wave':
+          playFlat(ev.action === 'start' ? 'onda-comeca' : 'onda-limpa', nowS);
+          break;
+        case 'down':
+          if (ev.action === 'down') {
+            if (localIndex(ev.entity) >= 0) playFlat('morte', nowS);
+          } else playBy(v, 'levantou', ev.entity, nowS);
+          break;
+        case 'spawn': {
+          // O Mega Bobo chegou: o rugido na hora.
+          const i = at(v, ev.entity);
+          if (i < 0 || v.kind[i] !== ENTITY_KIND.zombie || v.zombieType[i] !== ZOMBIE_TYPE.boss) break;
+          const o = i * 3;
+          playAt(
+            v,
+            'chefao-rugido',
+            null,
+            v.position[o]!,
+            v.position[o + 1]! + MATCH_SOUND.eyeM,
+            v.position[o + 2]!,
+            nowS,
+            SOUND_RANK.enemy,
+          );
+          break;
+        }
+        case 'barricade': {
+          const mo = v.mapObjects;
+          if (mo === null || ev.index >= mo.barricades) break;
+          const x = mo.bx[ev.index]!;
+          const y = mo.by[ev.index]! + mo.bh[ev.index]! * 0.5;
+          const z = mo.bz[ev.index]!;
+          if (ev.action === 'repair') playAt(v, 'tabua-poe', null, x, y, z, nowS, rankOf(v, ev.by));
+          else playAt(v, 'tabua-arranca', null, x, y, z, nowS, SOUND_RANK.world, ev.action === 'break' ? 1 : 0.8);
+          break;
+        }
+        case 'door': {
+          if (ev.action === 'denied') {
+            if (localIndex(ev.by) >= 0) playFlat('compra-negada', nowS);
+            break;
+          }
+          const mo = v.mapObjects;
+          if (mo === null || ev.index >= mo.doors) break;
+          const o = ev.index * 6;
+          const b = mo.doorBox;
+          playAt(
+            v,
+            'porta-abre',
+            null,
+            (b[o]! + b[o + 3]!) * 0.5,
+            (b[o + 1]! + b[o + 4]!) * 0.5,
+            (b[o + 2]! + b[o + 5]!) * 0.5,
+            nowS,
+            rankOf(v, ev.by),
+          );
+          break;
+        }
+        case 'purchase':
+          if (ev.action === 'denied') {
+            if (localIndex(ev.by) >= 0) playFlat('compra-negada', nowS);
+          } else playBy(v, ev.kind === 'perk' ? 'vantagem' : 'compra', ev.by, nowS);
+          break;
+        case 'box': {
+          if (ev.action === 'denied') {
+            if (localIndex(ev.by) >= 0) playFlat('compra-negada', nowS);
+            break;
+          }
+          if (ev.action === 'take') {
+            playBy(v, 'compra', ev.by, nowS);
+            break;
+          }
+          const mo = v.mapObjects;
+          if (mo === null || ev.index >= mo.boxSpots) break;
+          const x = mo.boxX[ev.index]!;
+          const y = mo.boxY[ev.index]! + 0.6;
+          const z = mo.boxZ[ev.index]!;
+          const rank = rankOf(v, ev.by);
+          if (ev.action === 'open') {
+            playAt(v, 'caixa-abre', null, x, y, z, nowS, rank);
+            playAt(v, 'caixa-gira', null, x, y, z, nowS, rank);
+          } else if (ev.action === 'move') playAt(v, 'caixa-ursinho', null, x, y, z, nowS, rank);
+          break;
+        }
         case 'matchPhase': {
           if (ev.phase !== 'ended') break;
           const me = deps.localEntity(0);
@@ -641,6 +832,8 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
         playFlat('contagem-vai', nowS);
       }
       lastPhase = phase;
+      // M3 (fase 6d): os gemidos dos zumbis.
+      groans(v, dt, nowS);
       // Passos.
       markNearest(v);
       for (let i = 0; i < v.count; i++) {

@@ -149,7 +149,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   sozinho", bots de apoio); "Mudar regras" do resultado abre aqui. A velocidade entra na receita (`zombies.speed`).
 - **6c. Presets de fábrica** (feita em 11/11/2026, ARCHITECTURE §13.28): Sofá Zombies (Base Abandonada, Curta, os bots de apoio completam até 4) e Zombies
   Relâmpago (5 ondas), nos cards da Partida Rápida e na lista do sofá.
-- **6d. Sons do Zombies:** zumbis (gemido, ataque, tábua arrancada, chefão, gosma, cuspe), compras (parede, porta,
+- **6d. Sons do Zombies** (feita em 11/11/2026, ARCHITECTURE §13.29): zumbis (gemido, ataque, tábua arrancada, chefão, gosma, cuspe), compras (parede, porta,
   caixa, vantagem, sem pontos), drops, ondas (começo e fim), caído e levantado. Dos 3 pacotes da Kenney já baixados
   (#63) e da síntese em código.
 - **6e. Música em camadas:** a trilha das ondas em 2 camadas (calma no intervalo, horda durante a onda), sintetizada

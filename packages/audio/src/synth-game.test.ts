@@ -32,7 +32,8 @@ describe('sons sintetizados do jogo (fase 7a)', () => {
     const pcm = GAME_SYNTH_SOUNDS[name]!();
     const s = pcm.length / SYNTH_SAMPLE_RATE;
     expect(s).toBeGreaterThan(0.05);
-    expect(s).toBeLessThan(1.6);
+    // M3 (fase 6d): a caixa de música dura o giro da Caixa Misteriosa (4 s).
+    expect(s).toBeLessThan(name === 'caixa-gira' ? 4.01 : 1.6);
     let peak = 0;
     for (let i = 0; i < pcm.length; i++) {
       expect(Number.isFinite(pcm[i]!)).toBe(true);

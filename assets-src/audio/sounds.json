@@ -285,6 +285,62 @@
       "file": "maximize_009.ogg",
       "maxS": 0.21,
       "peakDb": -1
+    },
+    {
+      "out": "tabua-arranca",
+      "pack": "kenney-impact-sounds",
+      "file": "impactWood_heavy_000.ogg",
+      "maxS": 0.6,
+      "peakDb": -1
+    },
+    {
+      "out": "tabua-poe",
+      "pack": "kenney-impact-sounds",
+      "file": "impactPlank_medium_000.ogg",
+      "maxS": 0.5,
+      "peakDb": -1
+    },
+    {
+      "out": "porta-abre",
+      "pack": "kenney-impact-sounds",
+      "file": "impactMetal_heavy_000.ogg",
+      "maxS": 1.2,
+      "peakDb": -1
+    },
+    {
+      "out": "caixa-abre",
+      "pack": "kenney-impact-sounds",
+      "file": "impactWood_medium_000.ogg",
+      "maxS": 0.5,
+      "peakDb": -1
+    },
+    {
+      "out": "onda-comeca",
+      "pack": "kenney-impact-sounds",
+      "file": "impactBell_heavy_000.ogg",
+      "maxS": 1.1,
+      "peakDb": -1
+    },
+    {
+      "out": "compra-negada",
+      "pack": "kenney-interface-sounds",
+      "file": "error_006.ogg",
+      "maxS": 0.35,
+      "peakDb": -1
+    },
+    {
+      "out": "drop-aparece",
+      "pack": "kenney-interface-sounds",
+      "file": "maximize_006.ogg",
+      "maxS": 0.4,
+      "peakDb": -1
+    },
+    {
+      "out": "gosma",
+      "pack": "kenney-sci-fi-sounds",
+      "file": "slime_000.ogg",
+      "maxS": 0.9,
+      "peakDb": -1
     }
   ]
 }

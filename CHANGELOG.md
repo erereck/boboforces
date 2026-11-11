@@ -63,6 +63,10 @@ Plano em `docs/PLANO_M3.md`.
   Zombies abre essa tela.
 - **Fase 6c, presets de fábrica do Bobo Zombies:** Sofá Zombies (10 ondas; 3 bots de apoio que saem quando mais gente
   entra no sofá) e Zombies Relâmpago (5 ondas), na Partida Rápida e na tela do sofá.
+- **Fase 6d, os sons do Bobo Zombies:** gemidos dos zumbis (o Sprinter mais agudo, o Chonker mais grave), o rugido do
+  Mega Bobo, a gosma e o cuspe, tábuas arrancadas e repostas, a porta paga, a compra e o "sem pontos", a caixa de
+  música da Caixa Misteriosa e o ursinho, a vantagem, os drops, o sino do começo da onda e a vinheta do fim, e o som de
+  quem levantou.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

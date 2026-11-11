@@ -374,6 +374,233 @@ export function synthSlide(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   return finish(out, 0.7, 0, rate);
 }
 
+// --- M3 (fase 6d): o Bobo Zombies ---
+
+/**
+ * Voz de bobo-zumbi: uma tabela de onda de um período feita por soma de harmônicos com formantes de "uuuh" (F1 ~450 Hz,
+ * F2 ~900 Hz e um brilho em 2,5 kHz), tocada com o tom que escorrega, um tremor lento e o "ronco" (modulação rápida
+ * da amplitude, a voz rouca). Barato no Switch: a tabela tem 1024 pontos e o laço é só leitura com interpolação.
+ */
+export interface GroanRecipe {
+  readonly seed: number;
+  readonly lenS: number;
+  /** Tom de partida (Hz) e quanto ele cai até o fim (fração: 0,3 = 30% mais grave). */
+  readonly f0: number;
+  readonly fall: number;
+  /** Ronco: frequência (Hz) e profundidade (0..1) da modulação da amplitude. */
+  readonly growlHz: number;
+  readonly growl: number;
+  /** Sopro (ruído escuro) por cima da voz. */
+  readonly breath: number;
+}
+
+const GROAN_TABLE = 1024;
+
+/** Um período com os formantes de "u" para o tom `f0` (amplitude de cada harmônico pela distância aos formantes). */
+function formantTable(f0: number): Float32Array {
+  const table = new Float32Array(GROAN_TABLE);
+  const formants = [
+    [450, 160, 1],
+    [900, 220, 0.55],
+    [2500, 400, 0.12],
+  ] as const;
+  for (let k = 1; k * f0 < 4000; k++) {
+    const f = k * f0;
+    let amp = 0;
+    for (const [fc, bw, g] of formants) amp += g * Math.exp(-(((f - fc) / bw) ** 2));
+    amp = (amp + 0.04) / Math.sqrt(k);
+    for (let i = 0; i < GROAN_TABLE; i++) table[i] = table[i]! + amp * Math.sin((TAU * k * i) / GROAN_TABLE);
+  }
+  return table;
+}
+
+export function synthGroan(r: GroanRecipe, sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(r.lenS * rate);
+  const out = new Float32Array(n);
+  const table = formantTable(r.f0);
+  const rng = createRng(r.seed);
+  const breathLp: Lowpass2 = { a: 0, b: 0 };
+  const breathK = lowpassCoef(700, rate);
+  const wobbleHz = 4 + (r.seed % 3);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const u = t / r.lenS;
+    // Tom: sobe um pouco no começo ("uu-") e cai até o fim ("-uuurgh"), com tremor.
+    const contour = 1 + 0.08 * Math.sin(Math.PI * Math.min(1, u * 2.5)) - r.fall * u * u;
+    const f = r.f0 * contour * (1 + 0.025 * Math.sin(TAU * wobbleHz * t));
+    phase += (f * GROAN_TABLE) / rate;
+    if (phase >= GROAN_TABLE) phase -= GROAN_TABLE;
+    const i0 = phase | 0;
+    const fr = phase - i0;
+    const a = table[i0]!;
+    const b = table[(i0 + 1) % GROAN_TABLE]!;
+    const voice = a + (b - a) * fr;
+    const growl = 1 - r.growl * (0.5 + 0.5 * Math.sin(TAU * r.growlHz * t));
+    const env = Math.min(1, t / 0.09) * Math.min(1, (r.lenS - t) / 0.18);
+    out[i] = (voice * growl + lp2(breathLp, noise(rng), breathK) * r.breath * 6) * env;
+  }
+  return finish(out, 0.8, 1.2, rate);
+}
+
+/** As vozes dos zumbis (3, para não repetir) e o rugido do Mega Bobo. */
+export const GROANS = {
+  'zumbi-gemido-1': { seed: 0x0c01, lenS: 1.1, f0: 118, fall: 0.3, growlHz: 31, growl: 0.35, breath: 0.12 },
+  'zumbi-gemido-2': { seed: 0x0c02, lenS: 0.8, f0: 140, fall: 0.18, growlHz: 27, growl: 0.45, breath: 0.1 },
+  'zumbi-gemido-3': { seed: 0x0c03, lenS: 1.35, f0: 100, fall: 0.4, growlHz: 36, growl: 0.3, breath: 0.15 },
+  'chefao-rugido': { seed: 0x0c04, lenS: 1.55, f0: 58, fall: 0.35, growlHz: 23, growl: 0.6, breath: 0.45 },
+} as const satisfies Readonly<Record<string, GroanRecipe>>;
+
+/** Cuspe do Spitter ("ptuí"): estalo molhado (ruído que escurece) e um "pop" que despenca de tom. */
+export function synthSpit(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.3 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0c05);
+  const wet: Lowpass2 = { a: 0, b: 0 };
+  let k = 0;
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    if (i % SWEEP_STEP === 0) k = lowpassCoef(500 + 3500 * Math.exp(-t / 0.05), rate);
+    const burst = lp2(wet, noise(rng), k) * Math.exp(-t / 0.07) * 2;
+    phase += (TAU * (160 + 650 * Math.exp(-t / 0.025))) / rate;
+    const pop = Math.sin(phase) * Math.min(1, t / 0.002) * Math.exp(-t / 0.06) * 0.8;
+    out[i] = burst + pop;
+  }
+  return finish(out, 0.75, 1.3, rate);
+}
+
+/** Sino de brinquedo: o tom e o parcial inarmônico (2,76×) de um sininho, com queda rápida. */
+function bell(out: Float32Array, startS: number, hz: number, lenS: number, level: number, rate: number): void {
+  const from = Math.round(startS * rate);
+  const n = Math.min(out.length - from, Math.round(lenS * rate));
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const p = TAU * hz * t;
+    const env = Math.min(1, t / 0.002) * Math.exp(-t / (lenS * 0.35));
+    out[from + i] = out[from + i]! + (Math.sin(p) + Math.sin(p * 2.76) * 0.35 * Math.exp(-t / 0.05)) * env * level;
+  }
+}
+
+/** Compra ("tchan-tchin" da caixa registradora): um chiado curto e dois sininhos subindo. */
+export function synthPurchase(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(0.5 * rate));
+  const rng = createRng(0x0c06);
+  const hi: Lowpass2 = { a: 0, b: 0 };
+  const k = lowpassCoef(2500, rate);
+  for (let i = 0; i < Math.round(0.05 * rate); i++) {
+    const w = noise(rng);
+    out[i] = (w - lp2(hi, w, k)) * Math.exp(-i / rate / 0.015) * 0.6;
+  }
+  bell(out, 0.03, 1567.98, 0.25, 0.8, rate);
+  bell(out, 0.11, 2093, 0.38, 1, rate);
+  return finish(out, 0.7, 0, rate);
+}
+
+/** Notas (Hz) da caixa de música da Caixa Misteriosa: um motivo de 8 que se repete. */
+const MUSIC_BOX_NOTES = [1318.5, 1568, 2093, 1568, 1760, 1396.9, 1174.7, 1568];
+
+/**
+ * A Caixa Misteriosa girando (`ZOMBIE_BOX.rollS` = 4 s): caixa de música que começa a 9 notas por segundo e vai
+ * freando no último segundo, como uma roleta parando.
+ */
+export function synthMusicBox(lenS = 4, sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(lenS * rate));
+  let t = 0;
+  let k = 0;
+  while (t < lenS - 0.25) {
+    const slow = t > lenS - 1.3 ? 1 + ((t - (lenS - 1.3)) / 1.3) * 2.2 : 1;
+    toyNote(out, t, MUSIC_BOX_NOTES[k % MUSIC_BOX_NOTES.length]!, 0.35, k % 4 === 0 ? 1 : 0.7, rate);
+    t += 0.11 * slow;
+    k++;
+  }
+  return finish(out, 0.6, 0, rate);
+}
+
+/** Nota de "corneta de brinquedo" com o tom que pode escorregar (`bend`, fração) e tremer no fim. */
+function hornNote(
+  out: Float32Array,
+  startS: number,
+  hz: number,
+  lenS: number,
+  bend: number,
+  vibrato: number,
+  rate: number,
+): void {
+  const from = Math.round(startS * rate);
+  const n = Math.min(out.length - from, Math.round(lenS * rate));
+  let p = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const u = t / lenS;
+    const f = hz * (1 - bend * u) * (1 + vibrato * u * Math.sin(TAU * 6 * t));
+    p += (TAU * f) / rate;
+    const env = Math.min(1, t / 0.02) * Math.min(1, (lenS - t) / 0.06);
+    const v = Math.sin(p) + Math.sin(2 * p) * 0.5 + Math.sin(3 * p) * 0.3 + Math.sin(4 * p) * 0.12;
+    out[from + i] = out[from + i]! + v * env;
+  }
+}
+
+/** O ursinho da caixa (ela vai embora): "uá-uá-uá-uááá" de corneta que desce. */
+export function synthTeddy(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(1.5 * rate));
+  const notes = [392, 370, 349.2];
+  notes.forEach((hz, i) => hornNote(out, i * 0.28, hz, 0.26, 0.02, 0, rate));
+  hornNote(out, 0.84, 329.6, 0.62, 0.12, 0.05, rate);
+  return finish(out, 0.7, 0.8, rate);
+}
+
+/** Vantagem bebida: três goles graves ("glub") e um arpejo de brinquedo subindo. */
+export function synthPerk(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(1.1 * rate));
+  for (let g = 0; g < 3; g++) {
+    const from = Math.round(g * 0.14 * rate);
+    let p = 0;
+    for (let i = 0; i < Math.round(0.11 * rate); i++) {
+      const t = i / rate;
+      p += (TAU * (210 - 120 * (t / 0.11))) / rate;
+      out[from + i] = out[from + i]! + Math.sin(p) * Math.sin((Math.PI * t) / 0.11) * 0.9;
+    }
+  }
+  [1046.5, 1318.5, 1568].forEach((hz, i) => toyNote(out, 0.48 + i * 0.09, hz, 0.4, 0.8, rate));
+  return finish(out, 0.7, 0.6, rate);
+}
+
+/** Drop pego: fanfarra curta e rápida, com dois brilhos agudos no fim. */
+export function synthDropTake(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(0.75 * rate));
+  [784, 1046.5, 1318.5, 1568].forEach((hz, i) => toyNote(out, i * 0.06, hz, 0.3, 0.9, rate));
+  bell(out, 0.26, 2637, 0.4, 0.5, rate);
+  bell(out, 0.32, 3136, 0.35, 0.4, rate);
+  return finish(out, 0.65, 0, rate);
+}
+
+/** Onda limpa: três notas graves de corneta, "tã-tã-TÃÃ" (a próxima onda vem aí). */
+export function synthWaveClear(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(1.3 * rate));
+  hornNote(out, 0, 293.7, 0.18, 0, 0, rate);
+  hornNote(out, 0.2, 349.2, 0.18, 0, 0, rate);
+  hornNote(out, 0.4, 440, 0.85, 0, 0.03, rate);
+  return finish(out, 0.65, 0.9, rate);
+}
+
+/** Levantou (revivido): duas notas subindo. */
+export function synthRevive(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(0.5 * rate));
+  toyNote(out, 0, 880, 0.2, 0.9, rate);
+  toyNote(out, 0.1, 1318.5, 0.38, 1, rate);
+  return finish(out, 0.6, 0, rate);
+}
+
 /**
  * Os sons sintetizados do jogo: nome lógico → PCM mono a `SYNTH_SAMPLE_RATE`. `tiro-<arma>` e `tiro-<arma>-longe`
  * para cada arma de fogo; o resto pelo nome. O banco de sons do `game` diz canal, volume e prioridade de cada um.
@@ -394,4 +621,16 @@ export const GAME_SYNTH_SOUNDS: Readonly<Record<string, () => Float32Array>> = {
   derrota: () => synthJingle(false),
   coracao: () => synthHeartbeat(),
   deslize: () => synthSlide(),
+  // M3 (fase 6d): o Bobo Zombies.
+  ...Object.fromEntries(
+    (Object.keys(GROANS) as (keyof typeof GROANS)[]).map((id) => [id, () => synthGroan(GROANS[id])]),
+  ),
+  cuspe: () => synthSpit(),
+  compra: () => synthPurchase(),
+  'caixa-gira': () => synthMusicBox(),
+  'caixa-ursinho': () => synthTeddy(),
+  vantagem: () => synthPerk(),
+  'drop-pega': () => synthDropTake(),
+  'onda-limpa': () => synthWaveClear(),
+  levantou: () => synthRevive(),
 };
