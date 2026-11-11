@@ -8,8 +8,11 @@ import type { MipFilterMode, TextureMode, VertexAttributeMode } from '@boboforce
 import type { Disposable } from '@boboforces/shared';
 import type { StringKey, TestScreenModel } from '@boboforces/ui';
 
-/** Cena do bench: o Construto inteiro ou o canto de 32×32 m da cena-vitrine (arte-ux.md §5.2). */
-export type BenchScene = 'construto' | 'vitrine';
+/**
+ * Cena do bench: o Construto inteiro, o canto de 32×32 m da cena-vitrine (arte-ux.md §5.2) ou, desde o M3 (fase 7b),
+ * o Bobo Zombies na Base Abandonada (`zombies`: as vistas são bots de apoio; o pool no teto de zumbis do perfil).
+ */
+export type BenchScene = 'construto' | 'vitrine' | 'zombies';
 
 /**
  * Uma rodada do bench (tecnico.md §24.1). A mesma cena vira o `/bench` da web e o NRO de teste do Switch.

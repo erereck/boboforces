@@ -44,6 +44,8 @@ describe('bench: parâmetros', () => {
     expect(warnings).toContain('parâmetro desconhecido: foo');
     expect(warnings.some((w) => w.startsWith('bots limitado'))).toBe(true);
     expect(parseBenchParams({ route: 'bench:volta', views: '4' }).config.views).toBe(1);
+    // M3 (fase 7b): o Bobo Zombies na Base.
+    expect(parseBenchParams({ scene: 'zombies' }).config.scene).toBe('zombies');
   });
 });
 
@@ -123,6 +125,10 @@ describe('bench: relatório e linhas [t0]', () => {
       'loading_ms total=3120 assets=410 texturas=120 malha=1290 luz=820 nav=150 skins=90 figuras=40 shaders=360',
     );
     expect(lines).toContain(`erro "algo 'deu' errado"`);
+    expect(lines.some((l) => l.startsWith('zumbis_vivos'))).toBe(false);
+    // M3 (fase 7b): no Bobo Zombies, a linha dos zumbis vivos depois da sim e da IA.
+    const z = formatBenchReport({ ...report, zombies: { avgAlive: 23.46, maxAlive: 40, pool: 40, wave: 2 } });
+    expect(z.split('\n')).toContain('zumbis_vivos media=23.5 max=40 pool=40 onda=2');
     expect(lines.at(-1)).toBe('fim');
   });
 

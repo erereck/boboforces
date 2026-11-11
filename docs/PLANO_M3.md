@@ -163,7 +163,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **7a. Minimapa** (feita em 11/11/2026, ARCHITECTURE §13.32; K7): no quadrante livre da tela dividida de 3, a planta
   do mapa vista de cima com as portas fechadas, a caixa, os zumbis, os aliados e os jogadores locais; o placar sobe
   para o alto do quadrante.
-- **7b. Bench com 4 vistas:** o bench passa a conhecer o Bobo Zombies na Base (zumbis no teto do `pcSplit`) e mede
+- **7b. Bench com 4 vistas** (feita em 11/11/2026, ARCHITECTURE §13.33; PERF §2: 60,01 fps na RTX 2050 com 40
+  zumbis e com 24 bots): o bench passa a conhecer o Bobo Zombies na Base (zumbis no teto do `pcSplit`) e mede
   as 4 vistas no PC; o resultado vai para o PERF.
 - **7c. 10 ondas do começo ao fim:** o robô das ondas leva partidas até a vitória na 10ª (com 1 e com 4 bots, em
   regras que deixam chegar), conferindo especiais, os dois chefões e que nada trava.

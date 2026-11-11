@@ -509,17 +509,32 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       warnings.push(`bots limitado a ${bots} (${bench.views} jogadores locais também são bots)`);
     }
     if (!bench.armed) warnings.push('armed=0 ainda não existe no M1: os bots estão armados');
-    const total = bench.views + bots;
-    const a = Math.ceil(total / 2);
-    const b = total - a;
-    recipe = {
-      format: MATCH_RECIPE_FORMAT,
-      mode: 'warfare.tdm',
-      map: 'construto',
-      seed: bench.seed >>> 0,
-      match: { timeLimitS: 0, viewDistanceM: bench.viewDistanceM },
-      teams: [{ bots: [{ ref, count: a }] }, { bots: b > 0 ? [{ ref, count: b }] : [] }],
-    };
+    if (bench.scene === 'zombies') {
+      // M3 (fase 7b): o Bobo Zombies na Base, sem fim: as vistas são bots de apoio (o `bots=` não vale aqui) com 1000 de
+      // vida (a horda se acumula sem derrubar o time), zumbis 3× mais numerosos e com 5× a vida (o pool enche).
+      recipe = {
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'zombies',
+        map: 'base',
+        seed: bench.seed >>> 0,
+        match: { timeLimitS: 0, scoreLimit: 0, viewDistanceM: bench.viewDistanceM },
+        players: { hp: 1000 },
+        zombies: { waves: 0, quantity: 3, hpMul: 5, selfRevives: -1 },
+        teams: [{ bots: [{ ref, count: bench.views }] }],
+      };
+    } else {
+      const total = bench.views + bots;
+      const a = Math.ceil(total / 2);
+      const b = total - a;
+      recipe = {
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'warfare.tdm',
+        map: 'construto',
+        seed: bench.seed >>> 0,
+        match: { timeLimitS: 0, viewDistanceM: bench.viewDistanceM },
+        teams: [{ bots: [{ ref, count: a }] }, { bots: b > 0 ? [{ ref, count: b }] : [] }],
+      };
+    }
   } else if (request.kind === 'wardrobe') {
     // M2 (fase 6c): o Meu Bobo: o Ringue sem ninguém (o bobo é um manequim).
     humans = 0;
@@ -1083,7 +1098,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let ghostDone = humans === 0 || host.stats.current.totals.matches >= GHOST.matches;
   let ghostAlpha = 0;
   const env = createEnvironment();
-  env.timeOfDay = bench?.timeOfDay ?? doc.light.timeOfDay;
+  // M3 (fase 7b): o bench do Zombies fica com a luz do mapa (a Base é à noite).
+  env.timeOfDay = bench && bench.scene !== 'zombies' ? bench.timeOfDay : doc.light.timeOfDay;
   const sun = doc.light.sunDir;
   const sunLen = Math.hypot(sun[0], sun[1], sun[2]) || 1;
   env.sunDirX = sun[0] / sunLen;
@@ -1687,8 +1703,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     },
     onEvents,
     ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
-    // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11).
-    ...(!bench && zombiesMode ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) } : {}),
+    // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11); no bench do Zombies
+    // (fase 7b), o `zombies=` da URL ou o mesmo teto.
+    ...(zombiesMode && (!bench || bench.zombies <= 0)
+      ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) }
+      : {}),
     budget: aiBudgetFor(profile),
     now,
     // A MESMA tabela que o render recebeu no `setFigures` (a hitbox e a pose de 3ª pessoa saem dela).
@@ -1777,6 +1796,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         /** Maior número de bonecos fora da capacidade da malha num frame medido (somem da tela). */
         bodiesOut: 0,
         gcPauses: 0,
+        // M3 (fase 7b): zumbis vivos por frame medido (Bobo Zombies).
+        zSum: 0,
+        zMax: 0,
+        zFrames: 0,
         ema: 0,
         stalls: 0,
         firstMinute: createSamples(240 * THERMAL_WINDOW_S, false),
@@ -3712,6 +3735,19 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     b.spikeFrame = 0;
   }
 
+  /** M3 (fase 7b): a linha dos zumbis do relatório do bench (o pool é a contagem de entidades zumbi da sim). */
+  function benchZombies(b: { zSum: number; zMax: number; zFrames: number }): {
+    avgAlive: number;
+    maxAlive: number;
+    pool: number;
+    wave: number;
+  } {
+    const zv = sim.view();
+    let pool = 0;
+    for (let i = 0; i < zv.count; i++) if (zv.kind[i] === ENTITY_KIND.zombie) pool++;
+    return { avgAlive: b.zFrames > 0 ? b.zSum / b.zFrames : 0, maxAlive: b.zMax, pool, wave: zv.match.zombieWave };
+  }
+
   function benchSample(frameMs: number, cpuMs: number, renderMs: number, uiMs: number): void {
     const b = benchState;
     if (!b || !bench) return;
@@ -3739,6 +3775,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return;
     }
     b.frames.push(frameMs);
+    if (zombiesMode) {
+      const zv = sim.view();
+      let alive = 0;
+      for (let i = 0; i < zv.count; i++) {
+        if (zv.kind[i] === ENTITY_KIND.zombie && zv.alive[i] === 1 && !(zv.flags[i]! & ENTITY_FLAG.dead)) alive++;
+      }
+      b.zSum += alive;
+      b.zFrames++;
+      if (alive > b.zMax) b.zMax = alive;
+    }
     if (frameMs >= 40) {
       const k = frameMs < 60 ? 0 : frameMs < 100 ? 1 : frameMs < 250 ? 2 : 3;
       b.slow[k] = b.slow[k]! + 1;
@@ -3858,6 +3904,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       threeRevision: renderer.info.threeRevision,
       config: bench,
       effectiveBots: Math.max(0, botsTotal - viewCount),
+      ...(zombiesMode ? { zombies: benchZombies(b) } : {}),
       mannequins: bench.actors ? vitrineMannequins : 0,
       maxDebris: profile.maxDebris,
       loadingMs: { ...setup.times },

@@ -2661,3 +2661,16 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   alocar.
 - **Conferido no Edge** (`local/m3/capturar-minimapa.ts`, teclado e 2 controles falsos pela tela do sofá): o Sofá
   Zombies na Base e os Times no Construto.
+
+### 13.33 Fase 7b: o bench com 4 vistas e o Bobo Zombies (11/11/2026)
+
+- **Cena nova do bench** (`scene=zombies`, `BenchScene`; a web pela URL e o Switch pelo `bench.json`): o Bobo
+  Zombies na Base Abandonada, sem fim, com a luz do mapa (noite; o `timeOfDay` do bench não vale aqui). As vistas
+  são bots de apoio Normal com 1000 de vida (a horda se acumula sem derrubar o time; o `bots=` não vale nesta cena) e
+  os zumbis vêm 3× mais numerosos e com 5× a vida, para o pool (`zombies=` ou o teto do perfil, 40 no `pcSplit`)
+  encher.
+- **Relatório:** a linha `zumbis_vivos media= max= pool= onda=` (só no Zombies), contada a cada frame medido.
+- **Medido** (PERF §2): na RTX 2050 (Edge headless com `--gpu-alto`), 4 vistas com o pool cheio (40 vivos no pico)
+  a 60,01 fps, p99 17,1 ms; e 4 vistas com 24 bots no Construto também a 60,01, p99 17,1. Com isso o critério 1 do
+  M3 está cumprido no PC de referência (as vistas do bench são bots; 4 controles de verdade só mudam a leitura da
+  entrada). Na integrada, a Base dá 57,7 fps (o Construto com 24 bots, 36,6).

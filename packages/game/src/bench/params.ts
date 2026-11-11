@@ -82,7 +82,7 @@ export function parseBenchParams(params: Readonly<Record<string, string>>): Pars
   const hz = oneOf('simHz', ['60', '30'], String(BENCH_DEFAULTS.simHz) as '60' | '30');
 
   const config: BenchConfig = {
-    scene: oneOf<BenchScene>('scene', ['construto', 'vitrine'], BENCH_DEFAULTS.scene),
+    scene: oneOf<BenchScene>('scene', ['construto', 'vitrine', 'zombies'], BENCH_DEFAULTS.scene),
     views,
     bots: int('bots', BENCH_DEFAULTS.bots),
     zombies: int('zombies', BENCH_DEFAULTS.zombies),

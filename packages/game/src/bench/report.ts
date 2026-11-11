@@ -151,6 +151,16 @@ export interface BenchReport {
     readonly bodiesOut: number;
   };
   readonly programs: number;
+  /**
+   * M3 (fase 7b): só no Bobo Zombies: zumbis vivos por frame medido (média e máximo), o tamanho do pool (o teto do
+   * perfil) e a onda no fim.
+   */
+  readonly zombies?: {
+    readonly avgAlive: number;
+    readonly maxAlive: number;
+    readonly pool: number;
+    readonly wave: number;
+  };
   /** MB; -1 = desconhecido. */
   readonly memoryMb: {
     readonly heapMax: number;
@@ -206,6 +216,12 @@ export function formatBenchReport(r: BenchReport): string {
     `sim_ia_ms sim_media=${ms(s.simAvg)} sim_p99=${ms(s.simP99)} sim_max=${ms(s.simMax)} ia_media=${ms(s.aiAvg)}` +
       ` ia_p99=${ms(s.aiP99)} ia_max=${ms(s.aiMax)} ticks=${s.ticks} sim_por_tick=${ms(s.simPerTick)}` +
       ` ia_por_tick=${ms(s.aiPerTick)}`,
+    ...(r.zombies
+      ? [
+          `zumbis_vivos media=${num(r.zombies.avgAlive)} max=${r.zombies.maxAlive} pool=${r.zombies.pool}` +
+            ` onda=${r.zombies.wave}`,
+        ]
+      : []),
     ...r.views.map(
       (v, i) =>
         `vista${i} draw=${num(v.drawCalls)} tri=${num(v.triangles, 0)} regioes=${num(v.regions)}` +
