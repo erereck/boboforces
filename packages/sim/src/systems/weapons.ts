@@ -25,7 +25,7 @@ import {
   RULE_FLAG,
   type SimContext,
 } from '../context.ts';
-import { secondsToTicks } from '../constants.ts';
+import { BOT_CONTROLLER_BASE, secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, eyeHeightFor, figurePostureOf, weaponGrip, type AimPoint } from '../hitbox.ts';
 import { isLivePhase } from '../view.ts';
@@ -258,12 +258,20 @@ export function weaponSystem(ctx: SimContext): void {
   }
 }
 
+/**
+ * M3 (fase 7c): no Bobo Zombies o bot de apoio não gasta a reserva (recarrega o pente, mas a reserva não acaba). Ele não
+ * compra munição na parede: sem isso, lá pela onda 7 os 4 bots estavam só na faca (robô das 10 ondas).
+ */
+const freeReserve = (ctx: SimContext, e: number): boolean =>
+  ctx.zombiesMode && ctx.s.controller[e]! >= BOT_CONTROLLER_BASE;
+
 /** Fim de um ciclo de recarga: o pente inteiro, ou 1 cartucho (e o próximo ciclo, se ainda faltar). */
 function finishReload(ctx: SimContext, e: number, k: number, def: WeaponDef): void {
   const s = ctx.s;
+  const spend = freeReserve(ctx, e) ? 0 : 1;
   if (def.reloadPerRoundS > 0) {
     s.slotClip[k] = s.slotClip[k]! + 1;
-    s.slotReserve[k] = s.slotReserve[k]! - 1;
+    s.slotReserve[k] = s.slotReserve[k]! - spend;
     if (s.slotClip[k]! < def.clipSize && s.slotReserve[k]! > 0) {
       s.reloadTicks[e] = Math.max(1, secondsToTicks(def.reloadPerRoundS * reloadMul(ctx, e), ctx.hz));
       return;
@@ -271,7 +279,7 @@ function finishReload(ctx: SimContext, e: number, k: number, def: WeaponDef): vo
   } else {
     const take = Math.min(def.clipSize - s.slotClip[k]!, s.slotReserve[k]!);
     s.slotClip[k] = s.slotClip[k]! + take;
-    s.slotReserve[k] = s.slotReserve[k]! - take;
+    s.slotReserve[k] = s.slotReserve[k]! - take * spend;
   }
   ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'reloadEnd');
 }

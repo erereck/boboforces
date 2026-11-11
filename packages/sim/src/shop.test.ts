@@ -5,7 +5,7 @@ import { BLOCK_FLAG, createBlockRegistry, createWorldGrid, fillBox, makeCell } f
 import { describe, expect, it } from 'vitest';
 import { WEAPON_CODE, WEAPON_DESMONTADOR, weaponDef } from './config/weapons.ts';
 import { BOX_PHASE, PERK, ZOMBIE_BOX, ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
-import { SIM_HZ } from './constants.ts';
+import { BOT_CONTROLLER_BASE, SIM_HZ } from './constants.ts';
 import type { BoxEvent, PurchaseEvent, SimEvent } from './events.ts';
 import { BOX } from './map-objects.ts';
 import { ENTITY_FLAG } from './entity.ts';
@@ -341,4 +341,37 @@ describe('Bobo Zombies: o Desmontador (M3, fase 4e)', () => {
     expect(def.selfDamageMul).toBe(0);
     expect(def.projectileSpeed).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('M3 (fase 7c): o bot de apoio não gasta a reserva', () => {
+  it('a recarga do bot de apoio mantém a reserva; a do humano gasta', () => {
+    const withBot: MatchRecipe = {
+      ...recipe,
+      teams: [{ humans: 'all', bots: [{ ref: 'builtin:normal-bob', count: 1 }] }],
+    };
+    const sim = createSim({ recipe: withBot, map: shopMap(), humans: 1, zombies: 1 });
+    const v = sim.view();
+    const f = createInputFrames();
+    const ctrls = [0, BOT_CONTROLLER_BASE];
+    const reserveOf = (c: number): number => {
+      const e = sim.controllerEntity(c) & 0xffff;
+      return v.slotReserve[e * WEAPON_SLOT_COUNT + v.slot[e]!]!;
+    };
+    const before = ctrls.map(reserveOf);
+    const press = (buttons: number): void => {
+      for (const c of ctrls) {
+        f[c]!.yaw = yawToU16(Math.PI);
+        f[c]!.buttons = buttons;
+      }
+      sim.step(f);
+    };
+    press(BUTTON.fire);
+    press(0);
+    press(BUTTON.reload);
+    for (let t = 0; t < 5 * SIM_HZ; t++) press(0);
+    const after = ctrls.map(reserveOf);
+    expect(before[0]).toBeGreaterThan(0);
+    expect(after[0]).toBeLessThan(before[0]!);
+    expect(after[1]).toBe(before[1]);
+  });
 });

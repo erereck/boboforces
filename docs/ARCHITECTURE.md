@@ -2674,3 +2674,20 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   a 60,01 fps, p99 17,1 ms; e 4 vistas com 24 bots no Construto também a 60,01, p99 17,1. Com isso o critério 1 do
   M3 está cumprido no PC de referência (as vistas do bench são bots; 4 controles de verdade só mudam a leitura da
   entrada). Na integrada, a Base dá 57,7 fps (o Construto com 24 bots, 36,6).
+
+### 13.34 Fase 7c: as 10 ondas do começo ao fim (11/11/2026)
+
+- **O robô** (`local/m3/robo-10-ondas.ts`): partidas headless na Base com bots de apoio até a vitória ou a derrota
+  (até 30 min de jogo), contando por onda a duração, os especiais e o chefão que nasceram, e marcando onda travada (2
+  min sem nenhum zumbi a menos). Variáveis `NIVEL`, `ONDAS`, `VIDA` (zumbis) e `HP` (bots).
+- **Achado: os bots de apoio ficavam sem munição.** Eles não compram nada; o fuzil e a escopeta secavam na onda 5, a
+  pistola na 7, e da onda 8 em diante os 4 bots estavam só na faca (mesmo com 1000 de vida, a partida caía na onda 8).
+  **Correção:** no Bobo Zombies o bot de apoio não gasta a reserva (`freeReserve` em `sim/systems/weapons.ts`:
+  controlador de bot; ele ainda recarrega o pente). O humano continua comprando na parede. Mudou os goldens do modo:
+  Construto `dd27cd5e` (onda 3, 37 abates, 3 quedas) e Posto `62251b7e` (onda 4, 47 abates, 5 quedas).
+- **Do começo ao fim:** com regras leves (zumbis com 1/4 da vida, bots com 1000), 4 bots Tryhard vencem as 10 ondas
+  nas 3 sementes, em 399–429 s de jogo, sem onda travada. Nascem os 4 especiais (Sprinter 15–24, Chonker 15–18,
+  Spitter 10–14) e o chefão nas ondas 5 e 10. As ondas duram 18–53 s.
+- **Com as regras padrão** (só bots, que não compram arma, não abrem porta nem usam caixa ou vantagem): Tryhard chega
+  às ondas 5–6 (média 5,3) e Normal às 4–5 (média 4,3); o paredão é o primeiro Mega Bobo, na onda 5. É um piso: o
+  balanço com gente (compras, portas, caixa, vantagens) é do teste do Erick (roteiro do M3).
