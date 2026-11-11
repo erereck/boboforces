@@ -116,6 +116,7 @@ import {
   heldReserve,
   MAX_CONTROLLERS,
   WEAPON_CODE,
+  WEAPON_DESMONTADOR,
   WEAPON_SPIT,
   WEAPON_FIRE,
   WEAPON_KILL_PLANE,
@@ -746,9 +747,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const aimOffsets = loaded.modelDocs.map((m) => viewmodelAimOffset(m));
   // M2: nome e categoria de cada arma na tabela pt-BR, resolvidos uma vez (a HUD só guarda a referência).
   const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
+  // M3 (fase 4e): o Desmontador fica fora de `WEAPONS` (só da caixa), mas tem nome e categoria no HUD.
+  weaponNames[WEAPON_DESMONTADOR] = t('weapon.desmontador');
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
+  weaponCategories[WEAPON_DESMONTADOR] = t('weapon.category.explosive');
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
   /** M2 (fase 8a): o look de cada bot pelo nome (o mesmo bot veste o mesmo look em qualquer partida). */
@@ -848,15 +852,19 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M3 (fase 4c): os nomes das vantagens em caixa alta (o aviso da máquina), pelo índice do bit. */
   const perkNamesUpper = PERK_IDS.map((id) => t(`perk.${id}` as StringKey).toUpperCase());
   /** M3 (fase 4b): as armas que passam em cima da caixa enquanto ela gira (só o desenho; o sorteio é da sim). */
-  const boxReel = WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code);
+  const boxReel = [...WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code), WEAPON_DESMONTADOR];
   const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
   // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
+  const desmontadorModel = modelIndex.get('desmontador') ?? NO_MODEL;
+  const boltModel = modelIndex.get('desmontador-bolt') ?? NO_MODEL;
   const modelOf = (code: number): number =>
-    code === WEAPON_SPIT
-      ? weaponModel[WEAPON_CODE.grenade]!
-      : code >= 0 && code < weaponModel.length
-        ? weaponModel[code]!
-        : NO_MODEL;
+    code === WEAPON_DESMONTADOR
+      ? desmontadorModel
+      : code === WEAPON_SPIT
+        ? weaponModel[WEAPON_CODE.grenade]!
+        : code >= 0 && code < weaponModel.length
+          ? weaponModel[code]!
+          : NO_MODEL;
   /** M3 (fase 4d): o modelo de cada drop (munição cheia, bomba, pontos em dobro, insta-kill, carpinteiro). */
   const dropModels = [
     ammoBoxModel,
@@ -2742,7 +2750,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (let p = 0; p < pv.count && n < projectiles.capacity; p++) {
       if (pv.alive[p] !== 1) continue;
       const code = pv.weapon[p]!;
-      const model = code === WEAPON_CODE.rocket ? rocketShellModel : modelOf(code);
+      const model =
+        code === WEAPON_CODE.rocket ? rocketShellModel : code === WEAPON_DESMONTADOR ? boltModel : modelOf(code);
       if (model === NO_MODEL) continue;
       const o = p * 3;
       const x = lerp(pv.prevPosition[o]!, pv.position[o]!, alpha);

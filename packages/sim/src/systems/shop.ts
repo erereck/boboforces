@@ -1,6 +1,6 @@
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
-import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_PERKS, ZOMBIE_SHOP } from '../config/zombie.ts';
+import { WEAPON_DESMONTADOR, WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
+import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_PERKS, ZOMBIE_SHOP, ZOMBIE_WONDER_WEIGHT } from '../config/zombie.ts';
 import { maxHpOf } from './life.ts';
 import { secondsToTicks } from '../constants.ts';
 import type { SimContext } from '../context.ts';
@@ -82,8 +82,12 @@ function buy(ctx: SimContext, e: number, w: number): void {
   ctx.events.purchase(ctx.tick, w, 'weapon', 'ok', code, cost, id);
 }
 
-/** M3 (fase 4b): o que a caixa pode dar (as primárias; a arma maravilha entra na 4e). */
-const BOX_POOL: readonly number[] = WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code);
+/** M3 (fase 4b): o que a caixa pode dar: as primárias (peso 1) e, fase 4e, o Desmontador (mais raro). */
+const BOX_POOL: readonly number[] = [
+  ...WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code),
+  WEAPON_DESMONTADOR,
+];
+const boxWeight = (code: number): number => (code === WEAPON_DESMONTADOR ? ZOMBIE_WONDER_WEIGHT : 1);
 
 /**
  * M3 (fase 4b): a Caixa Misteriosa (`ZOMBIE_BOX`). Parada: o bobo de pé na frente dela aperta o usar (na borda) e paga
@@ -183,12 +187,20 @@ function rollWeapon(ctx: SimContext, user: number): number {
     for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) if (s.loadout[k + slot] === code) return true;
     return false;
   };
+  // Sorteio com peso entre as que ele não tem (tendo todas, entre todas).
   let free = 0;
-  for (const code of BOX_POOL) if (!owns(code)) free++;
-  let pick = ctx.rngZombies.int(0, free > 0 ? free : BOX_POOL.length);
+  let total = 0;
+  for (const code of BOX_POOL) {
+    if (owns(code)) continue;
+    free++;
+    total += boxWeight(code);
+  }
+  if (free === 0) for (const code of BOX_POOL) total += boxWeight(code);
+  let roll = ctx.rngZombies.next() * total;
   for (const code of BOX_POOL) {
     if (free > 0 && owns(code)) continue;
-    if (pick-- === 0) return code;
+    roll -= boxWeight(code);
+    if (roll < 0) return code;
   }
   return BOX_POOL[0]!;
 }

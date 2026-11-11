@@ -42,6 +42,8 @@ Plano em `docs/PLANO_M3.md`.
   colega rápido); perdidas ao cair; as que você tem aparecem em cima da vida.
 - **Fase 4d, drops:** 2% dos zumbis deixam um drop (até 4 por onda): munição cheia, bomba, pontos em dobro, insta-kill
   ou carpinteiro; o HUD anuncia e mostra o tempo que sobra.
+- **Fase 4e, o Desmontador:** a arma maravilha (nome provisório), uma pistola de raio que só sai da Caixa Misteriosa
+  (~5% por giro): um raio verde que estoura e desmonta os zumbis em volta. Fecha a fase 4 (economia).
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

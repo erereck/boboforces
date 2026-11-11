@@ -2481,3 +2481,18 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   um número muda. Não conferido no Edge (o drop é raro numa captura; o caminho de desenho é o da caixinha).
 - **Goldens:** Construto `8feb69fb` (onda 3, 38 abates, 1 queda) e Posto `088bc2cc` (onda 3, 36 abates, 7 quedas):
   o sorteio dos drops muda as partidas.
+
+### 13.22 Fase 4e: o Desmontador e a medição da economia (10/11/2026)
+
+- **A arma maravilha** (`WEAPON_DESMONTADOR` = 11, `DESMONTADOR`; nome provisório, pergunta I1): fora de
+  `WEAPONS`, como a gosma e o cuspe, para só sair da Caixa Misteriosa (não entra em menu, loadout, regra de bot nem
+  no registro `weapon:` do Laboratório). Projétil de energia de 45 m/s, 400 de dano direto e na explosão de 2,5 m (mata
+  o zumbi até a onda 7 de uma vez), sem dano em quem atira, 6 no pente e 24 de reserva. Na caixa pesa 0,35 contra 1 de
+  cada primária (~5% por giro, `ZOMBIE_WONDER_WEIGHT`); o sorteio da caixa passou a ser com peso.
+- **Jogo:** modelos `desmontador` (pistola de raio de metal com o tubo de energia verde, os anéis do bocal e as
+  aletas; segura como fuzil) e `desmontador-bolt` (o raio em voo, verde-claro); nome e categoria no HUD; o som do
+  lançamento é o do foguete bem mais agudo. Não conferido no Edge (sai da caixa só com pontos de sobra).
+- **Medido** (robô das ondas, 4 bots Normal, sementes 1–6): Construto **3,8** e Posto **4,0**. Os bots não compram
+  nada (a economia é dos humanos; os bots de apoio já nascem com a primária), então só os drops mexem no número. O
+  balanço com humanos comprando fica para os testes do Erick e a fase 6.
+- **Fecha a fase 4** (a economia do Zombies).

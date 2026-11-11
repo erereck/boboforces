@@ -300,3 +300,6 @@ export const ZOMBIE_DROPS = {
   nukePoints: 400,
   carpenterPoints: 200,
 } as const;
+
+/** M3 (fase 4e): o peso do Desmontador no sorteio da caixa (cada primária pesa 1: ~5% por giro). */
+export const ZOMBIE_WONDER_WEIGHT = 0.35;

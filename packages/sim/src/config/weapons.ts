@@ -502,7 +502,13 @@ export const WEAPONS: readonly WeaponDef[] = [
 /** Arma do código, ou `null` (sem arma: `WEAPON_NONE`, código desconhecido). */
 export function weaponDef(code: number): WeaponDef | null {
   if (code < WEAPONS.length) return WEAPONS[code]!;
-  return code === WEAPON_GOO ? ZOMBIE_GOO : code === WEAPON_SPIT ? ZOMBIE_SPIT : null;
+  return code === WEAPON_GOO
+    ? ZOMBIE_GOO
+    : code === WEAPON_SPIT
+      ? ZOMBIE_SPIT
+      : code === WEAPON_DESMONTADOR
+        ? DESMONTADOR
+        : null;
 }
 
 /**
@@ -570,3 +576,30 @@ export function weaponDamageAt(def: WeaponDef, distanceM: number): number {
   const t = (distanceM - def.falloffStartM) / (def.falloffEndM - def.falloffStartM);
   return def.damage + (def.minDamage - def.damage) * t;
 }
+
+/**
+ * M3 (fase 4e): a arma maravilha do Bobo Zombies, o Desmontador (nome provisório, GDD §4.1.5: "raio que desmonta o
+ * zumbi em cubinhos"). Fora de `WEAPONS` (só sai da Caixa Misteriosa: não entra nos menus, no loadout nem nos bots do
+ * Warfare), como a gosma e o cuspe. Um projétil de energia rápido que estoura em 2,5 m com dano para matar o zumbi até
+ * a onda 7 de uma vez, sem machucar quem atira; o corpo já desmonta em cubinhos na morte. Números meus (revisáveis).
+ */
+export const WEAPON_DESMONTADOR = 11;
+
+export const DESMONTADOR: WeaponDef = {
+  ...WEAPON_ROCKET,
+  id: 'desmontador',
+  code: WEAPON_DESMONTADOR,
+  damage: 400,
+  minDamage: 400,
+  rpm: 120,
+  clipSize: 6,
+  reserve: 24,
+  reloadS: 2.4,
+  projectileSpeed: 45,
+  blastDamage: 400,
+  blastRadiusM: 2.5,
+  selfDamageMul: 0,
+  killForce: 10,
+  recoilKickDeg: 1,
+  recoilMaxDeg: 2,
+};

@@ -438,6 +438,8 @@ export const STRINGS_PT_BR = {
   'weapon.knife': 'Butter Knife',
   'weapon.grenade': 'Pineapple',
   'weapon.lmg': 'Lawnmower',
+  // M3 (fase 4e): a arma maravilha do Bobo Zombies (nome provisório).
+  'weapon.desmontador': 'Desmontador',
   'weapon.category.pistol': 'Pistola',
   'weapon.category.smg': 'SMG',
   'weapon.category.rifle': 'Fuzil',

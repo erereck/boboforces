@@ -3,7 +3,7 @@ import { BUTTON, quantizeAxis, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { yawToU16 } from '@boboforces/shared';
 import { BLOCK_FLAG, createBlockRegistry, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { WEAPON_CODE, weaponDef } from './config/weapons.ts';
+import { WEAPON_CODE, WEAPON_DESMONTADOR, weaponDef } from './config/weapons.ts';
 import { BOX_PHASE, PERK, ZOMBIE_BOX, ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
 import { SIM_HZ } from './constants.ts';
 import type { BoxEvent, PurchaseEvent, SimEvent } from './events.ts';
@@ -306,4 +306,39 @@ describe('Bobo Zombies: vantagens (M3, fase 4c)', () => {
     expect(up).toBeGreaterThan(0);
     expect(up).toBeLessThanOrEqual(1.5 * SIM_HZ + 1);
   });
+});
+
+describe('Bobo Zombies: o Desmontador (M3, fase 4e)', () => {
+  it('sai da caixa de vez em quando (mais raro que as outras) e é um projétil que não machuca quem atira', () => {
+    const sim = createSim({ recipe, map: shopMap(), humans: 1, zombies: 1 });
+    const v = sim.view();
+    const h = sim.controllerEntity(0) & 0xffff;
+    const st = v.mapObjects!.boxState as Int32Array;
+    const f = createInputFrames();
+    const events: SimEvent[] = [];
+    (v.position as Float64Array)[h * 3] = v.mapObjects!.boxX[0]!;
+    (v.position as Float64Array)[h * 3 + 2] = v.mapObjects!.boxZ[0]! - 1;
+    const offered: number[] = [];
+    for (let roll = 0; roll < 80; roll++) {
+      (v.points as Int32Array)[h] = 5000;
+      st[BOX.moveAt] = 1000;
+      press(sim, f, events);
+      for (let t = 0; t < ZOMBIE_BOX.rollS * SIM_HZ; t++) {
+        events.length = 0;
+        sim.step(f);
+        sim.drainEvents(events);
+        for (const ev of events) if (ev.type === 'box' && ev.action === 'offer') offered.push(ev.weapon);
+      }
+      // Deixa fechar sem pegar (a primária dele continua vazia: o sorteio vale entre todas).
+      for (let t = 0; t < ZOMBIE_BOX.offerS * SIM_HZ + 1; t++) sim.step(f);
+    }
+    expect(offered).toHaveLength(80);
+    const wonder = offered.filter((c) => c === WEAPON_DESMONTADOR).length;
+    expect(wonder).toBeGreaterThan(0);
+    expect(wonder).toBeLessThan(offered.filter((c) => c === WEAPON_CODE.smg).length + 5);
+    const def = weaponDef(WEAPON_DESMONTADOR)!;
+    expect(def.slot).toBe(0);
+    expect(def.selfDamageMul).toBe(0);
+    expect(def.projectileSpeed).toBeGreaterThan(0);
+  }, 60_000);
 });

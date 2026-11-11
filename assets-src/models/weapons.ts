@@ -541,6 +541,42 @@ export function rocketShell(): BuiltModel {
 }
 
 /** Ordem do pacote = ordem do registro de conteúdo (o M2 só acrescenta no fim; regra 20). */
+/**
+ * M3 (fase 4e): o Desmontador, a arma maravilha do Bobo Zombies: pistola de raio retrô, gorda, de metal com um tubo de
+ * energia verde em cima, aletas e o bocal em anéis. Encaixes como os da pistola (segura como fuzil: o id não está em
+ * `WEAPONS`, então a empunhadura cai na de duas mãos).
+ */
+export function desmontador(): BuiltModel {
+  const GREEN = tone('time', 2);
+  const GREEN_DARK = tone('grama', 1);
+  const m = new ModelBuilder('desmontador', 'weapon', { flags: 0, debrisColor: GREEN, blocksNav: false });
+  const L = m.layer('mdl_desmontador', 'opaque', GUNMETAL_DARK);
+  const body = m.part('body');
+  // Corpo, empunhadura com sulcos e guarda.
+  body.box([-1.5, 0, -9], [3, 3, 13], L, combine(shaded(GUNMETAL), stripeRow(1, GREEN)));
+  body.box([-1, -5, 1], [2, 5, 3], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  body.box([-1, -2, -2], [2, 1, 3], L, shaded(POLYMER_DARK));
+  // Tubo de energia em cima e as aletas atrás.
+  body.box(
+    [-1, 3, -7],
+    [2, 2, 8],
+    L,
+    shaded(GREEN, (face, p) => face !== 'top' && p.px(1, 0, GREEN_DARK)),
+  );
+  body.box([-2, 1, 1], [1, 2, 3], L, shaded(GUNMETAL_DARK));
+  body.box([1, 1, 1], [1, 2, 3], L, shaded(GUNMETAL_DARK));
+  // Bocal: dois anéis e a ponta verde.
+  body.box([-2, -0.5, -11], [4, 4, 1], L, shaded(GUNMETAL_DARK));
+  body.box([-2, -0.5, -13], [4, 4, 1], L, shaded(GUNMETAL_DARK));
+  body.box([-1, 0.5, -14], [2, 2, 5], L, shaded(GREEN));
+  m.socket('hand_r', body.index, [0, -2.5, 2.5], FORWARD);
+  m.socket('hand_l', body.index, [-1, -0.5, -6], FORWARD);
+  m.socket('muzzle', body.index, [0, 1.5, -14], FORWARD);
+  m.socket('mag', body.index, [0, 4, -3], DOWN);
+  m.socket('sight', body.index, [0, 5, -2], FORWARD);
+  return m.build();
+}
+
 export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   pistol,
   rifle,
@@ -552,4 +588,5 @@ export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   grenade,
   lmg,
   rocketShell,
+  desmontador,
 ];

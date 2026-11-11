@@ -13,6 +13,7 @@ import {
   NULL_ENTITY,
   SIM_HZ,
   WEAPON_CODE,
+  WEAPON_DESMONTADOR,
   type MatchPhase,
   type SimEvent,
   type SimView,
@@ -519,6 +520,10 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           } else if (ev.weapon === WEAPON_CODE.rocket) {
             if (rank === SOUND_RANK.own) playFlat('foguete', nowS, ownGain(), rank);
             else playAt(v, 'foguete', null, ev.x, ev.y, ev.z, nowS, rank);
+          } else if (ev.weapon === WEAPON_DESMONTADOR) {
+            // M3 (fase 4e): o raio do Desmontador: o sopro do foguete, bem mais agudo.
+            if (rank === SOUND_RANK.own) playFlat('foguete', nowS, ownGain(), rank, 1.9);
+            else playAt(v, 'foguete', null, ev.x, ev.y, ev.z, nowS, rank, 1, 1.9);
           } else if (ev.weapon === WEAPON_CODE.grenade) {
             // Arremesso: o mesmo sopro da faca, mais grave.
             if (rank === SOUND_RANK.own) playFlat('faca-golpe', nowS, 0.8, rank, 0.75);

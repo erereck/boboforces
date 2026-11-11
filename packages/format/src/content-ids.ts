@@ -168,6 +168,9 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:perk-buddy',
   // M3 (fase 4d): a moeda dos pontos em dobro (só acrescentado, regra 20)
   'model:drop-double',
+  // M3 (fase 4e): o Desmontador (a arma maravilha) e o raio dele em voo (só acrescentados, regra 20)
+  'model:desmontador',
+  'model:desmontador-bolt',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

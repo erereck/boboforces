@@ -280,6 +280,22 @@ export function dropDouble(): BuiltModel {
   return m.build();
 }
 
+/** M3 (fase 4e): o raio do Desmontador em voo: um bloco verde-claro de 0,19 × 0,19 × 0,31 m (o render faz brilhar). */
+export function desmontadorBolt(): BuiltModel {
+  const m = new ModelBuilder('desmontador-bolt', 'pickup', {
+    flags: 0,
+    debrisColor: tone('time', 2),
+    blocksNav: false,
+  });
+  const L = m.layer('mdl_desmontador_bolt', 'opaque', tone('time', 2));
+  const glow = m.tile(L, 8, 8, (p) => {
+    p.fill(tone('time', 2));
+    p.rect(2, 2, 4, 4, tone('emissivo', 2));
+  });
+  m.part('body').tiledBox([-3, -3, -5], [3, 3, 5], glow);
+  return m.build();
+}
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
 export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
   ammoBox,
@@ -290,4 +306,5 @@ export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
   perkSpeedy,
   perkBuddy,
   dropDouble,
+  desmontadorBolt,
 ];

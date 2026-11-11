@@ -131,6 +131,8 @@ const LOCKED_IDS = [
   'model:perk-speedy',
   'model:perk-buddy',
   'model:drop-double',
+  'model:desmontador',
+  'model:desmontador-bolt',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',
