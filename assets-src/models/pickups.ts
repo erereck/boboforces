@@ -3,7 +3,7 @@
  * das armas (`weapons.ts`): caixas a 32 px/m, tamanhos inteiros em texels, uma camada 64×64. O render desenha no
  * conjunto instanciado do modelo (programa 4, sem programa novo). Origem no centro do fundo (os pés da caixinha na sim).
  */
-import { ModelBuilder, shaded, type BuiltModel, type Painter } from '../../tools/modelgen/src/builder.ts';
+import { LayerCanvas, ModelBuilder, shaded, type BuiltModel, type Painter } from '../../tools/modelgen/src/builder.ts';
 import { tone } from '../../tools/skingen/src/palette.ts';
 
 const OLIVE = tone('metal', 3);
@@ -40,9 +40,9 @@ export function ammoBox(): BuiltModel {
  * M3 (fase 3d): a tábua da barricada (1,06 × 0,19 × 0,06 m), origem no centro, comprida em X. O render desenha 6 por
  * janela, uma em cima da outra, com uma inclinação alternada (cartoon), e tira a de cima quando o zumbi arranca.
  */
-export function zombiePlank(): BuiltModel {
+export function zombiePlank(shared: PickupLayers): BuiltModel {
   const m = new ModelBuilder('zombie-plank', 'pickup', { flags: 0, debrisColor: tone('madeira', 3), blocksNav: false });
-  const L = m.layer('mdl_zombie_plank', 'opaque', tone('madeira', 3));
+  const L = shared.misc;
   const face = m.tile(L, 34, 6, (p) => {
     p.fill(tone('madeira', 3));
     for (let x = 0; x < p.w; x++) {
@@ -229,9 +229,9 @@ export const perkBuddy = (): BuiltModel => perkMachine('perk-buddy', tone('time'
  * M3 (fase 4d): o drop dos pontos em dobro: uma moeda grossa amarela (0,5 × 0,5 × 0,12 m) com "x2" dos dois lados,
  * origem no centro (o render faz ela flutuar e girar).
  */
-export function dropDouble(): BuiltModel {
+export function dropDouble(shared: PickupLayers): BuiltModel {
   const m = new ModelBuilder('drop-double', 'pickup', { flags: 0, debrisColor: tone('amarelo', 2), blocksNav: false });
-  const L = m.layer('mdl_drop_double', 'opaque', tone('amarelo', 2));
+  const L = shared.misc;
   const face = m.tile(L, 16, 16, (p) => {
     p.fill(tone('amarelo', 2));
     for (let i = 0; i < 16; i++) {
@@ -281,13 +281,13 @@ export function dropDouble(): BuiltModel {
 }
 
 /** M3 (fase 4e): o raio do Desmontador em voo: um bloco verde-claro de 0,19 × 0,19 × 0,31 m (o render faz brilhar). */
-export function desmontadorBolt(): BuiltModel {
+export function desmontadorBolt(shared: PickupLayers): BuiltModel {
   const m = new ModelBuilder('desmontador-bolt', 'pickup', {
     flags: 0,
     debrisColor: tone('time', 2),
     blocksNav: false,
   });
-  const L = m.layer('mdl_desmontador_bolt', 'opaque', tone('time', 2));
+  const L = shared.misc;
   const glow = m.tile(L, 8, 8, (p) => {
     p.fill(tone('time', 2));
     p.rect(2, 2, 4, 4, tone('emissivo', 2));
@@ -296,8 +296,41 @@ export function desmontadorBolt(): BuiltModel {
   return m.build();
 }
 
+/**
+ * M3 (fase 5c): o contorno de giz da arma na parede (1,25 × 0,5 m, traço de 1 texel, origem no centro, plano XY): o
+ * render põe atrás da arma, encostado na parede, um pouco mais claro que a luz do lugar (lê no escuro).
+ */
+export function chalkOutline(shared: PickupLayers): BuiltModel {
+  const m = new ModelBuilder('chalk-outline', 'pickup', { flags: 0, debrisColor: tone('placa', 3), blocksNav: false });
+  const L = shared.misc;
+  const chalk = m.tile(L, 8, 8, (p) => {
+    p.fill(tone('placa', 3));
+    p.px(2, 3, tone('placa', 2));
+    p.px(5, 6, tone('placa', 2));
+  });
+  const body = m.part('body');
+  body.tiledBox([-20, 7, -0.5], [20, 8, 0.5], chalk);
+  body.tiledBox([-20, -8, -0.5], [20, -7, 0.5], chalk);
+  body.tiledBox([-20, -7, -0.5], [-19, 7, 0.5], chalk);
+  body.tiledBox([19, -7, -0.5], [20, 7, 0.5], chalk);
+  return m.build();
+}
+
+/**
+ * M3 (fase 5c): camada compartilhada pelos modelos pequenos do Bobo Zombies (tábua, moeda x2, raio do Desmontador e
+ * giz): o orçamento é de 32 camadas de modelo (`modelos64`) e cada modelo com camada própria passava dele. Criada a
+ * cada geração (`buildModels`), como a camada de brilho das props.
+ */
+export interface PickupLayers {
+  readonly misc: LayerCanvas;
+}
+
+export function createPickupLayers(): PickupLayers {
+  return { misc: new LayerCanvas('mdl_zombie_misc', 'opaque', tone('madeira', 3)) };
+}
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
-export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
+export const PICKUP_RECIPES: readonly ((shared: PickupLayers) => BuiltModel)[] = [
   ammoBox,
   zombiePlank,
   zombieDoor,
@@ -307,4 +340,5 @@ export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
   perkBuddy,
   dropDouble,
   desmontadorBolt,
+  chalkOutline,
 ];

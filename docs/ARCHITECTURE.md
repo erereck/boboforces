@@ -2529,3 +2529,15 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **No jogo** (`SceneFiguresInput.zombieKinds`, só no Bobo Zombies): as 4 skins entram logo depois da do comum na
   prioridade do plano de skins; `SceneFigures.zombieFigureOf/zombieSkinOf(type)` dão a do `ZOMBIE_TYPE` (o que anda
   e o que corre são o comum). O zumbi do pool troca de tipo a cada entrada, e o `spawn` resolve o boneco de novo.
+
+### 13.25 Fase 5c: leitura à noite (10/11/2026)
+
+- **Contorno de giz** (modelo novo `chalk-outline`, moldura de 1,25 × 0,5 m com traço de 1 texel): atrás de cada arma
+  na parede, encostado nela, um pouco mais claro que a luz do lugar (`luz × 1,3 + 0,3`), como o giz dos jogos do
+  gênero. A Caixa Misteriosa ganhou o mesmo tipo de brilho próprio (os "?" leem no escuro).
+- **A gosma do Chonker:** a explosão de `WEAPON_GOO` não tem mais bola de fogo: são 4 rajadas de cubinhos verdes
+  (`pushDebris`, as cores da gosma da paleta). O raio do Desmontador solta faíscas verdes e claras além da explosão.
+- **Orçamento de camadas:** com o giz, os modelos passavam de 32 camadas (o orçamento do M1 para `modelos64`). Os
+  modelos pequenos do Bobo Zombies (tábua, moeda x2, raio do Desmontador e giz) passaram a dividir uma camada
+  (`createPickupLayers`, criada a cada geração como a de brilho das props): 30 camadas.
+- **Conferido no Edge** (Base, nascimento temporário no QG): o giz em volta da Buzzer e a caixa clara no escuro.

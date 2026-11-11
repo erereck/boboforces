@@ -173,6 +173,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   // M3 (fase 4e): o Desmontador (a arma maravilha) e o raio dele em voo (só acrescentados, regra 20)
   'model:desmontador',
   'model:desmontador-bolt',
+  // M3 (fase 5c): o contorno de giz das armas na parede (só acrescentado, regra 20)
+  'model:chalk-outline',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

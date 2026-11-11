@@ -75,6 +75,7 @@ import {
   pushActorImpact,
   pushBlockImpact,
   pushDeath,
+  pushDebris,
   pushExplosion,
   pushMuzzleFlash,
   pushPropImpact,
@@ -117,6 +118,7 @@ import {
   MAX_CONTROLLERS,
   WEAPON_CODE,
   WEAPON_DESMONTADOR,
+  WEAPON_GOO,
   WEAPON_SPIT,
   WEAPON_FIRE,
   WEAPON_KILL_PLANE,
@@ -316,6 +318,11 @@ const PICKUP_SPIN_RAD_S = 1.2;
 /** Projéteis em voo e caixinhas no chão desenhados por frame (o resto fica de fora). */
 // M3 (fase 3d): + as tábuas das janelas (até 6 por janela) e as portas fechadas no mesmo buffer.
 const MAX_DRAWN_PROJECTILES = 384;
+
+/** M3 (fase 5c): rajadas de cubinhos da gosma e das faíscas: velocidade (x, y, z) e espalhamento de cada uma. */
+const GOO_BURSTS: readonly number[] = [3, 4, 0, 1.2, -3, 4, 1, 1.2, 0, 5, -3, 1.2, 1, 3, 3, 1.5];
+const GOO_COLORS: readonly number[] = [0x93ad57, 0x6e9444, 0x4f7a3a, 0x93ad57];
+const SPARK_COLORS: readonly number[] = [0x3ddc97, 0x9ee8ff, 0x3ddc97, 0xfff1b8];
 
 /** M3 (fase 4d): o anúncio de cada drop (na ordem de `PICKUP_KIND`, a partir de `maxAmmo`). */
 const DROP_TEXT: readonly StringKey[] = [
@@ -843,6 +850,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const plankModel = modelIndex.get('zombie-plank') ?? NO_MODEL;
   const doorModel = modelIndex.get('zombie-door') ?? NO_MODEL;
   const boxModel = modelIndex.get('mystery-box') ?? NO_MODEL;
+  const chalkModel = modelIndex.get('chalk-outline') ?? NO_MODEL;
   /** M3 (fase 4c): as máquinas, pelo bit da vantagem (1 chonky, 2 speedy, 4 buddy). */
   const perkModels = [
     modelIndex.get('perk-chonky') ?? NO_MODEL,
@@ -1551,7 +1559,25 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         }
         case 'explosion': {
-          pushExplosion(fx, ev.x, ev.y, ev.z, ev.radius);
+          // M3 (fase 5c): a gosma do Chonker é uma chuva de cubinhos verdes (sem fogo); o raio do Desmontador solta
+          // faíscas verdes além da explosão.
+          if (ev.weapon === WEAPON_GOO || ev.weapon === WEAPON_DESMONTADOR) {
+            for (let k = 0; k < GOO_BURSTS.length; k += 4) {
+              pushDebris(
+                fx,
+                ev.x,
+                ev.y,
+                ev.z,
+                GOO_BURSTS[k]!,
+                GOO_BURSTS[k + 1]!,
+                GOO_BURSTS[k + 2]!,
+                ev.weapon === WEAPON_GOO ? GOO_COLORS[k >> 2]! : SPARK_COLORS[k >> 2]!,
+                10,
+                GOO_BURSTS[k + 3]!,
+              );
+            }
+          }
+          if (ev.weapon !== WEAPON_GOO) pushExplosion(fx, ev.x, ev.y, ev.z, ev.radius);
           flashViews(ev.x, ev.y, ev.z, -1);
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
@@ -2872,8 +2898,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
       }
     }
-    // M3 (fase 4a): as armas na parede, deitadas na face da parede a 1,3 m do chão (o cano ao longo do muro).
-    for (let w = 0; w < mo.wallBuys && n < cap; w++) {
+    // M3 (fase 4a): as armas na parede, deitadas na face da parede a 1,3 m do chão (o cano ao longo do muro). Fase 5c:
+    // com o contorno de giz atrás, um pouco mais claro que o lugar (lê à noite).
+    for (let w = 0; w < mo.wallBuys && n + 1 < cap; w++) {
       const model = modelOf(mo.wbWeapon[w]!);
       if (model === NO_MODEL) continue;
       const nx = mo.wbnx[w]!;
@@ -2881,6 +2908,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const x = mo.wbx[w]! + nx * 0.06;
       const y = mo.wby[w]! + 1.3;
       const z = mo.wbz[w]! + nz * 0.06;
+      if (chalkModel !== NO_MODEL) {
+        sampleLightGrid(loaded.lightGrid, x + nx * 0.4, y, z + nz * 0.4, lightScratch, 0);
+        projectiles.model[n] = chalkModel;
+        projectiles.position[n * 3] = mo.wbx[w]! + nx * 0.02;
+        projectiles.position[n * 3 + 1] = y;
+        projectiles.position[n * 3 + 2] = mo.wbz[w]! + nz * 0.02;
+        projectiles.yaw[n] = nx !== 0 ? Math.PI / 2 : 0;
+        projectiles.pitch[n] = 0;
+        projectiles.roll[n] = 0;
+        projectiles.light[n * 3] = Math.min(1.4, lightScratch[0]! * 1.3 + 0.3);
+        projectiles.light[n * 3 + 1] = Math.min(1.4, lightScratch[1]! * 1.3 + 0.3);
+        projectiles.light[n * 3 + 2] = Math.min(1.4, lightScratch[2]! * 1.3 + 0.3);
+        n++;
+      }
       projectiles.model[n] = model;
       projectiles.position[n * 3] = x;
       projectiles.position[n * 3 + 1] = y;
@@ -2933,9 +2974,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.yaw[n] = yaw;
       projectiles.pitch[n] = 0;
       projectiles.roll[n] = 0;
-      projectiles.light[n * 3] = lightScratch[0]!;
-      projectiles.light[n * 3 + 1] = lightScratch[1]!;
-      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      // M3 (fase 5c): a caixa tem um brilho próprio (os "?" amarelos leem no escuro), como as máquinas.
+      projectiles.light[n * 3] = Math.min(1.5, lightScratch[0]! * 1.2 + 0.25);
+      projectiles.light[n * 3 + 1] = Math.min(1.5, lightScratch[1]! * 1.2 + 0.22);
+      projectiles.light[n * 3 + 2] = Math.min(1.5, lightScratch[2]! * 1.2 + 0.12);
       n++;
       const phase = st[BOX.phase]!;
       if (phase !== BOX_PHASE.idle) {

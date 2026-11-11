@@ -134,7 +134,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **5b. Os zumbis por tipo** (feita em 10/11/2026, ARCHITECTURE §13.24; o capacete de obra e a placa de "chefe"
   esperam o acessório 3D): uma skin para cada (comum, Sprinter de agasalho, Chonker de capacete de obra e barriga de
   gosma, Spitter de bochechas cheias e o Mega Bobo com a placa de "chefe"; arte-ux.md §2.8).
-- **5c. Leitura à noite:** contorno de giz das armas na parede, a caixa e as máquinas visíveis no escuro, a gosma verde
+- **5c. Leitura à noite** (feita em 10/11/2026, ARCHITECTURE §13.25): contorno de giz das armas na parede, a caixa e as máquinas visíveis no escuro, a gosma verde
   do Chonker.
 - **5d. Prints da rodada 14** para o Erick.
 

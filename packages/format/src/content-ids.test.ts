@@ -134,6 +134,7 @@ const LOCKED_IDS = [
   'model:drop-double',
   'model:desmontador',
   'model:desmontador-bolt',
+  'model:chalk-outline',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',

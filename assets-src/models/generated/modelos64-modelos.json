@@ -145,7 +145,7 @@
       "cutout": false
     },
     {
-      "name": "mdl_zombie_plank",
+      "name": "mdl_zombie_misc",
       "kind": "opaque",
       "frames": 1,
       "cutout": false
@@ -181,19 +181,7 @@
       "cutout": false
     },
     {
-      "name": "mdl_drop_double",
-      "kind": "opaque",
-      "frames": 1,
-      "cutout": false
-    },
-    {
       "name": "mdl_desmontador",
-      "kind": "opaque",
-      "frames": 1,
-      "cutout": false
-    },
-    {
-      "name": "mdl_desmontador_bolt",
       "kind": "opaque",
       "frames": 1,
       "cutout": false
