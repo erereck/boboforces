@@ -171,7 +171,10 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   regras que deixam chegar), conferindo especiais, os dois chefões e que nada trava.
 - **7d. Portão e roteiro** (feita em 11/11/2026, ARCHITECTURE §13.35; `docs/ROTEIRO_M3.md`): `npm run check`, builds, `portcheck --strict`, `smoke:web`, golden, balance e
   size-check; `docs/ROTEIRO_M3.md` com o teste de 4 controles na web e o checkpoint do Switch.
-- **7e. Prints da rodada 16 e o NRO do M3.** Publicar só com o OK do Erick.
+- **7e. Prints da rodada 16 e o NRO do M3** (feita em 11/11/2026: v18 da página das rodadas, perguntas M1–M4 junto com
+  as L, K, J e I abertas; montada por `local/m2/montar-pagina-r16.mjs`; NRO de 60,2 MB, menu no Eden em 1.401 ms).
+  Publicar só com o OK do Erick. Falta do critério: o roteiro (controles de verdade e o Switch com 4) e os prints
+  aprovados.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

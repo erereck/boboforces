@@ -2701,3 +2701,11 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **`docs/ROTEIRO_M3.md`:** o que só o Erick testa: o PC com controles de verdade (sofá do Zombies 2–4, entrar no
   meio, desconectar, o resultado, Mudar regras, a música na partida, as 10 ondas solo) e o checkpoint do Switch com 4
   controles, o bench do Zombies pelo `bench.json` e o `runtime.log`.
+
+### 13.36 Fase 7e: rodada 16 e o NRO do M3 (11/11/2026)
+
+- **Rodada 16** (v18 da página das rodadas, `local/m2/montar-pagina-r16.mjs`): seções 69 (o Zombies no sofá com 2,
+  3 e 4) e 70 (o minimapa); perguntas M1–M4 (minimapa, a munição dos bots de apoio, o primeiro Mega Bobo e fechar e
+  publicar o M3). Capturas por `local/m3/capturar-minimapa.ts` com `PADS=1..3` controles falsos.
+- **NRO do M3:** 60,2 MB (zip de 24,1 MB); no Eden, menu em 1.401 ms e a sonda de áudio ok. Os 4 controles e o
+  Zombies a 30 fps no console são o checkpoint do Erick (`docs/ROTEIRO_M3.md` §2).

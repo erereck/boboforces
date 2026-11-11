@@ -82,6 +82,8 @@ Plano em `docs/PLANO_M3.md`.
   `62251b7e`.
 - **Fase 7d, portão e roteiro:** o portão inteiro do marco verde (testes, builds, portcheck estrito, size-check, smoke
   da web e balance) e o `docs/ROTEIRO_M3.md` com o teste de controles no PC e o checkpoint do Switch.
+- **Fase 7e, rodada 16 dos prints:** o Bobo Zombies no sofá com 2, 3 e 4 e o minimapa, com as perguntas M1–M4, e o
+  NRO do M3. Falta o roteiro com controles de verdade e o Switch com 4 controles.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
