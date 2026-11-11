@@ -70,7 +70,7 @@ describe('Partida Rápida', () => {
 describe('presets de fábrica', () => {
   it('Vibe, Tryhard e Imortais: válidos, com nome e o atalho pelo nome', () => {
     const presets = factoryPresets();
-    expect(presets.map((p) => p.name)).toEqual(['Vibe', 'Tryhard', 'Imortais']);
+    expect(presets.map((p) => p.name)).toEqual(['Vibe', 'Tryhard', 'Imortais', 'Sofá Zombies', 'Zombies Relâmpago']);
     for (const p of presets) {
       const r = validateMatchRecipe(p, { maxBots: PC, maxLocalHumans: 4, maxViewDistanceM: 140 });
       expect(r.ok && r.warnings).toEqual([]);
@@ -78,5 +78,10 @@ describe('presets de fábrica', () => {
     expect(presets[2]!.teams[1]!.bots).toEqual([{ ref: 'builtin:jorge-the-immortal', count: 6 }]);
     expect(presetShortcut(presets[2]!)).toEqual({ label: 'Imortais', caption: 'Times · 10 min ou 75 abates' });
     expect(presetShortcut(DEBUT_PRESET)).toEqual({ label: '4×4 De boa', caption: 'Times · 5 min ou 30 abates' });
+    // M3 (fase 6c): os do Bobo Zombies.
+    expect(presetShortcut(presets[3]!)).toEqual({ label: 'Sofá Zombies', caption: 'Zombies · 10 ondas' });
+    expect(presetShortcut(presets[4]!)).toEqual({ label: 'Zombies Relâmpago', caption: 'Zombies · 5 ondas' });
+    expect(presetShortcut({ ...presets[3]!, name: '' }).label).toBe('Base Abandonada');
+    expect(presets[3]!.teams).toEqual([{ humans: 'all', bots: [{ ref: 'builtin:normal-bob', count: 3 }] }]);
   });
 });

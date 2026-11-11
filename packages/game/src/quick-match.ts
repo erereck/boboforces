@@ -162,7 +162,8 @@ export function quickValue(q: QuickSettings, option: QuickOption): string {
 
 /**
  * Presets de fábrica cujo modo já existe (gameplay.md §10.4): Vibe (Pela vibe, 4v4), Tryhard (6v6) e Imortais
- * (você e 5 Normal Bob contra 6 Jorge the Immortal; rodada 8, D2: era "Sexta do Jorge"). Os outros (X1 Sniper, 2v2 + bots, 4 vs 40, Sofá Zombies, Paintball) chegam
+ * (você e 5 Normal Bob contra 6 Jorge the Immortal; rodada 8, D2: era "Sexta do Jorge"); M3 (fase 6c): Sofá Zombies e
+ * Zombies Relâmpago. Os outros (X1 Sniper, 2v2 + bots, 4 vs 40, Paintball) chegam
  * com o modo, o mapa ou o multijogador deles.
  */
 export function factoryPresets(): MatchRecipe[] {
@@ -182,9 +183,23 @@ export function factoryPresets(): MatchRecipe[] {
     match: { timeLimitS: minutes * 60, scoreLimit: scoreFor('warfare.tdm', minutes) },
     teams: [{ humans: 'all', bots: [{ ref: ally, count: allies }] }, { bots: [{ ref: foe, count: foes }] }],
   });
+  // M3 (fase 6c): Bobo Zombies na Base Abandonada. O Sofá Zombies leva 3 bots de apoio, e quem entra no sofá toma o
+  // lugar deles (até 4 humanos); o Relâmpago são 5 ondas.
+  const zombies = (name: string, waves: number, support: number): MatchRecipe => ({
+    format: MATCH_RECIPE_FORMAT,
+    name,
+    mode: 'zombies',
+    map: 'base',
+    seed: 0,
+    match: { timeLimitS: 0, scoreLimit: 0 },
+    zombies: { waves },
+    teams: [{ humans: 'all', bots: support > 0 ? [{ ref: builtinBotRef('normal'), count: support }] : [] }],
+  });
   return [
     tdm(t('preset.name.vibe'), builtinBotRef('vibe'), 3, builtinBotRef('vibe'), 4, 5),
     tdm(t('preset.name.tryhard'), builtinBotRef('tryhard'), 5, builtinBotRef('tryhard'), 6, 10),
     tdm(t('preset.name.immortals'), builtinBotRef('normal'), 5, 'builtin:jorge-the-immortal', 6, 10),
+    zombies(t('preset.name.couchZombies'), 10, 3),
+    zombies(t('preset.name.zombiesBlitz'), 5, 0),
   ];
 }

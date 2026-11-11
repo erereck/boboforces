@@ -295,6 +295,9 @@ export const STRINGS_PT_BR = {
   'preset.name.vibe': 'Vibe',
   'preset.name.tryhard': 'Tryhard',
   'preset.name.immortals': 'Imortais',
+  // M3 (fase 6c): os presets de fábrica do Bobo Zombies.
+  'preset.name.couchZombies': 'Sofá Zombies',
+  'preset.name.zombiesBlitz': 'Zombies Relâmpago',
   // M2 (fase 4e): Partida personalizada.
   'menu.custom': 'Mais regras',
   'custom.title': 'Partida personalizada',

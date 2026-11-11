@@ -123,6 +123,14 @@ export function rollSurprise(rng: Rng): MatchRecipe {
  * baixo ("Times · 5 min ou 30 abates"; o mapa entra quando houver mais de um, na fase 5).
  */
 export function presetShortcut(recipe: MatchRecipe): { label: string; caption: string } {
+  if (recipe.mode === 'zombies') {
+    // M3 (fase 6c): o Bobo Zombies não tem tamanho de time nem nível: o nome (ou o mapa) e a duração.
+    const named = (recipe.name ?? '').trim();
+    return {
+      label: named !== '' ? named : t(`map.${recipe.map}` as StringKey),
+      caption: [t('mode.short.zombies'), zombieWaves(recipe)].join(t('summary.separator')),
+    };
+  }
   const counts = presetBotCounts(recipe);
   let size: string;
   if (ffa(recipe) || recipe.teams.length < 2) size = t('quick.bots', { n: counts.reduce((a, b) => a + b, 0) });

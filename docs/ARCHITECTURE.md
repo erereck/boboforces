@@ -2582,3 +2582,13 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Resultado:** no solo, "Caiu na onda N" e "Sobreviveu às N ondas!"; a linha do recorde só fica grande quando o
   recorde cai. Conferido no Edge (`local/m3/capturar-resultado-zombies.ts`, na porta 5174 porque a 5173 era de outro
   projeto aberto).
+
+### 13.28 Fase 6c: presets de fábrica do Bobo Zombies (11/11/2026)
+
+- **Sofá Zombies** (gameplay.md §10.4): Base Abandonada, Curta (10 ondas), 3 bots de apoio Normal Bob. Quem entra pela
+  tela do sofá toma o lugar de um bot (`seatRecipe` mantém o tamanho do time), então com 4 humanos não sobra bot.
+- **Zombies Relâmpago:** Base Abandonada, 5 ondas, sem bots.
+- **Onde aparecem:** nos "Prontos" da Partida Rápida (a lista rola; os 5 cards cabem), na troca de partida da tela do
+  sofá e no Surpreenda-me não (ele sorteia só o Warfare).
+- **Atalho do Zombies:** o card sem nome mostra o mapa ("Base Abandonada") e a linha "Zombies · 10 ondas" (antes saía
+  "0 bots", porque o atalho contava o tamanho do time).

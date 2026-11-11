@@ -61,6 +61,8 @@ Plano em `docs/PLANO_M3.md`.
   todos e ao Zombies. Com o Zombies, as abas mostram as regras do modo: duração, quantidade, velocidade e vida dos
   zumbis, especiais, chefão, pontos, "levanta sozinho" e de 0 a 3 bots de apoio. "Mudar regras" no resultado do
   Zombies abre essa tela.
+- **Fase 6c, presets de fábrica do Bobo Zombies:** Sofá Zombies (10 ondas; 3 bots de apoio que saem quando mais gente
+  entra no sofá) e Zombies Relâmpago (5 ondas), na Partida Rápida e na tela do sofá.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
