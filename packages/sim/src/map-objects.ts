@@ -1,7 +1,7 @@
 import { NAV_GATE_BLOCK, type NavGrid } from '@boboforces/nav';
 import { assert } from '@boboforces/shared';
 import { COLLIDER_FLAG, COLLIDER_STRIDE, createStaticColliders, type StaticColliders } from '@boboforces/world';
-import { ZOMBIE_BARRICADES } from './config/zombie.ts';
+import { ZOMBIE_BARRICADES, ZOMBIE_PERKS } from './config/zombie.ts';
 
 /**
  * M3 (fase 3d): as entidades do mapa do Bobo Zombies (GDD §4.1.5, gameplay.md §8.7): **janelas com barricada** (6
@@ -21,6 +21,7 @@ export const MAX_BARRICADES = 32;
 export const MAX_DOORS = 16;
 export const MAX_WALL_BUYS = 16;
 export const MAX_BOX_SPOTS = 3;
+export const MAX_PERK_MACHINES = 8;
 
 /** M3 (fase 4b): posições de `MapObjects.boxState`. */
 export const BOX = { active: 0, phase: 1, ticks: 2, weapon: 3, uses: 4, moveAt: 5 } as const;
@@ -74,6 +75,19 @@ export interface BoxSpotDef {
   readonly facing: BarricadeOutside;
 }
 
+/**
+ * M3 (fase 4c): máquina de vantagem: o meio da frente, no chão (metros), o lado da frente (`facing`), a vantagem
+ * (bit de `PERK`) e o preço. A máquina é uma caixa fixa atrás da frente (colide e fecha a navegação).
+ */
+export interface PerkMachineDef {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: BarricadeOutside;
+  readonly perk: number;
+  readonly cost: number;
+}
+
 const OUTSIDE_NX = [1, -1, 0, 0] as const;
 const OUTSIDE_NZ = [0, 0, 1, -1] as const;
 const DOOR_FLAGS = COLLIDER_FLAG.solid | COLLIDER_FLAG.blocksBullets | COLLIDER_FLAG.blocksSight;
@@ -108,6 +122,15 @@ export class MapObjects {
   readonly boxZ: Float32Array;
   readonly boxNx: Float32Array;
   readonly boxNz: Float32Array;
+  /** M3 (fase 4c): máquinas de vantagem (estáticas). */
+  readonly machines: number;
+  readonly pmx: Float32Array;
+  readonly pmy: Float32Array;
+  readonly pmz: Float32Array;
+  readonly pmnx: Float32Array;
+  readonly pmnz: Float32Array;
+  readonly pmPerk: Uint8Array;
+  readonly pmCost: Int32Array;
   // --- Estado (snapshot e hash) ---
   /** M3 (fase 4b): a caixa (índices em `BOX`: posição ativa, fase, ticks da fase, arma, usos, usos até o ursinho). */
   readonly boxState: Int32Array;
@@ -136,6 +159,7 @@ export class MapObjects {
     doors: readonly DoorDef[],
     wallBuys: readonly WallBuyDef[] = [],
     boxSpots: readonly BoxSpotDef[] = [],
+    machines: readonly PerkMachineDef[] = [],
   ) {
     const nb = barricades.length;
     const nd = doors.length;
@@ -191,6 +215,27 @@ export class MapObjects {
       this.boxNx[i] = OUTSIDE_NX[b.facing];
       this.boxNz[i] = OUTSIDE_NZ[b.facing];
     });
+    const nm = machines.length;
+    assert(nm <= MAX_PERK_MACHINES, `sim: até ${MAX_PERK_MACHINES} máquinas de vantagem`);
+    this.machines = nm;
+    this.pmx = new Float32Array(nm);
+    this.pmy = new Float32Array(nm);
+    this.pmz = new Float32Array(nm);
+    this.pmnx = new Float32Array(nm);
+    this.pmnz = new Float32Array(nm);
+    this.pmPerk = new Uint8Array(nm);
+    this.pmCost = new Int32Array(nm);
+    machines.forEach((q, i) => {
+      assert(Number.isFinite(q.x) && Number.isFinite(q.y) && Number.isFinite(q.z), `sim: máquina ${i} inválida`);
+      assert(Number.isInteger(q.cost) && q.cost >= 0 && q.perk > 0, `sim: máquina ${i} com vantagem ou preço inválido`);
+      this.pmx[i] = q.x;
+      this.pmy[i] = q.y;
+      this.pmz[i] = q.z;
+      this.pmnx[i] = OUTSIDE_NX[q.facing];
+      this.pmnz[i] = OUTSIDE_NZ[q.facing];
+      this.pmPerk[i] = q.perk;
+      this.pmCost[i] = q.cost;
+    });
     this.boxState = new Int32Array(6);
     this.boxUser = new Uint32Array(1);
     this.planks = new Uint8Array(nb);
@@ -198,8 +243,21 @@ export class MapObjects {
     this.repairTicks = new Int32Array(nb);
     this.repairer = new Uint32Array(nb);
     this.doorOpen = new Uint8Array(nd);
-    // Caixas dos portões (janelas, depois portas): a mesma caixa vai para a colisão e para a navegação.
-    const gates = new Float32Array((nb + nd) * 6);
+    // Caixas dos portões (janelas, portas e, M3 fase 4c, máquinas): a mesma caixa vai para a colisão e a navegação.
+    const nmGates = machines.length;
+    const gates = new Float32Array((nb + nd + nmGates) * 6);
+    machines.forEach((q, i) => {
+      const nx = OUTSIDE_NX[q.facing];
+      const nz = OUTSIDE_NZ[q.facing];
+      const hw = ZOMBIE_PERKS.widthM / 2;
+      const d = ZOMBIE_PERKS.depthM;
+      // Da frente (x, z) para trás (−normal) `depthM`; largura na tangente.
+      const x0 = nx !== 0 ? (nx > 0 ? q.x - d : q.x) : q.x - hw;
+      const x1 = nx !== 0 ? (nx > 0 ? q.x : q.x + d) : q.x + hw;
+      const z0 = nz !== 0 ? (nz > 0 ? q.z - d : q.z) : q.z - hw;
+      const z1 = nz !== 0 ? (nz > 0 ? q.z : q.z + d) : q.z + hw;
+      gates.set([x0, q.y, z0, x1, q.y + ZOMBIE_PERKS.heightM, z1], (nb + nd + i) * 6);
+    });
     barricades.forEach((b, i) => {
       assert(
         Number.isFinite(b.x) && Number.isFinite(b.y) && Number.isFinite(b.z) && b.width > 0,
@@ -234,7 +292,7 @@ export class MapObjects {
     // colisor por janela e por porta.
     const base = props?.count ?? 0;
     this.base = base;
-    const total = base + nb + nd;
+    const total = base + nb + nd + nmGates;
     const boxes = new Float32Array(total * COLLIDER_STRIDE);
     const flags = new Uint8Array(total);
     const owner = new Int32Array(total).fill(-1);
@@ -247,7 +305,7 @@ export class MapObjects {
     this.boboColliders = createStaticColliders({ boxes, flags: flags.slice(), owner, count: total });
     this.zombieColliders = createStaticColliders({ boxes, flags: flags.slice(), owner, count: total });
     this.nav = nav;
-    if (nav !== null) nav.assignGates(gates, nb + nd);
+    if (nav !== null) nav.assignGates(gates, nb + nd + nmGates);
     this.reset();
   }
 
@@ -268,6 +326,13 @@ export class MapObjects {
   sync(): void {
     for (let i = 0; i < this.barricades; i++) this.syncBarricade(i);
     for (let d = 0; d < this.doors; d++) this.syncDoor(d);
+    // M3 (fase 4c): as máquinas são fixas: sólidas para todos e fecham a navegação.
+    for (let q = 0; q < this.machines; q++) {
+      const k = this.base + this.barricades + this.doors + q;
+      this.boboColliders.flags[k] = DOOR_FLAGS;
+      this.zombieColliders.flags[k] = DOOR_FLAGS;
+      this.nav?.setGateBlock(this.barricades + this.doors + q, NAV_GATE_BLOCK.bobo | NAV_GATE_BLOCK.zombie);
+    }
   }
 
   syncBarricade(i: number): void {

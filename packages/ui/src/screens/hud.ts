@@ -91,6 +91,8 @@ export interface HudModel {
   interact: number;
   interactCost: number;
   interactAfford: boolean;
+  /** M3 (fase 4c): as vantagens do jogador (bits na ordem chonky, speedy, buddy), em plaquinhas em cima da vida. */
+  perks: number;
   /** M3 (fase 4a): o nome da arma na parede, já em caixa alta (`HUD_INTERACT.buy`; da tabela, sem criar por quadro). */
   interactName: string;
   /** M2 (fase 2c): mostra a dica da derrota feia ("Tá puxado?") na tela de morte. */
@@ -213,6 +215,7 @@ export function createHudModel(): HudModel {
     interactCost: 0,
     interactAfford: true,
     interactName: '',
+    perks: 0,
     hardTimeHint: false,
     primaryHit: { layout: PRIMARY_LAYOUT.none, count: 0, rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4) },
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
@@ -306,6 +309,9 @@ const HUD_CHIP_MAX_FRACTION = 0.36;
 /** M3 (fase 2d): o caído na HUD: sangrando (segundos), alguém levantando (%), levantando sozinho (segundos). */
 export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as const;
 
+/** M3 (fase 4c): a cor de cada vantagem (Chonky Cola, Speedy Soda, Buddy Brew) nas plaquinhas. */
+const PERK_COLORS: readonly number[] = [COLORS.perigo, TEAM_COLORS[2]!, TEAM_COLORS[1]!];
+
 /** M3 (fase 3d): o aviso de interagir do Bobo Zombies. */
 export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4, box: 5, boxTake: 6 } as const;
 
@@ -343,6 +349,8 @@ interface HudTexts {
   /** M3 (fase 4b): `hud.box` [antes, depois] do preço e `hud.boxTake` [antes, depois] do nome. */
   readonly box: readonly string[];
   readonly boxTake: readonly string[];
+  /** M3 (fase 4c): a inicial de cada vantagem (C, S, B). */
+  readonly perkLetters: readonly string[];
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -377,6 +385,7 @@ function hudTexts(): HudTexts {
     buyAmmo: templateParts('hud.buyAmmo', ['cost']).map((p) => p.toUpperCase()),
     box: templateParts('hud.box', ['cost']).map((p) => p.toUpperCase()),
     boxTake: templateParts('hud.boxTake', ['weapon']).map((p) => p.toUpperCase()),
+    perkLetters: [t('perk.chonky'), t('perk.speedy'), t('perk.buddy')].map((n) => n.slice(0, 1).toUpperCase()),
   };
   return cachedTexts;
 }
@@ -712,6 +721,27 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
     paintNumber(out, hud, hp, 0, left + pad, ty, numberPx, low ? COLORS.perigo : COLORS.texto);
     paintBar(out, left + pad, ty + capN + pad, innerW, barH, frac, COLORS.linha, low ? COLORS.perigo : COLORS.ok);
+    // M3 (fase 4c): as vantagens, em plaquinhas quadradas com a inicial na cor de cada uma, em cima da vida.
+    if (model.perks !== 0 && !model.dead) {
+      const size = Math.round(capL + pad * 2);
+      let bx = left;
+      for (let k = 0; k < PERK_COLORS.length; k++) {
+        if ((model.perks & (1 << k)) === 0) continue;
+        plate(out, bx, y - gap - size, size, size, s);
+        paintText(
+          out,
+          hud,
+          tx.perkLetters[k] as string,
+          bx + size / 2,
+          y - gap - size + pad,
+          labelPx,
+          PERK_COLORS[k]!,
+          0,
+          0.5,
+        );
+        bx += size + gap;
+      }
+    }
   }
 
   // Embaixo à direita: munição (pente / reserva; no compacto só o pente; a faca não tem; a granada na mão é só o

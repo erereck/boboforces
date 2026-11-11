@@ -38,6 +38,8 @@ Plano em `docs/PLANO_M3.md`.
   Door Knocker, Rattler e Lawnmower) com o aviso de compra no HUD; a mesma arma de novo recarrega pela metade do preço.
 - **Fase 4b, Caixa Misteriosa:** 950 pontos, gira e oferece uma arma aleatória por 10 s; de vez em quando sai o ursinho,
   devolve os pontos e a caixa muda de lugar (3 posições no Posto).
+- **Fase 4c, vantagens:** máquinas de Chonky Cola (vida 150), Speedy Soda (recarga rápida) e Buddy Brew (levanta o
+  colega rápido); perdidas ao cair; as que você tem aparecem em cima da vida.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

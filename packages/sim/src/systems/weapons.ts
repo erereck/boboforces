@@ -1,3 +1,4 @@
+import { PERK, ZOMBIE_PERKS } from '../config/zombie.ts';
 import { FIGURE_BONE, FIGURE_PART_CATEGORY, type FigurePart } from '@boboforces/format';
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { clamp, DEG_TO_RAD, HALF_PI, TAU } from '@boboforces/shared';
@@ -165,7 +166,10 @@ export function weaponSystem(ctx: SimContext): void {
       s.slotReserve[k]! > 0 &&
       (s.slotClip[k] === 0 || ((pressed & BUTTON.reload) !== 0 && s.slotClip[k]! < def.clipSize))
     ) {
-      s.reloadTicks[e] = Math.max(1, secondsToTicks(def.reloadPerRoundS > 0 ? def.reloadPerRoundS : def.reloadS, hz));
+      s.reloadTicks[e] = Math.max(
+        1,
+        secondsToTicks((def.reloadPerRoundS > 0 ? def.reloadPerRoundS : def.reloadS) * reloadMul(ctx, e), hz),
+      );
       ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'reloadStart');
     }
     if (s.reloadTicks[e]! > 0) fl |= F.reloading;
@@ -261,7 +265,7 @@ function finishReload(ctx: SimContext, e: number, k: number, def: WeaponDef): vo
     s.slotClip[k] = s.slotClip[k]! + 1;
     s.slotReserve[k] = s.slotReserve[k]! - 1;
     if (s.slotClip[k]! < def.clipSize && s.slotReserve[k]! > 0) {
-      s.reloadTicks[e] = Math.max(1, secondsToTicks(def.reloadPerRoundS, ctx.hz));
+      s.reloadTicks[e] = Math.max(1, secondsToTicks(def.reloadPerRoundS * reloadMul(ctx, e), ctx.hz));
       return;
     }
   } else {
@@ -646,4 +650,9 @@ function throwGrenade(ctx: SimContext, e: number, k: number, def: WeaponDef, fl:
     -Math.cos(yaw) * cp * v + s.velocity[e3 + 2]! * THROW_INHERIT,
     fuseTicks,
   );
+}
+
+/** M3 (fase 4c): a Speedy Soda recarrega na metade do tempo (só no Bobo Zombies). */
+function reloadMul(ctx: SimContext, e: number): number {
+  return ctx.zombiesMode && (ctx.s.perks[e]! & PERK.speedy) !== 0 ? ZOMBIE_PERKS.speedyReloadMul : 1;
 }

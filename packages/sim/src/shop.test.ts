@@ -4,10 +4,11 @@ import { yawToU16 } from '@boboforces/shared';
 import { BLOCK_FLAG, createBlockRegistry, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { WEAPON_CODE, weaponDef } from './config/weapons.ts';
-import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
+import { BOX_PHASE, PERK, ZOMBIE_BOX, ZOMBIE_POINTS, ZOMBIE_SHOP } from './config/zombie.ts';
 import { SIM_HZ } from './constants.ts';
 import type { BoxEvent, PurchaseEvent, SimEvent } from './events.ts';
 import { BOX } from './map-objects.ts';
+import { ENTITY_FLAG } from './entity.ts';
 import { createInputFrames } from './loop.ts';
 import { simMapFromMarkers } from './map.ts';
 import { createSim, type Sim, type SimMap } from './sim.ts';
@@ -40,6 +41,11 @@ function shopMap(): SimMap {
       boxSpots: [
         { x: 4, y: FLOOR, z: 14.5, facing: 3 },
         { x: 16, y: FLOOR, z: 14.5, facing: 3 },
+      ],
+      perkMachines: [
+        { x: 2, y: FLOOR, z: 15, facing: 3, perk: 'chonky', cost: 2500 },
+        { x: 7, y: FLOOR, z: 15, facing: 3, perk: 'speedy', cost: 3000 },
+        { x: 13, y: FLOOR, z: 15, facing: 3, perk: 'buddy', cost: 1500 },
       ],
     },
   });
@@ -205,5 +211,99 @@ describe('Bobo Zombies: Caixa Misteriosa (M3, fase 4b)', () => {
     // Na posição velha não abre mais.
     press(sim, f, events);
     expect(boxEvents(events)).toEqual([]);
+  });
+});
+
+describe('Bobo Zombies: vantagens (M3, fase 4c)', () => {
+  /** Põe o humano `c` na frente da máquina `q` (teste: direto na posição). */
+  function atMachine(sim: Sim, c: number, q: number): void {
+    const v = sim.view();
+    const e = sim.controllerEntity(c) & 0xffff;
+    const mo = v.mapObjects!;
+    (v.position as Float64Array)[e * 3] = mo.pmx[q]!;
+    (v.position as Float64Array)[e * 3 + 2] = mo.pmz[q]! - 0.8;
+  }
+
+  it('Chonky Cola: vida 150 na hora; Speedy Soda: recarga na metade; a máquina é sólida', () => {
+    const sim = createSim({ recipe, map: shopMap(), humans: 1, zombies: 1 });
+    const v = sim.view();
+    const h = sim.controllerEntity(0) & 0xffff;
+    const f = createInputFrames();
+    const events: SimEvent[] = [];
+    (v.points as Int32Array)[h] = 10_000;
+    atMachine(sim, 0, 0);
+    press(sim, f, events);
+    expect(v.perks[h]).toBe(PERK.chonky);
+    expect(v.health[h]).toBe(150);
+    expect(v.points[h]).toBe(10_000 - 2500);
+    // Recarga da pistola sem e com a Speedy Soda: ticks entre o começo e o fim (pelos eventos).
+    const me = sim.controllerEntity(0);
+    const reloadTicks = (): number => {
+      f[0]!.yaw = yawToU16(Math.PI);
+      f[0]!.buttons = BUTTON.fire;
+      sim.step(f);
+      f[0]!.buttons = 0;
+      sim.step(f);
+      f[0]!.buttons = BUTTON.reload;
+      let start = -1;
+      for (let t = 0; t < 5 * SIM_HZ; t++) {
+        events.length = 0;
+        sim.step(f);
+        f[0]!.buttons = 0;
+        sim.drainEvents(events);
+        for (const ev of events) {
+          if (ev.type !== 'weapon' || ev.entity !== me) continue;
+          if (ev.action === 'reloadStart') start = ev.tick;
+          if (ev.action === 'reloadEnd' && start >= 0) return ev.tick - start;
+        }
+      }
+      return -1;
+    };
+    const slow = reloadTicks();
+    for (let t = 0; t < 4 * SIM_HZ; t++) sim.step(f);
+    atMachine(sim, 0, 1);
+    f[0]!.yaw = 0;
+    press(sim, f, events);
+    expect(v.perks[h]).toBe(PERK.chonky | PERK.speedy);
+    const fast = reloadTicks();
+    expect(slow).toBeGreaterThan(20);
+    expect(Math.abs(fast - slow / 2)).toBeLessThanOrEqual(1);
+    // A máquina é sólida: andar para ela não passa da frente.
+    f[0]!.yaw = yawToU16(Math.PI);
+    f[0]!.moveY = quantizeAxis(1);
+    for (let t = 0; t < SIM_HZ; t++) sim.step(f);
+    f[0]!.moveY = 0;
+    expect(v.position[h * 3 + 2]).toBeLessThan(15 - 0.25);
+  });
+
+  it('Buddy Brew: levanta o colega caído na metade dos 3 s', () => {
+    const r2: MatchRecipe = { ...recipe, teams: [{ humans: 'all', bots: [] }] };
+    const sim = createSim({ recipe: r2, map: shopMap(), humans: 2, zombies: 1 });
+    const v = sim.view();
+    const a = sim.controllerEntity(0) & 0xffff;
+    const b = sim.controllerEntity(1) & 0xffff;
+    const f = createInputFrames();
+    const events: SimEvent[] = [];
+    (v.points as Int32Array)[a] = 5000;
+    atMachine(sim, 0, 2);
+    press(sim, f, events);
+    expect(v.perks[a]).toBe(PERK.buddy);
+    // Teste: o B cai do lado do A (o estado de caído, direto).
+    const pos = v.position as Float64Array;
+    pos[b * 3] = pos[a * 3]! + 0.8;
+    pos[b * 3 + 2] = pos[a * 3 + 2]!;
+    (v.flags as Uint32Array)[b] = v.flags[b]! | ENTITY_FLAG.downed;
+    (v.downTicks as Int32Array)[b] = 20 * SIM_HZ;
+    (v.health as Float32Array)[b] = 1;
+    f[0]!.buttons = BUTTON.use;
+    let up = -1;
+    for (let t = 0; t < 4 * SIM_HZ && up < 0; t++) {
+      events.length = 0;
+      sim.step(f);
+      sim.drainEvents(events);
+      if (events.some((ev) => ev.type === 'down' && ev.action === 'revive')) up = t + 1;
+    }
+    expect(up).toBeGreaterThan(0);
+    expect(up).toBeLessThanOrEqual(1.5 * SIM_HZ + 1);
   });
 });

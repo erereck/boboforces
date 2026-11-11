@@ -3,6 +3,7 @@ import type { NavGrid } from '@boboforces/nav';
 import { assert } from '@boboforces/shared';
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 import { WEAPONS } from './config/weapons.ts';
+import { perkBit } from './config/zombie.ts';
 import { MAX_TEAMS } from './constants.ts';
 import type { SimMap, SpawnPoint } from './sim.ts';
 
@@ -11,7 +12,10 @@ export interface SimMapSource {
   readonly grid: WorldGrid;
   readonly blocks: BlockRegistry;
   /** Marcadores do `.bfmap` (`MapDocument.markers`): spawns, área jogável e (M3) janelas e portas do Zombies. */
-  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys' | 'boxSpots'>;
+  readonly markers: Pick<
+    MapMarkers,
+    'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys' | 'boxSpots' | 'perkMachines'
+  >;
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
 }
@@ -75,6 +79,16 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     // M3 (fase 4b): posições da Caixa Misteriosa.
     ...(source.markers.boxSpots?.length
       ? { boxSpots: source.markers.boxSpots.map((b) => ({ x: b.x, y: b.y, z: b.z, facing: b.facing })) }
+      : {}),
+    // M3 (fase 4c): máquinas de vantagem (o ID vira o bit de `PERK`).
+    ...(source.markers.perkMachines?.length
+      ? {
+          perkMachines: source.markers.perkMachines.map((q, i) => {
+            const perk = perkBit(q.perk);
+            assert(perk > 0, `mapa: máquina ${i} com vantagem desconhecida (${q.perk})`);
+            return { x: q.x, y: q.y, z: q.z, facing: q.facing, perk, cost: q.cost };
+          }),
+        }
       : {}),
   };
 }

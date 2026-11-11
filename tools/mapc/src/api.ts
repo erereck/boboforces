@@ -5,6 +5,7 @@ import type {
   MapBoxSpotMarker,
   MapMannequin,
   MapPaidDoorMarker,
+  MapPerkMachineMarker,
   MapWallBuyMarker,
   MapMeta,
   MapPointMarker,
@@ -117,6 +118,8 @@ export interface MapBuilder {
   wallBuy(buy: MapWallBuyMarker): void;
   /** M3 (fase 4b): posição da Caixa Misteriosa (a 1ª chamada é onde ela começa; até 3). */
   boxSpot(spot: MapBoxSpotMarker): void;
+  /** M3 (fase 4c): máquina de vantagem (o meio da frente, no chão; a máquina fica atrás, encostada na parede). */
+  perkMachine(machine: MapPerkMachineMarker): void;
   playArea(minX: number, minZ: number, maxX: number, maxZ: number, killPlaneY: number): void;
   sun(dirX: number, dirY: number, dirZ: number, timeOfDay: TimeOfDay): void;
   /** RNG com semente por domínio (decoração procedural determinística). */

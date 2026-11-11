@@ -237,6 +237,19 @@ export interface MapBoxSpotMarker {
   readonly facing: 0 | 1 | 2 | 3;
 }
 
+/**
+ * M3 (fase 4c): máquina de vantagem do Bobo Zombies: o meio da frente, no chão (metros), o lado da frente (0 +X, 1 -X,
+ * 2 +Z, 3 -Z), a vantagem (`chonky`, `speedy` ou `buddy`) e o preço.
+ */
+export interface MapPerkMachineMarker {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: 0 | 1 | 2 | 3;
+  readonly perk: string;
+  readonly cost: number;
+}
+
 export interface MapMarkers {
   readonly spawns: readonly MapSpawnMarker[];
   readonly domination: readonly MapPointMarker[];
@@ -253,6 +266,8 @@ export interface MapMarkers {
   readonly wallBuys?: readonly MapWallBuyMarker[];
   /** M3 (fase 4b): posições da Caixa Misteriosa (até 3; a 1ª é onde ela começa). */
   readonly boxSpots?: readonly MapBoxSpotMarker[];
+  /** M3 (fase 4c): máquinas de vantagem (opcional). */
+  readonly perkMachines?: readonly MapPerkMachineMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

@@ -161,6 +161,24 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_perk_chonky",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_perk_speedy",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_perk_buddy",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

@@ -9,6 +9,7 @@ import {
   type MapMannequin,
   type MapMeta,
   type MapPaidDoorMarker,
+  type MapPerkMachineMarker,
   type MapWallBuyMarker,
   type MapPointMarker,
   type MapProp,
@@ -72,6 +73,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
   const paidDoors: MapPaidDoorMarker[] = [];
   const wallBuys: MapWallBuyMarker[] = [];
   const boxSpots: MapBoxSpotMarker[] = [];
+  const perkMachines: MapPerkMachineMarker[] = [];
   let meta: MapMeta | null = null;
   let playArea: MapDocument['markers']['playArea'] | null = null;
   let light: MapLight | null = null;
@@ -233,6 +235,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
     paidDoor: (d) => void paidDoors.push(d),
     wallBuy: (w) => void wallBuys.push(w),
     boxSpot: (b) => void boxSpots.push(b),
+    perkMachine: (q) => void perkMachines.push(q),
     playArea(minX, minZ, maxX, maxZ, killPlaneY) {
       playArea = { minX, minZ, maxX, maxZ, killPlaneY };
     },
@@ -294,6 +297,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
           ...(paidDoors.length > 0 ? { paidDoors } : {}),
           ...(wallBuys.length > 0 ? { wallBuys } : {}),
           ...(boxSpots.length > 0 ? { boxSpots } : {}),
+          ...(perkMachines.length > 0 ? { perkMachines } : {}),
           playArea: playArea ?? { minX: 0, minZ: 0, maxX: 0, maxZ: 0, killPlaneY: 0 },
         },
         light: light ?? { sunDir: [0, 1, 0], timeOfDay: 'day', emitters: [] },

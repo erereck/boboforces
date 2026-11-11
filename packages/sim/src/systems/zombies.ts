@@ -1,18 +1,20 @@
 import { BUTTON } from '@boboforces/input';
 import {
+  PERK,
   runnerChance,
   ZOMBIE_KINDS,
   ZOMBIE_SPECIALS,
   ZOMBIE_TYPE,
   ZOMBIES_DOWN,
   ZOMBIES_MODE,
+  ZOMBIE_PERKS,
   zombiesInWave,
   zombieWaveHp,
 } from '../config/zombie.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { barricadesSystem } from './barricades.ts';
-import { mysteryBoxSystem, wallBuySystem } from './shop.ts';
+import { mysteryBoxSystem, perkSystem, wallBuySystem } from './shop.ts';
 import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
 
 const F = ENTITY_FLAG;
@@ -36,6 +38,7 @@ export function zombiesSystem(ctx: SimContext): void {
   barricadesSystem(ctx);
   wallBuySystem(ctx);
   mysteryBoxSystem(ctx);
+  perkSystem(ctx);
   let bobos = 0;
   let bobosUp = 0;
   let selfComing = false;
@@ -127,7 +130,12 @@ function updateDowned(ctx: SimContext): void {
         s.reviveTicks[e] = 0;
       }
       s.reviveTicks[e] = s.reviveTicks[e]! + 1;
-      if (s.reviveTicks[e]! >= r.reviveTicks) standUp(ctx, e, id);
+      // M3 (fase 4c): com a Buddy Brew, quem levanta leva a metade do tempo.
+      const need =
+        (s.perks[helper]! & PERK.buddy) !== 0
+          ? Math.max(1, Math.round(r.reviveTicks * ZOMBIE_PERKS.buddyReviveMul))
+          : r.reviveTicks;
+      if (s.reviveTicks[e]! >= need) standUp(ctx, e, id);
       continue;
     }
     s.reviver[e] = NULL_ENTITY;

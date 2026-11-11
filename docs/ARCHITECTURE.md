@@ -2446,3 +2446,21 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   (troca a cada 0,12 s, só desenho) e sobem; oferecendo, a sorteada flutua no alto, mais clara. Avisos
   "Interagir: Caixa Misteriosa por 950" e, para quem pagou, "Interagir: pegar Lawnmower". Sem colisão por enquanto (a
   caixa muda de lugar; o colisor dinâmico fica para a arte da fase 5). Golden do Posto: `9524ad53` (só o hash).
+
+### 13.20 Fase 4c: as vantagens (10/11/2026)
+
+- **Efeitos** (`PERK`, `ZOMBIE_PERKS`; `SimState.perks`, bits por bobo, no snapshot e no hash do Bobo Zombies):
+  Chonky Cola, vida máxima ×1,5 (`maxHpOf`: regeneração, levantar e o HUD usam ela; comprar já soma os 50);
+  Speedy Soda, recarga na metade do tempo; Buddy Brew, quem levanta o colega leva a metade dos 3 s. Cair ou morrer
+  perde todas. Preços no Posto: Buddy 1500, Chonky 2500, Speedy 3000 (dentro dos 1500–3000 do GDD; escolhas minhas).
+- **Máquinas** (`perkSystem` em `systems/shop.ts`; `SimMap.perkMachines`, até 8): o meio da frente no chão, o
+  lado da frente, a vantagem e o preço; o usar (na borda) na frente dela compra (já tem, nada; sem pontos, `purchase`
+  `perk` `denied`). A máquina é uma caixa de 1 × 2 × 0,8 m atrás da frente: entra nos dois conjuntos de colisão
+  (para tiro e visão também) e é um portão da navegação sempre fechado (os nós que ela ocupa saem do caminho).
+- **Mapa:** marcador `perkMachines` no `map@1` (opcional; o validador confere a vantagem) e `perkMachine()` no
+  `mapc`. No Posto: Buddy Brew na sala 1; Chonky Cola e Speedy Soda na sala 2.
+- **Jogo:** modelos `perk-chonky` (vermelha), `perk-speedy` (verde) e `perk-buddy` (azul), geladeiras de 1 × 2 m
+  com a garrafa no painel, um pouco mais claras que a luz do lugar; aviso "Interagir: Chonky Cola por 2.500"; as
+  vantagens do jogador em plaquinhas com a inicial (C, S, B) em cima da vida, que vai a 150 com a Chonky Cola.
+- **Goldens:** Construto `e8669653` (só o hash); Posto `0e0d586b` (as máquinas ocupam espaço nas salas e a partida
+  mudou: onda 3, 31 abates, 8 quedas, derrota antes dos 2 min).

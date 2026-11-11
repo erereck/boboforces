@@ -1,6 +1,7 @@
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
-import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_SHOP } from '../config/zombie.ts';
+import { BOX_PHASE, ZOMBIE_BOX, ZOMBIE_PERKS, ZOMBIE_SHOP } from '../config/zombie.ts';
+import { maxHpOf } from './life.ts';
 import { secondsToTicks } from '../constants.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
@@ -207,4 +208,40 @@ function giveWeapon(ctx: SimContext, e: number, code: number): void {
   s.switchTicks[e] = 0;
   s.fireCooldownS[e] = 0;
   s.cookTicks[e] = -1;
+}
+
+/**
+ * M3 (fase 4c): as máquinas de vantagem. O bobo de pé na frente da máquina aperta o usar (na borda): já tem, nada; sem
+ * pontos, `purchase` com `denied`; senão ganha a vantagem (a Chonky Cola já soma os 50 de vida a mais).
+ */
+export function perkSystem(ctx: SimContext): void {
+  const mo = ctx.mapObjects;
+  if (mo === null || mo.machines === 0) return;
+  const s = ctx.s;
+  for (let e = 0; e < s.count; e++) {
+    if (!usePressed(s, e)) continue;
+    const e3 = e * 3;
+    for (let q = 0; q < mo.machines; q++) {
+      const dx = s.position[e3]! - mo.pmx[q]!;
+      const dz = s.position[e3 + 2]! - mo.pmz[q]!;
+      const dn = dx * mo.pmnx[q]! + dz * mo.pmnz[q]!;
+      const dt = Math.abs(dx * mo.pmnz[q]! - dz * mo.pmnx[q]!);
+      if (dn < 0 || dn > ZOMBIE_PERKS.reachM || dt > ZOMBIE_PERKS.sideM) continue;
+      if (Math.abs(s.position[e3 + 1]! - mo.pmy[q]!) > 1) continue;
+      const bit = mo.pmPerk[q]!;
+      if ((s.perks[e]! & bit) !== 0) break;
+      const cost = mo.pmCost[q]!;
+      const id = s.idOf(e);
+      if (s.points[e]! < cost) {
+        ctx.events.purchase(ctx.tick, q, 'perk', 'denied', bit, cost, id);
+        break;
+      }
+      s.points[e] = s.points[e]! - cost;
+      const before = maxHpOf(ctx, e);
+      s.perks[e] = s.perks[e]! | bit;
+      s.health[e] = Math.min(maxHpOf(ctx, e), s.health[e]! + (maxHpOf(ctx, e) - before));
+      ctx.events.purchase(ctx.tick, q, 'perk', 'ok', bit, cost, id);
+      break;
+    }
+  }
 }

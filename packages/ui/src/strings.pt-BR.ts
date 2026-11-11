@@ -407,6 +407,10 @@ export const STRINGS_PT_BR = {
   // M3 (fase 4b): a Caixa Misteriosa.
   'hud.box': 'Interagir: Caixa Misteriosa por {cost}',
   'hud.boxTake': 'Interagir: pegar {weapon}',
+  // M3 (fase 4c): as vantagens (nomes provisórios, GDD §4.1.5).
+  'perk.chonky': 'Chonky Cola',
+  'perk.speedy': 'Speedy Soda',
+  'perk.buddy': 'Buddy Brew',
   'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
   'hud.zombies.rest': 'Onda {wave} em {s} s',
   'hud.zombies.last': 'Onda {wave} · o último!',

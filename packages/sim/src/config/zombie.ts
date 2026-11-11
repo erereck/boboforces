@@ -254,3 +254,33 @@ export const ZOMBIE_BOX = {
 
 /** M3 (fase 4b): fases da caixa (`MapObjects.boxState[BOX.phase]`). */
 export const BOX_PHASE = { idle: 0, rolling: 1, offering: 2 } as const;
+
+/**
+ * M3 (fase 4c): as vantagens do Bobo Zombies (GDD §4.1.5, nomes provisórios): bits de `SimState.perks`. Chonky Cola
+ * (vida 150), Speedy Soda (recarga na metade do tempo) e Buddy Brew (levanta o colega na metade do tempo); perdidas ao
+ * cair. Preços dentro dos 1500–3000 do GDD (escolhas minhas, revisáveis).
+ */
+export const PERK = { chonky: 1, speedy: 2, buddy: 4 } as const;
+
+/** M3 (fase 4c): ID de cada vantagem (no mapa e na tabela de textos), na ordem dos bits. */
+export const PERK_IDS = ['chonky', 'speedy', 'buddy'] as const;
+export type PerkId = (typeof PERK_IDS)[number];
+
+export const ZOMBIE_PERKS = {
+  chonkyHpMul: 1.5,
+  speedyReloadMul: 0.5,
+  buddyReviveMul: 0.5,
+  /** Na frente da máquina (m) e de lado. */
+  reachM: 1.5,
+  sideM: 0.8,
+  /** Caixa da máquina: largura, altura e fundo (m). */
+  widthM: 1,
+  heightM: 2,
+  depthM: 0.8,
+} as const;
+
+/** O bit de uma vantagem pelo ID (-1 = desconhecida). */
+export function perkBit(id: string): number {
+  const i = (PERK_IDS as readonly string[]).indexOf(id);
+  return i < 0 ? -1 : 1 << i;
+}

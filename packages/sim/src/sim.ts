@@ -69,7 +69,14 @@ import { pickupSystem } from './systems/pickups.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
 import type { MatchView, PickupView, ProjectileView, SimView } from './view.ts';
-import { MapObjects, type BarricadeDef, type BoxSpotDef, type DoorDef, type WallBuyDef } from './map-objects.ts';
+import {
+  MapObjects,
+  type BarricadeDef,
+  type BoxSpotDef,
+  type DoorDef,
+  type PerkMachineDef,
+  type WallBuyDef,
+} from './map-objects.ts';
 
 /** Ponto de spawn declarado pelo mapa (metros, radianos). `team` = -1 para FFA/qualquer time. */
 export interface SpawnPoint {
@@ -104,6 +111,8 @@ export interface SimMap {
   readonly wallBuys?: readonly WallBuyDef[];
   /** M3 (fase 4b): posições da Caixa Misteriosa (até 3; a 1ª é onde ela começa; ausente = sem caixa). */
   readonly boxSpots?: readonly BoxSpotDef[];
+  /** M3 (fase 4c): máquinas de vantagem do Bobo Zombies (ausente = nenhuma). */
+  readonly perkMachines?: readonly PerkMachineDef[];
 }
 
 export interface SimConfig {
@@ -353,7 +362,8 @@ export function createSim(config: SimConfig): Sim {
     (map.barricades?.length ?? 0) +
       (map.doors?.length ?? 0) +
       (map.wallBuys?.length ?? 0) +
-      (map.boxSpots?.length ?? 0) >
+      (map.boxSpots?.length ?? 0) +
+      (map.perkMachines?.length ?? 0) >
     0
       ? new MapObjects(
           map.colliders ?? null,
@@ -362,6 +372,7 @@ export function createSim(config: SimConfig): Sim {
           map.doors ?? [],
           map.wallBuys ?? [],
           map.boxSpots ?? [],
+          map.perkMachines ?? [],
         )
       : null;
   const match: MatchState = {
@@ -543,6 +554,7 @@ export function createSim(config: SimConfig): Sim {
     health: s.health,
     zombieType: s.zombieType,
     bodyScale: s.bodyScale,
+    perks: s.perks,
     points: s.points,
     downTicks: s.downTicks,
     selfUp: s.selfUp,

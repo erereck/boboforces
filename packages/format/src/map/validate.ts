@@ -267,6 +267,16 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     else if (!inArea(b.x, b.z)) err(`posição da caixa ${i} fora da playArea`);
     if (![0, 1, 2, 3].includes(b.facing)) err(`posição da caixa ${i} com frente fora de 0..3`);
   });
+  // M3 (fase 4c): máquinas de vantagem (teto da sim: 8; as vantagens do M3).
+  const machines = mk.perkMachines ?? [];
+  if (machines.length > 8) err(`${machines.length} máquinas de vantagem (máximo 8)`);
+  machines.forEach((q, i) => {
+    if (!finite(q.x, q.y, q.z)) err(`máquina ${i} com número não finito`);
+    else if (!inArea(q.x, q.z)) err(`máquina ${i} fora da playArea`);
+    if (![0, 1, 2, 3].includes(q.facing)) err(`máquina ${i} com frente fora de 0..3`);
+    if (!['chonky', 'speedy', 'buddy'].includes(q.perk)) err(`máquina ${i}: vantagem desconhecida: ${q.perk}`);
+    if (!Number.isInteger(q.cost) || q.cost < 0 || q.cost > 100_000) err(`máquina ${i} com preço inválido`);
+  });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
   }

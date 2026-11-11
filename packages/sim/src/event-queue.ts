@@ -548,7 +548,7 @@ export class EventQueue {
   purchase(
     tick: number,
     index: number,
-    kind: 'weapon' | 'ammo',
+    kind: 'weapon' | 'ammo' | 'perk',
     action: 'ok' | 'denied',
     item: number,
     cost: number,

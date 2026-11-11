@@ -235,7 +235,7 @@ export interface DoorEvent extends EventBase {
 export interface PurchaseEvent extends EventBase {
   readonly type: 'purchase';
   readonly index: number;
-  readonly kind: 'weapon' | 'ammo';
+  readonly kind: 'weapon' | 'ammo' | 'perk';
   readonly action: 'ok' | 'denied';
   readonly item: number;
   readonly cost: number;

@@ -162,6 +162,10 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:zombie-door',
   // M3 (fase 4b): a Caixa Misteriosa (só acrescentado, regra 20)
   'model:mystery-box',
+  // M3 (fase 4c): as máquinas de vantagem (só acrescentados, regra 20)
+  'model:perk-chonky',
+  'model:perk-speedy',
+  'model:perk-buddy',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

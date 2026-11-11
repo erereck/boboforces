@@ -106,7 +106,10 @@ import {
   BOX_PHASE,
   ZOMBIE_BARRICADES,
   ZOMBIE_BOX,
+  ZOMBIE_PERKS,
   ZOMBIE_SHOP,
+  PERK,
+  PERK_IDS,
   ZOMBIES_DOWN,
   heldClip,
   heldReserve,
@@ -826,6 +829,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const plankModel = modelIndex.get('zombie-plank') ?? NO_MODEL;
   const doorModel = modelIndex.get('zombie-door') ?? NO_MODEL;
   const boxModel = modelIndex.get('mystery-box') ?? NO_MODEL;
+  /** M3 (fase 4c): as máquinas, pelo bit da vantagem (1 chonky, 2 speedy, 4 buddy). */
+  const perkModels = [
+    modelIndex.get('perk-chonky') ?? NO_MODEL,
+    modelIndex.get('perk-speedy') ?? NO_MODEL,
+    modelIndex.get('perk-buddy') ?? NO_MODEL,
+  ];
+  /** M3 (fase 4c): os nomes das vantagens em caixa alta (o aviso da máquina), pelo índice do bit. */
+  const perkNamesUpper = PERK_IDS.map((id) => t(`perk.${id}` as StringKey).toUpperCase());
   /** M3 (fase 4b): as armas que passam em cima da caixa enquanto ela gira (só o desenho; o sorteio é da sim). */
   const boxReel = WEAPONS.filter((w) => w.slot === WEAPON_SLOT.primary).map((w) => w.code);
   const projectiles = createProjectileBuffer(MAX_DRAWN_PROJECTILES);
@@ -2818,6 +2829,29 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.light[n * 3 + 2] = lightScratch[2]!;
       n++;
     }
+    // M3 (fase 4c): as máquinas de vantagem (a frente para o lado da normal; a caixa fica atrás da frente).
+    for (let q = 0; q < mo.machines && n < cap; q++) {
+      const model = perkModels[Math.log2(mo.pmPerk[q]!)] ?? NO_MODEL;
+      if (model === NO_MODEL) continue;
+      const nx = mo.pmnx[q]!;
+      const nz = mo.pmnz[q]!;
+      const x = mo.pmx[q]! - nx * ZOMBIE_PERKS.depthM * 0.5;
+      const y = mo.pmy[q]!;
+      const z = mo.pmz[q]! - nz * ZOMBIE_PERKS.depthM * 0.5;
+      projectiles.model[n] = model;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = Math.atan2(-nx, -nz);
+      projectiles.pitch[n] = 0;
+      projectiles.roll[n] = 0;
+      sampleLightGrid(loaded.lightGrid, mo.pmx[q]! + nx * 0.4, y + 1.2, mo.pmz[q]! + nz * 0.4, lightScratch, 0);
+      // A máquina brilha um pouco (tem luz própria, como as do gênero).
+      projectiles.light[n * 3] = Math.min(1.5, lightScratch[0]! * 1.2 + 0.15);
+      projectiles.light[n * 3 + 1] = Math.min(1.5, lightScratch[1]! * 1.2 + 0.15);
+      projectiles.light[n * 3 + 2] = Math.min(1.5, lightScratch[2]! * 1.2 + 0.15);
+      n++;
+    }
     // M3 (fase 4b): a Caixa Misteriosa na posição ativa e, girando ou oferecendo, a arma flutuando em cima.
     if (boxModel !== NO_MODEL && mo.boxSpots > 0 && n + 1 < cap) {
       const st = mo.boxState;
@@ -3191,6 +3225,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
     // M3 (fase 2d): Bobo Zombies.
     m.points = zombiesMode ? v.points[e]! : -1;
+    // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
+    m.perks = zombiesMode ? v.perks[e]! : 0;
+    if ((m.perks & PERK.chonky) !== 0) m.maxHealth = Math.round(m.maxHealth * ZOMBIE_PERKS.chonkyHpMul);
     m.waitWave = zombiesMode && m.dead;
     if (zombiesMode && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
       if (v.selfUp[e] === 1) {
@@ -3248,6 +3285,19 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.interactCost = cost;
         m.interactAfford = v.points[e]! >= cost;
         m.interactName = weaponNamesUpper[code] ?? '';
+      }
+      // M3 (fase 4c): máquina de vantagem que ele ainda não tem (as regras do `perkSystem`).
+      for (let q = 0; q < mo.machines && m.interact === HUD_INTERACT.none; q++) {
+        if ((v.perks[e]! & mo.pmPerk[q]!) !== 0 || Math.abs(y - mo.pmy[q]!) > 1) continue;
+        const dx = x - mo.pmx[q]!;
+        const dz = z - mo.pmz[q]!;
+        const dn = dx * mo.pmnx[q]! + dz * mo.pmnz[q]!;
+        const dt = Math.abs(dx * mo.pmnz[q]! - dz * mo.pmnx[q]!);
+        if (dn < 0 || dn > ZOMBIE_PERKS.reachM || dt > ZOMBIE_PERKS.sideM) continue;
+        m.interact = HUD_INTERACT.buy;
+        m.interactCost = mo.pmCost[q]!;
+        m.interactAfford = v.points[e]! >= mo.pmCost[q]!;
+        m.interactName = perkNamesUpper[Math.log2(mo.pmPerk[q]!)] ?? '';
       }
       // M3 (fase 4b): a Caixa Misteriosa (as regras do `mysteryBoxSystem`): pagar, ou pegar a arma de quem pagou.
       if (mo.boxSpots > 0 && m.interact === HUD_INTERACT.none) {

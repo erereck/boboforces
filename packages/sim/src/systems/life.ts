@@ -2,7 +2,7 @@ import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN } from '../config/zombie.ts';
+import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN, PERK, ZOMBIE_PERKS } from '../config/zombie.ts';
 import { BOT_CONTROLLER_BASE, MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
@@ -109,6 +109,8 @@ function knockDown(ctx: SimContext, t: number, by: EntityId): void {
   const w = ctx.waves;
   s.health[t] = 0;
   s.flags[t] = (s.flags[t]! & ~(F.sprinting | F.sliding | F.ads | F.firing | F.reloading)) | F.downed;
+  // M3 (fase 4c): caiu, perde as vantagens.
+  s.perks[t] = 0;
   s.cookTicks[t] = -1;
   s.reviveTicks[t] = 0;
   s.reviver[t] = NULL_ENTITY;
@@ -128,12 +130,18 @@ function knockDown(ctx: SimContext, t: number, by: EntityId): void {
   ctx.events.down(ctx.tick, s.idOf(t), by, 'down');
 }
 
+/** M3 (fase 4c): a vida máxima de `e` (a da regra, × 1,5 com a Chonky Cola no Bobo Zombies). */
+export function maxHpOf(ctx: SimContext, e: number): number {
+  const base = ctx.rules.maxHp[e]!;
+  return ctx.zombiesMode && (ctx.s.perks[e]! & PERK.chonky) !== 0 ? Math.round(base * ZOMBIE_PERKS.chonkyHpMul) : base;
+}
+
 /** M3 (fase 2c): o bobo caído `t` levanta (por `by`, ou sozinho) com uma parte da vida. */
 export function standUp(ctx: SimContext, t: number, by: EntityId): void {
   const s = ctx.s;
   const self = s.selfUp[t] === 1;
   s.flags[t] = s.flags[t]! & ~F.downed;
-  s.health[t] = Math.max(1, Math.round(ctx.rules.maxHp[t]! * ZOMBIES_DOWN.revivedHpFrac));
+  s.health[t] = Math.max(1, Math.round(maxHpOf(ctx, t) * ZOMBIES_DOWN.revivedHpFrac));
   s.downTicks[t] = 0;
   s.selfUp[t] = 0;
   s.reviveTicks[t] = 0;
@@ -429,10 +437,10 @@ export function spawnSystem(ctx: SimContext): void {
     if (
       (ctx.warfare || ctx.zombiesMode) &&
       s.kind[e] === ENTITY_KIND.bobo &&
-      s.health[e]! < ctx.rules.maxHp[e]! &&
+      s.health[e]! < maxHpOf(ctx, e) &&
       ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks
     ) {
-      s.health[e] = Math.min(ctx.rules.maxHp[e]!, s.health[e]! + ctx.regenPerTick);
+      s.health[e] = Math.min(maxHpOf(ctx, e), s.health[e]! + ctx.regenPerTick);
     }
   }
 }
@@ -668,6 +676,7 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.prevYaw[e] = sp.yaw;
   s.pitch[e] = 0;
   s.prevPitch[e] = 0;
+  s.perks[e] = 0;
   s.health[e] = zombie ? ctx.zombieHp : ctx.rules.maxHp[e]!;
   // Loadout do Bobo Warfare (gameplay.md §4.1): a primária escolhida (`primaryChoice`), pistola, faca e 2 granadas,
   // com pente e reserva cheios. Zumbi não tem arma (o render não desenha nenhuma; o golpe é o `meleeSystem`).

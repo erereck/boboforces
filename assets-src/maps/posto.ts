@@ -112,6 +112,10 @@ function objects(b: MapBuilder): void {
   b.boxSpot({ x: 21.5, y: G, z: Z1 - 0.8, facing: 3 });
   b.boxSpot({ x: 31.5, y: G, z: Z1 - 0.8, facing: 3 });
   b.boxSpot({ x: 32, y: G, z: Z0 + 0.8, facing: 2 });
+  // M3 (fase 4c): as máquinas de vantagem, encostadas nos muros (a frente fica 0,8 m para dentro).
+  b.perkMachine({ x: X0 + 1.3, y: G, z: 19.5, facing: 0, perk: 'buddy', cost: 1500 });
+  b.perkMachine({ x: X1 - 1.3, y: G, z: 19.5, facing: 1, perk: 'chonky', cost: 2500 });
+  b.perkMachine({ x: 26.5, y: G, z: Z1 - 1.3, facing: 3, perk: 'speedy', cost: 3000 });
   const zc = DOOR_Z;
   b.paidDoor({
     minX: XM,

@@ -18,6 +18,7 @@ import {
   type MapBoxSpotMarker,
   type MapMannequin,
   type MapPaidDoorMarker,
+  type MapPerkMachineMarker,
   type MapWallBuyMarker,
   type MapMarkers,
   type MapMeta,
@@ -173,6 +174,18 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
       : {}),
     ...(m.boxSpots && m.boxSpots.length > 0
       ? { boxSpots: m.boxSpots.map((b) => ({ x: b.x, y: b.y, z: b.z, facing: b.facing })) }
+      : {}),
+    ...(m.perkMachines && m.perkMachines.length > 0
+      ? {
+          perkMachines: m.perkMachines.map((q) => ({
+            x: q.x,
+            y: q.y,
+            z: q.z,
+            facing: q.facing,
+            perk: q.perk,
+            cost: q.cost,
+          })),
+        }
       : {}),
     playArea: {
       minX: m.playArea.minX,
@@ -636,6 +649,23 @@ function parseMarkers(json: Json): MapMarkers {
           if (facing !== 0 && facing !== 1 && facing !== 2 && facing !== 3) fail(`${p}.facing fora de 0..3`);
           return { x: num(q['x'], p), y: num(q['y'], p), z: num(q['z'], p), facing };
         });
+  const perkMachines =
+    m['perkMachines'] === undefined
+      ? []
+      : arr(m['perkMachines'], 'perkMachines').map((v, i): MapPerkMachineMarker => {
+          const q = obj(v, `perkMachines[${i}]`);
+          const p = `perkMachines[${i}]`;
+          const facing = int(q['facing'], p);
+          if (facing !== 0 && facing !== 1 && facing !== 2 && facing !== 3) fail(`${p}.facing fora de 0..3`);
+          return {
+            x: num(q['x'], p),
+            y: num(q['y'], p),
+            z: num(q['z'], p),
+            facing,
+            perk: str(q['perk'], p),
+            cost: int(q['cost'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
@@ -647,6 +677,7 @@ function parseMarkers(json: Json): MapMarkers {
     ...(paidDoors.length > 0 ? { paidDoors } : {}),
     ...(wallBuys.length > 0 ? { wallBuys } : {}),
     ...(boxSpots.length > 0 ? { boxSpots } : {}),
+    ...(perkMachines.length > 0 ? { perkMachines } : {}),
     playArea: {
       minX: num(a['minX'], 'playArea.minX'),
       minZ: num(a['minZ'], 'playArea.minZ'),

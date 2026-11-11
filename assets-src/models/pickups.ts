@@ -175,5 +175,63 @@ export function mysteryBox(): BuiltModel {
   return m.build();
 }
 
+/**
+ * M3 (fase 4c): máquina de vantagem (1,0 × 2,0 × 0,81 m), origem no centro do pé, frente em -Z: geladeira de refrigerante
+ * na cor da vantagem, com o painel claro e uma garrafa desenhada, a grade de ventilação embaixo e a tampa escura.
+ */
+function perkMachine(id: string, body: number, dark: number): BuiltModel {
+  const m = new ModelBuilder(id, 'pickup', { flags: 0, debrisColor: body, blocksNav: false });
+  const L = m.layer(`mdl_${id.replace('-', '_')}`, 'opaque', body);
+  const light = tone('placa', 3);
+  const front = m.tile(L, 32, 32, (p) => {
+    p.fill(body);
+    // Painel claro com a garrafa (de cima para baixo: tampa, gargalo, corpo com o rótulo).
+    p.rect(6, 4, 20, 24, light);
+    p.rect(14, 6, 4, 2, dark);
+    p.rect(14, 8, 4, 4, body);
+    p.rect(12, 12, 8, 14, body);
+    p.rect(12, 16, 8, 4, light);
+    p.rect(13, 17, 6, 2, dark);
+    for (let x = 0; x < p.w; x++) p.px(x, 0, dark);
+    for (let y = 0; y < p.h; y++) {
+      p.px(0, y, dark);
+      p.px(p.w - 1, y, dark);
+    }
+  });
+  const grille = m.tile(L, 32, 16, (p) => {
+    p.fill(body);
+    for (let y = 3; y < 14; y += 3) for (let x = 4; x < 28; x++) p.px(x, y, dark);
+    for (let y = 0; y < p.h; y++) {
+      p.px(0, y, dark);
+      p.px(p.w - 1, y, dark);
+    }
+  });
+  const side = m.tile(L, 16, 32, (p) => {
+    p.fill(body);
+    p.blotches(3, dark, 1, 2);
+    for (let y = 0; y < p.h; y++) p.px(0, y, dark);
+  });
+  const top = m.tile(L, 16, 16, (p) => {
+    p.fill(dark);
+  });
+  const body3d = m.part('body');
+  // Duas metades de 1 m: a de cima com o painel, a de baixo com a grade.
+  body3d.tiledBox([-16, 32, -13], [16, 64, 13], { front, back: side, left: side, right: side, top });
+  body3d.tiledBox([-16, 0, -13], [16, 32, 13], { front: grille, back: side, left: side, right: side, bottom: top });
+  return m.build();
+}
+
+export const perkChonky = (): BuiltModel => perkMachine('perk-chonky', tone('tijolo', 2), tone('tijolo', 0));
+export const perkSpeedy = (): BuiltModel => perkMachine('perk-speedy', tone('grama', 3), tone('grama', 0));
+export const perkBuddy = (): BuiltModel => perkMachine('perk-buddy', tone('time', 1), tone('aco', 0));
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
-export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [ammoBox, zombiePlank, zombieDoor, mysteryBox];
+export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
+  ammoBox,
+  zombiePlank,
+  zombieDoor,
+  mysteryBox,
+  perkChonky,
+  perkSpeedy,
+  perkBuddy,
+];

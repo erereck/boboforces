@@ -43,6 +43,8 @@ export interface SimView {
   readonly zombieType: Uint8Array;
   /** M3 (fase 3b): escala do corpo (o render desenha nela; a hitbox cresce junto). */
   readonly bodyScale: Float32Array;
+  /** M3 (fase 4c): as vantagens de cada bobo no Bobo Zombies (bits de `PERK`). */
+  readonly perks: Uint8Array;
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */
   readonly points: Int32Array;
   /**
@@ -232,4 +234,13 @@ export interface MapObjectsView {
   readonly boxNz: Float32Array;
   readonly boxState: Int32Array;
   readonly boxUser: Uint32Array;
+  /** M3 (fase 4c): máquinas de vantagem: meio da frente no chão, normal da frente, vantagem (bit) e preço. */
+  readonly machines: number;
+  readonly pmx: Float32Array;
+  readonly pmy: Float32Array;
+  readonly pmz: Float32Array;
+  readonly pmnx: Float32Array;
+  readonly pmnz: Float32Array;
+  readonly pmPerk: Uint8Array;
+  readonly pmCost: Int32Array;
 }
