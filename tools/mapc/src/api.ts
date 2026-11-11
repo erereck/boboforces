@@ -4,6 +4,7 @@ import type {
   MapBarricadeMarker,
   MapMannequin,
   MapPaidDoorMarker,
+  MapWallBuyMarker,
   MapMeta,
   MapPointMarker,
   MapSpawnMarker,
@@ -111,6 +112,8 @@ export interface MapBuilder {
   barricade(window: MapBarricadeMarker): void;
   /** M3 (fase 3d): porta paga do Bobo Zombies (a caixa que fecha a passagem livre na grade; metros). */
   paidDoor(door: MapPaidDoorMarker): void;
+  /** M3 (fase 4a): arma na parede do Bobo Zombies (ponto na face da parede, na altura do chão; metros). */
+  wallBuy(buy: MapWallBuyMarker): void;
   playArea(minX: number, minZ: number, maxX: number, maxZ: number, killPlaneY: number): void;
   sun(dirX: number, dirY: number, dirZ: number, timeOfDay: TimeOfDay): void;
   /** RNG com semente por domínio (decoração procedural determinística). */

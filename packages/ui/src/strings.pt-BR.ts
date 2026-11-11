@@ -401,6 +401,9 @@ export const STRINGS_PT_BR = {
   // M3 (fase 3d): janela e porta paga do Bobo Zombies.
   'hud.repair': 'Segure Interagir para consertar',
   'hud.door': 'Interagir: abrir por {cost}',
+  // M3 (fase 4a): arma na parede.
+  'hud.buy': 'Interagir: {weapon} por {cost}',
+  'hud.buyAmmo': 'Interagir: munição por {cost}',
   'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
   'hud.zombies.rest': 'Onda {wave} em {s} s',
   'hud.zombies.last': 'Onda {wave} · o último!',

@@ -103,6 +103,7 @@ import {
   MAX_ZOMBIES,
   NULL_ENTITY,
   ZOMBIE_BARRICADES,
+  ZOMBIE_SHOP,
   ZOMBIES_DOWN,
   heldClip,
   heldReserve,
@@ -729,6 +730,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const aimOffsets = loaded.modelDocs.map((m) => viewmodelAimOffset(m));
   // M2: nome e categoria de cada arma na tabela pt-BR, resolvidos uma vez (a HUD só guarda a referência).
   const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
+  /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
+  const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
@@ -2787,6 +2790,28 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
       }
     }
+    // M3 (fase 4a): as armas na parede, deitadas na face da parede a 1,3 m do chão (o cano ao longo do muro).
+    for (let w = 0; w < mo.wallBuys && n < cap; w++) {
+      const model = modelOf(mo.wbWeapon[w]!);
+      if (model === NO_MODEL) continue;
+      const nx = mo.wbnx[w]!;
+      const nz = mo.wbnz[w]!;
+      const x = mo.wbx[w]! + nx * 0.06;
+      const y = mo.wby[w]! + 1.3;
+      const z = mo.wbz[w]! + nz * 0.06;
+      projectiles.model[n] = model;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = nx !== 0 ? 0 : Math.PI / 2;
+      projectiles.pitch[n] = 0;
+      projectiles.roll[n] = 0;
+      sampleLightGrid(loaded.lightGrid, x + nx * 0.4, y, z + nz * 0.4, lightScratch, 0);
+      projectiles.light[n * 3] = lightScratch[0]!;
+      projectiles.light[n * 3 + 1] = lightScratch[1]!;
+      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      n++;
+    }
     if (doorModel !== NO_MODEL) {
       for (let d = 0; d < mo.doors && n < cap; d++) {
         if (mo.doorOpen[d] === 1) continue;
@@ -3154,6 +3179,24 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.interact = HUD_INTERACT.door;
         m.interactCost = mo.doorCost[d]!;
         m.interactAfford = v.points[e]! >= mo.doorCost[d]!;
+      }
+      // M3 (fase 4a): arma na parede (as regras do `wallBuySystem`): a nova, ou a munição da que já tem.
+      for (let w = 0; w < mo.wallBuys && m.interact === HUD_INTERACT.none; w++) {
+        if (Math.abs(y - mo.wby[w]!) > 1) continue;
+        const dx = x - mo.wbx[w]!;
+        const dz = z - mo.wbz[w]!;
+        const dn = dx * mo.wbnx[w]! + dz * mo.wbnz[w]!;
+        const dt = Math.abs(dx * mo.wbnz[w]! - dz * mo.wbnx[w]!);
+        if (dn < -0.25 || dn > ZOMBIE_SHOP.wallReachM || dt > ZOMBIE_SHOP.wallSideM) continue;
+        const code = mo.wbWeapon[w]!;
+        const k = e * WEAPON_SLOT_COUNT;
+        let owned = false;
+        for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) if (v.loadout[k + slot] === code) owned = true;
+        const cost = owned ? Math.round(mo.wbCost[w]! * ZOMBIE_SHOP.ammoCostFrac) : mo.wbCost[w]!;
+        m.interact = owned ? HUD_INTERACT.buyAmmo : HUD_INTERACT.buy;
+        m.interactCost = cost;
+        m.interactAfford = v.points[e]! >= cost;
+        m.interactName = weaponNamesUpper[code] ?? '';
       }
     }
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.

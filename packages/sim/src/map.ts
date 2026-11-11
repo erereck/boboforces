@@ -2,6 +2,7 @@ import type { MapMarkers } from '@boboforces/format';
 import type { NavGrid } from '@boboforces/nav';
 import { assert } from '@boboforces/shared';
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
+import { WEAPONS } from './config/weapons.ts';
 import { MAX_TEAMS } from './constants.ts';
 import type { SimMap, SpawnPoint } from './sim.ts';
 
@@ -10,7 +11,7 @@ export interface SimMapSource {
   readonly grid: WorldGrid;
   readonly blocks: BlockRegistry;
   /** Marcadores do `.bfmap` (`MapDocument.markers`): spawns, área jogável e (M3) janelas e portas do Zombies. */
-  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors'>;
+  readonly markers: Pick<MapMarkers, 'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys'>;
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
 }
@@ -59,6 +60,16 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
             maxZ: d.maxZ,
             cost: d.cost,
           })),
+        }
+      : {}),
+    // M3 (fase 4a): armas na parede (o ID da arma vira o código da sim; arma desconhecida falha aqui).
+    ...(source.markers.wallBuys?.length
+      ? {
+          wallBuys: source.markers.wallBuys.map((w, i) => {
+            const weapon = WEAPONS.findIndex((d) => d.id === w.weapon);
+            assert(weapon >= 0, `mapa: arma na parede ${i} desconhecida (${w.weapon})`);
+            return { x: w.x, y: w.y, z: w.z, facing: w.facing, weapon, cost: w.cost };
+          }),
         }
       : {}),
   };

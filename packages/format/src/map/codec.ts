@@ -17,6 +17,7 @@ import {
   type MapBarricadeMarker,
   type MapMannequin,
   type MapPaidDoorMarker,
+  type MapWallBuyMarker,
   type MapMarkers,
   type MapMeta,
   type MapPointMarker,
@@ -154,6 +155,18 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
             maxY: d.maxY,
             maxZ: d.maxZ,
             cost: d.cost,
+          })),
+        }
+      : {}),
+    ...(m.wallBuys && m.wallBuys.length > 0
+      ? {
+          wallBuys: m.wallBuys.map((w) => ({
+            x: w.x,
+            y: w.y,
+            z: w.z,
+            facing: w.facing,
+            weapon: w.weapon,
+            cost: w.cost,
           })),
         }
       : {}),
@@ -592,6 +605,23 @@ function parseMarkers(json: Json): MapMarkers {
             cost: int(q['cost'], p),
           };
         });
+  const wallBuys =
+    m['wallBuys'] === undefined
+      ? []
+      : arr(m['wallBuys'], 'wallBuys').map((v, i): MapWallBuyMarker => {
+          const q = obj(v, `wallBuys[${i}]`);
+          const p = `wallBuys[${i}]`;
+          const facing = int(q['facing'], p);
+          if (facing !== 0 && facing !== 1 && facing !== 2 && facing !== 3) fail(`${p}.facing fora de 0..3`);
+          return {
+            x: num(q['x'], p),
+            y: num(q['y'], p),
+            z: num(q['z'], p),
+            facing,
+            weapon: str(q['weapon'], p),
+            cost: int(q['cost'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
@@ -601,6 +631,7 @@ function parseMarkers(json: Json): MapMarkers {
     mannequins,
     ...(barricades.length > 0 ? { barricades } : {}),
     ...(paidDoors.length > 0 ? { paidDoors } : {}),
+    ...(wallBuys.length > 0 ? { wallBuys } : {}),
     playArea: {
       minX: num(a['minX'], 'playArea.minX'),
       minZ: num(a['minZ'], 'playArea.minZ'),

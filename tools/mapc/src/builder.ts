@@ -8,6 +8,7 @@ import {
   type MapMannequin,
   type MapMeta,
   type MapPaidDoorMarker,
+  type MapWallBuyMarker,
   type MapPointMarker,
   type MapProp,
   type MapSpawnMarker,
@@ -68,6 +69,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
   const mannequins: MapMannequin[] = [];
   const barricades: MapBarricadeMarker[] = [];
   const paidDoors: MapPaidDoorMarker[] = [];
+  const wallBuys: MapWallBuyMarker[] = [];
   let meta: MapMeta | null = null;
   let playArea: MapDocument['markers']['playArea'] | null = null;
   let light: MapLight | null = null;
@@ -227,6 +229,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
     mannequin: (q) => void mannequins.push(q),
     barricade: (w) => void barricades.push(w),
     paidDoor: (d) => void paidDoors.push(d),
+    wallBuy: (w) => void wallBuys.push(w),
     playArea(minX, minZ, maxX, maxZ, killPlaneY) {
       playArea = { minX, minZ, maxX, maxZ, killPlaneY };
     },
@@ -286,6 +289,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
           mannequins,
           ...(barricades.length > 0 ? { barricades } : {}),
           ...(paidDoors.length > 0 ? { paidDoors } : {}),
+          ...(wallBuys.length > 0 ? { wallBuys } : {}),
           playArea: playArea ?? { minX: 0, minZ: 0, maxX: 0, maxZ: 0, killPlaneY: 0 },
         },
         light: light ?? { sunDir: [0, 1, 0], timeOfDay: 'day', emitters: [] },

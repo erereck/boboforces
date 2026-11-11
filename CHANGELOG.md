@@ -32,6 +32,8 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 3d, parte 2 (o Posto Avançado):** mapa pequeno do Bobo Zombies (nome provisório) com 6 janelas e uma porta
   paga de 750 pontos; as tábuas e a porta aparecem no jogo, e o HUD avisa "Segure Interagir para consertar" e o preço da
   porta. O card do Bobo Zombies nos Modos agora abre nele.
+- **Fase 4a, armas na parede:** no Bobo Zombies o humano nasce de pistola; armas na parede (no Posto: Buzzer,
+  Door Knocker, Rattler e Lawnmower) com o aviso de compra no HUD; a mesma arma de novo recarrega pela metade do preço.
 - **Fase 3e, medição:** com 4 bots, a onda média é 4,0 no Construto e no Posto; golden novo do Bobo Zombies no Posto.
   Fecha a fase 3 (IA do Zombies).
 

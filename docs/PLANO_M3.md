@@ -115,6 +115,17 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **3e. Medição** (feita em 10/11/2026, ARCHITECTURE §13.17): robô das ondas (onda 4,0 no Construto e no Posto) e o
   golden do modo no Posto (`9e25b203`). Fecha a fase 3.
 
+## Fase 4 em detalhe: a economia do Zombies
+
+- **4a. Equipamento e armas na parede** (feita em 10/11/2026, ARCHITECTURE §13.18): o humano nasce de pistola, faca e
+  granadas; arma na parede (nova vai para a primária; a que já tem, munição pela metade); aviso de compra no HUD.
+- **4b. Caixa Misteriosa:** 950 pontos; gira 4 s e oferece uma arma aleatória por 10 s (inclusive a arma maravilha,
+  mais rara); depois de alguns usos, muda para outra das 3 posições.
+- **4c. Vantagens:** máquinas no mapa: Chonky Cola (vida 150), Speedy Soda (recarga rápida) e Buddy Brew (reviver
+  rápido); perdidas ao cair; ícones no HUD.
+- **4d. Drops:** 2% por abate, até 4 por onda: munição cheia, bomba, pontos em dobro e insta-kill por 30 s, carpinteiro.
+- **4e. A arma maravilha** (o Desmontador, só da caixa) e a medição (robô das ondas e golden).
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

@@ -2414,3 +2414,19 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   51 tábuas arrancadas e 33 repostas em 2 min). O do Warfare continua `5ee925a0`.
 - **Fecha a fase 3** (a IA do Zombies). O balanço das ondas (os bots param na onda 4) fica para a fase 4, com a
   economia: armas na parede, Caixa Misteriosa e vantagens mudam a conta.
+
+### 13.18 Fase 4a: equipamento do Zombies e armas na parede (10/11/2026)
+
+- **Equipamento:** no Bobo Zombies o humano nasce com a pistola, a faca e 2 granadas, sem a primária (vem da parede
+  ou, na 4b, da caixa); os bots de apoio continuam com a primária do loadout (são ajudantes, sem economia). Escolha minha
+  (revisável): o GDD lista as compras, mas não o equipamento do começo.
+- **Armas na parede** (`systems/shop.ts`, `ZOMBIE_SHOP`; `SimMap.wallBuys`, até 16; estáticas, fora do snapshot):
+  ponto na face da parede na altura do chão, lado para onde ela olha, arma e preço. O usar (na borda) a até 1,5 m da
+  parede e 0,9 m do centro compra: arma nova vai para o slot da primária, cheia, e direto para a mão; a que o bobo já
+  tem recarrega pente e reserva pela metade do preço (só se falta munição). Evento novo `purchase` (`weapon` ou
+  `ammo`, `ok` ou `denied`).
+- **Mapa:** marcador `wallBuys` no `map@1` (opcional, como as janelas; o validador confere a arma no registro) e
+  `wallBuy()` no `mapc`. No Posto: Buzzer (1000) e Door Knocker (900) na sala 1; Rattler (1200) e Lawnmower (1500)
+  na sala 2, atrás da porta.
+- **Jogo:** o modelo da arma deitado na face da parede a 1,3 m do chão (buffer instanciado); aviso
+  "Interagir: Buzzer por 1.000" (ou "munição por 500"), com o preço em vermelho sem pontos. Conferido no Edge.

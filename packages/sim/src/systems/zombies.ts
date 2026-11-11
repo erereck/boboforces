@@ -12,6 +12,7 @@ import {
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { barricadesSystem } from './barricades.ts';
+import { wallBuySystem } from './shop.ts';
 import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
 
 const F = ENTITY_FLAG;
@@ -33,6 +34,7 @@ export function zombiesSystem(ctx: SimContext): void {
   const w = ctx.waves;
   updateDowned(ctx);
   barricadesSystem(ctx);
+  wallBuySystem(ctx);
   let bobos = 0;
   let bobosUp = 0;
   let selfComing = false;

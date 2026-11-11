@@ -19,6 +19,7 @@ import { ZOMBIE_BARRICADES } from './config/zombie.ts';
 /** Janelas com barricada e portas pagas por mapa. */
 export const MAX_BARRICADES = 32;
 export const MAX_DOORS = 16;
+export const MAX_WALL_BUYS = 16;
 
 /** Lado de fora da janela (de onde os zumbis vêm): +X, -X, +Z, -Z. */
 export type BarricadeOutside = 0 | 1 | 2 | 3;
@@ -45,6 +46,19 @@ export interface DoorDef {
   readonly cost: number;
 }
 
+/**
+ * M3 (fase 4a): arma na parede: um ponto na face da parede, na altura do chão (metros; o desenho fica 1,3 m acima),
+ * o lado para onde a parede olha (onde fica quem compra) (`facing`: 0 +X, 1 -X, 2 +Z, 3 -Z), a arma (`WeaponCode`) e o preço.
+ */
+export interface WallBuyDef {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: BarricadeOutside;
+  readonly weapon: number;
+  readonly cost: number;
+}
+
 const OUTSIDE_NX = [1, -1, 0, 0] as const;
 const OUTSIDE_NZ = [0, 0, 1, -1] as const;
 const DOOR_FLAGS = COLLIDER_FLAG.solid | COLLIDER_FLAG.blocksBullets | COLLIDER_FLAG.blocksSight;
@@ -63,6 +77,15 @@ export class MapObjects {
   /** Portas: caixa (6 por porta) e preço. */
   readonly doorBox: Float32Array;
   readonly doorCost: Int32Array;
+  /** M3 (fase 4a): armas na parede (estáticas: não vão no snapshot). */
+  readonly wallBuys: number;
+  readonly wbx: Float32Array;
+  readonly wby: Float32Array;
+  readonly wbz: Float32Array;
+  readonly wbnx: Float32Array;
+  readonly wbnz: Float32Array;
+  readonly wbWeapon: Uint8Array;
+  readonly wbCost: Int32Array;
   // --- Estado (snapshot e hash) ---
   /** Tábuas de cada janela (0..6). */
   readonly planks: Uint8Array;
@@ -85,6 +108,7 @@ export class MapObjects {
     nav: NavGrid | null,
     barricades: readonly BarricadeDef[],
     doors: readonly DoorDef[],
+    wallBuys: readonly WallBuyDef[] = [],
   ) {
     const nb = barricades.length;
     const nd = doors.length;
@@ -100,6 +124,27 @@ export class MapObjects {
     this.bh = new Float32Array(nb);
     this.doorBox = new Float32Array(nd * 6);
     this.doorCost = new Int32Array(nd);
+    const nw = wallBuys.length;
+    assert(nw <= MAX_WALL_BUYS, `sim: até ${MAX_WALL_BUYS} armas na parede`);
+    this.wallBuys = nw;
+    this.wbx = new Float32Array(nw);
+    this.wby = new Float32Array(nw);
+    this.wbz = new Float32Array(nw);
+    this.wbnx = new Float32Array(nw);
+    this.wbnz = new Float32Array(nw);
+    this.wbWeapon = new Uint8Array(nw);
+    this.wbCost = new Int32Array(nw);
+    wallBuys.forEach((w, i) => {
+      assert(Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.z), `sim: arma na parede ${i} inválida`);
+      assert(Number.isInteger(w.cost) && w.cost >= 0, `sim: arma na parede ${i} com preço inválido`);
+      this.wbx[i] = w.x;
+      this.wby[i] = w.y;
+      this.wbz[i] = w.z;
+      this.wbnx[i] = OUTSIDE_NX[w.facing];
+      this.wbnz[i] = OUTSIDE_NZ[w.facing];
+      this.wbWeapon[i] = w.weapon;
+      this.wbCost[i] = w.cost;
+    });
     this.planks = new Uint8Array(nb);
     this.tearTicks = new Int32Array(nb);
     this.repairTicks = new Int32Array(nb);

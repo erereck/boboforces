@@ -223,3 +223,16 @@ export const ZOMBIE_BARRICADES = {
   thicknessM: 0.2,
   heightM: 2,
 } as const;
+
+/**
+ * M3 (fase 4a): as armas na parede do Bobo Zombies (GDD §4.1.5: 500–1500). O bobo de pé na frente da arma (até
+ * `wallReachM` da parede e `wallSideM` do centro, de lado) aperta o usar: arma nova vai para o slot da primária com
+ * munição cheia; a que ele já tem recarrega pente e reserva por `ammoCostFrac` do preço. Escolhas minhas (revisáveis),
+ * como o equipamento do começo: no Zombies o humano nasce com a pistola, a faca e 2 granadas (a primária vem da parede
+ * ou da caixa); os bots de apoio continuam com a primária do loadout.
+ */
+export const ZOMBIE_SHOP = {
+  wallReachM: 1.5,
+  wallSideM: 0.9,
+  ammoCostFrac: 0.5,
+} as const;

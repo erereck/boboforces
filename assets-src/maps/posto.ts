@@ -103,6 +103,11 @@ const WINDOWS: readonly { x: number; z: number; outside: 0 | 1 | 2 | 3; alongX: 
 
 function objects(b: MapBuilder): void {
   for (const w of WINDOWS) b.barricade({ x: w.x, y: G, z: w.z, outside: w.outside, width: GAP, height: GAP_H });
+  // M3 (fase 4a): armas na parede, na face de dentro dos muros (sala 1: as baratas; sala 2, atrás da porta: as caras).
+  b.wallBuy({ x: 21.5, y: G, z: Z0 + 0.5, facing: 2, weapon: 'smg', cost: 1000 });
+  b.wallBuy({ x: 16.5, y: G, z: Z1 - 0.5, facing: 3, weapon: 'shotgun', cost: 900 });
+  b.wallBuy({ x: 26.5, y: G, z: Z0 + 0.5, facing: 2, weapon: 'rifle', cost: 1200 });
+  b.wallBuy({ x: X1 - 0.5, y: G, z: 28.5, facing: 1, weapon: 'lmg', cost: 1500 });
   const zc = DOOR_Z;
   b.paidDoor({
     minX: XM,

@@ -91,6 +91,8 @@ export interface HudModel {
   interact: number;
   interactCost: number;
   interactAfford: boolean;
+  /** M3 (fase 4a): o nome da arma na parede, já em caixa alta (`HUD_INTERACT.buy`; da tabela, sem criar por quadro). */
+  interactName: string;
   /** M2 (fase 2c): mostra a dica da derrota feia ("Tá puxado?") na tela de morte. */
   hardTimeHint: boolean;
   /**
@@ -210,6 +212,7 @@ export function createHudModel(): HudModel {
     interact: 0,
     interactCost: 0,
     interactAfford: true,
+    interactName: '',
     hardTimeHint: false,
     primaryHit: { layout: PRIMARY_LAYOUT.none, count: 0, rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4) },
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
@@ -304,7 +307,7 @@ const HUD_CHIP_MAX_FRACTION = 0.36;
 export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as const;
 
 /** M3 (fase 3d): o aviso de interagir do Bobo Zombies. */
-export const HUD_INTERACT = { none: 0, repair: 1, door: 2 } as const;
+export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4 } as const;
 
 interface HudTexts {
   readonly health: string;
@@ -334,6 +337,9 @@ interface HudTexts {
   /** M3 (fase 3d): consertar e `hud.door` cortado em [antes, depois] do preço. */
   readonly repair: string;
   readonly door: readonly string[];
+  /** M3 (fase 4a): `hud.buy` cortado em [antes, entre, depois] do nome e do preço; `hud.buyAmmo` como a porta. */
+  readonly buy: readonly string[];
+  readonly buyAmmo: readonly string[];
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -364,6 +370,8 @@ function hudTexts(): HudTexts {
     waitWave: t('hud.waitWave').toUpperCase(),
     repair: t('hud.repair').toUpperCase(),
     door: templateParts('hud.door', ['cost']).map((p) => p.toUpperCase()),
+    buy: templateParts('hud.buy', ['weapon', 'cost']).map((p) => p.toUpperCase()),
+    buyAmmo: templateParts('hud.buyAmmo', ['cost']).map((p) => p.toUpperCase()),
   };
   return cachedTexts;
 }
@@ -867,17 +875,30 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
       paintText(out, hud, tx.repair, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
     } else {
-      const a = tx.door[0] as string;
-      const b = tx.door[1] as string;
+      // Porta, munição: [antes, depois] do preço; arma: [antes, entre, depois] com o nome no meio.
+      const parts =
+        model.interact === HUD_INTERACT.door ? tx.door : model.interact === HUD_INTERACT.buy ? tx.buy : tx.buyAmmo;
+      const named = model.interact === HUD_INTERACT.buy;
+      const a = parts[0] as string;
+      const mid = named ? model.interactName : '';
+      const between = named ? (parts[1] as string) : '';
+      const b = parts[named ? 2 : 1] as string;
       const cost = model.interactCost;
       const w =
         textWidth(hud, a, labelPx, M.labelTracking) +
+        (named
+          ? textWidth(hud, mid, labelPx, M.labelTracking) + textWidth(hud, between, labelPx, M.labelTracking)
+          : 0) +
         numberWidth(hud, cost, 0, labelPx) +
         textWidth(hud, b, labelPx, M.labelTracking);
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
       const color = model.interactAfford ? COLORS.texto : COLORS.perigo;
       let pen = cx - w / 2;
       pen += paintText(out, hud, a, pen, y + pad, labelPx, color, M.labelTracking);
+      if (named) {
+        pen += paintText(out, hud, mid, pen, y + pad, labelPx, COLORS.acao, M.labelTracking);
+        pen += paintText(out, hud, between, pen, y + pad, labelPx, color, M.labelTracking);
+      }
       pen += paintNumber(out, hud, cost, 0, pen, y + pad, labelPx, model.interactAfford ? COLORS.acao : COLORS.perigo);
       paintText(out, hud, b, pen, y + pad, labelPx, color, M.labelTracking);
     }

@@ -211,4 +211,13 @@ export interface MapObjectsView {
   readonly doorBox: Float32Array;
   readonly doorCost: Int32Array;
   readonly doorOpen: Uint8Array;
+  /** M3 (fase 4a): armas na parede: ponto na face da parede (altura do chão), normal da parede, arma (`WeaponCode`) e preço. */
+  readonly wallBuys: number;
+  readonly wbx: Float32Array;
+  readonly wby: Float32Array;
+  readonly wbz: Float32Array;
+  readonly wbnx: Float32Array;
+  readonly wbnz: Float32Array;
+  readonly wbWeapon: Uint8Array;
+  readonly wbCost: Int32Array;
 }

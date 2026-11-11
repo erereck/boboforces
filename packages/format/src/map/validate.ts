@@ -249,6 +249,16 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     else if (!inArea((d.minX + d.maxX) / 2, (d.minZ + d.maxZ) / 2)) err(`porta ${i} fora da playArea`);
     if (!Number.isInteger(d.cost) || d.cost < 0 || d.cost > 100_000) err(`porta ${i} com preço inválido`);
   });
+  // M3 (fase 4a): armas na parede (teto da sim: 16).
+  const buys = mk.wallBuys ?? [];
+  if (buys.length > 16) err(`${buys.length} armas na parede (máximo 16)`);
+  buys.forEach((w, i) => {
+    if (!finite(w.x, w.y, w.z)) err(`arma na parede ${i} com número não finito`);
+    else if (!inArea(w.x, w.z)) err(`arma na parede ${i} fora da playArea`);
+    if (![0, 1, 2, 3].includes(w.facing)) err(`arma na parede ${i} com lado fora de 0..3`);
+    if (!isKnownContentId(`weapon:${w.weapon}`)) err(`arma na parede ${i}: arma não registrada: weapon:${w.weapon}`);
+    if (!Number.isInteger(w.cost) || w.cost < 0 || w.cost > 100_000) err(`arma na parede ${i} com preço inválido`);
+  });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
   }

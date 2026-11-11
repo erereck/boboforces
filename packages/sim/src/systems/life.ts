@@ -3,7 +3,7 @@ import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN } from '../config/zombie.ts';
-import { MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
+import { BOT_CONTROLLER_BASE, MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
   DEFAULT_LOADOUT_REST,
@@ -680,6 +680,8 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   let first = -1;
   for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
     let code = zombie ? WEAPON_NONE : slot === 0 ? primary : (DEFAULT_LOADOUT_REST[slot - 1] ?? WEAPON_NONE);
+    // M3 (fase 4a): no Bobo Zombies, o humano nasce sem a primária (vem da parede ou da caixa); os bots, com ela.
+    if (slot === 0 && ctx.zombiesMode && s.controller[e]! < BOT_CONTROLLER_BASE) code = WEAPON_NONE;
     if (mask !== 0 && code !== WEAPON_NONE && (mask & (1 << code)) === 0) code = WEAPON_NONE;
     const def = weaponDef(code);
     s.loadout[k + slot] = code;

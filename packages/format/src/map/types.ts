@@ -215,6 +215,20 @@ export interface MapPaidDoorMarker {
   readonly cost: number;
 }
 
+/**
+ * M3 (fase 4a): arma na parede do Bobo Zombies: um ponto na face da parede, na altura do chão (metros; o desenho fica
+ * 1,3 m acima), o lado para onde a parede olha (onde fica quem compra) (0 +X, 1 -X, 2 +Z, 3 -Z), a arma (ID sem prefixo, `weapon:<id>` do
+ * registro) e o preço.
+ */
+export interface MapWallBuyMarker {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly facing: 0 | 1 | 2 | 3;
+  readonly weapon: string;
+  readonly cost: number;
+}
+
 export interface MapMarkers {
   readonly spawns: readonly MapSpawnMarker[];
   readonly domination: readonly MapPointMarker[];
@@ -227,6 +241,8 @@ export interface MapMarkers {
    */
   readonly barricades?: readonly MapBarricadeMarker[];
   readonly paidDoors?: readonly MapPaidDoorMarker[];
+  /** M3 (fase 4a): armas na parede (opcional, como as janelas). */
+  readonly wallBuys?: readonly MapWallBuyMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

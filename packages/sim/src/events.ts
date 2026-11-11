@@ -228,6 +228,20 @@ export interface DoorEvent extends EventBase {
   readonly by: EntityId;
 }
 
+/**
+ * M3 (fase 4a): compra na parede `index`: `by` levou a arma `item` (`weapon`) ou recarregou a munição dela
+ * (`ammo`), por `cost`; `denied` = sem pontos.
+ */
+export interface PurchaseEvent extends EventBase {
+  readonly type: 'purchase';
+  readonly index: number;
+  readonly kind: 'weapon' | 'ammo';
+  readonly action: 'ok' | 'denied';
+  readonly item: number;
+  readonly cost: number;
+  readonly by: EntityId;
+}
+
 export type SimEvent =
   | ShotEvent
   | HitEvent
@@ -245,6 +259,7 @@ export type SimEvent =
   | PickupEvent
   | UnstuckEvent
   | BarricadeEvent
-  | DoorEvent;
+  | DoorEvent
+  | PurchaseEvent;
 
 export type SimEventType = SimEvent['type'];

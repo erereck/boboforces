@@ -250,7 +250,10 @@ describe('Bobo Zombies: o diretor de ondas (M3, fase 2a)', () => {
 });
 
 describe('Bobo Zombies: pontos (M3, fase 2b)', () => {
-  /** O humano olha para −Z (onde os zumbis nascem) e atira sem parar; devolve os pontos e os eventos que contam. */
+  /**
+   * O humano olha para −Z (onde os zumbis nascem) e atira sem parar (fase 4a: nasce de pistola, semiautomática: um toque a
+   * cada 3 ticks); devolve os pontos e os eventos que contam.
+   */
   function shoot(economy: number): { points: number; hits: number; kills: number; heads: number } {
     const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 10, yaw: 0, team: -1 };
     const sim = createSim({ recipe: zombies({ economy }), map: map([human, far]), humans: 1, zombies: 4 });
@@ -262,6 +265,7 @@ describe('Bobo Zombies: pontos (M3, fase 2b)', () => {
     let heads = 0;
     const events: SimEvent[] = [];
     for (let t = 0; t < 14 * SIM_HZ; t++) {
+      f[0]!.buttons = t % 3 === 0 ? BUTTON.fire : 0;
       sim.step(f);
       events.length = 0;
       sim.drainEvents(events);

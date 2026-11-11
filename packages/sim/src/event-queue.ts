@@ -12,6 +12,7 @@ import type {
   WaveEvent,
   BarricadeEvent,
   DoorEvent,
+  PurchaseEvent,
   DownEvent,
   MoveEvent,
   PickupEvent,
@@ -161,6 +162,10 @@ export class EventQueue {
     () => ({ type: 'door', tick: 0, index: 0, action: 'open', cost: 0, by: 0 }),
     2,
   );
+  private readonly purchases = new EventPool<Mutable<PurchaseEvent>>(
+    () => ({ type: 'purchase', tick: 0, index: 0, kind: 'weapon', action: 'ok', item: 0, cost: 0, by: 0 }),
+    2,
+  );
   private readonly projectiles = new EventPool<Mutable<ProjectileEvent>>(
     () => ({
       type: 'projectile',
@@ -220,6 +225,7 @@ export class EventQueue {
     this.waves.reset();
     this.barricades.reset();
     this.doors.reset();
+    this.purchases.reset();
     this.downs.reset();
     this.projectiles.reset();
     this.explosions.reset();
@@ -510,6 +516,27 @@ export class EventQueue {
     e.tick = tick;
     e.index = index;
     e.action = action;
+    e.cost = cost;
+    e.by = by;
+    this.push(e);
+  }
+
+  /** M3 (fase 4a). */
+  purchase(
+    tick: number,
+    index: number,
+    kind: 'weapon' | 'ammo',
+    action: 'ok' | 'denied',
+    item: number,
+    cost: number,
+    by: EntityId,
+  ): void {
+    const e = this.purchases.acquire();
+    e.tick = tick;
+    e.index = index;
+    e.kind = kind;
+    e.action = action;
+    e.item = item;
     e.cost = cost;
     e.by = by;
     this.push(e);
