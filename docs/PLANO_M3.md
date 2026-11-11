@@ -123,7 +123,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   mais rara); depois de alguns usos, muda para outra das 3 posições.
 - **4c. Vantagens** (feita em 10/11/2026, ARCHITECTURE §13.20): máquinas no mapa: Chonky Cola (vida 150), Speedy Soda (recarga rápida) e Buddy Brew (reviver
   rápido); perdidas ao cair; ícones no HUD.
-- **4d. Drops:** 2% por abate, até 4 por onda: munição cheia, bomba, pontos em dobro e insta-kill por 30 s, carpinteiro.
+- **4d. Drops** (feita em 10/11/2026, ARCHITECTURE §13.21): 2% por abate, até 4 por onda: munição cheia, bomba, pontos em dobro e insta-kill por 30 s, carpinteiro.
 - **4e. A arma maravilha** (o Desmontador, só da caixa) e a medição (robô das ondas e golden).
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

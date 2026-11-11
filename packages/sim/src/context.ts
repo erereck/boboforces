@@ -99,6 +99,8 @@ export class DamageQueue {
 export const WEAPON_KILL_PLANE = 254;
 /** M3 (fase 2c): o "golpe" de quem sangrou até morrer caído (Bobo Zombies); o abate não é de ninguém. */
 export const WEAPON_BLEED_OUT = 253;
+/** M3 (fase 4d): o "golpe" da bomba (drop do Bobo Zombies): mata todos os zumbis em jogo, sem dono. */
+export const WEAPON_NUKE = 252;
 
 /**
  * M2 (fase 3b): regras de cada bobo (gameplay.md §6.5), uma por índice de entidade, montadas na criação a partir dos
@@ -249,6 +251,8 @@ export interface SimContext {
   readonly zombieRules: ZombieModeRules;
   /** Humanos da partida (a fórmula das ondas). */
   readonly humans: number;
+  /** M3 (fase 4d): chance de drop por zumbi abatido (`SimConfig.dropChance`). */
+  readonly dropChance: number;
   /** O estado do diretor de ondas (no snapshot e no hash só no Bobo Zombies). */
   readonly waves: WaveState;
   readonly rngZombies: Rng;
@@ -301,6 +305,10 @@ export interface WaveState {
   selfRevivesLeft: number;
   /** M3 (fase 3b): 1 = o chefão desta onda ainda não saiu. */
   bossPending: number;
+  /** M3 (fase 4d): drops que já caíram nesta onda e os ticks que sobram dos pontos em dobro e do insta-kill. */
+  drops: number;
+  doubleTicks: number;
+  instaTicks: number;
 }
 
 /**

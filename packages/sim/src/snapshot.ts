@@ -50,7 +50,10 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
       .i32(w.left)
       .u32(w.lastZombie)
       .i32(w.selfRevivesLeft)
-      .i32(w.bossPending);
+      .i32(w.bossPending)
+      .i32(w.drops)
+      .i32(w.doubleTicks)
+      .i32(w.instaTicks);
     ctx.rngZombies.saveState(rngScratch);
     h.bytes(rngScratch);
     for (const f of s.zombieFields) h.bytes(f.array.subarray(0, s.count * f.stride));
@@ -118,6 +121,9 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       v.lastZombie,
       v.selfRevivesLeft,
       v.bossPending,
+      v.drops,
+      v.doubleTicks,
+      v.instaTicks,
     ]) {
       w.writeBits(n >>> 0, 32);
     }
@@ -188,6 +194,9 @@ export function readState(ctx: SimContext, r: BitReader): void {
     v.lastZombie = r.readBits(32) >>> 0;
     v.selfRevivesLeft = r.readBits(32) | 0;
     v.bossPending = r.readBits(32) | 0;
+    v.drops = r.readBits(32) | 0;
+    v.doubleTicks = r.readBits(32) | 0;
+    v.instaTicks = r.readBits(32) | 0;
     v.runChance = r.readF64();
     readArray(r, rngScratch, RNG_STATE_WORDS);
     ctx.rngZombies.loadState(rngScratch);

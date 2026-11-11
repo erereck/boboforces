@@ -166,6 +166,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:perk-chonky',
   'model:perk-speedy',
   'model:perk-buddy',
+  // M3 (fase 4d): a moeda dos pontos em dobro (só acrescentado, regra 20)
+  'model:drop-double',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

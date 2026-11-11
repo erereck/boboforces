@@ -131,7 +131,9 @@ export interface ProjectileView {
 }
 
 /** M2 (fase 2b): tipos de pickup (`PickupView.kind`). Valor novo entra no fim. */
-export const PICKUP_KIND = { ammoBox: 0 } as const;
+export const PICKUP_KIND = { ammoBox: 0, maxAmmo: 1, nuke: 2, doublePoints: 3, instaKill: 4, carpenter: 5 } as const;
+/** M3 (fase 4d): quantos tipos de drop do Bobo Zombies (de `maxAmmo` a `carpenter`). */
+export const DROP_KINDS = 5;
 
 /**
  * Pickups no chão (pool fixo; iterar de 0 a `count - 1` conferindo `alive[i]`). Posição = pés da caixinha (m);
@@ -179,6 +181,9 @@ export interface MatchView {
   readonly zombieWave: number;
   readonly zombiesLeft: number;
   readonly zombieRestTicks: number;
+  /** M3 (fase 4d): ticks que sobram dos pontos em dobro e do insta-kill (0 = desligado). */
+  readonly doublePointsTicks: number;
+  readonly instaKillTicks: number;
   readonly lastZombie: number;
   /** M3 (fase 2c): "levanta sozinho" que sobram (-1 = sem limite; 0 fora do modo). */
   readonly selfRevivesLeft: number;

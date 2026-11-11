@@ -166,6 +166,8 @@ export interface PickupEvent extends EventBase {
   readonly x: number;
   readonly y: number;
   readonly z: number;
+  /** M3 (fase 4d): `PICKUP_KIND` (a caixinha do Warfare ou um drop do Zombies). */
+  readonly kind: number;
 }
 
 /**

@@ -414,6 +414,14 @@ export const STRINGS_PT_BR = {
   'hud.zombies.wave': 'Onda {wave} · {left} zumbis',
   'hud.zombies.rest': 'Onda {wave} em {s} s',
   'hud.zombies.last': 'Onda {wave} · o último!',
+  // M3 (fase 4d): os drops (o tempo que sobra e o anúncio de quem pegou).
+  'hud.zombies.double': 'Pontos em dobro {s} s',
+  'hud.zombies.insta': 'Insta-kill {s} s',
+  'drop.maxAmmo': 'Munição cheia!',
+  'drop.nuke': 'Bomba!',
+  'drop.doublePoints': 'Pontos em dobro!',
+  'drop.instaKill': 'Insta-kill!',
+  'drop.carpenter': 'Carpinteiro!',
   'hud.clickToAim': 'Clique para mirar com o mouse',
   /** Rótulo da vista no 2–4P (com o ícone e a cor do jogador). */
   'hud.player': 'P{n}',

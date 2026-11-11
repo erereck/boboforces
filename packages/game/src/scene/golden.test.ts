@@ -170,9 +170,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * sorteio dos especiais consome o RNG dos zumbis desde a onda 1: onda 3, 34 abates, 5 quedas). Fase 3c: `4f85c2b3`
  * (os zumbis seguem o flow field e o preso aperta Destravar: onda 3, 33 abates, 5 quedas). Fase 3d: `deecab03` (os
  * pontos de conserto da onda entram no hash; a partida é a mesma: o Construto não tem janelas). Fase 4c: `e8669653`
- * (as vantagens entram no hash; a partida é a mesma).
+ * (as vantagens entram no hash; a partida é a mesma). Fase 4d: `8feb69fb` (o sorteio dos drops usa o RNG dos zumbis e
+ * os drops ajudam: onda 3, 38 abates, 1 queda).
  */
-const GOLDEN_ZOMBIES_HASH = 'e8669653';
+const GOLDEN_ZOMBIES_HASH = '8feb69fb';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -221,10 +222,11 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
  * repuseram. Gravado na fase 3e (10/11/2026): `9e25b203` (onda 3, 38 abates, 5 quedas, 51 tábuas arrancadas e 33
  * repostas). Fase 4b: `9524ad53` (o estado da Caixa Misteriosa entra no hash; a partida é a mesma). Fase 4c:
  * `0e0d586b` (as 3 máquinas de vantagem ocupam espaço e fecham nós da navegação: onda 3, 31 abates, 8 quedas, 36
- * tábuas arrancadas e 18 repostas, derrota antes dos 2 min).
+ * tábuas arrancadas e 18 repostas, derrota antes dos 2 min). Fase 4d: `088bc2cc` (os drops: onda 3, 36 abates, 7
+ * quedas, 42 tábuas arrancadas e 24 repostas, derrota antes dos 2 min).
  * MUDA com a sim, a IA, o mapa ou as regras das janelas: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_POSTO_HASH = '0e0d586b';
+const GOLDEN_POSTO_HASH = '088bc2cc';
 
 function runPostoGolden(): {
   hash: string;

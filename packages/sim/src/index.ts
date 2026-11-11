@@ -51,4 +51,4 @@ export {
   type BoboHit,
   type BodyArrays,
 } from './hitbox.ts';
-export { WEAPON_KILL_PLANE, WEAPON_NONE } from './context.ts';
+export { WEAPON_KILL_PLANE, WEAPON_NONE, WEAPON_NUKE } from './context.ts';

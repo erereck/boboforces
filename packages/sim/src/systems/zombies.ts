@@ -34,6 +34,9 @@ export function zombiesSystem(ctx: SimContext): void {
   if (m.phase !== 'playing') return;
   const s = ctx.s;
   const w = ctx.waves;
+  // M3 (fase 4d): os tempos dos drops.
+  if (w.doubleTicks > 0) w.doubleTicks--;
+  if (w.instaTicks > 0) w.instaTicks--;
   updateDowned(ctx);
   barricadesSystem(ctx);
   wallBuySystem(ctx);
@@ -168,6 +171,7 @@ function startWave(ctx: SimContext): void {
   w.toSpawn += w.bossPending;
   // M3 (fase 3d): o teto dos pontos de conserto é por onda.
   s.repairPoints.fill(0);
+  w.drops = 0;
   // Quem caiu na onda passada volta agora.
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) === 0) continue;

@@ -193,7 +193,7 @@ export class EventQueue {
     8,
   );
   private readonly pickups = new EventPool<Mutable<PickupEvent>>(
-    () => ({ type: 'pickup', tick: 0, action: 'drop', index: 0, entity: 0, x: 0, y: 0, z: 0 }),
+    () => ({ type: 'pickup', tick: 0, action: 'drop', index: 0, entity: 0, x: 0, y: 0, z: 0, kind: 0 }),
     8,
   );
   private readonly unstucks = new EventPool<Mutable<UnstuckEvent>>(
@@ -452,8 +452,10 @@ export class EventQueue {
     x: number,
     y: number,
     z: number,
+    kind = 0,
   ): void {
     const e = this.pickups.acquire();
+    e.kind = kind;
     e.tick = tick;
     e.action = action;
     e.index = index;

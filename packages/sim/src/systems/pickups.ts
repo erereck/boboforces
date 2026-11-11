@@ -5,6 +5,11 @@ import { weaponDef } from '../config/weapons.ts';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
 import { PICKUP_KIND } from '../view.ts';
+import { ZOMBIE_BARRICADES, ZOMBIE_DROPS } from '../config/zombie.ts';
+import { secondsToTicks } from '../constants.ts';
+import { NULL_ENTITY } from '../entity.ts';
+import { PART_TORSO, WEAPON_NUKE } from '../context.ts';
+import { FIGURE_BONE } from '@boboforces/format';
 
 /**
  * M2 (fase 2b): a caixinha de munição do Bobo Warfare (gameplay.md §4.1). Quem morre deixa uma nos pés; ela salta um
@@ -43,6 +48,28 @@ export function dropAmmoBox(ctx: SimContext, e: number): void {
   s.pickVelY[i] = DROP_START_VY;
   s.pickTicks[i] = ctx.ammoBoxTicks;
   ctx.events.pickup(ctx.tick, 'drop', i, s.idOf(e), x, y, z);
+}
+
+/** M3 (fase 4d): o drop `kind` (`PICKUP_KIND`, de `maxAmmo` a `carpenter`) nos pés do zumbi `e` que caiu. */
+export function dropZombieDrop(ctx: SimContext, e: number, kind: number): void {
+  const s = ctx.s;
+  const i = s.allocatePickup();
+  if (i < 0) return;
+  const e3 = e * 3;
+  const i3 = i * 3;
+  const x = s.position[e3]!;
+  const y = s.position[e3 + 1]! + DROP_LIFT_M;
+  const z = s.position[e3 + 2]!;
+  s.pickKind[i] = kind;
+  s.pickPosition[i3] = x;
+  s.pickPosition[i3 + 1] = y;
+  s.pickPosition[i3 + 2] = z;
+  s.pickPrevPosition[i3] = x;
+  s.pickPrevPosition[i3 + 1] = y;
+  s.pickPrevPosition[i3 + 2] = z;
+  s.pickVelY[i] = DROP_START_VY;
+  s.pickTicks[i] = Math.max(1, secondsToTicks(ZOMBIE_DROPS.lifeS, ctx.hz));
+  ctx.events.pickup(ctx.tick, 'drop', i, s.idOf(e), x, y, z, kind);
 }
 
 /** Passo 4b (depois dos projéteis): tempo, queda e coleta das caixinhas. */
@@ -86,8 +113,15 @@ export function pickupSystem(ctx: SimContext): void {
       if (dx * dx + dz * dz > reach2) continue;
       const dy = y - s.position[e3 + 1]!;
       if (dy < -REACH_BELOW_M || dy > REACH_ABOVE_M) continue;
-      if (!refill(ctx, e)) continue;
-      ctx.events.pickup(ctx.tick, 'take', i, s.idOf(e), x, y, z);
+      const kind = s.pickKind[i]!;
+      if (kind === PICKUP_KIND.ammoBox) {
+        if (!refill(ctx, e)) continue;
+      } else {
+        // M3 (fase 4d): o drop: quem pega precisa estar de pé.
+        if ((s.flags[e]! & F.downed) !== 0) continue;
+        applyDrop(ctx, e, kind);
+      }
+      ctx.events.pickup(ctx.tick, 'take', i, s.idOf(e), x, y, z, kind);
       s.freePickup(i);
       break;
     }
@@ -117,4 +151,56 @@ export function refill(ctx: SimContext, e: number): boolean {
     }
   }
   return changed;
+}
+
+/** M3 (fase 4d): o efeito do drop `kind` que `e` pegou. */
+function applyDrop(ctx: SimContext, e: number, kind: number): void {
+  const s = ctx.s;
+  const w = ctx.waves;
+  const effect = Math.max(1, secondsToTicks(ZOMBIE_DROPS.effectS, ctx.hz));
+  if (kind === PICKUP_KIND.maxAmmo) {
+    // Todos os bobos: pente e reserva cheios em todo slot (e as granadas).
+    for (let b = 0; b < s.count; b++) {
+      if (s.alive[b] === 0 || s.kind[b] !== ENTITY_KIND.bobo || (s.flags[b]! & F.dead) !== 0) continue;
+      for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
+        const k = b * WEAPON_SLOT_COUNT + slot;
+        const def = weaponDef(s.loadout[k]!);
+        if (def === null) continue;
+        s.slotClip[k] = def.clipSize;
+        s.slotReserve[k] = def.reserve;
+      }
+    }
+  } else if (kind === PICKUP_KIND.nuke) {
+    // A bomba: todo zumbi em jogo morre (sem dono: sem pontos por abate nem drop); quem pegou ganha os pontos.
+    for (let z = 0; z < s.count; z++) {
+      if (s.alive[z] === 0 || s.kind[z] !== ENTITY_KIND.zombie || (s.flags[z]! & F.dead) !== 0) continue;
+      const z3 = z * 3;
+      ctx.damage.push(
+        z,
+        NULL_ENTITY,
+        1e9,
+        PART_TORSO,
+        FIGURE_BONE.torso,
+        WEAPON_NUKE,
+        s.position[z3]!,
+        s.position[z3 + 1]! + 1,
+        s.position[z3 + 2]!,
+      );
+    }
+    s.points[e] = s.points[e]! + Math.round(ZOMBIE_DROPS.nukePoints * ctx.zombieRules.economy);
+  } else if (kind === PICKUP_KIND.doublePoints) {
+    w.doubleTicks = effect;
+  } else if (kind === PICKUP_KIND.instaKill) {
+    w.instaTicks = effect;
+  } else if (kind === PICKUP_KIND.carpenter) {
+    const mo = ctx.mapObjects;
+    if (mo !== null) {
+      for (let i = 0; i < mo.barricades; i++) {
+        mo.planks[i] = ZOMBIE_BARRICADES.planks;
+        mo.tearTicks[i] = 0;
+        mo.syncBarricade(i);
+      }
+    }
+    s.points[e] = s.points[e]! + Math.round(ZOMBIE_DROPS.carpenterPoints * ctx.zombieRules.economy);
+  }
 }

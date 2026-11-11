@@ -1,8 +1,9 @@
+import { DROP_KINDS } from '../view.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN, PERK, ZOMBIE_PERKS } from '../config/zombie.ts';
+import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN, PERK, ZOMBIE_PERKS, ZOMBIE_DROPS } from '../config/zombie.ts';
 import { BOT_CONTROLLER_BASE, MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
@@ -15,7 +16,7 @@ import {
   WEAPONS,
   weaponDef,
 } from '../config/weapons.ts';
-import { dropAmmoBox } from './pickups.ts';
+import { dropAmmoBox, dropZombieDrop } from './pickups.ts';
 import { explode, launchProjectile } from './projectiles.ts';
 import {
   HIT_PARTS,
@@ -63,6 +64,19 @@ export function damageSystem(ctx: SimContext): void {
       // M2 (fase 4e): fogo amigo pela metade ou inteiro; um tiro mata (só dano de arma, nunca no aliado sem fogo amigo).
       if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
       if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
+    }
+    // M3 (fase 4d): insta-kill: qualquer dano de bobo mata o zumbi (menos o chefão).
+    if (
+      ctx.zombiesMode &&
+      ctx.waves.instaTicks > 0 &&
+      amount > 0 &&
+      s.kind[t] === ENTITY_KIND.zombie &&
+      s.zombieType[t] !== ZOMBIE_TYPE.boss &&
+      source !== NULL_ENTITY &&
+      s.isCurrent(source) &&
+      s.kind[source & 0xffff] === ENTITY_KIND.bobo
+    ) {
+      amount = Math.max(amount, s.health[t]!);
     }
     // Proteção de spawn segura dano de inimigo; queda e plano de morte passam.
     if (source !== NULL_ENTITY && (s.flags[t]! & F.spawnProtected) !== 0) amount = 0;
@@ -173,7 +187,9 @@ function award(ctx: SimContext, who: EntityId, base: number): void {
   if (who === NULL_ENTITY || !s.isCurrent(who)) return;
   const e = who & 0xffff;
   if (s.kind[e] !== ENTITY_KIND.bobo) return;
-  s.points[e] = s.points[e]! + Math.round(base * ctx.zombieRules.economy);
+  // M3 (fase 4d): pontos em dobro.
+  const mul = ctx.waves.doubleTicks > 0 ? 2 : 1;
+  s.points[e] = s.points[e]! + Math.round(base * mul * ctx.zombieRules.economy);
 }
 
 /**
@@ -317,6 +333,20 @@ function kill(
   // M3 (fase 3b): o Chonker explode em gosma ao morrer (machuca os bobos perto; no vazio, não).
   if (ctx.zombiesMode && zombie && s.zombieType[t] === ZOMBIE_TYPE.chonker && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, ZOMBIE_GOO, s.idOf(t), -1);
+  }
+  // M3 (fase 4d): o zumbi abatido por um bobo (não no vazio nem pela bomba) pode deixar um drop.
+  if (
+    ctx.zombiesMode &&
+    zombie &&
+    weapon !== WEAPON_KILL_PLANE &&
+    killer !== NULL_ENTITY &&
+    s.isCurrent(killer) &&
+    s.kind[killer & 0xffff] === ENTITY_KIND.bobo &&
+    ctx.waves.drops < ZOMBIE_DROPS.perWave &&
+    ctx.rngZombies.next() < ctx.dropChance
+  ) {
+    ctx.waves.drops++;
+    dropZombieDrop(ctx, t, 1 + ctx.rngZombies.int(0, DROP_KINDS));
   }
   // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
   if (ctx.warfare && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);

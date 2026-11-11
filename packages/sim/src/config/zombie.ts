@@ -284,3 +284,19 @@ export function perkBit(id: string): number {
   const i = (PERK_IDS as readonly string[]).indexOf(id);
   return i < 0 ? -1 : 1 << i;
 }
+
+/**
+ * M3 (fase 4d): os drops do Bobo Zombies (GDD §4.1.5): chance de 2% por zumbi abatido por um bobo, até 4 por onda; o
+ * drop fica `lifeS` no chão e qualquer bobo de pé pega passando por cima. Munição cheia (todos os bobos), bomba (mata
+ * os zumbis em jogo; `nukePoints` para quem pegou), pontos em dobro e insta-kill por `effectS` (o chefão não morre
+ * de uma vez), carpinteiro (todas as janelas cheias; `carpenterPoints` para quem pegou). Tempos e pontos: os do gênero
+ * (escolhas minhas, revisáveis).
+ */
+export const ZOMBIE_DROPS = {
+  chance: 0.02,
+  perWave: 4,
+  lifeS: 30,
+  effectS: 30,
+  nukePoints: 400,
+  carpenterPoints: 200,
+} as const;

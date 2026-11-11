@@ -33,6 +33,7 @@ import {
   ZOMBIE_RULES,
   ZOMBIES_DOWN,
   ZOMBIES_MODE,
+  ZOMBIE_DROPS,
 } from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
@@ -151,6 +152,8 @@ export interface SimConfig {
    * `MATCH_DEFAULTS.countdownS` nas partidas de verdade.
    */
   readonly countdownS?: number;
+  /** M3 (fase 4d): chance de drop por zumbi abatido no Bobo Zombies (padrão `ZOMBIE_DROPS.chance`; testes e robô). */
+  readonly dropChance?: number;
 }
 
 /** Referência a um snapshot já confirmado (delta do online, M5). */
@@ -446,6 +449,7 @@ export function createSim(config: SimConfig): Sim {
       bosses: recipe.zombies?.bosses ?? ZOMBIES_DEFAULTS.bosses,
     },
     humans,
+    dropChance: config.dropChance ?? ZOMBIE_DROPS.chance,
     waves: {
       wave: 0,
       resting: 1,
@@ -458,6 +462,9 @@ export function createSim(config: SimConfig): Sim {
       lastZombie: NULL_ENTITY,
       selfRevivesLeft: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
       bossPending: 0,
+      drops: 0,
+      doubleTicks: 0,
+      instaTicks: 0,
     },
     rngZombies: root.fork('zombies'),
     downedProfile: MOVEMENT_DOWNED,
@@ -516,6 +523,8 @@ export function createSim(config: SimConfig): Sim {
     zombieRestTicks: -1,
     lastZombie: NULL_ENTITY,
     selfRevivesLeft: 0,
+    doublePointsTicks: 0,
+    instaKillTicks: 0,
   };
   const projView: Mutable<ProjectileView> = {
     count: 0,
@@ -598,6 +607,8 @@ export function createSim(config: SimConfig): Sim {
       matchView.zombieWave = w.wave;
       matchView.zombiesLeft = w.left;
       matchView.zombieRestTicks = w.resting === 1 ? w.restTicks : -1;
+      matchView.doublePointsTicks = w.doubleTicks;
+      matchView.instaKillTicks = w.instaTicks;
       matchView.lastZombie = w.lastZombie;
       matchView.selfRevivesLeft = w.selfRevivesLeft;
     }

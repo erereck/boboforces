@@ -40,6 +40,8 @@ Plano em `docs/PLANO_M3.md`.
   devolve os pontos e a caixa muda de lugar (3 posições no Posto).
 - **Fase 4c, vantagens:** máquinas de Chonky Cola (vida 150), Speedy Soda (recarga rápida) e Buddy Brew (levanta o
   colega rápido); perdidas ao cair; as que você tem aparecem em cima da vida.
+- **Fase 4d, drops:** 2% dos zumbis deixam um drop (até 4 por onda): munição cheia, bomba, pontos em dobro, insta-kill
+  ou carpinteiro; o HUD anuncia e mostra o tempo que sobra.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

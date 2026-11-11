@@ -225,6 +225,61 @@ export const perkChonky = (): BuiltModel => perkMachine('perk-chonky', tone('tij
 export const perkSpeedy = (): BuiltModel => perkMachine('perk-speedy', tone('grama', 3), tone('grama', 0));
 export const perkBuddy = (): BuiltModel => perkMachine('perk-buddy', tone('time', 1), tone('aco', 0));
 
+/**
+ * M3 (fase 4d): o drop dos pontos em dobro: uma moeda grossa amarela (0,5 × 0,5 × 0,12 m) com "x2" dos dois lados,
+ * origem no centro (o render faz ela flutuar e girar).
+ */
+export function dropDouble(): BuiltModel {
+  const m = new ModelBuilder('drop-double', 'pickup', { flags: 0, debrisColor: tone('amarelo', 2), blocksNav: false });
+  const L = m.layer('mdl_drop_double', 'opaque', tone('amarelo', 2));
+  const face = m.tile(L, 16, 16, (p) => {
+    p.fill(tone('amarelo', 2));
+    for (let i = 0; i < 16; i++) {
+      p.px(i, 0, tone('amarelo', 0));
+      p.px(i, 15, tone('amarelo', 0));
+      p.px(0, i, tone('amarelo', 0));
+      p.px(15, i, tone('amarelo', 0));
+    }
+    const D = tone('laranja', 0);
+    // "x" (3–7) e "2" (9–13), de 5 texels de altura.
+    for (const [x, y] of [
+      [3, 5],
+      [7, 5],
+      [4, 6],
+      [6, 6],
+      [5, 7],
+      [4, 8],
+      [6, 8],
+      [3, 9],
+      [7, 9],
+      [9, 5],
+      [10, 5],
+      [11, 5],
+      [12, 6],
+      [11, 7],
+      [10, 8],
+      [9, 9],
+      [10, 9],
+      [11, 9],
+      [12, 9],
+    ] as const) {
+      p.px(x, y, D);
+    }
+  });
+  const edge = m.tile(L, 16, 4, (p) => {
+    p.fill(tone('amarelo', 1));
+  });
+  m.part('body').tiledBox([-8, -8, -2], [8, 8, 2], {
+    front: face,
+    back: face,
+    left: edge,
+    right: edge,
+    top: edge,
+    bottom: edge,
+  });
+  return m.build();
+}
+
 /** Ordem do pacote = ordem do registro de conteúdo (só acrescentar no fim; regra 20). */
 export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
   ammoBox,
@@ -234,4 +289,5 @@ export const PICKUP_RECIPES: readonly (() => BuiltModel)[] = [
   perkChonky,
   perkSpeedy,
   perkBuddy,
+  dropDouble,
 ];

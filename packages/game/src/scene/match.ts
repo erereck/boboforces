@@ -110,6 +110,7 @@ import {
   ZOMBIE_SHOP,
   PERK,
   PERK_IDS,
+  PICKUP_KIND,
   ZOMBIES_DOWN,
   heldClip,
   heldReserve,
@@ -314,6 +315,15 @@ const PICKUP_SPIN_RAD_S = 1.2;
 /** Projéteis em voo e caixinhas no chão desenhados por frame (o resto fica de fora). */
 // M3 (fase 3d): + as tábuas das janelas (até 6 por janela) e as portas fechadas no mesmo buffer.
 const MAX_DRAWN_PROJECTILES = 384;
+
+/** M3 (fase 4d): o anúncio de cada drop (na ordem de `PICKUP_KIND`, a partir de `maxAmmo`). */
+const DROP_TEXT: readonly StringKey[] = [
+  'drop.maxAmmo',
+  'drop.nuke',
+  'drop.doublePoints',
+  'drop.instaKill',
+  'drop.carpenter',
+];
 const FLASH_GAIN = 0.35;
 const FLASH_DECAY_S = 0.08;
 /**
@@ -847,6 +857,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       : code >= 0 && code < weaponModel.length
         ? weaponModel[code]!
         : NO_MODEL;
+  /** M3 (fase 4d): o modelo de cada drop (munição cheia, bomba, pontos em dobro, insta-kill, carpinteiro). */
+  const dropModels = [
+    ammoBoxModel,
+    modelOf(WEAPON_CODE.grenade),
+    modelIndex.get('drop-double') ?? NO_MODEL,
+    modelOf(WEAPON_CODE.knife),
+    plankModel,
+  ];
 
   // --- estado por entidade (fora da sim: cosmético) ---
   let flash = new Float32Array(1);
@@ -902,7 +920,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
   const zombiesMode = recipe.mode === 'zombies';
-  const zombieLineKey = new Int32Array(3).fill(-2);
+  const zombieLineKey = new Int32Array(6).fill(-2);
+  /** M3 (fase 4d): o anúncio do último drop pego (tipo e até quando, em s de relógio da cena). */
+  let dropAnnounce = 0;
+  let dropAnnounceUntil = 0;
   const trainingNow: TrainingNumbers = { accuracy: -1, headPct: -1, ttkS: -1, kills: 0 };
   let lastTraining = [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
   /** M2 (fase 5e): os números do treino para o Testar (a precisão é a dos bots que não são Alvo). */
@@ -944,18 +965,37 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const mv = sim.view().match;
     const rest = mv.zombieRestTicks >= 0 ? Math.ceil(mv.zombieRestTicks / sim.hz) : -1;
     const last = mv.lastZombie !== NULL_ENTITY ? 1 : 0;
+    // M3 (fase 4d): os tempos dos drops e o anúncio do último pego (só refaz a linha quando um número muda).
+    const double = Math.ceil(mv.doublePointsTicks / sim.hz);
+    const insta = Math.ceil(mv.instaKillTicks / sim.hz);
+    const announce = timeS < dropAnnounceUntil ? dropAnnounce : 0;
     const k = zombieLineKey;
-    if (k[0] === mv.zombieWave && k[1] === (rest >= 0 ? rest : mv.zombiesLeft) && k[2] === (rest >= 0 ? -1 : last))
+    if (
+      k[0] === mv.zombieWave &&
+      k[1] === (rest >= 0 ? rest : mv.zombiesLeft) &&
+      k[2] === (rest >= 0 ? -1 : last) &&
+      k[3] === double &&
+      k[4] === insta &&
+      k[5] === announce
+    )
       return;
     k[0] = mv.zombieWave;
     k[1] = rest >= 0 ? rest : mv.zombiesLeft;
     k[2] = rest >= 0 ? -1 : last;
-    sharedHud.trainingLine =
+    k[3] = double;
+    k[4] = insta;
+    k[5] = announce;
+    const base =
       rest >= 0
         ? t('hud.zombies.rest', { wave: mv.zombieWave + 1, s: rest })
         : last === 1
           ? t('hud.zombies.last', { wave: mv.zombieWave })
           : t('hud.zombies.wave', { wave: mv.zombieWave, left: mv.zombiesLeft });
+    const parts = [base];
+    if (announce > 0) parts.unshift(t(DROP_TEXT[announce - 1]!));
+    if (double > 0) parts.push(t('hud.zombies.double', { s: double }));
+    if (insta > 0) parts.push(t('hud.zombies.insta', { s: insta }));
+    sharedHud.trainingLine = parts.join(' · ');
   }
 
   function refreshTrainingLine(): void {
@@ -1535,6 +1575,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           }
           break;
         }
+        case 'pickup':
+          // M3 (fase 4d): pegou um drop do Bobo Zombies: o anúncio na linha das ondas por 2,5 s.
+          if (ev.action === 'take' && ev.kind >= PICKUP_KIND.maxAmmo) {
+            dropAnnounce = ev.kind;
+            dropAnnounceUntil = timeS + 2.5;
+          }
+          break;
         case 'unstuck':
           // Raro (anti-frustração): pode montar a string aqui.
           log.warn(
@@ -2753,19 +2800,26 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (left < blinkTicks && Math.floor(timeS * 6) % 2 === 1) continue;
       const o = i * 3;
       const x = pv.position[o]!;
-      const y = lerp(pv.prevPosition[o + 1]!, pv.position[o + 1]!, alpha);
+      let y = lerp(pv.prevPosition[o + 1]!, pv.position[o + 1]!, alpha);
       const z = pv.position[o + 2]!;
-      projectiles.model[n] = ammoBoxModel;
+      // M3 (fase 4d): os drops do Zombies flutuam, giram mais rápido e brilham (o modelo pelo tipo).
+      const kind = pv.kind[i]!;
+      const drop = kind !== PICKUP_KIND.ammoBox;
+      const model = drop ? (dropModels[kind - 1] ?? NO_MODEL) : ammoBoxModel;
+      if (model === NO_MODEL) continue;
+      if (drop) y += 0.55 + Math.sin(timeS * 3 + i) * 0.08;
+      projectiles.model[n] = model;
       projectiles.position[n * 3] = x;
       projectiles.position[n * 3 + 1] = y;
       projectiles.position[n * 3 + 2] = z;
-      projectiles.yaw[n] = timeS * PICKUP_SPIN_RAD_S + i * 1.7;
+      projectiles.yaw[n] = timeS * PICKUP_SPIN_RAD_S * (drop ? 2.5 : 1) + i * 1.7;
       projectiles.pitch[n] = 0;
       projectiles.roll[n] = 0;
       sampleLightGrid(loaded.lightGrid, x, y + 0.2, z, lightScratch, 0);
-      projectiles.light[n * 3] = lightScratch[0]!;
-      projectiles.light[n * 3 + 1] = lightScratch[1]!;
-      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      const glow = drop ? 0.35 : 0;
+      projectiles.light[n * 3] = Math.min(1.6, lightScratch[0]! + glow);
+      projectiles.light[n * 3 + 1] = Math.min(1.6, lightScratch[1]! + glow);
+      projectiles.light[n * 3 + 2] = Math.min(1.6, lightScratch[2]! + glow * 0.6);
       n++;
     }
     return n;

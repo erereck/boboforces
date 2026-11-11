@@ -2464,3 +2464,20 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   vantagens do jogador em plaquinhas com a inicial (C, S, B) em cima da vida, que vai a 150 com a Chonky Cola.
 - **Goldens:** Construto `e8669653` (só o hash); Posto `0e0d586b` (as máquinas ocupam espaço nas salas e a partida
   mudou: onda 3, 31 abates, 8 quedas, derrota antes dos 2 min).
+
+### 13.21 Fase 4d: os drops (10/11/2026)
+
+- **Regras** (`ZOMBIE_DROPS`; tipos novos de pickup em `PICKUP_KIND`, de `maxAmmo` a `carpenter`): o zumbi abatido
+  por um bobo (não no vazio nem pela bomba) deixa um drop com chance de 2% (`SimConfig.dropChance`, para testes e
+  robô), até 4 por onda; o sorteio (chance e tipo) usa o RNG dos zumbis. O drop cai nos pés do zumbi, fica 30 s (pisca
+  nos 3 últimos) e qualquer bobo de pé pega passando por cima. Munição cheia: todo bobo com pente e reserva cheios.
+  Bomba: todo zumbi em jogo morre pela fila de dano (`WEAPON_NUKE`, sem dono: sem pontos por abate nem drop) e quem
+  pegou ganha 400. Pontos em dobro e insta-kill: 30 s (`WaveState.doubleTicks`/`instaTicks`, no snapshot); o
+  insta-kill faz qualquer dano de bobo matar o zumbi, menos o chefão. Carpinteiro: todas as janelas cheias e 200 para
+  quem pegou. O evento `pickup` ganhou o `kind`.
+- **Jogo:** os drops usam modelos que já existiam (a caixinha, a granada, a faca, a tábua) e um novo, `drop-double`
+  (moeda amarela "x2"); flutuam, giram mais rápido e brilham. A linha das ondas do HUD mostra o anúncio do drop pego
+  por 2,5 s ("Bomba! · Onda 3 · 12 zumbis") e os tempos ("Pontos em dobro 25 s · Insta-kill 12 s"), refeita só quando
+  um número muda. Não conferido no Edge (o drop é raro numa captura; o caminho de desenho é o da caixinha).
+- **Goldens:** Construto `8feb69fb` (onda 3, 38 abates, 1 queda) e Posto `088bc2cc` (onda 3, 36 abates, 7 quedas):
+  o sorteio dos drops muda as partidas.

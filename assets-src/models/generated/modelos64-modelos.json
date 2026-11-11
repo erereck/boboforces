@@ -179,6 +179,12 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_drop_double",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }
