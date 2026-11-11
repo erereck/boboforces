@@ -51,6 +51,8 @@ Plano em `docs/PLANO_M3.md`.
   de gosma, o Spitter de capa de chuva e o Mega Bobo de farda de oficial: cada especial com a roupa e o rosto dele.
 - **Fase 5c, leitura à noite:** contorno de giz nas armas da parede, a Caixa Misteriosa clara no escuro, a gosma do
   Chonker em cubinhos verdes e faíscas verdes no raio do Desmontador.
+- **Fase 5d, rodada 14 dos prints:** o Bobo Zombies (Base Abandonada, janelas e portas, compras, os zumbis por tipo,
+  leitura à noite), com as perguntas K1–K7. Fecha a fase 5.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

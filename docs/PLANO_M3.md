@@ -136,7 +136,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   gosma, Spitter de bochechas cheias e o Mega Bobo com a placa de "chefe"; arte-ux.md §2.8).
 - **5c. Leitura à noite** (feita em 10/11/2026, ARCHITECTURE §13.25): contorno de giz das armas na parede, a caixa e as máquinas visíveis no escuro, a gosma verde
   do Chonker.
-- **5d. Prints da rodada 14** para o Erick.
+- **5d. Prints da rodada 14** (feita em 10/11/2026: v16 da página das rodadas, perguntas K1–K7 junto com as J e I
+  ainda abertas; montada por `local/m2/montar-pagina-r14.mjs`). Fecha a fase 5.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
