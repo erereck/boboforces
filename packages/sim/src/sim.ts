@@ -20,7 +20,7 @@ import {
 import type { NavGrid } from '@boboforces/nav';
 import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } from '@boboforces/world';
 import { BASE_HP, METRICS } from './config/metrics.ts';
-import { resolveMovementProfile } from './config/movement.ts';
+import { resolveMovementProfile, type MovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
 import {
@@ -399,7 +399,7 @@ export function createSim(config: SimConfig): Sim {
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
     profile: resolveMovementProfile(recipe.players),
-    zombieProfile: MOVEMENT_ZOMBIE,
+    zombieProfile: zombieSpeed(MOVEMENT_ZOMBIE, recipe),
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
     training: recipe.mode === 'training',
@@ -432,7 +432,7 @@ export function createSim(config: SimConfig): Sim {
     // Um slot de caixas por controlador (todo corpo de bobo ou zumbi tem um).
     figures: new FigureHitCache(figureTable, MAX_CONTROLLERS_WITH_ZOMBIES),
     zombiesMode,
-    zombieRunProfile: MOVEMENT_ZOMBIE_RUNNER,
+    zombieRunProfile: zombieSpeed(MOVEMENT_ZOMBIE_RUNNER, recipe),
     zombieRules: {
       waves: recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves,
       quantity: recipe.zombies?.quantity ?? ZOMBIES_DEFAULTS.quantity,
@@ -468,8 +468,8 @@ export function createSim(config: SimConfig): Sim {
     },
     rngZombies: root.fork('zombies'),
     downedProfile: MOVEMENT_DOWNED,
-    sprinterProfile: MOVEMENT_ZOMBIE_SPRINTER,
-    slowProfile: MOVEMENT_ZOMBIE_SLOW,
+    sprinterProfile: zombieSpeed(MOVEMENT_ZOMBIE_SPRINTER, recipe),
+    slowProfile: zombieSpeed(MOVEMENT_ZOMBIE_SLOW, recipe),
   };
 
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -720,4 +720,13 @@ export function createSim(config: SimConfig): Sim {
       events.clear();
     },
   };
+}
+
+/**
+ * M3 (fase 6b): a velocidade dos zumbis da receita (`zombies.speed`) em cima do perfil de cada tipo (andar e correr;
+ * a aceleração e o pulo ficam). Em 1× devolve o mesmo perfil (o golden não muda).
+ */
+function zombieSpeed(profile: MovementProfile, recipe: MatchRecipe): MovementProfile {
+  const k = recipe.zombies?.speed ?? ZOMBIES_DEFAULTS.speed;
+  return k === 1 ? profile : { ...profile, walk: profile.walk * k, sprint: profile.sprint * k };
 }

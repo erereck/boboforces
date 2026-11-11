@@ -2564,3 +2564,21 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Aba Dados:** a linha "Melhor onda no Bobo Zombies: N (mapa)", a maior de todas as configurações.
 - **Receita:** `zombies.speed` (0,5–2×; padrão 1) entra no formato agora para a chave do recorde já nascer com ela;
   a sim passa a usar na 6b.
+
+### 13.27 Fase 6b: a Partida personalizada do Bobo Zombies (11/11/2026)
+
+- **A linha Modo** virou um ciclo de 3 (Times → Todos contra todos → Zombies; para trás, o inverso). Entrar no Zombies
+  leva para a Base Abandonada (o Posto continua na lista; o Construto também, como mapa de teste), sem tempo nem meta,
+  com um time só: os aliados que já tinha viram bots de apoio (até 3). Sair do Zombies para os Times tira o bloco
+  `zombies`, vai a um mapa do Warfare e cria 4 adversários do mesmo bot (10 min, 75 abates, como o JOGAR).
+- **As abas do Zombies** (`customTabs`/`ZOMBIES_TABS`): Partida (modo, mapa, duração Relâmpago/Curta/Sem fim,
+  quantidade, velocidade, vida dos zumbis, especiais, chefão, pontos, "levanta sozinho" e visão), Jogadores (bots de
+  apoio 0–3 e qual bot, movimento, dano de queda, câmera), Armas (dano, mira, assistência, recuo, dispersão) e Tela.
+  Bots e Modificadores saem (não há bot adversário). A vida, o renascer e a regeneração ficam com o modo (o caído e
+  a Chonky Cola).
+- **"Mudar regras"** no resultado do Zombies abre esta tela (antes ia aos Modos).
+- **`zombies.speed` na sim:** multiplica o andar e o correr de todos os perfis de zumbi (comum, corredor, Sprinter e
+  os lentos); em 1× é o mesmo perfil, e os goldens não mudam.
+- **Resultado:** no solo, "Caiu na onda N" e "Sobreviveu às N ondas!"; a linha do recorde só fica grande quando o
+  recorde cai. Conferido no Edge (`local/m3/capturar-resultado-zombies.ts`, na porta 5174 porque a 5173 era de outro
+  projeto aberto).

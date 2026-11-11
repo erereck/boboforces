@@ -1,6 +1,6 @@
 import { builtinBot, DEBUT_PRESET, presetBotCounts, validateMatchRecipe, type MatchRecipe } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
-import { CUSTOM_TABS, customRows, presetName, stepCustom } from './custom-match.ts';
+import { CUSTOM_TABS, customRows, customTabs, presetName, stepCustom, ZOMBIES_TABS } from './custom-match.ts';
 
 /** M2, fase 4e: o editor da Partida personalizada. */
 
@@ -71,7 +71,8 @@ describe('Partida personalizada', () => {
     expect(presetBotCounts(r)).toEqual([0, 12]);
     const ffa = stepCustom('match', DEBUT_PRESET, 'mode', 1, PHONE);
     expect([ffa.mode, presetBotCounts(ffa)]).toEqual(['warfare.ffa', [7]]);
-    expect(presetBotCounts(stepCustom('match', ffa, 'mode', 1, PHONE))).toEqual([3, 4]);
+    // M3 (fase 6b): o modo é um ciclo de 3 (Times → Todos contra todos → Zombies); para trás, o FFA volta aos Times.
+    expect(presetBotCounts(stepCustom('match', ffa, 'mode', -1, PHONE))).toEqual([3, 4]);
     expect(customRows('bots', ffa).map((x) => x.id)).toEqual(['bot0', 'count0']);
   });
 
@@ -105,5 +106,93 @@ describe('Partida personalizada', () => {
     // Saiu da Oficina, mas o preset ainda tem: continua na escolha, com o nome dele.
     expect(value('bots', r, 'bot1')).toBe('Private Pickles');
     expect(stepCustom('bots', r, 'bot1', -1, PC).embeddedBots).toBeUndefined();
+  });
+});
+
+describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
+  const LIMITS = { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 };
+  const toZombies = (r: MatchRecipe): MatchRecipe => {
+    let z = r;
+    for (let i = 0; i < 3 && z.mode !== 'zombies'; i++) z = stepCustom('match', z, 'mode', 1, PC);
+    return z;
+  };
+
+  it('Times → Todos contra todos → Zombies: abas e linhas do modo, na Base, aliados viram apoio', () => {
+    const z = toZombies(DEBUT_PRESET);
+    expect(z.mode).toBe('zombies');
+    expect(z.map).toBe('base');
+    expect(customTabs(z)).toEqual(ZOMBIES_TABS);
+    expect(customRows('match', z).map((x) => x.id)).toEqual([
+      'mode',
+      'map',
+      'waves',
+      'quantity',
+      'zspeed',
+      'zhp',
+      'specials',
+      'bosses',
+      'economy',
+      'selfRevives',
+      'view',
+    ]);
+    expect(value('match', z, 'mode')).toBe('Zombies');
+    expect(value('match', z, 'waves')).toBe('Curta · 10 ondas');
+    expect(value('match', z, 'selfRevives')).toBe('3');
+    expect(customRows('players', z).map((x) => x.id)).toEqual(['support', 'supportBot', 'movement', 'fall', 'camera']);
+    expect(customRows('weapons', z).map((x) => x.id)).toEqual(['damage', 'ads', 'assist', 'recoil', 'spread']);
+    expect(z.match).toMatchObject({ timeLimitS: 0, scoreLimit: 0 });
+    expect(z.teams).toHaveLength(1);
+    const checked = validateMatchRecipe(z, LIMITS);
+    expect(checked.ok && checked.warnings).toEqual([]);
+  });
+
+  it('as regras do modo mudam a receita, que segue válida; os bots de apoio param em 3', () => {
+    let z = toZombies(DEBUT_PRESET);
+    z = stepCustom('match', z, 'waves', -1, PC);
+    z = stepCustom('match', z, 'quantity', 1, PC);
+    z = stepCustom('match', z, 'zspeed', 1, PC);
+    z = stepCustom('match', z, 'zhp', -1, PC);
+    z = stepCustom('match', z, 'specials', 0, PC);
+    z = stepCustom('match', z, 'economy', 1, PC);
+    z = stepCustom('match', z, 'selfRevives', -1, PC);
+    expect(z.zombies).toEqual({
+      waves: 5,
+      quantity: 1.5,
+      speed: 1.25,
+      hpMul: 0.75,
+      specials: false,
+      economy: 1.5,
+      selfRevives: 2,
+    });
+    expect(value('match', z, 'waves')).toBe('Relâmpago · 5 ondas');
+    for (let i = 0; i < 6; i++) z = stepCustom('players', z, 'support', 1, PC);
+    expect(presetBotCounts(z)).toEqual([3]);
+    const before = value('players', z, 'supportBot');
+    z = stepCustom('players', z, 'supportBot', 1, PC);
+    expect(value('players', z, 'supportBot')).not.toBe(before);
+    expect(presetBotCounts(z)).toEqual([3]);
+    // 2 → 1 → 0 → sem limite (o fim do ciclo).
+    let unlimited = z;
+    for (let i = 0; i < 3; i++) unlimited = stepCustom('match', unlimited, 'selfRevives', -1, PC);
+    expect(value('match', unlimited, 'selfRevives')).toBe('Sem limite');
+    const checked = validateMatchRecipe(z, LIMITS);
+    expect(checked.ok && checked.warnings).toEqual([]);
+  });
+
+  it('do Zombies de volta aos Times: sem o bloco do modo, num mapa do Warfare, com adversários', () => {
+    let z = toZombies(DEBUT_PRESET);
+    z = stepCustom('match', z, 'map', -1, PC);
+    expect(z.map).toBe('posto');
+    z = stepCustom('match', z, 'quantity', 1, PC);
+    const tdm = stepCustom('match', z, 'mode', 1, PC);
+    expect(tdm.mode).toBe('warfare.tdm');
+    expect(tdm.map).toBe('construto');
+    expect(tdm.zombies).toBeUndefined();
+    expect(tdm.teams).toHaveLength(2);
+    expect(presetBotCounts(tdm)[1]).toBe(4);
+    const ffa = stepCustom('match', z, 'mode', -1, PC);
+    expect(ffa.mode).toBe('warfare.ffa');
+    const checked = validateMatchRecipe(tdm, LIMITS);
+    expect(checked.ok && checked.warnings).toEqual([]);
   });
 });

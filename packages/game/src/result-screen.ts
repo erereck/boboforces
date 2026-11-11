@@ -292,7 +292,8 @@ export const zombiesResultScreen: Screen<ZombiesResultData> = {
               kind: 'text',
               id: 'record',
               text: { literal: d.record },
-              style: 'heading',
+              // Grande só quando o recorde cai agora.
+              style: d.newRecord ? 'heading' : 'body',
               color: d.newRecord ? COLORS.acao : COLORS.texto,
               textAlign: 'center',
             },

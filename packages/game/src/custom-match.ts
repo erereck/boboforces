@@ -4,12 +4,15 @@ import {
   builtinBotRef,
   FRIENDLY_FIRE_LEVELS,
   REGEN_RULES,
+  ZOMBIES_DEFAULTS,
+  ZOMBIES_WAVE_CHOICES,
   type BotDocument,
   type BotRef,
   type MatchRecipe,
   type PlayerRules,
   type WeaponRules,
   type HudRules,
+  type ZombiesRules,
 } from '@boboforces/format';
 import { formatDecimal, t, type StringKey } from '@boboforces/ui';
 import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
@@ -23,6 +26,17 @@ import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './map
 
 export const CUSTOM_TABS = ['match', 'players', 'weapons', 'bots', 'mods', 'hud'] as const;
 export type CustomTab = (typeof CUSTOM_TABS)[number];
+
+/**
+ * M3 (fase 6b): as abas do Bobo Zombies: Partida (as regras do modo), Jogadores (os bots de apoio e o movimento),
+ * Armas e Tela. Bots e Modificadores saem (não há bot adversário; os modificadores de mira são do Warfare).
+ */
+export const ZOMBIES_TABS = ['match', 'players', 'weapons', 'hud'] as const satisfies readonly CustomTab[];
+
+/** As abas da receita (o Bobo Zombies tem as dele). */
+export function customTabs(r: MatchRecipe): readonly CustomTab[] {
+  return r.mode === 'zombies' ? ZOMBIES_TABS : CUSTOM_TABS;
+}
 
 export const CUSTOM_TAB_LABELS: Readonly<Record<CustomTab, StringKey>> = {
   match: 'custom.tab.match',
@@ -119,6 +133,11 @@ function flag(
 }
 
 const ffa = (r: MatchRecipe): boolean => r.mode === 'warfare.ffa';
+const zombies = (r: MatchRecipe): ZombiesRules => r.zombies ?? {};
+const withZombies = (r: MatchRecipe, z: Partial<ZombiesRules>): MatchRecipe => ({
+  ...r,
+  zombies: { ...zombies(r), ...z },
+});
 const botsOf = (r: MatchRecipe, team: number): number => (r.teams[team]?.bots ?? []).reduce((n, b) => n + b.count, 0);
 const refOf = (r: MatchRecipe, team: number): BotRef => r.teams[team]?.bots[0]?.ref ?? builtinBotRef('normal');
 
@@ -167,12 +186,61 @@ function setTeam(r: MatchRecipe, team: number, ref: BotRef, count: number): Matc
 
 /** M2 (fase 5c): os bots cabem no mapa (o Ringue leva 7): corta os inimigos primeiro até a metade, depois os aliados. */
 function fitMap(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  if (r.mode === 'zombies') return r;
   const cap = mapBotCap(r.map, l.maxBots);
   if (ffa(r)) return botsOf(r, 0) > cap ? setTeam(r, 0, refOf(r, 0), cap) : r;
   const enemies = Math.min(botsOf(r, 1), Math.ceil(cap / 2));
   const allies = Math.min(botsOf(r, 0), cap - enemies);
   if (enemies === botsOf(r, 1) && allies === botsOf(r, 0)) return r;
   return setTeam(setTeam(r, 1, refOf(r, 1), enemies), 0, refOf(r, 0), allies);
+}
+
+/** M3 (fase 6b): os modos da linha Modo, na ordem do ciclo. */
+const CUSTOM_MODES = ['warfare.tdm', 'warfare.ffa', 'zombies'] as const;
+
+/** M3 (fase 6b): o mapa do Bobo Zombies quando se chega nele (a Base Abandonada; o Construto é mapa de teste). */
+const ZOMBIES_MAP = 'base';
+/** M3 (fase 6b): os bots de apoio completam o time até 4 (gameplay.md "Bobo Zombies": humanos e aliados 1–4). */
+export const ZOMBIES_SUPPORT_MAX = 3;
+
+/** Um passo no ciclo de modos. Do Bobo Zombies para o Warfare nasce um TDM do JOGAR (10 min, 75 abates). */
+function stepMode(r: MatchRecipe, delta: number, l: CustomLimits): MatchRecipe {
+  const i = Math.max(0, (CUSTOM_MODES as readonly string[]).indexOf(r.mode));
+  const next = CUSTOM_MODES[cycleIndex(CUSTOM_MODES.length, i, delta)]!;
+  if (next === 'zombies') return syncEmbedded(toZombies(r, l), l);
+  const warfare = r.mode === 'zombies' ? fromZombies(r, l) : r;
+  if (warfare.mode === next) return fitMap(warfare, l);
+  const switched = switchMode(warfare, l.maxBots);
+  return fitMap({ ...switched, map: mapForMode(switched.map, switched.mode) }, l);
+}
+
+/** Para o Bobo Zombies: só o time dos humanos, com os aliados que já tinha como bots de apoio (até 3). */
+function toZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  const support = Math.min(ZOMBIES_SUPPORT_MAX, l.maxBots, ffa(r) ? 0 : botsOf(r, 0));
+  const map = mapsForMode('zombies').includes(r.map as MenuMap) && r.map !== 'construto' ? r.map : ZOMBIES_MAP;
+  const { viewDistanceM } = r.match ?? {};
+  return {
+    ...r,
+    mode: 'zombies',
+    map,
+    match: { timeLimitS: 0, scoreLimit: 0, ...(viewDistanceM !== undefined ? { viewDistanceM } : {}) },
+    teams: [{ humans: 'all', bots: support > 0 ? [{ ref: refOf(r, 0), count: support }] : [] }],
+  };
+}
+
+/** Do Bobo Zombies para os Times: os bots de apoio viram aliados e entram 4 adversários do mesmo bot. */
+function fromZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  const { zombies: _gone, ...rest } = r;
+  const ref = refOf(r, 0);
+  const allies = Math.min(botsOf(r, 0), Math.max(0, l.maxBots - 4));
+  const { viewDistanceM } = r.match ?? {};
+  return {
+    ...rest,
+    mode: 'warfare.tdm',
+    map: mapForMode(r.map, 'warfare.tdm'),
+    match: { timeLimitS: 600, scoreLimit: 75, ...(viewDistanceM !== undefined ? { viewDistanceM } : {}) },
+    teams: [{ humans: 'all', bots: allies > 0 ? [{ ref, count: allies }] : [] }, { bots: [{ ref, count: 4 }] }],
+  };
 }
 
 /** TDM ↔ FFA mantendo a quantidade de bots: o FFA junta todo mundo num time; o TDM divide (você no primeiro). */
@@ -215,17 +283,17 @@ const mult = (v: number): string => {
   return t('custom.mult', { n: text });
 };
 
+/** M3 (fase 6b): a linha Modo (Times, Todos contra todos, Zombies); o mapa acompanha (o Ringue não tem FFA). */
+const MODE_ROW: RowDef = {
+  id: 'mode',
+  labelKey: 'quick.mode',
+  value: (r) =>
+    t(r.mode === 'zombies' ? 'mode.short.zombies' : ffa(r) ? 'mode.short.warfare.ffa' : 'mode.short.warfare.tdm'),
+  step: (r, d, l) => stepMode(r, d, l),
+};
+
 const MATCH_ROWS: readonly RowDef[] = [
-  {
-    id: 'mode',
-    labelKey: 'quick.mode',
-    value: (r) => t(ffa(r) ? 'mode.short.warfare.ffa' : 'mode.short.warfare.tdm'),
-    step: (r, _d, l) => {
-      // O mapa precisa ter o modo novo (o Ringue não tem FFA).
-      const next = switchMode(r, l.maxBots);
-      return fitMap({ ...next, map: mapForMode(next.map, next.mode) }, l);
-    },
-  },
+  MODE_ROW,
   {
     id: 'map',
     labelKey: 'quick.map',
@@ -269,6 +337,104 @@ const MATCH_ROWS: readonly RowDef[] = [
     step: (r, d, l) => {
       const list = VIEWS.filter((v) => v <= l.maxViewM);
       return { ...r, match: { ...r.match, viewDistanceM: stepList(list, r.match?.viewDistanceM ?? 100, d) } };
+    },
+  },
+];
+
+/** M3 (fase 6b): passos das regras do Bobo Zombies (as faixas do formato: quantidade 0,5–3×, vida 0,25–5×…). */
+const Z_QUANTITY = [0.5, 0.75, 1, 1.5, 2, 3];
+const Z_SPEED = [0.75, 1, 1.25, 1.5];
+const Z_HP = [0.5, 0.75, 1, 1.5, 2, 3];
+const Z_ECONOMY = [0.5, 0.75, 1, 1.5, 2, 3];
+/** "Levanta sozinho" por partida; -1 = sem limite (fica no fim do ciclo). */
+const Z_SELF_REVIVES = [0, 1, 2, 3, 5, 9, -1];
+const Z = ZOMBIES_DEFAULTS;
+
+function zombieMult(
+  id: string,
+  labelKey: StringKey,
+  list: readonly number[],
+  get: (z: ZombiesRules) => number | undefined,
+  key: 'quantity' | 'speed' | 'hpMul' | 'economy',
+): RowDef {
+  return {
+    id,
+    labelKey,
+    value: (r) => mult(get(zombies(r)) ?? Z[key]),
+    step: (r, d) => withZombies(r, { [key]: stepList(list, get(zombies(r)) ?? Z[key], d) }),
+  };
+}
+
+const ZOMBIE_MATCH_ROWS: readonly RowDef[] = [
+  MODE_ROW,
+  {
+    id: 'map',
+    labelKey: 'quick.map',
+    value: (r) => mapName(r.map),
+    step: (r, d) => {
+      const maps = mapsForMode('zombies');
+      return { ...r, map: maps[cycleIndex(maps.length, Math.max(0, maps.indexOf(r.map as MenuMap)), d)]! };
+    },
+  },
+  {
+    id: 'waves',
+    labelKey: 'custom.row.waves',
+    value: (r) => t(`custom.waves.${zombies(r).waves ?? Z.waves}` as StringKey),
+    step: (r, d) => {
+      const list = ZOMBIES_WAVE_CHOICES as readonly number[];
+      const i = Math.max(0, list.indexOf(zombies(r).waves ?? Z.waves));
+      return withZombies(r, { waves: list[cycleIndex(list.length, i, d)]! });
+    },
+  },
+  zombieMult('quantity', 'custom.row.zombieQuantity', Z_QUANTITY, (z) => z.quantity, 'quantity'),
+  zombieMult('zspeed', 'custom.row.zombieSpeed', Z_SPEED, (z) => z.speed, 'speed'),
+  zombieMult('zhp', 'custom.row.zombieHp', Z_HP, (z) => z.hpMul, 'hpMul'),
+  flag(
+    'specials',
+    'custom.row.specials',
+    (r) => zombies(r).specials ?? Z.specials,
+    (r, v) => withZombies(r, { specials: v }),
+  ),
+  flag(
+    'bosses',
+    'custom.row.bosses',
+    (r) => zombies(r).bosses ?? Z.bosses,
+    (r, v) => withZombies(r, { bosses: v }),
+  ),
+  zombieMult('economy', 'custom.row.economy', Z_ECONOMY, (z) => z.economy, 'economy'),
+  {
+    id: 'selfRevives',
+    labelKey: 'custom.row.selfRevives',
+    value: (r) => {
+      const n = zombies(r).selfRevives ?? Z.selfRevives;
+      return n < 0 ? t('custom.selfRevives.unlimited') : String(n);
+    },
+    step: (r, d) => {
+      const i = Math.max(0, Z_SELF_REVIVES.indexOf(zombies(r).selfRevives ?? Z.selfRevives));
+      return withZombies(r, { selfRevives: Z_SELF_REVIVES[cycleIndex(Z_SELF_REVIVES.length, i, d)]! });
+    },
+  },
+];
+
+/** M3 (fase 6b): os bots de apoio do Bobo Zombies (um bot, 0 a 3; os humanos do sofá tomam o lugar deles). */
+const SUPPORT_ROWS: readonly RowDef[] = [
+  {
+    id: 'support',
+    labelKey: 'custom.row.supportBots',
+    value: (r) => String(botsOf(r, 0)),
+    step: (r, d, l) => {
+      const n = Math.max(0, Math.min(ZOMBIES_SUPPORT_MAX, l.maxBots, botsOf(r, 0) + d));
+      return setTeam(r, 0, refOf(r, 0), n);
+    },
+  },
+  {
+    id: 'supportBot',
+    labelKey: 'custom.row.supportBot',
+    value: (r) => botName(refOf(r, 0), r),
+    step: (r, d, l) => {
+      const choices = botChoices(r, 0, l);
+      const i = cycleIndex(choices.length, Math.max(0, choices.indexOf(refOf(r, 0))), d);
+      return syncEmbedded(setTeam(r, 0, choices[i]!, botsOf(r, 0)), l);
     },
   },
 ];
@@ -497,8 +663,28 @@ const HUD_ROWS: readonly RowDef[] = [
   ),
 ];
 
+/** M3 (fase 6b): Jogadores no Bobo Zombies: os bots de apoio, o movimento, a queda e a câmera (vida e renascer são do modo). */
+function zombiePlayerRows(r: MatchRecipe): readonly RowDef[] {
+  const keep = new Set(['fall', 'camera']);
+  const movement = movementOf(r) === 'custom' ? [MOVEMENT_ROW, ...CUSTOM_MOVEMENT_ROWS] : [MOVEMENT_ROW];
+  return [...SUPPORT_ROWS, ...movement, ...PLAYER_ROWS.filter((x) => keep.has(x.id))];
+}
+
+/** M3 (fase 6b): Armas no Bobo Zombies: as armas vêm da parede e da caixa, então só o dano, a mira e o recuo. */
+const ZOMBIE_WEAPON_IDS = new Set(['damage', 'ads', 'assist']);
+
 /** As linhas de uma aba (as de Bots dependem do modo). */
 export function customRows(tab: CustomTab, r: MatchRecipe): readonly RowDef[] {
+  if (r.mode === 'zombies') {
+    if (tab === 'match') return [...ZOMBIE_MATCH_ROWS, ...MATCH_ROWS.filter((x) => x.id === 'view')];
+    if (tab === 'players') return zombiePlayerRows(r);
+    if (tab === 'weapons') {
+      return [
+        ...WEAPON_ROWS.filter((x) => ZOMBIE_WEAPON_IDS.has(x.id)),
+        ...MOD_ROWS.filter((x) => x.id === 'recoil' || x.id === 'spread'),
+      ];
+    }
+  }
   switch (tab) {
     case 'match':
       return MATCH_ROWS;

@@ -2631,7 +2631,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? t('result.zombies.firstRecord')
         : t('result.zombies.record', { wave: best });
     const data: ZombiesResultData = {
-      title: win ? t('result.zombiesWin', { waves: wave }) : t('result.zombiesLoss', { wave }),
+      // Solo: "Caiu na onda 7" (o plural é do time).
+      title: win
+        ? t(humans === 1 ? 'result.zombiesWinSolo' : 'result.zombiesWin', { waves: wave })
+        : t(humans === 1 ? 'result.zombiesLossSolo' : 'result.zombiesLoss', { wave }),
       titleColor: win ? COLORS.acao : COLORS.perigo,
       config,
       record: recordLine,

@@ -144,7 +144,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **6a. Resultado e recordes** (feita em 10/11/2026, ARCHITECTURE §13.26): uma tela de resultado própria do Bobo Zombies (a onda, o recorde e uma linha por bobo
   do time: pontos, abates, na cabeça, caídas e quantos levantou; De novo · Mudar regras · Salvar preset · Sair, sem
   Nêmesis nem "Mais difícil"); o `stats@1` guarda a onda máxima por mapa, configuração e número de jogadores locais.
-- **6b. Partida personalizada do Zombies:** o modo da Partida personalizada ganha o Zombies; com ele, as abas trocam
+- **6b. Partida personalizada do Zombies** (feita em 11/11/2026, ARCHITECTURE §13.27): o modo da Partida personalizada ganha o Zombies; com ele, as abas trocam
   para as regras do modo (mapa, duração, quantidade, velocidade, vida, especiais, chefões, economia, "levanta
   sozinho", bots de apoio); "Mudar regras" do resultado abre aqui. A velocidade entra na receita (`zombies.speed`).
 - **6c. Presets de fábrica:** Sofá Zombies (Base Abandonada, Curta, os bots de apoio completam até 4) e Zombies

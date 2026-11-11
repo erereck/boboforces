@@ -101,6 +101,23 @@ describe('Bobo Zombies: as fórmulas (GDD §4.1.5)', () => {
   });
 });
 
+describe('Bobo Zombies: velocidade da receita (M3, fase 6b)', () => {
+  it('zombies.speed 1,5 leva o zumbi mais longe no mesmo tempo', () => {
+    const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 5, yaw: Math.PI, team: -1 };
+    const walked = (speed: number): number => {
+      const sim = createSim({ recipe: zombies({ speed }), map: map([human, far]), humans: 1, zombies: 1 });
+      run(sim, ZOMBIES_MODE.firstWaveS * SIM_HZ + 2);
+      chase(sim, sim.controllerEntity(0), 2 * SIM_HZ);
+      const z = sim.controllerEntity(ZOMBIE_CONTROLLER_BASE) & 0xffff;
+      return sim.view().position[z * 3 + 2]! - far.z;
+    };
+    const slow = walked(1);
+    const fast = walked(1.5);
+    expect(slow).toBeGreaterThan(2);
+    expect(fast).toBeGreaterThan(slow * 1.3);
+  });
+});
+
 describe('Bobo Zombies: o diretor de ondas (M3, fase 2a)', () => {
   it('o pool começa fora de jogo; a 1ª onda abre depois do intervalo e solta os zumbis aos poucos', () => {
     const far: SpawnPoint = { x: cellCenter(20), y: FLOOR, z: 5, yaw: Math.PI, team: -1 };

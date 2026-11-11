@@ -716,10 +716,13 @@ export function startGame(deps: GameDeps): GameHandle {
   };
   function rebuildCustom(): void {
     const ed = editors!;
-    const tab = ed.CUSTOM_TABS[customTab]!;
+    // M3 (fase 6b): o Bobo Zombies tem outras abas; trocar o modo pode deixar a aba atual fora da lista.
+    const tabs = ed.customTabs(customRecipe);
+    customTab = Math.min(customTab, tabs.length - 1);
+    const tab = tabs[customTab]!;
     customMenu.setRoot(
       ed.customMatchScreen.build({
-        tabs: ed.CUSTOM_TABS.map((id) => ed.CUSTOM_TAB_LABELS[id]),
+        tabs: tabs.map((id) => ed.CUSTOM_TAB_LABELS[id]),
         tab: customTab,
         rows: ed.customRows(tab, customRecipe).map((r) => ({
           id: r.id,
@@ -1578,7 +1581,8 @@ export function startGame(deps: GameDeps): GameHandle {
         const nav = customMenu.update(menuInput, raw, u);
         const a = nav.activated;
         if (nav.tab !== 0) {
-          customTab = (customTab + nav.tab + editors!.CUSTOM_TABS.length) % editors!.CUSTOM_TABS.length;
+          const count = editors!.customTabs(customRecipe).length;
+          customTab = (customTab + nav.tab + count) % count;
           followTab(customMenu, customTab);
           rebuildCustom();
         } else if (nav.back || a === CUSTOM_ACTION.back) screen = customReturn;
@@ -1592,7 +1596,7 @@ export function startGame(deps: GameDeps): GameHandle {
         } else if (a !== null && a.startsWith(CUSTOM_ROW_PREFIX)) {
           const id = a.slice(CUSTOM_ROW_PREFIX.length);
           customRecipe = editors!.stepCustom(
-            editors!.CUSTOM_TABS[customTab]!,
+            editors!.customTabs(customRecipe)[customTab]!,
             customRecipe,
             id,
             nav.delta,
@@ -1732,9 +1736,8 @@ export function startGame(deps: GameDeps): GameHandle {
         const preset = playingPreset ?? currentPreset();
         closeCouch();
         leaveScene();
-        // M3 (fase 2d): a Partida personalizada ainda não sabe o Bobo Zombies (a tela dele é da fase 6): vai aos Modos.
-        if (preset.mode === 'zombies') screen = 'modes';
-        else openCustom(preset, 'title');
+        // M3 (fase 6b): também no Bobo Zombies (a Partida personalizada sabe as regras dele).
+        openCustom(preset, 'title');
       } else if (signal === 'save') {
         const preset = playingPreset ?? currentPreset();
         withEditors(() => void saveCustomPreset(preset));

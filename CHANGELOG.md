@@ -57,6 +57,10 @@ Plano em `docs/PLANO_M3.md`.
   de onda (por mapa, regras e número de jogadores) e uma linha por bobo do time (pontos, abates, na cabeça, quantas
   vezes caiu e quantos levantou). A aba Dados mostra a melhor onda. O Zombies não mexe mais nos recordes de abates e
   de sequência.
+- **Fase 6b, a Partida personalizada do Bobo Zombies:** o modo da Partida personalizada vai de Times a Todos contra
+  todos e ao Zombies. Com o Zombies, as abas mostram as regras do modo: duração, quantidade, velocidade e vida dos
+  zumbis, especiais, chefão, pontos, "levanta sozinho" e de 0 a 3 bots de apoio. "Mudar regras" no resultado do
+  Zombies abre essa tela.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.
