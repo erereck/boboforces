@@ -127,6 +127,16 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **4e. A arma maravilha** (feita em 10/11/2026, ARCHITECTURE §13.22; o Desmontador, só da caixa) e a medição
   (robô das ondas: 3,8 no Construto e 4,0 no Posto). Fecha a fase 4.
 
+## Fase 5 em detalhe: a Base Abandonada
+
+- **5a. O mapa** (feita em 10/11/2026, ARCHITECTURE §13.23): QG, Refeitório, Pátio e Garagem, à noite, com as janelas,
+  as portas, as armas, a caixa e as vantagens; a janela virou mão única para os zumbis.
+- **5b. Os zumbis por tipo:** uma skin para cada (comum, Sprinter de agasalho, Chonker de capacete de obra e barriga de
+  gosma, Spitter de bochechas cheias e o Mega Bobo com a placa de "chefe"; arte-ux.md §2.8).
+- **5c. Leitura à noite:** contorno de giz das armas na parede, a caixa e as máquinas visíveis no escuro, a gosma verde
+  do Chonker.
+- **5d. Prints da rodada 14** para o Erick.
+
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
 | # | Pergunta | Padrão |

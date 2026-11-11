@@ -44,6 +44,9 @@ Plano em `docs/PLANO_M3.md`.
   ou carpinteiro; o HUD anuncia e mostra o tempo que sobra.
 - **Fase 4e, o Desmontador:** a arma maravilha (nome provisório), uma pistola de raio que só sai da Caixa Misteriosa
   (~5% por giro): um raio verde que estoura e desmonta os zumbis em volta. Fecha a fase 4 (economia).
+- **Fase 5a, a Base Abandonada:** o mapa do Bobo Zombies, à noite: QG, Refeitório, Pátio com a torre de rádio e Garagem
+  com o jipe, ligados por portas pagas, com janelas, armas na parede, a caixa e as vantagens. Agora é ela que abre no
+  card do Bobo Zombies. Os zumbis não usam mais uma sala fechada como atalho.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

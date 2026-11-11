@@ -55,6 +55,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:ringue',
   // M3 (fase 3d): o mapa pequeno do Bobo Zombies com janelas e porta paga (só acrescentado, regra 20)
   'map:posto',
+  // M3 (fase 5a): a Base Abandonada, o mapa do Bobo Zombies (só acrescentado, regra 20)
+  'map:base',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

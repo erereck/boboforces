@@ -2496,3 +2496,22 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   nada (a economia é dos humanos; os bots de apoio já nascem com a primária), então só os drops mexem no número. O
   balanço com humanos comprando fica para os testes do Erick e a fase 6.
 - **Fecha a fase 4** (a economia do Zombies).
+
+### 13.23 Fase 5a: a Base Abandonada (10/11/2026)
+
+- **Mapa** `base` (`assets-src/maps/base.ts`, conteúdo novo `map:base`; nome provisório, pergunta I1), à noite:
+  QG (onde se nasce; 3 janelas, Buzzer e Door Knocker, a caixa começa aqui), Refeitório ao norte (porta de 750; mesas,
+  4 janelas, Rattler, Buddy Brew), Pátio a leste (porta de 1000; torre de rádio, caixa d'água, 4 janelas, Peekaboo,
+  Speedy Soda), Garagem ao sul (escombros de 1250; jipe, 3 janelas, Lawnmower, Chonky Cola) e uma 2ª porta de 750
+  entre o Refeitório e o Pátio (dá a volta). Muros de bloco de 3 m sem teto, lâmpadas no alto dos muros, cerca de
+  arame com holofotes nos cantos, galpões de chapa no anel de fora. Os zumbis nascem em 10 pontos fora dos muros.
+  3,6 KB, 1936 nós jogáveis, linha de visão de 49,4 m. O card do Bobo Zombies nos Modos agora abre nela.
+- **Linha de visão:** o `mapc` exige até 50 m em todo mapa (Switch 3–4P). Com a cerca a 56 m, as diagonais do anel
+  de fora passavam de 55 m por mais galpões que eu pusesse; a cerca ficou em x 12..58 e z 10..58 (o anel de 4 a 6 m
+  de largura), e duas janelas alinhadas da Garagem saíram (as retas atravessavam a sala de janela a janela).
+- **Janela de mão única** (`NavGrid.assignGates(boxes, count, oneWay)`, `linkOutward`): o robô das ondas achou
+  zumbis presos dentro de salas fechadas. O flow field usava a sala como atalho (entra por uma janela, sai pela outra),
+  mas as tábuas da outra janela só saem por fora. Agora a ligação que sai por uma janela fica fechada para os zumbis:
+  sala fechada não é mais caminho. Isso mudou também o golden do Posto (`dcc24861`).
+- **Medido:** robô das ondas na Base, 4 bots Normal: onda média **4,0**, partidas de 143 a 166 s (antes da mão única:
+  320 a 600 s, com Destravar em ciclo).

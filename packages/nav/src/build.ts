@@ -72,6 +72,8 @@ export interface NavGridImpl extends NavGrid {
   /** M3 (fase 3d): portão de cada ligação (-1 = nenhum) e o bloqueio de cada portão (`NAV_GATE_BLOCK`). */
   readonly linkGate: Int16Array;
   readonly gateBlock: Uint8Array;
+  /** M3 (fase 5a): 1 = a ligação sai por um portão de mão única (a janela, de dentro para fora): fechada para os zumbis. */
+  readonly linkOutward: Uint8Array;
   /** Caminhos criados (`createNavPath`) e as áreas de trabalho do A* compartilhadas. */
   pathCount: number;
   readonly search: SearchPool;
@@ -611,6 +613,7 @@ export function buildNavGridImpl(world: NavWorld, metrics: NavMetrics): NavGridI
     linkCost,
     componentCount,
     linkGate: new Int16Array(linkTarget.length).fill(-1),
+    linkOutward: new Uint8Array(linkTarget.length),
     gateBlock: new Uint8Array(MAX_NAV_GATES),
     pathCount: 0,
     search: createSearchPool(nodeCount),
@@ -650,8 +653,8 @@ export function buildNavGridImpl(world: NavWorld, metrics: NavMetrics): NavGridI
       out[offset + 1] = floorY[node]!;
       out[offset + 2] = (k + 0.5) * NAV_NODE_SIZE_M;
     },
-    assignGates(boxes, count) {
-      assignGatesImpl(nav, boxes, count);
+    assignGates(boxes, count, oneWay) {
+      assignGatesImpl(nav, boxes, count, oneWay);
     },
     setGateBlock(gate, block) {
       if (gate >= 0 && gate < MAX_NAV_GATES) nav.gateBlock[gate] = block;
@@ -664,9 +667,10 @@ export function buildNavGridImpl(world: NavWorld, metrics: NavMetrics): NavGridI
  * M3 (fase 3d): a ligação u → v atravessa a caixa do portão se o segmento entre os centros dos nós, na altura do peito
  * (piso + 1 m), corta a caixa (teste de placas). Recalcula todas as ligações e solta todos os bloqueios.
  */
-function assignGatesImpl(nav: NavGridImpl, boxes: Float32Array, count: number): void {
+function assignGatesImpl(nav: NavGridImpl, boxes: Float32Array, count: number, oneWay?: Float32Array): void {
   const n = Math.min(count, MAX_NAV_GATES);
   nav.linkGate.fill(-1);
+  nav.linkOutward.fill(0);
   nav.gateBlock.fill(0);
   if (n <= 0) return;
   const a = new Float32Array(3);
@@ -678,6 +682,12 @@ function assignGatesImpl(nav: NavGridImpl, boxes: Float32Array, count: number): 
       for (let g = 0; g < n; g++) {
         if (segmentHitsBox(a[0]!, a[1]! + 1, a[2]!, b[0]!, b[1]! + 1, b[2]!, boxes, g * 6)) {
           nav.linkGate[l] = g;
+          // Mão única: andar no sentido da normal "para fora" é sair pela janela.
+          if (oneWay !== undefined) {
+            const ox = oneWay[g * 2] ?? 0;
+            const oz = oneWay[g * 2 + 1] ?? 0;
+            if ((b[0]! - a[0]!) * ox + (b[2]! - a[2]!) * oz > 1e-6) nav.linkOutward[l] = 1;
+          }
           break;
         }
       }

@@ -27,6 +27,8 @@ export const GAME_ASSETS_M1 = {
   ringue: 'maps/ringue.bfmap',
   /** M3 (fase 3d): o Posto Avançado, mapa pequeno do Bobo Zombies (janelas e porta paga). */
   posto: 'maps/posto.bfmap',
+  /** M3 (fase 5a): a Base Abandonada, o mapa do Bobo Zombies (à noite). */
+  base: 'maps/base.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -48,4 +50,5 @@ export const MAP_ASSETS: Readonly<Record<string, string>> = {
   construto: GAME_ASSETS_M1.construto,
   ringue: GAME_ASSETS_M1.ringue,
   posto: GAME_ASSETS_M1.posto,
+  base: GAME_ASSETS_M1.base,
 };

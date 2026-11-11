@@ -68,8 +68,10 @@ export interface NavGrid {
   /**
    * M3 (fase 3d): prende ao portão `g` (0..count-1, até `MAX_NAV_GATES`) as ligações que atravessam a caixa `g`
    * (`boxes[g*6..]`: minX, minY, minZ, maxX, maxY, maxZ em metros) e solta todos (bloqueio 0). Na criação da sim.
+   * `oneWay[g*2..]` (x, z), quando não é (0, 0), é a normal "para fora" de um portão de mão única para os zumbis (a
+   * janela: o zumbi entra, mas não sai por ela): a ligação que atravessa o portão para fora fica fechada no flow field.
    */
-  assignGates(boxes: Float32Array, count: number): void;
+  assignGates(boxes: Float32Array, count: number, oneWay?: Float32Array): void;
   /** M3 (fase 3d): quem não passa pelo portão `g` (bits de `NAV_GATE_BLOCK`; 0 = todos passam). */
   setGateBlock(gate: number, block: number): void;
 }

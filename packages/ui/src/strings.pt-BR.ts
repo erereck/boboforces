@@ -1000,6 +1000,8 @@ export const STRINGS_PT_BR = {
   'map.ringue': 'Ringue',
   // M3 (fase 3d): o mapa pequeno do Bobo Zombies (nome provisório).
   'map.posto': 'Posto Avançado',
+  // M3 (fase 5a): o mapa do Bobo Zombies (nome provisório, pergunta I1).
+  'map.base': 'Base Abandonada',
   'mode.training': 'Bobo Training',
   // M3 (fase 2d): Bobo Zombies.
   'mode.zombies': 'Bobo Zombies',

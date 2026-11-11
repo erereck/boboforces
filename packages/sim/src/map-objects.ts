@@ -305,7 +305,13 @@ export class MapObjects {
     this.boboColliders = createStaticColliders({ boxes, flags: flags.slice(), owner, count: total });
     this.zombieColliders = createStaticColliders({ boxes, flags: flags.slice(), owner, count: total });
     this.nav = nav;
-    if (nav !== null) nav.assignGates(gates, nb + nd + nmGates);
+    // M3 (fase 5a): as janelas são de mão única para os zumbis (a normal para fora); portas e máquinas, não.
+    const oneWay = new Float32Array((nb + nd + nmGates) * 2);
+    for (let i = 0; i < nb; i++) {
+      oneWay[i * 2] = this.bnx[i]!;
+      oneWay[i * 2 + 1] = this.bnz[i]!;
+    }
+    if (nav !== null) nav.assignGates(gates, nb + nd + nmGates, oneWay);
     this.reset();
   }
 

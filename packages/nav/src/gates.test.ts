@@ -90,4 +90,17 @@ describe('nav: portões (M3, fase 3d)', () => {
     nav.assignGates(GATE, 1);
     expect(astar(nav, a, b)).toBe('found');
   });
+
+  it('janela de mão única: o zumbi entra pela janela, mas não sai por ela (M3, fase 5a)', () => {
+    const nav = walled();
+    // Lado de fora da passagem = +X (leste).
+    nav.assignGates(GATE, 1, new Float32Array([1, 0]));
+    nav.setGateBlock(0, NAV_GATE_BLOCK.bobo);
+    const west = node(nav, 2, 4);
+    const east = node(nav, 10, 4);
+    // Bobo do lado de dentro (oeste): o zumbi de fora (leste) entra.
+    expect(flowReaches(nav, east, west)).toBe(true);
+    // Bobo do lado de fora (leste): o zumbi de dentro (oeste) não sai pela janela.
+    expect(flowReaches(nav, west, east)).toBe(false);
+  });
 });

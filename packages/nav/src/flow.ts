@@ -132,6 +132,7 @@ export class FlowFieldImpl implements FlowField {
     const target = this.target;
     const linkGate = nav.linkGate;
     const gateBlock = nav.gateBlock;
+    const linkOutward = nav.linkOutward;
     let closed = 0;
     while (this.heapSize > 0 && closed < budget) {
       const v = this.pop();
@@ -151,9 +152,10 @@ export class FlowFieldImpl implements FlowField {
         const u = inFrom[k]!;
         if (pos[u] === CLOSED) continue;
         const l = inLink[k]!;
-        // M3 (fase 3d): portão fechado para os zumbis (porta paga fechada).
+        // M3 (fase 3d): portão fechado para os zumbis (porta paga fechada). Fase 5a: a janela é de mão única (o zumbi não
+        // sai por ela: uma sala fechada com duas janelas não vira atalho).
         const gate = linkGate[l]!;
-        if (gate >= 0 && (gateBlock[gate]! & NAV_GATE_BLOCK.zombie) !== 0) continue;
+        if (gate >= 0 && ((gateBlock[gate]! & NAV_GATE_BLOCK.zombie) !== 0 || linkOutward[l] === 1)) continue;
         const nd = dv + cost[l]!;
         if (nd >= dist[u]!) continue;
         dist[u] = nd;

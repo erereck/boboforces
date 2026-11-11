@@ -660,19 +660,19 @@ export function startGame(deps: GameDeps): GameHandle {
         })),
         // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
         { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
-        // M3 (fase 2d): o Bobo Zombies começa direto (fase 3d: no Posto Avançado, enquanto a Base Abandonada não chega).
+        // M3 (fase 2d): o Bobo Zombies começa direto (fase 5a: na Base Abandonada).
         { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
       ],
     }),
   );
   /**
-   * M3 (fase 2d): o Bobo Zombies dos Modos: a Curta (10 ondas), só os humanos contra as ondas. Fase 3d: no Posto Avançado
-   * (janelas com barricada e porta paga); o Construto continua nos recentes.
+   * M3 (fase 2d): o Bobo Zombies dos Modos: a Curta (10 ondas), só os humanos contra as ondas. Fase 5a: na Base
+   * Abandonada, à noite (o Posto Avançado e o Construto continuam nos recentes).
    */
   const ZOMBIES_PRESET: MatchRecipe = {
     format: MATCH_RECIPE_FORMAT,
     mode: 'zombies',
-    map: 'posto',
+    map: 'base',
     seed: 0,
     match: { timeLimitS: 0, scoreLimit: 0 },
     teams: [{ humans: 'all', bots: [] }],
