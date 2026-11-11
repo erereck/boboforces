@@ -2691,3 +2691,13 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Com as regras padrão** (só bots, que não compram arma, não abrem porta nem usam caixa ou vantagem): Tryhard chega
   às ondas 5–6 (média 5,3) e Normal às 4–5 (média 4,3); o paredão é o primeiro Mega Bobo, na onda 5. É um piso: o
   balanço com gente (compras, portas, caixa, vantagens) é do teste do Erick (roteiro do M3).
+
+### 13.35 Fase 7d: o portão do marco e o roteiro (11/11/2026)
+
+- **Portão** (commit `9c83761`): `npm run check` (1.715 testes), `build` e `build:switch` (`main.js` de 2.927 KB, 68
+  assets), `portcheck --strict`, `size-check` (menu 347,7 de 350 KB; a primeira partida no Construto 794,6 KB de
+  1 MB), `smoke:web` (0 erro e 0 aviso de console) e `balance` (os 5 níveis em ordem, 6,0 s). Os goldens estão no
+  `check`: Warfare `5ee925a0`, Zombies no Construto `dd27cd5e` e no Posto `62251b7e`.
+- **`docs/ROTEIRO_M3.md`:** o que só o Erick testa: o PC com controles de verdade (sofá do Zombies 2–4, entrar no
+  meio, desconectar, o resultado, Mudar regras, a música na partida, as 10 ondas solo) e o checkpoint do Switch com 4
+  controles, o bench do Zombies pelo `bench.json` e o `runtime.log`.

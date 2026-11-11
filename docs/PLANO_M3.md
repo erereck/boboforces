@@ -169,7 +169,7 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
 - **7c. 10 ondas do começo ao fim** (feita em 11/11/2026, ARCHITECTURE §13.34; achado e corrigido: os bots de apoio
   ficavam sem munição): o robô das ondas leva partidas até a vitória na 10ª (com 1 e com 4 bots, em
   regras que deixam chegar), conferindo especiais, os dois chefões e que nada trava.
-- **7d. Portão e roteiro:** `npm run check`, builds, `portcheck --strict`, `smoke:web`, golden, balance e
+- **7d. Portão e roteiro** (feita em 11/11/2026, ARCHITECTURE §13.35; `docs/ROTEIRO_M3.md`): `npm run check`, builds, `portcheck --strict`, `smoke:web`, golden, balance e
   size-check; `docs/ROTEIRO_M3.md` com o teste de 4 controles na web e o checkpoint do Switch.
 - **7e. Prints da rodada 16 e o NRO do M3.** Publicar só com o OK do Erick.
 
