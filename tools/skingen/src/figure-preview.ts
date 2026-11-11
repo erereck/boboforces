@@ -69,6 +69,11 @@ export const PREVIEW_LOOKS: readonly FigurePresetId[] = [
   'pajamas',
   'cardboard',
   'diver',
+  // M3 (fase 5b): os especiais do Bobo Zombies.
+  'zombie-sprinter',
+  'zombie-chonker',
+  'zombie-spitter',
+  'zombie-mega',
 ];
 
 /** A skin pintada: as 2 camadas 64×64 e o nível 1 (32×32 por camada). */

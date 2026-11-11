@@ -1322,8 +1322,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    */
   function resolveEntityFigure(v: SimView, i: number): void {
     if (v.kind[i] === ENTITY_KIND.zombie) {
-      figureOf[i] = figures.zombieFigure;
-      skinLayer[i] = figures.zombieSkin;
+      // M3 (fase 5b): a skin do tipo (o zumbi do pool troca de tipo a cada vez que entra; o `spawn` resolve de novo).
+      const type = v.zombieType[i]!;
+      figureOf[i] = figures.zombieFigureOf(type);
+      skinLayer[i] = figures.zombieSkinOf(type);
       return;
     }
     const team = ffa || v.team[i] === NO_TEAM ? -1 : v.team[i]!;

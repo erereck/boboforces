@@ -27,7 +27,12 @@ export type FigurePresetId =
   | 'astronaut'
   | 'pajamas'
   | 'cardboard'
-  | 'diver';
+  | 'diver'
+  // M3 (fase 5b): os especiais do Bobo Zombies (arte-ux.md §2.8).
+  | 'zombie-sprinter'
+  | 'zombie-chonker'
+  | 'zombie-spitter'
+  | 'zombie-mega';
 
 const F = FIGURE_FABRIC;
 /** Sem a peça (colete ou luvas). */
@@ -232,6 +237,47 @@ export const FIGURE_PRESETS: Readonly<Record<FigurePresetId, FigureLook>> = {
     eyewear: 2,
     accessory: 0xffd23f,
     outfit: outfit(F.plain, 0x1c1c1a, 0x1c1c1a, 0x2f3640, 0x1c1c1a, 0x1c1c1a),
+  }),
+  // M3 (fase 5b): os especiais do Bobo Zombies (arte-ux.md §2.8). A mesma pele verde do zumbi comum; o pintor desbota e
+  // rasga a roupa de todos, e cada um tem a roupa e o rosto do tipo (cores longe das 4 de time).
+  // Sprinter: agasalho de corrida vinho, faixa clara na testa, cabelo raspado, olho caído e tênis claro.
+  'zombie-sprinter': normalizeFigureLook({
+    skinTone: 0x8fae74,
+    hair: 0x28201b,
+    hairStyle: 5,
+    headwear: 1,
+    accessory: 0xd9d4c4,
+    outfit: outfit(F.plain, 0x6e2f3a, 0x5c2731, NONE, 0xc9c3b4, NONE),
+    zombie: { kind: 'sprinter', faceStyle: 1 },
+  }),
+  // Chonker: macacão de obra telha com colete amarelo de segurança, boné amarelo (o capacete de obra), careca, língua
+  // de fora; o pintor põe a barriga de gosma verde.
+  'zombie-chonker': normalizeFigureLook({
+    skinTone: 0x8fae74,
+    hair: 0x28201b,
+    hairStyle: 12,
+    headwear: 4,
+    accessory: 0xc9a23a,
+    outfit: outfit(F.plain, 0x8a4f2a, 0x4f4335, 0xc9a43a, 0x3b2f2a, NONE),
+    zombie: { kind: 'chonker', faceStyle: 2 },
+  }),
+  // Spitter: capa de chuva oliva, mullet, a boca em "uuuh" (de quem vai cuspir).
+  'zombie-spitter': normalizeFigureLook({
+    skinTone: 0x8fae74,
+    hair: 0x3a2a1f,
+    hairStyle: 13,
+    outfit: outfit(F.plain, 0x6b7a35, 0x4b4434, NONE, 0x3b2f2a, NONE),
+    zombie: { kind: 'spitter', faceStyle: 3 },
+  }),
+  // Mega Bobo: farda de oficial em camuflado noturno com colete marrom, boné escuro, boca costurada.
+  'zombie-mega': normalizeFigureLook({
+    skinTone: 0x8fae74,
+    hair: 0x28201b,
+    hairStyle: 12,
+    headwear: 4,
+    accessory: 0x2a2c33,
+    outfit: outfit(F.night, 0x3a3f46, 0x2c3036, 0x5a3a2a, 0x1c1c1a, NONE),
+    zombie: { kind: 'mega', faceStyle: 4 },
   }),
 };
 

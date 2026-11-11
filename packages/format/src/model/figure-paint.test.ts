@@ -93,6 +93,11 @@ const SKIN_HASHES: Readonly<Record<FigurePresetId, readonly [string, string, str
   pajamas: ['17f93150', 'fde238f4', 'c8abdf71'],
   cardboard: ['3587db0e', '3f14b90f', '0980bb70'],
   diver: ['f5d5d0a7', '11f8176b', '007e6423'],
+  // M3 (fase 5b): os especiais do Bobo Zombies.
+  'zombie-sprinter': ['130355ba', '6b23ef49', 'dfc36c59'],
+  'zombie-chonker': ['4fa6fd1c', '62466aba', 'da8813b8'],
+  'zombie-spitter': ['3450bd86', '9c3de21e', 'dc1f4389'],
+  'zombie-mega': ['3ac57ab9', '32eb9960', 'f4140dba'],
 };
 /** Zumbi comum nos 8 estilos de rosto, e os 5 tipos no estilo 0 (sem time). */
 const ZOMBIE_STYLE_HASHES = [
@@ -617,7 +622,7 @@ describe('pintor do boneco: conteúdo', () => {
 
   it('o uniforme de futebol saiu: sem número, escudo nem gola em V (só o tecido e as peças da farda na frente)', () => {
     for (const id of IDS) {
-      if (id === 'zombie') continue;
+      if (FIGURE_PRESETS[id as FigurePresetId]?.zombie) continue;
       for (const team of [-1, 0, 1]) {
         const look = FIGURE_PRESETS[id];
         const { out } = paint({ look, team, teamColors: TEAMS });
@@ -670,7 +675,7 @@ describe('pintor do boneco: conteúdo', () => {
     };
     let min = 1;
     for (const id of [...IDS, 'padrao' as const]) {
-      if (id === 'zombie') continue;
+      if (FIGURE_PRESETS[id as FigurePresetId]?.zombie) continue;
       const look = id === 'padrao' ? FIGURE_LOOK_DEFAULT : FIGURE_PRESETS[id];
       for (let team = 0; team < 4; team++) {
         const c = coverage(look, team);

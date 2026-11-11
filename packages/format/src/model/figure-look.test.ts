@@ -223,13 +223,13 @@ describe('chave da skin', () => {
     );
   });
 
-  it('os 16 looks prontos (12 + 4 fantasias, fase 6d) têm chaves distintas, e o zumbi muda com o estilo e o tipo', () => {
+  it('os 20 looks prontos (12 + 4 fantasias, fase 6d, + 4 especiais do Zombies, M3 fase 5b) têm chaves distintas, e o zumbi muda com o estilo e o tipo', () => {
     const keys = new Set(
       (Object.keys(FIGURE_PRESETS) as FigurePresetId[]).map((id) =>
         figureSkinKey({ look: FIGURE_PRESETS[id], team: -1, teamColors: [] }),
       ),
     );
-    expect(keys.size).toBe(16);
+    expect(keys.size).toBe(20);
     const z = FIGURE_PRESETS.zombie;
     const key = (look: FigureLook): string => figureSkinKey({ look, team: -1, teamColors: [] });
     expect(key({ ...z, zombie: { kind: 'common', faceStyle: 3 } })).not.toBe(key(z));
@@ -238,14 +238,19 @@ describe('chave da skin', () => {
 });
 
 describe('aparências prontas e rotação dos bots', () => {
-  it('um look por id, já normalizado e com id de conteúdo; só o zumbi é zumbi', () => {
+  it('um look por id, já normalizado e com id de conteúdo; só os zumbis são zumbi', () => {
     const ids = Object.keys(FIGURE_PRESETS) as FigurePresetId[];
-    expect(ids).toHaveLength(16);
+    expect(ids).toHaveLength(20);
     for (const id of ids) {
       expect(normalizeFigureLook(FIGURE_PRESETS[id])).toEqual(FIGURE_PRESETS[id]);
       expect(isKnownContentId(`skin:${id}`), id).toBe(true);
-      expect(FIGURE_PRESETS[id].zombie === null, id).toBe(id !== 'zombie');
+      expect(FIGURE_PRESETS[id].zombie === null, id).toBe(!id.startsWith('zombie'));
     }
+    // M3 (fase 5b): cada especial com o tipo dele.
+    expect(FIGURE_PRESETS['zombie-sprinter'].zombie?.kind).toBe('sprinter');
+    expect(FIGURE_PRESETS['zombie-chonker'].zombie?.kind).toBe('chonker');
+    expect(FIGURE_PRESETS['zombie-spitter'].zombie?.kind).toBe('spitter');
+    expect(FIGURE_PRESETS['zombie-mega'].zombie?.kind).toBe('mega');
     expect(FIGURE_PRESETS.zombie.zombie).toEqual({ kind: 'common', faceStyle: 0 });
     expect(FIGURE_PRESETS.zombie.skinTone).toBe(0x8fae74);
     expect([FIGURE_PRESETS.zombie.outfit.vest, FIGURE_PRESETS.zombie.outfit.gloves]).toEqual([-1, -1]);

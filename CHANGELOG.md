@@ -47,6 +47,8 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 5a, a Base Abandonada:** o mapa do Bobo Zombies, à noite: QG, Refeitório, Pátio com a torre de rádio e Garagem
   com o jipe, ligados por portas pagas, com janelas, armas na parede, a caixa e as vantagens. Agora é ela que abre no
   card do Bobo Zombies. Os zumbis não usam mais uma sala fechada como atalho.
+- **Fase 5b, os zumbis por tipo:** o Sprinter de agasalho e faixa na testa, o Chonker de colete de obra com a barriga
+  de gosma, o Spitter de capa de chuva e o Mega Bobo de farda de oficial: cada especial com a roupa e o rosto dele.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

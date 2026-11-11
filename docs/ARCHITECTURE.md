@@ -2515,3 +2515,17 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   sala fechada não é mais caminho. Isso mudou também o golden do Posto (`dcc24861`).
 - **Medido:** robô das ondas na Base, 4 bots Normal: onda média **4,0**, partidas de 143 a 166 s (antes da mão única:
   320 a 600 s, com Destravar em ciclo).
+
+### 13.24 Fase 5b: os zumbis por tipo (10/11/2026)
+
+- **Looks** (`FIGURE_PRESETS`, conteúdo novo `skin:zombie-sprinter|chonker|spitter|mega`): a mesma pele verde do comum
+  e o pintor de zumbi de sempre (desbota e rasga a roupa; a barriga de gosma é do tipo `chonker`), cada um com a roupa
+  e o traço de rosto dele (arte-ux.md §2.8). Sprinter: agasalho vinho, faixa clara na testa, tênis claro, olho caído.
+  Chonker: macacão telha, colete amarelo de segurança, boné amarelo (no lugar do capacete de obra: o boneco não tem
+  acessório 3D ainda), língua de fora. Spitter: capa de chuva oliva, mullet, boca em "uuuh". Mega Bobo: camuflado
+  noturno de oficial, colete marrom, boné escuro, boca costurada (a placa de "chefe" fica para quando houver acessório
+  3D). Hashes das skins travados no teste do pintor; prévias em `local/skins/figura-zombie-*.png`
+  (`npm run skingen:figuras`).
+- **No jogo** (`SceneFiguresInput.zombieKinds`, só no Bobo Zombies): as 4 skins entram logo depois da do comum na
+  prioridade do plano de skins; `SceneFigures.zombieFigureOf/zombieSkinOf(type)` dão a do `ZOMBIE_TYPE` (o que anda
+  e o que corre são o comum). O zumbi do pool troca de tipo a cada entrada, e o `spawn` resolve o boneco de novo.

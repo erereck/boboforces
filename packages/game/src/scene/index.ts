@@ -123,6 +123,7 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
       figures = createSceneFigures({
         profile,
         teamCount: recipe.recipe.teams.length,
+        zombieKinds: recipe.recipe.mode === 'zombies',
         mannequins: loaded.doc.markers.mannequins,
         prints: request.bench?.prints ?? false,
         capacity: Math.floor(loaded.models.reservedCount / FIGURE_SKIN_LAYERS),

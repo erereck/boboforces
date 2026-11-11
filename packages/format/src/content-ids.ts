@@ -192,6 +192,11 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'skin:pajamas',
   'skin:cardboard',
   'skin:diver',
+  // M3 (fase 5b): os especiais do Bobo Zombies (só acrescentados, regra 20)
+  'skin:zombie-sprinter',
+  'skin:zombie-chonker',
+  'skin:zombie-spitter',
+  'skin:zombie-mega',
   // M2 (fase 3a): os bots de fábrica especiais (gameplay.md §6.7; só acrescentados, regra 20)
   'bot:jorge-the-immortal',
   'bot:camper-carl',

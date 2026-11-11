@@ -34,6 +34,19 @@ export const FIGURE_DEFAULT_LOOK = 'padrao';
 export const FIGURE_TEAM_SLOTS = 5;
 /** O zumbi (`skin:zombie`): look próprio, sempre sem time. */
 export const FIGURE_ZOMBIE_LOOK: FigurePresetId = 'zombie';
+
+/**
+ * M3 (fase 5b): o look de cada `ZOMBIE_TYPE` da sim (o que anda e o que corre são o comum; depois Sprinter, Chonker,
+ * Spitter e o chefão). Só no Bobo Zombies (`SceneFiguresInput.zombieKinds`); fora dele, todo zumbi é o comum.
+ */
+export const FIGURE_ZOMBIE_TYPE_LOOKS: readonly FigurePresetId[] = [
+  'zombie',
+  'zombie',
+  'zombie-sprinter',
+  'zombie-chonker',
+  'zombie-spitter',
+  'zombie-mega',
+];
 /** M2 (fase 6c): o look do Meu Bobo (o jogador 1), um id que não é de preset. */
 export const FIGURE_PLAYER_LOOK = 'jogador';
 
@@ -134,6 +147,8 @@ export function figureTeamColors(teamCount: number): number[] {
 }
 
 export interface SceneFiguresInput {
+  /** M3 (fase 5b): pinta os especiais do Bobo Zombies (uma skin por tipo); fora do modo, só o zumbi comum. */
+  readonly zombieKinds?: boolean;
   readonly profile: PlatformProfile;
   /** Times da partida (os coletes A e B existem mesmo no FFA da vitrine: no mínimo 2). */
   readonly teamCount: number;
@@ -186,6 +201,9 @@ export interface SceneFigures {
   playerSkin(team: number): number;
   readonly zombieFigure: number;
   readonly zombieSkin: number;
+  /** M3 (fase 5b): gabarito e skin do zumbi do tipo `type` (`ZOMBIE_TYPE`; sem as variantes, o comum). */
+  zombieFigureOf(type: number): number;
+  zombieSkinOf(type: number): number;
   /** Skins pintadas (`paintSkins`) e o cache delas; `null` antes da etapa "skins". */
   readonly cache: FigureSkinCache | null;
   /** 1ª camada da skin de cada conjunto de `plan.sets` (mesma ordem; vazio antes da etapa "skins"). */
@@ -232,11 +250,17 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
   const lookById = new Map<string, FigureLook>();
   for (const [id, look] of rotation) lookById.set(id, look);
   lookById.set(FIGURE_ZOMBIE_LOOK, FIGURE_PRESETS.zombie);
+  // M3 (fase 5b): os especiais do Bobo Zombies (logo depois do comum na prioridade do plano).
+  const zombieKinds = input.zombieKinds === true ? FIGURE_ZOMBIE_TYPE_LOOKS.slice(2) : [];
+  for (const id of zombieKinds) lookById.set(id, FIGURE_PRESETS[id]);
   lookById.set(FIGURE_DEFAULT_LOOK, FIGURE_LOOK_DEFAULT);
   if (input.player) lookById.set(FIGURE_PLAYER_LOOK, normalizeFigureLook(input.player.look));
 
   // Pedido na ordem de prioridade: zumbi, rotação × times, manequins do mapa e a fila dos prints.
-  const requested: FigureSkinSet[] = [{ look: FIGURE_ZOMBIE_LOOK, team: -1 }];
+  const requested: FigureSkinSet[] = [
+    { look: FIGURE_ZOMBIE_LOOK, team: -1 },
+    ...zombieKinds.map((look) => ({ look, team: -1 })),
+  ];
   if (input.player) requested.push({ look: FIGURE_PLAYER_LOOK, team: input.player.team });
   for (const [id] of rotation) for (const team of teams) requested.push({ look: id, team });
   for (const m of input.mannequins) {
@@ -277,6 +301,9 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
   const playerSkins = new Uint16Array(FIGURE_TEAM_SLOTS);
   let zombieFigure = 0;
   let zombieSkin = 0;
+  /** M3 (fase 5b): por `ZOMBIE_TYPE` (o comum onde não há variante). */
+  const zombieFigures = new Uint8Array(FIGURE_ZOMBIE_TYPE_LOOKS.length);
+  const zombieSkins = new Uint16Array(FIGURE_ZOMBIE_TYPE_LOOKS.length);
   let cache: FigureSkinCache | null = null;
   /** Skin (1ª camada) de cada conjunto pintado, pela chave `look|time`. */
   const skinOfSet = new Map<string, number>();
@@ -333,6 +360,8 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
     get zombieSkin() {
       return zombieSkin;
     },
+    zombieFigureOf: (type) => zombieFigures[type] ?? zombieFigure,
+    zombieSkinOf: (type) => zombieSkins[type] ?? zombieSkin,
     get cache() {
       return cache;
     },
@@ -370,6 +399,11 @@ export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
       const z = planned(FIGURE_ZOMBIE_LOOK, -1);
       zombieFigure = z ? z.figure : 0;
       zombieSkin = z ? z.skin : 0;
+      FIGURE_ZOMBIE_TYPE_LOOKS.forEach((id, type) => {
+        const r = zombieKinds.includes(id) ? planned(id, -1) : null;
+        zombieFigures[type] = r ? r.figure : zombieFigure;
+        zombieSkins[type] = r ? r.skin : zombieSkin;
+      });
     },
     resolve(lookId, look, team) {
       if (!cache || disposed) return null;
