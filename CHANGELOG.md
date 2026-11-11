@@ -70,6 +70,8 @@ Plano em `docs/PLANO_M3.md`.
 - **Fase 6e, a música do Bobo Zombies:** duas camadas provisórias compostas em código, uma marcha de brinquedo
   assombrada. A calma toca entre as ondas. Durante a onda, com "Música na partida" ligada, a horda entra por cima
   conforme os zumbis chegam perto (e enche com o chefão). No resultado volta a música do menu.
+- **Fase 6f, rodada 15 dos prints:** o resultado, a Partida personalizada e os presets do Bobo Zombies, com os sons e a
+  música para ouvir, e as perguntas L1–L6. Fecha a fase 6.
 
 - **Fase 1a, assentos na partida:** cada jogador local tem um dispositivo e um lado (com o P1 ou contra); os humanos
   tomam o lugar de bots do próprio time, e os times mantêm o tamanho.

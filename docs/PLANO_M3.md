@@ -154,7 +154,9 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada; as visuais te
   (#63) e da síntese em código.
 - **6e. Música em camadas** (feita em 11/11/2026, ARCHITECTURE §13.30): a trilha das ondas em 2 camadas (calma no intervalo, horda durante a onda), sintetizada
   em código enquanto o Erick não escolhe uma faixa CC0 (I3: o download pede o OK com nome, origem e tamanho).
-- **6f. Medição e prints da rodada 15.** Fecha a fase 6.
+- **6f. Medição e prints da rodada 15** (feita em 11/11/2026: v17 da página das rodadas, perguntas L1–L6 junto com
+  as K, J e I ainda abertas, com os sons e a música para ouvir; montada por `local/m2/montar-pagina-r15.mjs`). Fecha a
+  fase 6.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

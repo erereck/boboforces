@@ -2632,3 +2632,14 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
 - **Conferido no Edge** (`local/m3/capturar-som-zombies.ts`, amostras a cada 2 s): a calma na contagem, nada
   durante a onda com o Ajuste desligado (o padrão), a do menu no resultado. A horda com o Ajuste ligado ficou só nos
   testes.
+
+### 13.31 Fase 6f: medição e rodada 15 (11/11/2026)
+
+- **Rodada 15** (v17 da página das rodadas, `local/m2/montar-pagina-r15.mjs`): seções 66 (resultado), 67 (Partida
+  personalizada) e 68 (presets), e os sons e a música do Zombies no topo da seção 54; perguntas L1–L6. Capturas por
+  `local/m3/capturar-r15.ts` (duas partidas de verdade até o fim: a primeira marca o recorde, a segunda mostra o
+  recorde) e `capturar-personalizada-zombies.ts`; os sons sintetizados por `local/m2/render-sinteticos.ts` e a música
+  somada e a emenda por `local/m3/render-musica-zumbis.ts`.
+- **Medido:** `npm run check` verde (1.711 testes); menu em 347,7 de 350 KB (era 344,3 no começo da fase 5; os textos
+  do Zombies, o banco de sons e a camada do mixer); MP3 do jogo 142 KB; a música do Zombies 2 × 115 KB, sob demanda.
+  NRO de 60,2 MB (zip de 24,0 MB) abriu no Eden até o menu em 2.007 ms.
