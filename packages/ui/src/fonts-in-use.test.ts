@@ -11,6 +11,7 @@ import { settingsScreen } from './screens/settings.ts';
 import { buildTabbed, type TabbedRow } from './screens/tabbed.ts';
 import { titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
+import { STRINGS_EXTRA_PT_BR } from './strings-extra.pt-BR.ts';
 import { t } from './text.ts';
 import { drawnCommands } from './test-fixtures.ts';
 import { mainMenuScreen } from './screens/main-menu.ts';
@@ -74,7 +75,8 @@ describe('atlas em uso: fontes, licença e métricas', () => {
     const display = glyphCodes(fonts.display);
     const outHud = new Set<string>();
     const outDisplay = new Set<string>();
-    for (const raw of Object.values(STRINGS_PT_BR)) {
+    // Refino R3a (#79): as duas tabelas (a do menu e a da cena).
+    for (const raw of [...Object.values(STRINGS_PT_BR), ...Object.values(STRINGS_EXTRA_PT_BR)] as string[]) {
       // O ™ não está no atlas: o drawText o compõe com T e M, que precisam estar nas duas fontes.
       const text = raw.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
       for (const ch of text) if (!hud.has(ch.charCodeAt(0))) outHud.add(ch);

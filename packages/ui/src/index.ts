@@ -2,6 +2,8 @@
 // do tema escuro e a tabela de textos pt-BR. Puro (sem DOM): o render desenha a DrawList; a casca nunca desenha UI do
 // jogo em DOM (decisão #3).
 export * from './strings.pt-BR.ts';
+// Refino R3a (#79): a tabela da cena e das telas de edição (só quem a importa a carrega).
+export * from './strings-extra.pt-BR.ts';
 export * from './text.ts';
 export * from './tokens.ts';
 export * from './draw-list.ts';

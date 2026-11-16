@@ -1,6 +1,7 @@
 // @boboforces/game/scene: a CENA do M1 (o Construto). Fica num subcaminho próprio porque é a parte pesada do jogo
 // (mundo, mesher, luz, navegação, IA, atores, VFX): a web baixa só quando o jogador entra nela (`GameDeps.loadScene`
 // com `import()` na casca; tecnico.md §16.4, menu ≤ 350 KB) e o Switch empacota junto (esbuild, um arquivo só).
+import { registerStrings, STRINGS_EXTRA_PT_BR } from '@boboforces/ui';
 import type { Scene, SceneHost, SceneModule, SceneRequest } from '../scene-api.ts';
 import { FIGURE_SKIN_LAYERS } from '@boboforces/format';
 import { drawLoadingScreen, loadingStepIndex, type DrawList, type LoadingModel } from '@boboforces/ui';
@@ -29,6 +30,9 @@ export {
   type SceneFigures,
   type SceneFiguresInput,
 } from './figures.ts';
+
+// Refino R3a (#79): os textos que só a partida usa chegam com ela.
+registerStrings(STRINGS_EXTRA_PT_BR);
 export { createCameraPose, poseFromCamera, routeDuration, sampleRoute, type CameraPose } from './route.ts';
 export { createSamples, type Samples } from './stats.ts';
 

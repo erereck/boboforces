@@ -1061,7 +1061,7 @@ describe('textos do game com o atlas real (#54)', () => {
       const labelPx = Math.max(13 * dpr, MIN_TEXT.phone * dpr * 0.75);
       for (let b = 0; b < DEFAULT_TOUCH_LAYOUT.buttons.length; b++) {
         const { control, radius } = placeTouchButton(DEFAULT_TOUCH_LAYOUT, b, 667 * dpr, 375 * dpr, dpr, rect);
-        const label = STRINGS_PT_BR[`touch.${control}` as StringKey].toUpperCase();
+        const label = (STRINGS_PT_BR as Readonly<Record<string, string>>)[`touch.${control}`]!.toUpperCase();
         const half = (hud.capHeight * labelPx) / hud.size / 2;
         const chord = 2 * Math.sqrt(radius * radius - half * half);
         expect(measureText(hud, label, labelPx, 0.04), `DPR ${dpr}: ${label}`).toBeLessThanOrEqual(chord);

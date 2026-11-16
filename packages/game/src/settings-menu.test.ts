@@ -14,7 +14,7 @@ import {
   wheel,
   type BindingSource,
 } from '@boboforces/input';
-import { STRINGS_PT_BR, type StringKey } from '@boboforces/ui';
+import { t, type StringKey } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { createMenuController, followTab } from './menu.ts';
 import {
@@ -52,7 +52,7 @@ describe('Ajustes: botões (parte 2)', () => {
     expect(bindingsText([key('ShiftLeft'), key('ShiftRight')])).toBe('Shift esquerdo +1');
     expect(bindingsText([])).toBe('Nenhum');
     for (const a of [...REMAP_ACTIONS.keyboardMouse, ...REMAP_ACTIONS.gamepad]) {
-      expect(STRINGS_PT_BR[actionLabel(a) as StringKey], a).toBeTruthy();
+      expect(t(actionLabel(a) as StringKey), a).not.toBe(actionLabel(a));
     }
   });
 

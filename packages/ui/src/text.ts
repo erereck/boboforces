@@ -7,6 +7,20 @@ import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 
 export type TextParams = Readonly<Record<string, string | number>>;
 
+/**
+ * Refino R3a (#79): a tabela que chega depois (`STRINGS_EXTRA_PT_BR`, com a cena e as telas de edição). Registrada
+ * uma vez por quem a importa; antes disso, uma chave dela volta como a própria chave (o menu não usa nenhuma).
+ */
+const extraStrings: Record<string, string> = {};
+
+export function registerStrings(table: Readonly<Record<string, string>>): void {
+  Object.assign(extraStrings, table);
+}
+
+function templateOf(key: StringKey): string {
+  return (STRINGS_PT_BR as Readonly<Record<string, string>>)[key] ?? extraStrings[key] ?? key;
+}
+
 /** Inteiro com separador de milhar: 1234567 → "1.234.567". */
 export function formatInt(n: number): string {
   const v = Math.trunc(n);
@@ -95,7 +109,7 @@ export function stringToCodes(text: string, out: Uint16Array, offset = 0): numbe
  * Chame uma vez (aloca). Parâmetro ausente no modelo é erro de programação (lança).
  */
 export function templateParts(key: StringKey, names: readonly string[]): readonly string[] {
-  const template: string = STRINGS_PT_BR[key];
+  const template = templateOf(key);
   const parts: string[] = [];
   let rest = template;
   for (const name of names) {
@@ -111,7 +125,7 @@ export function templateParts(key: StringKey, names: readonly string[]): readonl
 
 /** Busca a chave na tabela e troca `{param}`; números passam por `formatInt`/`formatDecimal`. */
 export function t(key: StringKey, params?: TextParams): string {
-  const template: string = STRINGS_PT_BR[key];
+  const template = templateOf(key);
   if (!params) return template;
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name: string) => {
     const value = params[name];
