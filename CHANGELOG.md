@@ -25,6 +25,9 @@ Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
   aba Vídeo virou Tela e junta tudo o que se vê: câmera (primeira ou terceira pessoa), ombro, campo de visão, tela
   dividida, qualidade, quadros e tamanho dos menus. O indicador de som foi para a Acessibilidade. As abas não passam
   mais da borda em celular pequeno.
+- **R4, pausa e arma:** na pausa, "Ajustar desafio" virou Dificuldade e "Destravar" virou Estou preso, com uma frase
+  explicando cada item. A arma em primeira pessoa ficou menor (jogando sozinho ou em dois), para não esconder quem
+  vem pela direita; a mira continua no centro.
 
 ### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 

@@ -1,7 +1,10 @@
 import { BOT_LEVELS, type BotLevel } from '@boboforces/format';
-import { COLORS, PLAYER_COLORS, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
+import { COLORS, PLAYER_COLORS, t, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
 
-/** Ações da tela de pausa (gameplay.md §2.2: Continuar · Ajustar desafio · Ajustes · Destravar · Sair). */
+/**
+ * Ações da tela de pausa (gameplay.md §2.2: Continuar · Ajustar desafio · Ajustes · Destravar · Sair). Refino R4 (#79):
+ * na tela, "Dificuldade" e "Estou preso" (os ids ficam).
+ */
 export const PAUSE_ACTION = {
   resume: 'resume',
   challenge: 'challenge',
@@ -34,6 +37,26 @@ export interface PauseState {
   readonly player?: number;
   /** M3 (fase 1c): o controle deste jogador (0 = P1) caiu; a linha avisa até ele voltar. Ausente ou -1 = nenhum. */
   readonly lost?: number;
+  /** Refino R4 (#79): a frase do item com o foco, embaixo dos botões (`pauseHelp`); ausente = sem a linha. */
+  readonly help?: string;
+}
+
+/** Refino R4 (#79): a frase de cada item da pausa (o que ele faz), pelo id do botão. */
+const PAUSE_HELP: Readonly<Record<string, StringKey>> = {
+  resume: 'pause.help.resume',
+  challenge: 'pause.help.challenge',
+  settings: 'pause.help.settings',
+  unstuck: 'pause.help.unstuck',
+  quit: 'pause.help.quit',
+  leave: 'pause.help.leave',
+};
+
+/** A frase do item com o foco (`''` sem frase). Calibrar e Pular calibração dependem do estado. */
+export function pauseHelp(focusedId: string | null, state: PauseState | null): string {
+  if (focusedId === null) return '';
+  if (focusedId === 'calibrate') return t(state?.calibrating ? 'pause.help.calibrateSkip' : 'pause.help.calibrate');
+  const key = PAUSE_HELP[focusedId];
+  return key !== undefined ? t(key) : '';
 }
 
 function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
@@ -72,6 +95,19 @@ export const pauseScreen: Screen<PauseState | null> = {
             ...((state?.player ?? 0) > 0
               ? [button('leave', 'pause.leaveCouch', PAUSE_ACTION.leave, { variant: 'danger' })]
               : mainItems(state, challenge)),
+            ...(state?.help !== undefined
+              ? [
+                  { kind: 'box', height: 4 } as const,
+                  {
+                    kind: 'text',
+                    id: 'help',
+                    text: { literal: state.help },
+                    style: 'caption',
+                    color: COLORS.texto,
+                    textAlign: 'center',
+                  } as const,
+                ]
+              : []),
           ],
         },
       ],

@@ -2801,3 +2801,14 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
   estouro tinha só 6 abas. Agora a fixture tem as 7 e a frase mais longa, e as abas ficaram mais justas
   (`BUTTON_COMPACT.padX` 16 → 13, folga 8 → 6): 599 de 608 px no 640×360, 1054 de 1216 no 1280×720.
 - **Medido:** o menu de 345,4 para 347,1 KB (as frases); sobram 2,9 KB até o teto.
+
+### 14.6 Fase R4a: a pausa e a arma na tela (16/11/2026)
+
+- **A pausa:** "Ajustar desafio" virou **Dificuldade** e "Destravar" virou **Estou preso** (os ids e as ações ficam). Embaixo
+  dos botões, a frase do item com o foco (`pauseHelp` em `game/src/pause.ts`; as frases `pause.help.*` moram na
+  tabela extra, que a cena registra: não pesam no menu). A frase pode passar da largura da coluna (centrada, dentro da
+  tela: o teste da pausa confere com a mais longa).
+- **A arma na 1ª pessoa:** com 1–2 jogadores a escala foi de 0,8 para 0,68 (`VIEWMODEL_SCALE_1P` no `match.ts`): o
+  fuzil tampava perto de um terço da tela e escondia quem vinha pela direita. O alvo do ADS agora leva a escala em
+  conta (a arma encolhe em torno da mão; alvo = −(mão + escala · (mira − mão))): antes, quanto menor a escala, mais a
+  mira do ADS saía do centro. Conferido em captura: a alça da mira no centro.

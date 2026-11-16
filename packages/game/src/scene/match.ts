@@ -85,6 +85,7 @@ import {
   pushTrail,
   resetFxQueue,
   viewmodelAimOffset,
+  VIEWMODEL_POSE,
   type ActorBuffer,
   type FxDeath,
   type MipFilterMode,
@@ -218,6 +219,7 @@ import {
   challengeLevel,
   challengeScreen,
   PAUSE_ACTION,
+  pauseHelp,
   pauseScreen,
 } from '../pause.ts';
 import {
@@ -429,6 +431,9 @@ interface ViewmodelTweak {
   readonly y: number;
   readonly z: number;
 }
+/** Refino R4 (#79): a escala do viewmodel com 1 ou 2 jogadores (era 0,8; com 3–4 e no lado a lado, 0,6). */
+const VIEWMODEL_SCALE_1P = 0.68;
+
 const VIEWMODEL_TWEAK: readonly (ViewmodelTweak | null)[] = WEAPONS.map((w) =>
   w.code === WEAPON_CODE.rocket
     ? { scale: 0.62, x: 0.13, y: -0.04, z: -0.1 }
@@ -2348,16 +2353,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (pausePage === 'main') pauseMain();
   }
 
+  /** Refino R4: o foco com que a pausa foi montada (a frase de ajuda é dele). */
+  let pauseMainFocus: string | null = null;
   function pauseMain(): void {
     pausePage = 'main';
-    pauseMenu.setRoot(
-      pauseScreen.build({
-        ...pauseState,
-        calibrating: calibration !== null,
-        player: seatNum[pausedBy] ?? 0,
-        lost: lostSeat >= 0 ? (seatNum[lostSeat] ?? -1) : -1,
-      }),
-    );
+    pauseMainFocus = pauseMenu.focusedId;
+    const st = {
+      ...pauseState,
+      calibrating: calibration !== null,
+      player: seatNum[pausedBy] ?? 0,
+      lost: lostSeat >= 0 ? (seatNum[lostSeat] ?? -1) : -1,
+    };
+    pauseMenu.setRoot(pauseScreen.build({ ...st, help: pauseHelp(pauseMainFocus, st) }));
   }
 
   function startCalibration(): void {
@@ -2535,6 +2542,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         resume();
         leaveSeat(k);
       } else if (a === PAUSE_ACTION.quit) return 'quit';
+      // Refino R4: a frase de ajuda segue o foco.
+      if (paused && pausePage === 'main' && pauseMenu.focusedId !== pauseMainFocus) pauseMain();
       return 'none';
     }
     if (pausePage === 'calibrated') {
@@ -3469,18 +3478,24 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
     const tweak = VIEWMODEL_TWEAK[v.weapon[e]!] ?? null;
     const away = 1 - ads;
-    vm.offsetX = (aim ? aim.x * ads : 0) + Math.sin(phase * 0.5) * 0.012 * walk + (tweak ? tweak.x * away : 0);
-    vm.offsetY = (aim ? aim.y * ads : 0) - Math.abs(Math.cos(phase * 0.5)) * 0.01 * walk + (tweak ? tweak.y * away : 0);
+    // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
+    // 0,6 em 3–4P deixavam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P). M3 (fase 1d): a vista
+    // estreita do lado a lado usa a escala do 3–4P. Refino R4 (#79): 0,8 → 0,68 em 1–2P (o fuzil tampava um terço da
+    // tela e escondia quem vinha pela direita).
+    const scale = (viewCount >= 3 || layoutVertical ? 0.6 : VIEWMODEL_SCALE_1P) * (tweak ? tweak.scale : 1);
+    // O alvo do ADS com a escala: a arma encolhe em torno da mão, então a mira (`sight`) chega mais perto dela; sem
+    // isto, quanto menor a escala, mais a mira do ADS sai do centro (alvo = −(mão + escala · (mira − mão))).
+    const aimX = aim ? aim.x - (1 - scale) * (aim.x + VIEWMODEL_POSE.hand[0]) : 0;
+    const aimY = aim ? aim.y - (1 - scale) * (aim.y + VIEWMODEL_POSE.hand[1]) : 0;
+    vm.offsetX = aimX * ads + Math.sin(phase * 0.5) * 0.012 * walk + (tweak ? tweak.x * away : 0);
+    vm.offsetY = aimY * ads - Math.abs(Math.cos(phase * 0.5)) * 0.01 * walk + (tweak ? tweak.y * away : 0);
     vm.offsetZ = kick * 0.045 + (tweak ? tweak.z * away : 0);
     vm.pitch = kick * 0.06;
     vm.yaw = 0;
     vm.roll = 0;
     // Braços do viewmodel com a skin do boneco do dono (1ª das 2 camadas, a mesma do `ActorBuffer.skin`).
     vm.skin = skinLayer[e] !== 0xffff ? skinLayer[e]! : 0;
-    // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
-    // 0,6 em 3–4P deixam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P).
-    // M3 (fase 1d): a vista estreita do lado a lado usa a escala do 3–4P.
-    vm.scale = (viewCount >= 3 || layoutVertical ? 0.6 : 0.8) * (tweak ? tweak.scale : 1);
+    vm.scale = scale;
     sampleLightGrid(loaded.lightGrid, c.x, c.y, c.z, lightScratch, 0);
     vm.lightSky = lightScratch[0]!;
     vm.lightSun = lightScratch[1]!;

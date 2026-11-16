@@ -443,9 +443,9 @@ export const STRINGS_PT_BR = {
 
   'pause.title': 'Pausado',
   'pause.resume': 'Continuar',
-  'pause.unstuck': 'Destravar',
+  'pause.unstuck': 'Estou preso',
   /** M2 (fase 2e): Ajustar desafio na pausa (gameplay.md §2.2). */
-  'pause.challenge': 'Ajustar desafio',
+  'pause.challenge': 'Dificuldade',
   'pause.challengeHint': 'Nível dos bots adversários, valendo agora',
   'pause.quitMatch': 'Sair da partida',
   // M3 (fase 1c): a pausa do sofá.

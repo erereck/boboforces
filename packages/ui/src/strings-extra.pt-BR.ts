@@ -254,6 +254,15 @@ export const STRINGS_EXTRA_PT_BR = {
   'fontSpecimen.accents': 'Ação, munição e áudio',
   'fontSpecimen.sample': 'Três vitórias seguidas, ação e munição à vontade: é o Bobo Warfare!',
   'fontSpecimen.digits': '0123456789',
+  // Refino R4 (#79): a frase do item da pausa com o foco.
+  'pause.help.resume': 'Volta para a partida.',
+  'pause.help.challenge': 'O nível dos bots adversários, valendo agora.',
+  'pause.help.calibrate': 'Acerta a sensibilidade mirando em alvos.',
+  'pause.help.calibrateSkip': 'Para a calibração; a mira fica como estava.',
+  'pause.help.settings': 'Controles, botões, tela e som, na hora.',
+  'pause.help.unstuck': 'Leva o seu bobo para um lugar livre.',
+  'pause.help.quit': 'Volta ao menu; esta partida não conta.',
+  'pause.help.leave': 'Um bot assume o seu lugar no sofá.',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type ExtraStringKey = keyof typeof STRINGS_EXTRA_PT_BR;

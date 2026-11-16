@@ -63,7 +63,9 @@ import {
   MIN_TOUCH_TARGET,
   moveFocus,
   parseFontPack,
+  STRINGS_EXTRA_PT_BR,
   STRINGS_PT_BR,
+  t as t_,
   uiScale,
   type StringKey,
   type TestScreenModel,
@@ -1026,7 +1028,12 @@ describe('textos do game com o atlas real (#54)', () => {
 
   it('pausa: título e botões cabem (texto ≤ largura − 2·padX·escala) e o D-pad passa pelos 5 botões', () => {
     for (const t of TARGETS) {
-      const layout = layoutTree(pauseScreen.build(null), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+      // Refino R4: com a frase de ajuda mais longa embaixo dos botões.
+      const help = (Object.keys(STRINGS_EXTRA_PT_BR) as StringKey[])
+        .filter((k) => k.startsWith('pause.help.'))
+        .map((k) => t_(k))
+        .reduce((x, y) => (y.length > x.length ? y : x));
+      const layout = layoutTree(pauseScreen.build({ challenge: true, help }), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
         fonts,
         minTextPx: t.minTextPx,
         minTarget: t.minTarget,
@@ -1047,7 +1054,15 @@ describe('textos do game com o atlas real (#54)', () => {
           expect(r.x + text.width, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
         }
       }
-      // M2 (fase 2e): Continuar · Ajustar desafio · Ajustes · Destravar · Sair.
+      // Refino R4: a frase, centrada embaixo dos botões, fica dentro da tela (pode passar da largura da coluna).
+      const helpNode = layout.byId.get('help')!;
+      const helpRect = layout.rects.get(helpNode)!;
+      const helpW = layout.texts.get(helpNode)!.width;
+      const mid = helpRect.x + helpRect.w / 2;
+      expect(mid - helpW / 2, t.name).toBeGreaterThanOrEqual(c.x - 0.5);
+      expect(mid + helpW / 2, t.name).toBeLessThanOrEqual(c.x + c.w + 0.5);
+      expect(helpRect.y + helpRect.h, t.name).toBeLessThanOrEqual(c.y + c.h + 1);
+      // M2 (fase 2e): Continuar · Dificuldade · Ajustes · Estou preso · Sair.
       const order = ['resume', 'challenge', 'settings', 'unstuck', 'quit'];
       for (let i = 0; i + 1 < order.length; i++) {
         expect(moveFocus(layout, order[i]!, 'down'), t.name).toBe(order[i + 1]);
