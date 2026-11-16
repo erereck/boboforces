@@ -79,6 +79,40 @@ entra na fase 3, com o OK do download.
 9. **Fechamento:** TURN decidido, aviso de privacidade revisado, `CHANGELOG`, `ARCHITECTURE` §16, `PERF`. Publicar o
    online só com o pedido do Erick.
 
+## Fase 4 em detalhe (16/11/2026)
+
+A sala junta três coisas novas: o protocolo do lobby (puro, no `net`), a partida com amigos na cena (o host com
+jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termina verde e commitada.
+
+- **4a, o protocolo do lobby (`net`):**
+  - o código da sala: 5 caracteres de um alfabeto sem ambíguos (sem 0/O/1/I), o link `#sala=XXXXX`;
+  - as mensagens do lobby pelo canal confiável: quem eu sou (nome, o Meu Bobo), o estado da sala que o host manda a
+    todos (jogadores, times, travada, o resumo da partida), a escolha de cada um, começar (a receita, os assentos, a
+    semente), expulsar e travar;
+  - um repartidor do `NetEndpoint` (o lobby e a partida no mesmo canal sem um roubar a mensagem do outro);
+  - o handshake vai para o lobby: a partida começa com os clientes já aceitos;
+  - teste por loopback: 4 entram, escolhem time, o host trava, um 5º é recusado, um é expulso e o começo chega igual
+    a todos.
+  - **feita em 16/11** (ARCHITECTURE §16.6).
+- **4b, a partida com amigos na cena (`game`):**
+  - **decisão menor revisável:** o contrato do online fica no `game` (`game/src/online-api.ts`), porque ele precisa
+    dos tipos da sim, que o `platform-api` não enxerga. A casca web o implementa com o `net` e injeta por
+    `GameDeps.loadOnline`, como os editores; no Switch não existe, e o `platform.online` continua nulo (regra 18);
+  - **o host:** a cena de sempre, mais os slots remotos (as entradas vêm da rede; quem cai vira bot pelo cérebro de
+    reserva do sofá, M3), o snapshot depois dos ticks e sem pausar a sim (PvP);
+  - **o cliente:** o `ClientDriver` no lugar do `LocalDriver`, sem diretor (sem "Ajustar desafio", sem pings de bot);
+  - teste com o `NullRenderer` e o loopback, se a cena couber nele.
+- **4c, as telas (chunk próprio, fora do menu):**
+  - o botão "Online" no título (O4), que carrega o chunk;
+  - o aviso de privacidade na 1ª vez (O5: eu escrevo, você revisa antes de publicar);
+  - Criar sala e Entrar com código, com o teclado do jogo no controle;
+  - o lobby: os 4 lugares, o time de cada um, o código grande, Copiar link, e Travar, Expulsar e Começar para o host;
+  - o host escolhe a partida com a Partida personalizada de sempre.
+- **4d, o link e a volta:** abrir o jogo por `#sala=XXXXX` cai direto no "Entrar". O hash não sai do navegador.
+- **4e, a prova:** duas abas do Edge pela sinalização local, do título até o fim da partida (`rtc:web` estendido), e
+  uma rodada pelos relays de verdade entre duas abas, só de leitura e escrita efêmera de sinalização, como o jogo faz.
+- **4f, a rodada de prints** (as telas e o texto do aviso de privacidade).
+
 ## Riscos
 
 - **O menu da web está em 348,3 de 350 KB.** O item "Online" e a tela de código precisam caber: a tela da sala vai

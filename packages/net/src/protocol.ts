@@ -42,8 +42,20 @@ export const PROTOCOL_VERSION = 1;
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
 
-/** Primeiro byte de toda mensagem. Valor novo entra no fim. */
-export const MSG = { hello: 1, welcome: 2, reject: 3, snapshot: 4, input: 5, events: 6 } as const;
+/** Primeiro byte de toda mensagem. Valor novo entra no fim. Do 7 ao 11, o lobby (`lobby.ts`). */
+export const MSG = {
+  hello: 1,
+  welcome: 2,
+  reject: 3,
+  snapshot: 4,
+  input: 5,
+  events: 6,
+  lobby: 7,
+  choice: 8,
+  start: 9,
+  kick: 10,
+  leave: 11,
+} as const;
 
 /** Canal da mensagem: confiável e ordenado (handshake, lobby, eventos) ou não confiável (entradas e snapshots). */
 export type NetChannel = 'reliable' | 'unreliable';

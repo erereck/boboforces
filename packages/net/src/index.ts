@@ -9,6 +9,9 @@ export * from './events.ts';
 export * from './transport.ts';
 export * from './host.ts';
 export * from './client.ts';
+export * from './room-code.ts';
+export * from './mux.ts';
+export * from './lobby.ts';
 // Fase 3: a rede de verdade (Trystero + WebRTC). Só a casca web carrega, sob demanda (o chunk do Online).
 export * from './net-config.ts';
 export * from './rtc/room.ts';

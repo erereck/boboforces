@@ -68,8 +68,11 @@ interface HostClient {
 }
 
 export interface NetHost {
-  /** Reserva o controlador `slot` para o peer (o lobby escolhe; fase 4). Só ele passa no handshake. */
-  addClient(peer: number, slot: number): void;
+  /**
+   * Reserva o controlador `slot` para o peer. Só ele passa no handshake; `verified` = já passou no lobby (fase 4a: o
+   * handshake é do lobby, e a partida começa com o cliente aceito).
+   */
+  addClient(peer: number, slot: number, verified?: boolean): void;
   removeClient(peer: number): void;
   /**
    * Escreve a entrada do humano remoto do controlador `slot` (o `writeHumanFrame` do `LocalDriver` chama nos slots
@@ -153,14 +156,14 @@ export function createNetHost(config: NetHostConfig): NetHost {
     stats,
     history,
     inputOf: (peer) => find(peer)?.input ?? null,
-    addClient(peer, slot): void {
+    addClient(peer, slot, verified = false): void {
       if (find(peer) !== null) return;
       clients.push({
         peer,
         slot,
         input: new RemoteInputBuffer(),
         send: (bytes) => endpoint.send(peer, 'unreliable', bytes),
-        verified: false,
+        verified,
       });
     },
     removeClient(peer): void {

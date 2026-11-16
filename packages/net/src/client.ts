@@ -39,6 +39,8 @@ export interface ClientDriverConfig {
   readonly writeLocalFrame: (out: InputFrame, seq: number) => void;
   /** O hello desta build (padrão `localHello()`; os testes trocam). */
   readonly hello?: NetHello;
+  /** Fase 4a: o welcome que o lobby já recebeu (a partida começa jogando, sem handshake). */
+  readonly welcome?: NetWelcome;
   /**
    * Os eventos do host, soltos quando o estado mostrado chega no tick deles (como o `onEvents` do `LocalDriver`:
    * objetos de pool, valem só durante a chamada).
@@ -125,10 +127,10 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     mispredicts: 0,
   };
   const dt = 1 / sim.hz;
-  let state: ClientNetState = 'connecting';
-  let welcome: NetWelcome | null = null;
+  let state: ClientNetState = config.welcome ? 'playing' : 'connecting';
+  let welcome: NetWelcome | null = config.welcome ?? null;
   let rejection: ClientDriver['rejection'] = null;
-  let helloSent = false;
+  let helloSent = config.welcome !== undefined;
   let disposed = false;
   let acc = 0;
   let seq = 0;

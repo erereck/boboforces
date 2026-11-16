@@ -3121,3 +3121,29 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   `net` ainda não está no bundle e o menu continua em 348,3 KB.
 - **Pendente:** jogar pelos relays de verdade, entre aparelhos e redes diferentes. Isso é a sala (fase 4), o checkpoint
   com amigos (fase 8) e o TURN (O3). Os testes daqui não publicam nada em relay público.
+
+### 16.6 Fase 4a: o protocolo do lobby (16/11/2026)
+
+- **O código da sala** (`net/src/room-code.ts`): 5 caracteres de `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (sem 0/O/1/I). O que
+  se digita vira maiúsculas, sem espaço nem traço. O link é `#sala=XXXXX` (o hash não vai a servidor nenhum).
+- **O repartidor** (`net/src/mux.ts`, `createEndpointMux`): o lobby (o handshake e os tipos 7 a 11) e a partida
+  (snapshot, entradas e eventos) usam o mesmo canal. O que é do outro lado fica guardado até o `poll` dele.
+- **O lobby** (`net/src/lobby.ts`): mensagens JSON pelo canal confiável, poucas e raras. O host manda o estado inteiro
+  a todos a cada mudança: o código, se está travada, o resumo da partida e os jogadores, cada um com slot, nome, time,
+  Meu Bobo (o `bobo@1` como texto, até 4 KB) e pronto.
+  - **Handshake:** o oi passou para o lobby, que responde com o welcome, sala cheia, sala travada (também depois de
+    começar) ou versão diferente.
+  - **O Trystero liga todo mundo com todo mundo:** o cliente manda o oi a cada amigo que aparece, e só o host
+    responde.
+  - **Saídas:** o host trava e expulsa. A saída do host fecha a sala ("host saiu = fim").
+  - **O começo** leva a receita (o `game` valida), a semente e o controlador de cada um. A partida começa com o cliente
+    já aceito: `NetHost.addClient(peer, slot, true)` e `ClientDriver` com o `welcome` do lobby.
+  - **O que vem de um amigo é validado:** nome limpo de até 16 caracteres, time de −1 a 3, e mensagem estragada não
+    derruba o frame.
+- **Teste por loopback** (40 ms com 5% de perda):
+  - entram 3 (os oi chegam fora de ordem) e o 4º ouve "cheia";
+  - a versão nova ouve "seu amigo precisa atualizar";
+  - o host trava, expulsa um, e quem chega depois ouve "travada";
+  - o começo chega igual aos que ficaram;
+  - do lobby à partida no mesmo canal, o cliente entra jogando sem handshake, e a saída dele chega ao lobby do host
+    durante a partida.
