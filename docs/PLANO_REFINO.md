@@ -30,4 +30,5 @@
    nomes claros e a frase do item; a arma menor na tela com 1–2 jogadores.
 5. **R5. Prints e perguntas** (feita em 16/11/2026): a rodada 17 (N1–N7, seções 71–77) é a versão 19 da página das
    rodadas, montada por `local/m2/montar-pagina-r17.mjs` com as capturas de `local/refino/`; o NRO do refino foi
-   junto. Sigo no padrão de todas; a N7 é seguir para o M4 (o plano em `docs/PLANO_M4.md`).
+   junto. Sigo no padrão de todas; a N7 é seguir para o M4 (o plano em `docs/PLANO_M4.md`). Depois da rodada entrou
+   ainda a R4c (a Partida personalizada explica cada regra).

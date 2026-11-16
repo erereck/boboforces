@@ -6,6 +6,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M4: o porte do Switch (planejado em 16/11/2026)
+
+- **Plano** em `docs/PLANO_M4.md`: a LOCAL EDITION (abre direto no lobby "aperte A"), o save e os arquivos no SD
+  (backup à vista e a pasta `oficina/`), o ciclo de vida, glifos genéricos e um teclado na tela próprio, o loading e o
+  aquecimento que o Teste Zero deixou, o ícone e o NSP, e o Teste Zero 2 com o jogo inteiro no console. Perguntas
+  P1–P9 no padrão.
+
 ### Refino antes do M4 (rodada 17 publicada em 16/11/2026)
 
 Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
