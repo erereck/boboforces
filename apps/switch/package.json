@@ -8,8 +8,8 @@
   "author": "EriLab",
   "scripts": {
     "build": "node scripts/build.ts",
-    "nro": "node scripts/build.ts && node scripts/nro.ts",
-    "nsp": "node scripts/build.ts && node scripts/package-nsp.ts",
+    "nro": "node scripts/build.ts && node scripts/prepare-icon.ts && node scripts/nro.ts",
+    "nsp": "node scripts/build.ts && node scripts/prepare-icon.ts && node scripts/package-nsp.ts",
     "verify:nro": "node scripts/verify-nro.ts",
     "verify:nsp": "node scripts/verify-nsp.ts",
     "icon": "node scripts/prepare-icon.ts",

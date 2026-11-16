@@ -2864,3 +2864,21 @@ Plano em `docs/PLANO_M4.md` (16/11/2026); perguntas P1–P9 no padrão (v20 da p
 - **Onde mora o importador:** no pedaço das telas de edição (`editors.ts` exporta `importWorkshopFiles`); o jogo
   importa quando ele chega (o Switch carrega no boot). No menu da web ele pesava 0,6 KB sem nunca rodar. Menu: 347,9
   de 350 KB.
+
+### 15.3 Fase 6a: o ícone do HOME (16/11/2026)
+
+- **A arte (P3):** própria e sintética, sem nada baixado: `apps/switch/scripts/icon-art.ts` pinta numa grade de 32×32
+  blocos a cabeça de um bobo de capacete (a pele padrão do boneco `0xe5aa84`, o verde da farda, o fundo do menu) e
+  a barrinha âmbar do título. `npm run icon` sem argumento grava o `icon.jpg` (JPEG 256×256, 2,8 KB) a partir
+  dela; com um PNG quadrado, usa o PNG (o caminho que o M1 deixou).
+- **Gerado, não versionado:** o `npm run nro` e o `npm run nsp` rodam o `prepare-icon` antes de empacotar, e o
+  `icon.jpg` está no `.gitignore` (a regra 23 fala de PNG e MP3; o JPEG é só entrada do NACP, sempre igual à arte).
+  O `verify:nro` confere que o ícone embutido é o `icon.jpg`.
+
+### 15.4 A fase 5a fica para depois do console
+
+A malha e a navegação prontas no `.bfmap` foram medidas antes de começar: só a `NavGrid` do Construto tem ~7 mil nós
+e dezenas de milhares de ligações (arrays por nó e por ligação), centenas de KB crus por mapa, e a "primeira partida no
+Construto" está em 796,5 KB de 1 MB na web. O ganho (1,4 s de navegação e 0,9 s de malha com o JIT frio) só se mede no
+console. Fica para quando o Switch voltar e a P1 tiver resposta: o caminho mais barato é gravar só a navegação, com
+os arrays em deflate e o teste "a gravada é igual à calculada".

@@ -13,6 +13,8 @@ coverage/
 *.nsp
 *.keys
 apps/switch/romfs/
+# M4 (fase 6a): o ícone sai da arte do jogo (scripts/icon-art.ts) a cada npm run nro/nsp
+apps/switch/icon.jpg
 
 # PRIVADO (padrão do novelo): config do Eden, chaves, logs, capturas
 local/
