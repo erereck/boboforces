@@ -5,7 +5,15 @@
  */
 import { registerStrings, STRINGS_EXTRA_PT_BR } from '@boboforces/ui';
 
-export { CUSTOM_TAB_LABELS, CUSTOM_TABS, customRows, customTabs, presetName, stepCustom } from './custom-match.ts';
+export {
+  CUSTOM_TAB_LABELS,
+  CUSTOM_TABS,
+  customHelp,
+  customRows,
+  customTabs,
+  presetName,
+  stepCustom,
+} from './custom-match.ts';
 export { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotName, stepLab } from './lab.ts';
 export { customMatchScreen, labScreen, workshopScreen } from '@boboforces/ui';
 

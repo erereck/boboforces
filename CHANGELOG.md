@@ -27,7 +27,8 @@ Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
   mais da borda em celular pequeno.
 - **R4, pausa e arma:** na pausa, "Ajustar desafio" virou Dificuldade e "Destravar" virou Estou preso, com uma frase
   explicando cada item. A arma em primeira pessoa ficou menor (jogando sozinho ou em dois), para não esconder quem
-  vem pela direita; a mira continua no centro. No resultado, sem ninguém pontuar não há mais MVP.
+  vem pela direita; a mira continua no centro. No resultado, sem ninguém pontuar não há mais MVP. A Partida
+  personalizada também explica cada regra embaixo das linhas.
 
 ### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 

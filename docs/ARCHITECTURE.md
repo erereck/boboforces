@@ -2812,5 +2812,8 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
   fuzil tampava perto de um terço da tela e escondia quem vinha pela direita. O alvo do ADS agora leva a escala em
   conta (a arma encolhe em torno da mão; alvo = −(mão + escala · (mira − mão))): antes, quanto menor a escala, mais a
   mira do ADS saía do centro. Conferido em captura: a alça da mira no centro.
+- **A Partida personalizada (R4c):** ganhou a mesma frase de ajuda dos Ajustes, para cada linha e cada aba nos 3
+  modos (`customHelp` em `game/src/custom-match.ts`, frases `custom.help.*` na tabela extra: a tela mora no pedaço
+  das telas de edição, que registra a tabela, e não pesa no menu).
 - **O MVP (R4b):** sem ninguém com abate ou assistência, o resultado diz "MVP: ninguém pontuou" (era o 1º da lista,
   com 0, e saía "MVP: P1" num empate de 0 × 0).

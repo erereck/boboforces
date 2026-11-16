@@ -719,6 +719,24 @@ export function stepCustom(
  * Nome do preset salvo, sem digitar (gameplay.md §10.1): "Times De boa 4×4", "Todos contra todos Tryhard 8 bots";
  * repetido com outro jeito de partida, ganha " 2", " 3"…
  */
+/**
+ * Refino R4c (#79): a frase embaixo das linhas para o foco atual (`tab:<i>` ou `row:<id>`), da tabela extra
+ * (`custom.help.*`); sem frase (os botões do canto), `''`.
+ */
+export function customHelp(tabs: readonly CustomTab[], focusedId: string | null): string {
+  if (focusedId === null) return '';
+  let key: string;
+  if (focusedId.startsWith('tab:')) {
+    const tab = tabs[Number(focusedId.slice(4))];
+    if (tab === undefined) return '';
+    key = `custom.help.tab.${tab}`;
+  } else if (focusedId.startsWith('row:')) key = `custom.help.${focusedId.slice(4)}`;
+  else return '';
+  // O `t` devolve a própria chave quando ela não existe.
+  const text = t(key as StringKey);
+  return text === key ? '' : text;
+}
+
 export function presetName(base: string, taken: (name: string) => boolean): string {
   if (!taken(base)) return base;
   for (let n = 2; n < 1000; n++) {

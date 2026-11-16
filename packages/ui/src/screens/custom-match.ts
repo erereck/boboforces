@@ -27,6 +27,8 @@ export interface CustomMatchState {
   readonly summary: string;
   /** Aviso de uma linha ("Salvo como Times De boa 4×4"); `''` = nenhum. */
   readonly note: string;
+  /** Refino R4c (#79): o que a linha (ou a aba) com o foco faz, embaixo das linhas; ausente = sem a linha. */
+  readonly help?: string;
 }
 
 /** Medidas (px de referência): a coluna das linhas e a altura da janela dela. */
@@ -42,6 +44,7 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       rows: state.rows.map((r) => ({ kind: 'option', id: r.id, labelKey: r.labelKey, value: r.value })),
       summary: state.summary,
       note: state.note,
+      ...(state.help !== undefined ? { help: state.help } : {}),
       buttons: [
         { id: CUSTOM_ACTION.back, labelKey: 'menu.back', variant: 'secondary' },
         { id: CUSTOM_ACTION.save, labelKey: 'custom.save', variant: 'secondary' },

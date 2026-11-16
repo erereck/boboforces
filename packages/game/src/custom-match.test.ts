@@ -1,6 +1,14 @@
 import { builtinBot, DEBUT_PRESET, presetBotCounts, validateMatchRecipe, type MatchRecipe } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
-import { CUSTOM_TABS, customRows, customTabs, presetName, stepCustom, ZOMBIES_TABS } from './custom-match.ts';
+import {
+  CUSTOM_TABS,
+  customHelp,
+  customRows,
+  customTabs,
+  presetName,
+  stepCustom,
+  ZOMBIES_TABS,
+} from './custom-match.ts';
 
 /** M2, fase 4e: o editor da Partida personalizada. */
 
@@ -194,5 +202,31 @@ describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
     expect(ffa.mode).toBe('warfare.ffa');
     const checked = validateMatchRecipe(tdm, LIMITS);
     expect(checked.ok && checked.warnings).toEqual([]);
+  });
+});
+
+describe('Partida personalizada: a frase de ajuda (refino R4c, #79)', () => {
+  it('toda linha e toda aba, nos 3 modos, têm frase; os botões do canto não', () => {
+    for (const mode of ['warfare.tdm', 'warfare.ffa', 'zombies'] as const) {
+      const r = { ...DEBUT_PRESET, mode, ...(mode === 'zombies' ? { map: 'base' } : {}) } as MatchRecipe;
+      const tabs = customTabs(r);
+      tabs.forEach((tab, i) => {
+        expect(customHelp(tabs, `tab:${i}`), `${mode}/${tab}`).not.toBe('');
+        for (const row of customRows(tab, r)) {
+          const help = customHelp(tabs, `row:${row.id}`);
+          expect(help, `${mode}/${tab}/${row.id}`).not.toBe('');
+          expect(help, `${mode}/${tab}/${row.id}`).not.toContain('custom.help.');
+        }
+      });
+      // O Personalizado libera Velocidade e Pulo.
+      const custom = stepCustom('players', r, 'movement', 1, { maxBots: 12, maxViewM: 140 });
+      for (const row of customRows(
+        'players',
+        stepCustom('players', custom, 'movement', 1, { maxBots: 12, maxViewM: 140 }),
+      ))
+        expect(customHelp(tabs, `row:${row.id}`), row.id).not.toBe('');
+    }
+    expect(customHelp(CUSTOM_TABS, 'start')).toBe('');
+    expect(customHelp(CUSTOM_TABS, null)).toBe('');
   });
 });

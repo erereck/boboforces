@@ -718,8 +718,11 @@ export function startGame(deps: GameDeps): GameHandle {
       return save.bots;
     },
   };
+  /** Refino R4c: o foco com que a Partida personalizada foi montada (a frase de ajuda é dele). */
+  let customHelpFocus: string | null = null;
   function rebuildCustom(): void {
     const ed = editors!;
+    customHelpFocus = customMenu.focusedId;
     // M3 (fase 6b): o Bobo Zombies tem outras abas; trocar o modo pode deixar a aba atual fora da lista.
     const tabs = ed.customTabs(customRecipe);
     customTab = Math.min(customTab, tabs.length - 1);
@@ -735,6 +738,7 @@ export function startGame(deps: GameDeps): GameHandle {
         })),
         summary: presetSummary(customRecipe),
         note: customNote,
+        help: ed.customHelp(tabs, customHelpFocus),
       }),
     );
   }
@@ -1615,6 +1619,8 @@ export function startGame(deps: GameDeps): GameHandle {
           customNote = '';
           rebuildCustom();
         }
+        // Refino R4c: a frase de ajuda segue o foco.
+        if (screen === 'custom' && customMenu.focusedId !== customHelpFocus) rebuildCustom();
         if (screen === 'custom') {
           customMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
