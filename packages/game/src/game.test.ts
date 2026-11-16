@@ -271,7 +271,7 @@ const loadEditors = (): Promise<Editors> => Promise.resolve(EDITORS);
 
 async function bootToTitle(
   id: PlatformId = 'web',
-  extra: { testItems?: readonly TestItem[] } = {},
+  extra: { testItems?: readonly TestItem[]; localEdition?: boolean } = {},
   store: Readonly<Record<string, string>> = {},
 ) {
   const platform = createFakePlatform({ id, store });
@@ -1808,4 +1808,59 @@ describe('sofá (M3, fase 1b)', () => {
     expect(game.screen).toBe('title');
     game.dispose();
   }, 120_000);
+});
+
+describe('LOCAL EDITION (M4, fase 1)', () => {
+  it('abre no lobby, sem título; o 1º Enter só põe o P1; as telas voltam para o lobby com ele sentado', async () => {
+    const { platform, game, events } = await bootToTitle('web', { localEdition: true });
+    expect(game.screen).toBe('couch');
+    expect(events).toContain('menuReady');
+    // O 1º Enter põe o teclado no P1 e não começa a partida.
+    platform.tap('Enter');
+    expect(game.screen).toBe('couch');
+    expect(platform.logLines.some((l) => l.includes('[game] sofá: P1 entrou'))).toBe(true);
+    // COMEÇAR | Modos | Surpreenda-me; embaixo, Meu Bobo, Laboratório, Ajustes, Testes, Sair (do COMEÇAR, o baixo
+    // cai no Laboratório, o mais perto).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('settings');
+    platform.tap('Escape');
+    expect(game.screen).toBe('couch');
+    // Modos e o voltar dele também caem no lobby (o título não existe).
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('modes');
+    platform.tap('Escape');
+    expect(game.screen).toBe('couch');
+    // O P1 não entrou de novo: o COMEÇAR (com o foco) joga.
+    expect(platform.logLines.filter((l) => l.includes('[game] sofá: P1 entrou')).length).toBe(1);
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    // Pausa → Sair da partida (o 5º item): a volta é o lobby.
+    platform.tap('KeyP');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.pump(2);
+    expect(game.screen).toBe('couch');
+    game.dispose();
+  }, 120_000);
+
+  it('Sair: o 1º aperto arma, sair do botão desarma, dois apertos seguidos fecham o jogo', async () => {
+    const { platform, game } = await bootToTitle('web', { localEdition: true });
+    platform.tap('Enter');
+    // Do COMEÇAR: baixo (Laboratório) e 3 para a direita (Ajustes, Testes, Sair).
+    platform.tap('ArrowDown');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(platform.exits).toBe(0);
+    platform.tap('ArrowLeft');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(platform.exits).toBe(0);
+    platform.tap('Enter');
+    expect(platform.exits).toBe(1);
+    game.dispose();
+  }, 60_000);
 });

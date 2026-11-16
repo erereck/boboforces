@@ -2817,3 +2817,28 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
   das telas de edição, que registra a tabela, e não pesa no menu).
 - **O MVP (R4b):** sem ninguém com abate ou assistência, o resultado diz "MVP: ninguém pontuou" (era o 1º da lista,
   com 0, e saía "MVP: P1" num empate de 0 × 0).
+
+## 15. M4: o porte do Switch
+
+Plano em `docs/PLANO_M4.md` (16/11/2026); perguntas P1–P9 no padrão (v20 da página das rodadas).
+
+### 15.1 Fase 1: a LOCAL EDITION (16/11/2026)
+
+- **A edição como dado:** `GameDeps.localEdition` (o Switch passa sempre; a web só no servidor de desenvolvimento,
+  com `?edicao=local`, para ensaiar). Sem campo novo na `Platform`.
+- **O lobby é a casa:** sem título; antes do `switch` de telas, `screen === 'title'` vira `enterLobby` no mesmo
+  quadro, então toda volta "ao título" (Modos, Ajustes, Laboratório, Testes, a partida) cai no lobby, com os mesmos
+  jogadores e a última partida na frente (`refreshCouchPresets`). O `closeCouch` não desfaz os assentos na edição
+  local (Mudar regras e Abrir Laboratório saíam do sofá). O menu fica pronto (`checkMenuReady`) com o lobby na tela.
+- **O 1º A é o P1:** no boot ninguém apertou nada; o lobby abre sem ninguém sentado e o 1º dispositivo que aperta A
+  (ou Enter) vira o P1 e o dono dos menus. Esse aperto não começa a partida (o quadro em que o P1 entra não passa
+  pelo menu). Assim, um controle que não seja o 0 também abre o jogo.
+- **A tela** (`couchScreen` com `home`): o nome do jogo, os 4 cartões, a PARTIDA (a última e as de fábrica),
+  COMEÇAR | Modos | Surpreenda-me e, embaixo, compactos, Meu Bobo, Laboratório, Ajustes, Testes (com itens da
+  casca) e Sair. Sem Voltar (o voltar do P1 não faz nada; o dos outros tira o jogador, como no M3).
+- **Sair do jogo (P6):** o 1º aperto arma (a linha embaixo do nome fica vermelha: "Aperte Sair de novo para fechar o
+  jogo."), mover o foco ou apertar outra coisa desarma, o 2º chama `platform.exit()`. O rótulo é "Sair", curto: no
+  4:3 com o piso de texto da TV, "Sair do jogo" passava da borda.
+- **A 1e (reabrir o "aperte A" na troca de dock/portátil e no HOME)** fica para a fase 3: o M3 já pausa, guarda o
+  assento de quem desconectou e deixa entrar no meio segurando A.
+- **Medido:** menu da web 347,7 de 350 KB; NRO no Eden com o menu pronto em 1,47 s (só possível com o lobby na tela).

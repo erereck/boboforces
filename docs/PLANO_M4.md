@@ -66,7 +66,8 @@ Uma de cada vez, nesta ordem; cada fase termina verde e commitada (sem push; só
 dá para conferir no PC, na web e no Eden vem primeiro; o que só o console responde fica junto num único checkpoint
 (fase 8), como no M3.** O Eden vale para boot, menu e "não cai"; **nunca para tempo de quadro** (#48).
 
-1. **LOCAL EDITION:** o lobby como porta de entrada, "Sair do jogo", reabrir o "aperte A".
+1. **LOCAL EDITION:** o lobby como porta de entrada, "Sair do jogo", reabrir o "aperte A". (Feita em 16/11/2026,
+   ARCHITECTURE §15.1; a 1e foi para a fase 3.)
 2. **Save e arquivos no SD:** backup, `oficina/` para bots e presets, SD ruim.
 3. **Ciclo de vida:** dock/portátil com as vistas, HOME/sleep, reconexão, bateria.
 4. **Glifos genéricos e teclado na tela.**

@@ -18,6 +18,12 @@ export function urlAsksForSwitchTitle(search: string): boolean {
   return query.get(TITLE_PREVIEW_PARAM)?.trim().toLowerCase() === 'switch';
 }
 
+/** M4 (fase 1): `?edicao=local` ensaia a LOCAL EDITION do Switch (o lobby como casa) no navegador. */
+export function urlAsksForLocalEdition(search: string): boolean {
+  const query = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  return query.get('edicao')?.trim().toLowerCase() === 'local';
+}
+
 /** Os 9 itens do título do Switch, na ordem do foco: só id e rótulo (`createSwitchTestItems` do apps/switch). */
 export const SWITCH_TITLE_ITEMS: readonly TestItem[] = [
   { id: 'bench-dock', labelKey: 'test.item.benchDock' },

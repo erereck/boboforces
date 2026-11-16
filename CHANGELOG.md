@@ -12,6 +12,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   (backup à vista e a pasta `oficina/`), o ciclo de vida, glifos genéricos e um teclado na tela próprio, o loading e o
   aquecimento que o Teste Zero deixou, o ícone e o NSP, e o Teste Zero 2 com o jogo inteiro no console. Perguntas
   P1–P9 no padrão.
+- **LOCAL EDITION (fase 1):** no Switch o jogo abre direto no lobby "aperte A", sem título: o primeiro que apertar A é
+  o P1; dali saem COMEÇAR, Modos, Surpreenda-me, Meu Bobo, Laboratório, Ajustes e Sair (com confirmação), e toda tela
+  volta para ele com os mesmos jogadores.
 
 ### Refino antes do M4 (rodada 17 publicada em 16/11/2026)
 

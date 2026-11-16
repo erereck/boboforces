@@ -22,7 +22,12 @@ import type { BenchShell } from './bench/shell.ts';
 import { bootWeb, type WebBoot } from './boot.ts';
 import { createDebugHook } from './debug-hook.ts';
 import { BUILD_INFO, type WebPlatform } from './platform/index.ts';
-import { asSwitchTitlePlatform, SWITCH_TITLE_ITEMS, urlAsksForSwitchTitle } from './title-preview.ts';
+import {
+  asSwitchTitlePlatform,
+  SWITCH_TITLE_ITEMS,
+  urlAsksForLocalEdition,
+  urlAsksForSwitchTitle,
+} from './title-preview.ts';
 
 /** Resultado do relatório no título da aba (sem UI em DOM, decisão #3). */
 const TITLE_SUFFIX: Readonly<Record<ReportDelivery, string>> = {
@@ -88,6 +93,8 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
       },
     },
     ...(bench ? { bench: bench.config, benchWarnings: bench.warnings } : {}),
+    // M4 (fase 1): ensaio da LOCAL EDITION do Switch (`?edicao=local`), só no servidor de desenvolvimento.
+    ...(import.meta.env.DEV && urlAsksForLocalEdition(window.location.search) ? { localEdition: true } : {}),
   });
   // O pointer lock só sai dentro de um gesto: o clique do mouse na canvas durante a cena pega o mouse de volta (o
   // pedido automático ao entrar ou continuar pode ser recusado, por exemplo logo depois de o jogador sair com Esc).

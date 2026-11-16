@@ -1,4 +1,5 @@
 import { COLORS, PLAYER_COLORS, withAlpha } from '../tokens.ts';
+import type { StringKey } from '../strings.pt-BR.ts';
 import type { Screen, TextContent, UiNode } from '../tree.ts';
 
 /**
@@ -6,7 +7,27 @@ import type { Screen, TextContent, UiNode } from '../tree.ts';
  * "Aperte A para entrar"; ocupado mostra o símbolo e a cor do jogador (P1 ▲, P2 ●, P3 ■, P4 ◆), o dispositivo e o
  * lado. O P1 escolhe a partida e começa; os outros trocam o próprio lado e saem com o voltar (a tela lê cada dispositivo).
  */
-export const COUCH_ACTION = { match: 'match', start: 'start', back: 'back' } as const;
+export const COUCH_ACTION = {
+  match: 'match',
+  start: 'start',
+  back: 'back',
+  // M4 (fase 1): a LOCAL EDITION (o lobby é a casa do Switch) leva os caminhos do título.
+  modes: 'modes',
+  surprise: 'surprise',
+  bobo: 'bobo',
+  lab: 'lab',
+  settings: 'settings',
+  tests: 'tests',
+  quit: 'quit',
+} as const;
+
+/** M4 (fase 1): o lobby como a casa da LOCAL EDITION (GDD §3.6): sem Voltar, com os caminhos do título. */
+export interface CouchHome {
+  /** Há itens de teste da casca (o botão Testes). */
+  readonly tests: boolean;
+  /** O 1º aperto do Sair armou a saída: a linha embaixo do nome pede o 2º aperto (P6). */
+  readonly quitArmed: boolean;
+}
 
 export interface CouchSeatView {
   /** O dispositivo ("Controle 2", "Teclado e mouse"); `null` = assento vago. */
@@ -26,6 +47,51 @@ export interface CouchState {
   readonly match: string;
   /** O teclado ainda não entrou (o cartão vago lembra do Enter). */
   readonly keyboardFree: boolean;
+  /** M4 (fase 1): a casa da LOCAL EDITION; ausente = a tela "Jogar no sofá" do M3. */
+  readonly home?: CouchHome;
+}
+
+/** M4 (fase 1): largura da coluna dos botões do lobby da casa (a dos 4 cartões). */
+export const COUCH_HOME_WIDTH = 4 * 268 + 3 * 16;
+
+function homeButtons(home: CouchHome): UiNode[] {
+  const wide = (id: string, key: 'couch.start' | 'menu.modes' | 'title.surprise', primary = false): UiNode => ({
+    kind: 'button',
+    id,
+    text: { key },
+    action: id,
+    variant: primary ? 'primary' : 'secondary',
+    ...(primary ? { autofocus: true } : {}),
+    width: (COUCH_HOME_WIDTH - 2 * 16) / 3,
+  });
+  const small = (id: string, key: StringKey, danger = false): UiNode => ({
+    kind: 'button',
+    id,
+    text: { key },
+    action: id,
+    variant: danger ? 'danger' : 'secondary',
+    compact: true,
+  });
+  return [
+    {
+      kind: 'row',
+      gap: 16,
+      children: [wide('start', 'couch.start', true), wide('modes', 'menu.modes'), wide('surprise', 'title.surprise')],
+    },
+    {
+      kind: 'row',
+      id: 'more',
+      gap: 12,
+      children: [
+        small('bobo', 'menu.bobo'),
+        small('lab', 'menu.lab'),
+        small('settings', 'menu.settings'),
+        ...(home.tests ? [small('tests', 'title.tests')] : []),
+        // "Sair" curto: no 4:3 com o piso da TV, "Sair do jogo" passava da borda. A confirmação vai na linha de cima.
+        small('quit', 'menu.quit', true),
+      ],
+    },
+  ];
 }
 
 /** Largura e altura de um cartão (px de referência): os 4 lado a lado cabem em 1280. */
@@ -101,6 +167,7 @@ function seatCard(seat: CouchSeatView, k: number, keyboardFree: boolean): UiNode
 export const couchScreen: Screen<CouchState> = {
   id: 'couch',
   build(state) {
+    if (state.home) return homeScreen(state, state.home);
     return {
       kind: 'box',
       id: 'root',
@@ -169,3 +236,59 @@ export const couchScreen: Screen<CouchState> = {
     };
   },
 };
+
+/**
+ * M4 (fase 1): o lobby da LOCAL EDITION. O Switch abre direto aqui (GDD §3.6): o nome do jogo, os 4 cartões, a partida
+ * (a última e as de fábrica), COMEÇAR, Modos e Surpreenda-me, e embaixo, compactos, Meu Bobo, Laboratório, Ajustes,
+ * Testes (com itens da casca) e Sair do jogo. Sem Voltar: é a casa.
+ */
+function homeScreen(state: CouchState, home: CouchHome): UiNode {
+  return {
+    kind: 'box',
+    id: 'root',
+    color: COLORS.bunker,
+    children: [
+      {
+        kind: 'column',
+        id: 'main',
+        anchor: 'center',
+        gap: 12,
+        children: [
+          { kind: 'text', id: 'heading', text: { key: 'title.logo' }, style: 'heading', color: COLORS.texto },
+          {
+            kind: 'text',
+            id: 'pitch',
+            text: { key: home.quitArmed ? 'lobby.quitArmed' : 'lobby.pitch' },
+            style: 'body',
+            color: home.quitArmed ? COLORS.perigo : COLORS.textoBaixo,
+          },
+          {
+            kind: 'row',
+            id: 'seats',
+            gap: 16,
+            children: state.seats.map((s, k) => seatCard(s, k, state.keyboardFree)),
+          },
+          {
+            kind: 'column',
+            id: 'actions',
+            gap: 12,
+            width: COUCH_HOME_WIDTH,
+            align: 'stretch',
+            children: [
+              {
+                kind: 'button',
+                id: 'match',
+                text: { key: 'couch.match' },
+                value: { literal: state.match },
+                valueWidth: 800,
+                action: COUCH_ACTION.match,
+                variant: 'secondary',
+              },
+              ...homeButtons(home),
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}

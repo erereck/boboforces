@@ -190,6 +190,11 @@ export interface GameDeps {
   /** M1: itens extras de teste no título (Switch: presets do bench, Controles, Teclado, Áudio). */
   readonly testItems?: readonly TestItem[];
   /**
+   * M4 (fase 1): a LOCAL EDITION (GDD §3.6): sem título, o jogo abre no lobby do sofá, que é a casa (toda volta ao
+   * título cai nele, com os mesmos jogadores). Switch: sempre; web: `?edicao=local` no servidor de desenvolvimento.
+   */
+  readonly localEdition?: boolean;
+  /**
    * M1: a cena (Construto). Web: `import()` do subcaminho `@boboforces/game/scene` (fora da carga inicial do menu) e o
    * renderer completo; Switch e testes: o módulo direto. Ausente = JOGAR não abre nada (só registra no log).
    */
@@ -386,6 +391,7 @@ export function startGame(deps: GameDeps): GameHandle {
   const titleMenu = createMenuController();
   const settingsMenu = createMenuController();
   const testItems = deps.testItems ?? [];
+  const localEdition = deps.localEdition === true;
   const extraItems: TitleExtraItem[] = [
     ...(platform.id === 'web' && deps.loadScene ? [{ id: VITRINE_ITEM_ID, labelKey: 'title.vitrine' as const }] : []),
     ...testItems.map((item) => ({ id: item.id, labelKey: item.labelKey })),
@@ -1066,6 +1072,8 @@ export function startGame(deps: GameDeps): GameHandle {
   /** O lado de cada assento: 0 = com o P1, 1 = contra (o do P1 é sempre 0). */
   const couchSides = new Uint8Array(4);
   let couchActive = false;
+  /** M4 (fase 1): o 1º aperto do Sair da casa (o 2º fecha o jogo). */
+  let quitArmed = false;
   let couchPresets: MatchRecipe[] = [];
   let couchPreset = 0;
   /** Assinatura do que a tela mostra (refaz a árvore só quando muda). */
@@ -1123,6 +1131,7 @@ export function startGame(deps: GameDeps): GameHandle {
       if (s.device !== null) sig |= (1 + (s.connected ? 2 : 0) + couchSides[s.index]! * 4) << (s.index * 4);
     }
     if (locals.slotOf(KEYBOARD_DEVICE) >= 0) sig |= 1 << 24;
+    if (quitArmed) sig |= 1 << 25;
     if (sig === couchSig) return;
     couchSig = sig;
     const teams = couchTeams();
@@ -1138,6 +1147,7 @@ export function startGame(deps: GameDeps): GameHandle {
         seats,
         match: preset ? presetSummary(preset) : '',
         keyboardFree: locals.slotOf(KEYBOARD_DEVICE) < 0,
+        ...(localEdition ? { home: { tests: extraItems.length > 0, quitArmed } } : {}),
       }),
     );
   }
@@ -1150,12 +1160,12 @@ export function startGame(deps: GameDeps): GameHandle {
       last === 'gamepad' ? { kind: 'gamepad', index: pad } : last === 'touch' ? TOUCH_DEVICE : KEYBOARD_DEVICE;
     locals.clear();
     couchSides.fill(0);
-    locals.join(p1, p1.kind === 'gamepad' ? (raw.gamepads[pad]?.id ?? '') : '');
-    menuInput.setOwner(p1);
-    // A partida: o último preset (o do JOGAR) e os de fábrica.
-    const current = currentPreset();
-    couchPresets = [current, ...factoryPresets().filter((p) => p.name !== current.name)];
-    couchPreset = 0;
+    // M4 (fase 1): no boot da LOCAL EDITION ninguém apertou nada ainda: o 1º que apertar A vira o P1 (couchFrame).
+    if (last !== null || !localEdition) {
+      locals.join(p1, p1.kind === 'gamepad' ? (raw.gamepads[pad]?.id ?? '') : '');
+      menuInput.setOwner(p1);
+    } else menuInput.setOwner(null);
+    refreshCouchPresets();
     couchActive = true;
     couchSig = -1;
     couchStartPrev = true;
@@ -1165,7 +1175,34 @@ export function startGame(deps: GameDeps): GameHandle {
     log(`[game] sofá aberto (P1: ${couchDeviceLabel(p1)})`);
   }
 
+  /** A partida da tela: o último preset (o do JOGAR) e os de fábrica. */
+  function refreshCouchPresets(): void {
+    const current = currentPreset();
+    couchPresets = [current, ...factoryPresets().filter((p) => p.name !== current.name)];
+    couchPreset = 0;
+  }
+
+  /**
+   * M4 (fase 1): a casa da LOCAL EDITION. A 1ª vez abre o lobby (o P1 entra); as outras voltam a ele com os mesmos
+   * jogadores e a partida que acabou de ser jogada (ou escolhida) na frente.
+   */
+  function enterLobby(raw: Readonly<RawInputState>): void {
+    if (!couchActive) {
+      openCouch(raw);
+      return;
+    }
+    refreshCouchPresets();
+    quitArmed = false;
+    couchSig = -1;
+    couchStartPrev = true;
+    rebuildCouch();
+    couchMenu.focus('start');
+    screen = 'couch';
+  }
+
   function closeCouch(): void {
+    // M4 (fase 1): na LOCAL EDITION o lobby é a casa: os assentos ficam (Mudar regras, Laboratório).
+    if (localEdition) return;
     locals.clear();
     menuInput.setOwner(null);
     couchActive = false;
@@ -1175,6 +1212,14 @@ export function startGame(deps: GameDeps): GameHandle {
   function couchFrame(raw: Readonly<RawInputState>, u: UiFrame): void {
     const joined = locals.update(raw, true);
     if (joined >= 0) log(`[game] sofá: P${joined + 1} entrou (${couchDeviceLabel(locals.slots[joined]!.device!)})`);
+    // M4 (fase 1): o 1º A da casa só põe o P1 (que passa a mandar nos menus); o mesmo aperto não começa a partida.
+    const p1Device = locals.slots[0]!.device;
+    if (joined === 0 && localEdition && p1Device !== null) {
+      menuInput.setOwner(p1Device);
+      couchStartPrev = true;
+      rebuildCouch();
+      return;
+    }
     for (let k = 1; k < locals.slots.length; k++) {
       const d = locals.slots[k]!.device;
       if (d === null || k === joined) continue;
@@ -1202,9 +1247,35 @@ export function startGame(deps: GameDeps): GameHandle {
     const startDown = p1?.kind === 'gamepad' && (raw.gamepads[p1.index]?.buttons[PAD_BUTTON.start] ?? 0) >= 0.5;
     const start = startDown && !couchStartPrev;
     couchStartPrev = startDown;
-    if (nav.back || nav.activated === COUCH_ACTION.back) {
-      closeCouch();
-      screen = 'title';
+    const a = nav.activated;
+    // M4 (fase 1): o Sair arma no 1º aperto e fecha no 2º; qualquer outra coisa desarma.
+    if (quitArmed && (a !== null || couchMenu.focusedId !== COUCH_ACTION.quit)) {
+      quitArmed = a === COUCH_ACTION.quit ? quitArmed : false;
+      couchSig = -1;
+    }
+    if (localEdition && a !== null && a !== COUCH_ACTION.match && a !== COUCH_ACTION.start) {
+      if (a === COUCH_ACTION.quit) {
+        if (quitArmed) platform.exit();
+        quitArmed = true;
+        couchSig = -1;
+      } else if (a === COUCH_ACTION.modes) screen = 'modes';
+      else if (a === COUCH_ACTION.surprise) {
+        rollNewSurprise();
+        screen = 'surprise';
+      } else if (a === COUCH_ACTION.settings) openSettings();
+      else if (a === COUCH_ACTION.lab) openWorkshop();
+      else if (a === COUCH_ACTION.tests) screen = 'tests';
+      else if (a === COUCH_ACTION.bobo) {
+        wardrobeOpen = true;
+        requestScene('wardrobe', null);
+      }
+      rebuildCouch();
+    } else if (nav.back || a === COUCH_ACTION.back) {
+      // Na casa o voltar do P1 não sai para lugar nenhum.
+      if (!localEdition) {
+        closeCouch();
+        screen = 'title';
+      }
     } else if (nav.activated === COUCH_ACTION.match && couchPresets.length > 0) {
       const n = couchPresets.length;
       couchPreset = (couchPreset + (nav.delta === 0 ? 1 : nav.delta) + n) % n;
@@ -1335,7 +1406,8 @@ export function startGame(deps: GameDeps): GameHandle {
       return;
     }
     if (couchActive) {
-      // M3 (fase 1b): do sofá, a volta é para a tela do sofá, com os mesmos jogadores.
+      // M3 (fase 1b): do sofá, a volta é para a tela do sofá, com os mesmos jogadores. M4: a partida jogada na frente.
+      refreshCouchPresets();
       couchSig = -1;
       couchStartPrev = true;
       rebuildCouch();
@@ -1464,6 +1536,8 @@ export function startGame(deps: GameDeps): GameHandle {
       return;
     }
 
+    // M4 (fase 1): na LOCAL EDITION não há título; quem volta para ele cai no lobby (no mesmo quadro).
+    if (screen === 'title' && localEdition) enterLobby(raw);
     switch (screen) {
       case 'loading':
       case 'error':
@@ -1778,7 +1852,7 @@ export function startGame(deps: GameDeps): GameHandle {
 
   /** O primeiro frame do título (ou do aviso de retrato por cima dele): o splash da casca pode sair. */
   function checkMenuReady(): void {
-    if (menuReady || screen !== 'title') return;
+    if (menuReady || screen !== (localEdition ? 'couch' : 'title')) return;
     menuReady = true;
     log(`${MENU_READY_MARKER} ${Math.round(platform.now() - bootAt)} ms`);
     hooks.onMenuReady?.();

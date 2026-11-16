@@ -8,6 +8,7 @@ import { layoutTree, type LayoutResult } from './layout.ts';
 import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
 import { settingsScreen } from './screens/settings.ts';
+import { couchScreen } from './screens/couch.ts';
 import { buildTabbed, type TabbedRow } from './screens/tabbed.ts';
 import { testListScreen, titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
@@ -422,6 +423,33 @@ describe('estouro de texto com o atlas real', () => {
       expect(ids.length).toBe(8);
       expect([...reachable(layout, 'play')].sort(), t.name).toEqual([...ids].sort());
       for (const id of ids) expect(reachable(layout, id).has('play'), `${t.name}: ${id} → JOGAR`).toBe(true);
+    }
+  });
+
+  it('M4 (fase 1): o lobby da LOCAL EDITION cabe no Switch e no PC, tudo alcançável pelo D-pad a partir do COMEÇAR', () => {
+    const seats = [
+      { device: 'Controle 1', side: null, disconnected: false },
+      { device: 'Controle 2', side: 1 as const, disconnected: false, tune: 'Mira 1,2× · Y invertido' },
+      { device: 'Controle 3', side: 0 as const, disconnected: true },
+      { device: null, side: null, disconnected: false },
+    ];
+    for (const home of [
+      { tests: true, quitArmed: false },
+      { tests: true, quitArmed: true },
+      { tests: false, quitArmed: false },
+    ]) {
+      const tree = couchScreen.build({
+        seats,
+        match: 'Bobo Zombies · Base Abandonada · Curta · 10 ondas · Suado',
+        keyboardFree: true,
+        home,
+      });
+      for (const t of [...SWITCH_TARGETS.slice(0, 4), WEB_TARGETS[0]!, WEB_TARGETS[4]!, WEB_TARGETS[5]!]) {
+        const layout = layoutFor(tree, t);
+        expectNoOverflow(layout, t);
+        expect(layout.byId.has('back'), t.name).toBe(false);
+        expect(reachable(layout, 'start').size, t.name).toBe(layout.focusable.length);
+      }
     }
   });
 

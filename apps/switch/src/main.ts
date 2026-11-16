@@ -102,6 +102,8 @@ try {
     platform: shell.platform,
     createRenderer: shell.hasGpu ? createSwitchRenderer : null,
     testItems: createSwitchTestItems(),
+    // M4 (fase 1): a LOCAL EDITION abre direto no lobby "aperte A" (GDD §3.6).
+    localEdition: true,
     // Um arquivo só (esbuild): a cena já está no bundle.
     loadScene: () => Promise.resolve({ module: SCENE_MODULE }),
     loadEditors: () => Promise.resolve(EDITORS),

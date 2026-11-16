@@ -290,6 +290,9 @@ export const STRINGS_PT_BR = {
   'couch.device.touch': 'Toque',
   'couch.match': 'Partida',
   'couch.start': 'Começar',
+  // M4 (fase 1): o lobby da LOCAL EDITION (a casa do Switch).
+  'lobby.pitch': 'Aperte A para entrar: até 4 no sofá, cada um com o seu controle.',
+  'lobby.quitArmed': 'Aperte Sair de novo para fechar o jogo.',
   'menu.news': 'Novidades',
   // M2 (fase 4g): Novidades (codinome e até 5 itens de 1 linha, arte-ux.md §6.12) e as estatísticas da aba Dados.
   'news.version': 'Versão {version} · {codename}',
