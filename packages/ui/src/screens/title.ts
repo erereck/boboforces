@@ -3,10 +3,11 @@ import { COLORS } from '../tokens.ts';
 import type { Screen, UiNode } from '../tree.ts';
 
 /**
- * Tela de título (arte-ux.md §6.3): logotipo, JOGAR (com o resumo do preset que ele vai jogar embaixo),
- * Surpreenda-me, Mudar (o menu principal) e o rodapé com crédito e versão. Composição à esquerda, como um painel de
- * comando: a direita fica livre para o fundo vitrine (arte-ux.md §5.6). M2 (fase 4c): os Ajustes foram para o menu
- * principal.
+ * Tela de título (arte-ux.md §6.3): logotipo, JOGAR (com o resumo do preset que ele vai jogar embaixo) e o rodapé com
+ * crédito e versão. Composição à esquerda, como um painel de comando: a direita fica livre para o fundo vitrine
+ * (arte-ux.md §5.6). Refino R3b (#79): o título é o centro de tudo, sem o "Mudar" e o menu principal no meio do
+ * caminho: JOGAR, Modos (o lugar de escolher o que jogar), Jogar no sofá, Meu Bobo, Laboratório, Ajustes e, no Switch,
+ * Sair. A Novidades foi para Ajustes → Sobre; o Surpreenda-me e a Partida personalizada, para os Modos.
  */
 
 export interface TitleState {
@@ -37,11 +38,56 @@ export interface TitleExtraItem {
 }
 
 /** Ações devolvidas por `navigateMenu` nesta tela. */
-export const TITLE_ACTION = { play: 'play', surprise: 'surprise', change: 'change', quit: 'quit' } as const;
+export const TITLE_ACTION = {
+  play: 'play',
+  modes: 'modes',
+  couch: 'couch',
+  bobo: 'bobo',
+  lab: 'lab',
+  settings: 'settings',
+  /** Refino R3b (#79): os itens de teste numa tela própria (`testListScreen`). */
+  tests: 'tests',
+  quit: 'quit',
+} as const;
+
+/** Refino R3b (#79): os botões do título depois do JOGAR, na ordem (jogar, personalizar, ajustar). */
+const TITLE_ITEMS = [
+  ['modes', 'menu.modes'],
+  ['couch', 'menu.couchShort'],
+  ['bobo', 'menu.bobo'],
+  ['lab', 'menu.lab'],
+  ['settings', 'menu.settings'],
+] as const satisfies readonly (readonly [keyof typeof TITLE_ACTION, StringKey])[];
 /** M1: prefixo da ação de item extra (`test:bench`). */
 export const TITLE_ACTION_TEST_PREFIX = 'test:';
 
 const spacer = (height: number): UiNode => ({ kind: 'box', height });
+
+/** Refino R3b (#79): a grade dos botões do título depois do JOGAR (px de referência). */
+export const TITLE_GRID = { columns: 2, button: 300, gap: 10 } as const;
+
+function gridRows(items: readonly { readonly id: keyof typeof TITLE_ACTION; readonly key: StringKey }[]): UiNode[] {
+  const rows: UiNode[] = [];
+  for (let i = 0; i < items.length; i += TITLE_GRID.columns) {
+    rows.push({
+      kind: 'row',
+      id: `titleRow${i / TITLE_GRID.columns}`,
+      gap: TITLE_GRID.gap,
+      children: items.slice(i, i + TITLE_GRID.columns).map(
+        (it) =>
+          ({
+            kind: 'button',
+            id: it.id,
+            text: { key: it.key },
+            action: TITLE_ACTION[it.id],
+            variant: 'secondary',
+            width: TITLE_GRID.button,
+          }) as UiNode,
+      ),
+    });
+  }
+  return rows;
+}
 
 /**
  * Medidas dos itens de teste (px de referência): botões secundários mais baixos que os do menu (48 ≥ 44), coluna de
@@ -70,52 +116,62 @@ function testButton(item: TitleExtraItem): UiNode {
   };
 }
 
-/**
- * Itens extras de teste (Switch: presets do bench, Controles, Teclado, Áudio; web: Cena-vitrine) à direita, com o
- * rótulo TESTES: não disputam com JOGAR (que segue com o foco inicial) e o D-pad chega neles pela direita. Até
- * `maxColumnItems`, uma coluna centrada na altura; acima disso, a grade de 2 colunas ancorada embaixo à direita, acima
- * da versão. Ids `test:<id>`. Rótulos curtos (`test.item.*`): o botão não tem quebra de linha.
- */
-function testItems(items: readonly TitleExtraItem[]): UiNode[] {
-  if (items.length === 0) return [];
-  const label: UiNode = {
-    kind: 'text',
-    id: 'testsLabel',
-    text: { key: 'title.tests' },
-    style: 'label',
-    color: COLORS.textoBaixo,
-  };
-  if (items.length <= TITLE_TESTS.maxColumnItems) {
-    return [
-      {
-        kind: 'column',
-        id: 'tests',
-        anchor: 'right',
-        gap: TITLE_TESTS.gap,
-        width: TITLE_TESTS.width,
-        children: [label, ...items.map(testButton)],
-      },
-    ];
-  }
-  const rows: UiNode[] = [];
-  for (let i = 0; i < items.length; i += TITLE_TESTS.gridColumns) {
-    rows.push({
-      kind: 'row',
-      gap: TITLE_TESTS.gap,
-      children: items.slice(i, i + TITLE_TESTS.gridColumns).map(testButton),
-    });
-  }
-  return [
-    {
-      kind: 'column',
-      id: 'tests',
-      anchor: 'bottomRight',
-      y: TITLE_TESTS.gridBottom,
-      gap: TITLE_TESTS.gap,
-      children: [label, ...rows],
-    },
-  ];
+/** Refino R3b (#79): estado da tela de testes (os mesmos itens extras da casca). */
+export interface TestListState {
+  readonly items: readonly TitleExtraItem[];
 }
+
+/** Ação de voltar da tela de testes (os itens devolvem `test:<id>`). */
+export const TEST_LIST_ACTION = { back: 'back' } as const;
+
+/**
+ * Refino R3b (#79): os itens extras de teste (Switch: presets do bench, Controles, Teclado, Áudio; web: Cena-vitrine)
+ * numa tela própria, aberta pelo botão TESTES do título: até `maxColumnItems` numa coluna, acima disso numa grade de
+ * `gridColumns` colunas. Ids `test:<id>`. Rótulos curtos (`test.item.*`): o botão não tem quebra de linha.
+ */
+export const testListScreen: Screen<TestListState> = {
+  id: 'testList',
+  build(state) {
+    const items = state.items;
+    const buttons = items.map(
+      (item, i) => (i === 0 ? { ...testButton(item), autofocus: true } : testButton(item)) as UiNode,
+    );
+    const rows: UiNode[] = [];
+    if (items.length <= TITLE_TESTS.maxColumnItems) rows.push(...buttons);
+    else {
+      for (let i = 0; i < buttons.length; i += TITLE_TESTS.gridColumns) {
+        rows.push({ kind: 'row', gap: TITLE_TESTS.gap, children: buttons.slice(i, i + TITLE_TESTS.gridColumns) });
+      }
+    }
+    return {
+      kind: 'box',
+      id: 'root',
+      color: COLORS.bunker,
+      children: [
+        {
+          kind: 'column',
+          id: 'main',
+          anchor: 'left',
+          gap: TITLE_TESTS.gap,
+          children: [
+            { kind: 'text', id: 'heading', text: { key: 'title.tests' }, style: 'title', color: COLORS.texto },
+            spacer(8),
+            { kind: 'column', id: 'tests', gap: TITLE_TESTS.gap, children: rows },
+            spacer(8),
+            {
+              kind: 'button',
+              id: 'back',
+              text: { key: 'menu.back' },
+              action: TEST_LIST_ACTION.back,
+              variant: 'secondary',
+              ...(items.length === 0 ? { autofocus: true } : {}),
+            },
+          ],
+        },
+      ],
+    };
+  },
+};
 
 export const titleScreen: Screen<TitleState> = {
   id: 'title',
@@ -134,13 +190,13 @@ export const titleScreen: Screen<TitleState> = {
             { kind: 'text', id: 'logo', text: { key: 'title.logo' }, style: 'logo', color: COLORS.texto },
             spacer(18),
             { kind: 'box', id: 'logoBar', width: 176, height: 10, color: COLORS.acao, chamfer: true },
-            spacer(56),
+            spacer(30),
             {
               kind: 'column',
               id: 'buttons',
-              gap: 14,
+              gap: 10,
               align: 'stretch',
-              width: 380,
+              width: TITLE_GRID.columns * TITLE_GRID.button + TITLE_GRID.gap,
               children: [
                 {
                   kind: 'button',
@@ -161,36 +217,16 @@ export const titleScreen: Screen<TitleState> = {
                       } as const,
                     ]
                   : []),
-                {
-                  kind: 'button',
-                  id: 'surprise',
-                  text: { key: 'title.surprise' },
-                  action: TITLE_ACTION.surprise,
-                  variant: 'secondary',
-                },
-                {
-                  kind: 'button',
-                  id: 'change',
-                  text: { key: 'title.change' },
-                  action: TITLE_ACTION.change,
-                  variant: 'secondary',
-                },
-                ...(state.canExit === true
-                  ? [
-                      {
-                        kind: 'button',
-                        id: 'quit',
-                        text: { key: 'menu.quit' },
-                        action: TITLE_ACTION.quit,
-                        variant: 'secondary',
-                      } as const,
-                    ]
-                  : []),
+                // Refino R3b (#79): o resto numa grade de 2 colunas (6 botões em coluna não cabiam embaixo do logo).
+                ...gridRows([
+                  ...TITLE_ITEMS.map(([id, key]) => ({ id, key }) as const),
+                  ...((state.extraItems ?? []).length > 0 ? [{ id: 'tests', key: 'title.tests' } as const] : []),
+                  ...(state.canExit === true ? [{ id: 'quit', key: 'menu.quit' } as const] : []),
+                ]),
               ],
             },
           ],
         },
-        ...testItems(state.extraItems ?? []),
         {
           kind: 'text',
           id: 'credit',

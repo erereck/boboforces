@@ -5,7 +5,8 @@ import type { Screen, UiNode } from '../tree.ts';
 /**
  * M2 (fase 4d): Modos (arte-ux.md §6.3: "grade de cards, ícone + até 7 palavras → configurar → COMEÇAR"): um card por
  * modo que já existe (o Bobo Training entra na fase 5), com o nome e uma frase. Escolher abre a Partida Rápida com o
- * modo marcado.
+ * modo marcado. Refino R3b (#79): é o lugar de escolher o que jogar: os modos, o Surpreenda-me e a Partida
+ * personalizada (6 cards em 3 linhas mais compactas).
  */
 export const MODES_ACTION = { back: 'back' } as const;
 /** Ação de um modo: `mode:<id>`. */
@@ -32,12 +33,12 @@ export const modesScreen: Screen<ModesState> = {
       id: `card:${m.id}`,
       color: COLORS.chapa,
       chamfer: true,
-      padding: 20,
+      padding: 14,
       width: MODES_CARD_WIDTH,
       children: [
         {
           kind: 'column',
-          gap: 14,
+          gap: 8,
           children: [
             {
               kind: 'button',
@@ -45,7 +46,7 @@ export const modesScreen: Screen<ModesState> = {
               text: { key: m.nameKey },
               action: `${MODES_PREFIX}${m.id}`,
               variant: i === 0 ? 'primary' : 'secondary',
-              width: MODES_CARD_WIDTH - 40,
+              width: MODES_CARD_WIDTH - 28,
               ...(i === 0 ? { autofocus: true } : {}),
             },
             { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo },
@@ -64,22 +65,22 @@ export const modesScreen: Screen<ModesState> = {
           anchor: 'left',
           children: [
             { kind: 'text', id: 'heading', text: { key: 'modes.title' }, style: 'title', color: COLORS.texto },
-            { kind: 'box', height: 16 },
+            { kind: 'box', height: 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 36 },
+            { kind: 'box', height: 22 },
             // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card).
             {
               kind: 'column',
               id: 'cards',
-              gap: 24,
+              gap: 14,
               children: Array.from({ length: Math.ceil(cards.length / 2) }, (_, r) => ({
                 kind: 'row',
                 id: `cards${r}`,
-                gap: 24,
+                gap: 20,
                 children: cards.slice(r * 2, r * 2 + 2),
               })) as UiNode[],
             },
-            { kind: 'box', height: 36 },
+            { kind: 'box', height: 20 },
             {
               kind: 'button',
               id: 'back',

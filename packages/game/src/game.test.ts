@@ -302,6 +302,24 @@ async function untilRunning(platform: FakePlatform, game: GameHandle): Promise<v
   expect(game.scene?.phase).toBe('running');
 }
 
+/**
+ * Refino R3b (#79): do título até um botão da grade e confirma. O título: JOGAR (largo) e, embaixo, Modos | Sofá,
+ * Meu Bobo | Laboratório, Ajustes | Testes (na web, a Cena-vitrine; no Switch, só com itens de teste) e Sair (Switch).
+ */
+const TITLE_TO = {
+  modes: ['ArrowDown'],
+  couch: ['ArrowDown', 'ArrowRight'],
+  bobo: ['ArrowDown', 'ArrowDown'],
+  lab: ['ArrowDown', 'ArrowDown', 'ArrowRight'],
+  settings: ['ArrowDown', 'ArrowDown', 'ArrowDown'],
+  besideSettings: ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowRight'],
+  belowSettings: ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown'],
+} as const;
+function titleTo(platform: { tap(code: string): void }, where: keyof typeof TITLE_TO): void {
+  for (const k of TITLE_TO[where]) platform.tap(k);
+  platform.tap('Enter');
+}
+
 describe('startGame (NullRenderer)', () => {
   it('carrega as fontes, chega ao título e grava o marcador do menu uma vez', async () => {
     const { platform, game, events } = await bootToTitle();
@@ -780,12 +798,15 @@ describe('startGame (NullRenderer)', () => {
       }),
     };
     const { platform, game } = await bootToTitle('switch', { testItems: [item] });
-    // No Switch o item fica na coluna de testes, à direita do menu.
-    platform.tap('ArrowRight');
+    // Refino R3b: o item fica na tela Testes (o botão ao lado de Ajustes), já com o foco.
+    titleTo(platform, 'besideSettings');
+    expect(game.screen).toBe('tests');
     platform.tap('Enter');
     expect(game.screen).toBe('test');
     platform.pump(3);
     expect(updates).toBeGreaterThan(0);
+    platform.tap('Escape');
+    expect(game.screen).toBe('tests');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
     expect(disposed).toBe(1);
@@ -795,11 +816,8 @@ describe('startGame (NullRenderer)', () => {
   it('no Switch o título tem "Sair", que chama platform.exit()', async () => {
     const { platform, game } = await bootToTitle('switch');
     // Convenção do Switch: o botão da direita confirma; no teclado do teste, Enter confirma do mesmo jeito.
-    // JOGAR, Surpreenda-me, Mudar, Sair.
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Refino R3b: Sair fica ao lado de Ajustes (sem itens de teste).
+    titleTo(platform, 'besideSettings');
     expect(platform.exits).toBe(1);
     game.dispose();
   });
@@ -1231,18 +1249,17 @@ describe('textos', () => {
 });
 
 describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
-  it('Mudar abre o menu principal; Ajustes e Voltar andam pelas telas', async () => {
+  it('refino R3b: o título abre cada tela direto (Modos, Ajustes) e o Voltar volta ao título', async () => {
     const { platform, game } = await bootToTitle();
+    titleTo(platform, 'modes');
+    expect(game.screen).toBe('modes');
+    platform.tap('Escape');
+    expect(game.screen).toBe('title');
+    // O título lembra o foco (Modos): baixo, baixo chega a Ajustes.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
-    platform.tap('Enter');
-    expect(game.screen).toBe('main');
-    // Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo, Ajustes.
-    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('settings');
-    platform.tap('Escape');
-    expect(game.screen).toBe('main');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
     game.dispose();
@@ -1250,6 +1267,9 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
 
   it('Surpreenda-me sorteia, Jogar começa a partida sorteada e o JOGAR seguinte repete o mesmo preset', async () => {
     const { platform, game } = await bootToTitle();
+    // Refino R3b: Modos → o card Surpreenda-me (3ª linha, à esquerda).
+    titleTo(platform, 'modes');
+    platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('surprise');
@@ -1280,10 +1300,8 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
 describe('Partida Rápida e Modos (M2, fase 4d)', () => {
   it('mudar os bots e COMEÇAR joga o tamanho escolhido, que vira o último preset', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Partida Rápida (o foco abre no COMEÇAR).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Refino R3b: Título → Modos → Times (o foco abre no COMEÇAR).
+    titleTo(platform, 'modes');
     platform.tap('Enter');
     expect(game.screen).toBe('quick');
     // COMEÇAR fica no canto: esquerda (Mais regras), esquerda (Voltar), esquerda (Duração), cima (Bots), direita (5
@@ -1310,10 +1328,8 @@ describe('Partida Rápida e Modos (M2, fase 4d)', () => {
 describe('Partida personalizada (M2, fase 4e)', () => {
   it('Mais regras → aba Jogadores → Vida 150 → COMEÇAR; no resultado, Salvar preset e Mudar regras', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Partida Rápida → Mais regras (à esquerda do COMEÇAR).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Refino R3b: Título → Modos → Times → Mais regras (à esquerda do COMEÇAR).
+    titleTo(platform, 'modes');
     platform.tap('Enter');
     platform.tap('ArrowLeft');
     platform.tap('Enter');
@@ -1350,14 +1366,9 @@ describe('Partida personalizada (M2, fase 4e)', () => {
 });
 
 describe('Meu Bobo (M2, fase 6c)', () => {
-  it('Mudar → Meu Bobo abre o editor no Ringue; o visual muda na hora, fica salvo e o Voltar leva ao menu', async () => {
+  it('Meu Bobo abre o editor no Ringue; o visual muda na hora, fica salvo e o Voltar leva ao título', async () => {
     const { platform, game } = await bootToTitle();
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    // Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo.
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
-    platform.tap('Enter');
+    titleTo(platform, 'bobo');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);
     expect(game.save.bobo.preset).toBe('recruit');
@@ -1373,7 +1384,7 @@ describe('Meu Bobo (M2, fase 6c)', () => {
     expect(game.save.bobo.look.beard).toBe((beard + 1) % 12);
     expect(platform.logLines).toContain('[meu bobo] abriu: recruit');
     platform.tap('Escape');
-    expect(game.screen).toBe('main');
+    expect(game.screen).toBe('title');
     game.dispose();
   }, 60_000);
 });
@@ -1403,12 +1414,7 @@ describe('3ª pessoa (M2, fase 6b)', () => {
 describe('Ajustes (M2, fase 4f)', () => {
   it('menu: Ajustes → Vídeo (E) → Tamanho dos menus; na pausa, Acessibilidade → Reduzir tremor vale na hora', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (Partida Rápida, Modos, Jogar no sofá, Laboratório, Meu Bobo, Ajustes).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
-    platform.tap('Enter');
+    titleTo(platform, 'settings');
     expect(game.screen).toBe('settings');
     // E E: Vídeo. Da aba (o foco vai junto) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
     platform.tap('KeyE');
@@ -1432,10 +1438,9 @@ describe('Ajustes (M2, fase 4f)', () => {
     platform.tap('Escape');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
-    // Na partida (o foco do título ficou no Mudar: sobe até o JOGAR): P, Ajustes (2 abaixo), E E E E
+    // Na partida (o foco do título ficou em Ajustes: sobe 3 até o JOGAR): P, Ajustes (2 abaixo), E E E E
     // (Acessibilidade, depois do Áudio da fase 7c), baixo, confirmar: Reduzir tremor ligado.
-    platform.tap('ArrowUp');
-    platform.tap('ArrowUp');
+    for (let i = 0; i < 3; i++) platform.tap('ArrowUp');
     platform.tap('Enter');
     await untilRunning(platform, game);
     platform.tap('KeyP');
@@ -1472,15 +1477,16 @@ describe('Novidades (M2, fase 4g)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
-    // Título → Mudar → Novidades (o 7º item) → OK volta ao menu principal.
+    // Refino R3b: Título → Ajustes → Sobre (a 7ª aba) → Novidades (a última linha) → volta aos Ajustes.
+    titleTo(platform, 'settings');
+    for (let i = 0; i < 6; i++) platform.tap('KeyE');
+    // Da aba: Copiar relatório, Novidades.
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
-    platform.tap('Enter');
-    for (let i = 0; i < 6; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('news');
     platform.tap('Escape');
-    expect(game.screen).toBe('main');
+    expect(game.screen).toBe('settings');
     game.dispose();
   }, 60_000);
 
@@ -1495,14 +1501,7 @@ describe('Novidades (M2, fase 4g)', () => {
 describe('Oficina (M2, fase 5a)', () => {
   it('Laboratório abre a Oficina; duplicar um de fábrica salva, favoritar e apagar (com confirmação)', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Laboratório (o 4º item).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    titleTo(platform, 'lab');
     expect(game.screen).toBe('workshop');
     // O foco começa no escolhido (o Vibe Bob, primeiro de fábrica). Desce 5 (Jorge the Immortal) e escolhe.
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
@@ -1528,7 +1527,7 @@ describe('Oficina (M2, fase 5a)', () => {
     expect(game.save.bots).toHaveLength(0);
     expect(game.save.presets.botFavorites).toEqual([]);
     platform.tap('Escape');
-    expect(game.screen).toBe('main');
+    expect(game.screen).toBe('title');
     game.dispose();
   }, 60_000);
 });
@@ -1536,14 +1535,8 @@ describe('Oficina (M2, fase 5a)', () => {
 describe('Laboratório (M2, fase 5b)', () => {
   it('Editar um de fábrica abre uma cópia; mudar a vida, rolar o nome e salvar; Voltar com mudança pede confirmação', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Laboratório → Jorge (6º de fábrica) → direita (Editar).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Título → Laboratório → Jorge (6º de fábrica) → direita (Editar).
+    titleTo(platform, 'lab');
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     platform.tap('ArrowRight');
@@ -1609,14 +1602,11 @@ describe('Ringue (M2, fase 5c)', () => {
 describe('Bobo Training (M2, fase 5d)', () => {
   it('Modos → Bobo Training: Ringue sem placar, alvos espalhados que não atacam e a linha dos números', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Modos (2º item) → o card de baixo (Bobo Training).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Refino R3b: Título → Modos → Bobo Training (o 4º card: 2ª linha, à direita).
+    titleTo(platform, 'modes');
     expect(game.screen).toBe('modes');
     platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
     platform.tap('Enter');
     await untilRunning(platform, game);
     expect(platform.logLines.some((l) => l.includes('[cena] ringue (play)'))).toBe(true);
@@ -1644,14 +1634,8 @@ describe('Bobo Training (M2, fase 5d)', () => {
 describe('Pontes do Laboratório (M2, fase 5e)', () => {
   it('Testar abre o Bobo Training com o bot (sem salvar) e Sair volta ao Laboratório', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Laboratório → Jorge (6º de fábrica) → Editar.
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Título → Laboratório → Jorge (6º de fábrica) → Editar.
+    titleTo(platform, 'lab');
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     platform.tap('ArrowRight');
@@ -1712,12 +1696,8 @@ describe('Conheça o Laboratório (M2, fase 5e)', () => {
 describe('Calibrar mira (M2, fase 5f)', () => {
   it('Ajustes → Controles → Calibrar mira abre o treino calibrando; a pausa oferece Pular calibração', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Ajustes (6º) → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
-    platform.tap('Enter');
+    // Título → Ajustes → baixo ×10 (dispositivo e as 8 linhas do teclado, depois a ação) → confirmar.
+    titleTo(platform, 'settings');
     expect(game.screen).toBe('settings');
     for (let i = 0; i < 10; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
@@ -1739,13 +1719,7 @@ describe('Calibrar mira (M2, fase 5f)', () => {
 describe('sofá (M3, fase 1b)', () => {
   it('Jogar no sofá: o teclado é o P1; o controle 2 entra, troca de lado e sai; Começar joga com os assentos', async () => {
     const { platform, game } = await bootToTitle();
-    // Título → Mudar → Jogar no sofá (3º item).
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
-    platform.tap('Enter');
+    titleTo(platform, 'couch');
     expect(game.screen).toBe('couch');
     const pad = platform.rawNext.gamepads[1]!;
     pad.connected = true;
@@ -1819,7 +1793,7 @@ describe('sofá (M3, fase 1b)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('couch');
     platform.tap('Escape');
-    expect(game.screen).toBe('main');
+    expect(game.screen).toBe('title');
     game.dispose();
   }, 120_000);
 });

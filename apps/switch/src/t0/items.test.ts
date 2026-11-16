@@ -8,6 +8,7 @@ import {
   STRINGS_PT_BR,
   BUTTON,
   TITLE_ACTION_TEST_PREFIX,
+  testListScreen,
   titleScreen,
   type LayoutResult,
   type Rect,
@@ -105,10 +106,12 @@ function reachable(layout: LayoutResult, start: string): Set<string> {
   return seen;
 }
 
-describe('título do Switch com os 9 itens (atlas real)', () => {
+describe('título e tela Testes do Switch com os 9 itens (atlas real)', () => {
   const fonts = realFonts();
   const extraItems = createSwitchTestItems().map((i) => ({ id: i.id, labelKey: i.labelKey }));
-  const root = titleScreen.build({ version: '0.1.0', codename: 'Teste', canExit: true, extraItems });
+  // Refino R3b (#79): o título ganha o botão Testes; os itens ficam na tela Testes.
+  const title = titleScreen.build({ version: '0.1.0', codename: 'Teste', canExit: true, extraItems });
+  const list = testListScreen.build({ items: extraItems });
   // O Switch desenha a 1280×720 com o piso de texto da TV; os outros tamanhos são os do print da web e do ui.
   const cases = [
     { w: 1280, h: 720, minTextPx: MIN_TEXT.tv },
@@ -120,36 +123,41 @@ describe('título do Switch com os 9 itens (atlas real)', () => {
 
   for (const { w, h, minTextPx } of cases) {
     it(`${w}×${h}: sem sobreposição, rótulos dentro do botão e foco por D-pad em todos`, () => {
-      const layout = layoutTree(root, { x: 0, y: 0, w, h }, 1, { fonts, minTextPx });
-      const ids = layout.focusable.map((b) => b.id ?? '');
+      const titleLayout = layoutTree(title, { x: 0, y: 0, w, h }, 1, { fonts, minTextPx });
+      expect(titleLayout.focusable.map((b) => b.id ?? '')).toEqual([
+        'play',
+        'modes',
+        'couch',
+        'bobo',
+        'lab',
+        'settings',
+        'tests',
+        'quit',
+      ]);
       const testIds = extraItems.map((i) => TITLE_ACTION_TEST_PREFIX + i.id);
-      expect(ids.slice(0, 4)).toEqual(['play', 'surprise', 'change', 'quit']);
-      expect(ids.filter((id) => id.startsWith(TITLE_ACTION_TEST_PREFIX)).sort()).toEqual([...testIds].sort());
-
-      // Peça a peça (logo, barra, coluna do menu, rodapé): a grade fica no vão entre o logo e os botões.
-      const others = ['logo', 'logoBar', 'buttons', 'credit', 'version'].map((id) => ({
-        id,
-        rect: rectOf(layout, id),
-      }));
-      for (const button of layout.focusable) {
-        const rect = layout.rects.get(button)!;
-        expect(inside(rect, layout.content), `${button.id} fora da área útil`).toBe(true);
-        const text = layout.texts.get(button)!;
-        expect(
-          text.width + 2 * BUTTON.padX * layout.scale,
-          `rótulo "${text.text}" (${text.width.toFixed(1)} px) não cabe no botão ${button.id} (${rect.w} px)`,
-        ).toBeLessThanOrEqual(rect.w + 0.5);
-        for (const other of layout.focusable) {
-          if (other !== button)
-            expect(overlaps(rect, layout.rects.get(other)!), `${button.id} × ${other.id}`).toBe(false);
+      for (const [layout, start] of [
+        [titleLayout, 'play'],
+        [layoutTree(list, { x: 0, y: 0, w, h }, 1, { fonts, minTextPx }), testIds[0]!],
+      ] as const) {
+        const ids = layout.focusable.map((b) => b.id ?? '');
+        for (const button of layout.focusable) {
+          const rect = layout.rects.get(button)!;
+          expect(inside(rect, layout.content), `${button.id} fora da área útil`).toBe(true);
+          const text = layout.texts.get(button)!;
+          expect(
+            text.width + 2 * BUTTON.padX * layout.scale,
+            `rótulo "${text.text}" (${text.width.toFixed(1)} px) não cabe no botão ${button.id} (${rect.w} px)`,
+          ).toBeLessThanOrEqual(rect.w + 0.5);
+          for (const other of layout.focusable) {
+            if (other !== button)
+              expect(overlaps(rect, layout.rects.get(other)!), `${button.id} × ${other.id}`).toBe(false);
+          }
         }
-        if (!button.id?.startsWith(TITLE_ACTION_TEST_PREFIX)) continue;
-        for (const o of others) expect(overlaps(rect, o.rect), `${button.id} × ${o.id}`).toBe(false);
+        // Todo item alcançável pelo D-pad a partir do foco inicial.
+        expect([...reachable(layout, start)].sort()).toEqual([...ids].sort());
       }
-
-      // Todo item alcançável a partir de JOGAR (foco inicial) e de volta a JOGAR, só com o D-pad.
-      expect([...reachable(layout, 'play')].sort()).toEqual([...ids].sort());
-      for (const id of testIds) expect(reachable(layout, id).has('play'), `${id} não volta a JOGAR`).toBe(true);
+      const listIds = layoutTree(list, { x: 0, y: 0, w, h }, 1, { fonts, minTextPx }).focusable.map((b) => b.id ?? '');
+      expect(listIds.filter((id) => id.startsWith(TITLE_ACTION_TEST_PREFIX)).sort()).toEqual([...testIds].sort());
     });
   }
 });

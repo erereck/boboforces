@@ -220,6 +220,8 @@ export const STRINGS_PT_BR = {
   'menu.modes': 'Modos',
   // M3 (fase 1b): a tela do sofá.
   'menu.couch': 'Jogar no sofá',
+  // Refino R3b (#79): no título, na grade de 2 colunas.
+  'menu.couchShort': 'Sofá',
   'couch.title': 'Sofá',
   'couch.pitch': 'Até 4 jogadores na mesma tela, cada um com o seu controle (o teclado conta como um).',
   'couch.player': 'P{n}',
@@ -259,7 +261,6 @@ export const STRINGS_PT_BR = {
   'stats.minutes': '{m} min',
   'stats.hours': '{h} h {m} min',
   'title.surprise': 'Surpreenda-me',
-  'title.change': 'Mudar',
   'surprise.title': 'Surpreenda-me',
   'surprise.reroll': 'Rolar de novo',
   // Resumo de um preset (título, sorteio, Partida Rápida).
@@ -289,6 +290,9 @@ export const STRINGS_PT_BR = {
   'mode.name.warfare.ffa': 'Todos contra todos',
   'mode.desc.warfare.tdm': 'Dois times; vence quem abater mais.',
   'mode.desc.warfare.ffa': 'Cada um por si, sem aliados.',
+  // Refino R3b (#79): os dois cards novos dos Modos.
+  'mode.desc.surprise': 'Modo, mapa e regras sorteados.',
+  'mode.desc.custom': 'Todas as regras; salve como preset.',
   'preset.name.vibe': 'Vibe',
   'preset.name.tryhard': 'Tryhard',
   'preset.name.immortals': 'Imortais',

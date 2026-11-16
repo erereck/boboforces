@@ -49,7 +49,7 @@ describe('drawTree', () => {
         (i) => dl.colors[i] === COLORS.acao && (dl.geom[i * DRAW_FLOATS_PER_COMMAND + 5] as number) > 0,
       );
     const play = layout.rects.get(layout.byId.get('play') as UiNode) as Rect;
-    const change = layout.rects.get(layout.byId.get('change') as UiNode) as Rect;
+    const modes = layout.rects.get(layout.byId.get('modes') as UiNode) as Rect;
 
     const onPlay = draw('play');
     const ringPlay = ringOf(onPlay);
@@ -59,11 +59,11 @@ describe('drawTree', () => {
     expect((onPlay.geom[g + 1] as number) + (onPlay.geom[g + 3] as number)).toBeGreaterThan(play.y + play.h);
     expect(onPlay.geom[g + 4]).toBeGreaterThan(0); // chanfro
 
-    // Em Mudar (secundário): um contorno só, em volta de Mudar.
-    const onSettings = draw('change');
-    const rings = ringOf(onSettings);
+    // Em Modos (secundário): um contorno só, em volta de Modos.
+    const onModes = draw('modes');
+    const rings = ringOf(onModes);
     expect(rings.length).toBe(1);
-    expect(onSettings.geom[(rings[0] as number) * DRAW_FLOATS_PER_COMMAND + 1]).toBeLessThan(change.y);
+    expect(onModes.geom[(rings[0] as number) * DRAW_FLOATS_PER_COMMAND + 1]).toBeLessThan(modes.y);
   });
 
   it('sem fontes, desenha só as formas (NullRenderer e testes não quebram)', () => {

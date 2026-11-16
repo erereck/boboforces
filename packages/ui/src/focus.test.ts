@@ -83,20 +83,26 @@ describe('foco espacial (D-pad)', () => {
 describe('navegação de menu e ponteiro', () => {
   const l = layoutTree(titleScreen.build({ version: '0.0.1', codename: 'Teste' }), viewport);
 
-  it('tela de título: começa em JOGAR, desce por Surpreenda-me até Mudar e confirma a ação certa', () => {
+  it('tela de título (refino R3b): começa em JOGAR, desce por Modos, Sofá, Meu Bobo, Laboratório até Ajustes', () => {
     const nav = createMenuNavigation();
     const start = defaultFocus(l);
     expect(start).toBe('play');
+    // Grade de 2 colunas: Modos | Sofá, Meu Bobo | Laboratório, Ajustes.
     navigateMenu(l, start, 'down', nav);
-    expect(nav.focusedId).toBe('surprise');
+    expect(nav.focusedId).toBe('modes');
+    navigateMenu(l, nav.focusedId, 'right', nav);
+    expect(nav.focusedId).toBe('couch');
     navigateMenu(l, nav.focusedId, 'down', nav);
-    expect(nav.focusedId).toBe('change');
+    expect(nav.focusedId).toBe('lab');
+    navigateMenu(l, nav.focusedId, 'left', nav);
+    expect(nav.focusedId).toBe('bobo');
     navigateMenu(l, nav.focusedId, 'down', nav);
-    expect(nav.focusedId).toBe('change'); // borda: fica onde está
+    expect(nav.focusedId).toBe('settings');
+    navigateMenu(l, nav.focusedId, 'down', nav);
+    expect(nav.focusedId).toBe('settings'); // borda: fica onde está
     navigateMenu(l, nav.focusedId, 'confirm', nav);
-    expect(nav.activated).toBe(TITLE_ACTION.change);
-    navigateMenu(l, nav.focusedId, 'up', nav);
-    navigateMenu(l, nav.focusedId, 'up', nav);
+    expect(nav.activated).toBe(TITLE_ACTION.settings);
+    for (let i = 0; i < 3; i++) navigateMenu(l, nav.focusedId, 'up', nav);
     expect(nav).toEqual({ focusedId: 'play', activated: null, back: false, delta: 0, tab: 0 });
     navigateMenu(l, 'play', 'confirm', nav);
     expect(nav.activated).toBe(TITLE_ACTION.play);

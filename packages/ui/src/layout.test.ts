@@ -188,19 +188,22 @@ describe('telas nas resoluções de referência (regra 17)', () => {
     }
   }
 
-  it('título: logo acima dos botões, JOGAR acima de Mudar, rodapé embaixo', () => {
+  it('título (refino R3b): logo acima dos botões, JOGAR acima da grade (Modos, Ajustes), rodapé embaixo', () => {
     const l = layoutTree(screens[0]!.tree, { x: 0, y: 0, w: 1280, h: 720 }, 1, { fonts });
     const logo = rectOf(l, 'logo');
     const play = rectOf(l, 'play');
-    const settings = rectOf(l, 'change');
+    const modes = rectOf(l, 'modes');
+    const settings = rectOf(l, 'settings');
     const version = rectOf(l, 'version');
     expect(logo.y + logo.h).toBeLessThan(play.y);
-    expect(play.y + play.h).toBeLessThan(settings.y);
-    expect(play.w).toBe(settings.w);
+    expect(play.y + play.h).toBeLessThan(modes.y);
+    expect(modes.y).toBeLessThan(settings.y);
+    expect(modes.w).toBe(settings.w);
+    expect(play.w).toBeGreaterThan(modes.w);
     expect(version.y + version.h).toBe(l.content.y + l.content.h);
     expect(version.x + version.w).toBe(l.content.x + l.content.w);
     expect(l.texts.get(l.byId.get('version') as UiNode)?.text).toBe('v0.0.1 · Primeiro Bloco');
     expect(l.texts.get(l.byId.get('play') as UiNode)?.text).toBe('JOGAR');
-    expect(l.texts.get(l.byId.get('change') as UiNode)?.text).toBe('MUDAR');
+    expect(l.texts.get(l.byId.get('settings') as UiNode)?.text).toBe('AJUSTES');
   });
 });

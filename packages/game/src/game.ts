@@ -48,8 +48,6 @@ import {
   CUSTOM_ACTION,
   CUSTOM_ROW_PREFIX,
   CUSTOM_TAB_PREFIX,
-  MAIN_MENU_ACTION,
-  mainMenuScreen,
   COUCH_ACTION,
   couchScreen,
   type CouchSeatView,
@@ -82,6 +80,8 @@ import {
   TITLE_ACTION_TEST_PREFIX,
   t,
   titleScreen,
+  testListScreen,
+  TEST_LIST_ACTION,
   uiScale,
   type LayoutOptions,
   type MenuNavigation,
@@ -217,13 +217,13 @@ function anyInputHeld(raw: Readonly<RawInputState>): boolean {
 export type GameScreen =
   | 'loading'
   | 'title'
-  | 'main'
   | 'news'
   | 'workshop'
   | 'lab'
   | 'labIntro'
   | 'quick'
   | 'modes'
+  | 'tests'
   | 'custom'
   | 'surprise'
   | 'couch'
@@ -389,8 +389,10 @@ export function startGame(deps: GameDeps): GameHandle {
     ...(platform.id === 'web' && deps.loadScene ? [{ id: VITRINE_ITEM_ID, labelKey: 'title.vitrine' as const }] : []),
     ...testItems.map((item) => ({ id: item.id, labelKey: item.labelKey })),
   ];
-  const mainMenu = createMenuController();
   const surpriseMenu = createMenuController();
+  // Refino R3b (#79): a tela dos itens de teste (antes, à direita do título).
+  const testsMenu = createMenuController();
+  testsMenu.setRoot(testListScreen.build({ items: extraItems }));
   /**
    * M2 (fase 4c): o que o JOGAR joga: o último preset (o save guarda os 5 últimos) ou, na primeira vez, a partida de
    * estreia (gameplay.md §2.5).
@@ -414,9 +416,6 @@ export function startGame(deps: GameDeps): GameHandle {
   }
   refreshTitle();
   // M2 (fase 6c): o Meu Bobo entre o Laboratório e os Ajustes (GDD §2.2).
-  mainMenu.setRoot(
-    mainMenuScreen.build({ items: ['quickMatch', 'modes', 'couch', 'lab', 'bobo', 'settings', 'news'] }),
-  );
 
   // M2 (fase 5a): a Oficina (a entrada do Laboratório): a biblioteca dos bots e o card do escolhido.
   const workshopMenu = createMenuController();
@@ -631,10 +630,10 @@ export function startGame(deps: GameDeps): GameHandle {
 
   // M2 (fase 4g): Novidades: uma vez depois de atualizar (no boot, antes do título) e sempre pelo menu principal.
   const newsMenu = createMenuController();
-  let newsReturn: 'title' | 'main' = 'title';
+  let newsReturn: 'title' | 'settings' = 'title';
   /** Documentos do save que vieram de um formato antigo neste boot (a Novidades avisa em 1 linha). */
   const migrated = migratedCount(save.loadWarnings);
-  function openNews(back: 'title' | 'main'): void {
+  function openNews(back: 'title' | 'settings'): void {
     newsReturn = back;
     newsMenu.setRoot(
       newsScreen.build({
@@ -659,10 +658,13 @@ export function startGame(deps: GameDeps): GameHandle {
           nameKey: id === 'warfare.tdm' ? ('mode.name.warfare.tdm' as const) : ('mode.name.warfare.ffa' as const),
           descKey: id === 'warfare.tdm' ? ('mode.desc.warfare.tdm' as const) : ('mode.desc.warfare.ffa' as const),
         })),
-        // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
-        { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
         // M3 (fase 2d): o Bobo Zombies começa direto (fase 5a: na Base Abandonada).
         { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
+        // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
+        { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
+        // Refino R3b (#79): o Surpreenda-me e a Partida personalizada (com a última partida) moram aqui agora.
+        { id: 'surprise', nameKey: 'title.surprise' as const, descKey: 'mode.desc.surprise' as const },
+        { id: 'custom', nameKey: 'custom.title' as const, descKey: 'mode.desc.custom' as const },
       ],
     }),
   );
@@ -835,6 +837,8 @@ export function startGame(deps: GameDeps): GameHandle {
       { kind: 'text', id: 'fonts2', text: t('settings.about.fonts2'), dim: true },
       { kind: 'text', id: 'three', text: t('settings.about.three'), dim: true },
       { kind: 'action', id: 'copy', label: { key: 'settings.about.copy' } },
+      // Refino R3b (#79): a Novidades mora aqui (saiu do menu principal).
+      { kind: 'action', id: 'news', label: { key: 'menu.news' } },
     ];
   }
   function rebuildSettings(): void {
@@ -922,6 +926,8 @@ export function startGame(deps: GameDeps): GameHandle {
     } else if (id === 'cancel') {
       pendingBackup = null;
       note('');
+    } else if (id === 'news') {
+      openNews('settings');
     } else if (id === 'copy') {
       const text = reportText();
       const clip = platform.clipboard;
@@ -1189,7 +1195,7 @@ export function startGame(deps: GameDeps): GameHandle {
     couchStartPrev = startDown;
     if (nav.back || nav.activated === COUCH_ACTION.back) {
       closeCouch();
-      screen = 'main';
+      screen = 'title';
     } else if (nav.activated === COUCH_ACTION.match && couchPresets.length > 0) {
       const n = couchPresets.length;
       couchPreset = (couchPreset + (nav.delta === 0 ? 1 : nav.delta) + n) % n;
@@ -1300,7 +1306,7 @@ export function startGame(deps: GameDeps): GameHandle {
     pendingScene = null;
     if (wardrobeOpen) {
       wardrobeOpen = false;
-      screen = 'main';
+      screen = 'title';
       return;
     }
     if (labTesting) {
@@ -1389,7 +1395,8 @@ export function startGame(deps: GameDeps): GameHandle {
   function closeTest(): void {
     runner?.dispose();
     runner = null;
-    screen = 'title';
+    // Refino R3b (#79): os testes se abrem pela tela Testes; voltam para ela.
+    screen = 'tests';
   }
 
   /** Pointer lock na borda: pede quando a cena passa a querer o mouse, solta quando deixa de querer. */
@@ -1457,11 +1464,28 @@ export function startGame(deps: GameDeps): GameHandle {
         const nav = titleMenu.update(menuInput, raw, u);
         const action = nav.activated;
         if (action === TITLE_ACTION.play) play();
-        else if (action === TITLE_ACTION.surprise) {
-          rollNewSurprise();
-          screen = 'surprise';
-        } else if (action === TITLE_ACTION.change) screen = 'main';
+        else if (action === TITLE_ACTION.modes) screen = 'modes';
+        else if (action === TITLE_ACTION.couch) openCouch(raw);
+        else if (action === TITLE_ACTION.settings) openSettings();
+        else if (action === TITLE_ACTION.lab) openWorkshop();
+        else if (action === TITLE_ACTION.bobo) {
+          // M2 (fase 6c): o editor é uma cena (o bobo em 3D); na volta, o título.
+          wardrobeOpen = true;
+          requestScene('wardrobe', null);
+        } else if (action === TITLE_ACTION.tests) screen = 'tests';
         else if (action === TITLE_ACTION.quit) platform.exit();
+        if (screen === 'title') {
+          titleMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'tests': {
+        // Refino R3b (#79): os itens de teste da casca (bench, controles, teclado, áudio; a cena-vitrine na web).
+        const nav = testsMenu.update(menuInput, raw, u);
+        const action = nav.activated;
+        if (nav.back || action === TEST_LIST_ACTION.back) screen = 'title';
         else if (action !== null && action.startsWith(TITLE_ACTION_TEST_PREFIX)) {
           const id = action.slice(TITLE_ACTION_TEST_PREFIX.length);
           if (id === VITRINE_ITEM_ID) requestScene('vitrine', null);
@@ -1470,29 +1494,8 @@ export function startGame(deps: GameDeps): GameHandle {
             if (item) startTest(item);
           }
         }
-        if (screen === 'title') {
-          titleMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
-        }
-        break;
-      }
-      case 'main': {
-        const nav = mainMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === MAIN_MENU_ACTION.back) screen = 'title';
-        else if (nav.activated === MAIN_MENU_ACTION.settings) openSettings();
-        else if (nav.activated === MAIN_MENU_ACTION.quickMatch) openQuick(null);
-        else if (nav.activated === MAIN_MENU_ACTION.modes) screen = 'modes';
-        else if (nav.activated === MAIN_MENU_ACTION.couch) openCouch(raw);
-        else if (nav.activated === MAIN_MENU_ACTION.news) openNews('main');
-        else if (nav.activated === MAIN_MENU_ACTION.lab) openWorkshop();
-        else if (nav.activated === MAIN_MENU_ACTION.bobo) {
-          // M2 (fase 6c): o editor é uma cena (o bobo em 3D); na volta, o menu principal.
-          wardrobeOpen = true;
-          requestScene('wardrobe', null);
-        }
-        if (screen === 'main') {
-          mainMenu.draw(list, u);
+        if (screen === 'tests') {
+          testsMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
@@ -1537,7 +1540,7 @@ export function startGame(deps: GameDeps): GameHandle {
       }
       case 'workshop': {
         const nav = workshopMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === WORKSHOP_ACTION.back) screen = 'main';
+        if (nav.back || nav.activated === WORKSHOP_ACTION.back) screen = 'title';
         else {
           if (nav.activated !== null) workshopAction(nav.activated);
           workshopMenu.draw(list, u);
@@ -1559,7 +1562,8 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'quick': {
         const nav = quickMenu.update(menuInput, raw, u);
         const a = nav.activated;
-        if (nav.back || a === QUICK_ACTION.back) screen = 'main';
+        // Refino R3b (#79): a Partida Rápida se abre pelos Modos (Times, Todos contra todos).
+        if (nav.back || a === QUICK_ACTION.back) screen = 'modes';
         else if (a === QUICK_ACTION.start) playPreset(quickToPreset(quick));
         else if (a === QUICK_ACTION.custom) openCustom(quickToPreset(quick), 'quick');
         else if (a !== null && (QUICK_ROWS as readonly string[]).includes(a)) {
@@ -1616,12 +1620,16 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'modes': {
         const nav = modesMenu.update(menuInput, raw, u);
         const a = nav.activated;
-        if (nav.back || a === MODES_ACTION.back) screen = 'main';
+        if (nav.back || a === MODES_ACTION.back) screen = 'title';
         else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
           else if (id === 'training') playTraining(trainingPreset());
           else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
+          else if (id === 'surprise') {
+            rollNewSurprise();
+            screen = 'surprise';
+          } else if (id === 'custom') openCustom(currentPreset(), 'modes');
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);
@@ -1632,7 +1640,7 @@ export function startGame(deps: GameDeps): GameHandle {
       }
       case 'surprise': {
         const nav = surpriseMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === SURPRISE_ACTION.back) screen = 'title';
+        if (nav.back || nav.activated === SURPRISE_ACTION.back) screen = 'modes';
         else if (nav.activated === SURPRISE_ACTION.reroll) rollNewSurprise();
         else if (nav.activated === SURPRISE_ACTION.play) playPreset(surprise);
         if (screen === 'surprise') {
@@ -1658,7 +1666,7 @@ export function startGame(deps: GameDeps): GameHandle {
           followTab(settingsMenu, settingsTab);
           settingsNote = '';
           rebuildSettings();
-        } else if (nav.back || a === SETTINGS_ACTION.back) screen = 'main';
+        } else if (nav.back || a === SETTINGS_ACTION.back) screen = 'title';
         else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
           settingsTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
           settingsNote = '';

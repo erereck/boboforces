@@ -25,7 +25,7 @@ import {
   fillControllerLine,
   TEST_SCREEN_MAX_LINES,
 } from './test-screen.ts';
-import { TITLE_ACTION_TEST_PREFIX, titleScreen } from './title.ts';
+import { testListScreen, TITLE_ACTION_TEST_PREFIX, titleScreen } from './title.ts';
 
 const fonts = syntheticFontPack().fonts;
 
@@ -381,52 +381,56 @@ describe('título com itens de teste', () => {
     );
   }
 
-  it('até 4 itens: coluna única de 330 px à direita, `test:<id>`, sem tirar o foco de JOGAR', () => {
+  function list(items: readonly { id: string; labelKey: StringKey }[], w: number, h: number) {
+    return layoutTree(testListScreen.build({ items }), { x: 0, y: 0, w, h }, 1, {
+      fonts,
+      minTextPx: w >= 1280 ? MIN_TEXT.tv : MIN_TEXT.phone,
+    });
+  }
+
+  it('refino R3b: o título ganha o botão TESTES na grade (sem itens, não); os itens ficam na tela de testes', () => {
     for (const [w, h] of SIZES) {
       const layout = title(four, w, h);
       expect(layout.focusable.map((b) => b.id)).toEqual([
         'play',
-        'surprise',
-        'change',
+        'modes',
+        'couch',
+        'bobo',
+        'lab',
+        'settings',
+        'tests',
         'quit',
-        'test:bench',
-        'test:controllers',
-        'test:keyboard',
-        'test:audio',
       ]);
-      const tests = layout.rects.get(layout.byId.get('tests')!)!;
-      const buttons = layout.rects.get(layout.byId.get('buttons')!)!;
-      expect(tests.w).toBe(Math.round(330 * layout.scale));
-      for (const id of ['test:bench', 'test:audio']) expect(layout.rects.get(layout.byId.get(id)!)!.w).toBe(tests.w);
-      expect(overlaps(tests, buttons)).toBe(false);
-      expect(tests.x + tests.w).toBeLessThanOrEqual(layout.content.x + layout.content.w);
-      expect(moveFocus(layout, 'play', 'right')?.startsWith(TITLE_ACTION_TEST_PREFIX)).toBe(true);
       expect(reachable(layout, 'play').size).toBe(layout.focusable.length);
     }
   });
 
-  it('9 itens (Switch): grade de 2 colunas embaixo à direita, acima da versão, alcançável pelo D-pad', () => {
+  it('tela de testes: até 4 itens numa coluna de 330 px, `test:<id>`, foco no primeiro, Voltar alcançável', () => {
+    for (const [w, h] of SIZES) {
+      const layout = list(four, w, h);
+      expect(layout.focusable.map((b) => b.id)).toEqual([
+        ...four.map((i) => `${TITLE_ACTION_TEST_PREFIX}${i.id}`),
+        'back',
+      ]);
+      for (const i of four)
+        expect(layout.rects.get(layout.byId.get(`test:${i.id}`)!)!.w).toBe(Math.round(330 * layout.scale));
+      expect(reachable(layout, 'test:bench').size).toBe(layout.focusable.length);
+    }
+  });
+
+  it('tela de testes com 9 itens (Switch): grade de 2 colunas, tudo dentro e alcançável pelo D-pad', () => {
     for (const [w, h] of [...SIZES, [1024, 768]] as const) {
-      const layout = title(nine, w, h);
+      const layout = list(nine, w, h);
       const rect = (id: string) => layout.rects.get(layout.byId.get(id)!)!;
-      const ids = layout.focusable.map((b) => b.id!);
-      expect(ids.slice(0, 4)).toEqual(['play', 'surprise', 'change', 'quit']);
-      expect(ids.slice(4)).toEqual(nine.map((i) => `test:${i.id}`));
       const cells = nine.map((i) => rect(`test:${i.id}`));
-      // Duas colunas: ímpares à esquerda, pares à direita, linhas de 2.
       expect(new Set(cells.map((c) => c.x)).size).toBe(2);
       expect(cells[1]!.y).toBe(cells[0]!.y);
-      expect(cells[2]!.y).toBeGreaterThan(cells[0]!.y);
-      const grid = rect('tests');
-      const version = rect('version');
-      expect(grid.y + grid.h).toBeLessThanOrEqual(version.y);
-      expect(grid.x + grid.w).toBeLessThanOrEqual(layout.content.x + layout.content.w);
-      for (const id of ['logo', 'logoBar', 'buttons', 'credit', 'version'])
-        expect(overlaps(grid, rect(id))).toBe(false);
-      for (const c of cells) expect(c.h).toBe(Math.round(48 * layout.scale));
-      // Todos alcançáveis a partir de JOGAR, e de qualquer item de teste se volta a JOGAR.
-      expect([...reachable(layout, 'play')].sort()).toEqual([...ids].sort());
-      for (const id of ids.slice(4)) expect(reachable(layout, id).has('play')).toBe(true);
+      for (const c of [...cells, rect('back')]) {
+        expect(c.y + c.h).toBeLessThanOrEqual(layout.content.y + layout.content.h + 1);
+        expect(c.x + c.w).toBeLessThanOrEqual(layout.content.x + layout.content.w + 1);
+      }
+      const ids = layout.focusable.map((b) => b.id!);
+      expect([...reachable(layout, 'test:bench-dock')].sort()).toEqual([...ids].sort());
     }
   });
 
@@ -438,6 +442,6 @@ describe('título com itens de teste', () => {
       h: 720,
     });
     expect(layout.byId.has('tests')).toBe(false);
-    expect(layout.focusable.map((b) => b.id)).toEqual(['play', 'surprise', 'change']);
+    expect(layout.focusable.map((b) => b.id)).toEqual(['play', 'modes', 'couch', 'bobo', 'lab', 'settings']);
   });
 });

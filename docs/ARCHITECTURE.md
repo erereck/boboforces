@@ -2753,3 +2753,34 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
 - **Goldens:** o campo novo entra no hash (a partida é a mesma): Warfare `b36eb8e1`, Zombies `edc93590` e
   `6c4eaf90`. Conferido no Edge (`local/refino/capturar-granada.ts`): segurando o G aparecem a granada na mão, o
   pavio e o arco; soltando, ela sai e o contador vai de 2 para 1.
+
+### 14.3 Fase R3a: os textos da partida fora do menu (16/11/2026)
+
+- **Por quê:** o menu estava em 347,8 de 350 KB e a tabela de textos era o maior módulo dele (35,4 KB crus no
+  `index.js`), inclusive com os textos que só a partida e as telas de edição usam.
+- **Como:** `ui/src/strings-extra.pt-BR.ts` (`STRINGS_EXTRA_PT_BR`) leva os prefixos que nenhum módulo do chunk do
+  menu usa (conferido pelo sourcemap do build, `local/refino/peso-menu.mjs`): `bobo.`, `debug.`, `death.`,
+  `scoreboard.`, `drop.`, `perk.`, `prize.`, `fontSpecimen.` e `tip.` (238 entradas). `registerStrings`
+  (`ui/src/text.ts`) a registra: a cena (`scene/index.ts`) e as telas de edição (`editors.ts`) chamam ao carregar;
+  o `t()` procura nas duas e, sem achar, devolve a própria chave. `StringKey` é a união das chaves (só tipo). Nos
+  testes da UI e do jogo, o setup do Vitest (`ui/src/test-strings.ts`) registra.
+- **Medido:** `index.js` de 272,6 para 266,0 KB crus; o menu (medido comprimido, com o atlas das fontes) de 347,8
+  para 345,4 KB.
+
+### 14.4 Fase R3b: o título como centro e os Modos (16/11/2026)
+
+- **Antes:** o título tinha JOGAR, Surpreenda-me e "Mudar"; tudo o mais (Partida Rápida, Modos, Sofá, Laboratório,
+  Meu Bobo, Ajustes, Novidades) ficava atrás do "Mudar", num menu principal que nem cabia na tela (o Voltar rolava
+  para fora). A Partida Rápida e os Modos eram duas portas para a mesma coisa.
+- **Agora, o título:** JOGAR (largo, com a última partida embaixo) e uma grade de 2 colunas: Modos | Sofá,
+  Meu Bobo | Laboratório, Ajustes | Testes (só com itens de teste: a Cena-vitrine na web, os do Teste Zero no
+  Switch) e Sair (Switch). O menu principal (`main-menu.ts`) saiu.
+- **Os Modos** são o lugar de escolher o que jogar: Times, Todos contra todos, Bobo Zombies, Bobo Training,
+  Surpreenda-me e Partida personalizada (6 cards em 3 linhas mais compactas). Times e Todos contra todos abrem a
+  Partida Rápida (a configuração rápida e os atalhos), que volta aos Modos; o Surpreenda-me também volta aos Modos; a
+  Personalizada abre com a última partida.
+- **Os itens de teste** saíram do título para a tela Testes (`testListScreen`): no Switch a grade de 9 encostava na
+  grade nova. O teste da casca volta para ela.
+- **A Novidades** foi para Ajustes → Sobre (ainda aparece sozinha uma vez depois de atualizar).
+- **Testes:** os 15 do jogo que passavam pelo "Mudar" usam o ajudante `titleTo`; os do título e dos itens de teste
+  foram reescritos para a grade e a tela Testes.

@@ -17,6 +17,10 @@ Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
   solta para jogar (antes o botão não fazia nada). Enquanto cozinha, a granada aparece na mão, o pavio na tela e o
   arco de onde ela vai cair. As granadas dos outros perto aparecem num anel em volta da mira. Dica nova nas primeiras
   partidas.
+- **R3, menus mais claros (parte 1):** o título agora mostra tudo: JOGAR e, embaixo, Modos, Sofá, Meu Bobo,
+  Laboratório e Ajustes (sai o "Mudar" e o menu do meio). Os Modos reúnem os jeitos de começar: Times, Todos contra
+  todos, Bobo Zombies, Bobo Training, Surpreenda-me e Partida personalizada. A Novidades foi para Ajustes → Sobre, e
+  os itens de teste ganharam uma tela própria.
 
 ### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 

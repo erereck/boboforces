@@ -9,12 +9,11 @@ import { drawFontSpecimen } from './screens/font-specimen.ts';
 import { createLoadingModel, drawLoadingScreen } from './screens/loading.ts';
 import { settingsScreen } from './screens/settings.ts';
 import { buildTabbed, type TabbedRow } from './screens/tabbed.ts';
-import { titleScreen, type TitleExtraItem } from './screens/title.ts';
+import { testListScreen, titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 import { STRINGS_EXTRA_PT_BR } from './strings-extra.pt-BR.ts';
 import { t } from './text.ts';
 import { drawnCommands } from './test-fixtures.ts';
-import { mainMenuScreen } from './screens/main-menu.ts';
 import { modesScreen } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { rotateScreen } from './screens/rotate.ts';
@@ -371,25 +370,6 @@ function expectNoOverflow(layout: LayoutResult, t: Target): void {
   }
 }
 
-/** Itens de teste não encostam no logotipo, nos botões do menu nem no rodapé. */
-function expectTestsClear(layout: LayoutResult, t: Target): void {
-  const rect = (id: string) => layout.rects.get(layout.byId.get(id) as UiNode) as Rect;
-  const tests = rect('tests');
-  const logo = rect('logo');
-  const logoText = layout.texts.get(layout.byId.get('logo') as UiNode);
-  // O retângulo do texto do logo vai até a largura medida (o nó não tem largura fixa).
-  const logoInk = { ...logo, w: Math.ceil(logoText?.width ?? logo.w) };
-  for (const [id, r] of [
-    ['logo', logoInk],
-    ['logoBar', rect('logoBar')],
-    ['buttons', rect('buttons')],
-    ['credit', rect('credit')],
-    ['version', rect('version')],
-  ] as const) {
-    expect(overlaps(tests, r), `${t.name}: itens de teste × ${id}`).toBe(false);
-  }
-}
-
 describe('estouro de texto com o atlas real', () => {
   it('título da web (Cena-vitrine): 1280×720, 640×360 (com e sem toque), celular, 1920×1080 e 4:3, foco por D-pad', () => {
     for (const t of WEB_TARGETS) {
@@ -398,7 +378,6 @@ describe('estouro de texto com o atlas real', () => {
         t,
       );
       expectNoOverflow(layout, t);
-      expectTestsClear(layout, t);
       expect(reachable(layout, 'play').size, t.name).toBe(layout.focusable.length);
     }
   });
@@ -410,17 +389,29 @@ describe('estouro de texto com o atlas real', () => {
         t,
       );
       expectNoOverflow(layout, t);
-      expectTestsClear(layout, t);
       const ids = layout.focusable.map((b) => b.id as string);
-      expect(ids.length).toBe(13);
+      // Refino R3b: JOGAR, Modos, Sofá, Meu Bobo, Laboratório, Ajustes, Testes e Sair (os itens de teste têm tela própria).
+      expect(ids.length).toBe(8);
       expect([...reachable(layout, 'play')].sort(), t.name).toEqual([...ids].sort());
       for (const id of ids) expect(reachable(layout, id).has('play'), `${t.name}: ${id} → JOGAR`).toBe(true);
     }
   });
 
-  it('menus da fase 4 (menu principal, Novidades, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
+  it('refino R3b: a tela de testes (os 9 itens do Switch e a Cena-vitrine) cabe nos alvos, tudo alcançável', () => {
+    for (const [items, targets] of [
+      [SWITCH_ITEMS, SWITCH_TARGETS],
+      [VITRINE, WEB_TARGETS],
+    ] as const) {
+      for (const t of targets) {
+        const layout = layoutFor(testListScreen.build({ items }), t);
+        expectNoOverflow(layout, t);
+        expect(reachable(layout, layout.focusable[0]!.id!).size, t.name).toBe(layout.focusable.length);
+      }
+    }
+  });
+
+  it('menus da fase 4 (Novidades, Partida Rápida, Modos, Surpreenda-me): cabem nos 6 alvos e no Switch', () => {
     const screens: UiNode[] = [
-      mainMenuScreen.build({ items: ['quickMatch', 'modes', 'lab', 'settings', 'news'] }),
       // M2 (fase 5e): o card Conheça o Laboratório (o Jorge, com as regras).
       labIntroScreen.build({
         name: 'Jorge the Immortal',
