@@ -25,11 +25,16 @@ export function isHashedFile(path: string): boolean {
  * nunca usado offline: a música (1 MB, carrega depois do menu e entra no cache quando tocar), a página do bench, o
  * próprio `sw.js` e mapas de código.
  */
+/** M5 (fase 3): o `net.json` nunca passa pelo cache do service worker. */
+export const NET_CONFIG_FILE = 'net.json';
+
 export function precacheList(files: readonly string[]): string[] {
   const out = ['./'];
   for (const f of [...files].sort()) {
     if (f === 'index.html' || f === 'sw.js' || f.endsWith('.map')) continue;
     if (f.startsWith('bench/') || f.startsWith('assets/music/')) continue;
+    // M5: a configuração da rede vem sempre da rede (relays trocados sem versão nova; o `Date` dela acerta o relógio).
+    if (f === NET_CONFIG_FILE) continue;
     out.push(`./${f}`);
   }
   return out;
@@ -80,6 +85,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   const scope = new URL(self.registration.scope);
   if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
+  // A configuração da rede vai sempre à rede (o cabeçalho Date dela acerta o relógio da sinalização).
+  if (url.pathname === scope.pathname + ${JSON.stringify(NET_CONFIG_FILE)}) return;
   // A navegação para o index (com ou sem query, como o ?bench) responde com o ./ do cache; outras páginas (o /bench/)
   // seguem como qualquer arquivo.
   const index = url.pathname === scope.pathname || url.pathname === scope.pathname + 'index.html';

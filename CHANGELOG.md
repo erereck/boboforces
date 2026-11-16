@@ -22,6 +22,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   de onde o host os tinha.
 - **O tiro no que você vê (fase 2d):** o host volta no tempo até o que o cliente via quando atirou (até 350 ms): a 80 ms
   de rede, mirando num boneco andando de lado, o cliente acerta 25 de 25 tiros (1 de 25 sem isso).
+- **A rede de verdade (fase 3):** o Trystero (o mesmo do FutBobo, com as correções dele para o relógio do celular) e a
+  sala por WebRTC, com um canal rápido que pode perder (entradas e snapshots) e um que não perde (eventos). Duas abas do
+  Edge conectam em ~1 s e jogam uma partida inteira com o mesmo resultado. O online só baixa quando você abrir "Online"
+  (a tela é a próxima fase).
 
 ### M4: o porte do Switch (planejado em 16/11/2026)
 

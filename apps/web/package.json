@@ -17,9 +17,13 @@
     "@boboforces/input": "0.0.0",
     "@boboforces/platform-api": "0.0.0",
     "@boboforces/render": "0.0.0",
-    "@boboforces/shared": "0.0.0"
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/net": "0.0.0"
   },
   "devDependencies": {
+    "@boboforces/ai": "0.0.0",
+    "@boboforces/format": "0.0.0",
+    "@boboforces/sim": "0.0.0",
     "vite": "8.3.5"
   }
 }

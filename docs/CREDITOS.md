@@ -23,7 +23,9 @@
 | three.js | MIT | web e Switch | render, só `WebGLRenderer` (pacote `render`) | 0.187.0 | https://github.com/mrdoob/three.js |
 | nx.js (runtime e pacotes de build) | MIT | só Switch | runtime JavaScript do Switch e geração de NRO/NSP | 1.0.0-beta.7 (fixada no M0; revisar no Teste Zero) | https://github.com/TooTallNate/nx.js |
 | Dependências indiretas do nx.js usadas pelos scripts locais do Switch: `@nx.js/patch-nacp`, `@tootallnate/{hacbrewpack,nacp,romfs,nro,nca,aes-xts}`, `jimp` | MIT | só na máquina do Erick | empacotar e conferir NRO/NSP, ícone | versões do `package-lock.json` (ver `docs/DEPENDENCIAS.md`) | via `@nx.js/nro` e `@nx.js/nsp` |
-| Trystero | MIT | só web | sinalização P2P por relays Nostr (online, M5) | a fixar no M5 | https://github.com/dmotz/trystero |
+| Trystero (`@trystero-p2p/core`), de Dan Motzenbecker | MIT | só web | sala P2P por WebRTC e o núcleo da sinalização por relays Nostr (online, M5) | 0.26.0 | https://github.com/dmotz/trystero |
+| Estratégia Nostr do Trystero (`@trystero-p2p/nostr` 0.26.0, de Dan Motzenbecker), na versão modificada do FutBobo (EriLab) | MIT (o aviso vai no topo do arquivo) | só web | a sinalização do online, com as correções do FutBobo (relógio do celular, ofertas repetidas dos relays, vida dos sockets) | 0.26.0 | `packages/net/src/rtc/nostr-strategy.ts` |
+| noble-secp256k1, de Paul Miller | MIT | só web | assinatura Schnorr dos eventos Nostr | 3.2.0 | https://github.com/paulmillr/noble-secp256k1 |
 | fflate | MIT | web, Switch e ferramentas | deflate/inflate de mapas, códigos, backups e PNG | 0.8.3 | https://github.com/101arrowz/fflate |
 
 ## 3. Fontes (decisão #54)

@@ -11,6 +11,8 @@
 |---|---|---|---|---|---|
 | three | 0.187.0 | MIT | Render (só `WebGLRenderer`, WebGL2 puro); decisão #2 | web e Switch | `packages/render` |
 | fflate | 0.8.3 | MIT | Inflate/deflate de mapas, códigos, backups e do decodificador PNG próprio | web, Switch e tools | `packages/format`, `packages/world` |
+| @trystero-p2p/core | 0.26.0 | MIT | Online (M5): sala P2P por WebRTC e o núcleo da sinalização; a estratégia Nostr é a do FutBobo, vendorizada em `packages/net/src/rtc/nostr-strategy.ts` | só web (chunk do Online, carregado ao abrir "Online") | `packages/net` |
+| @noble/secp256k1 | 3.2.0 | MIT | Assinatura Schnorr dos eventos Nostr da sinalização (a estratégia vendorizada) | só web (chunk do Online) | `packages/net` |
 
 ## Só ferramentas e build (não vão no jogo)
 
@@ -29,6 +31,18 @@
 | @nx.js/nsp | 1.0.0-beta.7 | MIT | Gera o NSP | só na máquina do Erick | `apps/switch` |
 | msdf-bmfont-xml | 2.8.0 | MIT | Gera o atlas MSDF das fontes OFL | dev (build de assets) | `tools/fontbake` |
 | @breezystack/lamejs | 1.2.7 | LGPL-3.0 | Codifica MP3 (PCM → MP3 mono) para os sons CC0 da Kenney, que vêm em OGG (decisão #47, regra 23) | dev (build de assets) | `tools/audioconv` |
+
+## Download do online (M5, fase 3)
+
+- **16/11/2026, com o OK do Erick** ("Pode baixar", pedido com nome, origem e tamanho; O2 do `PLANO_M5.md`): as mesmas
+  versões que o FutBobo usa, do registro do npm:
+  - `https://registry.npmjs.org/@trystero-p2p/core/-/core-0.26.0.tgz`, sha512-CZpeXPgfbDdFKrGxf…, 556 KB instalado;
+  - `https://registry.npmjs.org/@noble/secp256k1/-/secp256k1-3.2.0.tgz`, sha512-Z3ZAWOTxJ0EuTuZTi…, 192 KB instalado.
+- **No jogo:** ~25 KB com gzip (medido com o esbuild sobre as cópias do FutBobo), mais a estratégia vendorizada, só no
+  chunk do Online. O `portcheck` do Switch continua verde: só `apps/web` importa o `net`.
+- **Sem dependência nova de terceiros além dessas duas:** o `trystero` e o `@trystero-p2p/nostr` não entram, porque a
+  estratégia Nostr veio do FutBobo, com as correções dele (o relógio do celular, as ofertas repetidas dos relays e a
+  vida dos sockets).
 
 ## Observações do `npm install` do M0
 

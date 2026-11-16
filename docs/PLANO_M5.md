@@ -61,6 +61,9 @@ entra na fase 3, com o OK do download.
    (`stun.cloudflare.com`) no protótipo, `public/net.json` com relays, STUN/TURN e `protocolVersion`. Canal confiável
    (lobby, eventos, pings) e não confiável (`ordered:false, maxRetransmits:0`, entradas e snapshots), com o reserva
    "tudo no canal do Trystero a 20 Hz" se o não confiável não der. Chunk só na web, carregado ao abrir "Online".
+   **Feita em 16/11** (ARCHITECTURE §16.5): com o OK do download, a estratégia Nostr do FutBobo e a sala sobre o
+   Trystero; no Edge, duas abas conectam por WebRTC em ~1 s e jogam uma partida inteira com o mesmo resultado
+   (`npm run rtc:web`, sem relay público).
 4. **A sala:** Online → Criar sala / Entrar com código / Abrir link (`#sala=XXXXX`, 5 caracteres sem ambíguos; o hash
    não chega a servidor nenhum), o aviso de privacidade na 1ª vez, o lobby (o host configura e todos veem; cada um
    escolhe time e loadout; o Meu Bobo vai junto), o host inicia. Expulsar e travar a sala.

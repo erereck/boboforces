@@ -39,7 +39,8 @@
     "assets:check": "npm run texgen -- --check && npm run modelgen -- --check && npm run mapc -- --check",
     "audioconv": "node tools/audioconv/src/index.ts",
     "fontbake": "node tools/fontbake/src/index.ts",
-    "check": "npm run typecheck && npm test && npm run format:check && npm run guard"
+    "check": "npm run typecheck && npm test && npm run format:check && npm run guard",
+    "rtc:web": "node apps/web/scripts/rtc-web.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

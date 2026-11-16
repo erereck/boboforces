@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "protocolVersion": 1,
+  "relays": [
+    "wss://nos.lol",
+    "wss://relay.nostr.dev.br",
+    "wss://nostr.red5d.dev",
+    "wss://nostr.rblb.it",
+    "wss://relay.agentry.com",
+    "wss://relay.piazza.today",
+    "wss://0x-nostr-relay.fly.dev",
+    "wss://relay.ditto.pub",
+    "wss://relay.grigic.org",
+    "wss://nostr-pub.wellorder.net",
+    "wss://relay.primal.net"
+  ],
+  "iceServers": [{ "urls": "stun:stun.cloudflare.com:3478" }]
+}

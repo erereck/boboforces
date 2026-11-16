@@ -3087,3 +3087,37 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
 - **Teste:** na sim, mirar onde o alvo estava 10 ticks antes acerta voltando 10 ticks e erra no presente. Pela rede
   (`net/src/lagcomp.test.ts`), o host anda de lado e o cliente mira no que vê, a 80 ms com 5% de perda: **25 de 25**
   acertos com a compensação, **1 de 25** sem.
+
+### 16.5 Fase 3: o transporte de verdade (16/11/2026)
+
+- **Dependências** (com o OK do Erick, O2): `@trystero-p2p/core` 0.26.0 e `@noble/secp256k1` 3.2.0, as do FutBobo
+  (`docs/DEPENDENCIAS.md`). O `net` ganhou a lib DOM nos tsconfigs (os tipos do WebRTC e do WebSocket, como o
+  `render`); o guard continua barrando os globais do navegador nele (regra 1), e a rede só existe nele (regra 4).
+- **A sinalização Nostr** (`net/src/rtc/nostr-strategy.ts`) é a do FutBobo, sem mudar uma linha de código. Ela traz as
+  correções que ele mediu no celular: o relógio errado (`since` = agora − 15 min e o desvio pelo `Date` do
+  `net.json`), as ofertas velhas que os relays repetem e a vida dos sockets. O `appId` "boboforces" separa as salas
+  dos dois jogos.
+- **A sala** (`net/src/rtc/room.ts`, `joinNetRoom`) é o `NetEndpoint` sobre o Trystero:
+  - **confiável:** a action `bf`;
+  - **não confiável:** um `RTCDataChannel` negociado (`bf-u`, id 300, sem ordem e sem reenvio) na mesma
+    `RTCPeerConnection`, sem sinalização nova;
+  - **reserva:** se o não confiável não abre em 4 s, as mensagens dele vão pelo confiável (o reserva do §13.2);
+  - **fila cheia:** com mais de 64 KB esperando no não confiável, a mensagem é descartada;
+  - **numeração:** os amigos ganham números locais na ordem em que entram.
+- **A sinalização local** (`createLocalJoinRoom`): as mesmas ofertas por um canal entre abas, que a casca passa (o
+  `BroadcastChannel`). Serve para testar o WebRTC sem relay nenhum.
+- **O teste de verdade** (`npm run rtc:web`, `apps/web/scripts/rtc-web.ts`): duas abas do Edge se acham pela
+  sinalização local, conectam por WebRTC (os candidatos do próprio aparelho) e jogam uma TDM de 20 s com 6 bots.
+  Medido:
+  - conectaram em ~1 s, e o não confiável abriu nas duas;
+  - foram 654 snapshots por ele (~30 Hz) e 985 eventos pelo confiável, sem nada pelo reserva;
+  - a partida acabou com o mesmo placar e os mesmos abates e mortes nas duas abas;
+  - a predição errou 0 vezes em 654 reconciliações.
+- **A configuração:** `apps/web/public/net.json` (os 11 relays que o FutBobo mediu em 01/11 e o STUN da Cloudflare) é
+  igual à cópia embutida (`DEFAULT_NET_CONFIG`), e o teste confere. Ela fica fora do service worker: nem precache, nem
+  cache no fetch, porque o `Date` dela acerta o relógio.
+- **O carregador** (`apps/web/src/online.ts`, `loadOnline`) baixa o chunk do `net`, o `net.json` (prazo de 2,5
+  s; sem ele vale a cópia embutida) e acerta o relógio. Ainda não é chamado: a tela Online é da fase 4. Por isso o
+  `net` ainda não está no bundle e o menu continua em 348,3 KB.
+- **Pendente:** jogar pelos relays de verdade, entre aparelhos e redes diferentes. Isso é a sala (fase 4), o checkpoint
+  com amigos (fase 8) e o TURN (O3). Os testes daqui não publicam nada em relay público.

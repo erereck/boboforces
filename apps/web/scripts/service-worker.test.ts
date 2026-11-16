@@ -4,7 +4,7 @@ import { APPLY_UPDATE } from '../src/platform/updates.ts';
 import { APPLY_UPDATE_MESSAGE, isHashedFile, precacheList, serviceWorkerSource } from './service-worker.ts';
 
 describe('service worker (fase 8c)', () => {
-  it('precache: o index como ./, sem a música, o bench, o próprio sw e mapas de código', () => {
+  it('precache: o index como ./, sem a música, o bench, o próprio sw, mapas de código e o net.json', () => {
     const list = precacheList([
       'sw.js',
       'index.html',
@@ -14,6 +14,7 @@ describe('service worker (fase 8c)', () => {
       'assets/maps/construto.bfmap',
       'bench/index.html',
       'licencas.txt',
+      'net.json',
     ]);
     expect(list).toEqual(['./', './assets/index-AbCdEf12.js', './assets/maps/construto.bfmap', './licencas.txt']);
   });
@@ -30,6 +31,8 @@ describe('service worker (fase 8c)', () => {
     expect(src).toContain('"abc123"');
     expect(src).toContain('"boboforces-"');
     expect(src).toContain(JSON.stringify(APPLY_UPDATE_MESSAGE));
+    // M5: o net.json passa direto (nem precache, nem cache no fetch).
+    expect(src).toContain('scope.pathname + "net.json"');
     expect(APPLY_UPDATE).toBe(APPLY_UPDATE_MESSAGE);
   });
 });

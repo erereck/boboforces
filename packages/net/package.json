@@ -14,10 +14,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@boboforces/shared": "0.0.0",
     "@boboforces/format": "0.0.0",
     "@boboforces/input": "0.0.0",
-    "@boboforces/sim": "0.0.0"
+    "@boboforces/shared": "0.0.0",
+    "@boboforces/sim": "0.0.0",
+    "@noble/secp256k1": "3.2.0",
+    "@trystero-p2p/core": "0.26.0"
   },
   "devDependencies": {
     "@boboforces/ai": "0.0.0"

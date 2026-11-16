@@ -253,6 +253,10 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
 - **O tiro no que eu vi (fase 2d):** o histórico do host ocupa ~1 MB (24 ticks × 1.024 corpos de posição, mira e
   flags; só no host online) e grava `count` corpos por tick (3 cópias de typed array). A 80 ms de ida, o tiro do cliente
   volta **18 ticks** (300 ms) e acerta 25 de 25 (1 de 25 sem a volta).
+- **WebRTC de verdade (fase 3, `npm run rtc:web`):** duas abas do Edge headless na mesma máquina, sinalização local:
+  conectaram em 0,85–1,05 s; 654 snapshots pelo canal não confiável em 22 s (~30 Hz) e 985 eventos pelo confiável, sem
+  nenhum pelo reserva; a predição errou 0 vezes em 654 reconciliações. O chunk do Online pesa ~25 KB com gzip a mais pelo
+  Trystero e pelo noble (medido com o esbuild); ainda fora do build (a tela é a fase 4).
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).
