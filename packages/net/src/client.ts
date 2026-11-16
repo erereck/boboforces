@@ -1,6 +1,7 @@
 import { createInputFrame, type InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter } from '@boboforces/shared';
-import type { Sim } from '@boboforces/sim';
+import type { Sim, SimEvent } from '@boboforces/sim';
+import { EventQueue } from './events.ts';
 import { applyFrame, createRemoteState } from './frame.ts';
 import type { NetMatchDriver } from './host.ts';
 import { InputHistory } from './inputs.ts';
@@ -36,6 +37,11 @@ export interface ClientDriverConfig {
   readonly writeLocalFrame: (out: InputFrame, seq: number) => void;
   /** O hello desta build (padrão `localHello()`; os testes trocam). */
   readonly hello?: NetHello;
+  /**
+   * Os eventos do host, soltos quando o estado mostrado chega no tick deles (como o `onEvents` do `LocalDriver`:
+   * objetos de pool, valem só durante a chamada).
+   */
+  readonly onEvents?: (events: readonly SimEvent[], sim: Sim) => void;
 }
 
 /** `connecting` até o host responder; `rejected` com o veredito (quem atualiza) ou sala cheia. */
@@ -54,6 +60,7 @@ export interface ClientDriver extends NetMatchDriver {
   /** Por que o host recusou: `full`/`locked` ou o veredito de versão deste lado. */
   readonly rejection: HelloVerdict | 'full' | 'locked' | null;
   readonly assembler: SnapshotAssembler;
+  readonly events: EventQueue;
   readonly stats: ClientNetStats;
 }
 
@@ -71,6 +78,9 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
   const assembler = new SnapshotAssembler(layout);
+  const events = new EventQueue();
+  const onEvents = config.onEvents;
+  const release = onEvents ? (list: readonly SimEvent[]): void => onEvents(list, sim) : null;
   const remoteState = createRemoteState();
   const reader = new BitReader(new Uint8Array(0));
   const out = new BitWriter(MAX_MESSAGE_BYTES);
@@ -106,6 +116,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
               : checkHello(hello, r.host);
         state = 'rejected';
       }
+      if (type === MSG.events && state === 'playing') events.receive(bytes);
       return;
     }
     if (type === MSG.snapshot && state === 'playing') assembler.receive(bytes);
@@ -115,6 +126,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     sim,
     layout,
     assembler,
+    events,
     stats,
     get state(): ClientNetState {
       return state;
@@ -146,6 +158,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
       } else {
         sinceApply += Math.min(frameSeconds, MAX_FRAME_S);
       }
+      if (appliedTick >= 0) events.release(appliedTick, release);
       if (state !== 'playing') return 0;
       acc += Math.min(frameSeconds, MAX_FRAME_S);
       let ticks = 0;

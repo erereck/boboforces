@@ -5,6 +5,7 @@ export * from './schema.ts';
 export * from './frame.ts';
 export * from './snapshot.ts';
 export * from './inputs.ts';
+export * from './events.ts';
 export * from './transport.ts';
 export * from './host.ts';
 export * from './client.ts';

@@ -1,6 +1,7 @@
 import type { InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter } from '@boboforces/shared';
-import { NULL_ENTITY, type Sim } from '@boboforces/sim';
+import { NULL_ENTITY, type Sim, type SimEvent } from '@boboforces/sim';
+import { EventWriter } from './events.ts';
 import { captureFrame } from './frame.ts';
 import { RemoteInputBuffer } from './inputs.ts';
 import {
@@ -70,6 +71,11 @@ export interface NetHost {
   writeRemoteFrame(slot: number, out: InputFrame): boolean;
   /** Lê o que chegou (handshakes, entradas, acks). Antes dos ticks do frame. */
   receive(): void;
+  /**
+   * Os eventos de um tick (o `onEvents` do `LocalDriver` chama): vão aos clientes pelo canal confiável, juntos até o
+   * próximo snapshot. Os objetos são da sim e só valem na chamada: são escritos na hora.
+   */
+  recordEvents(events: readonly SimEvent[]): void;
   /** Depois dos ticks: se deu a hora, captura o snapshot e manda a cada cliente (delta contra o ack dele). */
   afterTicks(): void;
   readonly layout: NetLayout;
@@ -91,6 +97,9 @@ export function createNetHost(config: NetHostConfig): NetHost {
   const reader = new BitReader(new Uint8Array(0));
   const reply = new BitWriter(MAX_MESSAGE_BYTES);
   const stats: NetHostStats = { snapshots: 0, parts: 0, bytes: 0, full: 0, maxParts: 0, maxBytes: 0 };
+  const events = new EventWriter((bytes) => {
+    for (const c of clients) if (c.verified) endpoint.send(c.peer, 'reliable', bytes);
+  });
   let lastSnapshot = -1;
 
   const find = (peer: number): HostClient | null => {
@@ -150,10 +159,14 @@ export function createNetHost(config: NetHostConfig): NetHost {
     receive(): void {
       endpoint.poll(onMessage);
     },
+    recordEvents(list): void {
+      events.addAll(list);
+    },
     afterTicks(): void {
       const tick = sim.tick;
       if (lastSnapshot >= 0 && tick - lastSnapshot < interval) return;
       lastSnapshot = tick;
+      events.flush();
       const frame = history.next();
       captureFrame(layout, sim.view(), frame);
       stats.snapshots++;

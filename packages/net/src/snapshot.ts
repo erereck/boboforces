@@ -63,7 +63,7 @@ function readSlot(r: BitReader, table: SlotCodecs, j: number, base: number): num
 }
 
 /** Copia os bits [from, to) de `src` (LSB primeiro, como o BitWriter) para `dst`. */
-function copyBits(src: Uint8Array, from: number, to: number, dst: BitWriter): void {
+export function copyBits(src: Uint8Array, from: number, to: number, dst: BitWriter): void {
   let pos = from;
   while (pos < to) {
     const n = Math.min(24, to - pos);

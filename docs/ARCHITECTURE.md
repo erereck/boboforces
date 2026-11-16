@@ -3009,3 +3009,19 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   só monta quando falha (a rede escreve milhares de campos por snapshot).
 - **Desvio do plano:** os eventos da sim (tiro, acerto, morte, som) ainda não viajam. O cliente mostra o estado, sem
   efeitos e sem som. Eles entram na fase 2, pelo canal confiável, antes da sala (fase 4).
+
+### 16.2 Fase 2a: os eventos pelo canal confiável (16/11/2026)
+
+- **`net/src/events.ts`:** os 19 tipos de `SimEvent` com os campos na ordem em que viajam (`EVENT_SCHEMA`; tipo novo
+  no fim, campo novo no fim do tipo). Ids em 32 bits, enums pelo índice, reais em f32 (o render usa o ponto e a direção
+  exatos). Uma mensagem leva os eventos de até 255 ticks a partir do primeiro, com até 1.100 B.
+- **Host:** `NetHost.recordEvents(events)` (o `onEvents` do `LocalDriver` chama a cada tick) escreve na hora. A
+  mensagem aberta fecha na hora do snapshot, ou antes, quando enche, e vai a todos os clientes pelo canal confiável.
+- **Cliente:** `EventQueue` lê para objetos de pool (um por tipo, no formato do evento da sim) e solta os eventos no
+  `onEvents` do `ClientDriver` quando o snapshot aplicado chega no tick deles: o efeito e o som saem junto com o
+  boneco. Como na sim, o objeto só vale durante a chamada.
+- **Teste:** uma amostra de cada tipo (o TypeScript exige todos os campos, então campo que faltar no schema não volta
+  igual) e os eventos de 20 s de partida com bots e granadas voltam iguais. Na partida pelo loopback, os abates chegam a
+  cada cliente na mesma ordem do host, e nenhum evento sai antes do tick mostrado.
+- **Banda:** os eventos somam ~2,6 KB/s por cliente (host → cliente 8,4 KB/s com 8 bots). Os reais em f32 são a maior
+  parte: quantizar o ponto e a direção fica para a medição da fase 7.

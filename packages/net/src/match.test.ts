@@ -2,7 +2,7 @@ import { botPrimaries, createBotDirectorWithPaths } from '@boboforces/ai';
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import { yawToU16 } from '@boboforces/shared';
-import { createInputFrames, createSim, createSimLoop, type Sim } from '@boboforces/sim';
+import { createInputFrames, createSim, createSimLoop, type Sim, type SimEvent } from '@boboforces/sim';
 import { buildSyntheticConstruto, TEST_NAV_PATHS } from '@boboforces/sim/testing';
 import { describe, expect, it } from 'vitest';
 import { createClientDriver, type ClientDriver } from './client.ts';
@@ -36,7 +36,10 @@ function play(slot: number, out: InputFrame, seq: number): void {
 }
 
 /** O que o `LocalDriver` do `game` faz (a sim, a IA e o passo fixo), com os slots remotos vindo da rede. */
-function hostInner(writeHuman: (slot: number, out: InputFrame, seq: number) => void): NetMatchDriver & { sim: Sim } {
+function hostInner(
+  writeHuman: (slot: number, out: InputFrame, seq: number) => void,
+  onEvents: (events: readonly SimEvent[]) => void,
+): NetMatchDriver & { sim: Sim } {
   const sim = createSim({ recipe, map, humans: HUMANS, primaries: botPrimaries(recipe, HUMANS) });
   const director = createBotDirectorWithPaths({ recipe, humans: HUMANS, hz: sim.hz }, TEST_NAV_PATHS);
   let seq = 0;
@@ -48,6 +51,7 @@ function hostInner(writeHuman: (slot: number, out: InputFrame, seq: number) => v
       for (let h = 0; h < HUMANS; h++) writeHuman(h, f[h]!, seq);
       director.think(s.view(), f);
     },
+    afterTick: (_s, events) => onEvents(events),
   });
   return {
     sim,
@@ -67,21 +71,40 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
     const net = createLoopback({ seed: 9, latencyMs: 80, jitterMs: 25, loss: 0.05, duplicate: 0.01 });
     // O host é o peer 0 e joga no slot 0; os clientes 1..3 nos slots 1..3.
     let netHost: ReturnType<typeof createNetHost> | null = null;
-    const inner = hostInner((slot, out, seq) => {
-      if (slot === 0) play(0, out, seq);
-      else netHost!.writeRemoteFrame(slot, out);
-    });
+    // Os abates de cada um, na ordem (host e clientes), e o tick mostrado quando cada evento saiu.
+    const hostKills: number[] = [];
+    const inner = hostInner(
+      (slot, out, seq) => {
+        if (slot === 0) play(0, out, seq);
+        else netHost!.writeRemoteFrame(slot, out);
+      },
+      (events) => {
+        for (const ev of events) if (ev.type === 'kill') hostKills.push(ev.victim);
+        netHost!.recordEvents(events);
+      },
+    );
     netHost = createNetHost({ sim: inner.sim, endpoint: net.endpoint(0), snapshotHz: 30 });
     const host = createHostDriver(netHost, inner);
     const clients: ClientDriver[] = [];
+    const clientKills: number[][] = [];
+    let early = 0;
     for (let slot = 1; slot < HUMANS; slot++) {
       netHost.addClient(slot, slot);
+      const kills: number[] = [];
+      clientKills.push(kills);
       clients.push(
         createClientDriver({
           sim: createSim({ recipe, map, humans: HUMANS, primaries: botPrimaries(recipe, HUMANS) }),
           endpoint: net.endpoint(slot),
           host: 0,
           writeLocalFrame: (out, seq) => play(slot, out, seq),
+          onEvents: (events, sim) => {
+            for (const ev of events) {
+              if (ev.type === 'kill') kills.push(ev.victim);
+              // O efeito sai junto com o estado: nunca antes do tick mostrado.
+              if (ev.tick > sim.tick) early++;
+            }
+          },
         }),
       );
     }
@@ -127,12 +150,15 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
       const input = netHost.inputOf(clients.indexOf(c) + 1)!;
       expect(input.stats.received / c.stats.inputsSent).toBeGreaterThan(0.99);
     }
+    // Os eventos chegam todos (canal confiável), na ordem, e nunca antes do estado.
+    for (const kills of clientKills) expect(kills).toEqual(hostKills);
+    expect(early).toBe(0);
     expect(net.stats.dropped).toBeGreaterThan(100);
     expect(net.stats.largest).toBeLessThanOrEqual(MAX_MESSAGE_BYTES);
-    // Banda do host por cliente (snapshots a 30 Hz, 4 humanos + 8 bots): bem abaixo dos 16 KB/s do §13.3.
+    // Banda do host por cliente (snapshots a 30 Hz e os eventos, 4 humanos + 8 bots): abaixo dos 16 KB/s do §13.3.
     const seconds = net.now / 1000;
     const perClient = net.bytesSentBy(0) / 3 / seconds;
-    expect(perClient).toBeLessThan(8000);
+    expect(perClient).toBeLessThan(12_000);
     console.log(
       `[net] ${seconds.toFixed(1)} s · host→cliente ${(perClient / 1024).toFixed(2)} KB/s · ` +
         `cliente→host ${(net.bytesSentBy(1) / seconds / 1024).toFixed(2)} KB/s · maior ${net.stats.largest} B · ` +

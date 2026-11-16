@@ -244,6 +244,8 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   duplicação, TDM de 40 s com 4 humanos e 8 bots): host → cada cliente **5,8 KB/s** (snapshots a 30 Hz e o
   handshake); cliente → host **3,2 KB/s** (entradas a 60 Hz com 3 repetidas); maior mensagem 559 B; 21 snapshots
   completos (os do 1º ack de cada cliente).
+- **Com os eventos (fase 2a)**, a mesma partida: host → cada cliente **8,4 KB/s** (os eventos somam ~2,6 KB/s, quase
+  tudo reais em f32 de tiro, impacto e passo).
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).

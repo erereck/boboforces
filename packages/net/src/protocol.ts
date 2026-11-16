@@ -43,7 +43,7 @@ export const PROTOCOL_VERSION = 1;
 export const MAX_MESSAGE_BYTES = 1100;
 
 /** Primeiro byte de toda mensagem. Valor novo entra no fim. */
-export const MSG = { hello: 1, welcome: 2, reject: 3, snapshot: 4, input: 5 } as const;
+export const MSG = { hello: 1, welcome: 2, reject: 3, snapshot: 4, input: 5, events: 6 } as const;
 
 /** Canal da mensagem: confiável e ordenado (handshake, lobby, eventos) ou não confiável (entradas e snapshots). */
 export type NetChannel = 'reliable' | 'unreliable';
