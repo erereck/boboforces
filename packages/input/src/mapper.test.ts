@@ -174,6 +174,22 @@ describe('teclado e mouse', () => {
     expect(m.isDown('crouch')).toBe(false);
   });
 
+  it('refino R1 (#79): a corrida alternada solta quando o jogador para de ir para a frente', () => {
+    const raw = createRawInputState();
+    const m = kbm({ ...createKeyboardMouseProfile(), toggleSprint: true });
+    press(raw, 'KeyW', 'ShiftLeft');
+    m.update(raw, DT);
+    release(raw, 'ShiftLeft');
+    m.update(raw, DT);
+    expect(m.isDown('sprint')).toBe(true);
+    release(raw, 'KeyW');
+    m.update(raw, DT);
+    press(raw, 'KeyW');
+    m.update(raw, DT);
+    m.update(raw, DT);
+    expect(m.isDown('sprint')).toBe(false);
+  });
+
   it('menu: setas e Enter, com auto-repetição só nas direções', () => {
     const raw = createRawInputState();
     const m = kbm();

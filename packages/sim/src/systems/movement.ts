@@ -215,9 +215,15 @@ export function movementSystem(ctx: SimContext): void {
     }
 
     // --- Correr e mirar ---
+    // Refino R1 (#79): o gatilho corta a corrida (antes ele não fazia nada enquanto o bobo corria).
     const adsHeld = (btn & BUTTON.ads) !== 0;
     const sprinting =
-      (btn & BUTTON.sprint) !== 0 && my > SPRINT_MIN_FORWARD && !crouching && !adsHeld && (wasOnGround || wasSprinting);
+      (btn & BUTTON.sprint) !== 0 &&
+      (btn & BUTTON.fire) === 0 &&
+      my > SPRINT_MIN_FORWARD &&
+      !crouching &&
+      !adsHeld &&
+      (wasOnGround || wasSprinting);
     const ads = adsHeld && !sprinting && !sliding;
     if (sprinting) s.sprintFireDelayTicks[e] = pt.sprintFireDelay;
 

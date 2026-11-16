@@ -434,14 +434,24 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     expect(heldReserve(sim.view(), e)).toBe(WEAPON_RIFLE.reserve - WEAPON_RIFLE.clipSize);
   });
 
-  it('correndo não atira', () => {
+  it('refino R1 (#79): o gatilho corta a corrida e o tiro sai em até 0,05 s', () => {
     const sim = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2 });
     const f = frames();
+    const e = entityIndex(sim.controllerEntity(0));
     f[0]!.moveY = quantizeAxis(1);
+    f[0]!.buttons = BUTTON.sprint;
+    run(sim, f, 30);
+    expect(sim.view().flags[e]! & ENTITY_FLAG.sprinting).not.toBe(0);
     f[0]!.buttons = BUTTON.sprint | BUTTON.fire;
-    let shots = 0;
-    run(sim, f, 30, (events) => (shots += events.filter((ev) => ev.type === 'shot').length));
-    expect(shots).toBe(0);
+    let tick = 0;
+    let first = -1;
+    run(sim, f, 30, (events) => {
+      tick++;
+      if (first < 0 && events.some((ev) => ev.type === 'shot')) first = tick;
+    });
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThanOrEqual(Math.ceil(0.05 * SIM_HZ) + 2);
+    expect(sim.view().flags[e]! & ENTITY_FLAG.sprinting).toBe(0);
   });
 });
 

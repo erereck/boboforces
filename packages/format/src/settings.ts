@@ -170,7 +170,8 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
   format: SETTINGS_FORMAT,
   controls: {
     keyboardMouse: deviceDefaults('off'),
-    gamepad: deviceDefaults('medium'),
+    // Refino R1 (#79): no controle, correr alterna com o L3 (segurar o L3 andando cansa); solta ao parar.
+    gamepad: { ...deviceDefaults('medium'), toggleSprint: true },
     touch: deviceDefaults('medium'),
   },
   video: {

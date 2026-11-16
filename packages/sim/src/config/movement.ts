@@ -72,8 +72,11 @@ export const MOVEMENT_BOBO: MovementProfile = {
   mantleHeight: 1.5,
   coyoteS: 0.1,
   jumpBufferS: 0.1,
-  sprintFireDelayS: 0.15,
-  adsMoveMul: 0.6,
+  // Refino R1 (#79, "mais arcade"): o tiro sai quase na hora depois de correr (era 0,15 s), mirar anda mais (era 0,6)
+  // e a mira quase não abre andando (×1,05; no ar ×1,75; eram ×1,5 e ×2,5). O Tático continua como estava.
+  sprintFireDelayS: 0.05,
+  adsMoveMul: 0.75,
+  moveSpreadMul: 0.7,
   fallDamage: true,
   slide: { durationS: 0.7, startSpeed: 8, cooldownS: 1 },
   bhop: false,

@@ -133,6 +133,8 @@ const MENU_DIRECTION_COUNT = 4;
 const A_ADS = GAME_ACTION_INDEX.ads;
 const A_CROUCH = GAME_ACTION_INDEX.crouch;
 const A_SPRINT = GAME_ACTION_INDEX.sprint;
+/** Refino R1 (#79): abaixo disto de "para a frente", a corrida alternada solta. */
+const SPRINT_RELEASE_FORWARD = 0.3;
 /** M2 (fase 6e): correr no toque: joystick a 92% do raio ou mais, com 70% ou mais para a frente. */
 export const TOUCH_SPRINT = { edge: 0.92, forward: 0.7 } as const;
 const A_NEXT = GAME_ACTION_INDEX.nextWeapon;
@@ -350,6 +352,10 @@ class Mapper implements InputMapper {
     this.updateWeapon();
     this.updateMenu(dt);
     this.updateMove(pad);
+    // Refino R1 (#79): a corrida alternada solta quando o jogador para de ir para a frente (como nos jogos de console).
+    if (this.toggleMask[A_SPRINT] === 1 && this.toggled[A_SPRINT] === 1 && this.moveY < SPRINT_RELEASE_FORWARD) {
+      this.toggled[A_SPRINT] = 0;
+    }
     this.updateLook(raw, pad, dt, aimScale);
 
     this.active = this.detectActivity(raw, pad, p.pressThreshold, p.deadzoneInner);

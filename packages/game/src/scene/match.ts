@@ -132,6 +132,9 @@ import {
   type Sim,
   type SimEvent,
   type SimView,
+  resolveMovementProfile,
+  SPREAD_STATE_MULTIPLIER,
+  SPREAD_WALKING_SPEED,
 } from '@boboforces/sim';
 import {
   ageKillFeed,
@@ -969,6 +972,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
   const zombiesMode = recipe.mode === 'zombies';
+  // Refino R1 (#79): quanto o perfil da partida abre a mira andando e no ar (a retícula da HUD segue).
+  const moveSpreadMul = resolveMovementProfile(recipe.players).moveSpreadMul ?? 1;
   // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
   const zombieMusic = zombiesMode ? createZombieMusic(host.audio.mixer, host.platform.assets, host.log) : null;
   const musicLocals: number[] = [];
@@ -3678,8 +3683,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.scope = held && held.adsZoom >= 3 && slot.adsBlend > 0.85 ? 1 : 0;
     // A retícula abre com a dispersão da arma no quadril (chumbos inclusive), fecha no ADS, e abre com o movimento.
     const hip = held ? Math.min(1, (held.hipSpreadDeg + held.pelletSpreadDeg) / 6) * (1 - slot.adsBlend) : 0;
+    // Refino R1 (#79): o movimento abre a retícula pelo que a sim abre de verdade (o perfil: no Bobo quase nada
+    // andando), não pela velocidade, que fazia a mira pulsar a cada passo.
     const speed = Math.hypot(v.velocity[e * 3]!, v.velocity[e * 3 + 2]!);
-    m.spread = Math.min(1, hip * 0.7 + (speed / RUN_SPEED) * 0.6 + (recoil[e] ?? 0) * 0.5);
+    const fl = v.flags[e]!;
+    const moveOpen =
+      (fl & ENTITY_FLAG.onGround) === 0
+        ? SPREAD_STATE_MULTIPLIER.air * moveSpreadMul - 1
+        : speed > SPREAD_WALKING_SPEED && (fl & ENTITY_FLAG.crouching) === 0
+          ? SPREAD_STATE_MULTIPLIER.walking * moveSpreadMul - 1
+          : 0;
+    m.spread = Math.min(1, hip * 0.7 + Math.min(0.6, moveOpen * 0.6) * (1 - slot.adsBlend) + (recoil[e] ?? 0) * 0.5);
     m.clickToAim =
       humans > 0 && s === 0 && !paused && device === 'keyboardMouse' && platform.id === 'web' && !rawLocked;
     m.tipAlpha = s === 0 ? tipAlpha(tips) : 0;

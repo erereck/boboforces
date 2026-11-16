@@ -6,7 +6,15 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M3 Sofá e Bobo Zombies (em construção)
+### Refino antes do M4 (em construção)
+
+Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
+
+- **R1, atirar andando mais arcade:** o gatilho corta a corrida e o tiro sai quase na hora; a mira quase não abre
+  andando e abre menos no ar; mirando anda mais rápido; no controle, correr alterna com o L3 e solta ao parar; a
+  retícula não pulsa mais a cada passo. Goldens novos: Warfare `34edbf41`, Zombies `b4b81b30` e `d7ff9e30`.
+
+### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 
 Plano em `docs/PLANO_M3.md`. Publicado no Pages em 11/11/2026 (até a fase 7e), antes do roteiro com controles e do
 checkpoint do Switch.

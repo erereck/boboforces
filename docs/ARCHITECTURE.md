@@ -2709,3 +2709,23 @@ Plano em `docs/PLANO_M3.md`. As escolhas abaixo são decisões menores revisáve
   publicar o M3). Capturas por `local/m3/capturar-minimapa.ts` com `PADS=1..3` controles falsos.
 - **NRO do M3:** 60,2 MB (zip de 24,1 MB); no Eden, menu em 1.401 ms e a sonda de áudio ok. Os 4 controles e o
   Zombies a 30 fps no console são o checkpoint do Erick (`docs/ROTEIRO_M3.md` §2).
+
+## 14. Refino antes do M4 (a partir de 16/11/2026)
+
+Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
+
+### 14.1 Fase R1: atirar andando, arcade (16/11/2026)
+
+- **O que estava esquisito:** no perfil Bobo a mira abria 1,5× andando e 2,5× no ar; correndo, o gatilho não fazia
+  nada, e ao parar de correr o tiro ainda esperava 0,15 s; no controle, correr era "segurar o L3"; e a retícula da
+  HUD abria até 60% pela velocidade, pulsando a cada passo mesmo sem atirar.
+- **Agora (perfil Bobo; o Tático, estilo CS, continua como estava):** o gatilho corta a corrida (a sim não deixa
+  correr com o gatilho apertado) e o tiro sai 0,05 s depois; a mira abre ×1,05 andando e ×1,75 no ar
+  (`moveSpreadMul` 0,7 no Bobo); mirando (ADS) anda a 75% (era 60%).
+- **Controle:** correr **alterna** com o L3 por padrão (instalação nova; quem já tem o save fica com o que tinha, e
+  troca em Ajustes → Controles), e a corrida alternada **solta** quando o jogador para de ir para a frente (mapeador,
+  qualquer dispositivo com a alternância ligada).
+- **Retícula:** abre pelo que a sim abre de verdade (o multiplicador do perfil, andando ou no ar, some no ADS), não
+  pela velocidade.
+- **Goldens** (a partida dos bots muda): Warfare `34edbf41`, Zombies no Construto `b4b81b30` e no Posto
+  `d7ff9e30`. O balance continua em ordem.
