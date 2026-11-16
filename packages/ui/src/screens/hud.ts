@@ -901,7 +901,8 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       pushShape(out, x - capPad * 2, y, w + capPad * 4, h, withAlpha(COLORS.hudFundo, 0.7 * a), Math.round(5 * s));
       const ring = Math.max(1, Math.round(2 * s));
       pushShape(out, x, y + capPad, capW, capH, withAlpha(COLORS.acao, a), 0, ring);
-      if (glyph) drawFaceGlyph(out, x + pad, y + capPad + pad, capL, model.tipGlyph, a, ring);
+      // O glifo ocupa o miolo inteiro da tecla (o texto deixa `pad` de respiro; o glifo, metade).
+      if (glyph) drawFaceGlyph(out, x + pad / 2, y + capPad + pad / 2, capL + pad, model.tipGlyph, a);
       else paintText(out, hud, model.tipKey, x + pad, y + capPad + pad, labelPx, withAlpha(COLORS.acao, a));
       paintText(out, hud, model.tipText, x + capW + gap * 2, y + capPad + pad, labelPx, withAlpha(COLORS.texto, a));
     }
@@ -1613,25 +1614,17 @@ const FACE_OFFSETS = [0, 1, 1, 0, -1, 0, 0, -1] as const;
 
 /**
  * M4 (fase 4a): o glifo genérico do botão de face num quadrado de lado `size`: 4 quadradinhos em cruz, o `active`
- * cheio e os outros só o contorno (a mesma posição em qualquer controle; sem letra e sem desenho de marca).
+ * aceso e os outros apagados (a mesma posição em qualquer controle; sem letra e sem desenho de marca). Apagado é
+ * cheio e fraco, não contorno: no tamanho da dica, o contorno de 1–2 px vira borrão.
  */
-function drawFaceGlyph(
-  out: DrawList,
-  x: number,
-  y: number,
-  size: number,
-  active: number,
-  a: number,
-  ring: number,
-): void {
+function drawFaceGlyph(out: DrawList, x: number, y: number, size: number, active: number, a: number): void {
   const q = Math.max(3, Math.round(size * 0.3));
-  const o = Math.round(size * 0.34);
+  const o = Math.round(size * 0.33);
   const cx = x + size / 2;
   const cy = y + size / 2;
   for (let i = 0; i < 4; i++) {
     const bx = Math.round(cx + FACE_OFFSETS[i * 2]! * o - q / 2);
     const by = Math.round(cy + FACE_OFFSETS[i * 2 + 1]! * o - q / 2);
-    if (i === active) pushShape(out, bx, by, q, q, withAlpha(COLORS.acao, a), 0);
-    else pushShape(out, bx, by, q, q, withAlpha(COLORS.acao, a * 0.6), 0, Math.max(1, ring - 1));
+    pushShape(out, bx, by, q, q, withAlpha(COLORS.acao, i === active ? a : a * 0.3), 0);
   }
 }

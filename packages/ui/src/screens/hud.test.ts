@@ -310,7 +310,7 @@ describe('HUD por vista: conteúdo', () => {
     expect(syntheticGlyphText(list)).not.toContain('agacha');
   });
 
-  it('M4 (fase 4a): botão de face vira o glifo genérico (4 quadradinhos em cruz, o da vez cheio), sem o nome', () => {
+  it('M4 (fase 4a): botão de face vira o glifo genérico (4 quadradinhos em cruz, o da vez aceso), sem o nome', () => {
     for (const size of SIZES) {
       const v = layoutHudScreen(1, size.width, size.height, { minTextPx: size.single }).views[0]!;
       for (let face = 0; face < 4; face++) {
@@ -328,7 +328,7 @@ describe('HUD por vista: conteúdo', () => {
           (c) => c.color === withAlpha(COLORS.acao, 1) && c.op === DRAW_OP.rect && c.v0 === 0 && c.w === c.h,
         );
         const rings = drawnCommands(list).filter(
-          (c) => c.color === withAlpha(COLORS.acao, 0.6) && c.op === DRAW_OP.rect && c.w === c.h,
+          (c) => c.color === withAlpha(COLORS.acao, 0.3) && c.op === DRAW_OP.rect && c.v0 === 0 && c.w === c.h,
         );
         expect(filled.length, `${size.width}×${size.height}`).toBe(1);
         expect(rings.length, `${size.width}×${size.height}`).toBe(3);

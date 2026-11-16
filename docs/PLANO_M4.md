@@ -80,7 +80,8 @@ dá para conferir no PC, na web e no Eden vem primeiro; o que só o console resp
    boneco uma vez, e o Switch ficou só com array + inteiro.)
 6. **NACP, ícone, title ID e NSP.** (O ícone, 6a, feito em 16/11/2026: ARCHITECTURE §15.3.)
 7. **Teste Zero 2, preparação:** roteiro, amostras de heap, bench de 20 min, rodada de prints no Eden. (7a e 7c
-   feitas em 16/11/2026: ARCHITECTURE §15.5 e `docs/ROTEIRO_M4.md`; a 7b também, §15.8: o "Bench 20 min".)
+   feitas em 16/11/2026: ARCHITECTURE §15.5 e `docs/ROTEIRO_M4.md`; a 7b também, §15.8: o "Bench 20 min"; a 7d,
+   a rodada 18, na v22 da página, com as perguntas Q1–Q5.)
 8. **Checkpoint do console** (o Erick; lote único).
 9. **Fechamento.**
 
