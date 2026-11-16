@@ -4,13 +4,13 @@
 // chave existente e as linhas mostram só o dado técnico (literal). Quando a chave entra, o texto aparece sozinho.
 //
 // Os rótulos dos itens do título usam as chaves CURTAS `test.item.*` (decisão #54: com a Russo One os rótulos longos
-// estouravam o botão e a coluna de 9 itens cobria o logo). Só `test.item.benchPlanB` passa por aqui; as outras são
+// estouravam o botão e a coluna de 9 itens cobria o logo). Só `test.item.benchZombies20` passa por aqui; as outras são
 // usadas direto em `items.ts`, e o typecheck garante que existem.
 import { STRINGS_PT_BR, type StringKey } from '@boboforces/ui';
 
 /** Chaves pedidas → texto sugerido (pt-BR). */
 export const SWITCH_TEST_STRINGS = {
-  'test.item.benchPlanB': 'Bench plano B',
+  'test.item.benchZombies20': 'Bench 20 min',
   'test.controllers': 'Teste de controles',
   'test.keyboard': 'Teste de teclado',
   'test.audio': 'Teste de áudio',

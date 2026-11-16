@@ -107,7 +107,7 @@ as chaves curtas `test.item.*` (#54).
 | Bench 1P (`solo`) | 1 vista, 24 bots, 90 m, 5 min | — (B interrompe) |
 | Bench zumbis (`zombies`) | dock + 24 zumbis, 2 min | — (B interrompe) |
 | Bench 48 bots (`bots48`) | 4 vistas, 48 bots, 2 min | — (B interrompe) |
-| Bench plano B (`planB`) | atlas com padding + atributos em float, dock, 2 min | — (B interrompe) |
+| Bench 20 min (`zombies20`, M4) | Bobo Zombies na Base, 4 vistas, 20 min; o relatório traz `heap_5a10`, `heap_15a20` e a `tendencia` (P8) | — (B interrompe) |
 | Bench GPU (`gpu`) | dock com `gl.finish()` por frame, 1 min (o FPS cai de propósito: só mede a GPU) | — (B interrompe) |
 | Controles (teste de controles) | lista cada controle (índice, tipo, `styleSet`, `deviceType`, vibração) | A entra (até 4 jogadores) · X vibra · + (não pode fechar o jogo) · B volta |
 | Teclado (teste de teclado) | abre o teclado do sistema | A reabre · B volta |
@@ -127,10 +127,11 @@ vitrine) e o teto de detritos do perfil (`detritos=`; 120 no `switch34p`, 200 no
 | `solo` | 1 | 24 | 0 | 90 m | 300 s | — |
 | `zombies` | 4 | 12 | 24 | 50 m | 120 s | — |
 | `bots48` | 4 | 48 | 0 | 50 m | 120 s | — |
-| `planB` | 4 | 12 | 0 | 50 m | 120 s | atlas + float |
+| `zombies20` | 4 | — | a horda | 50 m | 1200 s | Base Abandonada (M4) |
 | `gpu` | 4 | 12 | 0 | 50 m | 60 s | `gl.finish()` |
 
-Todos com aquecimento de 10 s, armados, Dia, semente 1 e 60 Hz. Desde o M2 (fase 1c) o `bench.json` também aceita
+Todos com aquecimento de 10 s, armados, Dia, semente 1 e 60 Hz. O `planB` (atlas + float) saiu no M4 (fase 5c, P4):
+no Switch o renderer é sempre array + inteiro, mesmo que o `bench.json` peça a outra rota. Desde o M2 (fase 1c) o `bench.json` também aceita
 `"weapons"` (`rifle` padrão, `smg`, `shotgun`, `sniper`, `rocket`, `lmg` ou `mix`) para medir o custo do arsenal; os
 presets acima continuam no fuzil.
 

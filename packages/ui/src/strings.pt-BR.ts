@@ -730,7 +730,7 @@ export const STRINGS_PT_BR = {
   'test.item.benchAtlas': 'Bench atlas',
   'test.item.benchFloat': 'Bench float',
   'test.item.benchGpu': 'Bench GPU',
-  'test.item.benchPlanB': 'Bench plano B',
+  'test.item.benchZombies20': 'Bench 20 min',
   'test.item.controllers': 'Controles',
   'test.item.keyboard': 'Teclado',
   'test.item.audio': 'Áudio',

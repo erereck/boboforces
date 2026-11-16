@@ -26,6 +26,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   teclado na tela (letras, números e acentos; L apaga, R maiúsculas, B cancela) quando não há teclado do sistema, quando
   ele não abre, ou na web quando você está no controle. Nas dicas da partida, o botão aparece como uma cruz com o botão
   certo aceso, em vez do nome escrito.
+- **Desempenho (fase 5):** o loading agora desenha uma vez cada efeito e cada boneco fora da tela, para o 1º tiro da
+  partida não travar no console (+0,1 s de loading no Eden). No Switch, o "plano B" de render, que derrubou o console no
+  Teste Zero, saiu.
+- **Bench de 20 min (fase 7b):** na tela Testes do Switch, o "Bench 20 min" (Bobo Zombies na Base, 4 vistas), com a
+  tendência do heap no relatório.
 - **Preparação do console (fase 7):** no Switch, o heap vai para o `runtime.log` a cada minuto de partida, e o
   `docs/ROTEIRO_M4.md` junta o que testar quando o console voltar.
 - **Ícone (fase 6a):** o NRO ganhou ícone próprio, um bobo de capacete em blocos (era o ícone padrão do nx.js).

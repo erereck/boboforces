@@ -2941,3 +2941,24 @@ os arrays em deflate e o teste "a gravada é igual à calculada".
   o mesmo botão no Switch e nos controles padrão da web.
 - **Prints (rodada 18, parte):** `local/m4/capturar-fase4.ts` (Edge headless com um controle falso pela Gamepad API):
   o teclado aberto, digitando, os acentos com a maiúscula e a página Jogadores.
+
+### 15.8 Fases 5b, 5c e 7b: o aquecimento, sem plano B e o bench de 20 min (16/11/2026)
+
+- **Medição antes de mexer (5b):** a partida agora registra os programas de shader do fim do aquecimento contra os de
+  120 frames depois (`[partida] programas: 7 no aquecimento, 7 em 120 frames`; com diferença, a linha diz "compilou
+  depois do aquecimento"). No Eden, com o Bobo Zombies de 4 vistas, são 7 e 7: as travadas do item 15 no console não
+  são programa novo do three.
+- **O desenho do aquecimento (5b):** o `warmup` dos passes de efeitos e de bonecos só compilava e escondia as malhas
+  antes do frame fora da tela, então o 1º desenho de verdade de cada programa com cada estado (mistura aditiva,
+  alfa, decalque, viewmodel) acontecia no 1º tiro, e é aí que o driver do console costuma terminar o trabalho. Agora
+  `ScenePass.warmDraw()` deixa toda malha instanciada visível, sem corte por frustum e com 1 instância (os dados
+  zerados desenham um ponto degenerado) e desenha a cena do viewmodel, tudo no pixel do canto, e desfaz. No Eden a
+  etapa "shaders" passou de 693 para 791 ms (+0,1 s de loading), sem erro de GL e com os mesmos 7 programas. Se as
+  travadas do item 15 somem ou não, só o console diz (`frames_lentos` e `inicio_ms` do bench).
+- **Sem plano B no Switch (5c, P4):** o preset `planB` saiu da tela Testes e o `createSwitchRenderer` usa sempre
+  array + atributo inteiro, mesmo com um `bench.json` que peça a outra rota (fica uma linha `[render]` no log). A web
+  continua com as duas rotas. A sonda de boot das figuras (item 4 do T0) ainda desenha as duas rotas fora da tela: é
+  pequena e passou em todos os boots do console.
+- **O bench de 20 min (7b):** no lugar do plano B, o "Bench 20 min" (`zombies20`: Bobo Zombies na Base, 4 vistas,
+  1200 s; o mesmo preset na dock e no portátil, quem muda é o console). O heap de cada minuto fica guardado na partida, e
+  o relatório do bench ganha `heap_5a10`, `heap_15a20` e a `tendencia` (a P8: até +10%) na linha `memoria_mb`.

@@ -206,7 +206,7 @@ import {
   stepCalibration,
   type CalibrationState,
 } from './calibration.ts';
-import { formatBenchReport, type BenchReport } from '../bench/report.ts';
+import { formatBenchReport, heapWindow, type BenchReport } from '../bench/report.ts';
 import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
 import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camera.ts';
@@ -448,6 +448,8 @@ interface ViewmodelTweak {
 }
 /** M4 (fase 7a): de quanto em quanto tempo (s de partida) o Switch grava a linha `[mem]`. */
 const MEMORY_LOG_EVERY_S = 60;
+/** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
+const PROGRAM_CHECK_FRAMES = 120;
 
 /** Refino R4 (#79): a escala do viewmodel com 1 ou 2 jogadores (era 0,8; com 3–4 e no lado a lado, 0,6). */
 const VIEWMODEL_SCALE_1P = 0.68;
@@ -4235,6 +4237,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         heapLimit: heapLimitMb,
         textures: Math.round((mem.textureBytes / 1e6) * 10) / 10,
         meshes: Math.round((mem.worldMeshBytes / 1e6) * 10) / 10,
+        heapEarly: heapWindow(heapByMinute, 5, 10),
+        heapLate: heapWindow(heapByMinute, 15, 20),
       },
       gcPauses: b.gcPauses,
       warnings: [...warnings, ...threeWarnings],
@@ -4462,6 +4466,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    */
   let memoryLogS = MEMORY_LOG_EVERY_S;
   let memoryLogMin = 0;
+  /** M4 (fase 5b): os programas de shader no fim do aquecimento (a partida nasce logo depois dele) e os frames feitos. */
+  const warmPrograms = renderer.stats.programs;
+  let renderedFrames = 0;
+  /** M4 (fase 7b): o heap (MB) no fim de cada minuto (o índice é o minuto); -1 = sem amostra. */
+  const heapByMinute = new Float32Array(64).fill(-1);
   function sampleMemory(dt: number): void {
     heapCheckS -= dt;
     if (heapCheckS > 0) return;
@@ -4473,14 +4482,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       heapLimitMb = m.heapLimitBytes > 0 ? Math.round((m.heapLimitBytes / 1e6) * 10) / 10 : -1;
     }
     memoryLogS -= 1;
-    if (memoryLogS <= 0 && heapNowMb >= 0 && platform.id === 'switch') {
+    if (memoryLogS <= 0 && heapNowMb >= 0) {
       memoryLogS = MEMORY_LOG_EVERY_S;
       memoryLogMin++;
+      // M4 (fase 7b): a amostra do minuto (a tendência do relatório do bench de 20 min).
+      if (memoryLogMin < heapByMinute.length) heapByMinute[memoryLogMin] = heapNowMb;
       // Uma vez por minuto: o texto pode alocar.
-      host.log(
-        `[mem] t=${memoryLogMin}min heap_mb=${heapNowMb} max_mb=${heapMaxMb}` +
-          (heapLimitMb > 0 ? ` limite_mb=${heapLimitMb}` : ''),
-      );
+      if (platform.id === 'switch') {
+        host.log(
+          `[mem] t=${memoryLogMin}min heap_mb=${heapNowMb} max_mb=${heapMaxMb}` +
+            (heapLimitMb > 0 ? ` limite_mb=${heapLimitMb}` : ''),
+        );
+      }
     }
     memoryCheckS -= 1;
     if (memoryCheckS <= 0 && panel.visible) {
@@ -4693,6 +4706,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
       const renderMs = now() - tr0;
       trace('render', renderer.stats.drawCalls, renderer.stats.programs);
+      // M4 (fase 5b): programa compilado depois do aquecimento é travada no 1º uso (o Switch não compila em paralelo).
+      if (renderedFrames < PROGRAM_CHECK_FRAMES && ++renderedFrames === PROGRAM_CHECK_FRAMES) {
+        const after = renderer.stats.programs;
+        host.log(
+          `[partida] programas: ${warmPrograms} no aquecimento, ${after} em ${PROGRAM_CHECK_FRAMES} frames` +
+            (after > warmPrograms ? ' (compilou depois do aquecimento)' : ''),
+        );
+      }
       const tUi1 = now();
       if (fontSpecimen) {
         pushRect(list, 0, 0, ui.width, ui.height, COLORS.bunker);

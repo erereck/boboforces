@@ -67,8 +67,12 @@ function createSwitchRenderer(surface: GraphicsSurface, routes?: RendererRoutes)
   try {
     // Switch: 720p fixo, sem AA e DPR 1 (tecnico.md §6.10). Nada de `setAnimationLoop` (o nx.js não declara `self`):
     // o laço é o `platform.requestFrame` do game.
-    // As rotas do Teste Zero (plano B: atlas + float) chegam do bench; o game recria o renderer quando mudam.
-    const renderer = createRenderer(surface, { antialias: false, maxPixelRatio: 1, ...(routes ?? {}) }, (three) =>
+    // M4 (fase 5c, P4): só array + atributo inteiro no Switch. O plano B (atlas + float) derrubou o console no Teste
+    // Zero; um `bench.json` que ainda o peça fica no padrão (com a linha no log).
+    if (routes && (routes.textureMode !== 'array' || routes.vertexAttributes !== 'int')) {
+      shell.log(`[render] rota ${routes.textureMode} + ${routes.vertexAttributes} pedida: no Switch só array + int`);
+    }
+    const renderer = createRenderer(surface, { antialias: false, maxPixelRatio: 1 }, (three) =>
       createMsdfUiPass(three),
     );
     let three = '-';

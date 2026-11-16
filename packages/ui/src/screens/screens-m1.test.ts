@@ -365,7 +365,7 @@ describe('título com itens de teste', () => {
     { id: 'bench-solo', labelKey: 'test.item.benchSolo' },
     { id: 'bench-zombies', labelKey: 'test.item.benchZombies' },
     { id: 'bench-bots48', labelKey: 'test.item.benchStress' },
-    { id: 'bench-planb', labelKey: 'test.item.benchPlanB' },
+    { id: 'bench-zombies20', labelKey: 'test.item.benchZombies20' },
     { id: 'bench-gpu', labelKey: 'test.item.benchGpu' },
     { id: 'controllers', labelKey: 'test.item.controllers' },
     { id: 'keyboard', labelKey: 'test.item.keyboard' },

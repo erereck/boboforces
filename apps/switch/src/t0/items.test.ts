@@ -29,7 +29,7 @@ describe('itens de teste do título no Switch', () => {
       'bench-solo',
       'bench-zombies',
       'bench-bots48',
-      'bench-planb',
+      'bench-zombies20',
       'bench-gpu',
       'controllers',
       'keyboard',
@@ -37,7 +37,7 @@ describe('itens de teste do título no Switch', () => {
     ]);
     expect(new Set(items.map((i) => i.id)).size).toBe(items.length);
     const p = SWITCH_BENCH_PRESETS;
-    expect(items.slice(0, 6).map((i) => i.bench)).toEqual([p.dock, p.solo, p.zombies, p.bots48, p.planB, p.gpu]);
+    expect(items.slice(0, 6).map((i) => i.bench)).toEqual([p.dock, p.solo, p.zombies, p.bots48, p.zombies20, p.gpu]);
     for (const item of items.slice(6)) {
       expect(item.bench).toBeUndefined();
       expect(typeof item.start).toBe('function');
@@ -49,10 +49,12 @@ describe('itens de teste do título no Switch', () => {
       expect(item.labelKey).toMatch(/^test\.item\./);
       expect(item.labelKey in STRINGS_PT_BR).toBe(true);
     }
-    // Plano B: a chave nova quando a tabela tiver, senão o "Bench" genérico.
-    const planB = items.find((i) => i.id === 'bench-planb')!;
-    expect(planB.labelKey).toBe('test.item.benchPlanB' in STRINGS_PT_BR ? 'test.item.benchPlanB' : 'test.item.bench');
-    expect(SWITCH_TEST_STRINGS['test.item.benchPlanB']).toBe('Bench plano B');
+    // Zombies 20 min (M4, fase 7b): a chave nova quando a tabela tiver, senão o "Bench" genérico.
+    const z20 = items.find((i) => i.id === 'bench-zombies20')!;
+    expect(z20.labelKey).toBe(
+      'test.item.benchZombies20' in STRINGS_PT_BR ? 'test.item.benchZombies20' : 'test.item.bench',
+    );
+    expect(SWITCH_TEST_STRINGS['test.item.benchZombies20']).toBe('Bench 20 min');
   });
 
   it('bench.json e presets sem chaves de contorno, densidade ou fontes candidatas', () => {

@@ -185,6 +185,12 @@ export interface ScenePass extends Disposable {
   afterView(view: ViewContext): void;
   /** Força a compilação dos programas do passe (o `warmup` da render-mundo chama antes do frame fora da tela). */
   warmup(): void;
+  /**
+   * M4 (fase 5b): no frame fora da tela do aquecimento (viewport de 1 px já aplicado), deixa toda malha do passe
+   * visível com ao menos 1 instância e desenha a cena do viewmodel, para o 1º DESENHO de cada programa e estado
+   * (mistura, profundidade, decalque) acontecer no loading e não no 1º tiro. Devolve quem desfaz.
+   */
+  warmDraw(): () => void;
 }
 
 /** Programa 4: bonecos (1 draw de caixas instanciadas), armas, props por grupo de 32 m, acessórios e viewmodel. */

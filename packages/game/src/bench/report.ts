@@ -167,6 +167,12 @@ export interface BenchReport {
     readonly heapLimit: number;
     readonly textures: number;
     readonly meshes: number;
+    /**
+     * M4 (fase 7b): o heap médio dos minutos 5–10 e 15–20 (as amostras de 1 por minuto do `[mem]`); -1 sem
+     * amostra. A P8 ("heap estável"): o de 15–20 até 10% acima do de 5–10.
+     */
+    readonly heapEarly: number;
+    readonly heapLate: number;
   };
   readonly gcPauses: number;
   readonly warnings: readonly string[];
@@ -175,6 +181,27 @@ export interface BenchReport {
 
 function quote(text: string): string {
   return `"${text.replace(/"/g, "'").replace(/[\r\n]+/g, ' ')}"`;
+}
+
+/** M4 (fase 7b): ` heap_5a10=… heap_15a20=… tendencia=+N%` (só com as duas janelas medidas; senão nada). */
+function heapTrend(early: number, late: number): string {
+  if (early <= 0 || late < 0) return '';
+  const pct = Math.round(((late - early) / early) * 1000) / 10;
+  return ` heap_5a10=${early.toFixed(1)} heap_15a20=${late.toFixed(1)} tendencia=${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+}
+
+/** M4 (fase 7b): a média das amostras (≥ 0) de `perMinute` nos minutos `from`..`to` (inclusive), ou -1. */
+export function heapWindow(perMinute: ArrayLike<number>, from: number, to: number): number {
+  let sum = 0;
+  let n = 0;
+  for (let m = from; m <= to && m < perMinute.length; m++) {
+    const v = perMinute[m]!;
+    if (v >= 0) {
+      sum += v;
+      n++;
+    }
+  }
+  return n > 0 ? Math.round((sum / n) * 10) / 10 : -1;
 }
 
 function num(n: number, places = 1): string {
@@ -232,7 +259,8 @@ export function formatBenchReport(r: BenchReport): string {
       ` corpos_fora=${r.figures.bodiesOut}`,
     `programas=${r.programs}`,
     `memoria_mb heap_max=${num(r.memoryMb.heapMax)} heap_limite=${num(r.memoryMb.heapLimit)}` +
-      ` texturas=${num(r.memoryMb.textures)} malhas=${num(r.memoryMb.meshes)}`,
+      ` texturas=${num(r.memoryMb.textures)} malhas=${num(r.memoryMb.meshes)}` +
+      heapTrend(r.memoryMb.heapEarly, r.memoryMb.heapLate),
     `gc_pausas=${r.gcPauses}`,
     `avisos=${r.warnings.length}`,
     ...r.warnings.slice(0, 10).map((w) => `aviso ${quote(w)}`),

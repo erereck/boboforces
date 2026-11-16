@@ -36,7 +36,7 @@ describe('itens de teste do título no Switch', () => {
       'bench-solo',
       'bench-zombies',
       'bench-bots48',
-      'bench-planb',
+      'bench-zombies20',
       'bench-gpu',
       'controllers',
       'keyboard',
@@ -46,7 +46,11 @@ describe('itens de teste do título no Switch', () => {
     expect(SWITCH_BENCH_PRESETS.solo).toMatchObject({ views: 1, bots: 24, viewDistanceM: 90 });
     expect(SWITCH_BENCH_PRESETS.zombies.zombies).toBe(24);
     expect(SWITCH_BENCH_PRESETS.bots48.bots).toBe(48);
-    expect(SWITCH_BENCH_PRESETS.planB).toMatchObject({ textureMode: 'atlas', vertexAttributes: 'float' });
+    // M4 (fase 5c e 7b): sem plano B no Switch; no lugar, o Zombies de 20 min (e nenhum preset sai do array + inteiro).
+    expect(SWITCH_BENCH_PRESETS.zombies20).toMatchObject({ scene: 'zombies', views: 4, durationS: 1200 });
+    for (const preset of Object.values(SWITCH_BENCH_PRESETS)) {
+      expect(preset).toMatchObject({ textureMode: 'array', vertexAttributes: 'int' });
+    }
     expect(SWITCH_BENCH_PRESETS.gpu.gpuFinish).toBe(true);
     for (const item of items) {
       expect(typeof item.labelKey).toBe('string');

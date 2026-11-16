@@ -368,6 +368,17 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     data[d + INST.team] = a.team[i]!;
   }
 
+  /** As malhas instanciadas do passe (o aquecimento liga e desliga todas). */
+  function passMeshes(): InstancedMesh[] {
+    return [
+      figureMesh,
+      shadows.shadow.mesh,
+      ...props.map((p) => p.mesh),
+      ...weapons.flatMap((w) => (w ? [w.mesh] : [])),
+      ...viewmodels.flatMap((v) => (v ? [v.mesh] : [])),
+    ];
+  }
+
   function setVisibleAll(visible: boolean | null, saved: boolean[]): void {
     const meshes: InstancedMesh[] = [
       figureMesh,
@@ -638,6 +649,17 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       set.mesh.visible = false;
     },
 
+    warmDraw() {
+      if (disposed) return () => undefined;
+      const undo = showForWarmDraw(passMeshes());
+      const three = ctx.three;
+      const autoClear = three.autoClear;
+      three.autoClear = false;
+      three.render(vmScene, warmCamera);
+      three.autoClear = autoClear;
+      return undo;
+    },
+
     warmup() {
       if (disposed) return;
       const saved: boolean[] = [];
@@ -673,4 +695,26 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     },
   };
   return pass;
+}
+
+/**
+ * M4 (fase 5b): as `meshes` com espaço para instância ficam visíveis, sem corte por frustum e com 1 instância (os dados
+ * zerados desenham um ponto degenerado no pixel do canto); devolve quem desfaz.
+ */
+function showForWarmDraw(all: readonly InstancedMesh[]): () => void {
+  const meshes = all.filter((m) => m.instanceMatrix.count >= 1);
+  const saved = meshes.map((m) => [m.visible, m.frustumCulled, m.count] as const);
+  for (const m of meshes) {
+    m.visible = true;
+    m.frustumCulled = false;
+    m.count = 1;
+  }
+  return () => {
+    meshes.forEach((m, k) => {
+      const s = saved[k]!;
+      m.visible = s[0];
+      m.frustumCulled = s[1];
+      m.count = s[2];
+    });
+  };
 }

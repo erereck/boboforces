@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { GAME_ASSETS_M1, TEXTURE_ARRAY_BASES, textureStripPaths } from '../assets-m1.ts';
 import { parseBenchParams } from './params.ts';
-import { formatBenchReport, type BenchReport } from './report.ts';
+import { formatBenchReport, heapWindow, type BenchReport } from './report.ts';
 import { formatT0Line, T0_ITEMS } from './t0.ts';
 import { BENCH_DEFAULTS } from './types.ts';
 
@@ -100,7 +100,7 @@ describe('bench: relatório e linhas [t0]', () => {
       figureLod: { l0: 10, l1: 2.5, l2: 3 },
       figures: { skins: 10, overflow: 0, templates: 4, bodiesOut: 0 },
       programs: 7,
-      memoryMb: { heapMax: 148.2, heapLimit: -1, textures: 3.4, meshes: 18.7 },
+      memoryMb: { heapMax: 148.2, heapLimit: -1, textures: 3.4, meshes: 18.7, heapEarly: -1, heapLate: -1 },
       gcPauses: 2,
       warnings: [],
       errors: ['algo "deu" errado'],
@@ -130,6 +130,17 @@ describe('bench: relatório e linhas [t0]', () => {
     const z = formatBenchReport({ ...report, zombies: { avgAlive: 23.46, maxAlive: 40, pool: 40, wave: 2 } });
     expect(z.split('\n')).toContain('zumbis_vivos media=23.5 max=40 pool=40 onda=2');
     expect(lines.at(-1)).toBe('fim');
+    expect(lines).toContain('memoria_mb heap_max=148.2 heap_limite=-1 texturas=3.4 malhas=18.7');
+    // M4 (fase 7b): com 20 min, a tendência do heap (P8: até +10% entre os minutos 5–10 e 15–20).
+    const perMinute = new Float32Array(64).fill(-1);
+    for (let m = 1; m <= 20; m++) perMinute[m] = m <= 10 ? 40 : 42;
+    const early = heapWindow(perMinute, 5, 10);
+    const late = heapWindow(perMinute, 15, 20);
+    expect([early, late, heapWindow(perMinute, 30, 40)]).toEqual([40, 42, -1]);
+    const h = formatBenchReport({ ...report, memoryMb: { ...report.memoryMb, heapEarly: early, heapLate: late } });
+    expect(h.split('\n')).toContain(
+      'memoria_mb heap_max=148.2 heap_limite=-1 texturas=3.4 malhas=18.7 heap_5a10=40.0 heap_15a20=42.0 tendencia=+5.0%',
+    );
   });
 
   it('linha [t0] com campos na ordem e texto entre aspas', () => {
