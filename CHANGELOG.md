@@ -13,6 +13,10 @@ Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
 - **R1, atirar andando mais arcade:** o gatilho corta a corrida e o tiro sai quase na hora; a mira quase não abre
   andando e abre menos no ar; mirando anda mais rápido; no controle, correr alterna com o L3 e solta ao parar; a
   retícula não pulsa mais a cada passo. Goldens novos: Warfare `34edbf41`, Zombies `b4b81b30` e `d7ff9e30`.
+- **R2, a granada:** o G (RB no controle, o botão do toque) agora joga granada de qualquer arma: segura para cozinhar,
+  solta para jogar (antes o botão não fazia nada). Enquanto cozinha, a granada aparece na mão, o pavio na tela e o
+  arco de onde ela vai cair. As granadas dos outros perto aparecem num anel em volta da mira. Dica nova nas primeiras
+  partidas.
 
 ### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 

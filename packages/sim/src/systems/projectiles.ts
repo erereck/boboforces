@@ -73,6 +73,96 @@ export function launchProjectile(
   return p;
 }
 
+const predictHit = createRayHit();
+
+/**
+ * Refino R2 (#79): o arco da granada que vai ser jogada agora, para a HUD desenhar. A MESMA conta do
+ * `projectileSystem` (gravidade, quique com perda, parada no chão) a partir do olho, com a mira dada e a herança da
+ * velocidade do arremesso (`GRENADE_THROW`), por até `ticks` ticks; grava um ponto (x, y, z) a cada `every` ticks e
+ * sempre o último (onde ela estará quando o pavio acabar). Devolve quantos pontos. Puro e sem alocação: o jogo chama
+ * por quadro. Não vê corpos (a granada os atravessa) nem as portas que abrem depois.
+ */
+export function predictThrow(
+  grid: SimContext['grid'],
+  blocks: SimContext['blocks'],
+  colliders: SimContext['colliders'],
+  def: WeaponDef,
+  x0: number,
+  y0: number,
+  z0: number,
+  vx0: number,
+  vy0: number,
+  vz0: number,
+  hz: number,
+  ticks: number,
+  every: number,
+  out: Float32Array,
+): number {
+  const dt = 1 / hz;
+  const max = Math.floor(out.length / 3);
+  let x = x0;
+  let y = y0;
+  let z = z0;
+  let vx = vx0;
+  let vy = vy0;
+  let vz = vz0;
+  let n = 0;
+  let resting = false;
+  for (let t = 1; t <= ticks && n < max; t++) {
+    if (!resting) {
+      vy -= def.projectileGravity * dt;
+      const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      const step = speed * dt;
+      if (step > 1e-9) {
+        raycastGrid(
+          grid,
+          blocks,
+          x,
+          y,
+          z,
+          vx / speed,
+          vy / speed,
+          vz / speed,
+          step,
+          BLOCK_FLAG.blocksBullets,
+          predictHit,
+          colliders,
+        );
+        if (predictHit.hit) {
+          const nx = predictHit.normalX;
+          const ny = predictHit.normalY;
+          const nz = predictHit.normalZ;
+          x = predictHit.x + nx * SURFACE_OFFSET;
+          y = predictHit.y + ny * SURFACE_OFFSET;
+          z = predictHit.z + nz * SURFACE_OFFSET;
+          const vn = vx * nx + vy * ny + vz * nz;
+          if (vn < 0) {
+            const tx = vx - vn * nx;
+            const ty = vy - vn * ny;
+            const tz = vz - vn * nz;
+            vx = tx * BOUNCE_TANGENT - vn * BOUNCE_NORMAL * nx;
+            vy = ty * BOUNCE_TANGENT - vn * BOUNCE_NORMAL * ny;
+            vz = tz * BOUNCE_TANGENT - vn * BOUNCE_NORMAL * nz;
+          }
+          if (Math.sqrt(vx * vx + vy * vy + vz * vz) < REST_SPEED && ny > 0.7) resting = true;
+        } else {
+          x += vx * dt;
+          y += vy * dt;
+          z += vz * dt;
+        }
+      }
+    }
+    if (t % every === 0 || t === ticks || resting) {
+      out[n * 3] = x;
+      out[n * 3 + 1] = y;
+      out[n * 3 + 2] = z;
+      n++;
+      if (resting) break;
+    }
+  }
+  return n;
+}
+
 /** Pavio do foguete em ticks: o tempo de voar o alcance da arma. */
 export function rocketFuseTicks(def: WeaponDef, hz: number): number {
   return secondsToTicks(def.rangeM / Math.max(1, def.projectileSpeed), hz);

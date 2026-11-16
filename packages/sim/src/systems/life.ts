@@ -11,6 +11,7 @@ import {
   DEFAULT_PRIMARY,
   isPrimaryWeapon,
   WEAPON_CODE,
+  WEAPON_SLOT,
   WEAPON_ROCKET,
   ZOMBIE_GOO,
   WEAPONS,
@@ -126,6 +127,7 @@ function knockDown(ctx: SimContext, t: number, by: EntityId): void {
   // M3 (fase 4c): caiu, perde as vantagens.
   s.perks[t] = 0;
   s.cookTicks[t] = -1;
+  s.quickNade[t] = 0;
   s.reviveTicks[t] = 0;
   s.reviver[t] = NULL_ENTITY;
   let helper = false;
@@ -272,11 +274,14 @@ function kill(
   const s = ctx.s;
   const q = ctx.damage;
   s.health[t] = 0;
-  // Morreu cozinhando a granada: ela cai da mão com o pavio que sobrou.
+  // Morreu cozinhando a granada: ela cai da mão com o pavio que sobrou (no arremesso rápido, a do slot de arremesso).
   if (s.cookTicks[t]! >= 0) {
-    const held = weaponDef(s.weapon[t]!);
+    const quick = s.quickNade[t] === 1;
+    const slotK = quick ? WEAPON_SLOT.throwable : s.slot[t]!;
+    const held = weaponDef(quick ? s.loadout[t * WEAPON_SLOT_COUNT + slotK]! : s.weapon[t]!);
+    s.quickNade[t] = 0;
     if (held !== null) {
-      const k = t * WEAPON_SLOT_COUNT + s.slot[t]!;
+      const k = t * WEAPON_SLOT_COUNT + slotK;
       if (s.slotClip[k]! > 0) s.slotClip[k] = s.slotClip[k]! - 1;
       const t3 = t * 3;
       launchProjectile(
@@ -731,6 +736,7 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.slot[e] = first < 0 ? 0 : first;
   s.weapon[e] = s.loadout[k + s.slot[e]!]!;
   s.cookTicks[e] = -1;
+  s.quickNade[e] = 0;
   s.adsAmount[e] = 0;
   s.burstShots[e] = 0;
   s.recoilPitch[e] = 0;

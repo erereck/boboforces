@@ -219,7 +219,7 @@ export function movementSystem(ctx: SimContext): void {
     const adsHeld = (btn & BUTTON.ads) !== 0;
     const sprinting =
       (btn & BUTTON.sprint) !== 0 &&
-      (btn & BUTTON.fire) === 0 &&
+      (btn & (BUTTON.fire | BUTTON.grenade)) === 0 &&
       my > SPRINT_MIN_FORWARD &&
       !crouching &&
       !adsHeld &&

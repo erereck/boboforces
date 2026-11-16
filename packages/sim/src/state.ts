@@ -95,6 +95,11 @@ export class SimState {
   readonly burstShots = new Uint16Array(MAX_ENTITIES);
   /** Granada sendo cozida: ticks de pavio que sobram, ou -1 (não está cozinhando). */
   readonly cookTicks = new Int32Array(MAX_ENTITIES).fill(-1);
+  /**
+   * Refino R2 (#79): 1 = o cozimento em `cookTicks` é do arremesso rápido (botão granada, de qualquer arma: solta o
+   * botão, joga a granada do slot de arremesso; a arma da mão não muda).
+   */
+  readonly quickNade = new Uint8Array(MAX_ENTITIES);
   /** Vida e spawn. */
   readonly respawnTicks = new Int32Array(MAX_ENTITIES);
   readonly spawnProtectTicks = new Int32Array(MAX_ENTITIES);
@@ -217,6 +222,7 @@ export class SimState {
       f('lastShotTick', this.lastShotTick),
       f('burstShots', this.burstShots),
       f('cookTicks', this.cookTicks),
+      f('quickNade', this.quickNade),
       f('respawnTicks', this.respawnTicks),
       f('spawnProtectTicks', this.spawnProtectTicks),
       f('lastDamageTick', this.lastDamageTick),

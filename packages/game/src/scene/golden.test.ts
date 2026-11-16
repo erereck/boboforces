@@ -63,12 +63,13 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * ponto, Estrategista flanqueia mais) e todos dão pulinhos de bobeira; esta semente sorteou um minuto mais parado (a
  * média de 8 sementes é 14,8 abates e 238 tiros, contra 15,4 e 256 sem personalidade), então o piso de tiros caiu de
  * 100 para 60. Refino R1 (16/11/2026): `34edbf41` (11 abates, 91 tiros, 4×7, 9 granadas) — atirar andando ficou
- * arcade no perfil Bobo (a mira quase não abre andando, o gatilho corta a corrida). O hash MUDA, de propósito, quando o
+ * arcade no perfil Bobo (a mira quase não abre andando, o gatilho corta a corrida). Refino R2: `b36eb8e1` (o campo do
+ * arremesso rápido da granada entra no estado e no hash; a partida é a mesma). O hash MUDA, de propósito, quando o
  * mapa, os blocos, as props,
  * a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
  * Mudança sem querer é bug de determinismo. O CI no Linux confere o mesmo valor.
  */
-const GOLDEN_HASH = '34edbf41';
+const GOLDEN_HASH = 'b36eb8e1';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -174,9 +175,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * pontos de conserto da onda entram no hash; a partida é a mesma: o Construto não tem janelas). Fase 4c: `e8669653`
  * (as vantagens entram no hash; a partida é a mesma). Fase 4d: `8feb69fb` (o sorteio dos drops usa o RNG dos zumbis e
  * os drops ajudam: onda 3, 38 abates, 1 queda). Fase 7c: `dd27cd5e` (o bot de apoio não gasta a reserva: onda 3, 37
- * abates, 3 quedas). Refino R1: `b4b81b30` (atirar andando arcade: onda 3, 37 abates, 3 quedas).
+ * abates, 3 quedas). Refino R1: `b4b81b30` (atirar andando arcade: onda 3, 37 abates, 3 quedas). Refino R2:
+ * `edc93590` (o campo do arremesso rápido no hash; a partida é a mesma).
  */
-const GOLDEN_ZOMBIES_HASH = 'b4b81b30';
+const GOLDEN_ZOMBIES_HASH = 'edc93590';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -229,10 +231,11 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
  * quedas, 42 tábuas arrancadas e 24 repostas, derrota antes dos 2 min). Fase 5a: `dcc24861` (a janela é de mão única
  * para os zumbis no flow field: onda 3, 37 abates, 7 quedas, 42/24 tábuas). Fase 7c: `62251b7e` (o bot de apoio não gasta
  * a reserva: onda 4, 47 abates, 5 quedas, 44/23 tábuas, ainda jogando nos 2 min). Refino R1: `d7ff9e30` (atirar
- * andando arcade: onda 3, 33 abates, 7 quedas, 18/6 tábuas, derrota antes dos 2 min).
+ * andando arcade: onda 3, 33 abates, 7 quedas, 18/6 tábuas, derrota antes dos 2 min). Refino R2: `6c4eaf90` (o campo
+ * do arremesso rápido no hash; a partida é a mesma).
  * MUDA com a sim, a IA, o mapa ou as regras das janelas: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_POSTO_HASH = 'd7ff9e30';
+const GOLDEN_POSTO_HASH = '6c4eaf90';
 
 function runPostoGolden(): {
   hash: string;

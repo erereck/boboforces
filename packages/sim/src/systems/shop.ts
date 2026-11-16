@@ -79,6 +79,7 @@ function buy(ctx: SimContext, e: number, w: number): void {
   s.switchTicks[e] = 0;
   s.fireCooldownS[e] = 0;
   s.cookTicks[e] = -1;
+  s.quickNade[e] = 0;
   ctx.events.purchase(ctx.tick, w, 'weapon', 'ok', code, cost, id);
 }
 
@@ -220,6 +221,7 @@ function giveWeapon(ctx: SimContext, e: number, code: number): void {
   s.switchTicks[e] = 0;
   s.fireCooldownS[e] = 0;
   s.cookTicks[e] = -1;
+  s.quickNade[e] = 0;
 }
 
 /**

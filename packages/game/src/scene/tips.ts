@@ -10,13 +10,15 @@ import type { StringKey } from '@boboforces/ui';
  * - `reload`: pente vazio com reserva;
  * - `ads`: mirando num inimigo a mais de 20 m sem o ADS;
  * - `slide`: correndo há 1,5 s (a regra do design é "correr perto de cobertura"; correr basta por ora);
- * - `sprint`: 5 s andando sem correr.
+ * - `sprint`: 5 s andando sem correr;
+ * - `grenade` (refino R2, #79): 25 s vivo com granada e sem ter jogado nenhuma (o arremesso rápido).
  */
 export const TIPS = {
   reload: { action: 'reload', textKey: 'tip.reload' },
   ads: { action: 'ads', textKey: 'tip.ads' },
   slide: { action: 'crouch', textKey: 'tip.slide' },
   sprint: { action: 'sprint', textKey: 'tip.sprint' },
+  grenade: { action: 'grenade', textKey: 'tip.grenade' },
 } as const satisfies Record<string, { readonly action: RemapAction; readonly textKey: StringKey }>;
 
 export type TipId = keyof typeof TIPS;
@@ -29,6 +31,7 @@ export const TIP_RULES = {
   sprintS: 1.5,
   farM: 20,
   farS: 0.5,
+  grenadeS: 25,
   /** Na tela por 4 s (o último meio segundo some aos poucos); 3 s de folga até a próxima. */
   showS: 4,
   fadeS: 0.5,
@@ -43,6 +46,8 @@ export interface TipSignals {
   /** Mirando (sem ADS) num inimigo a mais de `TIP_RULES.farM`. */
   farEnemy: boolean;
   magEmpty: boolean;
+  /** Tem granada e ainda não jogou nenhuma nesta partida. */
+  grenadeUnused: boolean;
 }
 
 export interface TipsState {
@@ -54,17 +59,18 @@ export interface TipsState {
   walkS: number;
   sprintS: number;
   farS: number;
+  grenadeS: number;
 }
 
 export function createTipSignals(): TipSignals {
-  return { alive: false, moving: false, sprinting: false, farEnemy: false, magEmpty: false };
+  return { alive: false, moving: false, sprinting: false, farEnemy: false, magEmpty: false, grenadeUnused: false };
 }
 
 /** `enabled` = a regra das 2 primeiras partidas e o ajuste "Dicas"; `seen` = as já mostradas (do `stats@1`). */
 export function createTips(enabled: boolean, seen: readonly string[]): TipsState {
   const pending = new Set<TipId>();
   if (enabled) for (const id of TIP_IDS) if (!seen.includes(id)) pending.add(id);
-  return { pending, current: null, shownS: 0, gapS: 0, walkS: 0, sprintS: 0, farS: 0 };
+  return { pending, current: null, shownS: 0, gapS: 0, walkS: 0, sprintS: 0, farS: 0, grenadeS: 0 };
 }
 
 /**
@@ -90,6 +96,7 @@ export function stepTips(
   st.walkS = walking ? st.walkS + dt : 0;
   st.sprintS = sig.alive && sig.sprinting ? st.sprintS + dt : 0;
   st.farS = sig.alive && sig.farEnemy ? st.farS + dt : 0;
+  st.grenadeS = sig.alive && sig.grenadeUnused ? st.grenadeS + dt : 0;
   if (st.current !== null || st.gapS > 0 || !sig.alive) return null;
   for (const id of TIP_IDS) {
     if (!st.pending.has(id) || !triggered(st, sig, id) || !canShow(id)) continue;
@@ -111,6 +118,8 @@ function triggered(st: TipsState, sig: Readonly<TipSignals>, id: TipId): boolean
       return st.sprintS >= TIP_RULES.sprintS;
     case 'sprint':
       return st.walkS >= TIP_RULES.walkS;
+    case 'grenade':
+      return st.grenadeS >= TIP_RULES.grenadeS;
   }
 }
 

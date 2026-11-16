@@ -573,6 +573,8 @@ export function createSim(config: SimConfig): Sim {
     loadout: s.loadout,
     slotClip: s.slotClip,
     slotReserve: s.slotReserve,
+    cookTicks: s.cookTicks,
+    quickNade: s.quickNade,
     adsAmount: s.adsAmount,
     kills: s.kills,
     deaths: s.deaths,

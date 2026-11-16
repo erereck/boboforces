@@ -66,6 +66,12 @@ export interface SimView {
   readonly loadout: Uint8Array;
   readonly slotClip: Uint16Array;
   readonly slotReserve: Uint16Array;
+  /**
+   * Refino R2 (#79): ticks que faltam do pavio da granada cozinhando na mão (-1 = nenhuma) e 1 = é o arremesso rápido
+   * (a granada do slot de arremesso, com outra arma no slot ativo).
+   */
+  readonly cookTicks: Int32Array;
+  readonly quickNade: Uint8Array;
   /** M2: quanto do ADS já entrou (0..1); a câmera aplica `WeaponDef.adsZoom` nessa fração. */
   readonly adsAmount: Float32Array;
   readonly kills: Uint16Array;

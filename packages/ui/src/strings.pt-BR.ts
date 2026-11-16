@@ -261,6 +261,7 @@ export const STRINGS_PT_BR = {
   'tip.slide': 'agacha; correndo, desliza',
   'tip.ads': 'mira com zoom',
   'tip.reload': 'recarrega',
+  'tip.grenade': 'segura e solta: granada',
   'title.surprise': 'Surpreenda-me',
   'title.change': 'Mudar',
   'surprise.title': 'Surpreenda-me',

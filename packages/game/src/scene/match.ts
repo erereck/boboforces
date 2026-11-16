@@ -97,6 +97,8 @@ import {
   entityIndex,
   expandRecipe,
   eyeHeightFor,
+  GRENADE_THROW,
+  predictThrow,
   figurePostureOf,
   isFfaMode,
   makeEntityId,
@@ -146,6 +148,8 @@ import {
   drawScoreboard,
   MAX_ALLY_MARKERS,
   MAX_TEAM_PINGS,
+  MAX_GRENADE_ARC,
+  MAX_GRENADE_WARNINGS,
   SETTINGS_ACTION,
   SETTINGS_ROW_PREFIX,
   SETTINGS_TAB_PREFIX,
@@ -258,7 +262,7 @@ import {
   type DeathState,
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
-import { projectToView } from './markers.ts';
+import { projectToView, type ProjectCamera, type ProjectRect } from './markers.ts';
 import {
   createMatchStats,
   localMatchRecord,
@@ -312,6 +316,10 @@ const ALLY_MARKER_HEIGHT_M = 2.05;
 const REDUCED_SHAKE = 0.25;
 /** M2 (fase 3e): por quanto tempo o aviso de um aliado fica na tela (s). */
 const PING_SHOW_S = 2.5;
+/** Refino R2 (#79): aviso de granada dos outros até esta distância (m; o raio da explosão é 5). */
+const GRENADE_WARN_M = 7;
+/** Refino R2 (#79): um ponto do arco da granada a cada tantos ticks da previsão. */
+const ARC_EVERY_TICKS = 3;
 /** M2 (fase 3h, prints): avisos a menos desta fração da altura da vista um do outro viram um só. */
 const PING_MERGE_FRAC = 0.04;
 /** M2 (fase 2e): o resultado aparece este tempo depois do fim da partida (s). */
@@ -977,6 +985,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
   const zombieMusic = zombiesMode ? createZombieMusic(host.audio.mixer, host.platform.assets, host.log) : null;
   const musicLocals: number[] = [];
+  // Refino R2 (#79): o arco da granada (pontos no mundo; um a cada `ARC_EVERY_TICKS` ticks).
+  const arcWorld = new Float32Array(MAX_GRENADE_ARC * 3);
   // M3 (fase 7a): o minimapa do quadrante livre (3 jogadores): a planta sai na 1ª vez que o quadrante aparece.
   let minimapPlan: MinimapPlan | null = null;
   const minimapLocals: number[] = [];
@@ -2287,6 +2297,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     tipSignals.alive = e >= 0 && v.alive[e] === 1 && (fl & ENTITY_FLAG.dead) === 0;
     tipSignals.farEnemy = false;
     tipSignals.magEmpty = false;
+    // Refino R2 (#79): com granada no slot e o pente de granadas cheio (ainda não jogou nenhuma).
+    const kT = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable;
+    const nade = e >= 0 ? weaponDef(v.loadout[kT]!) : null;
+    tipSignals.grenadeUnused =
+      nade !== null && nade.fire === WEAPON_FIRE.thrown && v.slotClip[kT] === nade.clipSize && v.cookTicks[e]! < 0;
     if (tipSignals.alive) {
       const speed = Math.hypot(v.velocity[e * 3]!, v.velocity[e * 3 + 2]!);
       tipSignals.moving = speed > 1 && (fl & ENTITY_FLAG.onGround) !== 0;
@@ -3408,8 +3423,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     desc.localSlot = s;
     desc.team = ffa ? 255 : v.team[e]!;
     desc.thirdPerson = false;
-    // Viewmodel: a arma da mão, com mola simples (ADS, passo, coice); luz amostrada no olho.
-    const model = modelOf(v.weapon[e]!);
+    // Viewmodel: a arma da mão, com mola simples (ADS, passo, coice); luz amostrada no olho. Refino R2 (#79): no
+    // arremesso rápido, a granada aparece na mão enquanto cozinha.
+    const model = modelOf(
+      v.quickNade[e] === 1 && v.cookTicks[e]! >= 0
+        ? v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!
+        : v.weapon[e]!,
+    );
     // Na luneta (zoom ≥ 3x quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD (fase 1e).
     const scoped = held !== null && held.adsZoom >= 3 && slot.adsBlend > 0.85;
     vm.visible = !dead && model !== NO_MODEL && !scoped;
@@ -3458,6 +3478,71 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     vm.lightSky = lightScratch[0]!;
     vm.lightSun = lightScratch[1]!;
     vm.lightEmissive = lightScratch[2]!;
+  }
+
+  /**
+   * Refino R2 (#79): o pavio (fração que falta) e o arco da granada que vai sair agora, previsto pela `predictThrow`
+   * da sim (gravidade, quiques e parada iguais aos de verdade) a partir do olho, com a mira e a herança da velocidade
+   * do arremesso, e projetado na vista. `+1` tick: a granada já anda no tick do lançamento.
+   */
+  function fillGrenadeArc(m: HudModel, v: SimView, e: number, cam: ProjectCamera, rect: ProjectRect): void {
+    m.cook = -1;
+    m.arcCount = 0;
+    const cook = v.cookTicks[e]!;
+    if (cook < 0) return;
+    const code = v.quickNade[e] === 1 ? v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]! : v.weapon[e]!;
+    const def = weaponDef(code);
+    if (def === null || def.fire !== WEAPON_FIRE.thrown) return;
+    m.cook = cook / Math.max(1, Math.round(def.fuseS * sim.hz));
+    const o = e * 3;
+    const yaw = v.yaw[e]!;
+    const pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, v.pitch[e]! + GRENADE_THROW.lift));
+    const cp = Math.cos(pitch);
+    const spd = def.projectileSpeed;
+    const n = predictThrow(
+      v.world,
+      v.blocks,
+      v.colliders,
+      def,
+      v.position[o]!,
+      v.position[o + 1]! + eyeHeightFor(v.flags[e]!),
+      v.position[o + 2]!,
+      -Math.sin(yaw) * cp * spd + v.velocity[o]! * GRENADE_THROW.inherit,
+      Math.sin(pitch) * spd + v.velocity[o + 1]! * GRENADE_THROW.inherit,
+      -Math.cos(yaw) * cp * spd + v.velocity[o + 2]! * GRENADE_THROW.inherit,
+      sim.hz,
+      cook + 1,
+      ARC_EVERY_TICKS,
+      arcWorld,
+    );
+    for (let i = 0; i < n && m.arcCount < MAX_GRENADE_ARC; i++) {
+      if (!projectToView(cam, rect, arcWorld[i * 3]!, arcWorld[i * 3 + 1]!, arcWorld[i * 3 + 2]!, projected)) continue;
+      m.arc[m.arcCount * 2] = projected[0]!;
+      m.arc[m.arcCount * 2 + 1] = projected[1]!;
+      m.arcCount++;
+    }
+  }
+
+  /** Refino R2 (#79): as granadas vivas dos outros a até `GRENADE_WARN_M`, no anel em volta da mira. */
+  function fillGrenadeWarnings(m: HudModel, v: SimView, e: number, me: number, yaw: number): void {
+    m.nadeCount = 0;
+    const p = v.projectiles;
+    const ex = v.position[e * 3]!;
+    const ey = v.position[e * 3 + 1]! + 1;
+    const ez = v.position[e * 3 + 2]!;
+    for (let i = 0; i < p.count && m.nadeCount < MAX_GRENADE_WARNINGS; i++) {
+      if (p.alive[i] !== 1 || p.weapon[i] !== WEAPON_CODE.grenade || p.owner[i] === me) continue;
+      const dx = p.position[i * 3]! - ex;
+      const dy = p.position[i * 3 + 1]! - ey;
+      const dz = p.position[i * 3 + 2]! - ez;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > GRENADE_WARN_M) continue;
+      let a = Math.atan2(-dx, -dz) - yaw;
+      a -= Math.round(a / (Math.PI * 2)) * Math.PI * 2;
+      m.nadeAngle[m.nadeCount] = a;
+      m.nadeAlpha[m.nadeCount] = 1 - d / GRENADE_WARN_M;
+      m.nadeCount++;
+    }
   }
 
   function fillHud(s: number, fonts: UiFonts | null, lay: HudScreenLayout, ui: UiFrame, rawLocked: boolean): void {
@@ -3579,6 +3664,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
       }
     }
+    // Refino R2 (#79): a granada cozinhando na mão: o pavio e o arco previsto (a mesma conta da sim); e as granadas
+    // dos outros perto.
+    fillGrenadeArc(m, v, e, desc.camera, lay.rects[s]!);
+    fillGrenadeWarnings(m, v, e, entity, desc.camera.yaw);
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
     m.pingCount = 0;
     if (calibration !== null && slot.controller === 0) {

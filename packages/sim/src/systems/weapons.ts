@@ -10,6 +10,7 @@ import {
   SPREAD_STATE_MULTIPLIER,
   SPREAD_WALKING_SPEED,
   WEAPON_FIRE,
+  WEAPON_SLOT,
   weaponDamageAt,
   weaponDef,
   type WeaponDef,
@@ -135,6 +136,64 @@ export function weaponSystem(ctx: SimContext): void {
         else s.slotReserve[base + q] = d.reserve;
       }
     }
+    // Refino R2 (#79): arremesso rápido no botão granada (G, RB, o botão do toque), de qualquer arma: segurar
+    // cozinha, soltar joga a granada do slot de arremesso; a arma da mão fica (não há troca).
+    const kT = base + WEAPON_SLOT.throwable;
+    if (s.quickNade[e] === 1 && s.cookTicks[e]! >= 0) {
+      const nade = weaponDef(s.loadout[kT]!);
+      if (nade === null || nade.fire !== WEAPON_FIRE.thrown) {
+        s.quickNade[e] = 0;
+        s.cookTicks[e] = -1;
+      } else {
+        s.cookTicks[e] = s.cookTicks[e]! - 1;
+        if (s.cookTicks[e]! <= 0) {
+          // Cozinhou demais: explode na mão.
+          s.cookTicks[e] = -1;
+          s.quickNade[e] = 0;
+          s.slotClip[kT] = s.slotClip[kT]! - 1;
+          const e3 = e * 3;
+          explode(
+            ctx,
+            s.position[e3]!,
+            s.position[e3 + 1]! + eyeHeightFor(fl),
+            s.position[e3 + 2]!,
+            nade,
+            s.idOf(e),
+            -1,
+          );
+        } else if ((btn & BUTTON.grenade) === 0 || !playing) {
+          throwGrenade(ctx, e, kT, nade, fl, s.cookTicks[e]!);
+          s.cookTicks[e] = -1;
+          s.quickNade[e] = 0;
+          s.lastShotTick[e] = ctx.tick;
+          fl |= F.firing;
+          fl &= ~F.spawnProtected;
+          s.spawnProtectTicks[e] = 0;
+        }
+      }
+    } else if (
+      (pressed & BUTTON.grenade) !== 0 &&
+      s.cookTicks[e]! < 0 &&
+      playing &&
+      s.switchTicks[e] === 0 &&
+      s.slotClip[kT]! > 0 &&
+      weaponDef(s.loadout[kT]!)?.fire === WEAPON_FIRE.thrown
+    ) {
+      // Recarga no meio é cancelada (arcade: a granada sai na hora).
+      if (s.reloadTicks[e]! > 0) {
+        s.reloadTicks[e] = 0;
+        ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'reloadEnd');
+      }
+      s.cookTicks[e] = Math.max(2, secondsToTicks(weaponDef(s.loadout[kT]!)!.fuseS, hz));
+      s.quickNade[e] = 1;
+      ctx.events.weapon(ctx.tick, s.idOf(e), s.loadout[kT]!, 'cook');
+    }
+    // Cozinhando no arremesso rápido, a arma da mão não atira nem recarrega.
+    if (s.quickNade[e] === 1) {
+      s.flags[e] = fl;
+      continue;
+    }
+
     const def = weaponDef(s.weapon[e]!);
     if (def === null) {
       s.flags[e] = fl;

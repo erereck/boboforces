@@ -128,10 +128,28 @@ export interface HudModel {
   tipKey: string;
   tipText: string;
   tipAlpha: number;
+  /** Refino R2 (#79): o pavio da granada cozinhando na mão (0..1, o que falta; -1 = nenhuma). */
+  cook: number;
+  /**
+   * Refino R2 (#79): o arco da granada que vai sair (x, y em px da superfície, 2 por ponto; o último é onde ela vai
+   * estar quando o pavio acabar). O `game` prevê e projeta; o desenho só pinta.
+   */
+  readonly arc: Float32Array;
+  arcCount: number;
+  /**
+   * Refino R2 (#79): granadas vivas perto (dos outros): ângulo relativo à mira (como `damageAngle`) e a força 0..1 (mais
+   * perto = mais forte), desenhadas num anel em volta da mira.
+   */
+  nadeCount: number;
+  readonly nadeAngle: Float32Array;
+  readonly nadeAlpha: Float32Array;
 }
 
 /** M2 (fase 3e): máximo de avisos do time na vista. */
 export const MAX_TEAM_PINGS = 8;
+/** Refino R2 (#79): pontos do arco da granada e avisos de granada perto por vista. */
+export const MAX_GRENADE_ARC = 48;
+export const MAX_GRENADE_WARNINGS = 4;
 
 /** M2 (fase 2d): máximo de marcadores de aliado por vista. */
 export const MAX_ALLY_MARKERS = 24;
@@ -227,6 +245,12 @@ export function createHudModel(): HudModel {
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
+    cook: -1,
+    arc: new Float32Array(MAX_GRENADE_ARC * 2),
+    arcCount: 0,
+    nadeCount: 0,
+    nadeAngle: new Float32Array(MAX_GRENADE_WARNINGS),
+    nadeAlpha: new Float32Array(MAX_GRENADE_WARNINGS),
   };
 }
 
@@ -809,6 +833,39 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     else drawCrosshair(out, cx, cy, crossGap, len, thick);
     for (let i = 0; i < model.soundCount; i++)
       drawSoundBlip(out, cx, cy, model.soundAngle[i]!, model.soundAlpha[i]!, s);
+    // Refino R2 (#79): granada perto: um círculo vermelho com contorno no anel de fora, na direção dela.
+    for (let i = 0; i < model.nadeCount && i < MAX_GRENADE_WARNINGS; i++) {
+      const a = model.nadeAngle[i]!;
+      const r = HUD_METRICS.soundRing * s * 1.9;
+      const size = Math.max(8, Math.round(7 * s));
+      const x = Math.round(cx - Math.sin(a) * r - size / 2);
+      const y = Math.round(cy - Math.cos(a) * r - size / 2);
+      const k = 0.45 + 0.55 * clamp01(model.nadeAlpha[i]!);
+      paintIcon(out, 1, x - 1, y - 1, size + 2, withAlpha(COLORS.bunker, 0.7 * k));
+      paintIcon(out, 1, x, y, size, withAlpha(COLORS.perigo, k));
+    }
+    // Refino R2 (#79): o arco da granada (pontinhos que somem com a distância; o fim, um quadrado âmbar) e o pavio.
+    if (!scoped && model.arcCount > 0) {
+      const n = Math.min(model.arcCount, MAX_GRENADE_ARC);
+      const dotS = Math.max(2, Math.round(1.6 * s));
+      for (let i = 0; i < n - 1; i++) {
+        const x = Math.round(model.arc[i * 2]! - dotS / 2);
+        const y = Math.round(model.arc[i * 2 + 1]! - dotS / 2);
+        pushRect(out, x, y, dotS, dotS, withAlpha(COLORS.texto, 0.85 - (0.45 * i) / n));
+      }
+      const end = Math.max(6, Math.round(5 * s));
+      const ex = Math.round(model.arc[(n - 1) * 2]! - end / 2);
+      const ey = Math.round(model.arc[(n - 1) * 2 + 1]! - end / 2);
+      pushShape(out, ex, ey, end, end, COLORS.acao, 0, Math.max(2, Math.round(s)));
+    }
+    if (model.cook >= 0) {
+      const w = Math.round(34 * s);
+      const h = Math.max(3, Math.round(2.5 * s));
+      const y = Math.round(cy + crossGap + len + gap);
+      pushRect(out, Math.round(cx - w / 2), y, w, h, withAlpha(COLORS.bunker, 0.7));
+      const left = clamp01(model.cook);
+      pushRect(out, Math.round(cx - w / 2), y, Math.round(w * left), h, left < 0.35 ? COLORS.perigo : COLORS.acao);
+    }
     const marker = Math.max(model.hitMarker, model.headshotMarker);
     if (marker > 0.01) {
       const step = Math.max(2, Math.round(M.hitStep * s));

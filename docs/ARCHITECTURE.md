@@ -2729,3 +2729,27 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
   pela velocidade.
 - **Goldens** (a partida dos bots muda): Warfare `34edbf41`, Zombies no Construto `b4b81b30` e no Posto
   `d7ff9e30`. O balance continua em ordem.
+
+### 14.2 Fase R2: a granada (16/11/2026)
+
+- **O defeito:** o G (teclado), o RB (controle) e o botão do toque mandavam o botão `grenade` do `InputFrame`, mas
+  a sim não lia esse bit: para jogar granada era preciso trocar para o slot 4, segurar o gatilho e soltar.
+- **Arremesso rápido** (`sim/systems/weapons.ts`): o botão granada, de qualquer arma, começa a cozinhar a granada do
+  slot de arremesso (cancela a recarga; não troca de arma); soltar joga; cozinhar o pavio inteiro explode na mão;
+  enquanto cozinha, a arma da mão não atira. Morrer cozinhando deixa a granada cair (a do slot de arremesso). O botão
+  também corta a corrida. Estado novo `SimState.quickNade` (no snapshot, versão 10, e no hash) e, na vista,
+  `cookTicks` e `quickNade`. O jeito antigo (slot 4 e gatilho) continua valendo.
+- **O arco** (`predictThrow` em `sim/systems/projectiles.ts`, exportado): a mesma conta do `projectileSystem`
+  (gravidade, quique com perda, parada no chão), pura e sem alocação, a partir do olho com a mira e a herança da
+  velocidade; o jogo prevê por quadro (`cookTicks + 1` ticks: a granada já anda no tick do lançamento), projeta e a
+  HUD pinta pontinhos que somem com a distância e um quadrado âmbar onde ela vai estar quando o pavio acabar. O teste
+  confere que o ponto previsto cai a menos de 2 cm da explosão de verdade.
+- **O pavio** na tela (uma barrinha embaixo da mira, âmbar e vermelha no fim) e **a granada na mão** (o viewmodel
+  troca para ela enquanto cozinha no arremesso rápido).
+- **Aviso de granada perto:** as granadas vivas dos outros a até 7 m (o raio da explosão é 5) aparecem como um círculo
+  vermelho com contorno num anel em volta da mira, na direção delas, mais forte quanto mais perto.
+- **Dica de 1 linha nova** (`tip.grenade`, "segura e solta: granada"): nas 2 primeiras partidas, depois de 25 s vivo
+  com granada e sem ter jogado nenhuma.
+- **Goldens:** o campo novo entra no hash (a partida é a mesma): Warfare `b36eb8e1`, Zombies `edc93590` e
+  `6c4eaf90`. Conferido no Edge (`local/refino/capturar-granada.ts`): segurando o G aparecem a granada na mão, o
+  pavio e o arco; soltando, ela sai e o contador vai de 2 para 1.

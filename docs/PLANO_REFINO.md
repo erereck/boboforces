@@ -20,7 +20,7 @@
 1. **R1. Atirar andando, arcade** (feita em 16/11/2026, ARCHITECTURE §14.1; perfil Bobo; o Tático continua como o CS): o gatilho corta a corrida e atira quase na
    hora; a mira quase não abre andando; no ar abre menos; mira andando mais rápida; no controle, correr alterna com o
    L3 e solta quando o jogador para; a retícula da HUD segue a dispersão de verdade.
-2. **R2. Granada:** arremesso rápido no G / RB / botão do toque (de qualquer arma, sem trocar: segura cozinha, solta
+2. **R2. Granada** (feita em 16/11/2026, ARCHITECTURE §14.2): arremesso rápido no G / RB / botão do toque (de qualquer arma, sem trocar: segura cozinha, solta
    joga, volta para a arma); o pavio na tela enquanto cozinha; o arco da trajetória; aviso de granada perto.
 3. **R3. Menus:** levantar o caminho de cada opção e reorganizar para ficar o mais claro possível.
 4. **R4. Outros refinos** achados jogando e nas capturas.

@@ -1,5 +1,5 @@
 import { createFigureGameTable, MATCH_RECIPE_FORMAT, type FigureGameTable, type MatchRecipe } from '@boboforces/format';
-import { BUTTON, createInputFrame, quantizeAxis, type InputFrame } from '@boboforces/input';
+import { BUTTON, createInputFrame, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter, pitchToI16, yawToU16 } from '@boboforces/shared';
 import {
   buildTestArena,
@@ -13,7 +13,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
 import { MOVEMENT_BOBO } from './config/movement.ts';
-import { WEAPON_RIFLE } from './config/weapons.ts';
+import { WEAPON_GRENADE, WEAPON_RIFLE, WEAPON_SLOT } from './config/weapons.ts';
+import { predictThrow } from './systems/projectiles.ts';
 import { MAX_CONTROLLERS, MAX_CONTROLLERS_WITH_ZOMBIES, SIM_HZ } from './constants.ts';
 import { ENTITY_FLAG, NULL_ENTITY, entityIndex } from './entity.ts';
 import type { SimEvent } from './events.ts';
@@ -452,6 +453,94 @@ describe('fuzil hitscan, dano, morte e respawn', () => {
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThanOrEqual(Math.ceil(0.05 * SIM_HZ) + 2);
     expect(sim.view().flags[e]! & ENTITY_FLAG.sprinting).toBe(0);
+  });
+});
+
+describe('refino R2 (#79): arremesso rápido da granada', () => {
+  it('segurar o botão cozinha de qualquer arma; soltar joga a do slot de arremesso e a arma da mão fica', () => {
+    const sim = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2 });
+    const f = frames();
+    const v = sim.view();
+    const e = entityIndex(sim.controllerEntity(0));
+    const kT = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable;
+    const before = v.slotClip[kT]!;
+    const slot = v.slot[e]!;
+    expect(before).toBeGreaterThan(0);
+    f[0]!.buttons = BUTTON.grenade | BUTTON.fire;
+    let launched = 0;
+    let shots = 0;
+    run(sim, f, 20, (events) => {
+      for (const ev of events) {
+        if (ev.type === 'shot') shots++;
+        if (ev.type === 'projectile' && ev.action === 'launch') launched++;
+      }
+    });
+    // Cozinhando: a arma da mão não atira, nada saiu ainda, o pavio corre.
+    expect([shots, launched]).toEqual([0, 0]);
+    expect(v.quickNade[e]).toBe(1);
+    expect(v.cookTicks[e]).toBeGreaterThan(0);
+    f[0]!.buttons = 0;
+    run(sim, f, 2, (events) => {
+      for (const ev of events) if (ev.type === 'projectile' && ev.action === 'launch') launched++;
+    });
+    expect(launched).toBe(1);
+    expect(v.slotClip[kT]).toBe(before - 1);
+    expect([v.slot[e], v.cookTicks[e], v.quickNade[e]]).toEqual([slot, -1, 0]);
+  });
+
+  it('o arco previsto (predictThrow) cai onde a granada de verdade explode', () => {
+    const map = flatMap([south, north], (g) => fillBox(g, 0, 1, 2, 39, 6, 2, concrete));
+    const sim = createSim({ recipe: duelRecipe(), map, humans: 2 });
+    const f = frames();
+    f[0]!.pitch = pitchToI16(0.5);
+    f[0]!.buttons = BUTTON.grenade;
+    run(sim, f, 3);
+    f[0]!.buttons = 0;
+    let launch: { tick: number; x: number; y: number; z: number; vx: number; vy: number; vz: number } | null = null;
+    let boom: { tick: number; x: number; y: number; z: number } | null = null;
+    run(sim, f, 4 * SIM_HZ, (events) => {
+      for (const ev of events) {
+        if (ev.type === 'projectile' && ev.action === 'launch' && launch === null) launch = { ...ev };
+        if (ev.type === 'explosion' && boom === null) boom = { tick: ev.tick, x: ev.x, y: ev.y, z: ev.z };
+      }
+    });
+    expect(launch).not.toBeNull();
+    expect(boom).not.toBeNull();
+    const l = launch!;
+    const b = boom!;
+    const out = new Float32Array(3 * 64);
+    const n = predictThrow(
+      map.grid,
+      map.blocks,
+      null,
+      WEAPON_GRENADE,
+      l.x,
+      l.y,
+      l.z,
+      l.vx,
+      l.vy,
+      l.vz,
+      SIM_HZ,
+      b.tick - l.tick + 1,
+      4,
+      out,
+    );
+    expect(n).toBeGreaterThan(1);
+    const k = (n - 1) * 3;
+    expect(Math.hypot(out[k]! - b.x, out[k + 1]! - b.y, out[k + 2]! - b.z)).toBeLessThan(0.3);
+  });
+
+  it('cozinhar demais explode na mão', () => {
+    const sim = createSim({ recipe: duelRecipe(), map: flatMap([south, north]), humans: 2 });
+    const f = frames();
+    const e = entityIndex(sim.controllerEntity(0));
+    f[0]!.buttons = BUTTON.grenade;
+    let exploded = 0;
+    run(sim, f, 6 * SIM_HZ, (events) => {
+      for (const ev of events) if (ev.type === 'explosion') exploded++;
+    });
+    expect(exploded).toBe(1);
+    expect(sim.view().quickNade[e]).toBe(0);
   });
 });
 
