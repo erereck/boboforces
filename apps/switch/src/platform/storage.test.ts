@@ -90,3 +90,36 @@ describe('save no SD', () => {
     expect(problems.join()).toContain('SD cheio');
   });
 });
+
+describe('cópia diária do save (M4, fase 2b)', () => {
+  const DIR = 'sdmc:/switch/boboforces';
+  const open = (fake: ReturnType<typeof createFakeSwitch>, today: string | null) =>
+    createSdStorage({
+      fs: fake.nx.Switch,
+      dir: DIR,
+      setTimeout: (cb, ms) => setTimeout(cb, ms),
+      clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      onProblem: () => {},
+      today: () => today,
+    });
+
+  it('a 1ª abertura do dia copia o save; ficam as 3 mais recentes; sem relógio ou sem save, nada', () => {
+    const fake = createFakeSwitch({ files: { [`${DIR}/save.json`]: '{"a":"1"}' } });
+    for (const day of ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16']) open(fake, day);
+    const backups = [...fake.files.keys()].filter((k) => k.startsWith(`${DIR}/backup/`)).sort();
+    expect(backups).toEqual([
+      `${DIR}/backup/save-2026-11-14.json`,
+      `${DIR}/backup/save-2026-11-15.json`,
+      `${DIR}/backup/save-2026-11-16.json`,
+    ]);
+    expect(fake.text(`${DIR}/backup/save-2026-11-16.json`)).toBe('{"a":"1"}');
+    // A 2ª abertura do mesmo dia não regrava (a cópia é a do começo do dia).
+    fake.nx.Switch.writeFileSync(`${DIR}/save.json`, '{"a":"2"}');
+    open(fake, '2026-11-16');
+    expect(fake.text(`${DIR}/backup/save-2026-11-16.json`)).toBe('{"a":"1"}');
+    const none = createFakeSwitch({ files: { [`${DIR}/save.json`]: '{"a":"1"}' } });
+    open(none, null);
+    open(createFakeSwitch(), '2026-11-16');
+    expect([...none.files.keys()].some((k) => k.includes('/backup/'))).toBe(false);
+  });
+});

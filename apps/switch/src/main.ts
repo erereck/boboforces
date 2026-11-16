@@ -12,6 +12,7 @@ import { SCENE_MODULE } from '@boboforces/game/scene';
 import { createMsdfUiPass, createRenderer, type Renderer } from '@boboforces/render';
 import type { GraphicsSurface } from '@boboforces/platform-api';
 import { t } from '@boboforces/ui';
+import { readWorkshopFiles } from './platform/files.ts';
 import { createSwitchShell, describeBuild, describeError, SD_DIR, type SwitchShell } from './platform/index.ts';
 import { readAutoBench } from './t0/auto-bench.ts';
 import { captureConsole, LATE_PROBES_DELAY_MS, runBootProbes, runLateProbes } from './t0/boot.ts';
@@ -104,6 +105,8 @@ try {
     testItems: createSwitchTestItems(),
     // M4 (fase 1): a LOCAL EDITION abre direto no lobby "aperte A" (GDD §3.6).
     localEdition: true,
+    // M4 (fase 2c): bots e presets feitos no PC, pela pasta oficina/ do cartão.
+    workshopFiles: () => readWorkshopFiles(shell.nx.Switch, SD_DIR, shell.log),
     // Um arquivo só (esbuild): a cena já está no bundle.
     loadScene: () => Promise.resolve({ module: SCENE_MODULE }),
     loadEditors: () => Promise.resolve(EDITORS),

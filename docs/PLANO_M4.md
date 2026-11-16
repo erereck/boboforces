@@ -68,7 +68,8 @@ dá para conferir no PC, na web e no Eden vem primeiro; o que só o console resp
 
 1. **LOCAL EDITION:** o lobby como porta de entrada, "Sair do jogo", reabrir o "aperte A". (Feita em 16/11/2026,
    ARCHITECTURE §15.1; a 1e foi para a fase 3.)
-2. **Save e arquivos no SD:** backup, `oficina/` para bots e presets, SD ruim.
+2. **Save e arquivos no SD:** backup, `oficina/` para bots e presets, SD ruim. (Feita em 16/11/2026, ARCHITECTURE
+   §15.2: a cópia do dia e a `oficina/`; o aviso na tela de SD ruim e o botão Restaurar ficaram de fora, com a razão.)
 3. **Ciclo de vida:** dock/portátil com as vistas, HOME/sleep, reconexão, bateria.
 4. **Glifos genéricos e teclado na tela.**
 5. **Desempenho:** pré-malha e navegação no `.bfmap`, aquecimento completo, o plano B.

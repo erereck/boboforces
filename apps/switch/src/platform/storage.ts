@@ -20,7 +20,16 @@ export interface SdStorageOptions {
   /** Avisa o diagnóstico (runtime.log) quando ler ou gravar dá errado. Nunca lança. */
   readonly onProblem: (message: string) => void;
   readonly debounceMs?: number;
+  /**
+   * M4 (fase 2b): o dia de hoje (`AAAA-MM-DD`), para a cópia diária do save em `backup/`; ausente (ou `null`, sem
+   * relógio) = sem cópia diária.
+   */
+  readonly today?: () => string | null;
 }
+
+/** M4 (fase 2b): a pasta das cópias diárias e quantas ficam. */
+export const DAILY_BACKUP_SUBDIR = 'backup';
+export const DAILY_BACKUPS_KEPT = 3;
 
 export interface SdStorage extends Storage {
   /** Grava agora, de forma síncrona (usado no `unload`, quando o laço de eventos já parou). */
@@ -71,6 +80,28 @@ export function createSdStorage(opts: SdStorageOptions): SdStorage {
     if (data) {
       loadedFrom = 'backup';
       onProblem(`save: ${primary} ilegível; usando o backup`);
+    }
+  }
+  // M4 (fase 2b): na 1ª abertura do dia, o save que abriu bem vira `backup/save-AAAA-MM-DD.json` (ficam os 3 mais
+  // recentes). É a volta para quem apagou algo sem querer (o `save.backup.json` é só a gravação anterior).
+  const today = opts.today?.() ?? null;
+  if (today !== null && /^\d{4}-\d{2}-\d{2}$/.test(today) && loadedFrom === 'primary') {
+    const folder = `${dir}/${DAILY_BACKUP_SUBDIR}`;
+    const daily = `${folder}/save-${today}.json`;
+    try {
+      if (read(daily) === null) {
+        const bytes = read(primary);
+        fs.mkdirSync(folder);
+        if (bytes) fs.writeFileSync(daily, new Uint8Array(bytes));
+      }
+      const old = (fs.readDirSync(folder) ?? [])
+        .filter((n) => /^save-\d{4}-\d{2}-\d{2}\.json$/.test(n))
+        .sort()
+        .reverse()
+        .slice(DAILY_BACKUPS_KEPT);
+      for (const name of old) fs.removeSync(`${folder}/${name}`);
+    } catch (error) {
+      onProblem(`save: não foi possível gravar a cópia do dia: ${errorText(error)}`);
     }
   }
   const values = data ?? new Map<string, string>();

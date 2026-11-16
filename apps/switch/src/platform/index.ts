@@ -75,6 +75,11 @@ export function createSwitchShell(opts: SwitchShellOptions = {}): SwitchShell {
     setTimeout: nx.setTimeout,
     clearTimeout: nx.clearTimeout,
     onProblem: log,
+    // M4 (fase 2b): a cópia diária do save; o relógio do console (sem ele, nada de cópia).
+    today: () => {
+      const d = new Date();
+      return Number.isFinite(d.getTime()) && d.getFullYear() >= 2024 ? d.toISOString().slice(0, 10) : null;
+    },
   });
   const t0 = createT0Logger(log);
   // Áudio criado no primeiro uso (o boot fica mais curto e o log começa pela linha de boot).

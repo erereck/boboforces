@@ -15,6 +15,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **LOCAL EDITION (fase 1):** no Switch o jogo abre direto no lobby "aperte A", sem título: o primeiro que apertar A é
   o P1; dali saem COMEÇAR, Modos, Surpreenda-me, Meu Bobo, Laboratório, Ajustes e Sair (com confirmação), e toda tela
   volta para ele com os mesmos jogadores.
+- **Save e arquivos no SD (fase 2):** uma cópia do save por dia em `backup/` no cartão (ficam as 3 últimas) e a pasta
+  `oficina/`: bots e presets feitos no PC entram na biblioteca do Switch ao abrir o jogo, sem duplicar nem passar
+  por cima do que você mudou lá.
 
 ### Refino antes do M4 (rodada 17 publicada em 16/11/2026)
 

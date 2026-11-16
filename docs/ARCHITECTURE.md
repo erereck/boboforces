@@ -2842,3 +2842,22 @@ Plano em `docs/PLANO_M4.md` (16/11/2026); perguntas P1–P9 no padrão (v20 da p
 - **A 1e (reabrir o "aperte A" na troca de dock/portátil e no HOME)** fica para a fase 3: o M3 já pausa, guarda o
   assento de quem desconectou e deixa entrar no meio segurando A.
 - **Medido:** menu da web 347,7 de 350 KB; NRO no Eden com o menu pronto em 1,47 s (só possível com o lobby na tela).
+
+### 15.2 Fase 2: o save e os arquivos no SD (16/11/2026)
+
+- **O que já estava (2a):** `save.json` com `save.backup.json` antes de cada escrita, `save.previous.json` por
+  chave, save corrompido abrindo pelo backup e falha de escrita virando linha no `runtime.log` sem lançar (testes de
+  `storage.ts`). O aviso **na tela** para SD cheio ou só leitura ficou de fora: pede um campo novo no contrato do
+  `Storage` para algo que ninguém viu acontecer; o registro basta até o console mostrar o contrário.
+- **A cópia do dia (2b):** na 1ª abertura de cada dia, o save que abriu bem (do principal, não do backup) vira
+  `sdmc:/switch/boboforces/backup/save-AAAA-MM-DD.json`; ficam as 3 mais recentes (`DAILY_BACKUPS_KEPT`). O dia
+  vem da casca (`today` no `createSdStorage`, pelo relógio do console; sem relógio válido, nada). Restaurar é
+  copiar o arquivo do dia por cima do `save.json` (no PC ou num gerenciador de arquivos); um botão "Restaurar" nos
+  Ajustes pediria listar arquivos pela `Platform` e fica para quando fizer falta.
+- **A pasta `oficina/` (2c, P2):** `sdmc:/switch/boboforces/oficina/*.json` traz bots (`bot@1`) e presets
+  (`preset@1`) feitos no PC. A casca lista e lê (`readWorkshopFiles` em `apps/switch/src/platform/files.ts`: só
+  `.json`, até 200 arquivos, maior que 64 KB nem é lido) e passa ao jogo por `GameDeps.workshopFiles`;
+  `importWorkshopFiles` (`game/src/workshop-files.ts`) valida pelo `format` e importa **sem passar por cima** do
+  que existe (bot pelo id, preset pelo nome; preset sem nome usa o do arquivo), então ler a pasta a cada abertura não
+  duplica nada nem desfaz o que o jogador mudou no Switch. O que não entra vira `[save] oficina: <arquivo> ignorado
+  (<razão>)` no registro. `importar/` e `exportar/` continuam para o backup inteiro e os relatórios.
