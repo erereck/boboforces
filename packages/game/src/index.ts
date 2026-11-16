@@ -14,7 +14,16 @@ export {
 } from './game.ts';
 export { createNullRenderer } from './null-renderer.ts';
 export * from './save-store.ts';
-export { createLocalDriver, type LocalDriver, type LocalDriverConfig, type MatchDriver } from './local-driver.ts';
+export {
+  createLocalDriver,
+  createMatchSim,
+  type LocalDriver,
+  type LocalDriverConfig,
+  type MatchDriver,
+} from './local-driver.ts';
+// M5 (fase 4b): o contrato do online (a casca web implementa com o `net`).
+export * from './online-api.ts';
+export { createSceneDriver, type SceneDriver } from './scene/scene-driver.ts';
 export { GAME_ASSETS, loadGameAssets, type GameAssets } from './assets.ts';
 export { pauseScreen, PAUSE_ACTION } from './pause.ts';
 export { verticalFov, DEFAULT_FOV_DEG } from './camera.ts';

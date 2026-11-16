@@ -95,7 +95,7 @@ import {
 } from '@boboforces/ui';
 import { loadGameAssets } from './assets.ts';
 import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/types.ts';
-import type { LocalDriver } from './local-driver.ts';
+import type { SceneDriver } from './scene/scene-driver.ts';
 import type { LocalSeat } from './scene/seats.ts';
 import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
 import { createNullRenderer } from './null-renderer.ts';
@@ -260,7 +260,7 @@ export interface GameHandle extends Disposable {
   /** Frames rodados desde o boot. */
   readonly frames: number;
   /** Partida em andamento (testes e F2); `null` fora da cena (e durante o loading dela). */
-  readonly match: LocalDriver | null;
+  readonly match: SceneDriver | null;
   /** Cena em andamento (loading ou partida); `null` fora dela. */
   readonly scene: Scene | null;
   /** M1: gancho de depuração dos prints (`window.__bfDebug.print`): não nulo quando o Construto carregou. */
@@ -1986,7 +1986,7 @@ export function startGame(deps: GameDeps): GameHandle {
     get frames(): number {
       return frames;
     },
-    get match(): LocalDriver | null {
+    get match(): SceneDriver | null {
       return scene?.driver ?? null;
     },
     get scene(): Scene | null {

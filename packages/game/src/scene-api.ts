@@ -19,7 +19,8 @@ import type { Disposable } from '@boboforces/shared';
 import type { DrawList, UiAtlasImage, UiFonts } from '@boboforces/ui';
 import type { BenchConfig, GameDebugApi } from './bench/types.ts';
 import type { LocalSeat } from './scene/seats.ts';
-import type { LocalDriver } from './local-driver.ts';
+import type { OnlineSession } from './online-api.ts';
+import type { SceneDriver } from './scene/scene-driver.ts';
 import type { UiFrame } from './menu.ts';
 
 /** Rotas de criação do renderer (fixas na criação: mudam os programas; tecnico.md §24.1, Teste Zero). */
@@ -65,6 +66,11 @@ export interface SceneRequest {
    * fica preso ao dispositivo do seu assento; vazio ou ausente = 1 jogador, que segue o último dispositivo usado.
    */
   readonly seats?: readonly LocalSeat[];
+  /**
+   * M5 (fase 4b): partida online (só na web): o lobby já decidiu quem é quem. Vem com a `recipe` do host (que vale
+   * inteira: o cliente não corta bots pelo aparelho) e a `seed` do começo.
+   */
+  readonly online?: OnlineSession;
 }
 
 /**
@@ -187,7 +193,7 @@ export interface Scene extends Disposable {
   /** M3 (fase 6e): a cena toca a própria música agora (o Bobo Zombies); o núcleo não mexe nela. */
   readonly ownsMusic?: boolean;
   /** Partida em andamento (testes, F2, `window.__bfDebug.simTick`); `null` durante o loading. */
-  readonly driver: LocalDriver | null;
+  readonly driver: SceneDriver | null;
   /** Gancho dos prints (`GameHandle.debug`): não nulo quando o Construto carregou. */
   readonly debug: GameDebugApi | null;
   /** M2 (fase 2e): nível rápido dos bots adversários agora (o da receita, ou o do "Ajustar desafio"). */

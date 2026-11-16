@@ -359,7 +359,7 @@ describe('startGame (NullRenderer)', () => {
     const sim = match.sim;
     const view = sim.view();
     // M2 (fase 4c): sem nada salvo, o JOGAR é a partida de estreia (TDM 4v4: o jogador e 7 bots De boa).
-    expect(match.director.botCount).toBe(7);
+    expect(match.director!.botCount).toBe(7);
     // M2 (fase 2d): o JOGAR começa com a contagem de 3 s, sem ninguém andar; os bots saem depois dela.
     expect([view.match.phase, view.match.countdownTicks > 0]).toEqual(['warmup', true]);
     platform.pump(view.match.countdownTicks + 5);
@@ -449,7 +449,7 @@ describe('startGame (NullRenderer)', () => {
     platform.pump(2);
     await settle();
     await untilRunning(platform, game);
-    expect(game.match!.director.botCount).toBe(6);
+    expect(game.match!.director!.botCount).toBe(6);
     for (let i = 0; i < 120 && reports.length === 0; i++) platform.pump(1);
     expect(reports).toHaveLength(1);
     const lines = reports[0]!.split('\n');
@@ -515,7 +515,7 @@ describe('startGame (NullRenderer)', () => {
       { ...BENCH_DEFAULTS, views: 4, bots: 64, durationS: 1, warmupS: 0 },
       factory,
     );
-    expect(game.match!.director.botCount).toBe(64);
+    expect(game.match!.director!.botCount).toBe(64);
     for (let i = 0; i < 200 && reports.length === 0; i++) platform.pump(1);
     const lines = reports[0]!.split('\n');
     expect(lines).toContain('erros=1');
@@ -1350,7 +1350,7 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     await untilRunning(platform, game);
     const rolled = game.save.presets.recent[0]!;
     const bots = rolled.teams.reduce((n, team) => n + team.bots.reduce((m, b) => m + b.count, 0), 0);
-    expect(game.match!.director.botCount).toBe(bots);
+    expect(game.match!.director!.botCount).toBe(bots);
     // Sai pela pausa (P, 4 × baixo, Sair) e joga de novo pelo JOGAR: o mesmo jeito de partida.
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
@@ -1358,7 +1358,7 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     expect(game.screen).toBe('title');
     platform.tap('Enter');
     await untilRunning(platform, game);
-    expect(game.match!.director.botCount).toBe(bots);
+    expect(game.match!.director!.botCount).toBe(bots);
     expect(game.save.presets.recent).toHaveLength(1);
     game.dispose();
   }, 120_000);
@@ -1382,7 +1382,7 @@ describe('Partida Rápida e Modos (M2, fase 4d)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);
-    expect(game.match!.director.botCount).toBe(9);
+    expect(game.match!.director!.botCount).toBe(9);
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');

@@ -81,20 +81,29 @@ export interface LocalDriver extends MatchDriver {
  * chamar `update` (solo e local pausam a sim, tecnico.md §4.2). Sem alocação por tick: os frames e as closures nascem
  * aqui. M1: a IA usa a navegação de verdade (`NAV_PATH_API` sobre `SimMap.nav`), o orçamento do perfil e os zumbis.
  */
-export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
-  const { recipe, map, humans, writeHumanFrame, onEvents } = config;
-  const zombies = config.zombies ?? 0;
-  const sim = createSim({
+/**
+ * M5 (fase 4b): a sim da partida, igual em todo aparelho que a cria com a mesma configuração: o `LocalDriver` (o
+ * host) e o cliente online (que só mostra o estado do host) passam por aqui, senão o conjunto de entidades diverge.
+ */
+export function createMatchSim(config: LocalDriverConfig): Sim {
+  const { recipe, map, humans } = config;
+  return createSim({
     recipe,
     map,
     humans,
-    zombies,
+    zombies: config.zombies ?? 0,
     ...(config.hz !== undefined ? { hz: config.hz } : {}),
     ...(config.figureTable ? { figureTable: config.figureTable } : {}),
     // M2: bots com a primária sorteada pela semente (`botPrimaries` da IA); o bench fixa a dele.
     primaries: config.primaries ?? botPrimaries(recipe, humans),
     ...(config.countdownS !== undefined ? { countdownS: config.countdownS } : {}),
   });
+}
+
+export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
+  const { recipe, humans, writeHumanFrame, onEvents } = config;
+  const zombies = config.zombies ?? 0;
+  const sim = createMatchSim(config);
   const director = createBotDirectorWithPaths(
     {
       recipe,

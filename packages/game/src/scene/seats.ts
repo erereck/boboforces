@@ -44,11 +44,22 @@ function keepBots(bots: readonly BotSlotRecipe[], keep: number): BotSlotRecipe[]
  * ficam. Os controladores seguem a ordem da sim (`expandRecipe`): os humanos do time 0 primeiro, depois os do time 1.
  */
 export function seatRecipe(recipe: MatchRecipe, seats: readonly LocalSeat[]): SeatedRecipe {
-  const n = seats.length;
-  if (n <= 1) return { recipe, controllers: [0] };
+  if (seats.length <= 1) return { recipe, controllers: [0] };
+  return placeHumans(
+    recipe,
+    seats.map((s, i) => (i === 0 ? 0 : s.side)),
+  );
+}
+
+/**
+ * M5 (fase 4b): os humanos na receita pelo lado de cada um (0 ou 1), na ordem dada: o sofá (o P1 sempre no 0) e o
+ * online (cada um no time que escolheu). No FFA, no treino e nos modos de um time só, todos ficam no 0.
+ */
+export function placeHumans(recipe: MatchRecipe, chosen: readonly (0 | 1)[]): SeatedRecipe {
+  const n = chosen.length;
   const training = recipe.mode === 'training';
   const oneTeam = training || isFfaMode(recipe.mode) || recipe.teams.length < 2;
-  const sides = seats.map((s, i) => (i === 0 || oneTeam ? 0 : s.side));
+  const sides = chosen.map((s) => (oneTeam ? 0 : s));
   const want = [0, 0];
   for (const s of sides) want[s]!++;
   const controllers: number[] = new Array<number>(n);

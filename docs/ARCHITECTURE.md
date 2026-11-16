@@ -3147,3 +3147,34 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   - o começo chega igual aos que ficaram;
   - do lobby à partida no mesmo canal, o cliente entra jogando sem handshake, e a saída dele chega ao lobby do host
     durante a partida.
+
+### 16.7 Fase 4b: a partida com amigos na cena (16/11/2026)
+
+- **O contrato do online fica no `game`** (`game/src/online-api.ts`; decisão menor revisável, como no plano). Ele fala
+  de `Sim`, `SimEvent` e `InputFrame`, que o `platform-api` não enxerga.
+  - **`OnlineSession`:** o papel, os humanos, o meu controlador, os dos amigos e se a sala fechou, mais
+    `attachHost(sim)` e `attachClient(sim, …)`;
+  - **quem implementa:** a casca web, com o `net` (`apps/web/src/online-session.ts`), entregando à cena pelo
+    `SceneRequest.online`. No Switch ele não existe, e o `platform.online` segue nulo (regra 18).
+- **A receita da sala** (`onlineRecipe`): cada um no time que escolheu, no lugar de bots do mesmo time; quem disse
+  "tanto faz" vai para o lado com menos gente. O miolo do `seatRecipe` do sofá virou `placeHumans(recipe, sides)`, e o
+  sofá não mudou (o P1 segue no time 0). Na cena, a receita online vale inteira, com só os limites do motor nos bots:
+  o cliente num celular não corta o que o host montou (a sim mudaria). A distância de visão corta pelo aparelho, porque
+  a sim usa a dela.
+- **O driver da cena** (`scene/scene-driver.ts`, `createSceneDriver`):
+  - **solo e sofá:** o `LocalDriver` de sempre;
+  - **host:** o mesmo, com os controladores dos amigos lendo da rede, os eventos e o snapshot indo ao link, e quem sai
+    virando bot pelo cérebro de reserva do sofá (M3);
+  - **cliente:** a sim criada igual à do host (`createMatchSim`, tirado do `LocalDriver`) e conduzida pelo link, sem
+    diretor;
+  - a cena fala só com o `SceneDriver`. Diretor opcional (sem "Ajustar desafio" nem pings de bot no cliente), a sim
+    não pausa no online e a sala fechada volta ao menu.
+- **O "eu" da cena:** a cena supunha em 18 lugares que o jogador local é o controlador 0. Agora é `me = seatCtrl[0]`,
+  o mesmo 0 no solo e no sofá; no online, o que o lobby deu.
+- **Testes:**
+  - a receita com times escolhidos e com "tanto faz";
+  - o celular não corta os bots;
+  - o driver do host e o do cliente com um online de mentira;
+  - de ponta a ponta em Node (`apps/web/src/online-session.test.ts`): o lobby do `net` pelo loopback, o começo, as duas
+    sessões e os dois drivers da cena. O amigo anda no host e o cliente vê o mesmo mundo;
+  - o golden, o jogo e o `smoke:web` seguem verdes, o menu em 348,3 KB e o Switch com +4 KB.

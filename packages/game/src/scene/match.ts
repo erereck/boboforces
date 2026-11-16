@@ -211,7 +211,7 @@ import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
 import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camera.ts';
 import { createTouchOverlay } from '../hud.ts';
-import { createLocalDriver, type LocalDriver } from '../local-driver.ts';
+import { createSceneDriver, type SceneDriver } from './scene-driver.ts';
 import { createMenuController, followTab, type UiFrame } from '../menu.ts';
 import {
   CALIBRATED_ACTION,
@@ -593,6 +593,11 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       match: { timeLimitS: 0 },
       teams: [{ humans: 'all', bots: [] }],
     };
+  } else if (request.kind === 'play' && request.online && request.recipe) {
+    // M5 (fase 4b): a receita do host como veio (o lobby já pôs os amigos nos times); a semente é a do começo.
+    recipe = { ...request.recipe, seed: request.seed >>> 0 };
+    humans = request.online.humans;
+    seatControllers = [request.online.localController];
   } else if (request.kind === 'play' && request.recipe) {
     // M2 (fase 4c): o preset pedido, com a semente desta partida (o validador abaixo corta no teto do aparelho).
     recipe = { ...request.recipe, seed: request.seed >>> 0 };
@@ -613,9 +618,13 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   const limits =
     request.kind === 'bench'
       ? { maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4, maxViewDistanceM: PLATFORM_PROFILES.pc.maxViewDistanceM }
-      : recipeLimitsFor(profile);
+      : request.online
+        ? // M5: online, só os limites do motor nos bots: o cliente não pode cortar a receita do host (a sim mudaria);
+          // a distância de visão é só do render (a sim usa a dela), então corta pelo aparelho.
+          { ...recipeLimitsFor(profile), maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4 }
+        : recipeLimitsFor(profile);
   // M3 (fase 1a): o sofá, até o teto de humanos locais do aparelho.
-  const seats = request.kind === 'play' ? (request.seats ?? []).slice(0, limits.maxLocalHumans) : [];
+  const seats = request.kind === 'play' && !request.online ? (request.seats ?? []).slice(0, limits.maxLocalHumans) : [];
   if (seats.length >= 2) {
     const seated = seatRecipe(recipe, seats);
     recipe = seated.recipe;
@@ -657,7 +666,7 @@ interface ViewSlot {
 }
 
 export interface ConstrutoMatch {
-  readonly driver: LocalDriver;
+  readonly driver: SceneDriver;
   readonly debug: GameDebugApi;
   readonly paused: boolean;
   readonly wantsPointerLock: boolean;
@@ -769,6 +778,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * O controlador da sim de cada assento (o 0 é o P1). Fase 1c: cresce quando alguém entra no meio, no lugar de um bot.
    */
   const seatCtrl: number[] = humans > 0 ? setup.recipe.seatControllers.slice(0, Math.max(1, seats.length)) : [];
+  /**
+   * M5 (fase 4b): o controlador do jogador deste aparelho (o P1). No solo e no sofá é o 0; no online, o que o lobby deu
+   * (o host pode estar no time 1, e cada cliente tem o seu).
+   */
+  const me = seatCtrl[0] ?? 0;
   /**
    * M3 (fase 1e): o perfil do jogador de número `num` (0 = P1, que usa os Ajustes): o do dispositivo com a mira e o Y do
    * ajuste dele (`settings.couch`, mudado na tela do sofá).
@@ -1027,7 +1041,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function trainingReport(): TrainingReport | null {
     if (!training) return null;
     const v = sim.view();
-    const h = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    const h = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
     trainingNumbers(matchStats, v, h, sim.hz, trainingNow);
     let shots = 0;
     let hits = 0;
@@ -1096,7 +1110,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   function refreshTrainingLine(): void {
-    const h = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    const h = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
     trainingNumbers(matchStats, sim.view(), h, sim.hz, trainingNow);
     const n = trainingNow;
     const prev = lastTraining;
@@ -1420,7 +1434,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     const team = ffa || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
     // M2 (fase 6c): o jogador 1 veste o Meu Bobo.
-    if (humans > 0 && v.controller[i] === 0) {
+    if (humans > 0 && v.controller[i] === me) {
       figureOf[i] = figures.playerFigure(team);
       skinLayer[i] = figures.playerSkin(team);
       return;
@@ -1489,7 +1503,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         velCur[o + c] = v.velocity[o + c]!;
       }
     }
-    const human = humans > 0 ? s.controllerEntity(0) : NULL_ENTITY;
+    const human = humans > 0 ? s.controllerEntity(me) : NULL_ENTITY;
     if (matchStats.capacity < v.capacity) matchStats = createMatchStats(v.capacity);
     for (let k = 0; k < events.length; k++) {
       const ev = events[k]!;
@@ -1713,51 +1727,54 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   };
 
-  const driver = createLocalDriver({
-    recipe,
-    map: loaded.simMap,
-    humans,
-    // M3 (fase 1c): os jogadores 2–4 do sofá ganham um cérebro de reserva (um bot assume quem sai).
-    ...(seatCtrl.length > 1 ? { standby: seatCtrl.slice(1) } : {}),
-    writeHumanFrame: (slot, out, seq) => {
-      const seat = seatOf(slot);
-      if (seat !== 0) {
-        // Sofá: os jogadores 2..4 só pelo dispositivo de cada um (sem 3ª pessoa, toque nem Destravar).
-        if (seat > 0) extras[seat - 1]!.writeFrame(out, seq);
-        return;
-      }
-      player.writeFrame(out, seq);
-      // M2 (fase 6b): em 3ª pessoa, o tiro mira o ponto que a câmera mira (do olho).
-      if (thirdPersonAim()) {
-        out.yaw = yawToU16(thirdAim[0]!);
-        out.pitch = pitchToI16(thirdAim[1]!);
-      }
-      // M2 (fase 6e): no toque, "atirar sozinho" aperta o gatilho com a retícula num inimigo.
-      if (device === 'touch' && host.settings.current.controls.touch.autoFire && enemyUnderCrosshair()) {
-        out.buttons |= BUTTON.fire;
-      }
-      // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
-      if (unstuckPending) {
-        out.buttons |= BUTTON.unstuck;
-        unstuckPending = false;
-      }
+  const driver = createSceneDriver(
+    {
+      recipe,
+      map: loaded.simMap,
+      humans,
+      // M3 (fase 1c): os jogadores 2–4 do sofá ganham um cérebro de reserva (um bot assume quem sai).
+      ...(seatCtrl.length > 1 ? { standby: seatCtrl.slice(1) } : {}),
+      writeHumanFrame: (slot, out, seq) => {
+        const seat = seatOf(slot);
+        if (seat !== 0) {
+          // Sofá: os jogadores 2..4 só pelo dispositivo de cada um (sem 3ª pessoa, toque nem Destravar).
+          if (seat > 0) extras[seat - 1]!.writeFrame(out, seq);
+          return;
+        }
+        player.writeFrame(out, seq);
+        // M2 (fase 6b): em 3ª pessoa, o tiro mira o ponto que a câmera mira (do olho).
+        if (thirdPersonAim()) {
+          out.yaw = yawToU16(thirdAim[0]!);
+          out.pitch = pitchToI16(thirdAim[1]!);
+        }
+        // M2 (fase 6e): no toque, "atirar sozinho" aperta o gatilho com a retícula num inimigo.
+        if (device === 'touch' && host.settings.current.controls.touch.autoFire && enemyUnderCrosshair()) {
+          out.buttons |= BUTTON.fire;
+        }
+        // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
+        if (unstuckPending) {
+          out.buttons |= BUTTON.unstuck;
+          unstuckPending = false;
+        }
+      },
+      onEvents,
+      ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
+      // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11); no bench do Zombies
+      // (fase 7b), o `zombies=` da URL ou o mesmo teto.
+      ...(zombiesMode && (!bench || bench.zombies <= 0)
+        ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) }
+        : {}),
+      budget: aiBudgetFor(profile),
+      now,
+      // A MESMA tabela que o render recebeu no `setFigures` (a hitbox e a pose de 3ª pessoa saem dela).
+      figureTable: figures.table,
+      // Bench: a primária fixa do `weapons=` (fuzil por padrão, comparável ao M1); fora dele, o sorteio dos bots.
+      ...(bench ? { primaries: benchPrimaries(bench.weapons) } : {}),
+      // M2 (fase 2d): a contagem de 3 s só nas partidas de verdade (o bench, a vitrine e os prints começam jogando).
+      ...(request.kind === 'play' ? { countdownS: MATCH_DEFAULTS.countdownS } : {}),
     },
-    onEvents,
-    ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
-    // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11); no bench do Zombies
-    // (fase 7b), o `zombies=` da URL ou o mesmo teto.
-    ...(zombiesMode && (!bench || bench.zombies <= 0)
-      ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) }
-      : {}),
-    budget: aiBudgetFor(profile),
-    now,
-    // A MESMA tabela que o render recebeu no `setFigures` (a hitbox e a pose de 3ª pessoa saem dela).
-    figureTable: figures.table,
-    // Bench: a primária fixa do `weapons=` (fuzil por padrão, comparável ao M1); fora dele, o sorteio dos bots.
-    ...(bench ? { primaries: benchPrimaries(bench.weapons) } : {}),
-    // M2 (fase 2d): a contagem de 3 s só nas partidas de verdade (o bench, a vitrine e os prints começam jogando).
-    ...(request.kind === 'play' ? { countdownS: MATCH_DEFAULTS.countdownS } : {}),
-  });
+    request.online ?? null,
+  );
   const sim = driver.sim;
   {
     const v = sim.view();
@@ -1772,7 +1789,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   if (humans > 0) {
     slots[0]!.controller = 0;
     const v = sim.view();
-    const e = entityIndex(sim.controllerEntity(0));
+    const e = entityIndex(sim.controllerEntity(me));
     player.setAngles(v.yaw[e]!, 0);
     player.setWeapon(v.weapon[e]!);
     for (let k = 1; k <= extras.length; k++) {
@@ -2413,7 +2430,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function updateTips(dt: number): void {
     if (tips.pending.size === 0 && tips.current === null) return;
     const v = sim.view();
-    const e = entityIndex(sim.controllerEntity(0));
+    const e = entityIndex(sim.controllerEntity(me));
     const fl = e >= 0 ? v.flags[e]! : 0;
     tipSignals.alive = e >= 0 && v.alive[e] === 1 && (fl & ENTITY_FLAG.dead) === 0;
     tipSignals.farEnemy = false;
@@ -2615,14 +2632,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function enemyUnderCrosshair(): boolean {
     if (humans === 0) return false;
     const v = sim.view();
-    const e = entityIndex(sim.controllerEntity(0));
+    const e = entityIndex(sim.controllerEntity(me));
     const fl = v.flags[e]!;
     if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
     const ex = v.position[e * 3]!;
     const ey = v.position[e * 3 + 1]! + eyeHeightFor(fl);
     const ez = v.position[e * 3 + 2]!;
     let third: ViewSlot | null = null;
-    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === 0 && slots[i]!.third) third = slots[i]!;
+    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === me && slots[i]!.third) third = slots[i]!;
     const cx = third ? ex + third.camOffX : ex;
     const cy = third ? ey + third.camOffY : ey;
     const cz = third ? ez + third.camOffZ : ez;
@@ -2633,10 +2650,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function thirdPersonAim(): boolean {
     if (humans === 0) return false;
     let slot: ViewSlot | null = null;
-    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === 0 && slots[i]!.third) slot = slots[i]!;
+    for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === me && slots[i]!.third) slot = slots[i]!;
     if (slot === null) return false;
     const v = sim.view();
-    const e = entityIndex(sim.controllerEntity(0));
+    const e = entityIndex(sim.controllerEntity(me));
     const fl = v.flags[e]!;
     if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
     const ex = v.position[e * 3]!;
@@ -2712,7 +2729,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const level = challengeLevel(a);
       if (level !== null) {
         currentLevel = level;
-        const n = driver.director.setLevel(level, challengeTeam);
+        const n = driver.director?.setLevel(level, challengeTeam) ?? 0;
         host.log(`[partida] desafio: ${level} (${n} bots)`);
         pauseMain();
       } else if (nav.back || a === 'back') pauseMain();
@@ -2757,7 +2774,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let resultData: ResultScreenData | null = null;
   function showResult(record: boolean, previewRecord: 'kills' | 'streak' | 'both' | null = null): void {
     const v = sim.view();
-    const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
     const sum = summarizeMatch(matchStats, v, human, ffa);
     resultNemesis = sum.nemesis;
     // M2 (fase 4g): a partida vai para o `stats@1` (o bench não tem humano). Rodada 8 (D5): em tela dividida, todos os
@@ -3380,7 +3397,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   function colorOf(v: SimView, i: number): number {
     if (!ffa && v.kind[i] !== ENTITY_KIND.zombie) return TEAM_COLORS[v.team[i]!] ?? COLORS.texto;
-    return v.controller[i] === 0 && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
+    return v.controller[i] === me && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
   }
 
   /** M2 (fase 2d): uma morte no kill feed ("Normal Bob  Rattler  P1"; sem matador, "P1  Caiu no vazio"). */
@@ -3422,7 +3439,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     scoreboard.teamCount = ffa ? 0 : recipe.teams.length;
     for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
       scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;
-    const human = humans > 0 ? entityIndex(sim.controllerEntity(0)) : -1;
+    const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
     for (let r = 0; r < n; r++) {
       const i = scoreOrder[r]!;
       scoreboard.name[r] = nameOf(v, i);
@@ -3440,14 +3457,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * humano: a conta da derrota feia, a dica (1 vez por partida) e a mira zerada, que vira o cursor do radial.
    */
   function onDeath(s: Sim, victim: number, killer: number, weapon: number): void {
-    const human = humans > 0 ? s.controllerEntity(0) : NULL_ENTITY;
+    const human = humans > 0 ? s.controllerEntity(me) : NULL_ENTITY;
     if (human !== NULL_ENTITY && killer === human && victim !== human) deathsWithoutKill = 0;
     for (let sIdx = 0; sIdx < slots.length; sIdx++) {
       const slot = slots[sIdx]!;
       if (slot.controller < 0 || s.controllerEntity(slot.controller) !== victim) continue;
       const c = slot.desc.camera;
       beginDeath(slot.death, victim, killer, weapon, c.yaw, c.pitch);
-      if (victim !== human || slot.controller !== 0) continue;
+      if (victim !== human || slot.controller !== me) continue;
       deathsWithoutKill++;
       if (
         !hardHintUsed &&
@@ -3567,7 +3584,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       vm.visible = false;
       return;
     }
-    const human = humans > 0 && slot.controller === 0;
+    const human = humans > 0 && slot.controller === me;
     // Humano: a mira vem do mapeador em todo frame de render (sem esperar o tick); bot: a da sim, interpolada.
     // Teste do sofá: os jogadores 2..4 também, cada um pelo seu mapeador.
     const local = mapperOf(slot.controller);
@@ -3845,7 +3862,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     fillGrenadeWarnings(m, v, e, entity, desc.camera.yaw);
     // M2 (fase 3e): avisos dos bots aliados N3 ("inimigo aqui"), só na vista do humano.
     m.pingCount = 0;
-    if (calibration !== null && slot.controller === 0) {
+    if (calibration !== null && slot.controller === me) {
       // M2 (fase 5f): o alvo da calibração, um losango a 10 m na direção dele.
       calibrationTarget(calibration, calibration.index, calibrationAim);
       const ty = calibrationAim[0]!;
@@ -3859,8 +3876,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.pings[1] = projected[1]!;
         m.pingCount = 1;
       }
-    } else if (!ffa && humans > 0 && slot.controller === 0) {
-      const n = driver.director.pings(v.team[e]!, Math.round(PING_SHOW_S * sim.hz), pingScratch);
+    } else if (!ffa && humans > 0 && slot.controller === me) {
+      const n = driver.director?.pings(v.team[e]!, Math.round(PING_SHOW_S * sim.hz), pingScratch) ?? 0;
       for (let k = 0; k < n && m.pingCount < MAX_TEAM_PINGS; k++) {
         const o = k * 3;
         if (
@@ -4176,7 +4193,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (const w of renderer.info.warnings) (w.startsWith('error:') ? threeErrors : threeWarnings).push(`three: ${w}`);
     const ticks = Math.max(1, b.ticks);
     const n = Math.max(1, frames);
-    const botsTotal = driver.director.botCount;
+    const botsTotal = driver.director?.botCount ?? 0;
     const report: BenchReport = {
       version: GAME_VERSION,
       codename: GAME_CODENAME,
@@ -4452,7 +4469,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     panel.heapMb = heapMaxMb < 0 ? -1 : heapNowMb;
     panel.heapLimitMb = heapLimitMb;
-    panel.bots = driver.director.botCount;
+    panel.bots = driver.director?.botCount ?? 0;
     panel.tick = sim.tick;
     panel.gcPauses = benchState?.gcPauses ?? panel.gcPauses;
     panel.voices = host.audio.mixer.stats.activeVoices;
@@ -4545,6 +4562,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
       // --- entrada e sim ---
       let signal: SceneSignal = 'none';
+      // M5: a sala acabou (o host saiu, fui expulso, a conexão caiu): de volta ao menu.
+      if (driver.closed) signal = 'quit';
       if (humans > 0) {
         const last = menu.lastDevice;
         if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
@@ -4632,7 +4651,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         if (benchState && benchState.phase !== 'done') finishBench(true);
         signal = 'quit';
       }
-      const running = !paused && !frozen;
+      const running = (!paused || driver.online) && !frozen;
       trace('entrada');
       if (running) {
         lastTicks = driver.update(dt);

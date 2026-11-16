@@ -101,7 +101,8 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
   - **o host:** a cena de sempre, mais os slots remotos (as entradas vêm da rede; quem cai vira bot pelo cérebro de
     reserva do sofá, M3), o snapshot depois dos ticks e sem pausar a sim (PvP);
   - **o cliente:** o `ClientDriver` no lugar do `LocalDriver`, sem diretor (sem "Ajustar desafio", sem pings de bot);
-  - teste com o `NullRenderer` e o loopback, se a cena couber nele.
+  - teste com o `NullRenderer` e o loopback, se a cena couber nele (não coube: a cena precisa de assets e render;
+    o driver da cena foi testado à parte, de ponta a ponta com o lobby; **feita em 16/11**, ARCHITECTURE §16.7).
 - **4c, as telas (chunk próprio, fora do menu):**
   - o botão "Online" no título (O4), que carrega o chunk;
   - o aviso de privacidade na 1ª vez (O5: eu escrevo, você revisa antes de publicar);
