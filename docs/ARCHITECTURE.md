@@ -2918,3 +2918,26 @@ os arrays em deflate e o teste "a gravada é igual à calculada".
   `then` como promessa rejeitada sem tratamento e o nx.js parava o boot. A leitura agora fica num `try` e a falha
   vira uma linha no `runtime.log` (`bateria: sem leitura (…)`); menu-ready no Eden em 1.472 ms.
 - **3b (HOME e sleep)** continua sendo o vão por amostragem do M1: só o console confirma (roteiro, item 4).
+
+### 15.7 Fase 4: o glifo do botão e o teclado do jogo (16/11/2026)
+
+- **O teclado do jogo (4d):** `packages/game/src/onscreen-keyboard.ts`, no chunk dos editores (fora do menu da web).
+  Duas páginas (letras e números; acentos e pontuação, só o que o nome do bot aceita), Maiúsc. de uma letra (como no
+  celular; apagar tudo volta a maiúscula), Espaço, Apagar e OK, com **L apaga, R maiúsculas, B cancela**. Teclas de
+  60 px de referência em linhas de 10 e a linha de controle em duas (a 640×360, o piso do texto não deixa 5 botões
+  numa linha). O nome digitado vai na fonte de leitura, porque a dos títulos só tem maiúsculas, e a linha do
+  contador avisa quando a próxima letra sai maiúscula.
+  - **Quando abre (decisão menor revisável):** no Laboratório (o único campo de texto hoje: o nome do bot), quando
+    não há teclado do sistema (`textInput.available` falso), quando ele não abre (o swkbd do Switch que devolve
+    `null`), e na web quando quem confirmou foi o controle (para não largar o controle atrás do teclado do PC). No
+    Switch, o swkbd continua sendo a primeira escolha.
+  - **O que ficou de fora:** a opção "Teclado do jogo" nos Ajustes (o menu da web está a 1,7 KB do teto, e o
+    automático acima cobre os casos). O "Sem teclado: role um nome" do Laboratório saiu: sempre dá para digitar.
+  - Cancelar volta o nome e também o "tem mudança" de antes (o Voltar não pede confirmação à toa).
+- **O glifo genérico do botão (4a e 4b):** na plaquinha das dicas da partida, um botão de face aparece como 4
+  quadradinhos em cruz com o da vez cheio, no lugar de "Botão da esquerda". É a posição, não a letra nem a marca, então
+  vale em qualquer controle e acompanha o remapeamento (o glifo sai do botão ligado à ação). É desenhado com os
+  retângulos da UI (sem atlas novo nem programa de shader). Os textos dos menus ("Aperte A") continuam em texto: o A é
+  o mesmo botão no Switch e nos controles padrão da web.
+- **Prints (rodada 18, parte):** `local/m4/capturar-fase4.ts` (Edge headless com um controle falso pela Gamepad API):
+  o teclado aberto, digitando, os acentos com a maiúscula e a página Jogadores.

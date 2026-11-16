@@ -13,7 +13,7 @@ describe('Laboratório', () => {
     const tuned = stepLab('skill', jorge, 'reaction', -1);
     expect(tuned.skill.reactionMs).toBeLessThan(jorge.skill.reactionMs);
     expect(botLevelOf(tuned)).toBeNull();
-    expect(labRows('skill', tuned, true)[0]).toMatchObject({ id: 'level', value: 'ajustada' });
+    expect(labRows('skill', tuned)[0]).toMatchObject({ id: 'level', value: 'ajustada' });
     // Ajustada → +1 cai no primeiro nível; daí anda.
     const vibe = stepLab('skill', tuned, 'level', 1);
     expect(botLevelOf(vibe)).toBe('vibe');
@@ -40,7 +40,7 @@ describe('Laboratório', () => {
     expect(rulesText(blind.rules)).toBe('500 de vida · só escopeta · visão 90° · vê através das paredes');
     // Armas: a escolha anda pela lista (todas, uma só…).
     expect(stepLab('rules', jorge, 'weapons', 1).rules.weapons).not.toEqual(jorge.rules.weapons);
-    for (const tab of LAB_TABS) expect(labRows(tab, jorge, true).length, tab).toBeGreaterThan(0);
+    for (const tab of LAB_TABS) expect(labRows(tab, jorge).length, tab).toBeGreaterThan(0);
     expect(labSummary(jorge)).toBe('Jorge the Immortal · Kamikaze · N0');
   });
 
@@ -54,6 +54,6 @@ describe('Laboratório', () => {
       taken.add(name);
     }
     expect(cleanBotName('  Jorge   😀 Júnior <3 the Great and Powerful')).toBe('Jorge Júnior 3 the Great');
-    expect(labRows('name', jorge, false).map((r) => r.id)).toEqual(['name', 'roll', 'noKeyboard']);
+    expect(labRows('name', jorge).map((r) => r.id)).toEqual(['name', 'roll']);
   });
 });

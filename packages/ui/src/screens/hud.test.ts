@@ -310,6 +310,41 @@ describe('HUD por vista: conteúdo', () => {
     expect(syntheticGlyphText(list)).not.toContain('agacha');
   });
 
+  it('M4 (fase 4a): botão de face vira o glifo genérico (4 quadradinhos em cruz, o da vez cheio), sem o nome', () => {
+    for (const size of SIZES) {
+      const v = layoutHudScreen(1, size.width, size.height, { minTextPx: size.single }).views[0]!;
+      for (let face = 0; face < 4; face++) {
+        const m = sampleModel();
+        m.tipKey = 'Botão da esquerda';
+        m.tipGlyph = face;
+        m.tipText = 'recarrega';
+        m.tipAlpha = 1;
+        const list = createDrawList();
+        drawHud(list, fonts, m, v);
+        const text = syntheticGlyphText(list);
+        expect(text).toContain('recarrega');
+        expect(text).not.toContain('Botão');
+        const filled = drawnCommands(list).filter(
+          (c) => c.color === withAlpha(COLORS.acao, 1) && c.op === DRAW_OP.rect && c.v0 === 0 && c.w === c.h,
+        );
+        const rings = drawnCommands(list).filter(
+          (c) => c.color === withAlpha(COLORS.acao, 0.6) && c.op === DRAW_OP.rect && c.w === c.h,
+        );
+        expect(filled.length, `${size.width}×${size.height}`).toBe(1);
+        expect(rings.length, `${size.width}×${size.height}`).toBe(3);
+        // O cheio fica do lado certo da cruz (baixo, direita, esquerda, cima).
+        const cx = rings.reduce((t, c) => t + c.x, filled[0]!.x) / 4;
+        const cy = rings.reduce((t, c) => t + c.y, filled[0]!.y) / 4;
+        const f = filled[0]!;
+        if (face === 0) expect(f.y).toBeGreaterThan(cy);
+        if (face === 1) expect(f.x).toBeGreaterThan(cx);
+        if (face === 2) expect(f.x).toBeLessThan(cx);
+        if (face === 3) expect(f.y).toBeLessThan(cy);
+        for (const c of drawnCommands(list)) expect(inside(c, v), `${size.width}×${size.height}`).toBe(true);
+      }
+    }
+  });
+
   it('dano direcional na borda certa (positivo = à esquerda, como o yaw)', () => {
     const side = (angle: number): DrawnCommand => {
       const m = sampleModel();

@@ -136,6 +136,7 @@ import {
   wantsMusic,
 } from './sound-bank.ts';
 import { createMixer, type MixerStats } from '@boboforces/audio';
+import type { OnscreenKeyboard } from './onscreen-keyboard.ts';
 import {
   DEFAULT_RENDERER_ROUTES,
   type BatteryReading,
@@ -478,7 +479,11 @@ export function startGame(deps: GameDeps): GameHandle {
   let labDiscard = false;
   /** Digitando o nome (o menu não anda) e, depois, esperando soltar tudo (o Enter não reabre a digitação). */
   let labTyping: TextInputSession | null = null;
+  /** M4 (fase 4d): o teclado do jogo aberto sobre o Laboratório. */
+  let labKeyboard: OnscreenKeyboard | null = null;
   let labTypingFrom = '';
+  /** M4 (fase 4d): se havia mudança antes de digitar (cancelar volta a isso, e não pede confirmação à toa). */
+  let labTypingDirty = false;
   let labHold = false;
   /** Testando o bot no Bobo Training (a volta da cena cai no Laboratório). */
   let labTesting = false;
@@ -490,7 +495,8 @@ export function startGame(deps: GameDeps): GameHandle {
       editors!.labScreen.build({
         tabs: editors!.LAB_TABS.map((id) => editors!.LAB_TAB_LABELS[id]),
         tab: labTab,
-        rows: editors!.labRows(editors!.LAB_TABS[labTab]!, labDoc, platform.textInput.available),
+        // M4 (fase 4d): sempre dá para digitar (sem teclado do sistema, o teclado do jogo).
+        rows: editors!.labRows(editors!.LAB_TABS[labTab]!, labDoc),
         summary: editors!.labSummary(labDoc),
         note: labNote,
       }),
@@ -518,11 +524,20 @@ export function startGame(deps: GameDeps): GameHandle {
   function endTyping(): void {
     labTyping?.close();
     labTyping = null;
+    labKeyboard = null;
     labHold = true;
   }
   function startTyping(): void {
-    if (!platform.textInput.available || labTyping !== null) return;
+    if (labTyping !== null || labKeyboard !== null) return;
     labTypingFrom = labDoc.name;
+    labTypingDirty = labDirty;
+    // M4 (fase 4d): o teclado do jogo quando não há o do sistema, quando ele não abre, ou digitando com o controle na
+    // web (o do Switch é o próprio swkbd).
+    const own = !platform.textInput.available || (menuInput.lastDevice === 'gamepad' && platform.id !== 'switch');
+    if (own) {
+      openOwnKeyboard();
+      return;
+    }
     const done = (name: string): void => {
       labDoc = { ...labDoc, name: name.trim() || labTypingFrom };
       labNote = '';
@@ -538,10 +553,27 @@ export function startGame(deps: GameDeps): GameHandle {
           rebuildLab();
         },
         onSubmit: (value) => done(editors!.cleanBotName(value)),
-        onCancel: () => done(labTypingFrom),
+        onCancel: () => {
+          done(labTypingFrom);
+          labDirty = labTypingDirty;
+        },
       },
     );
     if (labTyping !== null) labNote = t('lab.typing');
+    else openOwnKeyboard();
+  }
+  function openOwnKeyboard(): void {
+    labHold = true;
+    labKeyboard = editors!.createOnscreenKeyboard({
+      title: t('lab.keyboardTitle'),
+      initial: labDoc.name,
+      maxLength: BOT_RANGES.nameMaxLength,
+      clean: editors!.cleanBotName,
+      onChange: (value) => {
+        labDoc = { ...labDoc, name: value };
+        labDirty = true;
+      },
+    });
   }
   function labAction(nav: MenuNavigation): void {
     const a = nav.activated;
@@ -1635,9 +1667,19 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'lab': {
         // Digitando o nome, ou logo depois (até soltar tudo): o menu não anda.
         if (labHold && !anyInputHeld(raw)) labHold = false;
-        if (labTyping === null && !labHold) labAction(labMenu.update(menuInput, raw, u));
+        if (labTyping === null && labKeyboard === null && !labHold) labAction(labMenu.update(menuInput, raw, u));
         if (screen === 'lab') {
-          labMenu.draw(list, u);
+          // M4 (fase 4d): o teclado do jogo no lugar do Laboratório (OK grava o nome; B volta o de antes). O aperto que
+          // o abriu não digita: até soltar tudo (`labHold`), ele só aparece.
+          const kb = labKeyboard;
+          const r = kb === null ? 'open' : labHold ? (kb.draw(list, u), 'open') : kb.frame(menuInput, raw, u, list);
+          if (kb !== null && r !== 'open') {
+            labDoc = { ...labDoc, name: r === 'submit' ? kb.value.trim() || labTypingFrom : labTypingFrom };
+            if (r === 'cancel') labDirty = labTypingDirty;
+            endTyping();
+            rebuildLab();
+          }
+          if (labKeyboard === null) labMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

@@ -320,6 +320,13 @@ const ALLY_MARKER_MAX_M = 80;
 const ALLY_MARKER_HEIGHT_M = 2.05;
 /** M2 (fase 4f): com "Reduzir tremor", o tremor das explosões fica nesta fração. */
 const REDUCED_SHAKE = 0.25;
+/** M4 (fase 4a): os botões de face na ordem do glifo da dica (baixo, direita, esquerda, cima). */
+const FACE_GLYPHS: readonly number[] = [
+  PAD_BUTTON.faceDown,
+  PAD_BUTTON.faceRight,
+  PAD_BUTTON.faceLeft,
+  PAD_BUTTON.faceUp,
+];
 /** M4 (fase 3): abaixo disto (0–1), sem carregar, a partida avisa uma vez (P5). */
 const BATTERY_LOW = 0.2;
 /** De quantos em quantos segundos da partida a bateria é lida, e quanto tempo o aviso fica na tela. */
@@ -2388,6 +2395,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let tipLabelDevice: DeviceKind | null = null;
   let tipKey = '';
   let tipText = '';
+  /** M4 (fase 4a): o botão de face da dica como glifo (0 baixo, 1 direita, 2 esquerda, 3 cima), ou -1. */
+  let tipGlyph = -1;
   function refreshTipLabel(): void {
     const id = tips.current;
     if (id === null || (id === tipLabelId && device === tipLabelDevice)) return;
@@ -2395,6 +2404,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     tipLabelDevice = device;
     const sources = profileBindings(profiles[device], TIPS[id].action);
     tipKey = sources.length > 0 ? bindingLabel(sources[0]!) : '';
+    const src = sources[0];
+    tipGlyph = src !== undefined && src.device === 'padButton' && !src.hold ? FACE_GLYPHS.indexOf(src.button) : -1;
     tipText = t(TIPS[id].textKey);
   }
   function updateTips(dt: number): void {
@@ -3952,12 +3963,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       refreshTipLabel();
       m.tipKey = tipKey;
       m.tipText = tipText;
+      m.tipGlyph = tipGlyph;
     }
     // M4 (fase 3): o aviso da bateria usa a plaquinha da dica (passa na frente dela).
     if (s === 0 && batteryNoticeS > 0) {
       m.tipAlpha = Math.min(1, batteryNoticeS);
       m.tipKey = '!';
       m.tipText = batteryNotice;
+      m.tipGlyph = -1;
     }
     drawHud(slot.hud, fonts, m, lay.views[s]!);
     desc.hud = slot.hud;

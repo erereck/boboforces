@@ -21,3 +21,4 @@ export { customMatchScreen, labScreen, workshopScreen } from '@boboforces/ui';
 registerStrings(STRINGS_EXTRA_PT_BR);
 // M4 (fase 2c): o importador da pasta `oficina/` (só o Switch usa; fora do menu da web).
 export { importWorkshopFiles } from './workshop-files.ts';
+export { createOnscreenKeyboard } from './onscreen-keyboard.ts';

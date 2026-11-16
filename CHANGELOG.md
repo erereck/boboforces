@@ -22,6 +22,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   Switch, depois de trocar dock e portátil, do HOME e do sleep: A num controle livre fica no lugar de quem caiu (ou
   entra na partida), B no controle do P2 ao P4 sai do sofá, e a partida espera pausada. No Switch, a pausa mostra a
   bateria e a partida avisa uma vez abaixo de 20% sem carregar.
+- **Teclado do jogo e glifo do botão (fase 4):** o nome do bot no Laboratório se digita só com o controle, num
+  teclado na tela (letras, números e acentos; L apaga, R maiúsculas, B cancela) quando não há teclado do sistema, quando
+  ele não abre, ou na web quando você está no controle. Nas dicas da partida, o botão aparece como uma cruz com o botão
+  certo aceso, em vez do nome escrito.
 - **Preparação do console (fase 7):** no Switch, o heap vai para o `runtime.log` a cada minuto de partida, e o
   `docs/ROTEIRO_M4.md` junta o que testar quando o console voltar.
 - **Ícone (fase 6a):** o NRO ganhou ícone próprio, um bobo de capacete em blocos (era o ícone padrão do nx.js).

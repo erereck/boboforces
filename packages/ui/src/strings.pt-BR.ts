@@ -626,7 +626,6 @@ export const STRINGS_PT_BR = {
   'lab.knowledge.area': 'Sabe a área',
   'lab.knowledge.wallhack': 'Vê através',
   'lab.roll': 'Rolar nome',
-  'lab.noKeyboard': 'Sem teclado: role um nome.',
   'lab.levelHint': 'O nível preenche habilidade e inteligência.',
   'lab.mindHint': 'O nível liga os comportamentos; depois, cada um muda.',
   'lab.summary': '{name} · {persona} · N{n}',

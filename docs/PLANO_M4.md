@@ -73,7 +73,8 @@ dá para conferir no PC, na web e no Eden vem primeiro; o que só o console resp
 3. **Ciclo de vida:** dock/portátil com as vistas, HOME/sleep, reconexão, bateria. (Feita em 16/11/2026,
    ARCHITECTURE §15.6: a página Jogadores da pausa no lugar de voltar ao lobby, e a bateria na pausa; HOME e sleep
    esperam o console.)
-4. **Glifos genéricos e teclado na tela.**
+4. **Glifos genéricos e teclado na tela.** (Feita em 16/11/2026, ARCHITECTURE §15.7: o teclado do jogo no
+   Laboratório e o glifo do botão de face nas dicas; a opção nos Ajustes ficou de fora pelo teto do menu.)
 5. **Desempenho:** pré-malha e navegação no `.bfmap`, aquecimento completo, o plano B. (A 5a espera o console:
    ARCHITECTURE §15.4.)
 6. **NACP, ícone, title ID e NSP.** (O ícone, 6a, feito em 16/11/2026: ARCHITECTURE §15.3.)

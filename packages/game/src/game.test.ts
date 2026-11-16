@@ -1639,6 +1639,52 @@ describe('Laboratório (M2, fase 5b)', () => {
     expect(game.save.bots[0]).toEqual(bot);
     game.dispose();
   }, 60_000);
+  it('M4 (fase 4d): sem teclado do sistema, o Nome abre o teclado do jogo; só com setas e confirmar, OK grava e B cancela', async () => {
+    const { platform, game } = await bootToTitle();
+    titleTo(platform, 'lab');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    // E ×4: Nome; baixo (a linha do nome) e confirmar: o teclado do jogo abre por cima.
+    for (let i = 0; i < 4; i++) platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.pump(2);
+    // Q (o L do controle) apaga tudo; o foco começa no "q", e a 1ª letra sai maiúscula; direita e "w".
+    for (let i = 0; i < 30; i++) platform.tap('KeyQ');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    // Baixo ×3 (linhas de baixo e Maiúsc.), baixo (Espaço), direita (OK).
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('lab');
+    // De volta no Laboratório: baixo (Rolar), baixo (Voltar), direita ×2 (Salvar).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('workshop');
+    expect(game.save.bots[0]?.name).toBe('Qw');
+    // Editar de novo e digitar, mas o Esc (o B) cancela: o nome volta.
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    for (let i = 0; i < 4; i++) platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.pump(2);
+    platform.tap('Enter');
+    platform.tap('Escape');
+    expect(game.screen).toBe('lab');
+    platform.tap('Escape');
+    expect(game.screen).toBe('workshop');
+    expect(game.save.bots[0]?.name).toBe('Qw');
+    game.dispose();
+  }, 60_000);
 });
 
 describe('Ringue (M2, fase 5c)', () => {

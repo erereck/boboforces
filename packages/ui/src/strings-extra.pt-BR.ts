@@ -277,6 +277,18 @@ export const STRINGS_EXTRA_PT_BR = {
   'pause.battery': 'Bateria {n}%',
   'pause.batteryCharging': 'Bateria {n}%, carregando',
   'match.batteryLow': 'Bateria em {n}%: ligue o carregador.',
+  // M4 (fase 4d): o teclado do jogo (no canvas, só com o D-pad).
+  'keyboard.count': '{n}/{max}',
+  'keyboard.countUpper': '{n}/{max} · a próxima letra sai maiúscula',
+  'keyboard.upper': 'Maiúsc.',
+  'keyboard.lower': 'minúsc.',
+  'keyboard.accents': 'Acentos',
+  'keyboard.letters': 'Letras',
+  'keyboard.space': 'Espaço',
+  'keyboard.erase': 'Apagar',
+  'keyboard.ok': 'OK',
+  'keyboard.help': 'L apaga · R maiúsculas · B cancela',
+  'lab.keyboardTitle': 'Nome do bot',
   // Refino R4c (#79): a frase da linha (ou da aba) com o foco na Partida personalizada.
   'custom.help.tab.match': 'Modo, mapa, quando a partida acaba e até onde se vê.',
   'custom.help.tab.players': 'Movimento, vida, renascer e câmera de todo mundo.',

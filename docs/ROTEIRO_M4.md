@@ -26,6 +26,7 @@
 | 4b | Numa partida com 2, encaixar os Joy-Cons do P2 no console (ele vira outro controle) e apertar A neles | Na página Jogadores, o P2 passa para o controle novo; Continuar e ele joga |
 | 4c | Fora da dock, olhar a pausa (e, se der, jogar com a bateria abaixo de 20%) | "Bateria NN%" na pausa; abaixo de 20%, um aviso só na partida |
 | 5 | Do lobby: Modos, Ajustes, Laboratório, Meu Bobo e Testes, e voltar de cada um | Toda volta cai no lobby, com os mesmos jogadores sentados |
+| 5b | No Laboratório, aba Nome, confirmar na linha do nome | Abre o teclado do sistema; se não abrir, o teclado do jogo (D-pad, A digita, L apaga, R maiúsculas, OK grava) |
 | 6 | Com arquivos na `oficina/`, abrir o Laboratório | O bot (ou o preset) do PC aparece; no log, `[save] oficina: …` (o arquivo estranho como "ignorado") |
 | 7 | Solo, no portátil, Bobo Zombies o quanto der | Sem travar; anote se esquentar e em que onda parou |
 | 8 | Abrir o jogo a frio 3 vezes e anotar quanto o lobby demora; depois a 1ª partida | O `[boot] menu-ready` e o `loading` no log (a 1ª cena ainda deve ficar perto de 5 s: a 5a espera este número) |

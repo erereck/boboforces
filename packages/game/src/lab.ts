@@ -411,12 +411,11 @@ function rowsOf(tab: LabTab): readonly LabRow[] {
 /**
  * As linhas da aba. Nome: o nome (confirmar abre a digitação, quando o aparelho tem teclado) e "Rolar nome".
  */
-export function labRows(tab: LabTab, d: BotDocument, canType: boolean): TabbedRow[] {
+export function labRows(tab: LabTab, d: BotDocument): TabbedRow[] {
   if (tab === 'name') {
     return [
       { kind: 'value', id: 'name', labelKey: 'lab.row.name', value: d.name },
       { kind: 'action', id: 'roll', label: { key: 'lab.roll' } },
-      ...(canType ? [] : [{ kind: 'text' as const, id: 'noKeyboard', text: t('lab.noKeyboard'), dim: true }]),
     ];
   }
   const rows: TabbedRow[] = rowsOf(tab).map((r) => ({
