@@ -70,6 +70,7 @@ packages/world              grade, chunks, blocos, DDA/AABB, mesher (puro)
 packages/nav                navegação 2,5D (puro, M1+)
 packages/sim                sim headless, métricas, eventos, passo fixo (puro)
 packages/ai                 bots (puro)
+packages/net                online P2P (M5, só web; só apps/web importa): protocolo, snapshot, entradas, drivers
 packages/ui                 árvore de UI, DrawList, tema, strings.pt-BR (puro)
 packages/audio              mixer Web Audio (M2)
 packages/render             único com three (`@boboforces/render/data` é a parte sem three que o game importa)

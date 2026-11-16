@@ -13,7 +13,8 @@ const scratchF64 = new Float64Array(scratch);
 const scratchU32 = new Uint32Array(scratch);
 
 function checkBits(bits: number): void {
-  assert(Number.isInteger(bits) && bits >= 0 && bits <= 32, `bits precisa estar em [0, 32]: ${bits}`);
+  // M5: a mensagem só é montada quando falha (isto roda a cada campo de cada snapshot da rede).
+  if (!(Number.isInteger(bits) && bits >= 0 && bits <= 32)) assert(false, `bits precisa estar em [0, 32]: ${bits}`);
 }
 
 /** Maior inteiro sem sinal em `bits` bits (sem `<<`, que dá negativo a partir de 31 bits). */

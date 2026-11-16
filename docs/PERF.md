@@ -229,6 +229,27 @@ fatias de 800 nós; criar (CSR invertido e buffers) 2,7 ms no loading. No jitles
 de 800). Nas primeiras ondas (poucos zumbis vivos) o A* por zumbi sai mais barato, mas é no pico, com a horda cheia, que
 o orçamento aperta.
 
+## 1i. Rede (M5, fase 1; 16/11/2026, 0.0.1 local, i5-12450H)
+
+Snapshot pela rede, sem rede de verdade (`packages/net`, Node com JIT). Construto sintético, TDM, 4 humanos
+andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de aquecimento (sonda em
+`local/m5/medir-rede.test.ts.txt`). "Codificar" é por cliente (o host codifica uma vez para cada um).
+
+| Partida | Completo | Delta médio | Banda a 30 Hz | Partes | Captura | Codificar | Montar | Aplicar |
+|---|---|---|---|---|---|---|---|---|
+| 4 humanos + 8 bots (12 entidades) | 565 B | 131 B | **3,8 KB/s** | 1 | 17 µs | 39 µs | 18 µs | 13 µs |
+| 4 humanos + 48 bots + 24 zumbis (76 entidades) | 3.527 B | 663 B | **19,4 KB/s** | 4 | 133 µs | 486 µs | 147 µs | 90 µs |
+
+- **Loopback, a partida inteira** (`net/src/match.test.ts`: host + 3 clientes, 80 ms ± 25 ms, 5% de perda, 1% de
+  duplicação, TDM de 40 s com 4 humanos e 8 bots): host → cada cliente **5,8 KB/s** (snapshots a 30 Hz e o
+  handshake); cliente → host **3,2 KB/s** (entradas a 60 Hz com 3 repetidas); maior mensagem 559 B; 21 snapshots
+  completos (os do 1º ack de cada cliente).
+- **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
+  (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
+  captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).
+- **Orçamento do host no celular** (tecnico.md §13.4: rede 2 ms com 3 clientes e 8 bots): no PC, 17 + 3 × 39 =
+  **134 µs** por snapshot. Ainda falta medir no celular (fase 7).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

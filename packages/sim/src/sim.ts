@@ -69,7 +69,7 @@ import { movementSystem } from './systems/movement.ts';
 import { pickupSystem } from './systems/pickups.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
-import type { MatchView, PickupView, ProjectileView, SimView } from './view.ts';
+import type { MatchPhase, MatchView, PickupView, ProjectileView, SimView } from './view.ts';
 import {
   MapObjects,
   type BarricadeDef,
@@ -161,6 +161,40 @@ export interface SnapshotRef {
   readonly tick: number;
 }
 
+/** M5 (online): os escalares do estado que o cliente recebe do host (o `net` monta a partir do snapshot). */
+export interface SimRemoteState {
+  tick: number;
+  count: number;
+  projCount: number;
+  pickCount: number;
+  phase: MatchPhase;
+  ticksLeft: number;
+  countdownTicks: number;
+  winnerTeam: number;
+  winnerEntity: number;
+  zombieWave: number;
+  zombiesLeft: number;
+  /** -1 = no meio de uma onda (como na `MatchView`). */
+  zombieRestTicks: number;
+  doublePointsTicks: number;
+  instaKillTicks: number;
+  lastZombie: number;
+  selfRevivesLeft: number;
+}
+
+/**
+ * M5 (online, só o `net`): o cliente mostra o estado do host em vez de rodar a sim. `begin` copia o estado atual para
+ * os `prev*` (o render interpola do snapshot anterior para o novo); entre `begin` e `commit` o `net` escreve os
+ * arrays da view (inclusive os de `mapObjects` e o placar em `match.teamScore`), o único que escreve neles fora da
+ * sim; `commit` aplica os escalares, refaz a tabela controlador → entidade, devolve tábuas e portas à colisão e
+ * sincroniza a view. Os campos internos (cooldowns, botões, RNG) ficam como estão: o cliente não chama `step` enquanto
+ * recebe (a predição do próprio movimento é a fase 2 do M5).
+ */
+export interface SimRemote {
+  begin(): void;
+  commit(state: Readonly<SimRemoteState>): void;
+}
+
 /**
  * Fronteira da sim (tecnico.md §4.4). Headless, determinística na mesma build/plataforma, sem relógio e sem
  * alocação no laço quente. Ordem fixa por tick: aplicar inputs → movimento/colisão → armas → projéteis → dano/morte →
@@ -189,6 +223,8 @@ export interface Sim extends Disposable {
   stateHash(): number;
   writeSnapshot(w: BitWriter, baseline?: SnapshotRef): void;
   readSnapshot(r: BitReader): void;
+  /** M5: o estado do host escrito por cima (só o cliente online, pelo `net`). */
+  readonly remote: SimRemote;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -655,11 +691,60 @@ export function createSim(config: SimConfig): Sim {
     }
   };
 
+  const remote: SimRemote = {
+    begin(): void {
+      for (let e = 0; e < s.count; e++) {
+        const e3 = e * 3;
+        s.prevPosition[e3] = s.position[e3]!;
+        s.prevPosition[e3 + 1] = s.position[e3 + 1]!;
+        s.prevPosition[e3 + 2] = s.position[e3 + 2]!;
+        s.prevYaw[e] = s.yaw[e]!;
+        s.prevPitch[e] = s.pitch[e]!;
+      }
+      for (let p = 0; p < s.projCount * 3; p++) s.projPrevPosition[p] = s.projPosition[p]!;
+      for (let p = 0; p < s.pickCount * 3; p++) s.pickPrevPosition[p] = s.pickPosition[p]!;
+    },
+    commit(state): void {
+      ctx.tick = state.tick;
+      s.count = state.count;
+      s.projCount = state.projCount;
+      s.pickCount = state.pickCount;
+      match.phase = state.phase;
+      match.ticksLeft = state.ticksLeft;
+      match.countdownTicks = state.countdownTicks;
+      match.winnerTeam = state.winnerTeam;
+      match.winnerEntity = state.winnerEntity;
+      if (zombiesMode) {
+        const w = ctx.waves;
+        w.wave = state.zombieWave;
+        w.left = state.zombiesLeft;
+        w.resting = state.zombieRestTicks >= 0 ? 1 : 0;
+        w.restTicks = Math.max(0, state.zombieRestTicks);
+        w.doubleTicks = state.doublePointsTicks;
+        w.instaTicks = state.instaKillTicks;
+        w.lastZombie = state.lastZombie;
+        w.selfRevivesLeft = state.selfRevivesLeft;
+      }
+      // A câmera e o HUD acham "o meu bobo" por aqui; morto esperando o respawn continua com o id (como no host).
+      s.controllerEntity.fill(NULL_ENTITY);
+      for (let e = 0; e < s.count; e++) {
+        const c = s.controller[e]!;
+        if (s.alive[e] === 1 && c >= 0 && c < MAX_CONTROLLERS_WITH_ZOMBIES) s.controllerEntity[c] = s.idOf(e);
+      }
+      mapObjects?.sync();
+      ctx.figures.invalidate();
+      events.clear();
+      keepEvents = false;
+      syncView();
+    },
+  };
+
   return {
     hz,
     get tick(): number {
       return ctx.tick;
     },
+    remote,
     controllerCount,
     step(inputs): void {
       assert(!disposed, 'sim: step depois do dispose');

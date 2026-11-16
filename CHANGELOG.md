@@ -6,6 +6,17 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M5: online P2P (planejado em 16/11/2026)
+
+- **Plano** em `docs/PLANO_M5.md`: até 4 amigos na mesma partida pela web, cada um no seu aparelho, com os bots do
+  host, sala por código ou link, sem servidor de jogo e sem conta. O Switch continua sem rede. Perguntas O1–O6 no
+  padrão.
+- **O protocolo, ainda sem rede (fase 1):** o pacote `net` com o handshake de versões (quem está na mais antiga vê
+  "atualize"), o snapshot com delta e as entradas do cliente com as 3 anteriores repetidas. Numa rede de mentira com
+  80 ms e 5% de perda, uma partida inteira entre o host e 3 clientes termina igual nos 4; o host manda ~6 KB/s para
+  cada cliente com 8 bots. O cliente ainda não tem efeitos nem som (fase 2), e nada disso aparece no jogo até a sala
+  (fase 4).
+
 ### M4: o porte do Switch (planejado em 16/11/2026)
 
 - **Plano** em `docs/PLANO_M4.md`: a LOCAL EDITION (abre direto no lobby "aperte A"), o save e os arquivos no SD

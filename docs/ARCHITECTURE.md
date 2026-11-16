@@ -24,7 +24,7 @@ shared
 ├── audio  (+ platform-api)                          │
 └── render (+ platform-api, world, ui, three) ───────┘  (o game importa só os TIPOS do render)
 
-net (M5, só web): importa sim, format e platform-api; só apps/web importa net.
+net (M5, só web): importa shared, format, input e sim (platform-api na fase 3); só apps/web importa net.
 ```
 
 Em lista (cada pacote só importa os da esquerda que aparecem na sua linha):
@@ -43,6 +43,7 @@ Em lista (cada pacote só importa os da esquerda que aparecem na sua linha):
 | `audio` | shared, platform-api | ES2023 (puro desde o M1) | mixer sobre o subconjunto comum de Web Audio (`AudioContextLike`) |
 | `render` | shared, platform-api, world, ui, three | ES2023 + DOM | ÚNICO com three: chunks, texture arrays, instâncias, viewports, DrawList |
 | `game` | todos acima (do render, só o subcaminho sem three e sem DOM `@boboforces/render/data`) | ES2023 (puro) | fluxo de telas, cola, LocalDriver, NullRenderer; a cena do Construto em `@boboforces/game/scene` (M1) |
+| `net` | shared, format, input, sim | ES2023 (puro) | online P2P (M5, só web): protocolo, snapshot com delta, entradas, transporte, `HostDriver` e `ClientDriver` (§16) |
 | `apps/web` | game, render, platform-api, input, shared | DOM + vite/client | casca web: splash, platform-web, adaptadores de input |
 | `apps/switch` | game, render, ui, platform-api, input, shared | DOM (ver §6) | casca nx.js: platform-switch, build esbuild, NRO/NSP locais |
 
@@ -2962,3 +2963,49 @@ os arrays em deflate e o teste "a gravada é igual à calculada".
 - **O bench de 20 min (7b):** no lugar do plano B, o "Bench 20 min" (`zombies20`: Bobo Zombies na Base, 4 vistas,
   1200 s; o mesmo preset na dock e no portátil, quem muda é o console). O heap de cada minuto fica guardado na partida, e
   o relatório do bench ganha `heap_5a10`, `heap_15a20` e a `tendencia` (a P8: até +10%) na linha `memoria_mb`.
+
+## 16. M5: online P2P (a partir de 16/11/2026)
+
+Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/web` é o único que importa, regra 4).
+
+### 16.1 Fase 1: o protocolo, sem rede (16/11/2026)
+
+- **Pacote `net`:** importa `shared`, `format`, `input` e `sim` (o `platform-api` entra com o `OnlineService` na fase
+  3); `ai` só nos testes (devDependency: o host do teste tem bots). Puro e sem relógio: quem chama passa o tempo do
+  frame, e o loopback tem o relógio dele.
+- **Contrato novo na sim, `Sim.remote` (decisão menor revisável):** o cliente não roda a sim, ele mostra o estado do
+  host. `remote.begin()` copia o estado para os `prev*`; o `net` escreve os arrays da view (o único que escreve neles
+  fora da sim); `remote.commit(state)` aplica os escalares (`SimRemoteState`: tick, contagens, partida, ondas), refaz a
+  tabela controlador → entidade, devolve tábuas e portas à colisão e sincroniza a view. Assim o cliente usa a mesma
+  `Sim` (mapa, colisão, view), e a predição da fase 2 roda o mesmo código. Snapshot e hash da sim não mudaram (o golden
+  é o mesmo).
+- **O que viaja (`net/src/schema.ts`):** só os campos da `SimView`, em inteiros: posição em 1 cm (20 bits; a diferença
+  para a base em 10 bits quando cabe), mira nos mesmos 16 bits do InputFrame (a dos humanos e bots volta exata),
+  velocidade em 5 cm/s, vida em 0,1, ADS em 1/255, recuo em 0,1 mrad; o resto é inteiro como está. As entidades têm 11
+  grupos com um bit de "mudou" cada (4 quentes: posição, mira, velocidade e estado; 7 frios atrás de um bit), e dentro
+  do grupo um bit por componente. Projéteis, pickups e os escalares da partida (placar, ondas, tábuas, portas, a Caixa)
+  vão do mesmo jeito. Campo novo entra no fim do grupo e sobe o `PROTOCOL_VERSION`.
+- **Snapshot (`net/src/snapshot.ts`):** delta contra o último snapshot completo que o cliente confirmou (o host guarda
+  32, ~1 s a 30 Hz; ack mais velho ou nenhum = completo), dividido em partes de até 1.100 B. Ordem dos itens: os
+  escalares, a entidade do próprio jogador, as outras pela distância até ela, projéteis e pickups. Cada parte se lê
+  sozinha, e o snapshot só vale (é aplicado e vira base) com todas as partes. O cliente guarda 64 completos e monta até 4
+  ao mesmo tempo. Host e cliente guardam os mesmos inteiros (o teste confere, inteiro a inteiro).
+- **Entradas (`net/src/inputs.ts`):** uma mensagem por tick com o frame novo e os 3 anteriores, e o ack. No host, uma
+  fila por cliente consome um frame por tick em ordem. Um frame perdido de vez é pulado. Sem frame novo, repete o último
+  (o gatilho segue apertado). Com mais de 3 esperando, pula para perto do mais novo, somando os botões do que pulou (um
+  toque de pulo não se perde). O snapshot leva o último `seq` usado, para a reconciliação da fase 2.
+- **Drivers:** o `net` não importa o `game`, então o `MatchDriver` é repetido pela forma (`NetMatchDriver`).
+  `createHostDriver(net, inner)` embrulha o `LocalDriver`: lê a rede antes dos ticks e manda o snapshot depois. O
+  `writeHumanFrame` do driver de dentro chama `net.writeRemoteFrame` nos slots remotos. `createClientDriver` manda a
+  entrada a cada tick e aplica o snapshot completo mais novo. O `alpha` anda do snapshot anterior ao novo ao longo do
+  intervalo entre eles. O handshake (`hello` → `welcome` ou `reject`) leva o `PROTOCOL_VERSION`, a versão do jogo e o
+  hash das tabelas que mexem na sim (`SIM_CONTENT_TABLES`). Quem está na versão mais antiga vê "atualize".
+- **`createLoopback`:** a rede de mentira em memória, com latência, variação, perda e duplicação no canal não
+  confiável, e com o confiável sempre em ordem. É determinística pela semente.
+- **Critério 1 do plano:** host e 3 clientes, a 80 ms com 25 ms de variação e 5% de perda, jogam uma TDM de 40 s com 8
+  bots até o fim. Nos 4, o resultado é igual: vencedor, placar, abates e mortes de cada entidade. O último snapshot de
+  cada cliente é, inteiro a inteiro, o que o host guardou (`net/src/match.test.ts`). Números no `PERF.md` §1i.
+- **De passagem, no `shared`:** o `checkBits` do BitWriter/BitReader montava a mensagem de erro em toda escrita. Agora
+  só monta quando falha (a rede escreve milhares de campos por snapshot).
+- **Desvio do plano:** os eventos da sim (tiro, acerto, morte, som) ainda não viajam. O cliente mostra o estado, sem
+  efeitos e sem som. Eles entram na fase 2, pelo canal confiável, antes da sala (fase 4).

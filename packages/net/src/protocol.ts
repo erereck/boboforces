@@ -1,0 +1,213 @@
+import { CONTENT_IDS, GAME_VERSION } from '@boboforces/format';
+import { StateHasher, type BitReader, type BitWriter } from '@boboforces/shared';
+import {
+  BASE_HP,
+  BOBO_NAV_METRICS,
+  DESMONTADOR,
+  HEADSHOT_MULTIPLIER,
+  MATCH_DEFAULTS,
+  METRICS,
+  MOVEMENT_BOBO,
+  MOVEMENT_DOWNED,
+  MOVEMENT_TACTICAL,
+  MOVEMENT_ZOMBIE,
+  MOVEMENT_ZOMBIE_RUNNER,
+  MOVEMENT_ZOMBIE_SLOW,
+  MOVEMENT_ZOMBIE_SPRINTER,
+  PART_DAMAGE_MULTIPLIER,
+  SPREAD_STATE_MULTIPLIER,
+  WEAPON_FIRE,
+  WEAPONS,
+  ZOMBIE_BARRICADES,
+  ZOMBIE_BOX,
+  ZOMBIE_DROPS,
+  ZOMBIE_GOO,
+  ZOMBIE_KINDS,
+  ZOMBIE_PERKS,
+  ZOMBIE_POINTS,
+  ZOMBIE_RULES,
+  ZOMBIE_SHOP,
+  ZOMBIE_SPECIALS,
+  ZOMBIE_SPIT,
+  ZOMBIES_DOWN,
+  ZOMBIES_MODE,
+} from '@boboforces/sim';
+
+/**
+ * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
+ * versões diferentes (quem está na mais antiga atualiza).
+ */
+export const PROTOCOL_VERSION = 1;
+
+/** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
+export const MAX_MESSAGE_BYTES = 1100;
+
+/** Primeiro byte de toda mensagem. Valor novo entra no fim. */
+export const MSG = { hello: 1, welcome: 2, reject: 3, snapshot: 4, input: 5 } as const;
+
+/** Canal da mensagem: confiável e ordenado (handshake, lobby, eventos) ou não confiável (entradas e snapshots). */
+export type NetChannel = 'reliable' | 'unreliable';
+
+/** Tick nenhum (snapshot completo, sem base; ou "ainda não recebi snapshot"). */
+export const NO_TICK = 0xffffffff;
+
+/**
+ * Tabelas que mexem na sim (tecnico.md §13.3: "registro de IDs e tabelas de armas e regras"). Host e cliente com
+ * tabelas diferentes simulariam outra coisa: o hash entra no handshake. Tabela nova da sim entra aqui.
+ */
+export const SIM_CONTENT_TABLES: readonly unknown[] = [
+  CONTENT_IDS,
+  METRICS,
+  PART_DAMAGE_MULTIPLIER,
+  HEADSHOT_MULTIPLIER,
+  BASE_HP,
+  MOVEMENT_BOBO,
+  MOVEMENT_TACTICAL,
+  MATCH_DEFAULTS,
+  WEAPON_FIRE,
+  WEAPONS,
+  ZOMBIE_GOO,
+  ZOMBIE_SPIT,
+  DESMONTADOR,
+  SPREAD_STATE_MULTIPLIER,
+  BOBO_NAV_METRICS,
+  ZOMBIE_RULES,
+  MOVEMENT_ZOMBIE,
+  MOVEMENT_ZOMBIE_RUNNER,
+  MOVEMENT_ZOMBIE_SLOW,
+  MOVEMENT_ZOMBIE_SPRINTER,
+  MOVEMENT_DOWNED,
+  ZOMBIES_MODE,
+  ZOMBIE_POINTS,
+  ZOMBIES_DOWN,
+  ZOMBIE_KINDS,
+  ZOMBIE_SPECIALS,
+  ZOMBIE_BARRICADES,
+  ZOMBIE_SHOP,
+  ZOMBIE_BOX,
+  ZOMBIE_PERKS,
+  ZOMBIE_DROPS,
+];
+
+/** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */
+export function simContentHash(tables: readonly unknown[] = SIM_CONTENT_TABLES): number {
+  const h = new StateHasher();
+  for (const t of tables) h.string(JSON.stringify(t) ?? 'undefined');
+  return h.digest();
+}
+
+/** O que cada lado diz de si no handshake. */
+export interface NetHello {
+  readonly protocolVersion: number;
+  /** `GAME_VERSION` (version.json): só ASCII visível, até 32 caracteres. */
+  readonly gameVersion: string;
+  readonly contentHash: number;
+}
+
+/** O hello desta build. */
+export function localHello(): NetHello {
+  return { protocolVersion: PROTOCOL_VERSION, gameVersion: GAME_VERSION, contentHash: simContentHash() };
+}
+
+const MAX_VERSION_CHARS = 32;
+
+function writeAscii(w: BitWriter, s: string): void {
+  const n = Math.min(s.length, MAX_VERSION_CHARS);
+  w.writeBits(n, 8);
+  for (let i = 0; i < n; i++) {
+    const c = s.charCodeAt(i);
+    w.writeBits(c >= 0x20 && c <= 0x7e ? c : 0x3f, 8);
+  }
+}
+
+function readAscii(r: BitReader): string {
+  const n = Math.min(r.readBits(8), MAX_VERSION_CHARS);
+  let s = '';
+  for (let i = 0; i < n; i++) s += String.fromCharCode(r.readBits(8));
+  return s;
+}
+
+export function writeHello(w: BitWriter, hello: NetHello): void {
+  w.writeBits(MSG.hello, 8);
+  w.writeBits(hello.protocolVersion, 16);
+  w.writeBits(hello.contentHash >>> 0, 32);
+  writeAscii(w, hello.gameVersion);
+}
+
+/** Lê o corpo de um hello (o tipo já foi lido). */
+export function readHello(r: BitReader): NetHello {
+  const protocolVersion = r.readBits(16);
+  const contentHash = r.readBits(32) >>> 0;
+  return { protocolVersion, gameVersion: readAscii(r), contentHash };
+}
+
+/** Compara versões "a.b.c" (partes que faltam valem 0; texto depois de "-" é ignorado). */
+export function compareGameVersions(a: string, b: string): number {
+  const pa = (a.split('-')[0] ?? '').split('.');
+  const pb = (b.split('-')[0] ?? '').split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = Number.parseInt(pa[i] ?? '0', 10) || 0;
+    const y = Number.parseInt(pb[i] ?? '0', 10) || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Resultado do handshake visto deste lado (tecnico.md §13.3): `update-self` = "Atualize a página" (e o service worker
+ * procura a nova), `update-friend` = "Seu amigo precisa atualizar", `mismatch` = mesma versão com conteúdo diferente
+ * (build de desenvolvimento; os dois atualizam).
+ */
+export type HelloVerdict = 'ok' | 'update-self' | 'update-friend' | 'mismatch';
+
+export function checkHello(local: NetHello, remote: NetHello): HelloVerdict {
+  if (local.protocolVersion !== remote.protocolVersion) {
+    return local.protocolVersion < remote.protocolVersion ? 'update-self' : 'update-friend';
+  }
+  if (local.contentHash === remote.contentHash) return 'ok';
+  const order = compareGameVersions(local.gameVersion, remote.gameVersion);
+  return order < 0 ? 'update-self' : order > 0 ? 'update-friend' : 'mismatch';
+}
+
+/** Motivo de recusa do host (`MSG.reject`). Valor novo entra no fim. */
+export const REJECT_REASON = { version: 1, full: 2, locked: 3 } as const;
+export type RejectReason = (typeof REJECT_REASON)[keyof typeof REJECT_REASON];
+
+/** Resposta do host ao hello: o controlador (slot) do cliente e o ritmo da partida. */
+export interface NetWelcome {
+  readonly slot: number;
+  readonly hz: number;
+  readonly snapshotHz: number;
+}
+
+export function writeWelcome(w: BitWriter, welcome: NetWelcome): void {
+  w.writeBits(MSG.welcome, 8);
+  w.writeBits(welcome.slot, 8);
+  w.writeBits(welcome.hz, 8);
+  w.writeBits(welcome.snapshotHz, 8);
+}
+
+export function readWelcome(r: BitReader): NetWelcome {
+  const slot = r.readBits(8);
+  const hz = r.readBits(8);
+  return { slot, hz, snapshotHz: r.readBits(8) };
+}
+
+/** Recusa: o motivo e o hello do host (o cliente decide quem atualiza com `checkHello`). */
+export function writeReject(w: BitWriter, reason: RejectReason, host: NetHello): void {
+  w.writeBits(MSG.reject, 8);
+  w.writeBits(reason, 8);
+  w.writeBits(host.protocolVersion, 16);
+  w.writeBits(host.contentHash >>> 0, 32);
+  writeAscii(w, host.gameVersion);
+}
+
+export function readReject(r: BitReader): { readonly reason: number; readonly host: NetHello } {
+  const reason = r.readBits(8);
+  return { reason, host: readHello(r) };
+}
+
+/** Diferença entre dois `seq` de 16 bits (com a volta): positivo = `a` depois de `b`. */
+export function seqDiff(a: number, b: number): number {
+  return ((((a - b) & 0xffff) + 0x8000) & 0xffff) - 0x8000;
+}

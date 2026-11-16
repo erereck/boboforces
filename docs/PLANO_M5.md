@@ -48,7 +48,11 @@ entra na fase 3, com o OK do download.
    (1 cm, ângulos em 16 bits), a divisão em mensagens de até 1.100 bytes por prioridade de entidade, e as entradas do
    cliente com as 3 anteriores repetidas. Um transporte de mentira em memória (`createLoopback`, com latência, perda e
    reordenação por semente). `HostDriver` e `ClientDriver` atrás do `MatchDriver`.
-2. **Predição e compensação:** o cliente prediz só o próprio movimento com o mesmo código da sim, reconcilia por
+   **Feita em 16/11** (ARCHITECTURE §16.1): a partida inteira pelo loopback (80 ms, 5% de perda) termina igual no host
+   e nos 3 clientes; a sim ganhou o `Sim.remote` (o cliente escreve o estado do host na sim dele). Ficou para a fase 2:
+   os eventos da sim pelo canal confiável (o cliente ainda mostra sem efeitos e sem som).
+2. **Eventos, predição e compensação:** os eventos da sim (tiro, acerto, morte, som) vão do host pelo canal confiável
+   (vieram da fase 1); o cliente prediz só o próprio movimento com o mesmo código da sim, reconcilia por
    `seq` e interpola o resto com 100 ms; o host guarda 200 ms de hitboxes para o rewind do tiro. Teste: loopback de
    4 jogadores com 80 ms e 5% de perda termina igual ao host; o "tiro no que eu vi" acerta dentro de 200 ms.
 3. **O transporte de verdade:** Trystero com relays Nostr (o mesmo caminho do FutBobo), só STUN
