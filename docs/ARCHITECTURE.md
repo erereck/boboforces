@@ -2861,3 +2861,6 @@ Plano em `docs/PLANO_M4.md` (16/11/2026); perguntas P1–P9 no padrão (v20 da p
   que existe (bot pelo id, preset pelo nome; preset sem nome usa o do arquivo), então ler a pasta a cada abertura não
   duplica nada nem desfaz o que o jogador mudou no Switch. O que não entra vira `[save] oficina: <arquivo> ignorado
   (<razão>)` no registro. `importar/` e `exportar/` continuam para o backup inteiro e os relatórios.
+- **Onde mora o importador:** no pedaço das telas de edição (`editors.ts` exporta `importWorkshopFiles`); o jogo
+  importa quando ele chega (o Switch carrega no boot). No menu da web ele pesava 0,6 KB sem nunca rodar. Menu: 347,9
+  de 350 KB.

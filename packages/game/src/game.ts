@@ -23,7 +23,7 @@ import {
   parseLoopManifest,
 } from '@boboforces/format';
 import { stepLevel } from './pause.ts';
-import { importWorkshopFiles, type WorkshopFile } from './workshop-files.ts';
+import type { WorkshopFile } from './workshop-files.ts';
 import {
   confirmConventionFor,
   createBindingCapture,
@@ -296,15 +296,6 @@ export function startGame(deps: GameDeps): GameHandle {
   // M2 (fase 4b): o save do jogador. O que veio estragado ou de versão antiga vai para o log (e para o relatório).
   const save = createSaveStore(platform.storage, libraryCapsFor(platform.id));
   for (const w of save.loadWarnings) platform.diagnostics.appendLog(`[save] ${w.path}: ${w.code}`);
-  // M4 (fase 2c): bots e presets da pasta `oficina/` do cartão (o que não entra fica no registro com a razão).
-  if (deps.workshopFiles) {
-    const limits = recipeLimitsFor(selectPlatformProfile(platform.features.profileHint, 1));
-    const got = importWorkshopFiles(deps.workshopFiles(), save, limits);
-    for (const line of got.lines) platform.diagnostics.appendLog(`[save] ${line}`);
-    if (got.bots + got.presets > 0) {
-      platform.diagnostics.appendLog(`[save] oficina: ${got.bots} bot(s) e ${got.presets} preset(s) novos`);
-    }
-  }
   // M2 (fase 7b): um mixer só para o jogo inteiro (a interface e a partida tocam nele). Sem áudio na plataforma, ele
   // existe mudo. Os MP3 do banco carregam depois do primeiro frame do título (`startSoundFiles`).
   const mixer = createMixer(platform.audio);
@@ -786,6 +777,16 @@ export function startGame(deps: GameDeps): GameHandle {
     editorsPromise = deps.loadEditors().then(
       (m) => {
         editors = m;
+        // M4 (fase 2c): bots e presets da pasta `oficina/` do cartão, uma vez (o importador mora no pedaço das telas
+        // de edição, fora do menu da web; o Switch carrega esse pedaço logo no boot). O que não entra vai ao registro.
+        if (deps.workshopFiles) {
+          const limits = recipeLimitsFor(selectPlatformProfile(platform.features.profileHint, 1));
+          const got = m.importWorkshopFiles(deps.workshopFiles(), save, limits);
+          for (const line of got.lines) platform.diagnostics.appendLog(`[save] ${line}`);
+          if (got.bots + got.presets > 0) {
+            platform.diagnostics.appendLog(`[save] oficina: ${got.bots} bot(s) e ${got.presets} preset(s) novos`);
+          }
+        }
       },
       (error: unknown) => fail(error),
     );

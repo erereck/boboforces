@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHeadlessMatch } from '@boboforces/ai';
 import {
+  builtinBot,
   builtinBotRef,
   DEBUT_PRESET,
   DEFAULT_BOBO,
@@ -271,7 +272,11 @@ const loadEditors = (): Promise<Editors> => Promise.resolve(EDITORS);
 
 async function bootToTitle(
   id: PlatformId = 'web',
-  extra: { testItems?: readonly TestItem[]; localEdition?: boolean } = {},
+  extra: {
+    testItems?: readonly TestItem[];
+    localEdition?: boolean;
+    workshopFiles?: () => readonly { name: string; text: string }[];
+  } = {},
   store: Readonly<Record<string, string>> = {},
 ) {
   const platform = createFakePlatform({ id, store });
@@ -1861,6 +1866,24 @@ describe('LOCAL EDITION (M4, fase 1)', () => {
     expect(platform.exits).toBe(0);
     platform.tap('Enter');
     expect(platform.exits).toBe(1);
+    game.dispose();
+  }, 60_000);
+});
+
+describe('pasta oficina/ no boot (M4, fase 2c)', () => {
+  it('os arquivos entram quando as telas de edição chegam; o quebrado vira linha no registro', async () => {
+    const bot = { ...builtinBot('chill-bob')!, id: 'pc-bot-boot', name: 'Do PC' };
+    const { platform, game } = await bootToTitle('switch', {
+      workshopFiles: () => [
+        { name: 'bot.json', text: JSON.stringify(bot) },
+        { name: 'ruim.json', text: 'nada' },
+      ],
+    });
+    platform.pump(2);
+    await settle();
+    expect(game.save.bots.map((b) => b.id)).toContain('pc-bot-boot');
+    expect(platform.logLines.some((l) => l.includes('oficina: ruim.json ignorado (não é JSON)'))).toBe(true);
+    expect(platform.logLines.some((l) => l.includes('oficina: 1 bot(s) e 0 preset(s) novos'))).toBe(true);
     game.dispose();
   }, 60_000);
 });

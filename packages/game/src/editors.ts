@@ -19,3 +19,5 @@ export { customMatchScreen, labScreen, workshopScreen } from '@boboforces/ui';
 
 // Refino R3a (#79): a tabela de textos da cena também vale aqui (o Laboratório e a Oficina podem abrir antes dela).
 registerStrings(STRINGS_EXTRA_PT_BR);
+// M4 (fase 2c): o importador da pasta `oficina/` (só o Switch usa; fora do menu da web).
+export { importWorkshopFiles } from './workshop-files.ts';
