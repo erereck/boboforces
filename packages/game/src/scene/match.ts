@@ -431,6 +431,9 @@ interface ViewmodelTweak {
   readonly y: number;
   readonly z: number;
 }
+/** M4 (fase 7a): de quanto em quanto tempo (s de partida) o Switch grava a linha `[mem]`. */
+const MEMORY_LOG_EVERY_S = 60;
+
 /** Refino R4 (#79): a escala do viewmodel com 1 ou 2 jogadores (era 0,8; com 3–4 e no lado a lado, 0,6). */
 const VIEWMODEL_SCALE_1P = 0.68;
 
@@ -4297,6 +4300,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   let heapNowMb = -1;
   let memoryCheckS = 0;
+  /**
+   * M4 (fase 7a): no Switch, uma linha `[mem]` por minuto de partida no `runtime.log` (o heap de agora, o pico e o
+   * teto), para provar o "heap estável" dos 20 min com 4 no Zombies (P8) com o jogo de verdade, não só no bench.
+   */
+  let memoryLogS = MEMORY_LOG_EVERY_S;
+  let memoryLogMin = 0;
   function sampleMemory(dt: number): void {
     heapCheckS -= dt;
     if (heapCheckS > 0) return;
@@ -4306,6 +4315,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       heapNowMb = Math.round((m.usedHeapBytes / 1e6) * 10) / 10;
       heapMaxMb = Math.max(heapMaxMb, heapNowMb);
       heapLimitMb = m.heapLimitBytes > 0 ? Math.round((m.heapLimitBytes / 1e6) * 10) / 10 : -1;
+    }
+    memoryLogS -= 1;
+    if (memoryLogS <= 0 && heapNowMb >= 0 && platform.id === 'switch') {
+      memoryLogS = MEMORY_LOG_EVERY_S;
+      memoryLogMin++;
+      // Uma vez por minuto: o texto pode alocar.
+      host.log(
+        `[mem] t=${memoryLogMin}min heap_mb=${heapNowMb} max_mb=${heapMaxMb}` +
+          (heapLimitMb > 0 ? ` limite_mb=${heapLimitMb}` : ''),
+      );
     }
     memoryCheckS -= 1;
     if (memoryCheckS <= 0 && panel.visible) {

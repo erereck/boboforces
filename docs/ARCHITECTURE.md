@@ -2861,6 +2861,9 @@ Plano em `docs/PLANO_M4.md` (16/11/2026); perguntas P1–P9 no padrão (v20 da p
   que existe (bot pelo id, preset pelo nome; preset sem nome usa o do arquivo), então ler a pasta a cada abertura não
   duplica nada nem desfaz o que o jogador mudou no Switch. O que não entra vira `[save] oficina: <arquivo> ignorado
   (<razão>)` no registro. `importar/` e `exportar/` continuam para o backup inteiro e os relatórios.
+- **O backup da web também serve:** a web não exporta um bot sozinho; o caminho do PC para o Switch é o backup de
+  Ajustes → Dados (`backup@1`, até 1 MB) posto na `oficina/`: entram só os bots e os presets salvos dele, pelas
+  mesmas regras (os ajustes, as estatísticas e o Meu Bobo do Switch ficam como estão).
 - **Onde mora o importador:** no pedaço das telas de edição (`editors.ts` exporta `importWorkshopFiles`); o jogo
   importa quando ele chega (o Switch carrega no boot). No menu da web ele pesava 0,6 KB sem nunca rodar. Menu: 347,9
   de 350 KB.
@@ -2882,3 +2885,13 @@ e dezenas de milhares de ligações (arrays por nó e por ligação), centenas d
 Construto" está em 796,5 KB de 1 MB na web. O ganho (1,4 s de navegação e 0,9 s de malha com o JIT frio) só se mede no
 console. Fica para quando o Switch voltar e a P1 tiver resposta: o caminho mais barato é gravar só a navegação, com
 os arrays em deflate e o teste "a gravada é igual à calculada".
+
+### 15.5 Fase 7, parte 1: o heap no registro e o roteiro (16/11/2026)
+
+- **`[mem]` por minuto (7a, P8):** no Switch, toda partida grava `[mem] t=<n>min heap_mb=… max_mb=… limite_mb=…` no
+  `runtime.log` a cada 60 s (`MEMORY_LOG_EVERY_S`, dentro do `sampleMemory` que já lia o heap 1 vez por segundo;
+  o texto só é montado uma vez por minuto). É a prova do "heap estável" da partida de 20 min com o jogo de verdade.
+- **`docs/ROTEIRO_M4.md` (7c):** o lote do console para quando o Switch voltar (lobby, 20 min com 4 no Zombies na
+  dock e no portátil, HOME/sleep/controle, a `oficina/`, o loading a frio, o Sair), já com o que o roteiro do M3
+  deixou sem log.
+- O bench de 20 min (7b) e a rodada 18 (7d) ficam para depois das fases 3 e 4.

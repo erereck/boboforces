@@ -13,8 +13,8 @@ export const IMPORT_SUBDIR = 'importar';
 export const EXPORT_SUBDIR = 'exportar';
 /** M4 (fase 2c): bots e presets feitos no PC (GDD §4.8: `sdmc:/switch/boboforces/oficina/`). */
 export const WORKSHOP_SUBDIR = 'oficina';
-/** Teto de um arquivo da oficina (GDD §4.8); maior que isso nem é lido. */
-const WORKSHOP_MAX_BYTES = 64 * 1024;
+/** Teto de um arquivo da oficina: o backup da web pode chegar a 1 MB (bot e preset ficam em 64 KB, no jogo). */
+const WORKSHOP_MAX_BYTES = 1024 * 1024;
 /** No máximo tantos arquivos por abertura (a biblioteca do Switch cabe nisso com folga). */
 const WORKSHOP_MAX_FILES = 200;
 
@@ -36,7 +36,7 @@ export function readWorkshopFiles(
     for (const name of names.slice(0, WORKSHOP_MAX_FILES)) {
       const size = fs.statSync(`${folder}/${name}`)?.size ?? 0;
       if (size > WORKSHOP_MAX_BYTES) {
-        log(`oficina: ${name} ignorado (maior que 64 KB)`);
+        log(`oficina: ${name} ignorado (maior que 1 MB)`);
         continue;
       }
       const bytes = fs.readFileSync(`${folder}/${name}`);

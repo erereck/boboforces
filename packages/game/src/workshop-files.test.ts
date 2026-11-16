@@ -47,7 +47,10 @@ describe('pasta oficina/ do SD (M4, fase 2c)', () => {
         { name: 'quebrado.json', text: '{ "format": ' },
         { name: 'outro.json', text: JSON.stringify({ format: 'boboforces/settings@1' }) },
         { name: 'sem-format.json', text: '{}' },
-        { name: 'grande.json', text: ' '.repeat(WORKSHOP_FILE_MAX_BYTES + 1) },
+        {
+          name: 'grande.json',
+          text: JSON.stringify({ ...bot, id: 'grande', pad: 'a'.repeat(WORKSHOP_FILE_MAX_BYTES) }),
+        },
       ],
       save,
       limits,
@@ -93,5 +96,24 @@ describe('pasta oficina/ do SD (M4, fase 2c)', () => {
     expect(save.presets.saved.map((p) => p.name)).toContain('Sexta');
     expect(got.lines.length).toBe(1);
     expect(got.lines[0]).toMatch(/^oficina: bot-ruim\.json ignorado \(.+\)$/);
+  });
+});
+
+describe('o backup da web na oficina/ (M4, fase 2c)', () => {
+  it('traz só os bots e os presets salvos dele, pelas mesmas regras; ler de novo não duplica', () => {
+    const pc = createSaveStore(memoryStorage(), libraryCapsFor('web'));
+    pc.saveBot(bot);
+    pc.savePreset({ ...preset, name: 'Sexta do PC' });
+    const text = pc.exportBackup('2026-11-16T00:00:00.000Z', '0.0.1');
+    const sw = createSaveStore(memoryStorage(), libraryCapsFor('switch'));
+    const settingsBefore = sw.settings;
+    const got = importWorkshopFiles([{ name: 'boboforces-backup.json', text }], sw, limits);
+    expect([got.bots, got.presets, got.lines]).toEqual([1, 1, []]);
+    expect(sw.bots.map((b) => b.id)).toContain('pc-bot-1');
+    expect(sw.presets.saved.map((p) => p.name)).toContain('Sexta do PC');
+    // Os ajustes do Switch ficam como estão; a 2ª leitura não traz nada de novo.
+    expect(sw.settings).toBe(settingsBefore);
+    const again = importWorkshopFiles([{ name: 'boboforces-backup.json', text }], sw, limits);
+    expect([again.bots, again.presets]).toEqual([0, 0]);
   });
 });

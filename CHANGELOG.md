@@ -18,6 +18,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Save e arquivos no SD (fase 2):** uma cópia do save por dia em `backup/` no cartão (ficam as 3 últimas) e a pasta
   `oficina/`: bots e presets feitos no PC entram na biblioteca do Switch ao abrir o jogo, sem duplicar nem passar
   por cima do que você mudou lá.
+- **Preparação do console (fase 7):** no Switch, o heap vai para o `runtime.log` a cada minuto de partida, e o
+  `docs/ROTEIRO_M4.md` junta o que testar quando o console voltar.
 - **Ícone (fase 6a):** o NRO ganhou ícone próprio, um bobo de capacete em blocos (era o ícone padrão do nx.js).
 
 ### Refino antes do M4 (rodada 17 publicada em 16/11/2026)

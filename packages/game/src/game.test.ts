@@ -193,6 +193,8 @@ function createFakePlatform(
         extra: {},
       }),
       appendLog: (line) => void platform.logLines.push(line),
+      // M4 (fase 7a): o Switch mede o heap (a linha [mem] por minuto de partida).
+      ...(id === 'switch' ? { memoryUsage: () => ({ usedHeapBytes: 41_200_000, heapLimitBytes: 537_000_000 }) } : {}),
     },
     input: {
       poll(out) {
@@ -1886,4 +1888,18 @@ describe('pasta oficina/ no boot (M4, fase 2c)', () => {
     expect(platform.logLines.some((l) => l.includes('oficina: 1 bot(s) e 0 preset(s) novos'))).toBe(true);
     game.dispose();
   }, 60_000);
+});
+
+describe('heap no runtime.log (M4, fase 7a)', () => {
+  it('no Switch, uma linha [mem] por minuto de partida com o heap, o pico e o teto', async () => {
+    const { platform, game } = await bootToTitle('switch');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    const before = platform.logLines.filter((l) => l.startsWith('[mem]')).length;
+    for (let i = 0; i < 62; i++) platform.pump(60);
+    const lines = platform.logLines.filter((l) => l.startsWith('[mem]'));
+    expect(lines.length - before).toBeGreaterThanOrEqual(1);
+    expect(lines[0]).toBe('[mem] t=1min heap_mb=41.2 max_mb=41.2 limite_mb=537');
+    game.dispose();
+  }, 180_000);
 });
