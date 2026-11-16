@@ -15,7 +15,12 @@ export const PAUSE_ACTION = {
   leave: 'leave',
   /** M2 (fase 5f): no Bobo Training, no lugar do "Ajustar desafio". */
   calibrate: 'calibrate',
+  /** M4 (fase 3): a página Jogadores (refazer os assentos do sofá). */
+  players: 'players',
 } as const;
+
+/** M4 (fase 3): a página Jogadores: Continuar volta à partida (o B do P1 volta à pausa). */
+export const PLAYERS_ACTION = { resume: 'resume' } as const;
 
 /** M2 (fase 5f): a página do resultado da calibração: OK fica com o ajuste; Desfazer volta o de antes. */
 export const CALIBRATED_ACTION = { ok: 'ok', undo: 'undo' } as const;
@@ -39,6 +44,10 @@ export interface PauseState {
   readonly lost?: number;
   /** Refino R4 (#79): a frase do item com o foco, embaixo dos botões (`pauseHelp`); ausente = sem a linha. */
   readonly help?: string;
+  /** M4 (fase 3): partida do sofá: o P1 tem o item Jogadores. */
+  readonly players?: boolean;
+  /** M4 (fase 3): a linha da bateria ("Bateria 64%"); ausente ou vazia = sem a linha (web, ou sem leitura). */
+  readonly battery?: string;
 }
 
 /** Refino R4 (#79): a frase de cada item da pausa (o que ele faz), pelo id do botão. */
@@ -49,6 +58,7 @@ const PAUSE_HELP: Readonly<Record<string, StringKey>> = {
   unstuck: 'pause.help.unstuck',
   quit: 'pause.help.quit',
   leave: 'pause.help.leave',
+  players: 'pause.help.players',
 };
 
 /** A frase do item com o foco (`''` sem frase). Calibrar e Pular calibração dependem do estado. */
@@ -79,7 +89,7 @@ export const pauseScreen: Screen<PauseState | null> = {
           anchor: 'center',
           align: 'stretch',
           width: 380,
-          gap: 14,
+          gap: 12,
           children: [
             {
               kind: 'text',
@@ -90,7 +100,7 @@ export const pauseScreen: Screen<PauseState | null> = {
               textAlign: 'center',
             },
             ...couchLines(state),
-            { kind: 'box', height: 18 },
+            { kind: 'box', height: 10 },
             button('resume', 'pause.resume', PAUSE_ACTION.resume, { variant: 'primary', autofocus: true }),
             ...((state?.player ?? 0) > 0
               ? [button('leave', 'pause.leaveCouch', PAUSE_ACTION.leave, { variant: 'danger' })]
@@ -129,6 +139,16 @@ function couchLines(state: PauseState | null): UiNode[] {
       textAlign: 'center',
     });
   }
+  if (state?.battery) {
+    out.push({
+      kind: 'text',
+      id: 'battery',
+      text: { literal: state.battery },
+      style: 'caption',
+      color: COLORS.textoBaixo,
+      textAlign: 'center',
+    });
+  }
   const lost = state?.lost ?? -1;
   if (lost >= 0) {
     out.push({
@@ -149,6 +169,7 @@ function mainItems(state: PauseState | null, challenge: boolean): UiNode[] {
     state?.calibrate
       ? button('calibrate', state.calibrating ? 'pause.calibrateSkip' : 'pause.calibrate', PAUSE_ACTION.calibrate)
       : button('challenge', 'pause.challenge', PAUSE_ACTION.challenge, { disabled: !challenge }),
+    ...(state?.players ? [button('players', 'pause.players', PAUSE_ACTION.players)] : []),
     button('settings', 'menu.settings', PAUSE_ACTION.settings),
     button('unstuck', 'pause.unstuck', PAUSE_ACTION.unstuck),
     button('quit', 'pause.quitMatch', PAUSE_ACTION.quit, { variant: 'danger' }),
@@ -255,6 +276,105 @@ export const calibratedScreen: Screen<{ readonly message: string; readonly chang
                 ...(state.changed ? [button('undo', 'calibrate.undo', CALIBRATED_ACTION.undo)] : []),
               ],
             },
+          ],
+        },
+      ],
+    };
+  },
+};
+
+/** M4 (fase 3): uma linha da página Jogadores (o jogador `player`, 0 = P1). */
+export interface PlayerSeatLine {
+  readonly player: number;
+  /** `pad` e `keyboard` = sentado; `lost` = o controle caiu (o assento espera); `free` = ninguém. */
+  readonly state: 'pad' | 'keyboard' | 'lost' | 'free';
+  /** O índice do controle (`pad`), ou -1. */
+  readonly pad: number;
+}
+
+/** M4 (fase 3): o que a página Jogadores mostra. */
+export interface PlayersState {
+  readonly seats: readonly PlayerSeatLine[];
+  /** O jogador (0 = P1) cujo controle caiu, ou -1. */
+  readonly lost: number;
+  /** Ainda cabe gente (assento livre e um bot para assumir). */
+  readonly canJoin: boolean;
+  /** Há P2–P4 sentados (a linha do B que sai). */
+  readonly canLeave: boolean;
+}
+
+/** O texto e a cor de uma linha da página Jogadores. */
+function seatLine(line: PlayerSeatLine): UiNode {
+  const n = line.player + 1;
+  const key: StringKey =
+    line.state === 'pad'
+      ? 'players.seat.pad'
+      : line.state === 'keyboard'
+        ? 'players.seat.keyboard'
+        : line.state === 'lost'
+          ? 'players.seat.lost'
+          : 'players.seat.free';
+  return {
+    kind: 'text',
+    id: `seat-${line.player}`,
+    text: { key, params: { n, c: line.pad + 1 } },
+    style: 'body',
+    color:
+      line.state === 'lost'
+        ? COLORS.perigo
+        : line.state === 'free'
+          ? COLORS.textoBaixo
+          : (PLAYER_COLORS[line.player] as number),
+    textAlign: 'center',
+  };
+}
+
+/**
+ * M4 (fase 3): a página Jogadores da pausa (GDD §3.6: dock/portátil, controle caído e HOME reabrem o "aperte A"). Os 4
+ * assentos e o que fazer: A num controle livre fica no lugar de quem caiu (ou entra), B no controle do P2–P4 sai. A
+ * partida fica pausada por trás; Continuar volta para ela.
+ */
+export const playersScreen: Screen<PlayersState> = {
+  id: 'players',
+  build(state) {
+    const hint = (id: string, key: StringKey, n = 0): UiNode => ({
+      kind: 'text',
+      id,
+      text: { key, params: { n } },
+      style: 'caption',
+      color: COLORS.texto,
+      textAlign: 'center',
+    });
+    return {
+      kind: 'box',
+      id: 'root',
+      color: COLORS.veu,
+      children: [
+        {
+          kind: 'column',
+          id: 'main',
+          anchor: 'center',
+          align: 'stretch',
+          width: 380,
+          gap: 8,
+          children: [
+            {
+              kind: 'text',
+              id: 'title',
+              text: { key: 'pause.players' },
+              style: 'title',
+              color: COLORS.texto,
+              textAlign: 'center',
+            },
+            { kind: 'box', height: 6 },
+            ...state.seats.map(seatLine),
+            { kind: 'box', height: 6 },
+            state.lost >= 0
+              ? hint('hint', 'players.hint.lost', state.lost + 1)
+              : hint('hint', state.canJoin ? 'players.hint.join' : 'players.hint.full'),
+            ...(state.canLeave ? [hint('hint-leave', 'players.hint.leave')] : []),
+            { kind: 'box', height: 10 },
+            button('resume', 'pause.resume', PLAYERS_ACTION.resume, { variant: 'primary', autofocus: true }),
           ],
         },
       ],

@@ -138,6 +138,7 @@ import {
 import { createMixer, type MixerStats } from '@boboforces/audio';
 import {
   DEFAULT_RENDERER_ROUTES,
+  type BatteryReading,
   type RendererFactory,
   type RendererRoutes,
   type Scene,
@@ -201,6 +202,8 @@ export interface GameDeps {
    * importados sem passar por cima do que já existe (`importWorkshopFiles`). Só o Switch passa.
    */
   readonly workshopFiles?: () => readonly WorkshopFile[];
+  /** M4 (fase 3): a bateria (Switch); a pausa mostra o nível e a partida avisa uma vez abaixo de 20% sem carregar. */
+  readonly battery?: () => BatteryReading | null;
   /**
    * M1: a cena (Construto). Web: `import()` do subcaminho `@boboforces/game/scene` (fora da carga inicial do menu) e o
    * renderer completo; Switch e testes: o módulo direto. Ausente = JOGAR não abre nada (só registra no log).
@@ -1389,6 +1392,8 @@ export function startGame(deps: GameDeps): GameHandle {
           },
         },
         benchReport: (text) => hooks.onBenchReport?.(text),
+        ...(localEdition ? { localEdition: true } : {}),
+        ...(deps.battery ? { battery: deps.battery } : {}),
       },
       request,
     );

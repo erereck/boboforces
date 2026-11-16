@@ -127,6 +127,13 @@ export interface SceneStats {
   tipSeen(id: string): void;
 }
 
+/** M4 (fase 3): a leitura da bateria (Switch: `navigator.getBattery` do nx.js, guardada pela casca). */
+export interface BatteryReading {
+  /** De 0 a 1. */
+  readonly level: number;
+  readonly charging: boolean;
+}
+
 /** O que o núcleo empresta para a cena. */
 export interface SceneHost {
   readonly platform: Platform;
@@ -145,6 +152,10 @@ export interface SceneHost {
   readonly audio: SceneAudio;
   /** Relatório do bench pronto (`formatBenchReport`); o núcleo repassa para `GameHooks.onBenchReport`. */
   benchReport(text: string): void;
+  /** M4 (fase 3): a LOCAL EDITION (`GameDeps.localEdition`): a pausa do sistema abre a página Jogadores. */
+  readonly localEdition?: boolean;
+  /** M4 (fase 3): a bateria agora (`null` = sem leitura); ausente fora do Switch. */
+  battery?(): BatteryReading | null;
 }
 
 /**
@@ -181,7 +192,7 @@ export interface Scene extends Disposable {
   readonly debug: GameDebugApi | null;
   /** M2 (fase 2e): nível rápido dos bots adversários agora (o da receita, ou o do "Ajustar desafio"). */
   readonly level: BotLevel;
-  /** Pausa vinda da plataforma (pointer lock perdido, aba oculta, HOME). */
+  /** Pausa vinda da plataforma (pointer lock perdido, aba oculta, HOME, dock↔portátil, controle caído). */
   pause(): void;
   /** M2 (fase 5e): os números do Bobo Training (`null` fora dele ou antes de a partida existir). */
   trainingReport(): TrainingReport | null;

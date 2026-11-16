@@ -22,7 +22,9 @@
 | 1 | Abrir o jogo | Abre direto no lobby "aperte A" (sem título); o 1º controle que apertar A vira o P1 |
 | 2 | Na dock, 4 controles apertam A; o P1 escolhe **Sofá Zombies** e COMEÇAR; jogar **20 min** | 30 fps ou mais, sem fechar sozinho; no log, uma linha `[mem]` por minuto (o heap não sobe minuto a minuto) |
 | 3 | O mesmo no portátil (1 ou 2 jogadores) e depois tirar da dock no meio de uma partida | Pausa sozinho; no portátil, 1 vista se estiver sozinho; a partida continua |
-| 4 | HOME e voltar; dormir e acordar; desconectar e reconectar um controle | Pausa e volta sem perder a partida nem a música; o assento de quem desconectou espera ele |
+| 4 | HOME e voltar; dormir e acordar; desconectar e reconectar um controle | A pausa abre na página **Jogadores** e volta sem perder a partida nem a música; o assento de quem desconectou espera ele |
+| 4b | Numa partida com 2, encaixar os Joy-Cons do P2 no console (ele vira outro controle) e apertar A neles | Na página Jogadores, o P2 passa para o controle novo; Continuar e ele joga |
+| 4c | Fora da dock, olhar a pausa (e, se der, jogar com a bateria abaixo de 20%) | "Bateria NN%" na pausa; abaixo de 20%, um aviso só na partida |
 | 5 | Do lobby: Modos, Ajustes, Laboratório, Meu Bobo e Testes, e voltar de cada um | Toda volta cai no lobby, com os mesmos jogadores sentados |
 | 6 | Com arquivos na `oficina/`, abrir o Laboratório | O bot (ou o preset) do PC aparece; no log, `[save] oficina: …` (o arquivo estranho como "ignorado") |
 | 7 | Solo, no portátil, Bobo Zombies o quanto der | Sem travar; anote se esquentar e em que onda parou |

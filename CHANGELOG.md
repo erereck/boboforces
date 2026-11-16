@@ -18,6 +18,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Save e arquivos no SD (fase 2):** uma cópia do save por dia em `backup/` no cartão (ficam as 3 últimas) e a pasta
   `oficina/`: bots e presets feitos no PC entram na biblioteca do Switch ao abrir o jogo, sem duplicar nem passar
   por cima do que você mudou lá.
+- **Ciclo de vida (fase 3):** a pausa ganhou a página **Jogadores**, que abre sozinha quando um controle cai e, no
+  Switch, depois de trocar dock e portátil, do HOME e do sleep: A num controle livre fica no lugar de quem caiu (ou
+  entra na partida), B no controle do P2 ao P4 sai do sofá, e a partida espera pausada. No Switch, a pausa mostra a
+  bateria e a partida avisa uma vez abaixo de 20% sem carregar.
 - **Preparação do console (fase 7):** no Switch, o heap vai para o `runtime.log` a cada minuto de partida, e o
   `docs/ROTEIRO_M4.md` junta o que testar quando o console voltar.
 - **Ícone (fase 6a):** o NRO ganhou ícone próprio, um bobo de capacete em blocos (era o ícone padrão do nx.js).

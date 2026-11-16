@@ -79,8 +79,8 @@ import { verticalFov } from './camera.ts';
 import { MENU_READY_MARKER, startGame, type Editors, type GameDeps, type GameHandle } from './game.ts';
 import { createLocalDriver } from './local-driver.ts';
 import { createNullRenderer } from './null-renderer.ts';
-import { pauseScreen } from './pause.ts';
-import type { SceneBundle, SceneRequest } from './scene-api.ts';
+import { pauseScreen, playersScreen } from './pause.ts';
+import type { BatteryReading, SceneBundle, SceneRequest } from './scene-api.ts';
 import { createConstrutoLoader } from './scene/load.ts';
 import { SCENE_MODULE } from './scene/index.ts';
 import {
@@ -278,6 +278,7 @@ async function bootToTitle(
     testItems?: readonly TestItem[];
     localEdition?: boolean;
     workshopFiles?: () => readonly { name: string; text: string }[];
+    battery?: () => BatteryReading | null;
   } = {},
   store: Readonly<Record<string, string>> = {},
 ) {
@@ -1040,7 +1041,11 @@ describe('textos do game com o atlas real (#54)', () => {
         .filter((k) => k.startsWith('pause.help.'))
         .map((k) => t_(k))
         .reduce((x, y) => (y.length > x.length ? y : x));
-      const layout = layoutTree(pauseScreen.build({ challenge: true, help }), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+      // M4 (fase 3): na LOCAL EDITION (sem toque), o item Jogadores, a bateria e o aviso de controle, tudo junto.
+      const battery = t_('pause.batteryCharging', { n: 100 });
+      const local = t.minTarget === 0;
+      const state = local ? { challenge: true, help, players: true, battery, lost: 3 } : { challenge: true, help };
+      const layout = layoutTree(pauseScreen.build(state), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
         fonts,
         minTextPx: t.minTextPx,
         minTarget: t.minTarget,
@@ -1069,11 +1074,51 @@ describe('textos do game com o atlas real (#54)', () => {
       expect(mid - helpW / 2, t.name).toBeGreaterThanOrEqual(c.x - 0.5);
       expect(mid + helpW / 2, t.name).toBeLessThanOrEqual(c.x + c.w + 0.5);
       expect(helpRect.y + helpRect.h, t.name).toBeLessThanOrEqual(c.y + c.h + 1);
-      // M2 (fase 2e): Continuar · Dificuldade · Ajustes · Estou preso · Sair.
-      const order = ['resume', 'challenge', 'settings', 'unstuck', 'quit'];
+      // M2 (fase 2e): Continuar · Dificuldade · (M4: Jogadores) · Ajustes · Estou preso · Sair.
+      const order = ['resume', 'challenge', ...(local ? ['players'] : []), 'settings', 'unstuck', 'quit'];
       for (let i = 0; i + 1 < order.length; i++) {
         expect(moveFocus(layout, order[i]!, 'down'), t.name).toBe(order[i + 1]);
         expect(moveFocus(layout, order[i + 1]!, 'up'), t.name).toBe(order[i]);
+      }
+    }
+  });
+
+  it('M4 (fase 3): a página Jogadores cabe, com as 4 linhas e as frases mais longas', () => {
+    const states = [
+      {
+        seats: [
+          { player: 0, state: 'pad', pad: 3 },
+          { player: 1, state: 'lost', pad: -1 },
+          { player: 2, state: 'keyboard', pad: -1 },
+          { player: 3, state: 'free', pad: -1 },
+        ],
+        lost: 1,
+        canJoin: true,
+        canLeave: true,
+      },
+      { seats: [{ player: 0, state: 'pad', pad: 0 }], lost: -1, canJoin: true, canLeave: false },
+      { seats: [{ player: 0, state: 'pad', pad: 0 }], lost: -1, canJoin: false, canLeave: true },
+    ] as const;
+    for (const t of TARGETS) {
+      for (const st of states) {
+        const layout = layoutTree(playersScreen.build(st), { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+          fonts,
+          minTextPx: t.minTextPx,
+          minTarget: t.minTarget,
+        });
+        const c = layout.content;
+        for (const node of layout.order) {
+          const r = layout.rects.get(node)!;
+          const text = layout.texts.get(node);
+          if (!text) continue;
+          expect(text.px, `${t.name}: ${text.text}`).toBeGreaterThanOrEqual(t.minTextPx);
+          const mid = r.x + r.w / 2;
+          expect(mid - text.width / 2, `${t.name}: "${text.text}"`).toBeGreaterThanOrEqual(c.x - 0.5);
+          expect(mid + text.width / 2, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.x + c.w + 0.5);
+          expect(r.y + r.h, `${t.name}: "${text.text}"`).toBeLessThanOrEqual(c.y + c.h + 1);
+          if (node.kind === 'button') expect(r.h).toBeGreaterThanOrEqual(t.minTarget);
+        }
+        expect(layout.byId.get('resume'), t.name).toBeDefined();
       }
     }
   });
@@ -1845,9 +1890,9 @@ describe('LOCAL EDITION (M4, fase 1)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);
-    // Pausa → Sair da partida (o 5º item): a volta é o lobby.
+    // Pausa → Sair da partida (o 6º item: o sofá tem Jogadores): a volta é o lobby.
     platform.tap('KeyP');
-    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
     platform.pump(2);
     expect(game.screen).toBe('couch');
@@ -1870,6 +1915,65 @@ describe('LOCAL EDITION (M4, fase 1)', () => {
     expect(platform.exits).toBe(1);
     game.dispose();
   }, 60_000);
+
+  it('fase 3: a pausa do sistema abre a página Jogadores; A num controle livre entra ou fica no lugar de quem caiu; B sai; a bateria avisa uma vez', async () => {
+    let battery: BatteryReading | null = { level: 0.15, charging: false };
+    const { platform, game } = await bootToTitle('web', { localEdition: true, battery: () => battery });
+    platform.tap('Enter');
+    const pad = (i: number, id: string) => {
+      const p = platform.rawNext.gamepads[i]!;
+      p.connected = true;
+      p.id = id;
+      return (button: number): void => {
+        p.buttons[button] = 1;
+        platform.pump(1);
+        p.buttons[button] = 0;
+        platform.pump(1);
+      };
+    };
+    const tap2 = pad(1, 'controle 2 de teste');
+    tap2(PAD_BUTTON.faceDown);
+    expect(platform.logLines.some((l) => l.includes('sofá: P2 entrou (Controle 2)'))).toBe(true);
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    platform.pump(30);
+    // A bateria (15%, sem carregar): um aviso só, mesmo com a partida seguindo.
+    platform.pump(400);
+    expect(platform.logLines.filter((l) => l.includes('[partida] bateria em 15% sem carregar: aviso')).length).toBe(1);
+    battery = null;
+    // HOME/dock (a pausa do sistema): na LOCAL EDITION, a página Jogadores. Um A só (sem segurar) no controle 3 entra.
+    platform.firePause();
+    platform.pump(1);
+    expect(game.scene?.paused).toBe(true);
+    const tap3 = pad(2, 'controle 3 de teste');
+    tap3(PAD_BUTTON.faceDown);
+    expect(platform.logLines.some((l) => l.includes('[partida] sofá: P3 entrou no meio (controle 3)'))).toBe(true);
+    expect(game.scene?.paused).toBe(true);
+    // O B (botão da direita na web) do P3 sai do sofá; a partida continua pausada.
+    tap3(PAD_BUTTON.faceRight);
+    expect(platform.logLines.some((l) => l.includes('[partida] sofá: P3 saiu; um bot assume'))).toBe(true);
+    expect(game.scene?.paused).toBe(true);
+    platform.tap('Enter');
+    expect(game.scene?.paused).toBe(false);
+    // O controle do P2 cai: a pausa abre na página; o A do controle 4 (um Joy-Con que voltou em outro índice) fica no
+    // lugar dele, e o Enter do P1 continua.
+    platform.rawNext.gamepads[1]!.connected = false;
+    platform.pump(2);
+    expect(game.scene?.paused).toBe(true);
+    const tap4 = pad(3, 'controle 4 de teste');
+    tap4(PAD_BUTTON.faceDown);
+    expect(platform.logLines.some((l) => l.includes('[partida] sofá: o P2 agora joga no controle 4'))).toBe(true);
+    expect(platform.logLines.some((l) => l.includes('P4 entrou no meio'))).toBe(false);
+    expect(game.scene?.paused).toBe(true);
+    platform.tap('Enter');
+    expect(game.scene?.paused).toBe(false);
+    // O controle 2 volta: o assento é do controle 4 agora (nada de pausa nova).
+    platform.rawNext.gamepads[1]!.connected = true;
+    platform.pump(2);
+    expect(game.scene?.paused).toBe(false);
+    game.dispose();
+  }, 120_000);
 });
 
 describe('pasta oficina/ no boot (M4, fase 2c)', () => {

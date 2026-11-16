@@ -2895,3 +2895,26 @@ os arrays em deflate e o teste "a gravada é igual à calculada".
   dock e no portátil, HOME/sleep/controle, a `oficina/`, o loading a frio, o Sair), já com o que o roteiro do M3
   deixou sem log.
 - O bench de 20 min (7b) e a rodada 18 (7d) ficam para depois das fases 3 e 4.
+
+### 15.6 Fase 3: o ciclo de vida (16/11/2026)
+
+- **A página Jogadores da pausa (3a, 3c e a 1e que veio da fase 1):** em vez de voltar ao lobby com a partida
+  guardada por trás (o desenho do plano), a pausa ganhou uma página com os 4 assentos ("P2: controle 2",
+  "P3: desconectado", "P4: livre") e o que fazer embaixo. Decisão menor revisável: é o mesmo efeito (refazer os
+  jogadores sem perder a partida) com bem menos estado, e a partida pausada nunca sai da tela.
+  - **Abre sozinha** quando um controle do sofá cai (em qualquer edição) e, na LOCAL EDITION, em toda pausa do sistema
+    (dock↔portátil, HOME, sleep: `Scene.pause()` da casca vira `systemPause` na partida). Na LOCAL EDITION a
+    pausa principal tem o item Jogadores; na web ele não aparece (a coluna da pausa não cabe com 6 botões de toque).
+  - **A num controle livre:** fica no lugar de quem caiu (o Joy-Con que encaixou no console e voltou como outro
+    controle) ou, sem ninguém caído, entra na hora (sem segurar 1 s, como no meio da partida). **B no controle do
+    P2–P4:** sai do sofá. O menu continua do P1; o frame em que alguém sentou não lê o menu (o A não vira Continuar).
+  - O que já existia continua: o assento de quem caiu espera, e o controle que volta no mesmo índice (ou com o mesmo
+    id em outro) senta sozinho. No portátil, 1 jogador = 1 vista já valia (as vistas são os assentos).
+- **A bateria (3d, P5):** os logs do console no M1 mostram que o `getBattery` do nx.js devolve o nível (88–93%,
+  carregando), então o item ficou: a casca guarda a leitura (`apps/switch/src/platform/battery.ts`, uma a cada 30 s)
+  e passa por `GameDeps.battery` (sem mudar o contrato da `Platform`). A pausa mostra "Bateria 64%" (ou
+  "carregando") e a partida avisa **uma vez** abaixo de 20% sem carregar, na plaquinha da dica da vista do P1.
+- **Achado no Eden:** lá o `getBattery()` resolve, mas ler o `level` lança (não há o serviço `psm`); o erro saía do
+  `then` como promessa rejeitada sem tratamento e o nx.js parava o boot. A leitura agora fica num `try` e a falha
+  vira uma linha no `runtime.log` (`bateria: sem leitura (…)`); menu-ready no Eden em 1.472 ms.
+- **3b (HOME e sleep)** continua sendo o vão por amostragem do M1: só o console confirma (roteiro, item 4).

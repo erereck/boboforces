@@ -12,6 +12,7 @@ import { SCENE_MODULE } from '@boboforces/game/scene';
 import { createMsdfUiPass, createRenderer, type Renderer } from '@boboforces/render';
 import type { GraphicsSurface } from '@boboforces/platform-api';
 import { t } from '@boboforces/ui';
+import { createBatteryReader } from './platform/battery.ts';
 import { readWorkshopFiles } from './platform/files.ts';
 import { createSwitchShell, describeBuild, describeError, SD_DIR, type SwitchShell } from './platform/index.ts';
 import { readAutoBench } from './t0/auto-bench.ts';
@@ -95,6 +96,11 @@ function createSwitchRenderer(surface: GraphicsSurface, routes?: RendererRoutes)
 // `sdmc:/switch/boboforces/bench.json` (one-shot) começa direto no bench: Eden sem controle, rodadas repetidas.
 const autoBench = shell.hasGpu ? readAutoBench(shell.nx.Switch, SD_DIR, shell.log) : undefined;
 
+const battery = createBatteryReader(
+  shell.nx.navigator.getBattery ? () => shell.nx.navigator.getBattery!() : undefined,
+  () => shell.platform.now(),
+  shell.log,
+);
 let game: GameHandle | null = null;
 let bootError: string | null = null;
 let lateProbesStarted = false;
@@ -107,6 +113,8 @@ try {
     localEdition: true,
     // M4 (fase 2c): bots e presets feitos no PC, pela pasta oficina/ do cartão.
     workshopFiles: () => readWorkshopFiles(shell.nx.Switch, SD_DIR, shell.log),
+    // M4 (fase 3): a bateria na pausa e o aviso de 20% (P5).
+    battery: () => battery.read(),
     // Um arquivo só (esbuild): a cena já está no bundle.
     loadScene: () => Promise.resolve({ module: SCENE_MODULE }),
     loadEditors: () => Promise.resolve(EDITORS),

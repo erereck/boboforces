@@ -221,6 +221,9 @@ import {
   PAUSE_ACTION,
   pauseHelp,
   pauseScreen,
+  PLAYERS_ACTION,
+  playersScreen,
+  type PlayerSeatLine,
 } from '../pause.ts';
 import {
   prizeLine,
@@ -317,6 +320,11 @@ const ALLY_MARKER_MAX_M = 80;
 const ALLY_MARKER_HEIGHT_M = 2.05;
 /** M2 (fase 4f): com "Reduzir tremor", o tremor das explosões fica nesta fração. */
 const REDUCED_SHAKE = 0.25;
+/** M4 (fase 3): abaixo disto (0–1), sem carregar, a partida avisa uma vez (P5). */
+const BATTERY_LOW = 0.2;
+/** De quantos em quantos segundos da partida a bateria é lida, e quanto tempo o aviso fica na tela. */
+const BATTERY_CHECK_S = 5;
+const BATTERY_NOTICE_S = 6;
 /** M2 (fase 3e): por quanto tempo o aviso de um aliado fica na tela (s). */
 const PING_SHOW_S = 2.5;
 /** Refino R2 (#79): aviso de granada dos outros até esta distância (m; o raio da explosão é 5). */
@@ -871,7 +879,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 3e): avisos do time (x, y, z) lidos do diretor. */
   const pingScratch = new Float64Array(MAX_TEAM_PINGS * 3);
   // M2 (fase 2e): pausa com páginas, nível dos bots adversários, Destravar e o resultado.
-  let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' = 'main';
+  let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' | 'players' = 'main';
   // M2 (fase 5f): no Bobo Training, "Ajustar desafio" vira "Calibrar mira".
   const pauseState = {
     challenge: request.kind === 'play' && recipe.mode !== 'training',
@@ -2236,9 +2244,100 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     lostSeat = lost;
     if (lost >= 0) {
       host.log(`[partida] sofá: controle do P${seatNum[lost]! + 1} desconectado`);
+      // M4 (fase 3): a pausa abre na página Jogadores (A em outro controle fica no lugar dele).
       if (!paused) pause();
-      else if (pausePage === 'main') pauseMain();
-    } else if (was >= 0 && paused && pausePage === 'main') pauseMain();
+      if (paused && (pausePage === 'main' || pausePage === 'players')) openPlayers();
+    } else if (was >= 0 && paused) {
+      if (pausePage === 'main') pauseMain();
+      else if (pausePage === 'players') openPlayers();
+    }
+  }
+
+  // --- M4 (fase 3): a página Jogadores da pausa ---
+  /** Linhas da página (pré-alocadas; a página só é refeita quando algo muda). */
+  const seatLines: { player: number; state: PlayerSeatLine['state']; pad: number }[] = [0, 1, 2, 3].map((player) => ({
+    player,
+    state: 'free',
+    pad: -1,
+  }));
+  /** Há um bot no lugar do qual alguém pode entrar. */
+  function botSeatFree(): boolean {
+    for (const s of recipeSlots) if (s.bot !== null && seatOf(s.controller) < 0) return true;
+    return false;
+  }
+  /** Abre (ou refaz) a página: a pausa passa a ser do P1. */
+  function openPlayers(): void {
+    pausePage = 'players';
+    pausedBy = 0;
+    menuOwnerFor(0);
+    for (const line of seatLines) {
+      const k = seatNum.indexOf(line.player);
+      const d = k >= 0 ? seatDevice(k) : null;
+      line.state = k < 0 ? 'free' : k === lostSeat ? 'lost' : d !== null && d.kind === 'gamepad' ? 'pad' : 'keyboard';
+      line.pad = line.state === 'pad' && d !== null && d.kind === 'gamepad' ? d.index : -1;
+    }
+    pauseMenu.setRoot(
+      playersScreen.build({
+        seats: seatLines,
+        lost: lostSeat >= 0 ? (seatNum[lostSeat] ?? -1) : -1,
+        canJoin: extras.length < 3 && botSeatFree(),
+        canLeave: extras.length > 0,
+      }),
+    );
+  }
+  /** O controle `d` passa a ser o do assento `k`, cujo controle caiu (Joy-Con que mudou de índice, outro controle). */
+  function takeSeat(k: number, d: DeviceBinding & { kind: 'gamepad' }, raw: Readonly<RawInputState>): void {
+    if (k === 0) {
+      p1Device = d;
+      padIndex = d.index;
+      player.setDevice(d);
+    } else {
+      extraDevices[k - 1] = d;
+      extras[k - 1]!.setDevice(d);
+    }
+    seatPadId[k] = raw.gamepads[d.index]?.id ?? '';
+    lostSeat = -1;
+    host.log(`[partida] sofá: o P${seatNum[k]! + 1} agora joga no controle ${d.index + 1}`);
+  }
+  /**
+   * A entrada da página além do menu (que é do P1): A num controle livre fica no lugar de quem caiu ou entra no meio; B
+   * no controle de um P2–P4 sai do sofá. Devolve `true` quando algo mudou (o menu não lê este frame: o A que sentou
+   * alguém não vira Continuar).
+   */
+  function playersInput(raw: Readonly<RawInputState>): boolean {
+    const menu = frameMenu;
+    if (menu === null) return false;
+    let changed = false;
+    for (let k = seatCtrl.length - 1; k >= 1; k--) {
+      const d = seatDevice(k);
+      if (d === null || k === lostSeat || !menu.pressedBy(d, 'back')) continue;
+      leaveSeat(k);
+      changed = true;
+    }
+    for (let i = 0; i <= MAX_GAMEPADS; i++) {
+      const pad = i < MAX_GAMEPADS;
+      const d = pad ? pads[i]! : keyboard;
+      if (pad && raw.gamepads[i]?.connected !== true) continue;
+      if (seated(d.kind, i) || !menu.pressedBy(d, 'confirm')) continue;
+      const lostDevice = lostSeat >= 0 ? seatDevice(lostSeat) : null;
+      if (lostSeat >= 0 && d.kind === 'gamepad' && lostDevice !== null && lostDevice.kind === 'gamepad') {
+        takeSeat(lostSeat, d, raw);
+        changed = true;
+      } else if (lostSeat < 0 && extras.length < 3) {
+        const before = extras.length;
+        joinMidMatch(d);
+        if (extras.length > before) changed = true;
+      }
+    }
+    if (changed) openPlayers();
+    return changed;
+  }
+  /** A pausa do sistema (dock↔portátil, HOME, sleep): na LOCAL EDITION, abre a página Jogadores (GDD §3.6). */
+  function systemPause(): void {
+    const was = paused;
+    pause();
+    if (!paused || host.localEdition !== true || !couch) return;
+    if (!was || pausePage === 'main') openPlayers();
   }
 
   /** M3 (fase 1c): o assento que pausou passa a ser o dono dos menus; ao continuar, volta o P1. */
@@ -2356,6 +2455,33 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (pausePage === 'main') pauseMain();
   }
 
+  // --- M4 (fase 3): a bateria (Switch; P5: o nível na pausa e um aviso só abaixo de 20%, sem carregar) ---
+  let batteryWarned = false;
+  let batteryCheckS = 0;
+  let batteryNoticeS = 0;
+  let batteryNotice = '';
+  /** A linha da pausa ("Bateria 64%"), ou `''` sem leitura. */
+  function batteryLine(): string {
+    const b = host.battery?.() ?? null;
+    if (b === null) return '';
+    return t(b.charging ? 'pause.batteryCharging' : 'pause.battery', { n: Math.round(b.level * 100) });
+  }
+  /** A cada 5 s da partida: abaixo de 20% e sem carregar, o aviso aparece uma vez (na vista do P1). */
+  function checkBattery(dt: number): void {
+    if (batteryNoticeS > 0) batteryNoticeS = Math.max(0, batteryNoticeS - dt);
+    if (batteryWarned || !host.battery || humans === 0) return;
+    batteryCheckS -= dt;
+    if (batteryCheckS > 0) return;
+    batteryCheckS = BATTERY_CHECK_S;
+    const b = host.battery();
+    if (b === null || b.charging || b.level >= BATTERY_LOW) return;
+    const n = Math.round(b.level * 100);
+    batteryWarned = true;
+    batteryNoticeS = BATTERY_NOTICE_S;
+    batteryNotice = t('match.batteryLow', { n });
+    host.log(`[partida] bateria em ${n}% sem carregar: aviso`);
+  }
+
   /** Refino R4: o foco com que a pausa foi montada (a frase de ajuda é dele). */
   let pauseMainFocus: string | null = null;
   function pauseMain(): void {
@@ -2366,6 +2492,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       calibrating: calibration !== null,
       player: seatNum[pausedBy] ?? 0,
       lost: lostSeat >= 0 ? (seatNum[lostSeat] ?? -1) : -1,
+      // O item Jogadores é da LOCAL EDITION (na web, a página abre sozinha quando um controle cai).
+      players: couch && host.localEdition === true,
+      battery: batteryLine(),
     };
     pauseMenu.setRoot(pauseScreen.build({ ...st, help: pauseHelp(pauseMainFocus, st) }));
   }
@@ -2544,9 +2673,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         const k = pausedBy;
         resume();
         leaveSeat(k);
+      } else if (a === PAUSE_ACTION.players) {
+        openPlayers();
+        return 'none';
       } else if (a === PAUSE_ACTION.quit) return 'quit';
       // Refino R4: a frase de ajuda segue o foco.
       if (paused && pausePage === 'main' && pauseMenu.focusedId !== pauseMainFocus) pauseMain();
+      return 'none';
+    }
+    if (pausePage === 'players') {
+      if (a === PLAYERS_ACTION.resume) resume();
+      else if (nav.back) pauseMain();
       return 'none';
     }
     if (pausePage === 'calibrated') {
@@ -3816,6 +3953,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.tipKey = tipKey;
       m.tipText = tipText;
     }
+    // M4 (fase 3): o aviso da bateria usa a plaquinha da dica (passa na frente dela).
+    if (s === 0 && batteryNoticeS > 0) {
+      m.tipAlpha = Math.min(1, batteryNoticeS);
+      m.tipKey = '!';
+      m.tipText = batteryNotice;
+    }
     drawHud(slot.hud, fonts, m, lay.views[s]!);
     desc.hud = slot.hud;
     void ui;
@@ -4360,7 +4503,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     get level(): BotLevel {
       return currentLevel;
     },
-    pause,
+    pause: systemPause,
     trainingReport,
     nemesisBot,
     frame(dt, raw, menu, ui, list, rawFrameMs): SceneSignal {
@@ -4438,6 +4581,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               finishCalibration();
           }
           if (couch) checkMidJoin(raw, dt);
+          checkBattery(dt);
           const pauser = updateExtras(raw, dt, frozen, false);
           if (pauser > 0) pause(pauser);
           else if (player.wasPressed('pause')) pause();
@@ -4451,7 +4595,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // Capturando um botão (e esperando soltar tudo depois): nem a pausa nem o menu andam.
           if (capture.active) finishCapture(capture.update(raw));
           else if (player.wasPressed('pause') || extraPause > 0) resume();
-          else {
+          else if (pausePage !== 'players' || !playersInput(raw)) {
             signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }
         }
