@@ -37,6 +37,8 @@ export class InputHistory {
 const BUFFER = 64;
 /** Com mais que isto esperando (além do da vez), o host pula para perto do mais novo (a fila não vira atraso). */
 const MAX_WAITING = 3;
+/** Ticks repetindo o último frame antes de soltar movimento e botões (aba em segundo plano, conexão parada). */
+const STARVE_HOLD = 8;
 /** Quantos deixa esperando depois de pular. */
 const KEEP_WAITING = 2;
 
@@ -64,6 +66,7 @@ export class RemoteInputBuffer {
   private newest = -1;
   private lastSeq = -1;
   private carry = 0;
+  private starvedRun = 0;
   /** O snapshot completo mais novo que o cliente disse ter. */
   ackTick = NO_TICK;
   readonly stats: RemoteInputStats = { received: 0, duplicates: 0, starved: 0, skipped: 0 };
@@ -109,8 +112,8 @@ export class RemoteInputBuffer {
       return;
     }
     // Atrasado demais: pula para perto do mais novo, somando os botões do que pulou.
-    if (seqDiff(this.newest, this.next) >= MAX_WAITING) {
-      const target = (this.newest - KEEP_WAITING + 1) & 0xffff;
+    if (seqDiff(this.newest, this.next) > MAX_WAITING) {
+      const target = (this.newest - KEEP_WAITING) & 0xffff;
       while (this.next !== target) {
         const k = this.next & (BUFFER - 1);
         if (this.seqs[k] === this.next) this.carry |= this.ring[k]!.buttons;
@@ -126,6 +129,7 @@ export class RemoteInputBuffer {
         this.carry = 0;
         this.lastSeq = this.next;
         this.next = (this.next + 1) & 0xffff;
+        this.starvedRun = 0;
         break;
       }
       if (seqDiff(this.newest, this.next) > 0) {
@@ -135,6 +139,12 @@ export class RemoteInputBuffer {
         continue;
       }
       this.stats.starved++;
+      // Parado de vez: o boneco para e solta o gatilho, mas a mira fica.
+      if (++this.starvedRun > STARVE_HOLD) {
+        this.last.buttons = 0;
+        this.last.moveX = 0;
+        this.last.moveY = 0;
+      }
       break;
     }
     copyInputFrame(out, this.last);

@@ -1,6 +1,6 @@
 import type { InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter } from '@boboforces/shared';
-import { NULL_ENTITY, type Sim, type SimEvent } from '@boboforces/sim';
+import { NULL_ENTITY, PREDICT_STATE_SIZE, type Sim, type SimEvent } from '@boboforces/sim';
 import { EventWriter } from './events.ts';
 import { captureFrame } from './frame.ts';
 import { RemoteInputBuffer } from './inputs.ts';
@@ -50,6 +50,8 @@ export interface NetHostStats {
   full: number;
   maxParts: number;
   maxBytes: number;
+  /** Mensagens estragadas ignoradas. */
+  bad: number;
 }
 
 interface HostClient {
@@ -96,11 +98,13 @@ export function createNetHost(config: NetHostConfig): NetHost {
   const clients: HostClient[] = [];
   const reader = new BitReader(new Uint8Array(0));
   const reply = new BitWriter(MAX_MESSAGE_BYTES);
-  const stats: NetHostStats = { snapshots: 0, parts: 0, bytes: 0, full: 0, maxParts: 0, maxBytes: 0 };
+  const stats: NetHostStats = { snapshots: 0, parts: 0, bytes: 0, full: 0, maxParts: 0, maxBytes: 0, bad: 0 };
   const events = new EventWriter((bytes) => {
     for (const c of clients) if (c.verified) endpoint.send(c.peer, 'reliable', bytes);
   });
   let lastSnapshot = -1;
+  const priv = new Float64Array(PREDICT_STATE_SIZE);
+  const target = { focus: -1, inputSeq: -1, priv };
 
   const find = (peer: number): HostClient | null => {
     for (const c of clients) if (c.peer === peer) return c;
@@ -108,6 +112,15 @@ export function createNetHost(config: NetHostConfig): NetHost {
   };
 
   const onMessage = (from: number, channel: NetChannel, bytes: Uint8Array): void => {
+    try {
+      handle(from, channel, bytes);
+    } catch {
+      // Mensagem truncada ou estragada: ignorada (as entradas repetem as 3 anteriores).
+      stats.bad++;
+    }
+  };
+
+  const handle = (from: number, channel: NetChannel, bytes: Uint8Array): void => {
     reader.reset(bytes);
     const type = reader.readBits(8);
     const client = find(from);
@@ -175,12 +188,11 @@ export function createNetHost(config: NetHostConfig): NetHost {
         const base = history.get(c.input.ackTick);
         if (base === null) stats.full++;
         const id = sim.controllerEntity(c.slot);
-        const r = encoder.encode(
-          frame,
-          base === frame ? null : base,
-          { focus: id === NULL_ENTITY ? -1 : id & 0xffff, inputSeq: c.input.lastConsumedSeq },
-          c.send,
-        );
+        target.focus = id === NULL_ENTITY ? -1 : id & 0xffff;
+        target.inputSeq = c.input.lastConsumedSeq;
+        // Fase 2b: o estado de movimento do boneco dele, para a predição.
+        if (target.focus >= 0) sim.predict.save(target.focus, priv);
+        const r = encoder.encode(frame, base === frame ? null : base, target, c.send);
         stats.parts += r.parts;
         stats.bytes += r.bytes;
         stats.maxParts = Math.max(stats.maxParts, r.parts);

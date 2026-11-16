@@ -127,154 +127,144 @@ function zombieTicksFor(type: number): ProfileTicks {
 }
 
 export function movementSystem(ctx: SimContext): void {
-  const s = ctx.s;
-  const dt = ctx.dt;
-  const area = ctx.playArea;
-  const hw = METRICS.aabbWidth / 2;
+  updateProfiles(ctx);
+  for (let e = 0; e < ctx.s.count; e++) moveBody(ctx, e);
+}
+
+/**
+ * M5 (fase 2b, a predição do cliente online): o movimento de uma entidade só, com o mesmo código do sistema (o cliente
+ * move o próprio boneco a cada tick e refaz as entradas que o host ainda não usou).
+ */
+export function moveOne(ctx: SimContext, e: number): void {
+  updateProfiles(ctx);
+  moveBody(ctx, e);
+}
+
+function updateProfiles(ctx: SimContext): void {
   boboTicks.update(ctx.profile, ctx.hz);
   zombieTicks.update(ctx.zombieProfile, ctx.hz);
   runnerTicks.update(ctx.zombieRunProfile, ctx.hz);
   downedTicks.update(ctx.downedProfile, ctx.hz);
   sprinterTicks.update(ctx.sprinterProfile, ctx.hz);
   slowTicks.update(ctx.slowProfile, ctx.hz);
+}
 
-  for (let e = 0; e < s.count; e++) {
-    const kind = s.kind[e]!;
-    if (s.alive[e] === 0 || !isBody(kind)) continue;
-    let fl = s.flags[e]!;
-    if ((fl & F.dead) !== 0) continue;
-    // M3 (fase 3d): o zumbi bate nas tábuas da janela; o bobo, na janela inteira (as portas valem para os dois).
-    const colliders = kind === ENTITY_KIND.zombie ? ctx.zombieColliders : ctx.colliders;
-    const pt =
-      kind === ENTITY_KIND.zombie ? zombieTicksFor(s.zombieType[e]!) : (fl & F.downed) !== 0 ? downedTicks : boboTicks;
-    const p = pt.profile!;
-    const g = p.gravity;
-    const slide = p.slide;
-    const btn = s.inButtons[e]!;
-    const pressed = btn & ~s.prevButtons[e]!;
-    const i3 = e * 3;
-    let x = s.position[i3]!;
-    let y = s.position[i3 + 1]!;
-    let z = s.position[i3 + 2]!;
-    let vx = s.velocity[i3]!;
-    let vy = s.velocity[i3 + 1]!;
-    let vz = s.velocity[i3 + 2]!;
-    const wasOnGround = (fl & F.onGround) !== 0;
-    const wasSprinting = (fl & F.sprinting) !== 0;
-    // Deslocamento no plano deste tick (ver o comentário do módulo); o padrão é a média de início e fim.
-    const vx0 = vx;
-    const vz0 = vz;
-    let frictionTravel = -1;
-    // Fração do tick em que a velocidade ainda variava (chegou no alvo no meio do tick: o resto é a velocidade final).
-    let rampFrac = 1;
+function moveBody(ctx: SimContext, e: number): void {
+  const s = ctx.s;
+  const dt = ctx.dt;
+  const area = ctx.playArea;
+  const hw = METRICS.aabbWidth / 2;
+  const kind = s.kind[e]!;
+  if (s.alive[e] === 0 || !isBody(kind)) return;
+  let fl = s.flags[e]!;
+  if ((fl & F.dead) !== 0) return;
+  // M3 (fase 3d): o zumbi bate nas tábuas da janela; o bobo, na janela inteira (as portas valem para os dois).
+  const colliders = kind === ENTITY_KIND.zombie ? ctx.zombieColliders : ctx.colliders;
+  const pt =
+    kind === ENTITY_KIND.zombie ? zombieTicksFor(s.zombieType[e]!) : (fl & F.downed) !== 0 ? downedTicks : boboTicks;
+  const p = pt.profile!;
+  const g = p.gravity;
+  const slide = p.slide;
+  const btn = s.inButtons[e]!;
+  const pressed = btn & ~s.prevButtons[e]!;
+  const i3 = e * 3;
+  let x = s.position[i3]!;
+  let y = s.position[i3 + 1]!;
+  let z = s.position[i3 + 2]!;
+  let vx = s.velocity[i3]!;
+  let vy = s.velocity[i3 + 1]!;
+  let vz = s.velocity[i3 + 2]!;
+  const wasOnGround = (fl & F.onGround) !== 0;
+  const wasSprinting = (fl & F.sprinting) !== 0;
+  // Deslocamento no plano deste tick (ver o comentário do módulo); o padrão é a média de início e fim.
+  const vx0 = vx;
+  const vz0 = vz;
+  let frictionTravel = -1;
+  // Fração do tick em que a velocidade ainda variava (chegou no alvo no meio do tick: o resto é a velocidade final).
+  let rampFrac = 1;
 
-    // Direção desejada no plano: frente (-sin, -cos) · moveY + direita (cos, -sin) · moveX.
-    const yaw = s.yaw[e]!;
-    const sinY = Math.sin(yaw);
-    const cosY = Math.cos(yaw);
-    const mx = s.inMoveX[e]!;
-    const my = s.inMoveY[e]!;
-    let wx = -sinY * my + cosY * mx;
-    let wz = -cosY * my - sinY * mx;
-    let wishLen = Math.sqrt(wx * wx + wz * wz);
-    if (wishLen > 1) {
-      wx /= wishLen;
-      wz /= wishLen;
-      wishLen = 1;
+  // Direção desejada no plano: frente (-sin, -cos) · moveY + direita (cos, -sin) · moveX.
+  const yaw = s.yaw[e]!;
+  const sinY = Math.sin(yaw);
+  const cosY = Math.cos(yaw);
+  const mx = s.inMoveX[e]!;
+  const my = s.inMoveY[e]!;
+  let wx = -sinY * my + cosY * mx;
+  let wz = -cosY * my - sinY * mx;
+  let wishLen = Math.sqrt(wx * wx + wz * wz);
+  if (wishLen > 1) {
+    wx /= wishLen;
+    wz /= wishLen;
+    wishLen = 1;
+  }
+  const hSpeed = Math.sqrt(vx * vx + vz * vz);
+
+  // --- Deslize (agachar correndo, perfil Bobo) ---
+  let sliding = (fl & F.sliding) !== 0;
+  if (s.slideCooldownTicks[e]! > 0) s.slideCooldownTicks[e]!--;
+  if (
+    slide &&
+    !sliding &&
+    (pressed & BUTTON.crouch) !== 0 &&
+    wasSprinting &&
+    wasOnGround &&
+    s.slideCooldownTicks[e] === 0 &&
+    hSpeed >= p.walk * 0.9
+  ) {
+    sliding = true;
+    s.slideTicks[e] = pt.slideTotal;
+    s.slideDir[e * 2] = vx / hSpeed;
+    s.slideDir[e * 2 + 1] = vz / hSpeed;
+    ctx.events.move(ctx.tick, s.idOf(e), 'slide', slide.startSpeed);
+  }
+
+  // --- Agachar (levanta só se couber em pé: caixa agachada varrida para cima, com formas e props) ---
+  let crouching = (fl & F.crouching) !== 0;
+  if ((btn & BUTTON.crouch) !== 0 || sliding) {
+    crouching = true;
+  } else if (crouching) {
+    setBox(standProbe, x, y, z, METRICS.aabbCrouchHeight);
+    const rise = METRICS.aabbHeight - METRICS.aabbCrouchHeight;
+    sweepAabb(ctx.grid, ctx.blocks, standProbe, 0, rise, 0, 0, standSweep, colliders);
+    if (!standSweep.hitY) crouching = false;
+  }
+
+  // --- Correr e mirar ---
+  // Refino R1 (#79): o gatilho corta a corrida (antes ele não fazia nada enquanto o bobo corria).
+  const adsHeld = (btn & BUTTON.ads) !== 0;
+  const sprinting =
+    (btn & BUTTON.sprint) !== 0 &&
+    (btn & (BUTTON.fire | BUTTON.grenade)) === 0 &&
+    my > SPRINT_MIN_FORWARD &&
+    !crouching &&
+    !adsHeld &&
+    (wasOnGround || wasSprinting);
+  const ads = adsHeld && !sprinting && !sliding;
+  if (sprinting) s.sprintFireDelayTicks[e] = pt.sprintFireDelay;
+
+  // --- Velocidade no plano ---
+  if (sliding && slide) {
+    const left = --s.slideTicks[e]!;
+    const t = 1 - left / pt.slideTotal;
+    const speed = slide.startSpeed + (p.crouch - slide.startSpeed) * t;
+    vx = s.slideDir[e * 2]! * speed;
+    vz = s.slideDir[e * 2 + 1]! * speed;
+    if (left <= 0 || (btn & BUTTON.crouch) === 0) {
+      sliding = false;
+      s.slideCooldownTicks[e] = pt.slideCooldown;
     }
-    const hSpeed = Math.sqrt(vx * vx + vz * vz);
-
-    // --- Deslize (agachar correndo, perfil Bobo) ---
-    let sliding = (fl & F.sliding) !== 0;
-    if (s.slideCooldownTicks[e]! > 0) s.slideCooldownTicks[e]!--;
-    if (
-      slide &&
-      !sliding &&
-      (pressed & BUTTON.crouch) !== 0 &&
-      wasSprinting &&
-      wasOnGround &&
-      s.slideCooldownTicks[e] === 0 &&
-      hSpeed >= p.walk * 0.9
-    ) {
-      sliding = true;
-      s.slideTicks[e] = pt.slideTotal;
-      s.slideDir[e * 2] = vx / hSpeed;
-      s.slideDir[e * 2 + 1] = vz / hSpeed;
-      ctx.events.move(ctx.tick, s.idOf(e), 'slide', slide.startSpeed);
-    }
-
-    // --- Agachar (levanta só se couber em pé: caixa agachada varrida para cima, com formas e props) ---
-    let crouching = (fl & F.crouching) !== 0;
-    if ((btn & BUTTON.crouch) !== 0 || sliding) {
-      crouching = true;
-    } else if (crouching) {
-      setBox(standProbe, x, y, z, METRICS.aabbCrouchHeight);
-      const rise = METRICS.aabbHeight - METRICS.aabbCrouchHeight;
-      sweepAabb(ctx.grid, ctx.blocks, standProbe, 0, rise, 0, 0, standSweep, colliders);
-      if (!standSweep.hitY) crouching = false;
-    }
-
-    // --- Correr e mirar ---
-    // Refino R1 (#79): o gatilho corta a corrida (antes ele não fazia nada enquanto o bobo corria).
-    const adsHeld = (btn & BUTTON.ads) !== 0;
-    const sprinting =
-      (btn & BUTTON.sprint) !== 0 &&
-      (btn & (BUTTON.fire | BUTTON.grenade)) === 0 &&
-      my > SPRINT_MIN_FORWARD &&
-      !crouching &&
-      !adsHeld &&
-      (wasOnGround || wasSprinting);
-    const ads = adsHeld && !sprinting && !sliding;
-    if (sprinting) s.sprintFireDelayTicks[e] = pt.sprintFireDelay;
-
-    // --- Velocidade no plano ---
-    if (sliding && slide) {
-      const left = --s.slideTicks[e]!;
-      const t = 1 - left / pt.slideTotal;
-      const speed = slide.startSpeed + (p.crouch - slide.startSpeed) * t;
-      vx = s.slideDir[e * 2]! * speed;
-      vz = s.slideDir[e * 2 + 1]! * speed;
-      if (left <= 0 || (btn & BUTTON.crouch) === 0) {
-        sliding = false;
-        s.slideCooldownTicks[e] = pt.slideCooldown;
-      }
-    } else {
-      // M2 (fase 3b): velocidade por regra do bot (×0,5 a ×2).
-      let target = (crouching ? p.crouch : sprinting ? p.sprint : p.walk) * ctx.rules.speed[e]!;
-      if (ads) target *= p.adsMoveMul;
-      const tx = wx * target;
-      const tz = wz * target;
-      if (wasOnGround) {
-        if (wishLen > 0) {
-          const ddx = tx - vx;
-          const ddz = tz - vz;
-          const dl = Math.sqrt(ddx * ddx + ddz * ddz);
-          const maxDelta = p.accel * dt;
-          if (dl <= maxDelta) {
-            rampFrac = maxDelta > 0 ? dl / maxDelta : 0;
-            vx = tx;
-            vz = tz;
-          } else {
-            vx += (ddx / dl) * maxDelta;
-            vz += (ddz / dl) * maxDelta;
-          }
-        } else {
-          const k = Math.exp(-p.friction * dt);
-          // Quanto anda neste tick pela integral de v·e^(-f·t): o total até parar é v/f em qualquer SIM_HZ.
-          frictionTravel = p.friction > 0 ? (1 - k) / p.friction : dt;
-          vx *= k;
-          vz *= k;
-          if (vx * vx + vz * vz < STOP_SPEED * STOP_SPEED) {
-            vx = 0;
-            vz = 0;
-          }
-        }
-      } else if (wishLen > 0) {
-        // No ar: controle parcial e sem ganhar velocidade além da que já tinha (sem bhop no Bobo).
+  } else {
+    // M2 (fase 3b): velocidade por regra do bot (×0,5 a ×2).
+    let target = (crouching ? p.crouch : sprinting ? p.sprint : p.walk) * ctx.rules.speed[e]!;
+    if (ads) target *= p.adsMoveMul;
+    const tx = wx * target;
+    const tz = wz * target;
+    if (wasOnGround) {
+      if (wishLen > 0) {
         const ddx = tx - vx;
         const ddz = tz - vz;
         const dl = Math.sqrt(ddx * ddx + ddz * ddz);
-        const maxDelta = p.accel * p.airControl * dt;
+        const maxDelta = p.accel * dt;
         if (dl <= maxDelta) {
           rampFrac = maxDelta > 0 ? dl / maxDelta : 0;
           vx = tx;
@@ -283,134 +273,158 @@ export function movementSystem(ctx: SimContext): void {
           vx += (ddx / dl) * maxDelta;
           vz += (ddz / dl) * maxDelta;
         }
-        const cap = Math.max(hSpeed, target);
-        const ns = Math.sqrt(vx * vx + vz * vz);
-        if (ns > cap && ns > 0) {
-          vx *= cap / ns;
-          vz *= cap / ns;
+      } else {
+        const k = Math.exp(-p.friction * dt);
+        // Quanto anda neste tick pela integral de v·e^(-f·t): o total até parar é v/f em qualquer SIM_HZ.
+        frictionTravel = p.friction > 0 ? (1 - k) / p.friction : dt;
+        vx *= k;
+        vz *= k;
+        if (vx * vx + vz * vz < STOP_SPEED * STOP_SPEED) {
+          vx = 0;
+          vz = 0;
         }
       }
-    }
-
-    // --- Pulo (buffer + coyote) ---
-    let jumpBuffer = s.jumpBufferTicks[e]!;
-    if ((pressed & BUTTON.jump) !== 0) jumpBuffer = pt.jumpBufferMax + 1;
-    let coyote = s.coyoteTicks[e]!;
-    let jumped = false;
-    if (jumpBuffer > 0 && (wasOnGround || coyote > 0)) {
-      vy = pt.jumpSpeed;
-      jumpBuffer = 0;
-      coyote = 0;
-      jumped = true;
-      if (sliding) {
-        sliding = false;
-        s.slideCooldownTicks[e] = pt.slideCooldown;
-      }
-      ctx.events.move(ctx.tick, s.idOf(e), 'jump', pt.jumpSpeed);
-    }
-    if (jumpBuffer > 0) jumpBuffer--;
-
-    // --- Gravidade e colisão ---
-    if (wasOnGround && !jumped && vy < 0) vy = 0;
-    const dy = vy * dt - 0.5 * g * dt * dt;
-    vy -= g * dt;
-    if (vy < -MATCH_DEFAULTS.terminalSpeed) vy = -MATCH_DEFAULTS.terminalSpeed;
-    const fallSpeed = -vy;
-    setBox(box, x, y, z, crouching ? METRICS.aabbCrouchHeight : METRICS.aabbHeight);
-    const stepHeight = wasOnGround && !jumped ? METRICS.stepHeight : pt.airStep;
-    // Rampa linear até o alvo (média de início e fim) e depois velocidade constante; no atrito, a integral exata.
-    const ramp = rampFrac * 0.5;
-    const moveX = frictionTravel >= 0 ? vx0 * frictionTravel : (vx0 * ramp + vx * (1 - ramp)) * dt;
-    const moveZ = frictionTravel >= 0 ? vz0 * frictionTravel : (vz0 * ramp + vz * (1 - ramp)) * dt;
-    sweepAabb(ctx.grid, ctx.blocks, box, moveX, dy, moveZ, stepHeight, sweep, colliders);
-    if (sweep.hitX) vx = 0;
-    if (sweep.hitZ) vz = 0;
-    if (sweep.hitY) vy = 0;
-    let onGround = sweep.onGround;
-    // Descer degrau (ou rampa): estava no chão, não pulou e o chão sumiu; se houver chão até um degrau abaixo, gruda.
-    let stepDown = 0;
-    if (wasOnGround && !jumped && !onGround && vy <= 0) {
-      const minY = box.minY;
-      const maxY = box.maxY;
-      sweepAabb(ctx.grid, ctx.blocks, box, 0, -METRICS.stepHeight, 0, 0, drop, colliders);
-      if (drop.onGround) {
-        onGround = true;
-        vy = 0;
-        stepDown = drop.dy;
+    } else if (wishLen > 0) {
+      // No ar: controle parcial e sem ganhar velocidade além da que já tinha (sem bhop no Bobo).
+      const ddx = tx - vx;
+      const ddz = tz - vz;
+      const dl = Math.sqrt(ddx * ddx + ddz * ddz);
+      const maxDelta = p.accel * p.airControl * dt;
+      if (dl <= maxDelta) {
+        rampFrac = maxDelta > 0 ? dl / maxDelta : 0;
+        vx = tx;
+        vz = tz;
       } else {
-        box.minY = minY;
-        box.maxY = maxY;
+        vx += (ddx / dl) * maxDelta;
+        vz += (ddz / dl) * maxDelta;
+      }
+      const cap = Math.max(hSpeed, target);
+      const ns = Math.sqrt(vx * vx + vz * vz);
+      if (ns > cap && ns > 0) {
+        vx *= cap / ns;
+        vz *= cap / ns;
       }
     }
-    x = (box.minX + box.maxX) / 2;
-    y = box.minY;
-    z = (box.minZ + box.maxZ) / 2;
-
-    // Área jogável: parede invisível em X/Z (tecnico.md §4.5). Volta para dentro só no eixo que passou.
-    if (area !== null) {
-      if (x < area.minX + hw) {
-        x = area.minX + hw;
-        if (vx < 0) vx = 0;
-      } else if (x > area.maxX - hw) {
-        x = area.maxX - hw;
-        if (vx > 0) vx = 0;
-      }
-      if (z < area.minZ + hw) {
-        z = area.minZ + hw;
-        if (vz < 0) vz = 0;
-      } else if (z > area.maxZ - hw) {
-        z = area.maxZ - hw;
-        if (vz > 0) vz = 0;
-      }
-    }
-
-    if (onGround && !wasOnGround) {
-      const fall = s.airPeakY[e]! - y;
-      ctx.events.move(ctx.tick, s.idOf(e), 'land', fallSpeed);
-      // M2 (fase 6a): o Tático freia no pouso (sem bhop).
-      if (p.landingKeep !== undefined) {
-        vx *= p.landingKeep;
-        vz *= p.landingKeep;
-      }
-      if (p.fallDamage && fall > METRICS.safeFallHeight) {
-        const dmg = (fall - METRICS.safeFallHeight) * MATCH_DEFAULTS.fallDamagePerM;
-        ctx.damage.push(e, NULL_ENTITY, dmg, PART_TORSO, FIGURE_BONE.footR, WEAPON_NONE, x, y, z);
-      }
-    }
-    if (!onGround) {
-      if (wasOnGround) {
-        coyote = jumped ? 0 : pt.coyoteMax;
-        s.airPeakY[e] = y;
-      } else {
-        if (coyote > 0) coyote--;
-        if (y > s.airPeakY[e]!) s.airPeakY[e] = y;
-      }
-    } else {
-      coyote = 0;
-      s.airPeakY[e] = y;
-    }
-    // Degrau só quando a altura muda de uma vez (bloco, laje, degrau); na rampa a altura muda todo tick.
-    const stepDy = sweep.stepped && wasOnGround ? sweep.dy : stepDown;
-    if (stepDy !== 0 && !onSlope(ctx, x, y, z)) ctx.events.move(ctx.tick, s.idOf(e), 'step', stepDy);
-
-    // Plano de morte (tecnico.md §4.5): dano letal sem atacante, passa pela proteção de spawn.
-    if (y < ctx.killPlaneY)
-      ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, FIGURE_BONE.torso, WEAPON_KILL_PLANE, x, y, z);
-
-    s.position[i3] = x;
-    s.position[i3 + 1] = y;
-    s.position[i3 + 2] = z;
-    s.velocity[i3] = vx;
-    s.velocity[i3 + 1] = vy;
-    s.velocity[i3 + 2] = vz;
-    s.jumpBufferTicks[e] = jumpBuffer;
-    s.coyoteTicks[e] = coyote;
-    fl &= ~MOVE_FLAGS;
-    if (onGround) fl |= F.onGround;
-    if (crouching) fl |= F.crouching;
-    if (sprinting) fl |= F.sprinting;
-    if (sliding) fl |= F.sliding;
-    if (ads) fl |= F.ads;
-    s.flags[e] = fl;
   }
+
+  // --- Pulo (buffer + coyote) ---
+  let jumpBuffer = s.jumpBufferTicks[e]!;
+  if ((pressed & BUTTON.jump) !== 0) jumpBuffer = pt.jumpBufferMax + 1;
+  let coyote = s.coyoteTicks[e]!;
+  let jumped = false;
+  if (jumpBuffer > 0 && (wasOnGround || coyote > 0)) {
+    vy = pt.jumpSpeed;
+    jumpBuffer = 0;
+    coyote = 0;
+    jumped = true;
+    if (sliding) {
+      sliding = false;
+      s.slideCooldownTicks[e] = pt.slideCooldown;
+    }
+    ctx.events.move(ctx.tick, s.idOf(e), 'jump', pt.jumpSpeed);
+  }
+  if (jumpBuffer > 0) jumpBuffer--;
+
+  // --- Gravidade e colisão ---
+  if (wasOnGround && !jumped && vy < 0) vy = 0;
+  const dy = vy * dt - 0.5 * g * dt * dt;
+  vy -= g * dt;
+  if (vy < -MATCH_DEFAULTS.terminalSpeed) vy = -MATCH_DEFAULTS.terminalSpeed;
+  const fallSpeed = -vy;
+  setBox(box, x, y, z, crouching ? METRICS.aabbCrouchHeight : METRICS.aabbHeight);
+  const stepHeight = wasOnGround && !jumped ? METRICS.stepHeight : pt.airStep;
+  // Rampa linear até o alvo (média de início e fim) e depois velocidade constante; no atrito, a integral exata.
+  const ramp = rampFrac * 0.5;
+  const moveX = frictionTravel >= 0 ? vx0 * frictionTravel : (vx0 * ramp + vx * (1 - ramp)) * dt;
+  const moveZ = frictionTravel >= 0 ? vz0 * frictionTravel : (vz0 * ramp + vz * (1 - ramp)) * dt;
+  sweepAabb(ctx.grid, ctx.blocks, box, moveX, dy, moveZ, stepHeight, sweep, colliders);
+  if (sweep.hitX) vx = 0;
+  if (sweep.hitZ) vz = 0;
+  if (sweep.hitY) vy = 0;
+  let onGround = sweep.onGround;
+  // Descer degrau (ou rampa): estava no chão, não pulou e o chão sumiu; se houver chão até um degrau abaixo, gruda.
+  let stepDown = 0;
+  if (wasOnGround && !jumped && !onGround && vy <= 0) {
+    const minY = box.minY;
+    const maxY = box.maxY;
+    sweepAabb(ctx.grid, ctx.blocks, box, 0, -METRICS.stepHeight, 0, 0, drop, colliders);
+    if (drop.onGround) {
+      onGround = true;
+      vy = 0;
+      stepDown = drop.dy;
+    } else {
+      box.minY = minY;
+      box.maxY = maxY;
+    }
+  }
+  x = (box.minX + box.maxX) / 2;
+  y = box.minY;
+  z = (box.minZ + box.maxZ) / 2;
+
+  // Área jogável: parede invisível em X/Z (tecnico.md §4.5). Volta para dentro só no eixo que passou.
+  if (area !== null) {
+    if (x < area.minX + hw) {
+      x = area.minX + hw;
+      if (vx < 0) vx = 0;
+    } else if (x > area.maxX - hw) {
+      x = area.maxX - hw;
+      if (vx > 0) vx = 0;
+    }
+    if (z < area.minZ + hw) {
+      z = area.minZ + hw;
+      if (vz < 0) vz = 0;
+    } else if (z > area.maxZ - hw) {
+      z = area.maxZ - hw;
+      if (vz > 0) vz = 0;
+    }
+  }
+
+  if (onGround && !wasOnGround) {
+    const fall = s.airPeakY[e]! - y;
+    ctx.events.move(ctx.tick, s.idOf(e), 'land', fallSpeed);
+    // M2 (fase 6a): o Tático freia no pouso (sem bhop).
+    if (p.landingKeep !== undefined) {
+      vx *= p.landingKeep;
+      vz *= p.landingKeep;
+    }
+    if (p.fallDamage && fall > METRICS.safeFallHeight) {
+      const dmg = (fall - METRICS.safeFallHeight) * MATCH_DEFAULTS.fallDamagePerM;
+      ctx.damage.push(e, NULL_ENTITY, dmg, PART_TORSO, FIGURE_BONE.footR, WEAPON_NONE, x, y, z);
+    }
+  }
+  if (!onGround) {
+    if (wasOnGround) {
+      coyote = jumped ? 0 : pt.coyoteMax;
+      s.airPeakY[e] = y;
+    } else {
+      if (coyote > 0) coyote--;
+      if (y > s.airPeakY[e]!) s.airPeakY[e] = y;
+    }
+  } else {
+    coyote = 0;
+    s.airPeakY[e] = y;
+  }
+  // Degrau só quando a altura muda de uma vez (bloco, laje, degrau); na rampa a altura muda todo tick.
+  const stepDy = sweep.stepped && wasOnGround ? sweep.dy : stepDown;
+  if (stepDy !== 0 && !onSlope(ctx, x, y, z)) ctx.events.move(ctx.tick, s.idOf(e), 'step', stepDy);
+
+  // Plano de morte (tecnico.md §4.5): dano letal sem atacante, passa pela proteção de spawn.
+  if (y < ctx.killPlaneY)
+    ctx.damage.push(e, NULL_ENTITY, 1e9, PART_TORSO, FIGURE_BONE.torso, WEAPON_KILL_PLANE, x, y, z);
+
+  s.position[i3] = x;
+  s.position[i3 + 1] = y;
+  s.position[i3 + 2] = z;
+  s.velocity[i3] = vx;
+  s.velocity[i3 + 1] = vy;
+  s.velocity[i3 + 2] = vz;
+  s.jumpBufferTicks[e] = jumpBuffer;
+  s.coyoteTicks[e] = coyote;
+  fl &= ~MOVE_FLAGS;
+  if (onGround) fl |= F.onGround;
+  if (crouching) fl |= F.crouching;
+  if (sprinting) fl |= F.sprinting;
+  if (sliding) fl |= F.sliding;
+  if (ads) fl |= F.ads;
+  s.flags[e] = fl;
 }

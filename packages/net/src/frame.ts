@@ -2,6 +2,7 @@ import {
   MAX_ENTITIES,
   MAX_PICKUPS,
   MAX_PROJECTILES,
+  PREDICT_STATE_SIZE,
   type Sim,
   type SimRemoteState,
   type SimView,
@@ -23,6 +24,12 @@ export class NetFrame {
   proj: Int32Array = new Int32Array(0);
   pick: Int32Array = new Int32Array(0);
   readonly glob: Int32Array;
+  /**
+   * Fase 2b: o estado de movimento do boneco do dono deste snapshot (`Sim.predict`), só no que vai para ele.
+   * `privEntity` -1 = não veio (host e bases não têm).
+   */
+  readonly priv = new Float64Array(PREDICT_STATE_SIZE);
+  privEntity = -1;
 
   constructor(layout: NetLayout) {
     this.glob = new Int32Array(layout.globals.length);
@@ -172,6 +179,8 @@ export function copyFrame(dst: NetFrame, src: NetFrame): void {
   copyPool(dst, src, 'proj', PROJECTILE_SLOTS.count, dst.projCount, src.projCount);
   copyPool(dst, src, 'pick', PICKUP_SLOTS.count, dst.pickCount, src.pickCount);
   dst.glob.set(src.glob);
+  // O bloco privado é de um snapshot só (não é base de nada).
+  dst.privEntity = -1;
   dst.tick = src.tick;
   dst.count = src.count;
   dst.projCount = src.projCount;
@@ -197,6 +206,7 @@ export function clearFrame(f: NetFrame): void {
   f.proj.fill(0, 0, f.projCount * PROJECTILE_SLOTS.count);
   f.pick.fill(0, 0, f.pickCount * PICKUP_SLOTS.count);
   f.glob.fill(0);
+  f.privEntity = -1;
   f.tick = NO_TICK;
   f.count = 0;
   f.projCount = 0;
@@ -230,8 +240,21 @@ const SNAP_M2 = 3 * 3;
 const before = new Uint32Array(Math.max(MAX_ENTITIES, MAX_PROJECTILES, MAX_PICKUPS));
 
 /** Marca em `before` quem existia (`alive`) e com qual geração (0 = não existia). */
-function markBefore(alive: Uint8Array, generation: Uint16Array | null, count: number, upTo: number): void {
-  for (let i = 0; i < upTo; i++) before[i] = i < count && alive[i] === 1 ? (generation ? generation[i]! + 1 : 1) : 0;
+function markBefore(
+  alive: Uint8Array,
+  generation: Uint16Array | null,
+  owner: Uint32Array | null,
+  count: number,
+  upTo: number,
+): void {
+  for (let i = 0; i < upTo; i++) before[i] = i < count ? identity(alive, generation, owner, i) : 0;
+}
+
+/** Quem ocupa o slot: 0 = ninguém; a geração da entidade ou o dono do projétil (+1). */
+function identity(alive: Uint8Array, generation: Uint16Array | null, owner: Uint32Array | null, i: number): number {
+  if (alive[i] !== 1) return 0;
+  if (generation !== null) return generation[i]! + 1;
+  return owner !== null ? (owner[i]! + 1) >>> 0 : 1;
 }
 
 /**
@@ -274,6 +297,7 @@ function applyPool<V>(
   count: number,
   alive: Uint8Array,
   generation: Uint16Array | null,
+  owner: Uint32Array | null,
   position: Float64Array,
   prevPosition: Float64Array,
   yaw: Float64Array | null,
@@ -295,7 +319,7 @@ function applyPool<V>(
     }
   }
   for (let item = 0; item < count; item++) {
-    const now = alive[item] === 1 ? (generation ? generation[item]! + 1 : 1) : 0;
+    const now = identity(alive, generation, owner, item);
     const p = item * 3;
     const dx = position[p]! - prevPosition[p]!;
     const dy = position[p + 1]! - prevPosition[p + 1]!;
@@ -320,7 +344,7 @@ const snapAim = new Uint8Array(MAX_ENTITIES);
 export function applyFrame(layout: NetLayout, frame: NetFrame, sim: Sim, state: SimRemoteState): void {
   const view = sim.view();
   sim.remote.begin();
-  markBefore(view.alive, view.generation, view.count, frame.count);
+  markBefore(view.alive, view.generation, null, view.count, frame.count);
   snapAim.fill(0, 0, frame.count);
   applyPool(
     view,
@@ -329,6 +353,7 @@ export function applyFrame(layout: NetLayout, frame: NetFrame, sim: Sim, state: 
     frame.count,
     view.alive,
     view.generation,
+    null,
     view.position,
     view.prevPosition,
     view.yaw,
@@ -340,11 +365,22 @@ export function applyFrame(layout: NetLayout, frame: NetFrame, sim: Sim, state: 
     }
   }
   const pv = view.projectiles;
-  markBefore(pv.alive, null, pv.count, frame.projCount);
-  applyPool(pv, PROJECTILE_SLOTS, frame.proj, frame.projCount, pv.alive, null, pv.position, pv.prevPosition, null);
+  markBefore(pv.alive, null, pv.owner, pv.count, frame.projCount);
+  applyPool(
+    pv,
+    PROJECTILE_SLOTS,
+    frame.proj,
+    frame.projCount,
+    pv.alive,
+    null,
+    pv.owner,
+    pv.position,
+    pv.prevPosition,
+    null,
+  );
   const kv = view.pickups;
-  markBefore(kv.alive, null, kv.count, frame.pickCount);
-  applyPool(kv, PICKUP_SLOTS, frame.pick, frame.pickCount, kv.alive, null, kv.position, kv.prevPosition, null);
+  markBefore(kv.alive, null, null, kv.count, frame.pickCount);
+  applyPool(kv, PICKUP_SLOTS, frame.pick, frame.pickCount, kv.alive, null, null, kv.position, kv.prevPosition, null);
   state.tick = frame.tick;
   state.count = frame.count;
   state.projCount = frame.projCount;

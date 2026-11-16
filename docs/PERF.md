@@ -246,6 +246,10 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   completos (os do 1º ack de cada cliente).
 - **Com os eventos (fase 2a)**, a mesma partida: host → cada cliente **8,4 KB/s** (os eventos somam ~2,6 KB/s, quase
   tudo reais em f32 de tiro, impacto e passo).
+- **Predição e interpolação (fases 2b e 2c)**, a mesma partida: o bloco privado (o estado de movimento do boneco de
+  cada cliente, ~50 B por snapshot) sobe o host → cliente para **9,8 KB/s**; a predição erra em média 0,02–0,06 cm por
+  reconciliação (~13 entradas refeitas em cada uma, o ida e volta de ~210 ms); a interpolação fica a **0,37 cm** do
+  host em média e **2 cm** no p99.
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).

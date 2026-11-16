@@ -37,11 +37,11 @@ describe('entradas do cliente (M5 fase 1)', () => {
         got.push(out.yaw);
       }
     }
-    // Do 1 ao 4 em dia; na 8 chegam 5..8 juntos: o host pula para o 7 (não vira atraso) e segue um por tick.
+    // Do 1 ao 4 em dia; na 8 chegam 5..8 juntos e o host segue um por tick (até 3 esperando, sem pular).
     expect(got.slice(0, 4)).toEqual([1, 2, 3, 4]);
-    expect(got.slice(4)).toEqual([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+    expect(got.slice(4)).toEqual([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
     expect(buf.ackTick).toBe(120);
-    expect(buf.lastConsumedSeq).toBe(19);
+    expect(buf.lastConsumedSeq).toBe(17);
     expect(buf.stats.duplicates).toBeGreaterThan(0);
   });
 
@@ -61,10 +61,10 @@ describe('entradas do cliente (M5 fase 1)', () => {
       buf.receive(message(history));
     }
     buf.consume(out);
-    expect(out.yaw).toBe(10);
+    expect(out.yaw).toBe(9);
     expect(out.buttons & BUTTON.jump).toBe(BUTTON.jump);
     buf.consume(out);
-    expect([out.yaw, out.buttons]).toEqual([11, 0]);
+    expect([out.yaw, out.buttons]).toEqual([10, 0]);
     expect(buf.stats.skipped).toBeGreaterThan(0);
   });
 

@@ -65,7 +65,7 @@ import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
-import { movementSystem } from './systems/movement.ts';
+import { movementSystem, moveOne } from './systems/movement.ts';
 import { pickupSystem } from './systems/pickups.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
@@ -196,6 +196,25 @@ export interface SimRemote {
 }
 
 /**
+ * M5 (fase 2b): tamanho do estado de movimento de uma entidade (`SimPredict.save`): posição (3), velocidade (3),
+ * flags, botões, coiote, pulo guardado, deslize, recarga do deslize, direção do deslize (2), pico do ar e o atraso do
+ * tiro depois de correr.
+ */
+export const PREDICT_STATE_SIZE = 16;
+
+/**
+ * M5 (fase 2b, só o cliente online): o cliente prediz o próprio movimento com o mesmo código do `step`. O host manda,
+ * só para o dono, o estado de movimento do boneco dele (`save`); o cliente carrega (`load`) e refaz as entradas que o
+ * host ainda não tinha usado (`step`, uma por tick). Só o movimento: armas, dano e regras ficam com o host.
+ */
+export interface SimPredict {
+  save(e: number, out: Float64Array): void;
+  load(e: number, from: Float64Array): void;
+  /** Um tick do movimento de `e` com `frame` (`prev*` ← atual, entrada, movimento); eventos e dano descartados. */
+  step(e: number, frame: Readonly<InputFrame>): void;
+}
+
+/**
  * Fronteira da sim (tecnico.md §4.4). Headless, determinística na mesma build/plataforma, sem relógio e sem
  * alocação no laço quente. Ordem fixa por tick: aplicar inputs → movimento/colisão → armas → projéteis → dano/morte →
  * regras do modo → spawns → eventos. A IA roda FORA (antes do `step`) e entrega InputFrames como um humano.
@@ -225,6 +244,8 @@ export interface Sim extends Disposable {
   readSnapshot(r: BitReader): void;
   /** M5: o estado do host escrito por cima (só o cliente online, pelo `net`). */
   readonly remote: SimRemote;
+  /** M5 (fase 2b): a predição do próprio movimento (só o cliente online, pelo `net`). */
+  readonly predict: SimPredict;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -657,37 +678,40 @@ export function createSim(config: SimConfig): Sim {
   let keepEvents = true;
   let disposed = false;
 
-  /** Passo 1: aplica os InputFrames (mira absoluta; botões guardados para detectar bordas). */
+  /** Passo 1 de uma entidade: a entrada do controlador dela (mira absoluta; botões guardados para detectar bordas). */
+  const applyInput = (e: number, f: Readonly<InputFrame> | null): void => {
+    s.prevButtons[e] = s.inButtons[e]!;
+    if (f === null) {
+      s.inButtons[e] = 0;
+      s.inMoveX[e] = 0;
+      s.inMoveY[e] = 0;
+      return;
+    }
+    // Contagem inicial: só a mira e a primária valem (a troca de arma pedida agora entra quando a partida começar).
+    const frozen = match.phase === 'warmup';
+    s.inButtons[e] = frozen ? 0 : f.buttons & 0xffff;
+    s.inMoveX[e] = frozen ? 0 : dequantizeAxis(f.moveX);
+    s.inMoveY[e] = frozen ? 0 : dequantizeAxis(f.moveY);
+    if (!frozen) s.inWeapon[e] = f.weapon & 0xff;
+    if ((s.flags[e]! & ENTITY_FLAG.downed) !== 0) {
+      s.inWeapon[e] = DOWNED_SLOT;
+      s.inButtons[e] = (s.inButtons[e]! & DOWNED_BUTTONS) | BUTTON.crouch;
+    }
+    // Primária do próximo spawn: código + 1 (0 = manter); código que não é primária é ignorado.
+    const p = (f.primary & 0xff) - 1;
+    if (p >= 0 && isPrimaryWeapon(p)) s.primaryChoice[e] = p;
+    if ((s.flags[e]! & ENTITY_FLAG.dead) === 0) {
+      s.yaw[e] = u16ToYaw(f.yaw);
+      s.pitch[e] = i16ToPitch(f.pitch);
+    }
+  };
+
+  /** Passo 1: aplica os InputFrames de todos os controladores. */
   const applyInputs = (inputs: ReadonlyArray<Readonly<InputFrame> | null>): void => {
     for (let c = 0; c < controllerCount; c++) {
       const id = s.controllerEntity[c]!;
       if (id === NULL_ENTITY) continue;
-      const e = id & 0xffff;
-      s.prevButtons[e] = s.inButtons[e]!;
-      const f = c < inputs.length ? (inputs[c] ?? null) : null;
-      if (f === null) {
-        s.inButtons[e] = 0;
-        s.inMoveX[e] = 0;
-        s.inMoveY[e] = 0;
-        continue;
-      }
-      // Contagem inicial: só a mira e a primária valem (a troca de arma pedida agora entra quando a partida começar).
-      const frozen = match.phase === 'warmup';
-      s.inButtons[e] = frozen ? 0 : f.buttons & 0xffff;
-      s.inMoveX[e] = frozen ? 0 : dequantizeAxis(f.moveX);
-      s.inMoveY[e] = frozen ? 0 : dequantizeAxis(f.moveY);
-      if (!frozen) s.inWeapon[e] = f.weapon & 0xff;
-      if ((s.flags[e]! & ENTITY_FLAG.downed) !== 0) {
-        s.inWeapon[e] = DOWNED_SLOT;
-        s.inButtons[e] = (s.inButtons[e]! & DOWNED_BUTTONS) | BUTTON.crouch;
-      }
-      // Primária do próximo spawn: código + 1 (0 = manter); código que não é primária é ignorado.
-      const p = (f.primary & 0xff) - 1;
-      if (p >= 0 && isPrimaryWeapon(p)) s.primaryChoice[e] = p;
-      if ((s.flags[e]! & ENTITY_FLAG.dead) === 0) {
-        s.yaw[e] = u16ToYaw(f.yaw);
-        s.pitch[e] = i16ToPitch(f.pitch);
-      }
+      applyInput(id & 0xffff, c < inputs.length ? (inputs[c] ?? null) : null);
     }
   };
 
@@ -739,12 +763,69 @@ export function createSim(config: SimConfig): Sim {
     },
   };
 
+  const predict: SimPredict = {
+    save(e, out): void {
+      const e3 = e * 3;
+      out[0] = s.position[e3]!;
+      out[1] = s.position[e3 + 1]!;
+      out[2] = s.position[e3 + 2]!;
+      out[3] = s.velocity[e3]!;
+      out[4] = s.velocity[e3 + 1]!;
+      out[5] = s.velocity[e3 + 2]!;
+      out[6] = s.flags[e]!;
+      out[7] = s.inButtons[e]!;
+      out[8] = s.coyoteTicks[e]!;
+      out[9] = s.jumpBufferTicks[e]!;
+      out[10] = s.slideTicks[e]!;
+      out[11] = s.slideCooldownTicks[e]!;
+      out[12] = s.slideDir[e * 2]!;
+      out[13] = s.slideDir[e * 2 + 1]!;
+      out[14] = s.airPeakY[e]!;
+      out[15] = s.sprintFireDelayTicks[e]!;
+    },
+    load(e, from): void {
+      const e3 = e * 3;
+      s.position[e3] = from[0]!;
+      s.position[e3 + 1] = from[1]!;
+      s.position[e3 + 2] = from[2]!;
+      s.velocity[e3] = from[3]!;
+      s.velocity[e3 + 1] = from[4]!;
+      s.velocity[e3 + 2] = from[5]!;
+      s.flags[e] = from[6]!;
+      s.inButtons[e] = from[7]!;
+      s.coyoteTicks[e] = from[8]!;
+      s.jumpBufferTicks[e] = from[9]!;
+      s.slideTicks[e] = from[10]!;
+      s.slideCooldownTicks[e] = from[11]!;
+      s.slideDir[e * 2] = from[12]!;
+      s.slideDir[e * 2 + 1] = from[13]!;
+      s.airPeakY[e] = from[14]!;
+      s.sprintFireDelayTicks[e] = from[15]!;
+    },
+    step(e, frame): void {
+      if (e < 0 || e >= s.count || s.alive[e] !== 1) return;
+      const e3 = e * 3;
+      s.prevPosition[e3] = s.position[e3]!;
+      s.prevPosition[e3 + 1] = s.position[e3 + 1]!;
+      s.prevPosition[e3 + 2] = s.position[e3 + 2]!;
+      s.prevYaw[e] = s.yaw[e]!;
+      s.prevPitch[e] = s.pitch[e]!;
+      applyInput(e, frame);
+      moveOne(ctx, e);
+      // O cliente não processa dano nem solta eventos da sim: quem manda nisso é o host.
+      ctx.damage.count = 0;
+      events.clear();
+      keepEvents = false;
+    },
+  };
+
   return {
     hz,
     get tick(): number {
       return ctx.tick;
     },
     remote,
+    predict,
     controllerCount,
     step(inputs): void {
       assert(!disposed, 'sim: step depois do dispose');

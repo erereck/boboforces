@@ -1,5 +1,5 @@
 import { BitReader, BitWriter } from '@boboforces/shared';
-import { MAX_ENTITIES, MAX_PICKUPS, MAX_PROJECTILES } from '@boboforces/sim';
+import { MAX_ENTITIES, MAX_PICKUPS, MAX_PROJECTILES, PREDICT_STATE_SIZE } from '@boboforces/sim';
 import { clearFrame, copyFrame, ensureEntities, ensurePickups, ensureProjectiles, NetFrame } from './frame.ts';
 import { MAX_MESSAGE_BYTES, MSG, NO_TICK } from './protocol.ts';
 import {
@@ -86,6 +86,40 @@ export interface SnapshotTarget {
   readonly focus: number;
   /** Último `seq` de entrada do cliente consumido pelo host (-1 = nenhum ainda). */
   readonly inputSeq: number;
+  /** Fase 2b: o estado de movimento do boneco `focus` (`Sim.predict.save`), só para o dono; ausente = não manda. */
+  readonly priv?: Float64Array;
+}
+
+/**
+ * Como viaja cada valor do estado de movimento (a ordem do `PREDICT_STATE_SIZE` da sim): posição e velocidade em f32
+ * (o cliente refaz o movimento a partir delas; 1 cm de quantização viraria tremida), flags e botões em 16 bits, os
+ * contadores em i16, a direção do deslize e o pico do ar em f32.
+ */
+const PRIV_F32 = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0] as const;
+if (PRIV_F32.length !== PREDICT_STATE_SIZE) throw new Error('net: estado de movimento da sim mudou');
+/** 1 bit "veio" + entidade + os valores. */
+export const PRIV_BITS = 1 + ENTITY_INDEX_BITS + PRIV_F32.reduce<number>((n, f) => n + (f ? 32 : 16), 0);
+
+function writePriv(w: BitWriter, focus: number, priv: Float64Array | undefined): void {
+  if (priv === undefined || focus < 0) {
+    w.writeBits(0, 1);
+    return;
+  }
+  w.writeBits(1, 1);
+  w.writeBits(focus, ENTITY_INDEX_BITS);
+  for (let i = 0; i < PREDICT_STATE_SIZE; i++) {
+    if (PRIV_F32[i] === 1) w.writeF32(priv[i]!);
+    else w.writeBits(priv[i]! & 0xffff, 16);
+  }
+}
+
+function readPriv(r: BitReader, f: NetFrame): void {
+  if (r.readBits(1) === 0) return;
+  f.privEntity = r.readBits(ENTITY_INDEX_BITS);
+  for (let i = 0; i < PREDICT_STATE_SIZE; i++) {
+    // Flags e botões sem sinal; os contadores podem ser negativos (i16).
+    f.priv[i] = PRIV_F32[i] === 1 ? r.readF32() : i === 6 || i === 7 ? r.readBits(16) : signExtend(r.readBits(16), 16);
+  }
 }
 
 export interface EncodeResult {
@@ -143,7 +177,8 @@ export class SnapshotEncoder {
     // Partes: gulosas, na ordem dos itens (os escalares e o próprio jogador caem na primeira).
     const budget = MAX_MESSAGE_BYTES * 8 - SNAPSHOT_HEADER_BITS - 1;
     let parts = 1;
-    let used = 0;
+    // A 1ª parte leva o bloco privado (sempre cabe: o resto do orçamento vai para os itens).
+    let used = PRIV_BITS;
     let start = 0;
     for (let i = 0; i < items; i++) {
       const size = this.itemEnd[i]! - start + 1;
@@ -172,7 +207,8 @@ export class SnapshotEncoder {
       pw.writeBits(cur.pickCount, 16);
       pw.writeBits(target.inputSeq >= 0 ? 1 : 0, 1);
       pw.writeBits(target.inputSeq >= 0 ? target.inputSeq : 0, 16);
-      let used2 = 0;
+      if (part === 0) writePriv(pw, target.focus, target.priv);
+      let used2 = part === 0 ? PRIV_BITS : 0;
       while (item < items) {
         const size = this.itemEnd[item]! - start + 1;
         if (used2 > 0 && used2 + size > budget) break;
@@ -379,6 +415,8 @@ export interface AssemblerStats {
   noBase: number;
   /** Partes velhas (de um snapshot mais antigo que o último completo) ou repetidas. */
   stale: number;
+  /** Mensagens truncadas ou estragadas. */
+  bad: number;
 }
 
 /**
@@ -392,7 +430,9 @@ export class SnapshotAssembler {
   private readonly reader = new BitReader(new Uint8Array(0));
   private newestFrame: NetFrame | null = null;
   private newestSeq = -1;
-  readonly stats: AssemblerStats = { parts: 0, completed: 0, noBase: 0, stale: 0 };
+  /** O snapshot que a parte em leitura monta (o catch descarta). */
+  private current: Pending | null = null;
+  readonly stats: AssemblerStats = { parts: 0, completed: 0, noBase: 0, stale: 0, bad: 0 };
 
   constructor(layout: NetLayout, ringSize = 64, pendingSize = 4) {
     this.layout = layout;
@@ -425,10 +465,31 @@ export class SnapshotAssembler {
     return this.ring.get(tick);
   }
 
-  /** Uma mensagem `MSG.snapshot` inteira (com o byte do tipo). Devolve se completou um snapshot novo. */
+  /** A fila dos completos (a interpolação do cliente procura o par em volta do tick mostrado). */
+  get frames(): readonly NetFrame[] {
+    return this.ring.frames;
+  }
+
+  /**
+   * Uma mensagem `MSG.snapshot` inteira (com o byte do tipo). Devolve se completou um snapshot novo. Mensagem
+   * truncada ou estragada: o snapshot que ela montava é descartado (o host manda outro contra o ack).
+   */
   receive(bytes: Uint8Array): boolean {
     const r = this.reader;
     r.reset(bytes);
+    this.current = null;
+    try {
+      return this.receivePart(r);
+    } catch {
+      this.stats.bad++;
+      // O TypeScript não vê o `receivePart` mudar o campo: lê pelo tipo declarado.
+      const cur = this.current as Pending | null;
+      if (cur !== null) cur.tick = NO_TICK;
+      return false;
+    }
+  }
+
+  private receivePart(r: BitReader): boolean {
     if (r.readBits(8) !== MSG.snapshot) return false;
     this.stats.parts++;
     const tick = r.readBits(32);
@@ -444,22 +505,39 @@ export class SnapshotAssembler {
       this.stats.stale++;
       return false;
     }
-    let p = this.pending.find((x) => x.tick === tick) ?? null;
+    let p: Pending | null = null;
+    for (const x of this.pending) {
+      if (x.tick === tick) {
+        p = x;
+        break;
+      }
+    }
     if (p === null) {
-      // O slot livre ou o do snapshot mais antigo (que já não vai completar).
-      p = this.pending[0]!;
-      for (const x of this.pending) if (x.tick === NO_TICK || (p.tick !== NO_TICK && x.tick < p.tick)) p = x;
-      if (baseTick === NO_TICK) {
-        clearFrame(p.frame);
-      } else {
-        const b = this.ring.get(baseTick);
-        if (b === null) {
+      // A base primeiro (sem ela, nem ocupa um slot).
+      let base: NetFrame | null = null;
+      if (baseTick !== NO_TICK) {
+        base = this.ring.get(baseTick);
+        if (base === null) {
           this.stats.noBase++;
-          p.tick = NO_TICK;
           return false;
         }
-        copyFrame(p.frame, b);
       }
+      // Um slot livre ou o do snapshot mais velho, se este for mais novo que ele.
+      let victim = this.pending[0]!;
+      for (const x of this.pending) {
+        if (x.tick === NO_TICK) {
+          victim = x;
+          break;
+        }
+        if (x.tick < victim.tick) victim = x;
+      }
+      if (victim.tick !== NO_TICK && victim.tick > tick) {
+        this.stats.stale++;
+        return false;
+      }
+      p = victim;
+      if (base === null) clearFrame(p.frame);
+      else copyFrame(p.frame, base);
       p.tick = tick;
       p.parts = parts;
       p.received = 0;
@@ -471,6 +549,11 @@ export class SnapshotAssembler {
       this.stats.stale++;
       return false;
     }
+    // Lê antes de marcar: uma parte que estoura no meio derruba o snapshot inteiro (o catch acima).
+    this.current = p;
+    if (part === 0) readPriv(r, p.frame);
+    this.decodeItems(r, p.frame);
+    this.current = null;
     if (part < 32) p.lo |= bit;
     else p.hi |= bit;
     p.received++;
@@ -478,7 +561,6 @@ export class SnapshotAssembler {
     p.projCount = projCount;
     p.pickCount = pickCount;
     p.inputSeq = hasSeq === 1 ? seq : -1;
-    this.decodeItems(r, p.frame);
     if (p.received < p.parts) return false;
     // Completo: vira base e o mais novo.
     const f = p.frame;

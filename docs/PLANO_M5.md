@@ -52,9 +52,10 @@ entra na fase 3, com o OK do download.
    e nos 3 clientes; a sim ganhou o `Sim.remote` (o cliente escreve o estado do host na sim dele). Os eventos da sim
    ficaram para a fase 2 (2a, feita: ARCHITECTURE §16.2).
 2. **Eventos, predição e compensação:** os eventos da sim (tiro, acerto, morte, som) vão do host pelo canal confiável
-   (vieram da fase 1); o cliente prediz só o próprio movimento com o mesmo código da sim, reconcilia por
+   (vieram da fase 1; 2a feita); o cliente prediz só o próprio movimento com o mesmo código da sim, reconcilia por
    `seq` e interpola o resto com 100 ms; o host guarda 200 ms de hitboxes para o rewind do tiro. Teste: loopback de
-   4 jogadores com 80 ms e 5% de perda termina igual ao host; o "tiro no que eu vi" acerta dentro de 200 ms.
+   4 jogadores com 80 ms e 5% de perda termina igual ao host; o "tiro no que eu vi" acerta dentro de 200 ms. **2b e 2c feitas em 16/11** (ARCHITECTURE §16.3): a predição erra mais
+   de 10 cm em menos de 1% das reconciliações e os outros ficam a 2 cm do host no p99; falta a 2d (o rewind do tiro).
 3. **O transporte de verdade:** Trystero com relays Nostr (o mesmo caminho do FutBobo), só STUN
    (`stun.cloudflare.com`) no protótipo, `public/net.json` com relays, STUN/TURN e `protocolVersion`. Canal confiável
    (lobby, eventos, pings) e não confiável (`ordered:false, maxRetransmits:0`, entradas e snapshots), com o reserva

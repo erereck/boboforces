@@ -3025,3 +3025,46 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   cada cliente na mesma ordem do host, e nenhum evento sai antes do tick mostrado.
 - **Banda:** os eventos somam ~2,6 KB/s por cliente (host → cliente 8,4 KB/s com 8 bots). Os reais em f32 são a maior
   parte: quantizar o ponto e a direção fica para a medição da fase 7.
+
+### 16.3 Fases 2b e 2c: a predição do próprio boneco e os outros 100 ms atrás (16/11/2026)
+
+- **Contrato novo na sim, `Sim.predict` (decisão menor revisável):** `save`/`load` do estado de movimento de uma
+  entidade (`PREDICT_STATE_SIZE` = 16: posição, velocidade, flags, botões, coiote, pulo guardado, deslize e a recarga
+  dele, direção do deslize, pico do ar e o atraso do tiro depois de correr) e `step(e, frame)`, um tick do movimento
+  de uma entidade só com o mesmo código do `step`. Para isso, o `movementSystem` virou um laço sobre
+  `moveBody(ctx, e)` (com `moveOne` para uma entidade) e o passo de entrada virou `applyInput(e, f)`, sem mudar
+  nenhuma conta: o golden é o mesmo. Teste da sim: carregar o estado e repetir as entradas dá a mesma posição do `step`,
+  bit a bit, por 600 ticks com pulo e deslize.
+- **O bloco privado:** a 1ª parte do snapshot de cada cliente leva o estado de movimento do boneco dele (posição e
+  velocidade em f32; o resto em 16 bits; ~50 B), além do último `seq` de entrada que o host usou.
+- **Predição (2b):** o cliente move o próprio boneco a cada tick local (`Sim.predict.step`). A cada snapshot novo,
+  carrega o estado do host e refaz as entradas guardadas depois daquele `seq` (até 64). O que não é movimento (vida,
+  arma, munição, placar, caído) vem do snapshot mais novo. Nas flags, os bits de movimento (no chão, agachado,
+  correndo, deslizando, mirando) ficam os previstos.
+- **Os outros (2c):** ficam `INTERP_DELAY_S` (100 ms) atrás do host. O "tick mostrado" anda com o relógio do cliente
+  e puxa devagar para "o snapshot mais novo + o tempo desde que chegou − 100 ms". A posição, a mira e a velocidade vêm
+  da interpolação entre os dois snapshots em volta dele, e o resto do snapshot de antes. Os eventos saem nesse mesmo
+  tick. Teleporte (mais de 3 m entre os dois) não desliza. Os outros ficam com `prev` igual ao atual, e o `alpha`
+  do driver é o do passo fixo local (o do próprio boneco).
+- **Medido no loopback** (80 ms ± 25 ms, 5% de perda; `net/src/match.test.ts`):
+  - **predição:** erro médio de 0,02 a 0,06 cm por reconciliação; 1 a 3 das ~1.130 passaram de 10 cm (o host repetiu
+    ou pulou uma entrada); os teleportes do respawn ficam fora da conta;
+  - **interpolação:** a 0,37 cm do host em média e 2 cm no p99;
+  - **banda:** o bloco privado sobe o host → cliente para 9,8 KB/s.
+- **Revisão da fase 1 (um revisor independente):** o codec, os zeros e as partes passaram em 9.000 idas e voltas
+  aleatórias. Corrigido:
+  1. **A fila de entradas do host era funda de menos.** Ela pulava com 3 esperando e ficava com 1, então passava fome
+     e pulava frames com a variação normal. Agora pula acima de 3 e fica com 2. Na simulação do revisor, os ticks com
+     fome caíram de 77 para 2.
+  2. **A fome não tinha limite.** Depois de 8 ticks sem entrada nova, o boneco para e solta o gatilho, e a mira fica
+     onde estava.
+  3. **Mensagem estragada.** Uma parte truncada completava um snapshot errado e a exceção escapava do laço. Agora a
+     parte é lida antes de ser marcada, o snapshot dela é descartado, e o host e o cliente ignoram mensagens estragadas
+     (`stats.bad`).
+  4. **Despejo das partes pendentes.** A base é procurada antes de ocupar um slot, e a parte de um snapshot mais velho
+     não despeja a de um mais novo.
+  5. **Slot de projétil reaproveitado.** O dono entra na identidade do slot, então o projétil novo não desliza a partir
+     do velho.
+- **Pendente:** a predição do próprio tiro (o clarão, o som e o recuo saem já na tela do cliente, sem esperar o host)
+  e a suavização da correção da reconciliação ficam para quando o online estiver na tela (fases 4 e 6). Antes delas,
+  não dá para sentir.

@@ -17,6 +17,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   cada cliente com 8 bots. Nada disso aparece no jogo até a sala (fase 4).
 - **Eventos (fase 2a):** tiros, acertos, mortes, sons e compras do host chegam ao cliente pelo canal confiável e saem
   junto com o boneco na tela (~8 KB/s por cliente com 8 bots, contando os snapshots).
+- **Predição e interpolação (fases 2b e 2c):** o próprio boneco anda na hora, com o mesmo código do host, e se acerta a
+  cada snapshot (erra mais de 10 cm em menos de 1% das vezes, fora o respawn); os outros aparecem 100 ms atrás, a 2 cm
+  de onde o host os tinha.
 
 ### M4: o porte do Switch (planejado em 16/11/2026)
 
