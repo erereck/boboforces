@@ -60,6 +60,7 @@ import { bindFigureTable, FigureHitCache, unbindFigureTable } from './hitbox.ts'
 import type { SimEvent } from './events.ts';
 import { expandRecipe, isFfaMode, isWarfareMode } from './recipe.ts';
 import { hashState, readState, writeState } from './snapshot.ts';
+import { REWIND_HISTORY, REWIND_MAX_S, RewindState } from './rewind.ts';
 import { SimState } from './state.ts';
 import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { zombiesSystem } from './systems/zombies.ts';
@@ -246,6 +247,21 @@ export interface Sim extends Disposable {
   readonly remote: SimRemote;
   /** M5 (fase 2b): a predição do próprio movimento (só o cliente online, pelo `net`). */
   readonly predict: SimPredict;
+  /** M5 (fase 2d): o "tiro no que eu vi" (só o host online, pelo `net`). */
+  readonly rewind: SimRewind;
+}
+
+/**
+ * M5 (fase 2d, só o host online): compensação do tiro (tecnico.md §13.3). `enable` liga o histórico (24 ticks, ~1 MB);
+ * `set` diz quantos ticks o tiro hitscan de um controlador volta no tempo (o host põe o atraso do que o cliente via,
+ * até `maxTicks`: 350 ms, `REWIND_MAX_S`). Só hitscan: foguete, granada e faca são do presente.
+ */
+export interface SimRewind {
+  enable(): void;
+  set(controller: number, ticks: number): void;
+  readonly maxTicks: number;
+  /** Tiros que voltaram no tempo desde o começo. */
+  readonly rewound: number;
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -488,6 +504,7 @@ export function createSim(config: SimConfig): Sim {
     rngWeapons: root.fork('weapons'),
     // Um slot de caixas por controlador (todo corpo de bobo ou zumbi tem um).
     figures: new FigureHitCache(figureTable, MAX_CONTROLLERS_WITH_ZOMBIES),
+    rewind: null,
     zombiesMode,
     zombieRunProfile: zombieSpeed(MOVEMENT_ZOMBIE_RUNNER, recipe),
     zombieRules: {
@@ -819,6 +836,24 @@ export function createSim(config: SimConfig): Sim {
     },
   };
 
+  const maxRewind = Math.min(REWIND_HISTORY - 2, Math.round(REWIND_MAX_S * hz));
+  const rewind: SimRewind = {
+    maxTicks: maxRewind,
+    get rewound(): number {
+      return ctx.rewind?.rewound ?? 0;
+    },
+    enable(): void {
+      if (ctx.rewind !== null) return;
+      ctx.rewind = new RewindState();
+      ctx.rewind.record(s, ctx.tick);
+    },
+    set(controller, ticks): void {
+      const r = ctx.rewind;
+      if (r === null || controller < 0 || controller >= r.byController.length) return;
+      r.byController[controller] = Math.max(0, Math.min(maxRewind, Math.round(ticks)));
+    },
+  };
+
   return {
     hz,
     get tick(): number {
@@ -826,6 +861,7 @@ export function createSim(config: SimConfig): Sim {
     },
     remote,
     predict,
+    rewind,
     controllerCount,
     step(inputs): void {
       assert(!disposed, 'sim: step depois do dispose');
@@ -854,6 +890,7 @@ export function createSim(config: SimConfig): Sim {
       spawnSystem(ctx);
       zombiesSystem(ctx);
       ctx.tick++;
+      ctx.rewind?.record(s, ctx.tick);
       syncView();
     },
     view: () => view,

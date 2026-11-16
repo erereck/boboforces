@@ -250,6 +250,9 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   cada cliente, ~50 B por snapshot) sobe o host → cliente para **9,8 KB/s**; a predição erra em média 0,02–0,06 cm por
   reconciliação (~13 entradas refeitas em cada uma, o ida e volta de ~210 ms); a interpolação fica a **0,37 cm** do
   host em média e **2 cm** no p99.
+- **O tiro no que eu vi (fase 2d):** o histórico do host ocupa ~1 MB (24 ticks × 1.024 corpos de posição, mira e
+  flags; só no host online) e grava `count` corpos por tick (3 cópias de typed array). A 80 ms de ida, o tiro do cliente
+  volta **18 ticks** (300 ms) e acerta 25 de 25 (1 de 25 sem a volta).
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).

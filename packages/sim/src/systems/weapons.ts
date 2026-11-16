@@ -293,7 +293,12 @@ export function weaponSystem(ctx: SimContext): void {
           if ((pressed & BUTTON.fire) !== 0) ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'empty');
         } else {
           if (def.fire === WEAPON_FIRE.projectile) fireRocket(ctx, e, k, def, fl);
-          else fireHitscan(ctx, e, k, def, fl);
+          else {
+            // M5 (fase 2d): o tiro de um jogador remoto testa os alvos onde ele os via.
+            ctx.rewind?.select(s, e, ctx.tick);
+            fireHitscan(ctx, e, k, def, fl);
+            if (ctx.rewind !== null) ctx.rewind.active = 0;
+          }
           fired = true;
         }
       }
@@ -445,6 +450,21 @@ function castRay(ctx: SimContext, e: number, ox: number, oy: number, oz: number,
     if (s.alive[j] === 0 || !isBody(s.kind[j]!) || !canHurt(ctx, e, j)) continue;
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
+    // M5 (fase 2d): voltando no tempo, cada alvo é testado onde estava (postura daquele tick; o cache das caixas
+    // usa o tick antigo como chave).
+    const rw = ctx.rewind;
+    if (rw !== null && rw.active > 0) {
+      if (!rw.has(j)) continue;
+      rw.swapIn(s, j);
+      const old = figurePostureOf(rw.flagsOf(j), weaponGrip(s.weapon[j]!), s.kind[j]!);
+      const hitOld = figures.testEntity(s, j, old, rw.tick);
+      rw.swapOut(s, j);
+      if (hitOld >= 0) {
+        best = j;
+        bestBone = hitOld as FigurePart;
+      }
+      continue;
+    }
     const bone = figures.testEntity(s, j, figurePostureOf(fj, weaponGrip(s.weapon[j]!), s.kind[j]!), ctx.tick);
     if (bone >= 0) {
       best = j;

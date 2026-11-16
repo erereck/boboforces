@@ -40,6 +40,11 @@ export interface NetHostConfig {
   readonly history?: number;
   /** O hello desta build (padrão `localHello()`; os testes trocam). */
   readonly hello?: NetHello;
+  /**
+   * Fase 2d: o tiro hitscan de um cliente testa os alvos onde ele os via (até 200 ms; padrão ligado). Desligado só nos
+   * testes que medem a diferença.
+   */
+  readonly lagCompensation?: boolean;
 }
 
 export interface NetHostStats {
@@ -92,6 +97,8 @@ export function createNetHost(config: NetHostConfig): NetHost {
   const { sim, endpoint } = config;
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
+  const compensate = config.lagCompensation ?? true;
+  if (compensate) sim.rewind.enable();
   const history = new FrameRing(layout, config.history ?? 32);
   const encoder = new SnapshotEncoder(layout);
   const interval = Math.max(1, Math.round(sim.hz / config.snapshotHz));
@@ -164,6 +171,11 @@ export function createNetHost(config: NetHostConfig): NetHost {
       for (const c of clients) {
         if (c.slot === slot) {
           c.input.consume(out);
+          // Fase 2d: quantos ticks atrás o cliente via os outros quando gerou esta entrada (o tick que roda agora
+          // menos o que ele mostrava, pelos 16 bits baixos).
+          const view = c.input.lastView;
+          const back = view < 0 ? 0 : (sim.tick - view) & 0xffff;
+          if (compensate) sim.rewind.set(slot, back > 0x8000 ? 0 : back);
           return true;
         }
       }

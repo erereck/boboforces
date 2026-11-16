@@ -55,7 +55,8 @@ entra na fase 3, com o OK do download.
    (vieram da fase 1; 2a feita); o cliente prediz só o próprio movimento com o mesmo código da sim, reconcilia por
    `seq` e interpola o resto com 100 ms; o host guarda 200 ms de hitboxes para o rewind do tiro. Teste: loopback de
    4 jogadores com 80 ms e 5% de perda termina igual ao host; o "tiro no que eu vi" acerta dentro de 200 ms. **2b e 2c feitas em 16/11** (ARCHITECTURE §16.3): a predição erra mais
-   de 10 cm em menos de 1% das reconciliações e os outros ficam a 2 cm do host no p99; falta a 2d (o rewind do tiro).
+   de 10 cm em menos de 1% das reconciliações e os outros ficam a 2 cm do host no p99; 2d feita (§16.4): pela rede a 80 ms, mirando no que vê, o cliente acerta 25 de 25 tiros (1 de 25 sem a compensação); o
+   teto da volta passou de 200 para 350 ms, porque a 80 ms de ida o tiro precisa voltar 300 ms.
 3. **O transporte de verdade:** Trystero com relays Nostr (o mesmo caminho do FutBobo), só STUN
    (`stun.cloudflare.com`) no protótipo, `public/net.json` com relays, STUN/TURN e `protocolVersion`. Canal confiável
    (lobby, eventos, pings) e não confiável (`ordered:false, maxRetransmits:0`, entradas e snapshots), com o reserva

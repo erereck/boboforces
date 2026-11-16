@@ -11,16 +11,21 @@ import { MSG, NO_TICK, seqDiff } from './protocol.ts';
 /** Frames por mensagem: o novo + 3 repetidos. */
 export const INPUT_REDUNDANCY = 4;
 
-/** Cliente: os últimos frames, do mais novo para o mais velho. */
+/**
+ * Cliente: os últimos frames, do mais novo para o mais velho. Cada um leva o tick que o cliente mostrava dos outros
+ * (fase 2d: o host volta o tiro até lá; -1 = nenhum snapshot ainda), nos 16 bits baixos.
+ */
 export class InputHistory {
   private readonly frames: InputFrame[] = Array.from({ length: INPUT_REDUNDANCY }, createInputFrame);
+  private readonly views = new Int32Array(INPUT_REDUNDANCY).fill(-1);
   private head = 0;
   private size = 0;
 
   /** Guarda uma cópia do frame do tick. */
-  push(f: Readonly<InputFrame>): void {
+  push(f: Readonly<InputFrame>, viewTick = -1): void {
     this.head = (this.head + INPUT_REDUNDANCY - 1) % INPUT_REDUNDANCY;
     copyInputFrame(this.frames[this.head]!, f);
+    this.views[this.head] = viewTick;
     if (this.size < INPUT_REDUNDANCY) this.size++;
   }
 
@@ -29,7 +34,13 @@ export class InputHistory {
     w.writeBits(MSG.input, 8);
     w.writeBits(ackTick >>> 0, 32);
     w.writeBits(this.size, 3);
-    for (let i = 0; i < this.size; i++) writeInputFrame(w, this.frames[(this.head + i) % INPUT_REDUNDANCY]!);
+    for (let i = 0; i < this.size; i++) {
+      const k = (this.head + i) % INPUT_REDUNDANCY;
+      writeInputFrame(w, this.frames[k]!);
+      const view = this.views[k]!;
+      w.writeBits(view >= 0 ? 1 : 0, 1);
+      w.writeBits(view >= 0 ? view & 0xffff : 0, 16);
+    }
   }
 }
 
@@ -60,6 +71,7 @@ export interface RemoteInputStats {
 export class RemoteInputBuffer {
   private readonly ring: InputFrame[] = Array.from({ length: BUFFER }, createInputFrame);
   private readonly seqs = new Int32Array(BUFFER).fill(-1);
+  private readonly views = new Int32Array(BUFFER).fill(-1);
   private readonly scratch = createInputFrame();
   private readonly last = createInputFrame();
   private next = -1;
@@ -70,6 +82,9 @@ export class RemoteInputBuffer {
   /** O snapshot completo mais novo que o cliente disse ter. */
   ackTick = NO_TICK;
   readonly stats: RemoteInputStats = { received: 0, duplicates: 0, starved: 0, skipped: 0 };
+
+  /** O tick que o cliente mostrava no último frame usado (16 bits baixos; -1 = nenhum): a volta do tiro (fase 2d). */
+  lastView = -1;
 
   /** Último `seq` usado (-1 = nenhum): vai no snapshot para o cliente reconciliar (fase 2). */
   get lastConsumedSeq(): number {
@@ -83,6 +98,9 @@ export class RemoteInputBuffer {
     const n = r.readBits(3);
     for (let i = 0; i < n; i++) {
       const f = readInputFrame(r, this.scratch);
+      const hasView = r.readBits(1);
+      const view16 = r.readBits(16);
+      const view = hasView === 1 ? view16 : -1;
       const seq = f.seq;
       if (this.lastSeq >= 0 && seqDiff(seq, this.lastSeq) <= 0) {
         this.stats.duplicates++;
@@ -94,6 +112,7 @@ export class RemoteInputBuffer {
         continue;
       }
       copyInputFrame(this.ring[k]!, f);
+      this.views[k] = view;
       this.seqs[k] = seq;
       this.stats.received++;
       if (this.newest < 0 || seqDiff(seq, this.newest) > 0) this.newest = seq;
@@ -125,6 +144,7 @@ export class RemoteInputBuffer {
       const k = this.next & (BUFFER - 1);
       if (this.seqs[k] === this.next) {
         copyInputFrame(this.last, this.ring[k]!);
+        this.lastView = this.views[k]!;
         this.last.buttons |= this.carry;
         this.carry = 0;
         this.lastSeq = this.next;

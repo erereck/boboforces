@@ -798,7 +798,7 @@ interface InputFrame { seq: number /*u16*/; buttons: number /*u32*/; moveX: numb
   - prediz só o próprio movimento, com o mesmo código da `sim`;
   - reconcilia por `seq`;
   - interpola o resto com 100 ms de atraso.
-- **Lag compensation:** histórico de hitboxes de 200 ms em ring buffer, com rewind limitado a 200 ms. O host joga com 0 ms, o que é aceitável entre amigos.
+- **Lag compensation:** histórico de hitboxes de 200 ms em ring buffer, com rewind limitado a 200 ms. O host joga com 0 ms, o que é aceitável entre amigos. (M5, medido: o teto ficou em 350 ms, os 200 ms de rede mais a interpolação e a fila do host; ARCHITECTURE §16.4.)
 - **Bobo Royale (M6+):** entidades distantes recebem atualização a 5–10 Hz.
 - **Banda estimada:**
   - 44 entidades (4 humanos + 40 bots) × ~12 B × 30 Hz ≈ 16 KB/s por cliente;

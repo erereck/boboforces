@@ -318,7 +318,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         seq = (seq + 1) & 0xffff;
         writeLocalFrame(frame, seq);
         frame.seq = seq;
-        history.push(frame);
+        history.push(frame, renderTick < 0 ? -1 : Math.round(renderTick));
         const k = seq & (REPLAY - 1);
         copyInputFrame(inputs[k]!, frame);
         inputSeqs[k] = seq;

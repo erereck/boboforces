@@ -3068,3 +3068,22 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
 - **Pendente:** a predição do próprio tiro (o clarão, o som e o recuo saem já na tela do cliente, sem esperar o host)
   e a suavização da correção da reconciliação ficam para quando o online estiver na tela (fases 4 e 6). Antes delas,
   não dá para sentir.
+
+### 16.4 Fase 2d: o tiro no que eu vi (16/11/2026)
+
+- **Contrato novo na sim, `Sim.rewind` (decisão menor revisável):** `enable()` liga o histórico (`sim/src/rewind.ts`:
+  24 ticks de posição, mira e flags de cada corpo, gravados no fim de cada `step`; ~1 MB, só no host online).
+  `set(controller, ticks)` diz quanto o tiro hitscan daquele controlador volta no tempo. No `castRay`, voltando, cada
+  alvo é posto onde estava (posição, mira e a postura daquele tick), testado com o tick antigo como chave do cache das
+  caixas do boneco, e devolvido ao presente. Vivo e morto são os do presente. Foguete, granada e faca não voltam. O
+  golden e o Switch não mudam: sem `enable`, nada é gravado.
+- **A rede:** cada entrada do cliente leva o tick que ele mostrava dos outros (16 bits). O host, ao usar a entrada,
+  põe na sim `tick atual − tick mostrado` para aquele controlador (`NetHostConfig.lagCompensation`, padrão ligado).
+- **Desvio do tecnico.md §13.3 (o teto):** o plano dizia "rewind limitado a 200 ms". Medido no loopback a 80 ms de
+  ida, o tiro precisa voltar **300 ms** (18 ticks): a ida do snapshot, os 100 ms da interpolação, a ida da entrada e a
+  fila do host. Com o teto em 200 ms, o cliente acertava 7 de 25 tiros. O teto agora é `REWIND_MAX_S` = 350 ms:
+  200 ms de rede (o ida e volta que o §13.3 queria cobrir), mais os 100 ms da interpolação, mais ~50 ms da fila. Acima
+  disso, o jogador com rede ruim precisa mirar à frente.
+- **Teste:** na sim, mirar onde o alvo estava 10 ticks antes acerta voltando 10 ticks e erra no presente. Pela rede
+  (`net/src/lagcomp.test.ts`), o host anda de lado e o cliente mira no que vê, a 80 ms com 5% de perda: **25 de 25**
+  acertos com a compensação, **1 de 25** sem.

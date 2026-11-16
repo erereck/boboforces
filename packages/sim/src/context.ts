@@ -1,3 +1,4 @@
+import type { RewindState } from './rewind.ts';
 import type { FigurePart } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
 import type { NavGrid } from '@boboforces/nav';
@@ -244,6 +245,8 @@ export interface SimContext {
   readonly rngWeapons: Rng;
   /** Hitboxes do boneco: a tabela de jogo da partida e o cache de caixas por corpo por tick (`hitbox.ts`). */
   readonly figures: FigureHitCache;
+  /** M5 (fase 2d): o histórico do "tiro no que eu vi" (só o host online liga; `null` = desligado). */
+  rewind: RewindState | null;
   /** M3 (fase 2a): Bobo Zombies (`mode: 'zombies'`): o diretor de ondas, os renascimentos e o pool de zumbis. */
   readonly zombiesMode: boolean;
   readonly zombieRunProfile: MovementProfile;
