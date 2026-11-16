@@ -227,7 +227,7 @@ frio**, a rodada cabe no M4 (P1) e quase tudo é conferível no PC.
   quebrou", e o que mandar de volta (`runtime.log`, `runtime.old.log`, `crash_reports`, `nxjs-debug.log`, as três
   anotações: travou/piscou, som e vibração, esquentou).
 - **7d. Rodada 18 de prints** (Eden, no PC): lobby da LOCAL EDITION, glifos por controle, teclado próprio, Oficina
-  com arquivo do cartão, aviso de bateria, ícone. Página das rodadas no mesmo padrão (v21; a v20 levou as P1–P9 junto da rodada 17), com perguntas Q1–Qn e o
+  com arquivo do cartão, aviso de bateria, ícone. Página das rodadas no mesmo padrão (v22; a v20 levou as P1–P9 e a v21 o lobby, junto da rodada 17), com perguntas Q1–Qn e o
   padrão de cada uma.
 - **7e. Portão:** `npm run check`, builds, `portcheck --strict` (varredura do bundle do Switch: nada de rede, `eval`,
   `localStorage`), `smoke:web`, golden, balance e `size-check`.
