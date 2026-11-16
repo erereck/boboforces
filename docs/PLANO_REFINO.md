@@ -28,4 +28,6 @@
    em 16/11/2026, §14.5): os Ajustes, com a Tela (câmera e gráficos juntos) e a frase de ajuda da linha com o foco.
 4. **R4. Outros refinos** achados jogando e nas capturas. R4a (feita em 16/11/2026, ARCHITECTURE §14.6): a pausa com
    nomes claros e a frase do item; a arma menor na tela com 1–2 jogadores.
-5. **R5. Prints e perguntas**, depois o próximo marco.
+5. **R5. Prints e perguntas** (feita em 16/11/2026): a rodada 17 (N1–N7, seções 71–77) é a versão 19 da página das
+   rodadas, montada por `local/m2/montar-pagina-r17.mjs` com as capturas de `local/refino/`; o NRO do refino foi
+   junto. Sigo no padrão de todas; a N7 é seguir para o M4 (o plano em `docs/PLANO_M4.md`).

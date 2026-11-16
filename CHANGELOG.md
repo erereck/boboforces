@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### Refino antes do M4 (em construção)
+### Refino antes do M4 (rodada 17 publicada em 16/11/2026)
 
 Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
 
