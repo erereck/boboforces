@@ -251,9 +251,10 @@ export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa
       if (tIdx !== team && m.teamScore[tIdx]! > otherScore) otherScore = m.teamScore[tIdx]!;
     }
   }
+  // Refino R4 (#79): sem ninguém com abate ou assistência, não há MVP (era o 1º da lista, com 0).
   const mvp = best(
     view,
-    () => true,
+    (i) => view.kills[i]! + view.assists[i]! > 0,
     (i) => view.kills[i]! + view.assists[i]! * 0.5,
     (i) => view.deaths[i]!,
   );

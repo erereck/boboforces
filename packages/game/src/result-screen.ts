@@ -118,7 +118,9 @@ export const resultScreen: Screen<ResultScreenData> = {
             },
             line('level', 'result.level', { level: d.level }, COLORS.textoBaixo),
             { kind: 'box', height: 6 },
-            line('mvp', 'result.mvp', { name: d.mvp }),
+            d.mvp !== ''
+              ? line('mvp', 'result.mvp', { name: d.mvp })
+              : line('mvp', 'result.noMvp', {}, COLORS.textoBaixo),
             ...nemesis,
             d.victim !== ''
               ? line('victim', 'result.victim', { name: d.victim, n: d.victimKills })

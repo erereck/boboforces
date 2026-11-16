@@ -152,6 +152,12 @@ describe('resumo do fim', () => {
     expect(summarizeMatch(st, v, 0, false).outcome).toBe('win');
     m.winnerTeam = -1;
     expect(summarizeMatch(st, v, 0, false).outcome).toBe('draw');
+    // Refino R4: ninguém com abate nem assistência, nenhum MVP (antes era o 1º da lista, com 0).
+    kills.fill(0);
+    assists.fill(0);
+    expect(summarizeMatch(st, v, 0, false).mvp).toBe(-1);
+    assists[3] = 1;
+    expect(summarizeMatch(st, v, 0, false).mvp).toBe(3);
   });
 
   it('rodada 8 (D5): tela dividida soma os locais; o recorde é do melhor; o resultado, o melhor deles', () => {

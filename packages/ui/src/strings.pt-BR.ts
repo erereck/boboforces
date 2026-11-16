@@ -679,6 +679,7 @@ export const STRINGS_PT_BR = {
   'result.score': '{own} × {other}',
   'result.level': 'Bots: {level}',
   'result.mvp': 'MVP: {name}',
+  'result.noMvp': 'MVP: ninguém pontuou',
   'result.nemesis': 'Nêmesis: {name} (te pegou {n}×)',
   'result.noNemesis': 'Nêmesis: ninguém te pegou',
   'result.victim': 'Freguês: {name} (você pegou {n}×)',
