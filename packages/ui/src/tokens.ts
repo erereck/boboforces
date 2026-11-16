@@ -129,7 +129,9 @@ export const OPTION = {
 } as const satisfies { readonly value: TypeStyle } & Readonly<Record<string, unknown>>;
 
 /** M2 (fase 4e): botão compacto (`ButtonNode.compact`): mais baixo (48 ≥ 44), respiro menor e sem largura mínima. */
-export const BUTTON_COMPACT = { height: 48, padX: 16 } as const;
+/** Refino R3c (#79): `padX` 16 → 13 e a folga entre as abas 8 → 6: as 7 abas dos Ajustes passavam da borda no
+ * celular de 640×360 desde o Áudio (fase 7c); o teste só tinha 6. */
+export const BUTTON_COMPACT = { height: 48, padX: 13 } as const;
 
 /** Botão: medidas em px de referência. O layout aplica `minTarget` por cima da altura. */
 export const BUTTON = {

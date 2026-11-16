@@ -17,6 +17,8 @@ export interface SettingsScreenState {
   readonly rows: readonly TabbedRow[];
   /** Aviso de uma linha (backup exportado, relatório copiado); `''` = nenhum. */
   readonly note: string;
+  /** Refino R3c (#79): o que a linha com o foco faz (embaixo das linhas); `''` = nada a dizer. */
+  readonly help?: string;
 }
 
 export const settingsScreen: Screen<SettingsScreenState> = {
@@ -29,6 +31,7 @@ export const settingsScreen: Screen<SettingsScreenState> = {
       rows: state.rows,
       summary: '',
       note: state.note,
+      help: state.help ?? '',
       buttons: [{ id: SETTINGS_ACTION.back, labelKey: 'menu.back', variant: 'secondary' }],
     });
   },

@@ -24,7 +24,7 @@
    joga, volta para a arma); o pavio na tela enquanto cozinha; o arco da trajetória; aviso de granada perto.
 3. **R3. Menus:** levantar o caminho de cada opção e reorganizar para ficar o mais claro possível. R3a (feita em
    16/11/2026, ARCHITECTURE §14.3): os textos da partida fora do menu, para abrir espaço. R3b (feita em 16/11/2026,
-   §14.4): o título como centro (sem o "Mudar"), os Modos como o lugar de escolher o que jogar, a tela Testes. R3c: os
-   Ajustes.
+   §14.4): o título como centro (sem o "Mudar"), os Modos como o lugar de escolher o que jogar, a tela Testes. R3c (feita
+   em 16/11/2026, §14.5): os Ajustes, com a Tela (câmera e gráficos juntos) e a frase de ajuda da linha com o foco.
 4. **R4. Outros refinos** achados jogando e nas capturas.
 5. **R5. Prints e perguntas**, depois o próximo marco.

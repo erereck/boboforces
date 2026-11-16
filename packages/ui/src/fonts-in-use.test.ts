@@ -180,14 +180,23 @@ function reachableScrolling(tree: UiNode, t: Target, start: string): Set<string>
 }
 
 /** M2 (fase 4f): as 6 abas dos Ajustes com os rótulos e os valores mais longos. */
+/** As 7 abas dos Ajustes (refino R3c: a Tela no lugar do Vídeo). */
 const SETTINGS_TABS_FIXTURE = [
   'settings.tab.controls',
   'settings.tab.buttons',
   'settings.tab.video',
+  'settings.tab.audio',
   'settings.tab.access',
   'settings.tab.data',
   'settings.tab.about',
 ] as const;
+/** Refino R3c: a frase de ajuda mais longa (embaixo das linhas). */
+function longestHelp(): string {
+  return (Object.keys(STRINGS_PT_BR) as StringKey[])
+    .filter((k) => k.startsWith('settings.help.'))
+    .map((k) => t(k))
+    .reduce((a, b) => (b.length > a.length ? b : a));
+}
 function settingsFixtures(): UiNode[] {
   const option = (id: string, labelKey: StringKey, value: string) => ({ kind: 'option' as const, id, labelKey, value });
   const rows = [
@@ -205,8 +214,26 @@ function settingsFixtures(): UiNode[] {
       option('deadOut', 'settings.row.deadOut', '100%'),
     ],
     bindingFixtureRows(),
-    [option('fov', 'settings.row.fov', 'Padrão'), option('uiScale', 'settings.row.uiScale', '×1,3')],
-    [option('shake', 'settings.row.reduceShake', 'Desligado'), option('tips', 'settings.row.tips', 'Desligado')],
+    [
+      option('view', 'settings.row.view', 'Primeira pessoa'),
+      option('shoulder', 'settings.row.shoulder', 'Esquerdo'),
+      option('fov', 'settings.row.fov', '110°'),
+      option('split2', 'settings.row.split2', 'Cima e baixo'),
+      option('quality', 'settings.row.quality', 'Automática: Média'),
+      option('fps', 'settings.row.fps', '60 por segundo'),
+      option('uiScale', 'settings.row.uiScale', '×1,3'),
+    ],
+    [
+      option('master', 'settings.row.master', '100%'),
+      option('musicInMatch', 'settings.row.musicInMatch', 'Desligado'),
+      option('mono', 'settings.row.mono', 'Desligado'),
+    ],
+    [
+      option('shake', 'settings.row.reduceShake', 'Desligado'),
+      option('vibration', 'settings.row.vibration', 'Desligado'),
+      option('soundIndicator', 'settings.row.soundIndicator', 'Desligado'),
+      option('tips', 'settings.row.tips', 'Desligado'),
+    ],
     [
       { kind: 'text' as const, id: 'w', text: t('settings.data.warning'), dim: true },
       { kind: 'text' as const, id: 'w2', text: t('settings.data.warning2'), dim: true },
@@ -239,6 +266,7 @@ function settingsFixtures(): UiNode[] {
         tab === 1
           ? t('settings.bind.orphaned', { source: longestBindName(), other: t('bind.action.lastWeapon') })
           : t('settings.data.exported', { name: 'boboforces-backup-2026-11-09.json' }),
+      help: longestHelp(),
     }),
   );
 }
@@ -653,7 +681,7 @@ describe('estouro de texto com o atlas real', () => {
     for (const target of portrait) expectNoOverflow(layoutFor(rotateScreen.build(null), target), target);
   });
 
-  it('ajustes (as 6 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {
+  it('ajustes (as 7 abas): cabem nos 6 alvos da web e no Switch, alcançáveis pelo D-pad', () => {
     for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
       for (const tree of settingsFixtures()) {
         const layout = layoutFor(tree, target);
@@ -661,6 +689,15 @@ describe('estouro de texto com o atlas real', () => {
         expect(reachableScrolling(tree, target, layout.focusable[0]!.id!).size, `${target.name}: foco`).toBe(
           layout.focusable.length,
         );
+        // Refino R3c: a frase de ajuda mais longa cabe na largura das linhas e não encosta no Voltar.
+        const help = layout.byId.get('help')!;
+        const helpRect = layout.rects.get(help)!;
+        const back = layout.rects.get(layout.byId.get('back')!)!;
+        expect(layout.texts.get(help)!.width, target.name).toBeLessThanOrEqual(800 * layout.scale + 0.5);
+        expect(
+          helpRect.y + helpRect.h <= back.y || helpRect.x + layout.texts.get(help)!.width <= back.x,
+          target.name,
+        ).toBe(true);
       }
     }
   });

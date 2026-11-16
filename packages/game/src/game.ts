@@ -103,6 +103,7 @@ import {
   rebindSettings,
   SETTINGS_TAB_LABELS,
   SETTINGS_TABS,
+  settingsHelp,
   settingsRows,
   stepSettings,
 } from './settings-menu.ts';
@@ -841,8 +842,11 @@ export function startGame(deps: GameDeps): GameHandle {
       { kind: 'action', id: 'news', label: { key: 'menu.news' } },
     ];
   }
+  /** Refino R3c: o foco com que a tela foi montada (a frase de ajuda é dele). */
+  let settingsHelpFocus: string | null = null;
   function rebuildSettings(): void {
     const tab = SETTINGS_TABS[settingsTab]!;
+    settingsHelpFocus = settingsMenu.focusedId;
     settingsMenu.setRoot(
       settingsScreen.build({
         tabs: SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
@@ -860,6 +864,7 @@ export function startGame(deps: GameDeps): GameHandle {
                   ]
                 : settingsRows(tab, save.settings, settingsDevice, capturing, platform.features.keyboardMouse),
         note: settingsNote,
+        help: settingsHelp(SETTINGS_TABS, tab, settingsHelpFocus, settingsDevice),
       }),
     );
   }
@@ -1690,6 +1695,8 @@ export function startGame(deps: GameDeps): GameHandle {
             rebuildSettings();
           }
         }
+        // Refino R3c: a frase de ajuda segue o foco.
+        if (screen === 'settings' && settingsMenu.focusedId !== settingsHelpFocus) rebuildSettings();
         settingsMenu.draw(list, u);
         renderer.renderViews(NO_VIEWS);
         renderer.drawUi(list);

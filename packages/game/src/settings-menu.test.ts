@@ -26,6 +26,7 @@ import {
   bindingsText,
   bindRowAction,
   rebindSettings,
+  settingsHelp,
   settingsRows,
   stepSettings,
 } from './settings-menu.ts';
@@ -123,7 +124,7 @@ describe('Ajustes', () => {
     // A assistência para no Forte; a linha do dispositivo dá a volta.
     expect(stepSettings('controls', doc, device, 'assist', 1).doc.controls.gamepad.aimAssist).toBe('strong');
     expect(stepSettings('controls', doc, 'touch', 'device', 1).device).toBe('keyboardMouse');
-    // Vídeo e acessibilidade.
+    // Tela e acessibilidade.
     const fov = stepSettings('video', doc, device, 'fov', 1).doc;
     expect(fov.video.fovDeg).toBe(60);
     const shake = stepSettings('access', doc, device, 'shake', 0).doc;
@@ -165,15 +166,9 @@ describe('Ajustes: Áudio (M2, fase 7c)', () => {
 
   it('volumes em % de 0 a 100, em passos de 10; mono, música na partida e indicador ligam e desligam', () => {
     const rows = settingsRows('audio', DEFAULT_SETTINGS, 'keyboardMouse');
-    expect(rows.map((r) => r.id)).toEqual([
-      'master',
-      'sfx',
-      'music',
-      'uiVolume',
-      'musicInMatch',
-      'mono',
-      'soundIndicator',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['master', 'sfx', 'music', 'uiVolume', 'musicInMatch', 'mono']);
+    // Refino R3c: o indicador de som é um aviso na tela; mora na Acessibilidade.
+    expect(settingsRows('access', DEFAULT_SETTINGS, 'keyboardMouse').map((r) => r.id)).toContain('soundIndicator');
     expect(rows[0]).toMatchObject({ value: '90%' });
     let doc = DEFAULT_SETTINGS;
     doc = stepSettings('audio', doc, 'keyboardMouse', 'master', 1).doc;
@@ -183,8 +178,55 @@ describe('Ajustes: Áudio (M2, fase 7c)', () => {
     expect(doc.audio.music).toBe(0);
     doc = stepSettings('audio', doc, 'keyboardMouse', 'uiVolume', -1).doc;
     expect(doc.audio.ui).toBe(7);
-    doc = stepSettings('audio', doc, 'keyboardMouse', 'soundIndicator', 0).doc;
+    doc = stepSettings('access', doc, 'keyboardMouse', 'soundIndicator', 0).doc;
     doc = stepSettings('audio', doc, 'keyboardMouse', 'mono', 1).doc;
     expect([doc.audio.soundIndicator, doc.audio.mono, doc.audio.musicInMatch]).toEqual([true, true, false]);
+  });
+});
+
+describe('Ajustes: a Tela e a frase de ajuda (refino R3c, #79)', () => {
+  it('a Tela (ex-Vídeo) junta câmera e gráficos; o indicador de som e as dicas ficam na Acessibilidade', () => {
+    expect(SETTINGS_TABS).toEqual(['controls', 'buttons', 'video', 'audio', 'access', 'data', 'about']);
+    expect(t('settings.tab.video')).toBe('Tela');
+    expect(settingsRows('video', DEFAULT_SETTINGS, 'gamepad').map((r) => r.id)).toEqual([
+      'view',
+      'shoulder',
+      'fov',
+      'split2',
+      'quality',
+      'fps',
+      'uiScale',
+    ]);
+    expect(settingsRows('access', DEFAULT_SETTINGS, 'gamepad').map((r) => r.id)).toEqual([
+      'shake',
+      'vibration',
+      'soundIndicator',
+      'tips',
+    ]);
+    const tips = stepSettings('access', DEFAULT_SETTINGS, 'gamepad', 'tips', 0).doc;
+    expect(tips.accessibility.tips).toBe(!DEFAULT_SETTINGS.accessibility.tips);
+  });
+
+  it('toda linha de opção, toda aba e as ações têm frase; o Voltar e os textos não', () => {
+    for (const tab of SETTINGS_TABS) {
+      expect(settingsHelp(SETTINGS_TABS, 'controls', `tab:${SETTINGS_TABS.indexOf(tab)}`, 'gamepad')).not.toBe('');
+      for (const device of ['keyboardMouse', 'gamepad', 'touch'] as const) {
+        for (const r of settingsRows(tab, DEFAULT_SETTINGS, device)) {
+          if (r.kind === 'text') continue;
+          const help = settingsHelp(SETTINGS_TABS, tab, `row:${r.id}`, device);
+          expect(help, `${tab}/${device}/${r.id}`).not.toBe('');
+          expect(help, `${tab}/${device}/${r.id}`).not.toContain('settings.help.');
+        }
+      }
+    }
+    for (const id of ['calibrate', 'export', 'import', 'merge', 'replace', 'copy', 'news']) {
+      expect(settingsHelp(SETTINGS_TABS, 'data', `row:${id}`, 'gamepad')).not.toBe('');
+    }
+    expect(settingsHelp(SETTINGS_TABS, 'controls', 'back', 'gamepad')).toBe('');
+    expect(settingsHelp(SETTINGS_TABS, 'controls', null, 'gamepad')).toBe('');
+    // A frase da linha de botão é a da captura, em qualquer ação.
+    expect(settingsHelp(SETTINGS_TABS, 'buttons', 'row:bind:fire', 'gamepad')).toBe(
+      settingsHelp(SETTINGS_TABS, 'buttons', 'row:bind:jump', 'gamepad'),
+    );
   });
 });

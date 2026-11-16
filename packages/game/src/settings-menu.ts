@@ -34,6 +34,11 @@ import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
  * Botões (parte 2): uma linha por ação remapeável; confirmar abre a captura (`createBindingCapture`, no `game`).
  */
 
+/**
+ * Refino R3c (#79): a aba `video` se chama Tela e junta o que se vê (Câmera, Ombro, Campo de visão, Sofá com 2, e
+ * depois Qualidade, Limite de quadros e Tamanho dos menus); o Indicador de som foi para a Acessibilidade. Uma 8ª aba
+ * (Jogo) não cabia no celular de 640×360 (a fileira de 7 já encostava na borda).
+ */
 export const SETTINGS_TABS = ['controls', 'buttons', 'video', 'audio', 'access', 'data', 'about'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 /** As abas que a pausa mostra (Dados e Sobre ficam no menu). */
@@ -58,6 +63,8 @@ export const SETTINGS_TAB_LABELS: Readonly<Record<SettingsTab, StringKey>> = {
 interface OptionDef {
   readonly id: string;
   readonly labelKey: StringKey;
+  /** Refino R3c: a frase embaixo das linhas quando esta está com o foco. */
+  readonly helpKey: StringKey;
   /** Só para estes dispositivos (as zonas mortas são do controle). */
   readonly devices?: readonly ControlDevice[];
   value(doc: SettingsDocument, device: ControlDevice): string;
@@ -90,6 +97,7 @@ function withDevice(doc: SettingsDocument, device: ControlDevice, c: Partial<Dev
 function control(
   id: string,
   labelKey: StringKey,
+  helpKey: StringKey,
   value: (c: DeviceControls) => string,
   step: (c: DeviceControls, delta: number) => Partial<DeviceControls>,
   devices?: readonly ControlDevice[],
@@ -97,6 +105,7 @@ function control(
   return {
     id,
     labelKey,
+    helpKey,
     ...(devices ? { devices } : {}),
     value: (doc, device) => value(doc.controls[device]),
     step: (doc, device, delta) => withDevice(doc, device, step(doc.controls[device], delta)),
@@ -107,12 +116,14 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'sens',
     'settings.row.sens',
+    'settings.help.sens',
     (c) => mult(c.sensitivity),
     (c, d) => ({ sensitivity: stepList(SENS, c.sensitivity, d) }),
   ),
   control(
     'sensY',
     'settings.row.sensY',
+    'settings.help.sensY',
     (c) => mult(c.sensitivityYMul),
     (c, d) => ({
       sensitivityYMul: stepList(SENS_Y, c.sensitivityYMul, d),
@@ -121,18 +132,21 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'ads',
     'settings.row.ads',
+    'settings.help.ads',
     (c) => mult(c.adsMul),
     (c, d) => ({ adsMul: stepList(ADS, c.adsMul, d) }),
   ),
   control(
     'invertY',
     'settings.row.invertY',
+    'settings.help.invertY',
     (c) => onOff(c.invertY),
     (c) => ({ invertY: !c.invertY }),
   ),
   control(
     'assist',
     'settings.row.assist',
+    'settings.help.assist',
     (c) => t(`settings.assist.${c.aimAssist}` as StringKey),
     (c, d) => {
       const i = AIM_ASSIST_NAMES.indexOf(c.aimAssist);
@@ -142,12 +156,14 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'toggleAds',
     'settings.row.toggleAds',
+    'settings.help.toggleAds',
     (c) => holdToggle(c.toggleAds),
     (c) => ({ toggleAds: !c.toggleAds }),
   ),
   control(
     'toggleCrouch',
     'settings.row.toggleCrouch',
+    'settings.help.toggleCrouch',
     (c) => holdToggle(c.toggleCrouch),
     (c) => ({
       toggleCrouch: !c.toggleCrouch,
@@ -156,6 +172,7 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'toggleSprint',
     'settings.row.toggleSprint',
+    'settings.help.toggleSprint',
     (c) => holdToggle(c.toggleSprint),
     (c) => ({
       toggleSprint: !c.toggleSprint,
@@ -164,6 +181,7 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'deadIn',
     'settings.row.deadIn',
+    'settings.help.deadIn',
     (c) => t('settings.percent', { n: Math.round(c.deadzoneInner * 100) }),
     (c, d) => ({ deadzoneInner: stepList(DEAD_IN, c.deadzoneInner, d) }),
     ['gamepad'],
@@ -171,6 +189,7 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'deadOut',
     'settings.row.deadOut',
+    'settings.help.deadOut',
     (c) => t('settings.percent', { n: Math.round(c.deadzoneOuter * 100) }),
     (c, d) => ({ deadzoneOuter: Math.max(c.deadzoneInner + 0.1, stepList(DEAD_OUT, c.deadzoneOuter, d)) }),
     ['gamepad'],
@@ -179,6 +198,7 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'autoFire',
     'settings.row.autoFire',
+    'settings.help.autoFire',
     (c) => onOff(c.autoFire),
     (c) => ({ autoFire: !c.autoFire }),
     ['touch'],
@@ -186,49 +206,42 @@ const CONTROL_ROWS: readonly OptionDef[] = [
   control(
     'leftHanded',
     'settings.row.leftHanded',
+    'settings.help.leftHanded',
     (c) => onOff(c.leftHanded),
     (c) => ({ leftHanded: !c.leftHanded }),
     ['touch'],
   ),
 ];
 
+/** Refino R3c (#79): a Tela, com o que se vê: primeiro a câmera, depois os gráficos e o tamanho dos menus. */
 const VIDEO_ROWS: readonly OptionDef[] = [
-  {
-    id: 'fov',
-    labelKey: 'settings.row.fov',
-    value: (doc) => (doc.video.fovDeg === 0 ? t('settings.default') : t('settings.degrees', { n: doc.video.fovDeg })),
-    step: (doc, _dev, d) => ({ ...doc, video: { ...doc.video, fovDeg: stepList(FOVS, doc.video.fovDeg, d) } }),
-  },
-  {
-    id: 'uiScale',
-    labelKey: 'settings.row.uiScale',
-    value: (doc) => mult(doc.video.uiScale),
-    step: (doc, _dev, d) => ({ ...doc, video: { ...doc.video, uiScale: stepList(UI_SCALES, doc.video.uiScale, d) } }),
-  },
   // M2 (fase 6b): 1ª ou 3ª pessoa e o ombro (na partida: T e X no teclado, direcional dos lados no controle).
   {
     id: 'view',
     labelKey: 'settings.row.view',
+    helpKey: 'settings.help.view',
     value: (doc) => t(doc.video.view === 'third' ? 'settings.view.third' : 'settings.view.first'),
     step: (doc) => ({ ...doc, video: { ...doc.video, view: doc.video.view === 'third' ? 'first' : 'third' } }),
   },
   {
     id: 'shoulder',
     labelKey: 'settings.row.shoulder',
+    helpKey: 'settings.help.shoulder',
     value: (doc) => t(doc.video.shoulder === 'left' ? 'settings.shoulder.left' : 'settings.shoulder.right'),
     step: (doc) => ({ ...doc, video: { ...doc.video, shoulder: doc.video.shoulder === 'left' ? 'right' : 'left' } }),
   },
-  // M2 (fase 6e): 60 ou 30 quadros por segundo (o celular poupa bateria e esquenta menos).
   {
-    id: 'fps',
-    labelKey: 'settings.row.fps',
-    value: (doc) => t(doc.video.fpsCap === 30 ? 'settings.fps.30' : 'settings.fps.60'),
-    step: (doc) => ({ ...doc, video: { ...doc.video, fpsCap: doc.video.fpsCap === 30 ? 60 : 30 } }),
+    id: 'fov',
+    labelKey: 'settings.row.fov',
+    helpKey: 'settings.help.fov',
+    value: (doc) => (doc.video.fovDeg === 0 ? t('settings.default') : t('settings.degrees', { n: doc.video.fovDeg })),
+    step: (doc, _dev, d) => ({ ...doc, video: { ...doc.video, fovDeg: stepList(FOVS, doc.video.fovDeg, d) } }),
   },
   // M3 (fase 1d): com 2 jogadores no sofá, cima e baixo ou lado a lado.
   {
     id: 'split2',
     labelKey: 'settings.row.split2',
+    helpKey: 'settings.help.split2',
     value: (doc) => t(doc.video.split2 === 'sideBySide' ? 'settings.split2.sideBySide' : 'settings.split2.stacked'),
     step: (doc) => ({
       ...doc,
@@ -239,6 +252,7 @@ const VIDEO_ROWS: readonly OptionDef[] = [
   {
     id: 'quality',
     labelKey: 'settings.row.quality',
+    helpKey: 'settings.help.quality',
     value: (doc) =>
       doc.video.quality !== 'auto'
         ? t(`settings.quality.${doc.video.quality}`)
@@ -251,6 +265,21 @@ const VIDEO_ROWS: readonly OptionDef[] = [
       return { ...doc, video: { ...doc.video, quality: next } };
     },
   },
+  // M2 (fase 6e): 60 ou 30 quadros por segundo (o celular poupa bateria e esquenta menos).
+  {
+    id: 'fps',
+    labelKey: 'settings.row.fps',
+    helpKey: 'settings.help.fps',
+    value: (doc) => t(doc.video.fpsCap === 30 ? 'settings.fps.30' : 'settings.fps.60'),
+    step: (doc) => ({ ...doc, video: { ...doc.video, fpsCap: doc.video.fpsCap === 30 ? 60 : 30 } }),
+  },
+  {
+    id: 'uiScale',
+    labelKey: 'settings.row.uiScale',
+    helpKey: 'settings.help.uiScale',
+    value: (doc) => mult(doc.video.uiScale),
+    step: (doc, _dev, d) => ({ ...doc, video: { ...doc.video, uiScale: stepList(UI_SCALES, doc.video.uiScale, d) } }),
+  },
 ];
 
 /** M2 (fase 7c): um volume de 0 a 10, mostrado em %. */
@@ -258,6 +287,7 @@ function volumeRow(id: string, labelKey: StringKey, key: 'master' | 'sfx' | 'mus
   return {
     id,
     labelKey,
+    helpKey: `settings.help.${id}` as StringKey,
     value: (doc) => t('settings.percent', { n: doc.audio[key] * 10 }),
     step: (doc, _dev, d) => ({
       ...doc,
@@ -270,6 +300,7 @@ function audioToggle(id: string, labelKey: StringKey, key: 'mono' | 'musicInMatc
   return {
     id,
     labelKey,
+    helpKey: `settings.help.${id}` as StringKey,
     value: (doc) => onOff(doc.audio[key]),
     step: (doc) => ({ ...doc, audio: { ...doc.audio, [key]: !doc.audio[key] } }),
   };
@@ -282,13 +313,13 @@ const AUDIO_ROWS: readonly OptionDef[] = [
   volumeRow('uiVolume', 'settings.row.uiVolume', 'ui'),
   audioToggle('musicInMatch', 'settings.row.musicInMatch', 'musicInMatch'),
   audioToggle('mono', 'settings.row.mono', 'mono'),
-  audioToggle('soundIndicator', 'settings.row.soundIndicator', 'soundIndicator'),
 ];
 
 const ACCESS_ROWS: readonly OptionDef[] = [
   {
     id: 'shake',
     labelKey: 'settings.row.reduceShake',
+    helpKey: 'settings.help.shake',
     value: (doc) => onOff(doc.accessibility.reduceShake),
     step: (doc) => ({ ...doc, accessibility: { ...doc.accessibility, reduceShake: !doc.accessibility.reduceShake } }),
   },
@@ -296,12 +327,16 @@ const ACCESS_ROWS: readonly OptionDef[] = [
   {
     id: 'vibration',
     labelKey: 'settings.row.vibration',
+    helpKey: 'settings.help.vibration',
     value: (doc) => onOff(doc.accessibility.vibration),
     step: (doc) => ({ ...doc, accessibility: { ...doc.accessibility, vibration: !doc.accessibility.vibration } }),
   },
+  // M2 (fase 7c); refino R3c: saiu do Áudio (é um aviso na tela).
+  audioToggle('soundIndicator', 'settings.row.soundIndicator', 'soundIndicator'),
   {
     id: 'tips',
     labelKey: 'settings.row.tips',
+    helpKey: 'settings.help.tips',
     value: (doc) => onOff(doc.accessibility.tips),
     step: (doc) => ({ ...doc, accessibility: { ...doc.accessibility, tips: !doc.accessibility.tips } }),
   },
@@ -356,6 +391,54 @@ export function settingsRows(
     rows.push({ kind: 'option', id: r.id, labelKey: r.labelKey, value: r.value(doc, device) });
   }
   return rows;
+}
+
+/** Refino R3c: a frase de cada aba (com o foco na fileira de abas). */
+export const SETTINGS_TAB_HELP: Readonly<Record<SettingsTab, StringKey>> = {
+  controls: 'settings.help.tab.controls',
+  buttons: 'settings.help.tab.buttons',
+  video: 'settings.help.tab.video',
+  audio: 'settings.help.tab.audio',
+  access: 'settings.help.tab.access',
+  data: 'settings.help.tab.data',
+  about: 'settings.help.tab.about',
+};
+
+/** As linhas de ação (Dados, Sobre, Botões, Controles) com frase própria. */
+const ACTION_HELP: Readonly<Record<string, StringKey>> = {
+  device: 'settings.help.device',
+  calibrate: 'settings.help.calibrate',
+  reset: 'settings.help.reset',
+  export: 'settings.help.export',
+  import: 'settings.help.import',
+  merge: 'settings.help.merge',
+  replace: 'settings.help.replace',
+  copy: 'settings.help.copy',
+  news: 'settings.help.news',
+};
+
+/**
+ * Refino R3c (#79): a frase embaixo das linhas para o foco atual (`tab:<i>` ou `row:<id>`): o que a opção faz, em
+ * pt-BR curto. Sem frase (o Voltar, um texto), `''`.
+ */
+export function settingsHelp(
+  tabs: readonly SettingsTab[],
+  tab: SettingsTab,
+  focusedId: string | null,
+  device: ControlDevice,
+): string {
+  if (focusedId === null) return '';
+  if (focusedId.startsWith('tab:')) {
+    const other = tabs[Number(focusedId.slice(4))];
+    return other !== undefined ? t(SETTINGS_TAB_HELP[other]) : '';
+  }
+  if (!focusedId.startsWith('row:')) return '';
+  const id = focusedId.slice(4);
+  if (tab === 'buttons' && bindRowAction(id, device) !== null) return t('settings.help.bind');
+  const action = ACTION_HELP[id];
+  if (action !== undefined) return t(action);
+  const row = optionDefs(tab, device).find((r) => r.id === id);
+  return row ? t(row.helpKey) : '';
 }
 
 /** Um passo numa linha (`delta` 0 = o confirmar, que avança). A linha `device` troca o dispositivo ajustado. */

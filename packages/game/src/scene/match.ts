@@ -238,6 +238,7 @@ import {
   PAUSE_SETTINGS_TABS,
   rebindSettings,
   SETTINGS_TAB_LABELS,
+  settingsHelp,
   settingsRows,
   stepSettings,
 } from '../settings-menu.ts';
@@ -2397,14 +2398,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 4f, parte 2): a captura do novo botão de uma ação (aba Botões). */
   const capture = createBindingCapture();
   let capturing: RemapAction | null = null;
+  /** Refino R3c: o foco com que a página foi montada (a frase de ajuda é dele). */
+  let pauseHelpFocus: string | null = null;
   function pauseSettings(): void {
     const tab = PAUSE_SETTINGS_TABS[pauseSettingsTab]!;
+    pauseHelpFocus = pauseMenu.focusedId;
     pauseMenu.setRoot(
       settingsScreen.build({
         tabs: PAUSE_SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
         tab: pauseSettingsTab,
         rows: settingsRows(tab, host.settings.current, pauseSettingsDevice, capturing, platform.features.keyboardMouse),
         note: pauseNote,
+        help: settingsHelp(PAUSE_SETTINGS_TABS, tab, pauseHelpFocus, pauseSettingsDevice),
       }),
     );
   }
@@ -2580,6 +2585,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
       pauseSettings();
     }
+    // Refino R3c: a frase de ajuda segue o foco (a página continua a dos Ajustes se nada acima a trocou).
+    if (pausePage === 'settings' && pauseMenu.focusedId !== pauseHelpFocus) pauseSettings();
     return 'none';
   }
 

@@ -48,6 +48,11 @@ export interface TabbedState {
   readonly summary: string;
   /** Aviso de uma linha, em âmbar, no lugar do resumo; `''` = nenhum. */
   readonly note: string;
+  /**
+   * Refino R3c (#79): a linha de ajuda embaixo das linhas (o que a linha com o foco faz). Sem o campo, a tela não
+   * reserva a linha; com `''`, reserva (a coluna não pula quando o foco passa por uma linha sem frase).
+   */
+  readonly help?: string;
   readonly buttons: readonly TabbedButton[];
   /**
    * M2 (fase 6c): painel à direita por cima da cena (o Meu Bobo: o bobo fica à esquerda), sem o fundo cheio, com as
@@ -135,7 +140,8 @@ export function buildTabbed(state: TabbedState): UiNode {
         color: state.note !== '' ? COLORS.acao : COLORS.textoBaixo,
       },
       { kind: 'box', height: 10 },
-      { kind: 'row', id: 'tabs', gap: 8, children: tabs },
+      // Refino R3c: folga 8 → 6 (com o `padX` menor), para as 7 abas dos Ajustes caberem no celular de 640×360.
+      { kind: 'row', id: 'tabs', gap: 6, children: tabs },
       { kind: 'box', height: 16 },
       {
         kind: 'column',
@@ -146,6 +152,12 @@ export function buildTabbed(state: TabbedState): UiNode {
         height: TABBED_LAYOUT.rowsHeight,
         children: state.rows.map((r) => rowNode(r, width, panel ? TABBED_LAYOUT.panelValueWidth : null)),
       },
+      ...(state.help !== undefined
+        ? ([
+            { kind: 'box', height: 14 },
+            { kind: 'text', id: 'help', text: { literal: state.help }, style: 'caption', color: COLORS.texto },
+          ] as const)
+        : []),
     ],
   };
   return {

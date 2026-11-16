@@ -21,6 +21,10 @@ Plano em `docs/PLANO_REFINO.md` (pedido do Erick, #79).
   Laboratório e Ajustes (sai o "Mudar" e o menu do meio). Os Modos reúnem os jeitos de começar: Times, Todos contra
   todos, Bobo Zombies, Bobo Training, Surpreenda-me e Partida personalizada. A Novidades foi para Ajustes → Sobre, e
   os itens de teste ganharam uma tela própria.
+- **R3, Ajustes mais claros (parte 2):** embaixo das linhas aparece uma frase dizendo o que a opção com o foco faz. A
+  aba Vídeo virou Tela e junta tudo o que se vê: câmera (primeira ou terceira pessoa), ombro, campo de visão, tela
+  dividida, qualidade, quadros e tamanho dos menus. O indicador de som foi para a Acessibilidade. As abas não passam
+  mais da borda em celular pequeno.
 
 ### M3 Sofá e Bobo Zombies (fechado em 16/11/2026, #78)
 

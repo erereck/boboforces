@@ -1416,11 +1416,11 @@ describe('Ajustes (M2, fase 4f)', () => {
     const { platform, game } = await bootToTitle();
     titleTo(platform, 'settings');
     expect(game.screen).toBe('settings');
-    // E E: Vídeo. Da aba (o foco vai junto) desce para a 2ª linha (Tamanho dos menus) e anda um para a direita.
+    // E E: Tela. Da aba (o foco vai junto) desce até a 7ª linha (refino R3c: Tamanho dos menus, a última) e anda um
+    // para a direita.
     platform.tap('KeyE');
     platform.tap('KeyE');
-    platform.tap('ArrowDown');
-    platform.tap('ArrowDown');
+    for (let i = 0; i < 7; i++) platform.tap('ArrowDown');
     platform.tap('ArrowRight');
     expect(game.save.settings.video.uiScale).toBe(1.1);
     // Q: Botões. Desce até "Andar: frente" (depois do dispositivo), confirma e aperta o I.
@@ -1438,7 +1438,7 @@ describe('Ajustes (M2, fase 4f)', () => {
     platform.tap('Escape');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
-    // Na partida (o foco do título ficou em Ajustes: sobe 3 até o JOGAR): P, Ajustes (2 abaixo), E E E E
+    // Na partida (o foco do título ficou em Ajustes: sobe 3 até o JOGAR): P, Ajustes (2 abaixo), E ×4
     // (Acessibilidade, depois do Áudio da fase 7c), baixo, confirmar: Reduzir tremor ligado.
     for (let i = 0; i < 3; i++) platform.tap('ArrowUp');
     platform.tap('Enter');
@@ -1447,10 +1447,7 @@ describe('Ajustes (M2, fase 4f)', () => {
     platform.tap('ArrowDown');
     platform.tap('ArrowDown');
     platform.tap('Enter');
-    platform.tap('KeyE');
-    platform.tap('KeyE');
-    platform.tap('KeyE');
-    platform.tap('KeyE');
+    for (let i = 0; i < 4; i++) platform.tap('KeyE');
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.save.settings.accessibility.reduceShake).toBe(true);

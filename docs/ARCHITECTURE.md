@@ -2784,3 +2784,20 @@ Pedido do Erick (#79); plano em `docs/PLANO_REFINO.md`.
 - **A Novidades** foi para Ajustes → Sobre (ainda aparece sozinha uma vez depois de atualizar).
 - **Testes:** os 15 do jogo que passavam pelo "Mudar" usam o ajudante `titleTo`; os do título e dos itens de teste
   foram reescritos para a grade e a tela Testes.
+
+### 14.5 Fase R3c: os Ajustes (16/11/2026)
+
+- **A Tela (ex-Vídeo):** a aba `video` (o id fica) se chama Tela e junta o que se vê, na ordem de quem procura: Câmera,
+  Ombro, Campo de visão, Sofá com 2, e depois Qualidade, Limite de quadros e Tamanho dos menus. O Indicador de som
+  saiu do Áudio para a Acessibilidade (é um aviso na tela), e as Dicas ficam no fim dela.
+- **A frase de ajuda:** embaixo das linhas, uma frase curta diz o que a linha com o foco faz (e, com o foco numa aba, o
+  que a aba tem). `settingsHelp` (`game/src/settings-menu.ts`) acha a frase pelo foco; cada opção tem `helpKey`
+  (`settings.help.*`, 46 frases); as linhas de botão dividem uma frase só (a da captura). O `game` e a pausa refazem
+  a tela quando o foco muda (`settingsHelpFocus`/`pauseHelpFocus`). No `tabbed.ts`, `help` é opcional: a
+  Partida personalizada não tem.
+- **Uma aba Jogo foi tentada e saiu:** com 8 abas a fileira passava da borda no celular de 640×360. Juntar Dados e
+  Sobre para abrir espaço deixaria a Sobre misturada (estatísticas, backup, créditos).
+- **Achado:** a fileira de 7 abas já passava da borda no 640×360 desde o Áudio (fase 7c, 634 de 608 px): o teste de
+  estouro tinha só 6 abas. Agora a fixture tem as 7 e a frase mais longa, e as abas ficaram mais justas
+  (`BUTTON_COMPACT.padX` 16 → 13, folga 8 → 6): 599 de 608 px no 640×360, 1054 de 1216 no 1280×720.
+- **Medido:** o menu de 345,4 para 347,1 KB (as frases); sobram 2,9 KB até o teto.
