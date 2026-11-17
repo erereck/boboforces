@@ -86,10 +86,20 @@ export interface ClientDriver extends NetMatchDriver {
   readonly renderTick: number;
   /** Fase 2b: o índice do próprio boneco (-1 = ainda não veio). */
   readonly ownEntity: number;
+  /**
+   * M5 (fase 5a): há quantos segundos o host está ausente (0 = presente): desde o aviso dele, ou desde o último
+   * snapshot quando passa de `HOST_SILENT_S` sem nada.
+   */
+  readonly hostAbsentS: number;
 }
 
 /** Fila de ticks locais por frame (como o `LocalDriver`): frame limitado a 0,1 s, no máximo 4 ticks. */
 const MAX_FRAME_S = 0.1;
+/**
+ * M5 (fase 5a): sem snapshot novo por tanto tempo, o host conta como ausente mesmo sem o aviso (o celular pode suspender
+ * a aba antes de mandar; tecnico.md §13.4).
+ */
+export const HOST_SILENT_S = 3;
 const MAX_TICKS = 4;
 /** Fase 2c: os outros bonecos ficam este tanto atrás do host (tecnico.md §13.3). */
 export const INTERP_DELAY_S = 0.1;
@@ -146,6 +156,14 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   let shownTick = -1;
   let renderTick = -1;
   let clientTime = 0;
+  /** M5 (fase 5a): o host avisou que foi para segundo plano (e desde quando, no relógio do cliente). */
+  let hostAway = false;
+  let awaySince = 0;
+  const absentS = (): number => {
+    if (hostAway) return Math.max(clientTime - awaySince, 1e-3);
+    const silent = clientTime - arrivalTime;
+    return silent >= HOST_SILENT_S ? silent : 0;
+  };
   let arrivalTick = -1;
   let arrivalTime = 0;
 
@@ -246,6 +264,11 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         state = 'rejected';
       }
       if (type === MSG.events && state === 'playing') events.receive(bytes);
+      if (type === MSG.hostAway) {
+        const away = reader.readBits(8) === 1;
+        if (away && !hostAway) awaySince = clientTime;
+        hostAway = away;
+      }
       return;
     }
     if (type === MSG.snapshot && state === 'playing') assembler.receive(bytes);
@@ -274,6 +297,9 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     },
     get ownEntity(): number {
       return own;
+    },
+    get hostAbsentS(): number {
+      return absentS();
     },
     update(frameSeconds: number): number {
       if (!helloSent) {
@@ -313,6 +339,12 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         if (newest.tick > reconciledTick && newest.privEntity >= 0) reconcile(newest);
       }
       if (state !== 'playing') return 0;
+      // M5 (fase 5a): com o host ausente, o próprio boneco não anda sozinho nem manda entradas (a partida está parada
+      // do lado dele); quando ele volta, a predição recomeça do snapshot dele.
+      if (absentS() > 0) {
+        acc = 0;
+        return 0;
+      }
       acc += step;
       let ticks = 0;
       while (acc >= dt && ticks < MAX_TICKS) {

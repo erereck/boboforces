@@ -293,6 +293,7 @@ import {
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
 import { cleanTypedName } from '../names.ts';
+import { HOST_AWAY_END_S, waitsForHost } from '../online-api.ts';
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
 import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
@@ -2493,6 +2494,36 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (pausePage === 'main') pauseMain();
   }
 
+  // --- M5 (fase 5a): o host online ausente (só no cliente) ---
+  let hostAwayText = '';
+  /** Os segundos que a faixa mostra (o texto só é refeito quando eles mudam). */
+  let hostAwayShown = -2;
+  /**
+   * 1x por frame no cliente online: a faixa "O host saiu do jogo"; no PvP, a contagem de 10 s e, sem o host, o
+   * resultado do último snapshot (tecnico.md §13.4). No coop, a partida espera (a predição já parou no `net`).
+   */
+  function checkHostAway(): void {
+    const absent = driver.hostAbsentS;
+    if (absent <= 0) {
+      hostAwayText = '';
+      hostAwayShown = -2;
+      return;
+    }
+    if (resultShown) return;
+    const coop = waitsForHost(recipe.mode);
+    const left = coop ? -1 : Math.max(0, Math.ceil(HOST_AWAY_END_S - absent));
+    if (left !== hostAwayShown) {
+      if (hostAwayShown === -2) host.log(`[partida] host ausente (${coop ? 'coop: espera' : 'PvP: 10 s'})`);
+      hostAwayShown = left;
+      hostAwayText = coop ? t('match.hostAway') : t('match.hostAwayEnds', { s: left });
+    }
+    if (!coop && absent >= HOST_AWAY_END_S && humans > 0) {
+      host.log('[partida] o host não voltou em 10 s: resultado do último snapshot');
+      hostAwayText = '';
+      showResult(true);
+    }
+  }
+
   // --- M4 (fase 3): a bateria (Switch; P5: o nível na pausa e um aviso só abaixo de 20%, sem carregar) ---
   let batteryWarned = false;
   let batteryCheckS = 0;
@@ -3995,7 +4026,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.tipGlyph = tipGlyph;
     }
     // M4 (fase 3): o aviso da bateria usa a plaquinha da dica (passa na frente dela).
-    if (s === 0 && batteryNoticeS > 0) {
+    if (s === 0 && hostAwayText !== '') {
+      m.tipAlpha = 1;
+      m.tipKey = '!';
+      m.tipText = hostAwayText;
+      m.tipGlyph = -1;
+    } else if (s === 0 && batteryNoticeS > 0) {
       m.tipAlpha = Math.min(1, batteryNoticeS);
       m.tipKey = '!';
       m.tipText = batteryNotice;
@@ -4574,6 +4610,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       let signal: SceneSignal = 'none';
       // M5: a sala acabou (o host saiu, fui expulso, a conexão caiu): de volta ao menu.
       if (driver.closed && !resultShown) signal = 'quit';
+      checkHostAway();
       if (humans > 0) {
         const last = menu.lastDevice;
         if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);

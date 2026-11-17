@@ -35,6 +35,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   partida os amigos aparecem com o nome deles, e no fim todo mundo volta à sala para a próxima. No celular, a
   Cena-vitrine saiu do título para o Online caber.
 - **O link da sala (fase 4d):** quem abre o link que o host copiou cai direto no Entrar, com o código já posto.
+- **Quando alguém some (fase 5a):** se o host sai da tela, os amigos veem "O host saiu do jogo"; no Bobo Zombies a
+  partida espera, nos outros modos ela acaba em 10 s com o placar daquela hora. Quem fica 60 s parado (ou com a aba
+  escondida) dá a vaga a um bot até voltar.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

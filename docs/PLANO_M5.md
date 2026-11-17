@@ -119,6 +119,37 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
   "host saiu"; o amigo entrou em 1,9 s pela sinalização local e em 4,4 s pelos relays de verdade.
 - **4f, a rodada de prints** (as telas e o texto do aviso de privacidade). **Feita em 16/11:** `npm run online:web -- --prints` captura as 21 telas (o caminho inteiro em 1280×720 e o host num celular de 667×375); rodada 19 da página de prints (S1–S6, com O3 e O6 do plano).
 
+## Fase 5 em detalhe (16/11/2026)
+
+O que o GDD (§3.7, "Quedas") e o `tecnico.md` §13.4 e §13.5 pedem para quando as coisas dão errado, em 4 partes,
+cada uma verde e commitada:
+
+- **5a, as ausências:**
+  - **host em segundo plano:** ele avisa os amigos pelo canal confiável na hora em que a aba some, e os amigos também
+    contam 3 s sem snapshot como host ausente (o celular pode suspender antes do aviso). No coop, a faixa "O host saiu
+    do jogo por um instante" e a partida espera; no PvP, a contagem de 10 s e, sem o host, o resultado do último
+    snapshot. O host que volta depois de 10 s num PvP encerra a partida com o placar daquela hora;
+  - **amigo em segundo plano ou parado (AFK):** 60 s sem entrada (aba escondida ou nada apertado) e um bot assume a
+    vaga; a primeira entrada de verdade devolve o boneco a ele. Enquanto o host está ausente, o amigo não prediz
+    nem manda entradas.
+  - **feita em 16/11** (ARCHITECTURE §16.10).
+- **5b, a queda e a volta:**
+  - um id do aparelho, guardado no perfil do Online, vai na escolha do lobby;
+  - o host que sai de propósito avisa ("a sala acabou"); a conexão que cai sem aviso faz o amigo tentar voltar por 20 s
+    ("Reconectando…"), no mesmo código;
+  - o host reconhece o id: quem caiu no meio da partida volta para o boneco dele (que estava com um bot), mesmo com a
+    sala trancada ou jogando, e recebe o snapshot completo; quem foi tirado não volta naquela sala.
+- **5c, versões diferentes:** "Atualize a página" com o botão Atualizar quando o service worker já baixou a versão
+  nova, e "Seu amigo precisa atualizar" do outro lado (as mensagens já existem desde a 4a).
+- **5d, ping e emotes** (sem chat de texto):
+  - **ping:** o botão de aviso (botão do meio do mouse ou N, direcional para cima) marca o ponto onde a mira está, para
+    o próprio time; passa pela sim como os outros botões, então vale no online e no sofá;
+  - **emotes:** o botão de emote (B, direcional para baixo) mostra um dos 4 balões fixos em cima do bobo ("Boa!",
+    "Valeu!", "Bora!", "Ops!"; cada aperto passa para o próximo), para todos. As 4 poses do `arte-ux` ficam para
+    quando o contrato de emote do `ActorBuffer` existir (decisão menor revisável).
+- **Fica para a fase 6:** o aviso "Você é o host: não troque de app", o teto de 8 bots e os snapshots a 20 Hz com host
+  no celular.
+
 ## Riscos
 
 - **O menu da web está em 349,2 de 350 KB** (depois da 4c). O item "Online" e a tela de código precisam caber: a tela

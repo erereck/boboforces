@@ -277,6 +277,9 @@ export const STRINGS_EXTRA_PT_BR = {
   'pause.battery': 'Bateria {n}%',
   'pause.batteryCharging': 'Bateria {n}%, carregando',
   'match.batteryLow': 'Bateria em {n}%: ligue o carregador.',
+  // M5 (fase 5a): o host online foi para segundo plano (a faixa da dica, no cliente).
+  'match.hostAway': 'O host saiu do jogo por um instante.',
+  'match.hostAwayEnds': 'O host saiu do jogo: acaba em {s} s.',
   // M4 (fase 4d): o teclado do jogo (no canvas, só com o D-pad).
   'keyboard.count': '{n}/{max}',
   'keyboard.countUpper': '{n}/{max} · a próxima letra sai maiúscula',

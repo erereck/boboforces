@@ -123,3 +123,90 @@ describe('a partida online na cena, pela rede de mentira (M5 fase 4b)', () => {
     client.dispose();
   });
 });
+
+describe('o AFK pela rede de mentira (M5 fase 5a)', () => {
+  it('60 s com a entrada parada e um bot assume; o primeiro passo devolve a vaga', () => {
+    const { map } = buildSyntheticConstruto();
+    const loop = net.createLoopback({ seed: 21, latencyMs: 30, jitterMs: 5, loss: 0.02 });
+    const placed = onlineRecipe(base, [0, 1]);
+    const start: net.LobbyStart = {
+      recipe: placed.recipe,
+      seed: 5,
+      members: [
+        { slot: 0, name: 'Host', team: 0, bobo: null, ready: true, controller: placed.controllers[0]! },
+        { slot: 1, name: 'Bia', team: 1, bobo: null, ready: true, controller: placed.controllers[1]! },
+      ],
+    };
+    const common = { net, start, snapshotHz: 30, isClosed: () => false, takeLeftSlots: () => [] } as const;
+    const hostSession = createOnlineSession({
+      ...common,
+      role: 'host',
+      endpoint: loop.endpoint(0),
+      mySlot: 0,
+      peerOfSlot: (slot) => (slot === 1 ? 1 : -1),
+      hostPeer: -1,
+      welcome: null,
+    });
+    // Espia o que o link do host decide (a cena só aplica).
+    const decided: number[] = [];
+    const spy = {
+      ...hostSession,
+      attachHost: (sim: Parameters<typeof hostSession.attachHost>[0]) => {
+        const link = hostSession.attachHost(sim);
+        return {
+          ...link,
+          takeControl: (out: number[]) => {
+            const n = link.takeControl(out);
+            decided.push(...out.slice(0, n));
+            return n;
+          },
+        };
+      },
+    };
+    const clientSession = createOnlineSession({
+      ...common,
+      role: 'client',
+      endpoint: loop.endpoint(1),
+      mySlot: 1,
+      peerOfSlot: () => -1,
+      hostPeer: 0,
+      welcome: { slot: 1, hz: 60, snapshotHz: 30 },
+    });
+    const moving = { on: true };
+    const host = createSceneDriver(
+      { recipe: { ...placed.recipe, seed: 5 }, map, humans: 2, writeHumanFrame: () => undefined },
+      spy,
+    );
+    const client = createSceneDriver(
+      {
+        recipe: { ...placed.recipe, seed: 5 },
+        map,
+        humans: 2,
+        writeHumanFrame: (_slot, out) => {
+          out.moveY = quantizeAxis(moving.on ? 1 : 0);
+        },
+      },
+      clientSession,
+    );
+    const frames = (n: number): void => {
+      for (let i = 0; i < n; i++) {
+        loop.advance(1000 / 60);
+        host.update(1 / 60);
+        client.update(1 / 60);
+      }
+    };
+    frames(120);
+    expect(decided).toEqual([]);
+    // Parado por 61 s: o bot assume (o controlador do amigo, "foi").
+    moving.on = false;
+    frames(61 * 60);
+    const c = placed.controllers[1]!;
+    expect(decided).toEqual([c * 2]);
+    // Um passo: a vaga volta para ele.
+    moving.on = true;
+    frames(30);
+    expect(decided).toEqual([c * 2, c * 2 + 1]);
+    host.dispose();
+    client.dispose();
+  }, 120_000);
+});

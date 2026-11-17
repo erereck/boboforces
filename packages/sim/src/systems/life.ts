@@ -411,6 +411,15 @@ export function rulesSystem(ctx: SimContext): void {
   endMatch(ctx, lead);
 }
 
+/**
+ * M5 (fase 5a): encerra a partida agora, com quem está na frente (empate sem ninguém na frente). O host online chama
+ * quando volta de mais de 10 s em segundo plano num PvP (tecnico.md §13.4). Já encerrada, nada muda.
+ */
+export function finishMatch(ctx: SimContext): void {
+  if (ctx.match.phase === 'ended') return;
+  endMatch(ctx, leader(ctx));
+}
+
 function endMatch(ctx: SimContext, team: number): void {
   const m = ctx.match;
   m.phase = 'ended';

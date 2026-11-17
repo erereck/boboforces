@@ -86,6 +86,14 @@ export class RemoteInputBuffer {
   /** O tick que o cliente mostrava no último frame usado (16 bits baixos; -1 = nenhum): a volta do tiro (fase 2d). */
   lastView = -1;
 
+  /**
+   * M5 (fase 5a): entradas de verdade que chegaram (contador: algo apertado, andando ou a mira mexendo). Parado ou com
+   * a aba escondida, não sobe: é por ele que o host vê o AFK (e a volta, mesmo com um bot no lugar e a fila sem ler).
+   */
+  activeReceived = 0;
+  private recvYaw = 0;
+  private recvPitch = 0;
+
   /** Último `seq` usado (-1 = nenhum): vai no snapshot para o cliente reconciliar (fase 2). */
   get lastConsumedSeq(): number {
     return this.lastSeq;
@@ -102,6 +110,11 @@ export class RemoteInputBuffer {
       const view16 = r.readBits(16);
       const view = hasView === 1 ? view16 : -1;
       const seq = f.seq;
+      if (f.buttons !== 0 || f.moveX !== 0 || f.moveY !== 0 || f.yaw !== this.recvYaw || f.pitch !== this.recvPitch) {
+        this.activeReceived++;
+      }
+      this.recvYaw = f.yaw;
+      this.recvPitch = f.pitch;
       if (this.lastSeq >= 0 && seqDiff(seq, this.lastSeq) <= 0) {
         this.stats.duplicates++;
         continue;

@@ -2069,8 +2069,12 @@ interface FakeRoom extends OnlineRoom {
 }
 
 /** Uma sessão de mentira: o host lê o amigo parado; o cliente só manda a entrada; `close()` fecha a partida. */
-function fakeSession(role: 'host' | 'client', calls: string[]): { session: OnlineSession; close(): void } {
+function fakeSession(
+  role: 'host' | 'client',
+  calls: string[],
+): { session: OnlineSession; close(): void; absent: { s: number } } {
   let closed = false;
+  const absent = { s: 0 };
   const session: OnlineSession = {
     role,
     humans: 2,
@@ -2086,6 +2090,8 @@ function fakeSession(role: 'host' | 'client', calls: string[]): { session: Onlin
       recordEvents: () => undefined,
       afterTicks: () => undefined,
       takeLost: () => 0,
+      takeControl: () => 0,
+      setAway: (on) => void calls.push(`away:${on}`),
       dispose: () => void calls.push('host-dispose'),
     }),
     attachClient: (_sim, write) => {
@@ -2098,11 +2104,14 @@ function fakeSession(role: 'host' | 'client', calls: string[]): { session: Onlin
           return 0;
         },
         alpha: 0,
+        get hostAbsentS() {
+          return absent.s;
+        },
         dispose: () => void calls.push('client-dispose'),
       };
     },
   };
-  return { session, close: () => (closed = true) };
+  return { session, close: () => (closed = true), absent };
 }
 
 function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
@@ -2346,6 +2355,33 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     expect(game.screen).toBe('online');
     expect(room.calls).toContain('leave');
     expect(game.onlineRoom).toBeNull();
+    game.dispose();
+  }, 60_000);
+
+  it('M5 (fase 5a): o host ausente: a faixa no amigo e, num PvP, o resultado depois de 10 s', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store, '#sala=AB3CD');
+    await settle();
+    platform.pump(2);
+    platform.tap('Enter');
+    const room = made[0]!;
+    room.status = 'playing';
+    room.mySlot = 1;
+    const fake = fakeSession('client', room.calls);
+    room.match = { recipe: DEBUT_PRESET, seed: 7, session: fake.session };
+    platform.pump(1);
+    await untilRunning(platform, game);
+    fake.absent.s = 4;
+    platform.pump(2);
+    expect(platform.logLines.some((l) => l.includes('[partida] host ausente (PvP: 10 s)'))).toBe(true);
+    fake.absent.s = 10.2;
+    platform.pump(2);
+    expect(platform.logLines.some((l) => l.includes('o host não voltou em 10 s'))).toBe(true);
+    // O resultado online (só "Voltar à sala"): o Enter volta à sala.
+    platform.tap('Enter');
+    expect(game.screen).toBe('online');
     game.dispose();
   }, 60_000);
 

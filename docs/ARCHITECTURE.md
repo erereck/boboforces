@@ -3276,3 +3276,25 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   casa, link, procurando, as salas do host e do amigo, Escolher partida, as duas partidas e pausas, o resultado online, a
   volta e o "host saiu") e o host num celular de 667×375 com toque. A aba que vai para trás volta pausada (o jogo pausa
   quando ela some; no online a partida não para): o roteiro só aperta Esc quando ela não está.
+
+
+### 16.10 Fase 5a: as ausências (16/11/2026)
+
+- **O host em segundo plano:** quando a aba some (`platform.lifecycle.onVisibility`), o driver do host avisa os amigos
+  pelo canal confiável (`MSG.hostAway`, do lado "partida" do repartidor); os amigos também contam 3 s sem snapshot novo
+  (`HOST_SILENT_S`) como host ausente. Ausente, o cliente não prediz nem manda entradas, e a cena mostra a faixa na
+  plaquinha da dica:
+  - **coop (Bobo Zombies):** "O host saiu do jogo por um instante." e a partida espera (`waitsForHost`);
+  - **PvP:** "O host saiu do jogo: acaba em N s." e, aos 10 s (`HOST_AWAY_END_S`), o resultado do último snapshot. O
+    host que volta depois de 10 s encerra a dele com o placar daquela hora (`Sim.finish()`, novo: a partida acaba com
+    quem está na frente, ou empatada).
+- **O amigo AFK ou com a aba escondida:** o host conta as entradas de verdade que chegam de cada amigo
+  (`RemoteInputBuffer.activeReceived`: algo apertado, andando ou a mira mexendo). 60 s sem nenhuma (`AFK_S`) e um bot
+  assume a vaga (o cérebro de reserva do sofá); a próxima devolve. Com o bot no lugar, a entrada do amigo não é lida (o
+  tiro do bot não volta no tempo pelo que o amigo via). Medir pelo que chega, e não pela fila consumida, evita o vaivém
+  da volta: a fila atrasada ainda tinha entradas paradas e o bot voltava logo depois de sair.
+- **Testes:** o aviso e o silêncio de 3 s no `net` (a predição para e volta); o AFK de ponta a ponta pela sessão da web
+  (61 s parado, o bot assume; um passo devolve); o driver da cena (o PvP acaba com o host fora por 10,5 s; não com 9 s
+  nem no coop); a faixa e o resultado no jogo inteiro. 1.804 testes; menu em 349,4 KB.
+- **No Edge headless** a aba de trás não fica "escondida" (o `online:web` não vê o aviso); o aviso fica coberto pelos
+  testes do `net` e da cena.

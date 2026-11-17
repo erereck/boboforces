@@ -49,7 +49,35 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
       setup.onAttached?.(true);
       const host = net.createNetHost({ sim, endpoint: setup.endpoint, snapshotHz: setup.snapshotHz });
       for (const m of remote) host.addClient(setup.peerOfSlot(m.slot), m.controller, true);
+      // M5 (fase 5a): o AFK pela última entrada de verdade que chegou de cada amigo (parado ou com a aba escondida, ela
+      // não chega): 60 s sem nada e um bot assume; a próxima devolve a vaga.
+      const afkTicks = Math.round(net.AFK_S * sim.hz);
+      // Por amigo (na ordem de `remote`), sem alocar no laço: a última atividade vista, o tick dela e se está AFK.
+      const seenActivity = new Float64Array(remote.length).fill(-1);
+      const seenTick = new Float64Array(remote.length);
+      const away = new Uint8Array(remote.length);
       return {
+        takeControl(out): number {
+          out.length = 0;
+          for (let i = 0; i < remote.length; i++) {
+            const c = remote[i]!.controller;
+            const a = host.activity(c);
+            if (a !== seenActivity[i]) {
+              const first = seenActivity[i] === -1;
+              seenActivity[i] = a;
+              seenTick[i] = sim.tick;
+              if (!first && away[i] === 1) {
+                away[i] = 0;
+                out.push(c * 2 + 1);
+              }
+            } else if (away[i] === 0 && sim.tick - seenTick[i]! >= afkTicks) {
+              away[i] = 1;
+              out.push(c * 2);
+            }
+          }
+          return out.length;
+        },
+        setAway: (on) => host.setAway(on),
         receive: () => host.receive(),
         writeRemoteFrame: (controller, out) => host.writeRemoteFrame(controller, out),
         recordEvents: (events) => host.recordEvents(events),
@@ -79,6 +107,9 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
         update: (s) => client.update(s),
         get alpha(): number {
           return client.alpha;
+        },
+        get hostAbsentS(): number {
+          return client.hostAbsentS;
         },
         dispose: () => {
           client.dispose();

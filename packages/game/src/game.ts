@@ -2068,6 +2068,8 @@ export function startGame(deps: GameDeps): GameHandle {
   const unsubscribes: Unsubscribe[] = [
     // Pointer lock perdido, aba oculta, HOME, dock↔portátil, controle desconectado: solo pausa (tecnico.md §4.2).
     platform.lifecycle.onPause(() => scene?.pause()),
+    // M5 (fase 5a): o host online avisa os amigos quando a aba some (e encerra o PvP se voltar depois de 10 s).
+    platform.lifecycle.onVisibility((visible) => scene?.driver?.setHidden(!visible, platform.now())),
   ];
 
   log(

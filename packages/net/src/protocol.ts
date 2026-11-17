@@ -55,6 +55,8 @@ export const MSG = {
   start: 9,
   kick: 10,
   leave: 11,
+  /** M5 (fase 5a): o host foi para segundo plano (1) ou voltou (0); pelo canal confiável, do lado "partida". */
+  hostAway: 12,
 } as const;
 
 /** Canal da mensagem: confiável e ordenado (handshake, lobby, eventos) ou não confiável (entradas e snapshots). */

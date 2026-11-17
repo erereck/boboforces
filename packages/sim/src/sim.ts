@@ -62,7 +62,7 @@ import { expandRecipe, isFfaMode, isWarfareMode } from './recipe.ts';
 import { hashState, readState, writeState } from './snapshot.ts';
 import { REWIND_HISTORY, REWIND_MAX_S, RewindState } from './rewind.ts';
 import { SimState } from './state.ts';
-import { damageSystem, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
+import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -249,6 +249,11 @@ export interface Sim extends Disposable {
   readonly predict: SimPredict;
   /** M5 (fase 2d): o "tiro no que eu vi" (só o host online, pelo `net`). */
   readonly rewind: SimRewind;
+  /**
+   * M5 (fase 5a): encerra a partida agora, com quem está na frente (o evento `matchPhase` sai no próximo `step`). Só o
+   * host online, quando volta de mais de 10 s em segundo plano num PvP.
+   */
+  finish(): void;
 }
 
 /**
@@ -863,6 +868,12 @@ export function createSim(config: SimConfig): Sim {
     predict,
     rewind,
     controllerCount,
+    finish(): void {
+      assert(!disposed, 'sim: finish depois do dispose');
+      // O evento vai junto com os do próximo passo (o step limpa a lista no começo, então ela fica guardada).
+      finishMatch(ctx);
+      keepEvents = true;
+    },
     step(inputs): void {
       assert(!disposed, 'sim: step depois do dispose');
       if (!keepEvents) events.clear();

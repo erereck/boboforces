@@ -44,10 +44,14 @@ function fakeOnline(role: 'host' | 'client'): {
   session: OnlineSession;
   calls: string[];
   lost: number[];
+  control: number[];
+  absent: { s: number };
   close: () => void;
 } {
   const calls: string[] = [];
   const lost: number[] = [];
+  const control: number[] = [];
+  const absent = { s: 0 };
   let closed = false;
   const hostLink: OnlineHostLink = {
     receive: () => calls.push('receive'),
@@ -65,6 +69,12 @@ function fakeOnline(role: 'host' | 'client'): {
       out.push(...lost.splice(0));
       return out.length;
     },
+    takeControl: (out) => {
+      out.length = 0;
+      out.push(...control.splice(0));
+      return out.length;
+    },
+    setAway: (on) => calls.push(`away:${on}`),
     dispose: () => calls.push('dispose'),
   };
   const session: OnlineSession = {
@@ -86,12 +96,15 @@ function fakeOnline(role: 'host' | 'client'): {
           return 1;
         },
         alpha: 0.5,
+        get hostAbsentS() {
+          return absent.s;
+        },
         dispose: () => calls.push('client-dispose'),
       };
       return link;
     },
   };
-  return { session, calls, lost, close: () => (closed = true) };
+  return { session, calls, lost, control, absent, close: () => (closed = true) };
 }
 
 describe('a receita da cena online (M5 fase 4b)', () => {
@@ -177,5 +190,63 @@ describe('o driver da cena online (M5 fase 4b)', () => {
     expect(d.update(1 / 60)).toBe(0);
     d.dispose();
     expect(fake.calls).toContain('client-dispose');
+  });
+});
+
+describe('as ausências na cena (M5 fase 5a)', () => {
+  const { map } = buildSyntheticConstruto();
+  const recipe = onlineRecipe(tdm, [0, 1]).recipe;
+
+  it('AFK: o bot assume a vaga do amigo e a devolve quando ele volta', () => {
+    const fake = fakeOnline('host');
+    const d = createSceneDriver({ recipe, map, humans: 2, writeHumanFrame: () => undefined }, fake.session);
+    for (let i = 0; i < 10; i++) d.update(1 / 60);
+    const remoteCalls = (): number => fake.calls.filter((c) => c === 'remote:1').length;
+    // Foi embora (AFK): a entrada dele não é mais lida (o bot joga).
+    fake.control.push(1 * 2);
+    d.update(1 / 60);
+    const away = remoteCalls();
+    for (let i = 0; i < 10; i++) d.update(1 / 60);
+    expect(remoteCalls()).toBe(away);
+    // Voltou: a entrada dele volta a ser lida.
+    fake.control.push(1 * 2 + 1);
+    for (let i = 0; i < 10; i++) d.update(1 / 60);
+    expect(remoteCalls()).toBeGreaterThan(away + 5);
+    d.dispose();
+  });
+
+  it('o host que some avisa e volta; num PvP, depois de 10 s a partida acaba; no coop e antes disso, não', () => {
+    const run = (mode: string, goneMs: number): { calls: string[]; phase: string } => {
+      const fake = fakeOnline('host');
+      const r = mode === 'zombies' ? { ...recipe, mode } : recipe;
+      const d = createSceneDriver({ recipe: r, map, humans: 2, writeHumanFrame: () => undefined }, fake.session);
+      for (let i = 0; i < 5; i++) d.update(1 / 60);
+      d.setHidden(true, 1000);
+      d.setHidden(true, 1500);
+      d.setHidden(false, 1000 + goneMs);
+      d.update(1 / 60);
+      const phase = d.sim.view().match.phase;
+      d.dispose();
+      return { calls: fake.calls.filter((c) => c.startsWith('away:')), phase };
+    };
+    const long = run('warfare.tdm', 10_500);
+    expect(long.calls).toEqual(['away:true', 'away:false']);
+    expect(long.phase).toBe('ended');
+    expect(run('warfare.tdm', 9_000).phase).not.toBe('ended');
+    expect(run('zombies', 60_000).phase).not.toBe('ended');
+  });
+
+  it('o cliente mostra há quanto tempo o host está ausente; solo e sofá, nunca', () => {
+    const fake = fakeOnline('client');
+    const d = createSceneDriver({ recipe, map, humans: 2, writeHumanFrame: () => undefined }, fake.session);
+    expect(d.hostAbsentS).toBe(0);
+    fake.absent.s = 4.5;
+    expect(d.hostAbsentS).toBe(4.5);
+    d.setHidden(true, 0);
+    d.dispose();
+    const local = createSceneDriver({ recipe, map, humans: 1, writeHumanFrame: () => undefined });
+    expect(local.hostAbsentS).toBe(0);
+    local.setHidden(true, 0);
+    local.dispose();
   });
 });

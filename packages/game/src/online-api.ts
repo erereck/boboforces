@@ -22,6 +22,13 @@ export interface OnlineHostLink {
   afterTicks(): void;
   /** Controladores dos amigos que saíram desde a última chamada (um bot assume cada um); devolve quantos. */
   takeLost(out: number[]): number;
+  /**
+   * M5 (fase 5a): quem ficou ausente (60 s sem entrada: um bot assume) ou voltou desde a última chamada. Cada item é
+   * `controlador * 2 + (voltou ? 1 : 0)`; devolve quantos.
+   */
+  takeControl(out: number[]): number;
+  /** M5 (fase 5a): o host foi para segundo plano (`true`) ou voltou: os amigos ficam sabendo na hora. */
+  setAway(away: boolean): void;
   dispose(): void;
 }
 
@@ -29,7 +36,20 @@ export interface OnlineHostLink {
 export interface OnlineClientLink {
   update(frameSeconds: number): number;
   readonly alpha: number;
+  /** M5 (fase 5a): há quantos segundos o host está ausente (0 = presente). */
+  readonly hostAbsentS: number;
   dispose(): void;
+}
+
+/**
+ * M5 (fase 5a): num PvP, o host ausente por tanto tempo encerra a partida (tecnico.md §13.4): os amigos mostram o
+ * resultado do último snapshot, e o host que volta depois disso encerra a dele com o placar daquela hora.
+ */
+export const HOST_AWAY_END_S = 10;
+
+/** A partida segue esperando o host ausente (coop) ou acaba depois de `HOST_AWAY_END_S` (PvP)? */
+export function waitsForHost(mode: string): boolean {
+  return mode === 'zombies';
 }
 
 /** Uma partida online começada (o lobby já decidiu quem é quem). */

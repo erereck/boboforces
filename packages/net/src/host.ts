@@ -47,6 +47,9 @@ export interface NetHostConfig {
   readonly lagCompensation?: boolean;
 }
 
+/** M5 (fase 5a): sem entrada de verdade por tanto tempo, um bot assume a vaga do amigo até ele voltar (GDD §3.7). */
+export const AFK_S = 60;
+
 export interface NetHostStats {
   snapshots: number;
   parts: number;
@@ -94,6 +97,10 @@ export interface NetHost {
   readonly history: FrameRing;
   /** A fila de entradas de um peer (testes e o F2). */
   inputOf(peer: number): RemoteInputBuffer | null;
+  /** M5 (fase 5a): quantas entradas de verdade chegaram do amigo do controlador `slot` (-1 = nenhum amigo nele). */
+  activity(slot: number): number;
+  /** M5 (fase 5a): avisa os amigos que o host foi para segundo plano (`true`) ou voltou, pelo canal confiável. */
+  setAway(away: boolean): void;
 }
 
 export function createNetHost(config: NetHostConfig): NetHost {
@@ -169,6 +176,14 @@ export function createNetHost(config: NetHostConfig): NetHost {
     removeClient(peer): void {
       const i = clients.findIndex((c) => c.peer === peer);
       if (i >= 0) clients.splice(i, 1);
+    },
+    activity(slot): number {
+      for (const c of clients) if (c.slot === slot) return c.input.activeReceived;
+      return -1;
+    },
+    setAway(away): void {
+      const bytes = new Uint8Array([MSG.hostAway, away ? 1 : 0]);
+      for (const c of clients) if (c.verified) endpoint.send(c.peer, 'reliable', bytes);
     },
     writeRemoteFrame(slot, out): boolean {
       for (const c of clients) {
