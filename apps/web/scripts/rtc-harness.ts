@@ -8,13 +8,11 @@ import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import {
   createClientDriver,
   createHostDriver,
-  createLocalJoinRoom,
   createNetHost,
-  joinNetRoom,
   type ClientDriver,
-  type LocalSignalChannel,
   type NetMatchDriver,
 } from '@boboforces/net';
+import { createLocalJoinRoom, joinNetRoom, type LocalSignalChannel } from '@boboforces/net/rtc';
 import { yawToU16 } from '@boboforces/shared';
 import { createInputFrames, createSim, createSimLoop, type Sim } from '@boboforces/sim';
 import { buildSyntheticConstruto, TEST_NAV_PATHS } from '@boboforces/sim/testing';

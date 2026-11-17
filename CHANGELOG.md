@@ -26,6 +26,14 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   sala por WebRTC, com um canal rápido que pode perder (entradas e snapshots) e um que não perde (eventos). Duas abas do
   Edge conectam em ~1 s e jogam uma partida inteira com o mesmo resultado. O online só baixa quando você abrir "Online"
   (a tela é a próxima fase).
+- **A sala (fases 4a e 4b):** código de 5 letras e números (sem 0, O, 1 e I) e o link `#sala=`; o host recusa sala
+  cheia, trancada ou com versão diferente, tira quem quiser e começa. Na partida, cada um joga no time que escolheu e
+  quem sai vira bot.
+- **As telas do Online (fase 4c):** o botão Online no título, o aviso de privacidade na primeira vez (texto ainda em
+  revisão), o seu nome, Criar sala, Entrar com código (dá para colar o link inteiro) e a sala: os 4 lugares, o seu
+  time, Copiar link e, para o host, Começar, Escolher partida (a Partida personalizada de sempre), Trancar e Tirar. Na
+  partida os amigos aparecem com o nome deles, e no fim todo mundo volta à sala para a próxima. No celular, a
+  Cena-vitrine saiu do título para o Online caber.
 
 ### M4: o porte do Switch (planejado em 16/11/2026)
 

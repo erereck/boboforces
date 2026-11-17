@@ -6,6 +6,12 @@ import type { RendererFactory, SceneBundle } from '@boboforces/game';
 import { SCENE_MODULE } from '@boboforces/game/scene';
 import { createMsdfUiPass, createRenderer, type RendererOptions } from '@boboforces/render';
 
+// M5 (fase 4c): o Online (as telas e a sala) vem no mesmo pedaço da cena: quem abre o Online vai jogar e baixaria a
+// cena de qualquer jeito, e assim nada vira pedaço comum entre a cena e o Online (um pedaço comum que precisa da `sim`
+// ou do `format` faz o empacotador tirar módulos do menu para pedaços à parte, e o menu passava dos 350 KB). O `net`
+// (Trystero) continua num pedaço só dele, pedido ao abrir o Online.
+export { loadWebOnline } from './online-bundle.ts';
+
 /** Monta o pacote da cena com a fábrica do renderer completo (mesmas opções de superfície do renderer do menu). */
 export function sceneBundle(base: RendererOptions): SceneBundle {
   const factory: RendererFactory = (surface, routes) =>

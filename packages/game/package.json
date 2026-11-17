@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./scene": "./src/scene/index.ts",
-    "./editors": "./src/editors.ts"
+    "./editors": "./src/editors.ts",
+    "./online": "./src/online-screens.ts"
   },
   "scripts": {
     "typecheck": "node ../../scripts/typecheck.ts packages/game",

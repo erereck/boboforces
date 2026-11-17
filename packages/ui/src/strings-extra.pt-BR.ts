@@ -340,6 +340,9 @@ export const STRINGS_EXTRA_PT_BR = {
   'custom.help.killFeed': 'A lista de quem derrubou quem, no canto.',
   'custom.help.hitmarker': 'O X na mira quando o tiro acerta.',
   'custom.help.allyMarkers': 'A marca em cima dos aliados.',
+  // M5 (fase 4c): a Partida personalizada aberta pela sala do Online e o resultado de uma partida online.
+  'custom.useInRoom': 'Usar na sala',
+  'result.backToRoom': 'Voltar à sala',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type ExtraStringKey = keyof typeof STRINGS_EXTRA_PT_BR;

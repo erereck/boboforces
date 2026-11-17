@@ -20,6 +20,8 @@ export const FORMAT_KINDS = [
   'layers',
   // M2 (fase 7d): o manifesto da música em loop (audio-loop.ts).
   'loop',
+  // M5 (fase 4c): o perfil do online (o nome na sala e o aviso de privacidade já lido; online-profile.ts).
+  'online',
 ] as const;
 
 export type FormatKind = (typeof FORMAT_KINDS)[number];
@@ -47,6 +49,7 @@ export const CURRENT_FORMAT_VERSION: Readonly<Record<FormatKind, number>> = {
   blocks: 1,
   layers: 1,
   loop: 1,
+  online: 1,
 };
 
 export function formatId(kind: FormatKind, version: number = CURRENT_FORMAT_VERSION[kind]): FormatId {

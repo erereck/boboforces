@@ -21,6 +21,7 @@ import {
   type QualityLevel,
   type SettingsDocument,
   parseLoopManifest,
+  validateMatchRecipe,
 } from '@boboforces/format';
 import { stepLevel } from './pause.ts';
 import type { WorkshopFile } from './workshop-files.ts';
@@ -112,6 +113,8 @@ import {
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import type * as EditorsModule from './editors.ts';
+import type * as OnlineModule from './online-screens.ts';
+import type { OnlineRoom, OnlineRooms, OnlineSession } from './online-api.ts';
 import { trainingPreset } from './training.ts';
 import {
   factoryPresets,
@@ -123,7 +126,7 @@ import {
   type QuickMode,
   type QuickSettings,
 } from './quick-match.ts';
-import { createSaveStore, libraryCapsFor, type SaveStore } from './save-store.ts';
+import { createSaveStore, libraryCapsFor, STORAGE_RECIPE_LIMITS, type SaveStore } from './save-store.ts';
 import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
 import { skipCappedFrame } from './frame-cap.ts';
 import {
@@ -215,10 +218,21 @@ export interface GameDeps {
    * jogo pede logo depois do menu pronto. Ausente = Laboratório, Oficina e Partida personalizada não abrem.
    */
   readonly loadEditors?: () => Promise<Editors>;
+  /**
+   * M5 (fase 4c): o Online (só a web): as telas (`@boboforces/game/online`) e a sala de verdade (feita com o `net`),
+   * pedidas ao abrir o botão Online do título. Ausente = sem o botão (Switch, #1).
+   */
+  readonly loadOnline?: () => Promise<OnlineBundle>;
 }
 
 /** M3: o módulo das telas de edição (`editors.ts`). */
 export type Editors = typeof EditorsModule;
+
+/** M5 (fase 4c): o que a casca web entrega ao abrir o Online. */
+export interface OnlineBundle {
+  readonly module: typeof OnlineModule;
+  readonly rooms: OnlineRooms;
+}
 
 /** Alguma tecla, botão do mouse ou do controle ainda apertado. */
 function anyInputHeld(raw: Readonly<RawInputState>): boolean {
@@ -245,6 +259,7 @@ export type GameScreen =
   | 'surprise'
   | 'couch'
   | 'settings'
+  | 'online'
   | 'scene'
   | 'test'
   | 'error';
@@ -267,6 +282,8 @@ export interface GameHandle extends Disposable {
   readonly debug: GameDebugApi | null;
   /** M2 (fase 4b): o save do jogador (ajustes, estatísticas, presets e bots), lido na criação. */
   readonly save: SaveStore;
+  /** M5 (fase 4c): a sala do Online aberta agora (o F2 e o teste das duas abas). */
+  readonly onlineRoom: OnlineRoom | null;
   /** M2 (fase 7b): os contadores do mixer e o estado do contexto (`'none'` sem áudio), para o F2 e os scripts. */
   readonly audio: {
     readonly stats: MixerStats;
@@ -404,7 +421,10 @@ export function startGame(deps: GameDeps): GameHandle {
   const testItems = deps.testItems ?? [];
   const localEdition = deps.localEdition === true;
   const extraItems: TitleExtraItem[] = [
-    ...(platform.id === 'web' && deps.loadScene ? [{ id: VITRINE_ITEM_ID, labelKey: 'title.vitrine' as const }] : []),
+    // M5 (fase 4c): no celular com o Online, a Cena-vitrine sai do título (a 4ª fileira de botões de toque não cabe).
+    ...(platform.id === 'web' && deps.loadScene && !(deps.loadOnline && platform.features.profileHint === 'mobile')
+      ? [{ id: VITRINE_ITEM_ID, labelKey: 'title.vitrine' as const }]
+      : []),
     ...testItems.map((item) => ({ id: item.id, labelKey: item.labelKey })),
   ];
   const surpriseMenu = createMenuController();
@@ -429,6 +449,7 @@ export function startGame(deps: GameDeps): GameHandle {
         canExit: platform.features.canExit,
         playSummary: presetSummary(currentPreset()),
         ...(extraItems.length > 0 ? { extraItems } : {}),
+        ...(deps.loadOnline ? { online: true } : {}),
       }),
     );
   }
@@ -758,6 +779,8 @@ export function startGame(deps: GameDeps): GameHandle {
   let customTab = 0;
   let customNote = '';
   let customReturn: GameScreen = 'quick';
+  /** M5 (fase 4c): aberta pela sala do Online: o Começar devolve a receita para a sala (`null` = Voltar). */
+  let customDone: ((recipe: MatchRecipe | null) => void) | null = null;
   // M2 (fase 5b): os bots da Oficina entram na escolha do bot de cada time (lidos na hora: a Oficina muda).
   const customLimits = {
     maxBots,
@@ -787,11 +810,19 @@ export function startGame(deps: GameDeps): GameHandle {
         summary: presetSummary(customRecipe),
         note: customNote,
         help: ed.customHelp(tabs, customHelpFocus),
+        ...(customDone !== null ? { forRoom: true } : {}),
       }),
     );
   }
-  function openCustom(recipe: MatchRecipe, back: GameScreen): void {
+  function openCustom(
+    recipe: MatchRecipe,
+    back: GameScreen,
+    done: ((recipe: MatchRecipe | null) => void) | null = null,
+  ): void {
     withEditors(() => {
+      // M5 (fase 4c): o pedaço dos editores chegou depois de o host já ter começado a partida: não abre por cima dela.
+      if (done !== null && screen !== 'online') return;
+      customDone = done;
       customRecipe = recipe;
       customTab = 0;
       customNote = '';
@@ -800,6 +831,56 @@ export function startGame(deps: GameDeps): GameHandle {
       customMenu.focus('start');
       screen = 'custom';
     });
+  }
+
+  // --- M5 (fase 4c): o Online chega à parte (`GameDeps.loadOnline`), ao abrir o botão do título ---
+  let onlineFlow: OnlineModule.OnlineFlow | null = null;
+  let onlineLoading = false;
+  /** A partida em andamento é online (a volta é para a sala). */
+  let playingOnline = false;
+  const onlineRng = createRng((Math.floor(platform.now()) ^ 0x0b0b0) >>> 0);
+  function openOnline(): void {
+    if (onlineFlow !== null) {
+      onlineFlow.open();
+      screen = 'online';
+      return;
+    }
+    if (onlineLoading || !deps.loadOnline) return;
+    onlineLoading = true;
+    deps.loadOnline().then(
+      (bundle) => {
+        onlineLoading = false;
+        if (disposed) return;
+        onlineFlow = bundle.module.createOnlineFlow({
+          platform,
+          rooms: bundle.rooms,
+          log,
+          initialRecipe: () => (currentPreset().mode === 'training' ? DEBUT_PRESET : currentPreset()),
+          summary: presetSummary,
+          pickMatch: (recipe, done) => openCustom(recipe, 'online', done),
+          play: (recipe, seed, session) => requestScene('play', null, recipe, false, { session, seed }),
+          exit: () => {
+            screen = 'title';
+            refreshTitle();
+            titleMenu.focus(TITLE_ACTION.online);
+          },
+          checkRecipe: (recipe) => {
+            const r = validateMatchRecipe(recipe, STORAGE_RECIPE_LIMITS);
+            return r.ok ? r.value : null;
+          },
+          seed: () => onlineRng.nextU32(),
+          lastDevice: () => menuInput.lastDevice,
+          createKeyboard: (options) => editors?.createOnscreenKeyboard(options) ?? null,
+        });
+        // Só abre se o jogador ainda está no título (pode ter ido a outra tela enquanto o pedaço chegava).
+        if (screen === 'title') openOnline();
+      },
+      (error: unknown) => {
+        onlineLoading = false;
+        // Sem rede (o pedaço não veio): o jogo segue; o botão tenta de novo no próximo aperto.
+        log(`[online] não carregou: ${error instanceof Error ? error.message : String(error)}`);
+      },
+    );
   }
 
   // --- M3: as telas de edição chegam à parte (`GameDeps.loadEditors`) ---
@@ -1342,6 +1423,7 @@ export function startGame(deps: GameDeps): GameHandle {
     bench: BenchConfig | null,
     recipe: MatchRecipe | null = null,
     calibrate = false,
+    online: { readonly session: OnlineSession; readonly seed: number } | null = null,
   ): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
@@ -1361,14 +1443,16 @@ export function startGame(deps: GameDeps): GameHandle {
       kind,
       bench,
       benchWarnings: bench ? (deps.benchWarnings ?? []) : [],
-      seed: bench ? bench.seed : (0x6b0b0 + matches * 0x9e37) >>> 0,
+      seed: online ? online.seed : bench ? bench.seed : (0x6b0b0 + matches * 0x9e37) >>> 0,
       convention,
       device: p1 ? p1.kind : menuInput.lastDevice,
       gamepad: p1?.kind === 'gamepad' ? p1.index : menuInput.lastGamepad,
       ...(recipe ? { recipe } : {}),
       ...(calibrate ? { calibrate: true } : {}),
       ...(seats.length >= 1 ? { seats } : {}),
+      ...(online ? { online: online.session } : {}),
     };
+    playingOnline = online !== null;
     screen = 'scene';
     pendingLoading.current = 0;
     if (!bundlePromise) {
@@ -1432,12 +1516,19 @@ export function startGame(deps: GameDeps): GameHandle {
     log(`[game] cena ${matches}: ${request.kind}${request.bench ? ` (vistas=${request.bench.views})` : ''}`);
   }
 
-  function leaveScene(): void {
+  function leaveScene(left = false): void {
     // M2 (fase 5e): o Testar do Laboratório volta para o editor, com os números do treino.
     const report = labTesting ? (scene?.trainingReport() ?? null) : null;
     scene?.dispose();
     scene = null;
     pendingScene = null;
+    if (playingOnline) {
+      // M5 (fase 4c): da partida online, de volta à sala (o amigo que saiu pela pausa sai dela).
+      playingOnline = false;
+      screen = 'online';
+      onlineFlow?.afterMatch(left);
+      return;
+    }
     if (wardrobeOpen) {
       wardrobeOpen = false;
       screen = 'title';
@@ -1569,6 +1660,8 @@ export function startGame(deps: GameDeps): GameHandle {
     updateMusic();
     platform.input.poll(raw);
     menuInput.update(raw, dt);
+    // M5 (fase 4c): a sala anda em toda tela (no lobby, na partida e no resultado).
+    onlineFlow?.tick();
     const u = syncUi();
     resetDrawList(list, u.width, u.height);
 
@@ -1602,6 +1695,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const action = nav.activated;
         if (action === TITLE_ACTION.play) play();
         else if (action === TITLE_ACTION.modes) screen = 'modes';
+        else if (action === TITLE_ACTION.online) openOnline();
         else if (action === TITLE_ACTION.couch) openCouch(raw);
         else if (action === TITLE_ACTION.settings) openSettings();
         else if (action === TITLE_ACTION.lab) openWorkshop();
@@ -1737,8 +1831,13 @@ export function startGame(deps: GameDeps): GameHandle {
           customTab = (customTab + nav.tab + count) % count;
           followTab(customMenu, customTab);
           rebuildCustom();
-        } else if (nav.back || a === CUSTOM_ACTION.back) screen = customReturn;
-        else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
+        } else if (nav.back || a === CUSTOM_ACTION.back || (a === CUSTOM_ACTION.start && customDone !== null)) {
+          // M5 (fase 4c): da sala do Online, o "Usar na sala" leva a receita de volta (o Voltar, nada).
+          const done = customDone;
+          customDone = null;
+          screen = customReturn;
+          done?.(a === CUSTOM_ACTION.start ? customRecipe : null);
+        } else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
         else if (a === CUSTOM_ACTION.save) {
           customNote = saveCustomPreset(customRecipe);
           rebuildCustom();
@@ -1863,6 +1962,14 @@ export function startGame(deps: GameDeps): GameHandle {
         renderer.drawUi(list);
         break;
       }
+      case 'online': {
+        onlineFlow!.frame(menuInput, raw, u, list);
+        if (screen === 'online') {
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
       case 'scene':
         break;
     }
@@ -1880,7 +1987,8 @@ export function startGame(deps: GameDeps): GameHandle {
         }
       }
       const signal = scene !== null ? scene.frame(dt, raw, menuInput, u, list, intervalMs) : 'none';
-      if (signal === 'quit') {
+      if (signal === 'leave') leaveScene(true);
+      else if (signal === 'quit') {
         leaveScene();
         maybeLabIntro();
       } else if (signal === 'again' || signal === 'easier' || signal === 'harder') {
@@ -1996,6 +2104,9 @@ export function startGame(deps: GameDeps): GameHandle {
       return scene?.debug ?? null;
     },
     save,
+    get onlineRoom(): OnlineRoom | null {
+      return onlineFlow?.room ?? null;
+    },
     get audio() {
       return { stats: mixer.stats, state: mixer.context?.state ?? 'none', sounds: soundCount, music: mixer.music };
     },
@@ -2008,6 +2119,8 @@ export function startGame(deps: GameDeps): GameHandle {
       runner = null;
       scene?.dispose();
       scene = null;
+      onlineFlow?.dispose();
+      onlineFlow = null;
       if (wantsLock) hooks.releasePointerLock?.();
       renderer.setUiAtlas(null);
       renderer.dispose();

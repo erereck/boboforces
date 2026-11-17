@@ -12,6 +12,7 @@ import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { DEFAULT_SETTINGS, SETTINGS_FORMAT, SETTINGS_RANGES, validateSettings } from './settings.ts';
 import { EMPTY_STATS, STATS_FORMAT, validateStats, zombieRecordKey } from './stats.ts';
 import { BOBO_FORMAT, DEFAULT_BOBO, validateBobo } from './bobo.ts';
+import { DEFAULT_ONLINE_PROFILE, ONLINE_PROFILE_FORMAT, validateOnlineProfile } from './online-profile.ts';
 import { FIGURE_PRESETS } from './model/figure-presets.ts';
 import { cloneJson, ISSUE_CODES, type RecipeLimits } from './validation.ts';
 
@@ -273,5 +274,22 @@ describe('backup@1', () => {
       'bots[0]',
     ]);
     expect(validateBackup({ format: STATS_FORMAT }, LIMITS).ok).toBe(false);
+  });
+});
+
+describe('online@1 (M5 fase 4c)', () => {
+  it('o nome cabe em 16, a versão do aviso fica entre 0 e o teto, e o que veio torto cai no padrão', () => {
+    expect(validateOnlineProfile(cloneJson(DEFAULT_ONLINE_PROFILE))).toEqual({
+      ok: true,
+      value: DEFAULT_ONLINE_PROFILE,
+      warnings: [],
+    });
+    const r = validateOnlineProfile({ format: ONLINE_PROFILE_FORMAT, name: 'Erick do Bobo Forces', privacy: 2.6 });
+    expect(r.ok && [r.value.name, r.value.privacy]).toEqual(['Erick do Bobo Fo', 3]);
+    const bad = validateOnlineProfile({ format: ONLINE_PROFILE_FORMAT, name: 7, privacy: -4 });
+    expect(bad.ok && [bad.value.name, bad.value.privacy]).toEqual(['', 0]);
+    if (bad.ok) codesKnown(bad.warnings);
+    const other = validateOnlineProfile({ format: BOBO_FORMAT });
+    expect(!other.ok && other.errors[0]!.code).toBe('format.wrongKind');
   });
 });

@@ -139,7 +139,26 @@ describe('lobby pela rede de mentira (M5 fase 4a)', () => {
     for (const c of [bySlot(1), bySlot(2)]) {
       expect(c.status).toBe('started');
       expect(c.start).toEqual(start);
+      expect(c.state!.playing).toBe(true);
     }
+    // M5 (fase 4c): o que um amigo escolhe durante a partida não vale; a partida acaba e a sala volta ao lobby: os
+    // dois voltam a "in", a escolha deles vai de novo, e dá para começar outra.
+    bySlot(1).setChoice(choice('Caio', 0, true));
+    pump(net, 10, step);
+    expect(host.state.members[1]!.name).not.toBe('Caio');
+    host.reopen();
+    pump(net, 20, step);
+    for (const c of [bySlot(1), bySlot(2)]) {
+      expect([c.status, c.start, c.state!.playing]).toEqual(['in', null, false]);
+    }
+    expect(host.state.members.map((m) => `${m.slot}:${m.name}:${m.ready}`)).toEqual([
+      '0:Erick:true',
+      '1:Caio:true',
+      '2:Bia:true',
+    ]);
+    host.start({ ...start, seed: 99 });
+    pump(net, 20, step);
+    expect(bySlot(2).start!.seed).toBe(99);
   });
 
   it('do lobby à partida no mesmo canal: o repartidor separa e o cliente entra jogando', () => {

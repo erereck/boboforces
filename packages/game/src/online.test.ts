@@ -72,6 +72,7 @@ function fakeOnline(role: 'host' | 'client'): {
     humans: 2,
     localController: role === 'host' ? 0 : 1,
     remoteControllers: role === 'host' ? [1] : [0],
+    names: ['Erick', 'Bia'],
     get closed() {
       return closed;
     },

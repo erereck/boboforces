@@ -3178,3 +3178,75 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   - de ponta a ponta em Node (`apps/web/src/online-session.test.ts`): o lobby do `net` pelo loopback, o começo, as duas
     sessões e os dois drivers da cena. O amigo anda no host e o cliente vê o mesmo mundo;
   - o golden, o jogo e o `smoke:web` seguem verdes, o menu em 348,3 KB e o Switch com +4 KB.
+
+### 16.8 Fase 4c: as telas do Online (16/11/2026)
+
+- **O caminho:** título → Online (O4: ao lado de Modos; só aparece com `GameDeps.loadOnline`, que só a web passa) → o
+  aviso de privacidade na 1ª vez → a casa (o nome, Criar sala, Entrar com código, Privacidade) → a sala → a partida (a
+  cena de sempre, com a `OnlineSession`) → de volta à sala.
+- **Onde mora:**
+  - as árvores das telas em `ui/src/screens/online.ts` e os textos numa terceira tabela (`strings-online.pt-BR.ts`),
+    registrada pelo fluxo ao carregar (o menu só ganhou a chave `menu.online`);
+  - o fluxo em `game/src/online-screens.ts` (`@boboforces/game/online`). O `game.ts` só tem o botão, a tela `online`
+    que delega ao fluxo, o "Usar na sala" da Partida personalizada e a volta da cena;
+  - a sala de verdade em `apps/web/src/online-rooms.ts`: o contrato `OnlineRooms`/`OnlineRoom` do `online-api.ts`
+    (decisão menor revisável, como o da 4b) feito com o lobby, o repartidor e o transporte do `net`.
+- **Os pedaços do build (decisão menor revisável):**
+  - o fluxo, as telas, a sala e o núcleo do `net` vão no pedaço da cena; só a rede de verdade
+    (`@boboforces/net/rtc`: o Trystero, o noble, as sinalizações e a sala WebRTC) fica num pedaço próprio, de 28,5 KB
+    com gzip, pedido junto ao abrir o Online;
+  - **motivo:** com o `net` inteiro num pedaço próprio, a `sim` (que o núcleo dele usa) vira um pedaço comum com a cena
+    e o empacotador (Rolldown) tira o núcleo do `format` do menu para pedaços à parte; o menu foi a 351,2 KB. Medido
+    nas 4 montagens: com o `net` sozinho, 351,2; pedido do `main.ts` direto, 350,0; com o grupo "core" no
+    `vite.config`, a `sim` entra na carga inicial; só o `rtc` à parte, 349,2 (o menu volta a ser um arquivo só);
+  - **o custo:** quem joga solo baixa o núcleo do `net` e as telas do Online com a cena (~25 KB com gzip); a primeira
+    partida fica em 831,9 KB de 1 MB. O teclado do jogo chega pelo pedaço dos editores (`createKeyboard`) pelo mesmo
+    motivo (importado direto, ele vira pedaço comum e arrasta o `menu.ts`).
+- **O perfil `online@1`** (`format/src/online-profile.ts`, chave `online` do storage, fora do backup): o nome (16
+  caracteres, com o filtro do atlas) e a versão do aviso já lido (`ONLINE_PRIVACY_VERSION`; quando sobe, o aviso volta).
+- **O aviso de privacidade (O5):** o texto é meu e espera a revisão do Erick antes de publicar. Diz que a conexão é
+  direta (quem está na sala pode ver o IP), que os servidores públicos (Nostr e STUN) veem o código e o IP e nunca a
+  partida, que não há conta, chat nem servidor do jogo, e pede para jogar só com quem se conhece (menor de 18 combina
+  antes com quem cuida dele).
+- **A sala:**
+  - o código grande, os 4 lugares (nome, time, "host", "você" ou "no resultado"), o "Seu time" (laranja, azul ou tanto
+    faz; some quando a partida não tem times), Copiar link e Sair da sala. O host tem também Começar, Escolher partida
+    (a Partida personalizada de sempre, com "Usar na sala"), Trancar e Tirar;
+  - Voltar não sai da sala (o host a fecharia para todos): leva o foco ao Sair da sala;
+  - o lobby ganhou `playing` e `teams` no estado e o `reopen()` do host: no fim da partida a sala volta ao lobby, os
+    amigos voltam a `in` e reenviam a escolha, e dá para começar outra;
+  - o amigo valida a receita do host (regra 19) antes de entrar; se não passar, a sala acaba com o aviso;
+  - os nomes que chegam de outro aparelho passam pelo filtro do atlas (o mesmo do nome de bot, agora em
+    `game/src/names.ts`);
+  - o código digitado aceita o link inteiro colado (sai do `#sala=`); sem ninguém responder em 20 s, "ninguém respondeu
+    nesse código".
+- **Na partida:** os humanos com o nome da sala (placar, kill feed e resultado); o amigo sem "Ajustar desafio"; o Sair
+  da pausa do amigo sai da sala (um bot assume o lugar dele) e o do host leva todo mundo de volta à sala; o resultado
+  online só tem "Voltar à sala"; a sala que fecha não tira ninguém do resultado.
+- **O título no celular:** com o Online, a 4ª fileira de botões de toque não cabia (o logo saía da tela). No celular a
+  Cena-vitrine sai do título; no PC, fica.
+- **Testes:**
+  - as telas cabem nos 6 alvos da web e no Switch, com o nome mais largo, e tudo anda no D-pad;
+  - o lobby volta da partida e começa outra (`net`); o perfil `online@1` (`format`);
+  - a sala da web por uma internet de mentira (`online-rooms.test.ts`): entrar, escolher time, começar, quem chega no
+    meio é recusado, quem sai vira bot, a volta ao lobby, outra partida, o host sair, expulsar, sala cheia e o prazo;
+  - o jogo inteiro com uma sala de mentira (`game.test.ts`): o aviso na 1ª vez, Criar sala, Começar, a partida do host
+    e a volta à sala; o amigo pelo link colado, a sala, a partida, a volta e o Sair da pausa; a receita torta; o Switch
+    sem o botão;
+  - 1.795 testes; `smoke:web` e `rtc:web` verdes; menu 349,2 KB; Switch 2.996 KB.
+- **Revisão (Opus), 5 correções:**
+  - **o Começar espera quem está no resultado** ("Esperando Bia voltar do resultado."), e o lado "partida" do
+    repartidor é esvaziado a cada começo (no host e no amigo): uma entrada velha de seq alta faria o host recusar as
+    novas do amigo pela partida inteira, e um evento velho de tick alto travaria a fila dos novos;
+  - **quem sai no meio vira bot pela diferença do estado do lobby**, e não pelo aviso do transporte: o "saí" do amigo
+    costuma chegar antes do aviso do Trystero, e aí o peer já não tinha lugar (o teste agora entrega o aviso atrasado);
+  - **o nome aparece enquanto é digitado** pelo teclado do sistema, com a dica "Digite e aperte Enter"; no controle,
+    sem o teclado do jogo (o pedaço dos editores ainda não chegou), o do sistema não abre (sem Enter nem Esc, o
+    jogador ficaria preso);
+  - **o pedaço dos editores que chega atrasado** não abre a Partida personalizada da sala por cima de uma partida já
+    começada;
+  - **um começo torto** acaba a sala para o amigo em vez de derrubar o jogo; os nomes reserva ("Host", "Amigo 2") vêm
+    da tabela; o resumo do host passa por um filtro do atlas do HUD (`cleanHudText`).
+- **Visto no navegador:** o aviso, a casa e a sala com o código, no servidor de desenvolvimento. Essa sala, sem
+  `?sinal=local`, anunciou o código pelos relays públicos (só a sinalização efêmera, como o jogo faz) e foi fechada em
+  seguida.

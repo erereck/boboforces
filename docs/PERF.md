@@ -257,6 +257,11 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   conectaram em 0,85–1,05 s; 654 snapshots pelo canal não confiável em 22 s (~30 Hz) e 985 eventos pelo confiável, sem
   nenhum pelo reserva; a predição errou 0 vezes em 654 reconciliações. O chunk do Online pesa ~25 KB com gzip a mais pelo
   Trystero e pelo noble (medido com o esbuild); ainda fora do build (a tela é a fase 4).
+- **Os pedaços do Online (fase 4c, `size-check`):** a rede de verdade (`@boboforces/net/rtc`: Trystero, noble e as
+  sinalizações) num pedaço de **28,5 KB** com gzip, pedido ao abrir o Online; o núcleo do `net` e as telas vão com a
+  cena (~25 KB a mais na primeira partida). Com o `net` inteiro num pedaço só dele, o empacotador tirava o núcleo do
+  `format` do menu para 4 pedaços à parte e o menu ia a 351,2 KB (ARCHITECTURE §16.8). `rtc:web` depois da divisão:
+  conectou em 0,86–1,04 s, 654 snapshots, 933 eventos, 0 predição acima de 10 cm.
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).
@@ -293,6 +298,7 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
 
 | Data | Build | HTML + splash | Menu interativo | Primeira partida | Tempo até o splash | Tempo até o menu (PC / celular) | Observação |
 |---|---|---|---|---|---|---|---|
+| 16/11/2026 | 0.0.1 local (M5, fase 4c) | 3,8 KB | **349,2 KB** (teto 350, meta 300) | **831,9 KB** (teto 1 MB) | — | — | `size-check` ok. O menu cresceu 0,9 KB (o botão Online, a tela `online` e a volta da sala). O pedaço `rtc` (Trystero, 28,5 KB) conta como sob demanda; o núcleo do `net` e as telas do Online, na primeira partida. Maior arquivo: `scene-*.js`, 258,5 KB. `smoke:web` ok |
 | 09/11/2026 | 0.0.1 local (M2, fase 8d: `9522d50`) | — | **345,7 KB** (teto 350, meta 300) | **707,6 KB** (teto 1 MB) | — | — | `size-check` ok. O menu cresceu 1,7 KB com as fases 8a–8c e o teste do sofá. O `sw.js` (4 KB) não entra na carga inicial: registra 4 s depois do `load`. Precache de 59 arquivos, sem a música. `smoke:web` ok |
 | 07/11/2026 | 0.0.1 local (port do boneco, portão final) | — | **294,7 KB** (teto 350) | **518,5 KB** | — | — | `size-check`: build inteiro 539,5 KB (554,1 antes das remoções), maior arquivo `scene-*.js` 156,8 KB, texturas 45,4 KB; motor, pintor e tabela de jogo fora do chunk do menu. Antes das remoções: primeira partida 533,0 KB |
 | 03/11/2026 | 0.0.1 local (correção da revisão) | 3,8 KB | **294,7 KB** (fontes 119,6 KB de 120, JSON em gzip -4) | 489,4 KB | 236 ms | 621 ms / — | o JSON das fontes passou a ser medido no gzip nível 4 (limite de cima do GitHub Pages; ver §1d) e o kerning começa em 0,25 px. Construto 20,5 KB; texturas 54,9 KB; build inteiro 510,4 KB; maior arquivo three 130,1 KB. `smoke:web` ok: Construto em 1.008 ms, 7 programas, 0 erros de console (Edge headless, Intel UHD) |

@@ -11,6 +11,7 @@ export {
   type GameHandle,
   type GameHooks,
   type GameScreen,
+  type OnlineBundle,
 } from './game.ts';
 export { createNullRenderer } from './null-renderer.ts';
 export * from './save-store.ts';

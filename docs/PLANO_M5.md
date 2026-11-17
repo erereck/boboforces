@@ -109,6 +109,8 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
   - Criar sala e Entrar com código, com o teclado do jogo no controle;
   - o lobby: os 4 lugares, o time de cada um, o código grande, Copiar link, e Travar, Expulsar e Começar para o host;
   - o host escolhe a partida com a Partida personalizada de sempre.
+  - **feita em 16/11** (ARCHITECTURE §16.8). A rede de verdade (`@boboforces/net/rtc`) ficou num pedaço só dela; o
+    núcleo do `net` e as telas foram com o pedaço da cena (com o `net` inteiro à parte, o menu passava dos 350 KB).
 - **4d, o link e a volta:** abrir o jogo por `#sala=XXXXX` cai direto no "Entrar". O hash não sai do navegador.
 - **4e, a prova:** duas abas do Edge pela sinalização local, do título até o fim da partida (`rtc:web` estendido), e
   uma rodada pelos relays de verdade entre duas abas, só de leitura e escrita efêmera de sinalização, como o jogo faz.
@@ -116,8 +118,8 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
 
 ## Riscos
 
-- **O menu da web está em 348,3 de 350 KB.** O item "Online" e a tela de código precisam caber: a tela da sala vai
-  para o chunk de rede, e no menu fica só o botão (algumas dezenas de bytes). Se faltar, o primeiro passo da fase 4
+- **O menu da web está em 349,2 de 350 KB** (depois da 4c). O item "Online" e a tela de código precisam caber: a tela
+  da sala vai para o chunk de rede, e no menu fica só o botão (algumas dezenas de bytes). Se faltar, o primeiro passo da fase 4
   é abrir espaço (mover para a tabela extra os textos que o menu não usa, como na R3a).
 - **NAT simétrico (parte do 4G) não conecta só com STUN.** Por isso o TURN é critério de pronto, não detalhe.
 - **Host no celular:** o iOS e alguns Android suspendem a aba em segundo plano sem avisar; os clientes detectam 3 s

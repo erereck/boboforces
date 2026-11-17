@@ -1,0 +1,592 @@
+/**
+ * M5 (fase 4c): as telas do Online num pedaço à parte (`@boboforces/game/online`), fora do menu da web (tecnico.md
+ * §16.4: menu ≤ 350 KB). Regra 15: o `import()` fica no `apps/web`, que entrega este módulo junto com a sala de
+ * verdade (`OnlineRooms`, feita com o `net`) por `GameDeps.loadOnline`. O Switch nunca carrega (#1).
+ *
+ * O fluxo: o aviso de privacidade na 1ª vez → a casa (o nome, Criar sala, Entrar com código) → a sala (os 4 lugares, o
+ * time, e para o host Começar, Escolher partida, Trancar e Tirar) → a partida (a cena de sempre, com a sessão online)
+ * → de volta à sala. O nome e o aviso lido ficam no perfil `online@1`, numa chave própria do storage.
+ */
+import {
+  DEFAULT_ONLINE_PROFILE,
+  ONLINE_PROFILE_FORMAT,
+  ONLINE_PROFILE_RANGES,
+  validateOnlineProfile,
+  type MatchRecipe,
+  type OnlineProfileDocument,
+} from '@boboforces/format';
+import type { MenuInput, RawInputState } from '@boboforces/input';
+import type { Platform, TextInputSession } from '@boboforces/platform-api';
+import { isFfaMode } from '@boboforces/sim';
+import {
+  COLORS,
+  ONLINE_ACTION,
+  onlineHomeScreen,
+  onlineJoinScreen,
+  onlinePrivacyScreen,
+  onlineRoomScreen,
+  onlineStatusScreen,
+  registerStrings,
+  STRINGS_ONLINE_PT_BR,
+  t,
+  TEAM_COLORS,
+  type DrawList,
+  type MenuNavigation,
+  type OnlineRoomMemberRow,
+  type StringKey,
+} from '@boboforces/ui';
+import { createMenuController, type UiFrame } from './menu.ts';
+import { cleanHudText, cleanTypedName } from './names.ts';
+import {
+  onlineRecipe,
+  type OnlineMatchStart,
+  type OnlineRoom,
+  type OnlineRoomEnd,
+  type OnlineRooms,
+  type OnlineSession,
+} from './online-api.ts';
+import type { KeyboardResult, OnscreenKeyboard, OnscreenKeyboardOptions } from './onscreen-keyboard.ts';
+
+registerStrings(STRINGS_ONLINE_PT_BR);
+
+/** A versão do aviso de privacidade: subiu, o aviso aparece de novo para todo mundo. */
+export const ONLINE_PRIVACY_VERSION = 1;
+/** A chave do perfil `online@1` no storage. */
+export const ONLINE_PROFILE_KEY = 'online';
+
+/** O que o `game` dá às telas do Online. */
+export interface OnlineFlowDeps {
+  readonly platform: Platform;
+  readonly rooms: OnlineRooms;
+  log(line: string): void;
+  /** A partida com que a sala nasce (o último preset jogado, fora o treino). */
+  initialRecipe(): MatchRecipe;
+  /** "Times · De boa · 4 contra 4 · Construto". */
+  summary(recipe: MatchRecipe): string;
+  /** A Partida personalizada para o host; volta com a receita escolhida (`null` = Voltar, sem mudar). */
+  pickMatch(recipe: MatchRecipe, done: (recipe: MatchRecipe | null) => void): void;
+  /** Entra na partida (a cena, com a sessão online). */
+  play(recipe: MatchRecipe, seed: number, session: OnlineSession): void;
+  /** Sai do Online (o título). */
+  exit(): void;
+  /** Valida a receita que veio do host (regra 19); `null` = não abre aqui. */
+  checkRecipe(recipe: unknown): MatchRecipe | null;
+  /** A semente de cada partida que o host começa. */
+  seed(): number;
+  /** O último dispositivo dos menus (no controle, digitar é pelo teclado do jogo). */
+  lastDevice(): string | null;
+  /**
+   * O teclado do jogo (vem do pedaço dos editores, que o `game` carrega logo depois do menu); `null` = ainda não
+   * chegou (digita pelo sistema, se houver). Importar direto daqui faria dele um pedaço comum com os editores.
+   */
+  createKeyboard(options: OnscreenKeyboardOptions): OnscreenKeyboard | null;
+}
+
+export interface OnlineFlow {
+  /** Abre o Online pelo título (o aviso na 1ª vez). */
+  open(): void;
+  /** 1x por frame, em qualquer tela: a sala anda também durante a partida. */
+  tick(): void;
+  /** O frame da tela do Online: navega e desenha em `list`. */
+  frame(menu: MenuInput, raw: Readonly<RawInputState>, ui: UiFrame, list: DrawList): void;
+  /** Voltou da partida: `left` = saiu pela pausa (o amigo sai da sala; o host volta todos ao lobby). */
+  afterMatch(left: boolean): void;
+  /** A sala de agora (o F2 e os testes). */
+  readonly room: OnlineRoom | null;
+  dispose(): void;
+}
+
+type Page = 'privacy' | 'home' | 'join' | 'status' | 'room';
+
+const END_TEXT: Readonly<Record<OnlineRoomEnd, StringKey>> = {
+  full: 'online.end.full',
+  locked: 'online.end.locked',
+  'update-self': 'online.end.updateSelf',
+  'update-friend': 'online.end.updateFriend',
+  mismatch: 'online.end.mismatch',
+  kicked: 'online.end.kicked',
+  'host-left': 'online.end.hostLeft',
+  'not-found': 'online.end.notFound',
+  network: 'online.end.network',
+};
+
+/** Alguma tecla, botão do mouse ou do controle ainda apertado (o aperto que fechou o teclado não vale no menu). */
+function anyHeld(raw: Readonly<RawInputState>): boolean {
+  if (raw.mouseButtons !== 0) return true;
+  for (let k = 0; k < raw.keys.length; k++) if (raw.keys[k] === 1) return true;
+  for (const pad of raw.gamepads) {
+    if (!pad.connected) continue;
+    for (let b = 0; b < pad.buttons.length; b++) if (pad.buttons[b]! >= 0.5) return true;
+  }
+  return false;
+}
+
+export function loadOnlineProfile(platform: Platform): OnlineProfileDocument {
+  const text = platform.storage.get(ONLINE_PROFILE_KEY);
+  if (text === null) return DEFAULT_ONLINE_PROFILE;
+  try {
+    const r = validateOnlineProfile(JSON.parse(text));
+    return r.ok ? r.value : DEFAULT_ONLINE_PROFILE;
+  } catch {
+    return DEFAULT_ONLINE_PROFILE;
+  }
+}
+
+/** O nome na sala: o filtro do atlas (o que chega de um amigo também passa por ele) e o teto de 16. */
+export function cleanRoomName(text: string): string {
+  return cleanTypedName(text, ONLINE_PROFILE_RANGES.nameLength);
+}
+
+/** A partida tem times (a escolha do time vale)? No FFA, no treino e nos modos de um time, não. */
+export function recipeHasTeams(recipe: MatchRecipe): boolean {
+  return recipe.mode !== 'training' && !isFfaMode(recipe.mode) && recipe.teams.length >= 2;
+}
+
+/** O time na sala: -1 (tanto faz) → 0 → 1 → -1. */
+export function stepTeam(team: number, delta: number): number {
+  const order = [-1, 0, 1];
+  const i = Math.max(0, order.indexOf(team));
+  return order[(i + (delta < 0 ? 2 : 1)) % 3]!;
+}
+
+function teamLabel(team: number): string {
+  return t(team === 0 ? 'online.team.0' : team === 1 ? 'online.team.1' : 'online.team.any');
+}
+
+export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
+  const { platform, rooms } = deps;
+  const menu = createMenuController();
+  let profile = loadOnlineProfile(platform);
+  let page: Page = 'home';
+  let note = '';
+  let statusText = '';
+  let statusBusy = false;
+  let room: OnlineRoom | null = null;
+  let team = -1;
+  let ready = true;
+  /** O host: a partida da sala (a Partida personalizada muda). */
+  let recipe: MatchRecipe = deps.initialRecipe();
+  /** A partida que este aparelho já abriu (o cliente não reabre a mesma). */
+  let entered: OnlineMatchStart | null = null;
+  let inMatch = false;
+  let code = '';
+  // Digitando (o nome ou o código): pelo sistema ou pelo teclado do jogo; `hold` espera soltar tudo depois.
+  let typing: TextInputSession | null = null;
+  let keyboard: OnscreenKeyboard | null = null;
+  let keyboardFor: 'name' | 'code' | null = null;
+  let typingFrom = '';
+  /** O nome enquanto é digitado pelo teclado do sistema (a tela acompanha; `null` = não está digitando). */
+  let nameDraft: string | null = null;
+  let hold = false;
+  /** A tela precisa ser refeita (o estado mudou ou chegou outro estado da sala). */
+  let dirty = true;
+  let builtView: unknown = null;
+
+  function saveProfile(next: OnlineProfileDocument): void {
+    profile = next;
+    platform.storage.set(ONLINE_PROFILE_KEY, JSON.stringify({ ...next, format: ONLINE_PROFILE_FORMAT }));
+  }
+
+  const choice = () => ({ name: profile.name, team, ready });
+
+  function rebuild(): void {
+    dirty = true;
+  }
+
+  function go(next: Page, focus: string | null = null): void {
+    page = next;
+    rebuild();
+    if (focus !== null) menu.focus(focus);
+  }
+
+  function showStatus(text: string, busy: boolean): void {
+    statusText = text;
+    statusBusy = busy;
+    go('status');
+  }
+
+  /** A sala acabou (ou eu saí): solta tudo e mostra o motivo. */
+  function closeRoom(reason: string | null): void {
+    room?.leave();
+    room = null;
+    entered = null;
+    inMatch = false;
+    if (reason === null) {
+      note = '';
+      go('home');
+    } else showStatus(reason, false);
+  }
+
+  // --- digitar ---
+
+  function codeFrom(text: string): string {
+    const hash = text.indexOf('#');
+    if (hash >= 0) {
+      const fromLink = rooms.codeFromLink(text.slice(hash));
+      if (fromLink !== null) return fromLink;
+    }
+    let out = '';
+    for (const ch of text.toUpperCase()) if (rooms.codeAlphabet.includes(ch)) out += ch;
+    return out.slice(0, rooms.codeLength);
+  }
+
+  const codeReady = (): boolean => code.length === rooms.codeLength;
+
+  function endTyping(): void {
+    typing?.close();
+    typing = null;
+    keyboard = null;
+    keyboardFor = null;
+    nameDraft = null;
+    hold = true;
+    note = '';
+    rebuild();
+  }
+
+  function finishName(value: string): void {
+    const name = cleanRoomName(value).trim();
+    if (name !== profile.name) saveProfile({ ...profile, name });
+    endTyping();
+  }
+
+  function finishCode(value: string, submit: boolean): void {
+    code = codeFrom(value);
+    endTyping();
+    if (submit && codeReady()) joinRoom();
+  }
+
+  function startTyping(what: 'name' | 'code'): void {
+    if (typing !== null || keyboard !== null) return;
+    typingFrom = what === 'name' ? profile.name : code;
+    // O teclado do jogo quando não há o do sistema, quando ele não abre, ou digitando com o controle.
+    const options: OnscreenKeyboardOptions = {
+      title: t(what === 'name' ? 'online.nameKeyboard' : 'online.join.keyboard'),
+      initial: typingFrom,
+      maxLength: what === 'name' ? ONLINE_PROFILE_RANGES.nameLength : rooms.codeLength,
+      clean: what === 'name' ? cleanRoomName : codeFrom,
+      onChange: (value) => {
+        if (what === 'code') {
+          code = value;
+          rebuild();
+        }
+      },
+    };
+    const own = !platform.textInput.available || deps.lastDevice() === 'gamepad';
+    if (own) {
+      // Sem o teclado do jogo (o pedaço dos editores ainda não chegou), o do sistema não serve no controle (sem Enter
+      // nem Esc, o jogador ficaria preso nele): nada abre, e o próximo aperto tenta de novo.
+      const kb = deps.createKeyboard(options);
+      if (kb === null) return;
+      hold = true;
+      keyboardFor = what;
+      keyboard = kb;
+      return;
+    }
+    typing = platform.textInput.open(
+      what === 'name'
+        ? { initial: profile.name, maxLength: ONLINE_PROFILE_RANGES.nameLength, kind: 'name' }
+        : // Cabe um link colado inteiro (o código sai do `#sala=`).
+          { initial: code, maxLength: 200, kind: 'code' },
+      {
+        // A tela acompanha o que se digita (o campo do sistema fica escondido).
+        onChange: (value) => {
+          if (what === 'code') code = codeFrom(value);
+          else nameDraft = cleanRoomName(value);
+          rebuild();
+        },
+        onSubmit: (value) => (what === 'name' ? finishName(value) : finishCode(value, true)),
+        onCancel: () => (what === 'name' ? finishName(typingFrom) : finishCode(typingFrom, false)),
+      },
+    );
+    if (typing !== null) {
+      note = t('online.typing');
+      if (what === 'name') nameDraft = profile.name;
+      rebuild();
+      return;
+    }
+    // O sistema não abriu: o teclado do jogo.
+    const kb = deps.createKeyboard(options);
+    if (kb !== null) {
+      hold = true;
+      keyboardFor = what;
+      keyboard = kb;
+    }
+  }
+
+  function keyboardDone(result: KeyboardResult): void {
+    const kb = keyboard!;
+    if (keyboardFor === 'name') finishName(result === 'submit' ? kb.value : typingFrom);
+    else finishCode(result === 'submit' ? kb.value : typingFrom, result === 'submit');
+  }
+
+  // --- a sala ---
+
+  function createRoom(): void {
+    recipe = deps.initialRecipe();
+    team = -1;
+    ready = true;
+    room = rooms.create(choice());
+    room.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
+    deps.log(`[online] sala ${room.code} criada`);
+    note = '';
+    go('room', 'start');
+  }
+
+  function joinRoom(): void {
+    if (!codeReady()) {
+      note = t('online.join.invalid');
+      rebuild();
+      return;
+    }
+    team = -1;
+    ready = true;
+    room = rooms.join(code, choice());
+    deps.log(`[online] entrando na sala ${code}`);
+    note = '';
+    showStatus(t('online.status.joining', { code }), true);
+  }
+
+  function setChoice(): void {
+    room?.setChoice(choice());
+    rebuild();
+  }
+
+  function startMatch(r: OnlineRoom): void {
+    const view = r.view;
+    if (view === null || r.status !== 'lobby') return;
+    // Quem ainda está no resultado da partida anterior fica de fora até voltar: senão entraria parado (e as entradas
+    // velhas dele, ainda a caminho, confundiriam a partida nova). O host vê quem está faltando.
+    const away = view.members.find((m) => m.slot !== 0 && !m.ready);
+    if (away !== undefined) {
+      note = t('online.room.waitAway', { name: memberName(away) });
+      rebuild();
+      return;
+    }
+    const placed = onlineRecipe(
+      recipe,
+      view.members.map((m) => m.team),
+    );
+    const seed = deps.seed() >>> 0;
+    const match = r.start(placed.recipe, seed, placed.controllers);
+    deps.log(`[online] partida ${placed.recipe.mode} com ${view.members.length} jogador(es), semente ${seed}`);
+    enter(match, placed.recipe);
+  }
+
+  function enter(match: OnlineMatchStart, matchRecipe: MatchRecipe): void {
+    entered = match;
+    inMatch = true;
+    ready = false;
+    room?.setChoice(choice());
+    deps.play(matchRecipe, match.seed, match.session);
+  }
+
+  /** As transições que a sala pede (só com a tela do Online na frente). */
+  function follow(): void {
+    const r = room;
+    if (r === null) return;
+    if (r.status === 'ended') {
+      deps.log(`[online] sala ${r.code} acabou: ${r.end ?? '?'}`);
+      closeRoom(t(END_TEXT[r.end ?? 'network']));
+      return;
+    }
+    if (page === 'status' && statusBusy && r.status !== 'connecting') {
+      deps.log(`[online] na sala ${r.code} (lugar ${r.mySlot})`);
+      go('room', 'team');
+    }
+    if (r.role === 'client' && r.status === 'playing' && r.match !== null && r.match !== entered && !inMatch) {
+      const checked = deps.checkRecipe(r.match.recipe);
+      if (checked === null) {
+        deps.log('[online] a receita do host não abre aqui');
+        closeRoom(t('online.end.badRecipe'));
+        return;
+      }
+      enter(r.match, checked);
+      return;
+    }
+    if (page === 'room' && r.status === 'lobby' && !ready) {
+      ready = true;
+      setChoice();
+    }
+  }
+
+  // --- as telas ---
+
+  /** O nome na sala (veio de outro aparelho: passa pelo filtro do atlas); vazio, o padrão da tabela. */
+  function memberName(m: { readonly slot: number; readonly name: string }): string {
+    return (
+      cleanRoomName(m.name).trim() ||
+      (m.slot === 0 ? t('online.room.hostName') : t('online.room.friendName', { n: m.slot }))
+    );
+  }
+
+  function roomRows(r: OnlineRoom): OnlineRoomMemberRow[] {
+    const view = r.view;
+    if (view === null) return [];
+    return view.members.map((m) => {
+      const name = memberName(m);
+      const you = m.slot === r.mySlot;
+      return {
+        slot: m.slot,
+        name,
+        you,
+        team: view.teams ? teamLabel(m.team) : '',
+        teamColor: view.teams && (m.team === 0 || m.team === 1) ? TEAM_COLORS[m.team]! : COLORS.texto,
+        status:
+          m.slot === 0
+            ? t('online.room.host')
+            : you
+              ? t('online.room.you')
+              : !m.ready && view.playing === false
+                ? t('online.room.away')
+                : '',
+        kickable: m.slot !== 0,
+      };
+    });
+  }
+
+  function build(): void {
+    // O estado da sala é trocado inteiro a cada mudança (o mesmo objeto = nada mudou).
+    const view = room?.view ?? null;
+    if (!dirty && view === builtView) return;
+    dirty = false;
+    builtView = view;
+    if (page === 'privacy') menu.setRoot(onlinePrivacyScreen.build({}));
+    else if (page === 'home') menu.setRoot(onlineHomeScreen.build({ name: nameDraft ?? profile.name, note }));
+    else if (page === 'join') {
+      menu.setRoot(onlineJoinScreen.build({ code, length: rooms.codeLength, ready: codeReady(), note }));
+    } else if (page === 'status') menu.setRoot(onlineStatusScreen.build({ message: statusText, busy: statusBusy }));
+    else if (room !== null) {
+      const view = room.view;
+      const host = room.role === 'host';
+      menu.setRoot(
+        onlineRoomScreen.build({
+          code: room.code,
+          // O resumo do host veio de outro aparelho: só o que o atlas desenha.
+          summary: host ? deps.summary(recipe) : cleanHudText(view?.summary ?? '', 80),
+          host,
+          members: roomRows(room),
+          team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true)) ? teamLabel(team) : null,
+          locked: view?.locked ?? false,
+          note: note !== '' ? note : view?.locked ? t('online.room.locked') : '',
+        }),
+      );
+    }
+  }
+
+  function act(nav: MenuNavigation): void {
+    const a = nav.activated;
+    if (page === 'privacy') {
+      if (a === ONLINE_ACTION.ok) {
+        if (profile.privacy < ONLINE_PRIVACY_VERSION) saveProfile({ ...profile, privacy: ONLINE_PRIVACY_VERSION });
+        go('home', 'create');
+      } else if (nav.back || a === ONLINE_ACTION.back) {
+        if (profile.privacy >= ONLINE_PRIVACY_VERSION) go('home', 'privacy');
+        else deps.exit();
+      }
+    } else if (page === 'home') {
+      if (nav.back || a === ONLINE_ACTION.back) deps.exit();
+      else if (a === ONLINE_ACTION.name) startTyping('name');
+      else if (a === ONLINE_ACTION.create) createRoom();
+      else if (a === ONLINE_ACTION.privacy) go('privacy', 'ok');
+      else if (a === ONLINE_ACTION.join) {
+        note = '';
+        go('join', 'type');
+        startTyping('code');
+      }
+    } else if (page === 'join') {
+      if (nav.back || a === ONLINE_ACTION.back) {
+        note = '';
+        go('home', 'join');
+      } else if (a === ONLINE_ACTION.type) startTyping('code');
+      else if (a === ONLINE_ACTION.go) joinRoom();
+    } else if (page === 'status') {
+      if (statusBusy && (nav.back || a === ONLINE_ACTION.cancel)) closeRoom(null);
+      else if (!statusBusy && (nav.back || a === ONLINE_ACTION.ok)) {
+        note = '';
+        go('home', 'create');
+      }
+    } else if (room !== null) {
+      const r = room;
+      // Voltar não sai da sala (o host fecharia para todos sem querer): o foco vai para o Sair da sala.
+      if (nav.back) menu.focus('leave');
+      else if (a === ONLINE_ACTION.leave) closeRoom(null);
+      else if (a === ONLINE_ACTION.team) {
+        team = stepTeam(team, nav.delta === 0 ? 1 : nav.delta);
+        setChoice();
+      } else if (a === ONLINE_ACTION.copy) {
+        void r.copyLink().then((ok) => {
+          note = ok ? t('online.room.copied') : t('online.room.copyFailed', { code: r.code });
+          rebuild();
+        });
+      } else if (r.role === 'host') {
+        if (a === ONLINE_ACTION.start) startMatch(r);
+        else if (a === ONLINE_ACTION.lock) r.setLocked(!(r.view?.locked ?? false));
+        else if (a === ONLINE_ACTION.match) {
+          deps.pickMatch(recipe, (picked) => {
+            if (picked !== null) {
+              recipe = picked;
+              r.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
+            }
+            rebuild();
+          });
+        } else if (a !== null && a.startsWith(ONLINE_ACTION.kickPrefix)) {
+          r.kick(Number(a.slice(ONLINE_ACTION.kickPrefix.length)));
+          menu.focus('start');
+        }
+      }
+    }
+  }
+
+  return {
+    get room(): OnlineRoom | null {
+      return room;
+    },
+    open(): void {
+      note = '';
+      if (room !== null) go('room');
+      else if (profile.privacy < ONLINE_PRIVACY_VERSION) go('privacy', 'ok');
+      else go('home', 'create');
+    },
+    tick(): void {
+      room?.update();
+    },
+    frame(input, raw, ui, list): void {
+      follow();
+      if (inMatch) return;
+      build();
+      if (hold && !anyHeld(raw)) hold = false;
+      const kb = keyboard;
+      if (kb !== null) {
+        if (hold) kb.draw(list, ui);
+        else {
+          const result = kb.frame(input, raw, ui, list);
+          if (result !== 'open') keyboardDone(result);
+        }
+        if (keyboard !== null) return;
+        build();
+      }
+      if (typing === null && !hold) act(menu.update(input, raw, ui));
+      if (inMatch) return;
+      build();
+      menu.draw(list, ui);
+    },
+    afterMatch(left): void {
+      inMatch = false;
+      const r = room;
+      if (r === null) return;
+      if (left && r.role === 'client') {
+        deps.log(`[online] saiu da sala ${r.code} no meio da partida`);
+        closeRoom(t('online.end.left'));
+        return;
+      }
+      if (r.role === 'host') r.reopen();
+      go('room', r.role === 'host' ? 'start' : 'team');
+    },
+    dispose(): void {
+      typing?.close();
+      typing = null;
+      room?.leave();
+      room = null;
+    },
+  };
+}

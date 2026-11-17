@@ -69,6 +69,10 @@ export interface LobbyState {
   readonly code: string;
   readonly locked: boolean;
   readonly summary: string;
+  /** M5 (fase 4c): a partida escolhida tem times (a escolha do time só vale aí). */
+  readonly teams: boolean;
+  /** M5 (fase 4c): a partida está rolando; ao voltar a `false`, quem estava nela volta ao lobby. */
+  readonly playing: boolean;
   readonly members: readonly LobbyMember[];
 }
 
@@ -150,6 +154,8 @@ export function parseLobbyState(v: unknown): LobbyState | null {
     code: o['code'].slice(0, 8),
     locked: o['locked'] === true,
     summary: typeof summary === 'string' ? summary.slice(0, MAX_SUMMARY_CHARS) : '',
+    teams: o['teams'] !== false,
+    playing: o['playing'] === true,
     members: parsed as LobbyMember[],
   };
 }
@@ -198,7 +204,7 @@ export interface LobbyHost {
   /** Lê o lobby e manda o estado se mudou. A cada frame. */
   update(): void;
   setHostChoice(choice: LobbyChoice): void;
-  setSummary(text: string): void;
+  setSummary(text: string, teams?: boolean): void;
   setLocked(on: boolean): void;
   /** Tira um amigo da sala (ele recebe o aviso). */
   kick(slot: number): void;
@@ -206,6 +212,11 @@ export interface LobbyHost {
   removePeer(peer: number): void;
   /** Manda o começo a todos (o `game` montou a receita e os controladores). */
   start(start: LobbyStart): void;
+  /**
+   * M5 (fase 4c): a partida acabou e a sala volta ao lobby (dá para começar outra; quem chegar agora entra). Os amigos
+   * ficam "fora da sala" (`ready` falso) até voltarem do resultado.
+   */
+  reopen(): void;
   /** Mudou o estado (alguém entrou, saiu ou escolheu). */
   onChange: (() => void) | null;
 }
@@ -220,10 +231,11 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
   let members: LobbyMember[] = [host];
   let locked = false;
   let summary = '';
+  let teams = true;
   let started = false;
   let dirty = true;
 
-  const state = (): LobbyState => ({ code, locked, summary, members });
+  const state = (): LobbyState => ({ code, locked, summary, teams, playing: started, members });
   const broadcast = (): void => {
     const bytes = encodeLobbyMessage(LOBBY_MSG.lobby, state());
     for (const peer of peers.values()) endpoint.send(peer, 'reliable', bytes);
@@ -311,8 +323,9 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       members = members.map((m) => (m.slot === 0 ? host : m));
       dirty = true;
     },
-    setSummary(text): void {
+    setSummary(text, withTeams = true): void {
       summary = text.slice(0, MAX_SUMMARY_CHARS);
+      teams = withTeams;
       dirty = true;
     },
     setLocked(on): void {
@@ -335,6 +348,12 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       for (const peer of peers.values()) endpoint.send(peer, 'reliable', bytes);
       dirty = true;
     },
+    reopen(): void {
+      if (!started) return;
+      started = false;
+      members = members.map((m) => (m.slot === 0 ? m : { ...m, ready: false }));
+      dirty = true;
+    },
   };
   return api;
 }
@@ -343,7 +362,7 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
 // Cliente
 // ---------------------------------------------------------------------------------------------------------------
 
-/** `connecting` até o host responder; `in` no lobby; `started` com o começo; o resto acabou. */
+/** `connecting` até o host responder; `in` no lobby; `started` com o começo (volta a `in` no fim); o resto acabou. */
 export type LobbyClientStatus = 'connecting' | 'in' | 'rejected' | 'kicked' | 'started' | 'closed';
 
 export interface LobbyClientConfig {
@@ -422,6 +441,11 @@ export function createLobbyClient(config: LobbyClientConfig): LobbyClient {
       if (s !== null) {
         state = s;
         changed = true;
+        if (status === 'started' && !s.playing) {
+          status = 'in';
+          start = null;
+          sendChoice();
+        }
       }
     } else if (type === LOBBY_MSG.start && status === 'in') {
       const s = parseLobbyStart(decodeLobbyPayload(bytes));

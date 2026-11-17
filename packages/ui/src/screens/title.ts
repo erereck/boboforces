@@ -27,6 +27,8 @@ export interface TitleState {
    * `TITLE_ACTION_TEST_PREFIX + id`.
    */
   readonly extraItems?: readonly TitleExtraItem[];
+  /** M5 (fase 4c): a casca tem online (só a web): o botão Online ao lado de Modos (O4). */
+  readonly online?: boolean;
 }
 
 /** M1: item extra do título (o `game` recebe da casca por `GameDeps.testItems`). */
@@ -41,6 +43,8 @@ export interface TitleExtraItem {
 export const TITLE_ACTION = {
   play: 'play',
   modes: 'modes',
+  /** M5 (fase 4c): o Online (a casca carrega o pedaço dele ao abrir). */
+  online: 'online',
   couch: 'couch',
   bobo: 'bobo',
   lab: 'lab',
@@ -219,7 +223,9 @@ export const titleScreen: Screen<TitleState> = {
                   : []),
                 // Refino R3b (#79): o resto numa grade de 2 colunas (6 botões em coluna não cabiam embaixo do logo).
                 ...gridRows([
-                  ...TITLE_ITEMS.map(([id, key]) => ({ id, key }) as const),
+                  ...TITLE_ITEMS.slice(0, 1).map(([id, key]) => ({ id, key }) as const),
+                  ...(state.online === true ? [{ id: 'online', key: 'menu.online' } as const] : []),
+                  ...TITLE_ITEMS.slice(1).map(([id, key]) => ({ id, key }) as const),
                   ...((state.extraItems ?? []).length > 0 ? [{ id: 'tests', key: 'title.tests' } as const] : []),
                   ...(state.canExit === true ? [{ id: 'quit', key: 'menu.quit' } as const] : []),
                 ]),

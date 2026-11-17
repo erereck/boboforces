@@ -13,7 +13,18 @@ import { buildTabbed, type TabbedRow } from './screens/tabbed.ts';
 import { testListScreen, titleScreen, type TitleExtraItem } from './screens/title.ts';
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 import { STRINGS_EXTRA_PT_BR } from './strings-extra.pt-BR.ts';
+import { STRINGS_ONLINE_PT_BR } from './strings-online.pt-BR.ts';
+import {
+  ONLINE_ROOM,
+  onlineHomeScreen,
+  onlineJoinScreen,
+  onlinePrivacyScreen,
+  onlineRoomScreen,
+  onlineStatusScreen,
+} from './screens/online.ts';
+import { registerStrings } from './text.ts';
 import { t } from './text.ts';
+import { TEAM_COLORS, COLORS } from './tokens.ts';
 import { drawnCommands } from './test-fixtures.ts';
 import { modesScreen } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
@@ -76,9 +87,15 @@ describe('atlas em uso: fontes, licença e métricas', () => {
     const outHud = new Set<string>();
     const outDisplay = new Set<string>();
     // Refino R3a (#79): as duas tabelas (a do menu e a da cena).
-    for (const raw of [...Object.values(STRINGS_PT_BR), ...Object.values(STRINGS_EXTRA_PT_BR)] as string[]) {
+    // M5 (fase 4c): e a do Online.
+    for (const raw of [
+      ...Object.values(STRINGS_PT_BR),
+      ...Object.values(STRINGS_EXTRA_PT_BR),
+      ...Object.values(STRINGS_ONLINE_PT_BR),
+    ] as string[]) {
       // O ™ não está no atlas: o drawText o compõe com T e M, que precisam estar nas duas fontes.
-      const text = raw.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
+      // A quebra de linha separa as linhas de um parágrafo (a tela do aviso as desenha uma a uma): não é glifo.
+      const text = raw.replace(/\n/g, '').replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
       for (const ch of text) if (!hud.has(ch.charCodeAt(0))) outHud.add(ch);
       for (const ch of text.toUpperCase()) if (!display.has(ch.charCodeAt(0))) outDisplay.add(ch);
     }
@@ -552,6 +569,71 @@ describe('estouro de texto com o atlas real', () => {
         for (const other of ['rows', 'options', 'shortcutsPanel']) {
           const r = rectOfId(other);
           if (corner && r) expect(overlaps(corner, r), `${t.name}: buttons × ${other}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('M5 (fase 4c): o título com o Online e as telas do Online cabem nos 6 alvos e no Switch, tudo no D-pad', () => {
+    registerStrings(STRINGS_ONLINE_PT_BR);
+    // O título da web com o Online: com a Cena-vitrine no PC; no celular (toque) ela sai do título, senão a 4ª
+    // fileira de botões de 44 px empurra o logo para fora da tela.
+    for (const t of WEB_TARGETS) {
+      const extraItems = t.minTarget > 0 ? [] : VITRINE;
+      const layout = layoutFor(
+        titleScreen.build({ version: '0.1.0', codename: 'Primeiro Bloco', extraItems, online: true }),
+        t,
+      );
+      expectNoOverflow(layout, t);
+      expect(reachable(layout, 'play').size, t.name).toBe(layout.focusable.length);
+    }
+    // Os nomes mais largos que o filtro aceita (16 caracteres) e os textos mais longos de cada tela.
+    const wide = 'WWWWWWWWWWWWWWWW';
+    const member = (slot: number, name: string, team: number, status: string, kickable: boolean) => ({
+      slot,
+      name,
+      team: team < 0 ? t('online.team.any') : t(team === 0 ? 'online.team.0' : 'online.team.1'),
+      teamColor: team < 0 ? COLORS.texto : TEAM_COLORS[team]!,
+      you: slot === 0,
+      status,
+      kickable,
+    });
+    const room = (host: boolean, team: string | null) =>
+      onlineRoomScreen.build({
+        code: 'WWWWW',
+        summary: 'Todos contra todos · Pela vibe · 12 bobos · Construto',
+        host,
+        members: [
+          member(0, wide, 0, t('online.room.host'), false),
+          member(1, wide, 1, t('online.room.away'), true),
+          member(2, wide, -1, '', true),
+        ],
+        team,
+        locked: true,
+        note: t('online.room.copyFailed', { code: 'WWWWW' }),
+      });
+    const screens: UiNode[] = [
+      onlinePrivacyScreen.build({}),
+      onlineHomeScreen.build({ name: wide, note: t('online.end.updateFriend') }),
+      onlineJoinScreen.build({ code: 'AB3', length: 5, ready: false, note: t('online.join.invalid') }),
+      onlineJoinScreen.build({ code: 'AB3CD', length: 5, ready: true, note: '' }),
+      onlineStatusScreen.build({ message: t('online.end.notFound'), busy: false }),
+      onlineStatusScreen.build({ message: t('online.status.joining', { code: 'WWWWW' }), busy: true }),
+      room(true, t('online.team.any')),
+      room(false, t('online.team.any')),
+      room(false, null),
+    ];
+    for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      for (const tree of screens) {
+        const layout = layoutFor(tree, t);
+        expectNoOverflow(layout, t);
+        expect(reachable(layout, layout.focusable[0]!.id!).size, `${t.name}: foco`).toBe(layout.focusable.length);
+        // Na sala, o nome mais largo cabe na coluna dele (não invade a do time).
+        for (let i = 0; i < 4; i++) {
+          const node = layout.byId.get(`name${i}`);
+          const text = node ? layout.texts.get(node) : undefined;
+          if (text)
+            expect(text.width, `${t.name}: name${i}`).toBeLessThanOrEqual(ONLINE_ROOM.nameW * layout.scale + 0.5);
         }
       }
     }

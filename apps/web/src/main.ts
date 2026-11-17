@@ -79,6 +79,19 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
       : { loadScene: () => import('./scene.ts').then((m) => m.sceneBundle(options)) }),
     // M3: as telas de edição num chunk à parte (o jogo pede logo depois do menu pronto).
     loadEditors: () => import('@boboforces/game/editors'),
+    // M5 (fase 4c): o Online (as telas, a sala e o núcleo do `net`) vem com o chunk da cena e a rede de verdade (o
+    // Trystero, `@boboforces/net/rtc`) num chunk só dela, pedidos juntos ao abrir o botão do título. Fora do bench e da prévia do título do Switch. `?sinal=local`: as abas do mesmo navegador se acham sem relay (o teste).
+    ...(bench || switchTitle
+      ? {}
+      : {
+          loadOnline: () =>
+            Promise.all([import('./scene.ts'), import('@boboforces/net/rtc')]).then(([m, rtc]) =>
+              m.loadWebOnline(rtc, {
+                localSignal: new URLSearchParams(window.location.search).get('sinal') === 'local',
+                log: (line) => platform.diagnostics.appendLog(line),
+              }),
+            ),
+        }),
     hooks: {
       onProgress: (fraction) => boot.setProgress(fraction),
       onMenuReady: () => boot.reveal(),

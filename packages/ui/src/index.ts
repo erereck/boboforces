@@ -4,6 +4,8 @@
 export * from './strings.pt-BR.ts';
 // Refino R3a (#79): a tabela da cena e das telas de edição (só quem a importa a carrega).
 export * from './strings-extra.pt-BR.ts';
+// M5 (fase 4c): a tabela das telas do Online (só o pedaço do Online a importa).
+export * from './strings-online.pt-BR.ts';
 export * from './text.ts';
 export * from './tokens.ts';
 export * from './draw-list.ts';
@@ -25,6 +27,8 @@ export * from './screens/workshop.ts';
 export * from './screens/lab.ts';
 export * from './screens/lab-intro.ts';
 export * from './screens/couch.ts';
+// M5 (fase 4c): as telas do Online (só o pedaço do Online usa).
+export * from './screens/online.ts';
 // M1 (contratos; desenho da frente ui-fontes): HUD por vista, painel F2 e tela genérica de teste.
 export * from './screens/hud.ts';
 export * from './screens/debug-panel.ts';

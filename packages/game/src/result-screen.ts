@@ -48,6 +48,8 @@ export interface ResultScreenData {
   readonly openLab?: boolean;
   /** M2 (fase 4g): o recorde que a partida bateu (o título dos números vira "Recorde!", em âmbar). */
   readonly record?: 'kills' | 'streak' | 'both';
+  /** M5 (fase 4c): partida online: embaixo, só Voltar à sala (a próxima partida é o host quem escolhe, na sala). */
+  readonly online?: boolean;
 }
 
 const RECORD_TITLE = {
@@ -62,6 +64,16 @@ function line(id: string, key: StringKey, params: Record<string, string | number
 
 function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
   return { kind: 'button', id, text: { key }, action, variant: 'secondary', ...extra } as UiNode;
+}
+
+/** M5 (fase 4c): a fileira de baixo do resultado de uma partida online. */
+function onlineActions(): UiNode {
+  return {
+    kind: 'row',
+    id: 'actions',
+    gap: 12,
+    children: [button('quit', 'result.backToRoom', RESULT_ACTION.quit, { variant: 'primary', autofocus: true })],
+  } as UiNode;
 }
 
 /**
@@ -156,33 +168,40 @@ export const resultScreen: Screen<ResultScreenData> = {
                 ]
               : []),
             { kind: 'box', height: 10 },
-            {
-              kind: 'row',
-              id: 'actions',
-              gap: 12,
-              children: [
-                button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: !d.focusEasier }),
-                button('easier', 'result.easier', RESULT_ACTION.easier, {
-                  disabled: !d.canEasier,
-                  autofocus: d.focusEasier && d.canEasier,
-                }),
-                d.openLab
-                  ? button('harder', 'result.openLab', RESULT_ACTION.lab)
-                  : button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }),
-              ],
-            },
-            {
-              kind: 'row',
-              id: 'more',
-              gap: 12,
-              children: [
-                button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
-                d.presetSaved
-                  ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
-                  : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
-                button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
-              ],
-            },
+            ...(d.online === true
+              ? [onlineActions()]
+              : [
+                  {
+                    kind: 'row',
+                    id: 'actions',
+                    gap: 12,
+                    children: [
+                      button('again', 'result.again', RESULT_ACTION.again, {
+                        variant: 'primary',
+                        autofocus: !d.focusEasier,
+                      }),
+                      button('easier', 'result.easier', RESULT_ACTION.easier, {
+                        disabled: !d.canEasier,
+                        autofocus: d.focusEasier && d.canEasier,
+                      }),
+                      d.openLab
+                        ? button('harder', 'result.openLab', RESULT_ACTION.lab)
+                        : button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }),
+                    ],
+                  } as UiNode,
+                  {
+                    kind: 'row',
+                    id: 'more',
+                    gap: 12,
+                    children: [
+                      button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                      d.presetSaved
+                        ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
+                        : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
+                      button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
+                    ],
+                  } as UiNode,
+                ]),
           ],
         },
       ],
@@ -214,6 +233,8 @@ export interface ZombiesResultData {
   readonly newRecord: boolean;
   readonly rows: readonly ZombiesResultRow[];
   readonly presetSaved?: boolean;
+  /** M5 (fase 4c): partida online: só Voltar à sala. */
+  readonly online?: boolean;
 }
 
 /** As colunas da tabela: largura (px de referência) e o título. */
@@ -303,19 +324,21 @@ export const zombiesResultScreen: Screen<ZombiesResultData> = {
             header,
             ...rows,
             { kind: 'box', height: 10 },
-            {
-              kind: 'row',
-              id: 'actions',
-              gap: 12,
-              children: [
-                button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: true }),
-                button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
-                d.presetSaved
-                  ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
-                  : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
-                button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
-              ],
-            },
+            d.online === true
+              ? onlineActions()
+              : {
+                  kind: 'row',
+                  id: 'actions',
+                  gap: 12,
+                  children: [
+                    button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: true }),
+                    button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                    d.presetSaved
+                      ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
+                      : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
+                    button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
+                  ],
+                },
           ],
         },
       ],

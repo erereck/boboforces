@@ -71,3 +71,23 @@ describe('M3 (fase 6a): resultado do Bobo Zombies', () => {
     expect(find(saved, 'savePreset')).toMatchObject({ disabled: true, text: { key: 'result.presetSaved' } });
   });
 });
+
+describe('M5 (fase 4c): resultado de uma partida online', () => {
+  it('só Voltar à sala (a próxima partida o host escolhe na sala), no Warfare e no Bobo Zombies', () => {
+    for (const tree of [
+      resultScreen.build({ ...base, online: true }),
+      zombiesResultScreen.build({
+        title: 'Caíram na onda 7',
+        titleColor: COLORS.perigo,
+        config: 'Base · 10 ondas · 2 jogadores',
+        record: 'Primeira partida nesta configuração',
+        newRecord: false,
+        rows: [],
+        online: true,
+      }),
+    ]) {
+      expect(find(tree, 'quit')).toMatchObject({ action: RESULT_ACTION.quit, text: { key: 'result.backToRoom' } });
+      for (const id of ['again', 'easier', 'harder', 'changeRules', 'savePreset']) expect(find(tree, id)).toBeNull();
+    }
+  });
+});

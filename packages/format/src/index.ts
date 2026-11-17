@@ -16,6 +16,8 @@ export * from './quality.ts';
 export * from './stats.ts';
 // M2 (fase 6c): o Meu Bobo.
 export * from './bobo.ts';
+// M5 (fase 4c): o perfil do online.
+export * from './online-profile.ts';
 export * from './backup.ts';
 export * from './presets.ts';
 export * from './png.ts';

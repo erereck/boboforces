@@ -41,6 +41,8 @@ export interface OnlineSession {
   readonly localController: number;
   /** Os controladores dos amigos (no host, as entradas deles vêm da rede). */
   readonly remoteControllers: readonly number[];
+  /** M5 (fase 4c): o nome de cada humano na sala, pelo controlador (o placar, o kill feed e o resultado usam). */
+  readonly names: readonly (string | undefined)[];
   /** A sala acabou (o host saiu, fui expulso, a conexão caiu): a cena volta ao menu. */
   readonly closed: boolean;
   attachHost(sim: Sim): OnlineHostLink;
@@ -66,4 +68,86 @@ export function onlineRecipe(recipe: MatchRecipe, teams: readonly number[]): Sea
     return side;
   });
   return placeHumans(recipe, sides);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// M5 (fase 4c): a sala, vista pelas telas do Online. A casca web implementa com o `net` (o Trystero, o lobby e o
+// repartidor); o `game` só conhece estes tipos. Nada aqui existe no Switch (#1).
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Por que a sala acabou (ou nem abriu). */
+export type OnlineRoomEnd =
+  'full' | 'locked' | 'update-self' | 'update-friend' | 'mismatch' | 'kicked' | 'host-left' | 'not-found' | 'network';
+
+/** O que cada um escolhe na sala. `team` -1 = tanto faz (o host distribui). */
+export interface OnlineRoomChoice {
+  readonly name: string;
+  readonly team: number;
+  /** Está na tela da sala (falso enquanto vê o resultado da partida). */
+  readonly ready: boolean;
+}
+
+export interface OnlineRoomMember extends OnlineRoomChoice {
+  /** 0 = o host; 1..3 = os amigos. */
+  readonly slot: number;
+}
+
+/** O estado da sala, igual para todos (o host manda). */
+export interface OnlineRoomView {
+  readonly code: string;
+  readonly locked: boolean;
+  /** O resumo da partida que o host escolheu. */
+  readonly summary: string;
+  /** A partida escolhida tem times (no FFA e no Bobo Zombies, a escolha do time não vale). */
+  readonly teams: boolean;
+  readonly playing: boolean;
+  readonly members: readonly OnlineRoomMember[];
+}
+
+/** Uma partida que o host começou: a receita (o cliente valida antes de entrar), a semente e a sessão. */
+export interface OnlineMatchStart {
+  readonly recipe: unknown;
+  readonly seed: number;
+  readonly session: OnlineSession;
+}
+
+export type OnlineRoomStatus = 'connecting' | 'lobby' | 'playing' | 'ended';
+
+export interface OnlineRoom {
+  readonly role: 'host' | 'client';
+  readonly code: string;
+  /** `connecting` (o cliente procurando o host), `lobby`, `playing` (a partida começou) ou `ended` (veja `end`). */
+  readonly status: OnlineRoomStatus;
+  readonly end: OnlineRoomEnd | null;
+  /** `null` até o cliente entrar. */
+  readonly view: OnlineRoomView | null;
+  /** O lugar deste aparelho na sala (0 no host; -1 até o cliente entrar). */
+  readonly mySlot: number;
+  /** A última partida começada (cada começo é um objeto novo: o `game` lembra qual já abriu). */
+  readonly match: OnlineMatchStart | null;
+  /** 1x por frame, em qualquer tela: a conexão e o lobby andam também durante a partida. */
+  update(): void;
+  setChoice(choice: OnlineRoomChoice): void;
+  /** Host: o resumo da partida que os amigos veem e se ela tem times. */
+  setSummary(text: string, teams: boolean): void;
+  setLocked(on: boolean): void;
+  kick(slot: number): void;
+  /** Host: começa com a receita já com os amigos nos times (`controllers` na ordem de `view.members`). */
+  start(recipe: MatchRecipe, seed: number, controllers: readonly number[]): OnlineMatchStart;
+  /** Host: a partida acabou e a sala volta ao lobby. */
+  reopen(): void;
+  /** Copia o link da sala (`#sala=XXXXX`); `false` se a área de transferência recusou. */
+  copyLink(): Promise<boolean>;
+  /** Sai da sala (o host a fecha para todos) e solta a conexão. */
+  leave(): void;
+}
+
+export interface OnlineRooms {
+  create(choice: OnlineRoomChoice): OnlineRoom;
+  join(code: string, choice: OnlineRoomChoice): OnlineRoom;
+  /** O alfabeto e o tamanho do código (o teclado do jogo filtra por ele). */
+  readonly codeAlphabet: string;
+  readonly codeLength: number;
+  /** O código de um link colado (`…#sala=XXXXX`), ou `null`. */
+  codeFromLink(text: string): string | null;
 }

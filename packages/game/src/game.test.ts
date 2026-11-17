@@ -1,4 +1,6 @@
 import * as EDITORS from './editors.ts';
+import * as ONLINE from './online-screens.ts';
+import type { OnlineMatchStart, OnlineRoom, OnlineRoomChoice, OnlineRooms, OnlineSession } from './online-api.ts';
 import { readFileSync } from 'node:fs';
 import { createMixer } from '@boboforces/audio';
 import { dirname, join } from 'node:path';
@@ -42,7 +44,7 @@ import {
   type RawInputState,
   type TouchButtonRect,
 } from '@boboforces/input';
-import type { Platform, PlatformId } from '@boboforces/platform-api';
+import type { Platform, PlatformId, TextInputListener } from '@boboforces/platform-api';
 import { ACTOR_KIND, NO_FIGURE, type ActorBuffer } from '@boboforces/render/data';
 import { hashToHex } from '@boboforces/shared';
 import {
@@ -2052,4 +2054,333 @@ describe('heap no runtime.log (M4, fase 7a)', () => {
     expect(lines[0]).toBe('[mem] t=1min heap_mb=41.2 max_mb=41.2 limite_mb=537');
     game.dispose();
   }, 180_000);
+});
+
+// --- M5 (fase 4c): o Online pelo título, com uma sala de mentira (a de verdade é da web, com o `net`) ---
+
+interface FakeRoom extends OnlineRoom {
+  status: OnlineRoom['status'];
+  end: OnlineRoom['end'];
+  view: OnlineRoom['view'];
+  mySlot: number;
+  match: OnlineMatchStart | null;
+  readonly calls: string[];
+  readonly choices: OnlineRoomChoice[];
+}
+
+/** Uma sessão de mentira: o host lê o amigo parado; o cliente só manda a entrada; `close()` fecha a partida. */
+function fakeSession(role: 'host' | 'client', calls: string[]): { session: OnlineSession; close(): void } {
+  let closed = false;
+  const session: OnlineSession = {
+    role,
+    humans: 2,
+    localController: role === 'host' ? 0 : 1,
+    remoteControllers: role === 'host' ? [1] : [0],
+    names: ['Erick', 'Bia'],
+    get closed() {
+      return closed;
+    },
+    attachHost: () => ({
+      receive: () => void calls.push('receive'),
+      writeRemoteFrame: () => true,
+      recordEvents: () => undefined,
+      afterTicks: () => undefined,
+      takeLost: () => 0,
+      dispose: () => void calls.push('host-dispose'),
+    }),
+    attachClient: (_sim, write) => {
+      const f = { seq: 0, buttons: 0, moveX: 0, moveY: 0, yaw: 0, pitch: 0, weapon: 0, primary: 0 };
+      let seq = 0;
+      return {
+        update: () => {
+          write(f, ++seq);
+          calls.push('client-update');
+          return 0;
+        },
+        alpha: 0,
+        dispose: () => void calls.push('client-dispose'),
+      };
+    },
+  };
+  return { session, close: () => (closed = true) };
+}
+
+function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
+  const calls: string[] = [];
+  const choices: OnlineRoomChoice[] = [];
+  const room: FakeRoom = {
+    role,
+    code,
+    status: role === 'host' ? 'lobby' : 'connecting',
+    end: null,
+    view:
+      role === 'host'
+        ? {
+            code,
+            locked: false,
+            summary: '',
+            teams: true,
+            playing: false,
+            members: [{ slot: 0, name: '', team: -1, ready: true }],
+          }
+        : null,
+    mySlot: role === 'host' ? 0 : -1,
+    match: null,
+    calls,
+    choices,
+    update: () => void (calls.length < 5000 && calls.push('update')),
+    setChoice: (c) => void choices.push(c),
+    setSummary: (text, teams) => void calls.push(`summary:${text}:${teams}`),
+    setLocked: (on) => void calls.push(`lock:${on}`),
+    kick: (slot) => void calls.push(`kick:${slot}`),
+    start(recipe, seed, controllers) {
+      calls.push(`start:${seed}:${controllers.join(',')}`);
+      room.status = 'playing';
+      room.match = { recipe, seed, session: fakeSession('host', calls).session };
+      return room.match;
+    },
+    reopen: () => {
+      calls.push('reopen');
+      room.status = 'lobby';
+    },
+    copyLink: () => Promise.resolve(true),
+    leave: () => {
+      calls.push('leave');
+      room.status = 'ended';
+    },
+  };
+  return room;
+}
+
+async function bootWithOnline(store: Readonly<Record<string, string>> = {}) {
+  const platform = createFakePlatform({ store });
+  const made: FakeRoom[] = [];
+  const rooms: OnlineRooms = {
+    create: (choice) => {
+      const r = fakeRoom('host', 'BOBOS');
+      r.choices.push(choice);
+      made.push(r);
+      return r;
+    },
+    join: (code, choice) => {
+      const r = fakeRoom('client', code);
+      r.choices.push(choice);
+      made.push(r);
+      return r;
+    },
+    codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+    codeLength: 5,
+    codeFromLink: (text) => /sala=([a-z2-9]{5})/i.exec(text)?.[1]?.toUpperCase() ?? null,
+  };
+  const game = startGame({
+    platform,
+    createRenderer: null,
+    loadScene,
+    loadEditors,
+    loadOnline: () => Promise.resolve({ module: ONLINE, rooms }),
+  });
+  platform.pump(2);
+  await settle();
+  platform.pump(2);
+  return { platform, game, made };
+}
+
+/** Do título ao Online: a grade começa com Modos | Online. */
+async function openOnlineFromTitle(platform: FakePlatform): Promise<void> {
+  platform.tap('ArrowDown');
+  platform.tap('ArrowRight');
+  platform.tap('Enter');
+  await settle();
+  platform.pump(2);
+}
+
+/** O teclado do sistema (a web) de mentira: o teste é quem digita. */
+function systemKeyboard(platform: FakePlatform, onOpen?: (listener: TextInputListener) => void) {
+  const state: { listener: TextInputListener | null } = { listener: null };
+  (platform as { textInput: Platform['textInput'] }).textInput = {
+    available: true,
+    open: (_request, listener) => {
+      state.listener = listener;
+      onOpen?.(listener);
+      return { close: () => (state.listener = null) };
+    },
+  };
+  return state;
+}
+
+describe('o Online pelo título (M5 fase 4c)', () => {
+  it('host: o aviso na 1ª vez, Criar sala, Começar, a partida online e a volta à sala', async () => {
+    const { platform, game, made } = await bootWithOnline();
+    expect(game.screen).toBe('title');
+    await openOnlineFromTitle(platform);
+    expect(game.screen).toBe('online');
+    // O aviso de privacidade: Entendi grava a versão lida no perfil `online@1`.
+    platform.tap('Enter');
+    const profile = JSON.parse(platform.storage.get(ONLINE.ONLINE_PROFILE_KEY)!) as { privacy: number };
+    expect(profile.privacy).toBe(ONLINE.ONLINE_PRIVACY_VERSION);
+    // A casa: o foco em Criar sala.
+    platform.tap('Enter');
+    const room = made[0]!;
+    expect(room.role).toBe('host');
+    expect(room.calls.some((c) => c.startsWith('summary:') && c.endsWith(':true'))).toBe(true);
+    expect(room.calls).toContain('update');
+    // Um amigo ainda no resultado da partida anterior: Começar espera por ele (nada começa).
+    const away = {
+      code: 'BOBOS',
+      locked: false,
+      summary: '',
+      teams: true,
+      playing: false,
+      members: [
+        { slot: 0, name: '', team: -1, ready: true },
+        { slot: 1, name: 'Bia', team: 1, ready: false },
+      ],
+    };
+    room.view = away;
+    platform.pump(2);
+    platform.tap('Enter');
+    expect(room.calls.some((c) => c.startsWith('start:'))).toBe(false);
+    expect(game.screen).toBe('online');
+    // Ele voltou: na sala, o foco em Começar abre a partida com a sessão online (o host com o diretor dos bots).
+    room.view = { ...away, members: away.members.map((m) => ({ ...m, ready: true })) };
+    platform.pump(2);
+    platform.tap('Enter');
+    // Os dois na partida: o host (laranja) é o controlador 0 e a Bia (azul), o 1.
+    expect(room.calls.find((c) => c.startsWith('start:'))).toMatch(/:0,1$/);
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    expect(game.match!.online).toBe(true);
+    expect(game.match!.director).not.toBeNull();
+    platform.pump(10);
+    expect(room.calls).toContain('receive');
+    // Pausa → Sair (4 × baixo): o host volta à sala e ela volta ao lobby.
+    platform.firePause();
+    platform.pump(1);
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('online');
+    expect(room.calls).toContain('host-dispose');
+    expect(room.calls).toContain('reopen');
+    expect(game.match).toBeNull();
+    // Voltar não sai da sala (põe o foco no Sair da sala); o Enter nele sai.
+    platform.tap('Escape');
+    platform.tap('Enter');
+    expect(room.calls).toContain('leave');
+    expect(game.onlineRoom).toBeNull();
+    // Da casa, Voltar volta ao título.
+    platform.tap('Escape');
+    expect(game.screen).toBe('title');
+    game.dispose();
+  }, 60_000);
+
+  it('amigo: o código por link colado, a espera, a sala, a partida do host e sair pela pausa sai da sala', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({
+        format: 'boboforces/online@1',
+        name: 'Bia',
+        privacy: ONLINE.ONLINE_PRIVACY_VERSION,
+      }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    const keyboard = systemKeyboard(platform);
+    await openOnlineFromTitle(platform);
+    // Sem o aviso (já lido): a casa, com o foco em Criar sala; Entrar com código logo abaixo abre a digitação.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    const listener = keyboard.listener!;
+    expect(listener).not.toBeNull();
+    // Colou o link inteiro: o código sai do `#sala=`.
+    listener.onChange('https://jogo.test/#sala=ab3cd', 0);
+    listener.onSubmit('https://jogo.test/#sala=ab3cd');
+    platform.pump(2);
+    const room = made[0]!;
+    expect([room.role, room.code]).toEqual(['client', 'AB3CD']);
+    expect(room.choices[0]!.name).toBe('Bia');
+    // O host respondeu: a sala.
+    room.status = 'lobby';
+    room.mySlot = 1;
+    room.view = {
+      code: 'AB3CD',
+      locked: false,
+      summary: 'Times · Construto',
+      teams: true,
+      playing: false,
+      members: [
+        { slot: 0, name: 'Erick', team: 0, ready: true },
+        { slot: 1, name: 'Bia', team: -1, ready: true },
+      ],
+    };
+    platform.pump(3);
+    // O foco no time: direita troca de "tanto faz" para o laranja.
+    platform.tap('ArrowRight');
+    expect(room.choices.at(-1)!.team).toBe(0);
+    // O host começou: a receita passa pelo validador e a partida abre com a sessão do amigo.
+    const fake = fakeSession('client', room.calls);
+    room.status = 'playing';
+    room.match = { recipe: DEBUT_PRESET, seed: 5, session: fake.session };
+    platform.pump(1);
+    expect(game.screen).toBe('scene');
+    expect(room.choices.at(-1)!.ready).toBe(false);
+    await untilRunning(platform, game);
+    expect(game.match!.director).toBeNull();
+    platform.pump(5);
+    expect(room.calls).toContain('client-update');
+    // A partida fecha (o host voltou ao lobby): de volta à sala, pronto de novo.
+    fake.close();
+    room.status = 'lobby';
+    platform.pump(2);
+    expect(game.screen).toBe('online');
+    platform.pump(2);
+    expect(room.choices.at(-1)!.ready).toBe(true);
+    // A próxima partida: sair pela pausa (sem o Ajustar desafio: 3 × baixo) sai da sala.
+    const next = fakeSession('client', room.calls);
+    room.status = 'playing';
+    room.match = { recipe: DEBUT_PRESET, seed: 6, session: next.session };
+    platform.pump(1);
+    await untilRunning(platform, game);
+    platform.firePause();
+    platform.pump(1);
+    for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('online');
+    expect(room.calls).toContain('leave');
+    expect(game.onlineRoom).toBeNull();
+    game.dispose();
+  }, 60_000);
+
+  it('a receita do host que não passa no validador não abre: a sala acaba com o aviso', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: '', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    systemKeyboard(platform, (listener) => queueMicrotask(() => listener.onSubmit('ZZZZZ')));
+    await openOnlineFromTitle(platform);
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    const room = made[0]!;
+    expect(room.code).toBe('ZZZZZ');
+    room.status = 'playing';
+    room.mySlot = 1;
+    room.match = {
+      recipe: { format: 'boboforces/preset@1', mode: 'nada' },
+      seed: 1,
+      session: fakeSession('client', []).session,
+    };
+    platform.pump(2);
+    expect(game.screen).toBe('online');
+    expect(room.calls).toContain('leave');
+    expect(game.onlineRoom).toBeNull();
+    game.dispose();
+  });
+
+  it('sem `loadOnline` (o Switch) o título não tem o Online', async () => {
+    const { platform, game } = await bootToTitle('switch');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('couch');
+    game.dispose();
+  });
 });

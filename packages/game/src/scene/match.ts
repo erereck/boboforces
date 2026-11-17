@@ -292,6 +292,7 @@ import {
   type ShoulderPose,
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
+import { cleanTypedName } from '../names.ts';
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
 import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
@@ -846,6 +847,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   weaponCategories[WEAPON_DESMONTADOR] = t('weapon.category.explosive');
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
+  // M5 (fase 4c): online, cada humano com o nome que escolheu na sala (o filtro do atlas: veio de outro aparelho).
+  if (request.online) {
+    request.online.names.forEach((name, c) => {
+      const clean = name === undefined ? '' : cleanTypedName(name, 16).trim();
+      if (clean !== '' && c < humans) names[c] = clean;
+    });
+  }
   /** M2 (fase 8a): o look de cada bot pelo nome (o mesmo bot veste o mesmo look em qualquer partida). */
   const botLook = botLookIndices(names, figures.botLooks);
   /** M2 (fase 4e): o que a regra da partida deixa a HUD mostrar (`MatchRecipe.hud`) e a assistência permitida. */
@@ -905,7 +913,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' | 'players' = 'main';
   // M2 (fase 5f): no Bobo Training, "Ajustar desafio" vira "Calibrar mira".
   const pauseState = {
-    challenge: request.kind === 'play' && recipe.mode !== 'training',
+    challenge: request.kind === 'play' && recipe.mode !== 'training' && request.online?.role !== 'client',
     calibrate: recipe.mode === 'training',
   };
   /** M2 (fase 5f): a calibração em andamento, a pedida pelos Ajustes (começa no fim da contagem) e o "Desfazer". */
@@ -2706,7 +2714,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === PAUSE_ACTION.players) {
         openPlayers();
         return 'none';
-      } else if (a === PAUSE_ACTION.quit) return 'quit';
+      } else if (a === PAUSE_ACTION.quit) return request.online?.role === 'client' ? 'leave' : 'quit';
       // Refino R4: a frase de ajuda segue o foco.
       if (paused && pausePage === 'main' && pauseMenu.focusedId !== pauseMainFocus) pauseMain();
       return 'none';
@@ -2838,6 +2846,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       canHarder: currentLevel !== BOT_LEVELS[BOT_LEVELS.length - 1],
       focusEasier: sum.uglyLoss || hardHintUsed,
       ...(recordKind !== null ? { record: recordKind } : {}),
+      ...(request.online ? { online: true } : {}),
     };
     resultData = data;
     resultMenu.setRoot(resultScreen.build(data));
@@ -2918,6 +2927,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       config,
       record: recordLine,
       newRecord,
+      ...(request.online ? { online: true } : {}),
       rows: zombiesRows(matchStats, v).map((r) => {
         const c = v.controller[r.entity]!;
         return {
@@ -4563,7 +4573,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // --- entrada e sim ---
       let signal: SceneSignal = 'none';
       // M5: a sala acabou (o host saiu, fui expulso, a conexão caiu): de volta ao menu.
-      if (driver.closed) signal = 'quit';
+      if (driver.closed && !resultShown) signal = 'quit';
       if (humans > 0) {
         const last = menu.lastDevice;
         if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);

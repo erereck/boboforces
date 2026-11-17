@@ -8,9 +8,12 @@ import type { NetConfig } from '@boboforces/net';
  */
 
 export type NetModule = typeof import('@boboforces/net');
+/** M5 (fase 4c): a rede de verdade (Trystero), num pedaço só dela. */
+export type RtcModule = typeof import('@boboforces/net/rtc');
 
 export interface OnlineLoad {
   readonly net: NetModule;
+  readonly rtc: RtcModule;
   readonly config: NetConfig;
   /** Quanto o relógio do aparelho está adiantado (+) ou atrasado (−), em ms; `null` = sem cabeçalho legível. */
   readonly clockOffsetMs: number | null;
@@ -32,10 +35,17 @@ export type FetchLike = (
 
 let loading: Promise<OnlineLoad> | null = null;
 
-/** Baixa o chunk e a configuração (uma vez por página; as chamadas seguintes reaproveitam). */
-export function loadOnline(fetchLike: FetchLike = fetch, now: () => number = Date.now): Promise<OnlineLoad> {
+/**
+ * Lê a configuração e acerta o relógio (uma vez por página; as chamadas seguintes reaproveitam). O `net` e a rede de
+ * verdade chegam prontos: o núcleo com o pedaço da cena e o `rtc` pelo `import()` do `main.ts` (M5 fase 4c).
+ */
+export function loadOnline(
+  net: NetModule,
+  rtc: RtcModule,
+  fetchLike: FetchLike = fetch,
+  now: () => number = Date.now,
+): Promise<OnlineLoad> {
   loading ??= (async (): Promise<OnlineLoad> => {
-    const net = await import('@boboforces/net');
     let config = net.DEFAULT_NET_CONFIG;
     let clockOffsetMs: number | null = null;
     let fromNetwork = false;
@@ -47,14 +57,14 @@ export function loadOnline(fetchLike: FetchLike = fetch, now: () => number = Dat
         config = net.parseNetConfig(await response.json());
         fromNetwork = true;
         clockOffsetMs = net.clockOffsetFromDate(response.headers.get('date'), now());
-        if (clockOffsetMs !== null) net.setClockOffset(clockOffsetMs);
+        if (clockOffsetMs !== null) rtc.setClockOffset(clockOffsetMs);
       }
     } catch {
       // Sem rede ou sem o arquivo: a cópia embutida (a sala ainda tenta pelos relays dela).
     } finally {
       clearTimeout(timer);
     }
-    return { net, config, clockOffsetMs, fromNetwork };
+    return { net, rtc, config, clockOffsetMs, fromNetwork };
   })();
   return loading;
 }

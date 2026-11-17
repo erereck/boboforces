@@ -12,15 +12,6 @@ export * from './client.ts';
 export * from './room-code.ts';
 export * from './mux.ts';
 export * from './lobby.ts';
-// Fase 3: a rede de verdade (Trystero + WebRTC). Só a casca web carrega, sob demanda (o chunk do Online).
 export * from './net-config.ts';
-export * from './rtc/room.ts';
-export * from './rtc/local-strategy.ts';
-export {
-  joinRoom as joinNostrRoom,
-  kickRelays,
-  pauseRelayReconnection,
-  relayHealth,
-  resumeRelayReconnection,
-  setClockOffset,
-} from './rtc/nostr-strategy.ts';
+// Fase 3: a rede de verdade (Trystero + WebRTC) fica no subcaminho `@boboforces/net/rtc` (M5 fase 4c): o núcleo vai
+// com o pedaço da cena e o Trystero num pedaço só dele, pedido ao abrir "Online".

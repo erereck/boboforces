@@ -25,6 +25,8 @@ export interface OnlineMatchSetup {
   readonly isClosed: () => boolean;
   /** Host: os slots que saíram desde a última chamada. */
   readonly takeLeftSlots: () => readonly number[];
+  /** M5 (fase 4c): a cena ligou (`true`) ou soltou (`false`) a partida (a sala descarta o que sobrar da rede). */
+  readonly onAttached?: (attached: boolean) => void;
 }
 
 export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
@@ -32,15 +34,19 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
   const me = start.members.find((m) => m.slot === setup.mySlot);
   if (!me) throw new Error(`online: o slot ${setup.mySlot} não está no começo`);
   const remote = start.members.filter((m) => m.slot !== setup.mySlot);
+  const names: (string | undefined)[] = [];
+  for (const m of start.members) names[m.controller] = m.name;
   return {
     role: setup.role,
     humans: start.members.length,
     localController: me.controller,
     remoteControllers: remote.map((m) => m.controller),
+    names,
     get closed(): boolean {
       return setup.isClosed();
     },
     attachHost(sim): OnlineHostLink {
+      setup.onAttached?.(true);
       const host = net.createNetHost({ sim, endpoint: setup.endpoint, snapshotHz: setup.snapshotHz });
       for (const m of remote) host.addClient(setup.peerOfSlot(m.slot), m.controller, true);
       return {
@@ -56,10 +62,11 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
           }
           return out.length;
         },
-        dispose: () => undefined,
+        dispose: () => setup.onAttached?.(false),
       };
     },
     attachClient(sim, writeLocalFrame, onEvents): OnlineClientLink {
+      setup.onAttached?.(true);
       const client = net.createClientDriver({
         sim,
         endpoint: setup.endpoint,
@@ -73,7 +80,10 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
         get alpha(): number {
           return client.alpha;
         },
-        dispose: () => client.dispose(),
+        dispose: () => {
+          client.dispose();
+          setup.onAttached?.(false);
+        },
       };
     },
   };

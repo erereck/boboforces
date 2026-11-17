@@ -1,4 +1,5 @@
 import type { ExtraStringKey } from './strings-extra.pt-BR.ts';
+import type { OnlineStringKey } from './strings-online.pt-BR.ts';
 
 /**
  * TABELA DE TEXTOS (decisão #14, regra 13). Todo texto de interface sai daqui, desde o primeiro dia.
@@ -269,6 +270,8 @@ export const STRINGS_PT_BR = {
   'menu.couch': 'Jogar no sofá',
   // Refino R3b (#79): no título, na grade de 2 colunas.
   'menu.couchShort': 'Sofá',
+  // M5 (fase 4c): o botão do título que abre o Online (o resto dos textos chega com o pedaço dele).
+  'menu.online': 'Online',
   'couch.title': 'Sofá',
   'couch.pitch': 'Até 4 jogadores na mesma tela, cada um com o seu controle (o teclado conta como um).',
   'couch.player': 'P{n}',
@@ -911,5 +914,8 @@ export const STRINGS_PT_BR = {
   'issue.bot.valueClamped': 'Um valor do bot passou do limite e foi ajustado.',
 } as const satisfies Readonly<Record<string, string>>;
 
-/** As chaves das duas tabelas: a do menu (esta) e a que chega com a cena (`strings-extra.pt-BR.ts`). */
-export type StringKey = keyof typeof STRINGS_PT_BR | ExtraStringKey;
+/**
+ * As chaves das três tabelas: a do menu (esta), a que chega com a cena (`strings-extra.pt-BR.ts`) e a do Online
+ * (`strings-online.pt-BR.ts`, M5).
+ */
+export type StringKey = keyof typeof STRINGS_PT_BR | ExtraStringKey | OnlineStringKey;

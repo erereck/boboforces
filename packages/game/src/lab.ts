@@ -18,6 +18,7 @@ import type { Rng } from '@boboforces/shared';
 import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
 import { botDisplayName, botLevelOf } from './bot-card.ts';
 import { ALLOWED_CHOICES, ALLOWED_KEYS } from './custom-match.ts';
+import { cleanTypedName } from './names.ts';
 
 /**
  * M2 (fase 5b): o Laboratório (gameplay.md §6), o editor de um bot por vez, lógica pura sobre o `bot@1`. Cada aba tem
@@ -480,9 +481,5 @@ export function rollBotName(rng: Rng, taken: ReadonlySet<string>): string {
 
 /** O nome digitado: só letras latinas, números, espaço e pontuação simples (o atlas do HUD), sem sobrar espaço. */
 export function cleanBotName(text: string): string {
-  return text
-    .replace(/[^A-Za-z0-9À-ÖØ-öø-ÿ .,'!?&-]/gu, '')
-    .replace(/\s+/gu, ' ')
-    .trimStart()
-    .slice(0, BOT_RANGES.nameMaxLength);
+  return cleanTypedName(text, BOT_RANGES.nameMaxLength);
 }

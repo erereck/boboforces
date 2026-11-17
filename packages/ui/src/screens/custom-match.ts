@@ -29,6 +29,8 @@ export interface CustomMatchState {
   readonly note: string;
   /** Refino R4c (#79): o que a linha (ou a aba) com o foco faz, embaixo das linhas; ausente = sem a linha. */
   readonly help?: string;
+  /** M5 (fase 4c): aberta pela sala do Online: o Começar vira "Usar na sala" (a partida volta para a sala). */
+  readonly forRoom?: boolean;
 }
 
 /** Medidas (px de referência): a coluna das linhas e a altura da janela dela. */
@@ -48,7 +50,12 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       buttons: [
         { id: CUSTOM_ACTION.back, labelKey: 'menu.back', variant: 'secondary' },
         { id: CUSTOM_ACTION.save, labelKey: 'custom.save', variant: 'secondary' },
-        { id: CUSTOM_ACTION.start, labelKey: 'quick.start', variant: 'primary', autofocus: true },
+        {
+          id: CUSTOM_ACTION.start,
+          labelKey: state.forRoom === true ? 'custom.useInRoom' : 'quick.start',
+          variant: 'primary',
+          autofocus: true,
+        },
       ],
     });
   },

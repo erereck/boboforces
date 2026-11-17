@@ -170,7 +170,9 @@ export interface SceneHost {
  */
 /** M2 (fase 4e): `rules` = Mudar regras (abre a Partida personalizada com o preset); `save` = Salvar preset. */
 /** M2 (fase 5e): `nemesis` = Salvar na Oficina (o Nêmesis do resultado); `lab` = Abrir Laboratório (no Tryhard). */
-export type SceneSignal = 'none' | 'quit' | 'again' | 'easier' | 'harder' | 'rules' | 'save' | 'nemesis' | 'lab';
+/** M5 (fase 4c): `leave` = o amigo saiu da partida online pela pausa (sai da sala; um bot assume o lugar dele). */
+export type SceneSignal =
+  'none' | 'quit' | 'again' | 'easier' | 'harder' | 'rules' | 'save' | 'nemesis' | 'lab' | 'leave';
 
 /** M2 (fase 5e): o que o Testar do Laboratório mostra na volta do Bobo Training. */
 export interface TrainingReport {
