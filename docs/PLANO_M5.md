@@ -149,6 +149,7 @@ cada uma verde e commitada:
   - **emotes:** o botão de emote (B, direcional para baixo) mostra um dos 4 balões fixos em cima do bobo ("Boa!",
     "Valeu!", "Bora!", "Ops!"; cada aperto passa para o próximo), para todos. As 4 poses do `arte-ux` ficam para
     quando o contrato de emote do `ActorBuffer` existir (decisão menor revisável).
+  - **feita em 16/11** (ARCHITECTURE §16.13).
 - **Fica para a fase 6:** o aviso "Você é o host: não troque de app", o teto de 8 bots e os snapshots a 20 Hz com host
   no celular.
 

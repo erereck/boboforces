@@ -3341,3 +3341,23 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   (desde a 4a).
 - **De passagem:** dois testes do `mapc` que montam o mundo e compilam o Construto ganharam prazo (6,4 s e 32,9 s com a
   suíte inteira em paralelo).
+
+### 16.13 Fase 5d: ping e emotes (16/11/2026)
+
+- **Pela sim, como os outros botões** (vale no sofá e no online; o evento vai aos amigos como os outros): os botões de
+  aviso e de emote já existiam no `InputFrame` e no mapeador (aviso: botão do meio do mouse, N no outro perfil do
+  teclado, direcional para cima; emote: B, direcional para baixo), mas nada os usava. O `signalSystem` (novo, depois do
+  corpo a corpo) lê o aperto (`inButtons & ~prevButtons`) e solta o evento `signal`:
+  - **kind 0, o ping:** o ponto onde a mira bate no que tapa a vista, até 80 m (sem bater, no fim do alcance);
+  - **kind 1..4, os emotes:** um dos 4 balões fixos ("Boa!", "Valeu!", "Bora!", "Ops!"), e cada aperto passa para o
+    próximo;
+  - um aviso por bobo a cada 0,75 s, e segurar não repete. Os contadores ficam no `SimContext` (`signals`), fora do
+    hash e do snapshot: o golden não mudou.
+- **Na tela:** o ping aparece para o time de quem mandou (no FFA, só para ele) como o losango âmbar dos avisos dos bots,
+  por 2,5 s; o emote vira um balão na plaquinha do HUD, em âmbar, em cima da cabeça do bobo, para todos, por 2,5 s (um
+  balão por bobo: o novo troca o anterior).
+- **Decisão menor revisável:** balões de texto no lugar das 4 poses do `arte-ux` (o contrato de emote do
+  `ActorBuffer` ainda não existe). As 4 frases são da tabela (`emote.1..4`).
+- **Testes:** a sim (o ping no chão olhando para baixo e no fim do alcance olhando para o céu, segurar não repete, o
+  intervalo, o emote de 1 a 4 e de volta ao 1), o formato do evento pela rede, o balão no HUD (dentro da vista; fora
+  dela, nada) e, no Edge, o balão e o ping numa partida em 3ª pessoa. Switch +6 KB.

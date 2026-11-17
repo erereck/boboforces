@@ -105,6 +105,9 @@ const SAMPLES: SimEvent[] = [
   },
   { type: 'barricade', tick: 17, index: 31, action: 'repair', planks: 6, by: 0x10001 },
   { type: 'door', tick: 17, index: 15, action: 'denied', cost: 1250, by: 0x10001 },
+  // M5 (fase 5d): um ping e um emote.
+  { type: 'signal', tick: 17, entity: 0x10002, kind: 0, x: 3.25, y: 1.5, z: -7 },
+  { type: 'signal', tick: 17, entity: 0x10001, kind: 3, x: 1, y: 2.5, z: 2 },
   { type: 'purchase', tick: 18, index: 3, kind: 'perk', action: 'ok', item: 4, cost: 2500, by: 0x10001 },
   { type: 'box', tick: 18, index: 2, action: 'move', weapon: 11, by: 0 },
 ];

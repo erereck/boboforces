@@ -63,6 +63,7 @@ import { hashState, readState, writeState } from './snapshot.ts';
 import { REWIND_HISTORY, REWIND_MAX_S, RewindState } from './rewind.ts';
 import { SimState } from './state.ts';
 import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
+import { createSignalState, signalSystem } from './systems/signals.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -510,6 +511,7 @@ export function createSim(config: SimConfig): Sim {
     // Um slot de caixas por controlador (todo corpo de bobo ou zumbi tem um).
     figures: new FigureHitCache(figureTable, MAX_CONTROLLERS_WITH_ZOMBIES),
     rewind: null,
+    signals: createSignalState(MAX_ENTITIES),
     zombiesMode,
     zombieRunProfile: zombieSpeed(MOVEMENT_ZOMBIE_RUNNER, recipe),
     zombieRules: {
@@ -894,6 +896,8 @@ export function createSim(config: SimConfig): Sim {
       movementSystem(ctx);
       weaponSystem(ctx);
       meleeSystem(ctx);
+      // M5 (fase 5d): ping e emotes (depois do movimento e da mira deste tick).
+      signalSystem(ctx);
       projectileSystem(ctx);
       pickupSystem(ctx);
       damageSystem(ctx);

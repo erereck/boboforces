@@ -19,6 +19,7 @@ import type {
   PickupEvent,
   ProjectileEvent,
   ShotEvent,
+  SignalEvent,
   SimEvent,
   SpawnEvent,
   UnstuckEvent,
@@ -212,6 +213,12 @@ export class EventQueue {
     2,
   );
 
+  /** M5 (fase 5d). */
+  private readonly signals = new EventPool<Mutable<SignalEvent>>(
+    () => ({ type: 'signal', tick: 0, entity: 0, kind: 0, x: 0, y: 0, z: 0 }),
+    2,
+  );
+
   get size(): number {
     return this.length;
   }
@@ -237,6 +244,7 @@ export class EventQueue {
     this.explosions.reset();
     this.pickups.reset();
     this.unstucks.reset();
+    this.signals.reset();
   }
 
   /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
@@ -487,6 +495,18 @@ export class EventQueue {
     e.y = y;
     e.z = z;
     e.respawned = respawned;
+    this.push(e);
+  }
+
+  /** M5 (fase 5d): ping (`kind` 0) ou emote (1..4). */
+  signal(tick: number, entity: EntityId, kind: number, x: number, y: number, z: number): void {
+    const e = this.signals.acquire();
+    e.tick = tick;
+    e.entity = entity;
+    e.kind = kind;
+    e.x = x;
+    e.y = y;
+    e.z = z;
     this.push(e);
   }
 

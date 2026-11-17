@@ -43,6 +43,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   volta naquela sala. Quando o host fecha a sala, ela acaba na hora para todos.
 - **Versões diferentes (fase 5c):** quem está com o jogo desatualizado vê o botão Atualizar acender quando a versão
   nova chega; o host fica sabendo quando um amigo com outra versão tenta entrar.
+- **Ping e emotes (fase 5d):** o botão do meio do mouse (ou o direcional para cima) marca onde você está mirando
+  para o seu time; o B (ou o direcional para baixo) mostra um balão em cima do seu bobo: "Boa!", "Valeu!", "Bora!" ou
+  "Ops!", um a cada aperto. Vale no online e no sofá.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

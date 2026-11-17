@@ -1,3 +1,4 @@
+import type { SignalState } from './systems/signals.ts';
 import type { RewindState } from './rewind.ts';
 import type { FigurePart } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
@@ -247,6 +248,8 @@ export interface SimContext {
   readonly figures: FigureHitCache;
   /** M5 (fase 2d): o histórico do "tiro no que eu vi" (só o host online liga; `null` = desligado). */
   rewind: RewindState | null;
+  /** M5 (fase 5d): quando cada bobo pode avisar de novo e o próximo emote (fora do hash e do snapshot). */
+  readonly signals: SignalState;
   /** M3 (fase 2a): Bobo Zombies (`mode: 'zombies'`): o diretor de ondas, os renascimentos e o pool de zumbis. */
   readonly zombiesMode: boolean;
   readonly zombieRunProfile: MovementProfile;

@@ -122,6 +122,13 @@ export interface HudModel {
   readonly pings: Float32Array;
   pingCount: number;
   /**
+   * M5 (fase 5d): balões de emote em cima dos bobos ("Boa!"): 2 valores por balão (x, y em px da superfície, a base
+   * dele) e o texto, já resolvido pelo `game`.
+   */
+  readonly bubbles: Float32Array;
+  readonly bubbleText: string[];
+  bubbleCount: number;
+  /**
    * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
    * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
    */
@@ -152,6 +159,8 @@ export interface HudModel {
 
 /** M2 (fase 3e): máximo de avisos do time na vista. */
 export const MAX_TEAM_PINGS = 8;
+/** M5 (fase 5d): balões de emote por vista. */
+export const MAX_EMOTE_BUBBLES = 8;
 /** Refino R2 (#79): pontos do arco da granada e avisos de granada perto por vista. */
 export const MAX_GRENADE_ARC = 48;
 export const MAX_GRENADE_WARNINGS = 4;
@@ -247,6 +256,9 @@ export function createHudModel(): HudModel {
     markerSeat: new Int8Array(MAX_ALLY_MARKERS).fill(-1),
     pings: new Float32Array(MAX_TEAM_PINGS * 2),
     pingCount: 0,
+    bubbles: new Float32Array(MAX_EMOTE_BUBBLES * 2),
+    bubbleText: new Array<string>(MAX_EMOTE_BUBBLES).fill(''),
+    bubbleCount: 0,
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
@@ -482,6 +494,28 @@ function drawPlayerMarker(out: DrawList, x: number, y: number, unit: number, sea
 }
 
 /** Aviso do time (fase 3e): losango âmbar de 7 units com borda escura, centrado em (x, y). Fora da vista, nada. */
+/** M5 (fase 5d): o balão de um emote, com a base em (x, y): a plaquinha do HUD e o texto em âmbar. */
+function drawBubble(
+  out: DrawList,
+  hud: MsdfFont | null,
+  text: string,
+  x: number,
+  y: number,
+  px: number,
+  scale: number,
+  view: HudViewport,
+): void {
+  if (hud === null || text === '') return;
+  const pad = hudPad(scale);
+  const w = Math.round(textWidth(hud, text, px) + pad * 2);
+  const h = Math.round(capHeightPx(hud, px) + pad * 2);
+  const left = Math.round(x - w / 2);
+  const top = Math.round(y - h);
+  if (left < view.x || left + w > view.x + view.width || top < view.y || y > view.y + view.height) return;
+  plate(out, left, top, w, h, scale);
+  paintText(out, hud, text, left + pad, top + pad, px, COLORS.acao);
+}
+
 function drawPing(out: DrawList, x: number, y: number, unit: number, view: HudViewport): void {
   const r = unit * 3;
   if (x - r < view.x || x + r > view.x + view.width || y - r < view.y || y + r > view.y + view.height) return;
@@ -688,6 +722,9 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
     for (let i = 0; i < model.pingCount && i < MAX_TEAM_PINGS; i++) {
       drawPing(out, model.pings[i * 2]!, model.pings[i * 2 + 1]!, unit, view);
+    }
+    for (let i = 0; i < model.bubbleCount && i < MAX_EMOTE_BUBBLES; i++) {
+      drawBubble(out, hud, model.bubbleText[i]!, model.bubbles[i * 2]!, model.bubbles[i * 2 + 1]!, labelPx, s, view);
     }
   }
 

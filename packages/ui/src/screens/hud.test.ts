@@ -345,6 +345,23 @@ describe('HUD por vista: conteúdo', () => {
     }
   });
 
+  it('M5 (fase 5d): o balão do emote em cima do ponto, em âmbar na plaquinha; fora da vista, nada', () => {
+    const m = sampleModel();
+    m.bubbles[0] = view.x + view.width / 2;
+    m.bubbles[1] = view.y + view.height / 3;
+    m.bubbleText[0] = 'Valeu!';
+    m.bubbles[2] = view.x + view.width + 50;
+    m.bubbles[3] = view.y + view.height / 3;
+    m.bubbleText[1] = 'Ops!';
+    m.bubbleCount = 2;
+    const list = createDrawList();
+    drawHud(list, fonts, m, view);
+    expect(syntheticGlyphText(list)).toContain('Valeu!');
+    expect(syntheticGlyphText(list)).not.toContain('Ops!');
+    expect(glyphs(list).some((c) => c.color === COLORS.acao)).toBe(true);
+    for (const c of drawnCommands(list)) expect(inside(c, view)).toBe(true);
+  });
+
   it('dano direcional na borda certa (positivo = à esquerda, como o yaw)', () => {
     const side = (angle: number): DrawnCommand => {
       const m = sampleModel();

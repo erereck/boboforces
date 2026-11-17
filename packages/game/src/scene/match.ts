@@ -149,6 +149,7 @@ import {
   drawScoreboard,
   MAX_ALLY_MARKERS,
   MAX_TEAM_PINGS,
+  MAX_EMOTE_BUBBLES,
   MAX_GRENADE_ARC,
   MAX_GRENADE_WARNINGS,
   SETTINGS_ACTION,
@@ -342,6 +343,11 @@ const GRENADE_WARN_M = 7;
 const ARC_EVERY_TICKS = 3;
 /** M2 (fase 3h, prints): avisos a menos desta fração da altura da vista um do outro viram um só. */
 const PING_MERGE_FRAC = 0.04;
+/** M5 (fase 5d): quanto o balão do emote fica no ar (s), e quantos pings de humanos a cena guarda. */
+const EMOTE_SHOW_S = 2.5;
+const MAX_HUMAN_PINGS = 8;
+/** A base do balão fica acima dos pés (m): logo acima da cabeça. */
+const EMOTE_HEIGHT_M = 2.35;
 /** M2 (fase 2e): o resultado aparece este tempo depois do fim da partida (s). */
 const RESULT_DELAY_S = 2.5;
 /** Cubinhos por impacto (o render limita pelo teto do perfil). */
@@ -1429,6 +1435,41 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   // --- eventos da sim → VFX, HUD e estado cosmético ---
   let timeS = 0;
+  // M5 (fase 5d): os pings dos humanos (x, y, z, o time e quem mandou) e os balões de emote (quem, o texto e até quando).
+  const humanPings = new Float64Array(MAX_HUMAN_PINGS * 3);
+  const humanPingTeam = new Int8Array(MAX_HUMAN_PINGS);
+  const humanPingBy = new Float64Array(MAX_HUMAN_PINGS);
+  const humanPingUntil = new Float64Array(MAX_HUMAN_PINGS);
+  let humanPingNext = 0;
+  const emoteBy = new Float64Array(MAX_EMOTE_BUBBLES).fill(-1);
+  const emoteKind = new Uint8Array(MAX_EMOTE_BUBBLES);
+  const emoteUntil = new Float64Array(MAX_EMOTE_BUBBLES);
+  const emoteTexts = [1, 2, 3, 4].map((k) => t(`emote.${k}` as StringKey));
+  /** Um sinal da sim: o ping vai para a lista do time; o emote troca o balão de quem mandou (ou ocupa um vago). */
+  function onSignal(v: SimView, by: number, kind: number, x: number, y: number, z: number): void {
+    const i = entityIndex(by);
+    if (i >= v.count) return;
+    if (kind === 0) {
+      const k = humanPingNext;
+      humanPingNext = (humanPingNext + 1) % MAX_HUMAN_PINGS;
+      humanPings[k * 3] = x;
+      humanPings[k * 3 + 1] = y;
+      humanPings[k * 3 + 2] = z;
+      humanPingTeam[k] = v.team[i]!;
+      humanPingBy[k] = by;
+      humanPingUntil[k] = timeS + PING_SHOW_S;
+      return;
+    }
+    let slot = -1;
+    for (let b = 0; b < MAX_EMOTE_BUBBLES; b++) {
+      if (emoteBy[b] === by) slot = b;
+      else if (slot < 0 && emoteUntil[b]! <= timeS) slot = b;
+    }
+    if (slot < 0) return;
+    emoteBy[slot] = by;
+    emoteKind[slot] = kind;
+    emoteUntil[slot] = timeS + EMOTE_SHOW_S;
+  }
   /**
    * Gabarito e skin do boneco da entidade i: zumbi; o jogador 1 com o Meu Bobo (fase 6c); senão o look da rotação
    * pelo controlador no time dele (sem time no FFA). Tabelas prontas do loading: sem alocação.
@@ -1610,6 +1651,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           feedKill(v, ev.victim, ev.killer, ev.weapon, ev.headshot);
           break;
         }
+        case 'signal':
+          onSignal(v, ev.entity, ev.kind, ev.x, ev.y, ev.z);
+          break;
         case 'spawn': {
           const i = entityIndex(ev.entity);
           ensureCapacity(v.capacity);
@@ -3945,6 +3989,52 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.pings[m.pingCount * 2 + 1] = projected[1]!;
         m.pingCount++;
       }
+    }
+    // M5 (fase 5d): os pings dos humanos do time (no FFA, só os meus) e os balões de emote de todo mundo.
+    if (calibration === null && slot.controller >= 0) {
+      const mine = sim.controllerEntity(slot.controller);
+      for (let k = 0; k < MAX_HUMAN_PINGS && m.pingCount < MAX_TEAM_PINGS; k++) {
+        if (humanPingUntil[k]! <= timeS) continue;
+        if (ffa ? humanPingBy[k] !== mine : humanPingTeam[k] !== v.team[e]) continue;
+        if (
+          !projectToView(
+            desc.camera,
+            lay.rects[s]!,
+            humanPings[k * 3]!,
+            humanPings[k * 3 + 1]!,
+            humanPings[k * 3 + 2]!,
+            projected,
+          )
+        ) {
+          continue;
+        }
+        m.pings[m.pingCount * 2] = projected[0]!;
+        m.pings[m.pingCount * 2 + 1] = projected[1]!;
+        m.pingCount++;
+      }
+    }
+    m.bubbleCount = 0;
+    for (let b = 0; b < MAX_EMOTE_BUBBLES; b++) {
+      if (emoteUntil[b]! <= timeS) continue;
+      const i = entityIndex(emoteBy[b]!);
+      if (i >= v.count || v.alive[i] !== 1 || (v.flags[i]! & ENTITY_FLAG.dead) !== 0) continue;
+      const o = i * 3;
+      if (
+        !projectToView(
+          desc.camera,
+          lay.rects[s]!,
+          v.position[o]!,
+          v.position[o + 1]! + EMOTE_HEIGHT_M,
+          v.position[o + 2]!,
+          projected,
+        )
+      ) {
+        continue;
+      }
+      m.bubbles[m.bubbleCount * 2] = projected[0]!;
+      m.bubbles[m.bubbleCount * 2 + 1] = projected[1]!;
+      m.bubbleText[m.bubbleCount] = emoteTexts[emoteKind[b]! - 1] ?? '';
+      m.bubbleCount++;
     }
     // M2 (fase 2d): marcadores dos aliados (TDM), projetados com a câmera desta vista.
     m.markerCount = 0;

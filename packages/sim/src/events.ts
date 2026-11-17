@@ -186,6 +186,19 @@ export interface UnstuckEvent extends EventBase {
   readonly respawned: boolean;
 }
 
+/**
+ * M5 (fase 5d): um aviso de bobo, sem texto. `kind` 0 = ping no ponto (x, y, z) onde a mira bateu, para o time; 1..4 =
+ * um dos 4 emotes, para todos (x, y, z = acima da cabeça de quem mandou). Ver `systems/signals.ts`.
+ */
+export interface SignalEvent extends EventBase {
+  readonly type: 'signal';
+  readonly entity: EntityId;
+  readonly kind: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 export interface MatchPhaseEvent extends EventBase {
   readonly type: 'matchPhase';
   readonly phase: MatchPhase;
@@ -276,6 +289,7 @@ export type SimEvent =
   | BarricadeEvent
   | DoorEvent
   | PurchaseEvent
-  | BoxEvent;
+  | BoxEvent
+  | SignalEvent;
 
 export type SimEventType = SimEvent['type'];

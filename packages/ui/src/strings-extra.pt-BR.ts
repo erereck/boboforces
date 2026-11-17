@@ -277,6 +277,11 @@ export const STRINGS_EXTRA_PT_BR = {
   'pause.battery': 'Bateria {n}%',
   'pause.batteryCharging': 'Bateria {n}%, carregando',
   'match.batteryLow': 'Bateria em {n}%: ligue o carregador.',
+  // M5 (fase 5d): os 4 emotes (balões em cima do bobo; cada aperto do botão de emote passa para o próximo).
+  'emote.1': 'Boa!',
+  'emote.2': 'Valeu!',
+  'emote.3': 'Bora!',
+  'emote.4': 'Ops!',
   // M5 (fase 5a): o host online foi para segundo plano (a faixa da dica, no cliente).
   'match.hostAway': 'O host saiu do jogo por um instante.',
   'match.hostAwayEnds': 'O host saiu do jogo: acaba em {s} s.',
