@@ -355,6 +355,31 @@ function reachable(layout: LayoutResult, start: string): Set<string> {
  * Sem estouro: texto de botão cabe na largura menos o respiro (2·padX·escala) e dentro da altura; texto solto cabe na
  * área útil; botão com pelo menos o alvo mínimo. Devolve as larguras medidas (para a mensagem de erro ser útil).
  */
+/**
+ * M5 (fase 6c): o texto de um card (um `box` com id `card:*`) fica dentro dele. O `expectNoOverflow` só confere a tela:
+ * a descrição longa do X1 passava por baixo do card vizinho e o teste não via.
+ */
+function expectCardsFit(layout: LayoutResult, t: Target): void {
+  const inside = (node: UiNode, out: UiNode[]): UiNode[] => {
+    if (node.kind === 'text') out.push(node);
+    for (const child of 'children' in node ? (node.children ?? []) : []) inside(child, out);
+    return out;
+  };
+  for (const node of layout.order) {
+    if (node.kind !== 'box' || !node.id?.startsWith('card:')) continue;
+    const card = layout.rects.get(node) as Rect;
+    const pad = (node.padding ?? 0) * layout.scale;
+    for (const child of inside(node, [])) {
+      const text = layout.texts.get(child);
+      const r = layout.rects.get(child) as Rect | undefined;
+      if (!text || !r) continue;
+      expect(r.x + text.width, `${t.name}: "${text.text}" no ${node.id}`).toBeLessThanOrEqual(
+        card.x + card.w - pad + 0.5,
+      );
+    }
+  }
+}
+
 function expectNoOverflow(layout: LayoutResult, t: Target): void {
   const c = layout.content;
   for (const node of layout.order) {
@@ -686,6 +711,23 @@ describe('estouro de texto com o atlas real', () => {
             expect(text.width, `${t.name}: name${i}`).toBeLessThanOrEqual(ONLINE_ROOM.nameW * layout.scale + 0.5);
         }
       }
+    }
+  });
+
+  it('M5 (fase 6c): o texto de cada card dos Modos e da Partida da sala fica dentro do card', () => {
+    registerStrings(STRINGS_ONLINE_PT_BR);
+    const modes = modesScreen.build({
+      modes: [
+        { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
+        { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
+        { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'mode.desc.zombies' },
+        { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+        { id: 'surprise', nameKey: 'title.surprise', descKey: 'mode.desc.surprise' },
+        { id: 'custom', nameKey: 'mode.name.custom', descKey: 'mode.desc.custom' },
+      ],
+    });
+    for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS]) {
+      for (const tree of [modes, onlineMatchScreen.build(null)]) expectCardsFit(layoutFor(tree, t), t);
     }
   });
 

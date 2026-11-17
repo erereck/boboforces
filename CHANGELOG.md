@@ -55,6 +55,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   20 Hz (26% menos dados para cada amigo) e vê na sala "Você é o host: não troque de app durante a partida". Com um
   amigo no celular, a sala usa o teto do celular (12 bots, 24 zumbis, 90 m de visão): a partida escolhida perde bots
   do lado maior, e o host vê o aviso.
+- **A prova dos modos (fase 6c):** as duas abas do Edge jogam o X1 no Ringue e depois o Bobo Zombies na Base
+  Abandonada, escolhidos nos cards da sala, e voltam à sala entre um e outro. As descrições dos cards ficaram mais
+  curtas: as do X1 e do Surpreenda-me passavam do card, e no Switch 4:3 as do Bobo Zombies e do Training também.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

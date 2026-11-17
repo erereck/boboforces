@@ -572,7 +572,7 @@ export const STRINGS_PT_BR = {
   // M2 (fase 5d): Bobo Training.
   'training.line': 'Precisão {accuracy} · TTK médio {ttk} · Na cabeça {head} · Abates {kills}',
   'mode.name.training': 'Bobo Training',
-  'mode.desc.training': 'Alvos parados e andando no Ringue, sem placar.',
+  'mode.desc.training': 'Alvos parados e andando, sem placar.',
   // M2 (fase 5b): o Laboratório (editor de um bot por vez, gameplay.md §6).
   'lab.tab.skill': 'Habilidade',
   'lab.tab.mind': 'Inteligência',
@@ -835,7 +835,7 @@ export const STRINGS_PT_BR = {
   'mode.zombies': 'Bobo Zombies',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
-  'mode.desc.zombies': 'Ondas de bobos-zumbi. Caiu? O colega levanta.',
+  'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',
   'summary.zombieWaves': '{n} ondas',
   'summary.zombieEndless': 'Sem fim',
   'result.zombiesWin': 'Sobreviveram às {waves} ondas!',

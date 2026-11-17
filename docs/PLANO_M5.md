@@ -176,7 +176,7 @@ Os modos da sala e o host no celular, em 3 partes, cada uma verde e commitada:
   - **o aviso na sala:** "Você é o host: não troque de app durante a partida". O Wake Lock da partida já existe.
   - **feita em 17/11** (ARCHITECTURE §16.16).
 - **6c, a prova:** as duas abas do Edge passam pelos cards da sala, e os testes das partes ficam no portão. Depois, a
-  revisão.
+  revisão. **Feita em 17/11** (ARCHITECTURE §16.17).
 
 ## Riscos
 

@@ -3435,3 +3435,15 @@ Um revisor (Opus) leu as 4 partes e achou 5 problemas e 3 menores, todos corrigi
   no celular e o host no PC com um amigo no celular pelo jogo (`game.test.ts`); a partida do `match.test` também a
   20 Hz; e Times nos mapas de verdade a 20 e a 30 Hz (`online-modes.test.ts`). O layout da sala com as duas linhas
   novas cabe nos 6 alvos.
+
+### 16.17 Fase 6c: a prova dos modos (17/11/2026)
+
+- **`npm run online:web`** passa pelos cards: o host escolhe o X1 antes de o amigo chegar, os dois jogam 10 s no
+  Ringue pela rede (WebRTC de verdade entre as abas), voltam à sala, o host escolhe o Bobo Zombies e os dois jogam na
+  Base Abandonada (com o pool do host), voltam e o host fecha a sala. O roteiro confere pelo log do host que cada
+  partida começou com o modo certo. Com `--prints`, as capturas novas: `partida-da-sala`, `sala-amigo-zombies` e
+  `zombies-amigo`; a sala do host no celular já mostra o aviso.
+- **O texto dentro do card** (`expectCardsFit` no `fonts-in-use.test.ts`): o `expectNoOverflow` só conferia a tela, e
+  as capturas mostraram as descrições do X1 e do Surpreenda-me passando por baixo do card vizinho. Com a checagem nova
+  nos 8 alvos, apareceram também as do Bobo Zombies (3 px) e do Training (12 px) nos Modos do Switch 4:3. Todas
+  ficaram mais curtas; o respiro entre o botão e a descrição voltou a 8 (o contorno do foco encostava no texto).

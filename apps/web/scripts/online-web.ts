@@ -2,8 +2,10 @@
 // pelo `vite preview` e duas abas no mesmo Edge:
 //   1. o host abre o título, vai em Online, lê o aviso e cria a sala (pelo teclado, como um jogador);
 //   2. o amigo abre o link da sala (`#sala=XXXXX`) e cai direto no Entrar; entra;
-//   3. o host começa; os dois jogam pela rede (WebRTC de verdade entre as abas) por alguns segundos;
-//   4. o host sai pela pausa: os dois voltam à sala; o host sai da sala e o amigo vê "o host saiu".
+//   3. o host escolhe o X1 nos cards da sala (M5 fase 6c) e começa; os dois jogam no Ringue pela rede (WebRTC de verdade
+//      entre as abas) por alguns segundos;
+//   4. o host sai pela pausa: os dois voltam à sala; o host escolhe o Bobo Zombies e começa de novo, na Base Abandonada;
+//   5. o host sai pela pausa outra vez, sai da sala e o amigo vê "o host saiu".
 // Sem relay nenhum por padrão (`?sinal=local`: as abas se acham por um BroadcastChannel). `--relays`: a mesma rodada
 // pelos relays Nostr de verdade da `net.json` (só a sinalização efêmera, como o jogo faz). `--prints`: as capturas de cada
 // tela em `local/m5/prints/` (1280×720, mais uma passada do host num celular de 667×375 com toque), com o Escolher
@@ -14,6 +16,8 @@ import type { Browser, Page } from 'playwright-core';
 import { launchEdge, REPO_ROOT, startPreview, waitForTitle, type PageWindow } from './edge.ts';
 
 const PLAY_S = 10;
+/** A 2ª partida (o Bobo Zombies): só o bastante para os dois estarem jogando. */
+const ZOMBIES_S = 4;
 const STEP_TIMEOUT_MS = 30_000;
 const relays = process.argv.includes('--relays');
 const printsDir = process.argv.includes('--prints') ? join(REPO_ROOT, 'local', 'm5', 'prints') : null;
@@ -93,6 +97,28 @@ async function openPause(page: Page): Promise<void> {
     await tap(page, 'Escape');
 }
 
+/** Os logs do jogo de uma aba (os últimos `n`). */
+const logOf = (page: Page, n: number): Promise<readonly string[]> =>
+  page.evaluate((count) => (window as unknown as PageWindow).__bfDebug?.log?.(count) ?? [], n);
+
+/**
+ * M5 (fase 6c): da sala (o foco no Começar), o host abre o Escolher partida e anda nos cards até o que quer (`keys`,
+ * a partir do foco que a tela dá) e confirma; volta à sala com o foco no Começar.
+ */
+async function pickRoomMatch(page: Page, keys: readonly string[], card: string, print: string | null): Promise<void> {
+  await tap(page, 'ArrowDown');
+  await tap(page, 'Enter');
+  if (print !== null) await shot(page, print);
+  for (const key of keys) await tap(page, key);
+  await tap(page, 'Enter');
+  const start = Date.now();
+  while (!(await logOf(page, 6)).some((l) => l.includes(`[online] partida da sala: ${card} `))) {
+    if (Date.now() - start > STEP_TIMEOUT_MS)
+      throw new Error(`esperando o card ${card}: ${(await logOf(page, 6)).join(' | ')}`);
+    await page.waitForTimeout(100);
+  }
+}
+
 /** Uma captura (só com `--prints`). */
 async function shot(page: Page, name: string): Promise<void> {
   if (printsDir === null) return;
@@ -164,15 +190,20 @@ async function main(): Promise<number> {
     steps['sala'] = code;
     await shot(host, 'sala-host-sozinho');
     if (printsDir !== null) {
-      // Escolher partida: a Partida personalizada com "Usar na sala"; Voltar não muda nada.
+      // Escolher partida: os cards da sala; a Personalizada (embaixo, à direita) com "Usar na sala"; Voltar não muda
+      // nada e volta aos cards; Voltar de novo, à sala.
       await tap(host, 'ArrowDown');
       await tap(host, 'Enter');
+      for (const key of ['ArrowDown', 'ArrowDown', 'ArrowRight', 'Enter']) await tap(host, key);
       await until(host, 'a Partida personalizada', (s) => s.screen === 'custom');
       await shot(host, 'escolher-partida');
       await tap(host, 'Escape');
-      await until(host, 'a sala de novo', (s) => s.screen === 'online');
+      await until(host, 'os cards de novo', (s) => s.screen === 'online');
+      await tap(host, 'Escape');
       await tap(host, 'ArrowUp');
     }
+    // M5 (fase 6c): o X1 (o 3º card, embaixo do Times), antes de o amigo chegar.
+    await pickRoomMatch(host, ['ArrowDown'], 'x1', 'partida-da-sala');
 
     // 2. O amigo: o link da sala abre direto no Entrar.
     await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Bia', 1));
@@ -191,7 +222,7 @@ async function main(): Promise<number> {
     await shot(friend, 'sala-amigo');
     await shot(host, 'sala-host');
 
-    // 3. O host começa; os dois na partida pela rede.
+    // 3. O host começa o X1; os dois na partida pela rede, no Ringue.
     await tap(host, 'Enter');
     await until(host, 'a partida do host', (s) => s.screen === 'scene' && s.simTick > 0);
     await until(friend, 'a partida do amigo', (s) => s.screen === 'scene' && s.simTick > 0);
@@ -203,6 +234,8 @@ async function main(): Promise<number> {
     // O amigo mostra o host 100 ms atrás (6 ticks) mais o caminho da rede entre as abas.
     if (Math.abs(h.simTick - f.simTick) > 30) failures.push(`o amigo está longe do host: ${h.simTick} × ${f.simTick}`);
     if (h.simTick < PLAY_S * 50) failures.push(`a partida do host andou pouco: ${h.simTick} ticks em ${PLAY_S} s`);
+    if (!(await logOf(host, 30)).some((l) => l.includes('[online] partida warfare.tdm com 2 jogador(es)')))
+      failures.push('o host não começou o X1 (TDM com 2 jogadores)');
 
     if (printsDir !== null) {
       // A pausa do amigo (sem o Ajustar desafio; a partida não para) e o resultado online dele, que volta à sala antes
@@ -224,6 +257,33 @@ async function main(): Promise<number> {
     await until(host, 'o host de volta à sala', (s) => s.screen === 'online' && s.online?.status === 'lobby');
     await until(friend, 'o amigo de volta à sala', (s) => s.screen === 'online' && s.online?.status === 'lobby');
     await shot(host, 'sala-de-volta');
+
+    // 5. M5 (fase 6c): o Bobo Zombies (do lado do X1, onde o foco volta), na Base Abandonada, com o pool do host.
+    await pickRoomMatch(host, ['ArrowRight'], 'zombies', null);
+    await shot(friend, 'sala-amigo-zombies');
+    await tap(host, 'Enter');
+    const zStart = Date.now();
+    await until(host, 'o Bobo Zombies do host', (s) => s.screen === 'scene' && s.simTick > 0);
+    await until(friend, 'o Bobo Zombies do amigo', (s) => s.screen === 'scene' && s.simTick > 0);
+    steps['zombiesMs'] = Date.now() - zStart;
+    await host.waitForTimeout(ZOMBIES_S * 1000);
+    const [hz, fz] = [await snap(host), await snap(friend)];
+    await shot(friend, 'zombies-amigo');
+    steps['ticksZombies'] = { host: hz.simTick, amigo: fz.simTick };
+    if (Math.abs(hz.simTick - fz.simTick) > 30)
+      failures.push(`no Zombies, o amigo está longe do host: ${hz.simTick} × ${fz.simTick}`);
+    if (!(await logOf(host, 30)).some((l) => l.includes('[online] partida zombies com 2 jogador(es)')))
+      failures.push('o host não começou o Bobo Zombies');
+    await openPause(host);
+    for (let i = 0; i < 4; i++) await tap(host, 'ArrowDown');
+    await tap(host, 'Enter');
+    await until(host, 'o host de volta à sala (Zombies)', (s) => s.screen === 'online' && s.online?.status === 'lobby');
+    await until(
+      friend,
+      'o amigo de volta à sala (Zombies)',
+      (s) => s.screen === 'online' && s.online?.status === 'lobby',
+    );
+
     // O host sai da sala (Voltar põe o foco no Sair da sala): ela acaba para o amigo.
     await tap(host, 'Escape');
     await tap(host, 'Enter');

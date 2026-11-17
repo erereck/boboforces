@@ -85,9 +85,9 @@ export const STRINGS_ONLINE_PT_BR = {
   // M5 (fase 6a): a "Partida da sala" (os cards dos Modos, com os modos do online).
   'online.match.title': 'Partida da sala',
   'online.mode.x1': 'X1',
-  'online.mode.x1.desc': '1 contra 1 no Ringue. Com mais gente, cada um no lugar de um bot.',
-  'online.mode.zombies.desc': 'Todos juntos contra as ondas. Caiu? O colega levanta.',
-  'online.mode.surprise.desc': 'O jogo sorteia a partida. Escolha de novo para sortear outra.',
+  'online.mode.x1.desc': '1 contra 1 no Ringue; com 4, vira 2 contra 2.',
+  'online.mode.zombies.desc': 'Juntos contra as ondas de zumbis.',
+  'online.mode.surprise.desc': 'Sorteia a partida; de novo, sorteia outra.',
   'online.mode.custom.desc': 'Todas as regras, como no jogo sozinho.',
   // M5 (fase 6b): o host no celular e o menor teto da sala (tecnico.md §13.4; GDD §2).
   'online.room.phoneHost': 'Você é o host: não troque de app durante a partida.',

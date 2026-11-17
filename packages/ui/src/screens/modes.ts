@@ -40,7 +40,7 @@ export const modesScreen: Screen<ModesState> = {
       children: [
         {
           kind: 'column',
-          gap: 6,
+          gap: 8,
           children: [
             {
               kind: 'button',
