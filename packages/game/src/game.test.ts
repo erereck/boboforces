@@ -2152,7 +2152,7 @@ function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
   return room;
 }
 
-async function bootWithOnline(store: Readonly<Record<string, string>> = {}) {
+async function bootWithOnline(store: Readonly<Record<string, string>> = {}, onlineLink?: string) {
   const platform = createFakePlatform({ store });
   const made: FakeRoom[] = [];
   const rooms: OnlineRooms = {
@@ -2178,6 +2178,7 @@ async function bootWithOnline(store: Readonly<Record<string, string>> = {}) {
     loadScene,
     loadEditors,
     loadOnline: () => Promise.resolve({ module: ONLINE, rooms }),
+    ...(onlineLink !== undefined ? { onlineLink } : {}),
   });
   platform.pump(2);
   await settle();
@@ -2373,6 +2374,37 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     expect(room.calls).toContain('leave');
     expect(game.onlineRoom).toBeNull();
     game.dispose();
+  });
+
+  it('M5 (fase 4d): aberto por um link de sala, cai no Entrar com o código (depois do aviso, na 1ª vez)', async () => {
+    // 1ª vez: o aviso, e o Entrar logo depois; um aperto entra.
+    const first = await bootWithOnline({}, '#sala=ab3cd');
+    await settle();
+    first.platform.pump(2);
+    expect(first.game.screen).toBe('online');
+    first.platform.tap('Enter');
+    first.platform.tap('Enter');
+    expect(first.made.map((r) => [r.role, r.code])).toEqual([['client', 'AB3CD']]);
+    expect(first.platform.logLines.some((l) => l.includes('[online] link da sala AB3CD'))).toBe(true);
+    first.game.dispose();
+    // Aviso já lido: direto no Entrar.
+    const read = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const again = await bootWithOnline(read, '#x=1&sala=ZZZZZ');
+    await settle();
+    again.platform.pump(2);
+    again.platform.tap('Enter');
+    expect(again.made.map((r) => r.code)).toEqual(['ZZZZZ']);
+    again.game.dispose();
+    // Link sem código válido: a casa (o foco em Criar sala).
+    const bad = await bootWithOnline(read, '#sala=0O1I');
+    await settle();
+    bad.platform.pump(2);
+    expect(bad.game.screen).toBe('online');
+    bad.platform.tap('Enter');
+    expect(bad.made.map((r) => r.role)).toEqual(['host']);
+    bad.game.dispose();
   });
 
   it('sem `loadOnline` (o Switch) o título não tem o Online', async () => {

@@ -83,8 +83,11 @@ export interface OnlineFlowDeps {
 }
 
 export interface OnlineFlow {
-  /** Abre o Online pelo título (o aviso na 1ª vez). */
-  open(): void;
+  /**
+   * Abre o Online pelo título (o aviso na 1ª vez). M5 (fase 4d): com `link` (o `#sala=XXXXX` da URL), cai no Entrar
+   * com o código já posto (depois do aviso, se for a 1ª vez); um link sem código válido abre a casa.
+   */
+  open(link?: string): void;
   /** 1x por frame, em qualquer tela: a sala anda também durante a partida. */
   tick(): void;
   /** O frame da tela do Online: navega e desenha em `list`. */
@@ -166,6 +169,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   let ready = true;
   /** O host: a partida da sala (a Partida personalizada muda). */
   let recipe: MatchRecipe = deps.initialRecipe();
+  /** M5 (fase 4d): o código do link, esperando o aviso de privacidade ser lido. */
+  let linkCode: string | null = null;
   /** A partida que este aparelho já abriu (o cliente não reabre a mesma). */
   let entered: OnlineMatchStart | null = null;
   let inMatch = false;
@@ -351,6 +356,14 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     rebuild();
   }
 
+  /** O Entrar com o código já posto (o do link): o foco no Entrar, um aperto e pronto. */
+  function openJoin(fromLink: string): void {
+    linkCode = null;
+    code = fromLink;
+    note = '';
+    go('join', 'go');
+  }
+
   function startMatch(r: OnlineRoom): void {
     const view = r.view;
     if (view === null || r.status !== 'lobby') return;
@@ -478,8 +491,10 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     if (page === 'privacy') {
       if (a === ONLINE_ACTION.ok) {
         if (profile.privacy < ONLINE_PRIVACY_VERSION) saveProfile({ ...profile, privacy: ONLINE_PRIVACY_VERSION });
-        go('home', 'create');
+        if (linkCode !== null) openJoin(linkCode);
+        else go('home', 'create');
       } else if (nav.back || a === ONLINE_ACTION.back) {
+        linkCode = null;
         if (profile.privacy >= ONLINE_PRIVACY_VERSION) go('home', 'privacy');
         else deps.exit();
       }
@@ -541,10 +556,15 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     get room(): OnlineRoom | null {
       return room;
     },
-    open(): void {
+    open(link): void {
       note = '';
+      const fromLink = link === undefined ? null : rooms.codeFromLink(link);
+      if (link !== undefined) deps.log(`[online] link da sala ${fromLink === null ? 'sem código válido' : fromLink}`);
       if (room !== null) go('room');
-      else if (profile.privacy < ONLINE_PRIVACY_VERSION) go('privacy', 'ok');
+      else if (profile.privacy < ONLINE_PRIVACY_VERSION) {
+        linkCode = fromLink;
+        go('privacy', 'ok');
+      } else if (fromLink !== null) openJoin(fromLink);
       else go('home', 'create');
     },
     tick(): void {

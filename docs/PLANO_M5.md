@@ -112,8 +112,11 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
   - **feita em 16/11** (ARCHITECTURE §16.8). A rede de verdade (`@boboforces/net/rtc`) ficou num pedaço só dela; o
     núcleo do `net` e as telas foram com o pedaço da cena (com o `net` inteiro à parte, o menu passava dos 350 KB).
 - **4d, o link e a volta:** abrir o jogo por `#sala=XXXXX` cai direto no "Entrar". O hash não sai do navegador.
+  **Feita em 16/11** (ARCHITECTURE §16.9); a casca tira o hash da barra depois de ler.
 - **4e, a prova:** duas abas do Edge pela sinalização local, do título até o fim da partida (`rtc:web` estendido), e
   uma rodada pelos relays de verdade entre duas abas, só de leitura e escrita efêmera de sinalização, como o jogo faz.
+  **Feita em 16/11** (`npm run online:web`, ARCHITECTURE §16.9): do título à sala, à partida pela rede e de volta, e o
+  "host saiu"; o amigo entrou em 1,9 s pela sinalização local e em 4,4 s pelos relays de verdade.
 - **4f, a rodada de prints** (as telas e o texto do aviso de privacidade).
 
 ## Riscos

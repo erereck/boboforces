@@ -33,6 +33,18 @@ export interface WebDebugHook {
   readonly audio: GameHandle['audio'];
   /** Últimas linhas do log da plataforma (`[boot]`, `[bench]`, `[t0]`, avisos). */
   log(maxLines?: number): readonly string[];
+  /** M5 (fase 4e): a sala do Online aberta agora (o teste das duas abas, `npm run online:web`); `null` fora dela. */
+  readonly online: WebOnlineState | null;
+}
+
+/** O estado da sala que o teste das duas abas lê. */
+export interface WebOnlineState {
+  readonly code: string;
+  readonly role: string;
+  readonly status: string;
+  readonly end: string | null;
+  readonly mySlot: number;
+  readonly members: number;
 }
 
 export interface DebugHookSources {
@@ -81,5 +93,17 @@ export function createDebugHook(sources: DebugHookSources): WebDebugHook {
       return game.audio;
     },
     log: (maxLines = 200) => sources.recentLog(maxLines),
+    get online() {
+      const room = game.onlineRoom;
+      if (room === null) return null;
+      return {
+        code: room.code,
+        role: room.role,
+        status: room.status,
+        end: room.end,
+        mySlot: room.mySlot,
+        members: room.view?.members.length ?? 0,
+      };
+    },
   };
 }

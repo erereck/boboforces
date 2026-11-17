@@ -223,6 +223,11 @@ export interface GameDeps {
    * pedidas ao abrir o botão Online do título. Ausente = sem o botão (Switch, #1).
    */
   readonly loadOnline?: () => Promise<OnlineBundle>;
+  /**
+   * M5 (fase 4d): o jogo abriu por um link de sala (o hash `#sala=XXXXX`, que não sai do navegador): no primeiro quadro
+   * do título, o Online abre direto no Entrar com o código. Quem lê e valida o código é o pedaço do Online.
+   */
+  readonly onlineLink?: string;
 }
 
 /** M3: o módulo das telas de edição (`editors.ts`). */
@@ -839,9 +844,14 @@ export function startGame(deps: GameDeps): GameHandle {
   /** A partida em andamento é online (a volta é para a sala). */
   let playingOnline = false;
   const onlineRng = createRng((Math.floor(platform.now()) ^ 0x0b0b0) >>> 0);
-  function openOnline(): void {
+  /** O link da sala esperando o pedaço do Online chegar. */
+  let onlineLink: string | undefined;
+  function openOnline(link?: string): void {
+    if (link !== undefined) onlineLink = link;
     if (onlineFlow !== null) {
-      onlineFlow.open();
+      const pending = onlineLink;
+      onlineLink = undefined;
+      onlineFlow.open(pending);
       screen = 'online';
       return;
     }
@@ -2031,6 +2041,8 @@ export function startGame(deps: GameDeps): GameHandle {
     void startSoundFiles();
     pickAutoQuality();
     loadEditors();
+    // M5 (fase 4d): aberto por um link de sala: direto no Entrar.
+    if (deps.onlineLink !== undefined && deps.loadOnline) openOnline(deps.onlineLink);
     // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
     // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
     // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.

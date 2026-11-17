@@ -3250,3 +3250,25 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
 - **Visto no navegador:** o aviso, a casa e a sala com o código, no servidor de desenvolvimento. Essa sala, sem
   `?sinal=local`, anunciou o código pelos relays públicos (só a sinalização efêmera, como o jogo faz) e foi fechada em
   seguida.
+
+### 16.9 Fases 4d e 4e: o link da sala e a prova pelo jogo de verdade (16/11/2026)
+
+- **O link (4d):**
+  - quem abre o jogo por `…#sala=XXXXX` cai no Entrar com o código já posto, depois do aviso de privacidade se for a 1ª
+    vez; um aperto entra. Um link sem código válido abre a casa do Online;
+  - a casca só repassa o hash (`GameDeps.onlineLink`); quem lê e valida o código é o pedaço do Online
+    (`OnlineRooms.codeFromLink`), então o menu não ganha nada do `net` (+0,2 KB, 349,4 no total);
+  - o hash não vai a servidor nenhum, e a casca o tira da barra assim que o lê (`history.replaceState`): quem
+    recarrega, ou o jogo ao aplicar uma versão nova no título, não cai de novo na mesma sala.
+- **A prova (4e, `npm run online:web`):** o build servido pelo `vite preview` e duas abas no Edge headless, pelo
+  teclado, como um jogador:
+  - o host vai do título ao Online, lê o aviso e cria a sala; o amigo abre o link e entra; o host começa; os dois jogam
+    10 s pela rede (WebRTC de verdade entre as abas); o host sai pela pausa e os dois voltam à sala; o host sai da sala
+    e o amigo vê "o host saiu";
+  - o gancho `window.__bfDebug.online` dá o código, o papel, o estado e quantos estão na sala;
+  - a aba de trás roda devagar (o navegador segura os quadros dela): o roteiro traz para a frente a aba que recebe a
+    tecla e segura a tecla por 3 quadros do jogo;
+  - **sinalização local** (`?sinal=local`, padrão): o amigo entrou em 1,9 s; depois de 10 s o amigo estava 7 ticks
+    atrás do host (os 100 ms da interpolação);
+  - **relays de verdade** (`--relays`, uma rodada só, como o jogo faz: eventos efêmeros de sinalização nos relays da
+    `net.json` e o STUN da Cloudflare): o amigo entrou em 4,4 s; 8 ticks atrás do host; a volta à sala e o fim, iguais.

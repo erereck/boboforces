@@ -68,6 +68,11 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
   // Prévia do título do Switch (`?titulo=switch`, prints da decisão #54): a plataforma com a cara do Switch e os 9
   // itens de teste dele, sem cena (`title-preview.ts`).
   const switchTitle = !bench && urlAsksForSwitchTitle(window.location.search);
+  // M5 (fase 4d): o link da sala (`#sala=XXXXX`; o hash não vai a servidor nenhum). Lido uma vez e tirado da barra:
+  // quem recarrega (ou o jogo, ao aplicar uma versão nova no título) não cai de novo na mesma sala.
+  const hash = window.location.hash;
+  const onlineLink = !bench && !switchTitle && /(^#|&)sala=/i.test(hash) ? hash : undefined;
+  if (onlineLink !== undefined) history.replaceState(null, '', window.location.pathname + window.location.search);
   const game = startGame({
     platform: switchTitle ? asSwitchTitlePlatform(platform) : platform,
     // O menu desenha com o renderer só de UI; o completo (mundo, atores, VFX) chega com a cena (`loadScene`), por
@@ -81,6 +86,7 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
     loadEditors: () => import('@boboforces/game/editors'),
     // M5 (fase 4c): o Online (as telas, a sala e o núcleo do `net`) vem com o chunk da cena e a rede de verdade (o
     // Trystero, `@boboforces/net/rtc`) num chunk só dela, pedidos juntos ao abrir o botão do título. Fora do bench e da prévia do título do Switch. `?sinal=local`: as abas do mesmo navegador se acham sem relay (o teste).
+    ...(onlineLink !== undefined ? { onlineLink } : {}),
     ...(bench || switchTitle
       ? {}
       : {

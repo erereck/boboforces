@@ -262,6 +262,10 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   cena (~25 KB a mais na primeira partida). Com o `net` inteiro num pedaço só dele, o empacotador tirava o núcleo do
   `format` do menu para 4 pedaços à parte e o menu ia a 351,2 KB (ARCHITECTURE §16.8). `rtc:web` depois da divisão:
   conectou em 0,86–1,04 s, 654 snapshots, 933 eventos, 0 predição acima de 10 cm.
+- **O Online pelo jogo de verdade (fases 4d e 4e, `npm run online:web`):** duas abas do Edge headless na mesma
+  máquina, do título até a sala pelo teclado. Do link aberto à sala: **1,9 s** com a sinalização local e **4,4 s**
+  pelos relays de verdade (uma rodada). Depois de 10 s de partida, o amigo estava 7–8 ticks atrás do host (a
+  interpolação de 100 ms). O menu foi a 349,4 KB com o link (+0,2).
 - **Laço por tipo de array:** capturar e aplicar campo a campo num laço só deixava a leitura e a escrita megamórficas
   (7 tipos de typed array no mesmo ponto). Com um laço por tipo, aplicar 76 entidades caiu de 568 para **90 µs** e a
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).

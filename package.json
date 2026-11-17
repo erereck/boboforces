@@ -40,7 +40,8 @@
     "audioconv": "node tools/audioconv/src/index.ts",
     "fontbake": "node tools/fontbake/src/index.ts",
     "check": "npm run typecheck && npm test && npm run format:check && npm run guard",
-    "rtc:web": "node apps/web/scripts/rtc-web.ts"
+    "rtc:web": "node apps/web/scripts/rtc-web.ts",
+    "online:web": "node apps/web/scripts/online-web.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

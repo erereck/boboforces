@@ -34,6 +34,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   time, Copiar link e, para o host, Começar, Escolher partida (a Partida personalizada de sempre), Trancar e Tirar. Na
   partida os amigos aparecem com o nome deles, e no fim todo mundo volta à sala para a próxima. No celular, a
   Cena-vitrine saiu do título para o Online caber.
+- **O link da sala (fase 4d):** quem abre o link que o host copiou cai direto no Entrar, com o código já posto.
+- **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
+  voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 
 ### M4: o porte do Switch (planejado em 16/11/2026)
 
