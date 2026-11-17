@@ -60,6 +60,10 @@ export async function loadWebOnline(rtc: RtcModule, options: WebOnlineOptions): 
       crypto.getRandomValues(random);
       return random[0]! / 0x1_0000_0000;
     },
+    randomHex16: () => {
+      const words = crypto.getRandomValues(new Uint32Array(2));
+      return words[0]!.toString(16).padStart(8, '0') + words[1]!.toString(16).padStart(8, '0');
+    },
     linkFor: (code) => `${location.origin}${location.pathname}${net.roomLinkHash(code)}`,
     copy: (text) =>
       navigator.clipboard

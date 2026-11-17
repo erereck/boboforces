@@ -392,7 +392,8 @@ describe('mapa do M1: marcadores, área jogável e plano de morte', () => {
   });
 });
 
-describe('capacidade: 4 humanos + 64 bots + 64 zumbis', () => {
+// Monta e roda 132 corpos: ~2 s sozinho, mas passava dos 5 s padrão com a suíte inteira em paralelo (M5, fase 5).
+describe('capacidade: 4 humanos + 64 bots + 64 zumbis', { timeout: 30_000 }, () => {
   it('cria, roda e mantém o hash determinístico', () => {
     const hashOnce = (): number => {
       const sim = createSim({

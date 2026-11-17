@@ -4,7 +4,7 @@ import type { Sim, SimEvent } from '@boboforces/sim';
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
 import { describe, expect, it } from 'vitest';
 import type { OnlineClientLink, OnlineHostLink, OnlineSession } from './online-api.ts';
-import { onlineRecipe } from './online-api.ts';
+import { ONLINE_CONTROL, onlineRecipe } from './online-api.ts';
 import { sceneRecipe } from './scene/match.ts';
 import { createSceneDriver } from './scene/scene-driver.ts';
 import { PLATFORM_PROFILES } from '@boboforces/format';
@@ -99,6 +99,7 @@ function fakeOnline(role: 'host' | 'client'): {
         get hostAbsentS() {
           return absent.s;
         },
+        hostAwayNotified: false,
         dispose: () => calls.push('client-dispose'),
       };
       return link;
@@ -203,13 +204,13 @@ describe('as ausências na cena (M5 fase 5a)', () => {
     for (let i = 0; i < 10; i++) d.update(1 / 60);
     const remoteCalls = (): number => fake.calls.filter((c) => c === 'remote:1').length;
     // Foi embora (AFK): a entrada dele não é mais lida (o bot joga).
-    fake.control.push(1 * 2);
+    fake.control.push(1 * 4 + ONLINE_CONTROL.away);
     d.update(1 / 60);
     const away = remoteCalls();
     for (let i = 0; i < 10; i++) d.update(1 / 60);
     expect(remoteCalls()).toBe(away);
     // Voltou: a entrada dele volta a ser lida.
-    fake.control.push(1 * 2 + 1);
+    fake.control.push(1 * 4 + ONLINE_CONTROL.back);
     for (let i = 0; i < 10; i++) d.update(1 / 60);
     expect(remoteCalls()).toBeGreaterThan(away + 5);
     d.dispose();

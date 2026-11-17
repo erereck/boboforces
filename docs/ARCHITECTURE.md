@@ -3361,3 +3361,28 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
 - **Testes:** a sim (o ping no chão olhando para baixo e no fim do alcance olhando para o céu, segurar não repete, o
   intervalo, o emote de 1 a 4 e de volta ao 1), o formato do evento pela rede, o balão no HUD (dentro da vista; fora
   dela, nada) e, no Edge, o balão e o ping numa partida em 3ª pessoa. Switch +6 KB.
+
+### 16.14 A revisão da fase 5 (16/11/2026)
+
+Um revisor (Opus) leu as 4 partes e achou 5 problemas e 3 menores, todos corrigidos:
+
+- **AFK e depois saiu de vez:** a saída zerava a atividade (-1), o que parecia "voltou", e o bot soltava a vaga sem
+  ninguém no lugar. Agora sem cliente não há o que medir, e o código da mudança separa "voltou do AFK" de "caiu e
+  voltou" (`ONLINE_CONTROL`: `away`, `back`, `rejoined`, em `controlador * 4 + código`); só a volta depois de cair
+  devolve o controlador à rede.
+- **A volta antes de o host ver a queda** (o celular trocou de rede: o lado do amigo cai na hora, o do host só depois
+  do prazo do ICE): o hello novo com o mesmo id ouvia "sala trancada" e a sala acabava. Agora o host tira a conexão
+  antiga e trata a nova como volta; e o amigo que ouvir "trancada" ou "cheia" enquanto volta tenta de novo a cada
+  1,5 s até o prazo de 20 s.
+- **A queda e a volta na mesma leitura do lobby** (a aba do host parada): a diferença do estado não via a saída e a
+  sessão não trocava o peer. Agora a volta põe a saída antes dela.
+- **"Host ausente" falso no começo:** um amigo cuja cena carregava 3 s antes da do host (o celular demora) via a faixa e
+  parava. Agora antes do 1º snapshot não é ausência (só o aviso do host conta).
+- **O PvP acabando pela minha queda:** 10 s de silêncio também podem ser a conexão do amigo caindo, e aí a sala já
+  tenta voltar. Agora só o aviso do host (`hostAwayNotified`) conta os 10 s; o silêncio mostra só a faixa.
+- **Menores:** o id do aparelho sai do sorteio forte do navegador (`OnlineRooms.newDeviceId`, com o `crypto`; antes
+  vinha de um RNG semeado pelo relógio do boot); `takeLeftSlots` e `takeRejoined` devolvem a mesma lista vazia em vez de
+  alocar a cada quadro; o evento `signal` foi para o fim do esquema (os índices dos outros eventos não mudam).
+- **Testes novos:** a queda só do lado do amigo (a volta pega o boneco e o aviso atrasado da conexão antiga não a
+  tira), o AFK seguido da saída, o 1º snapshot demorado e o silêncio sem fim no PvP. O teste de capacidade da sim
+  ganhou prazo (passava dos 5 s com a suíte em paralelo).

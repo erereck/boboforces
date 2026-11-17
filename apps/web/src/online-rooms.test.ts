@@ -1,5 +1,5 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { createMatchSim, onlineRecipe, type OnlineRoom } from '@boboforces/game';
+import { createMatchSim, ONLINE_CONTROL, onlineRecipe, type OnlineRoom } from '@boboforces/game';
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
 import * as net from '@boboforces/net';
 import { describe, expect, it } from 'vitest';
@@ -62,6 +62,7 @@ function fakeInternet() {
     return t;
   };
   let codeSeed = 0;
+  let hexSeed = 0;
   const service = createWebRooms({
     net,
     connect,
@@ -73,6 +74,7 @@ function fakeInternet() {
       return Promise.resolve(true);
     },
     log: () => undefined,
+    randomHex16: () => (++hexSeed).toString(16).padStart(16, '0'),
   });
   const pump = async (frames: number, rooms: readonly OnlineRoom[]): Promise<void> => {
     for (let i = 0; i < frames; i++) {
@@ -96,7 +98,15 @@ function fakeInternet() {
       c.self.t.onPeerLeave?.(m.id);
     }
   };
-  return { service, pump, copied, cut, advanceClock: (ms: number) => (clock += ms) };
+  /**
+   * Só o lado da conexão `n` percebe a queda (o celular trocou de rede): o host continua achando que ela está lá até o
+   * aviso atrasado de quando ela sair de vez.
+   */
+  const cutOneSide = (n: number): void => {
+    const c = conns[n]!;
+    for (const m of c.members) if (m !== c.self) c.self.t.onPeerLeave?.(m.id);
+  };
+  return { service, pump, copied, cut, cutOneSide, advanceClock: (ms: number) => (clock += ms) };
 }
 
 describe('a sala do Online na web (M5 fase 4c)', () => {
@@ -240,7 +250,48 @@ describe('a queda e a volta (M5 fase 5b)', () => {
     expect(link.takeLost(lost)).toBe(1);
     expect(lost).toEqual([biaController]);
     expect(link.takeControl(control)).toBe(1);
-    expect(control).toEqual([biaController * 2 + 1]);
+    expect(control).toEqual([biaController * 4 + ONLINE_CONTROL.rejoined]);
+    link.dispose();
+  });
+
+  it('a volta chega antes de o host ver a queda: a conexão antiga sai e a nova pega o boneco', async () => {
+    const { service, pump, cutOneSide } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    await pump(30, [host, bia]);
+    host.setLocked(true);
+    const placed = onlineRecipe(
+      recipe,
+      host.view!.members.map((m) => m.team),
+    );
+    const started = host.start(placed.recipe, 7, placed.controllers);
+    await pump(10, [host, bia]);
+    const first = bia.match!;
+    const { map } = buildSyntheticConstruto();
+    const link = started.session.attachHost(
+      createMatchSim({ recipe: { ...placed.recipe, seed: 7 }, map, humans: 2, writeHumanFrame: () => undefined }),
+    );
+    const c = placed.controllers[1]!;
+    cutOneSide(1);
+    const statuses = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      await pump(1, [host, bia]);
+      statuses.add(bia.status);
+    }
+    // Não ouviu "trancada": voltou jogando, e o host trocou a conexão (saída antes da volta, no mesmo quadro).
+    expect(statuses.has('ended')).toBe(false);
+    expect(bia.status).toBe('playing');
+    expect(bia.match).not.toBe(first);
+    const lost: number[] = [];
+    const control: number[] = [];
+    expect(link.takeLost(lost)).toBe(1);
+    expect(lost).toEqual([c]);
+    expect(link.takeControl(control)).toBe(1);
+    expect(control).toEqual([c * 4 + ONLINE_CONTROL.rejoined]);
+    // O aviso atrasado da conexão antiga não tira a nova.
+    await pump(30, [host, bia]);
+    expect(host.view!.members.map((m) => m.name).sort()).toEqual(['Bia', 'Erick']);
+    expect(bia.status).toBe('playing');
     link.dispose();
   });
 

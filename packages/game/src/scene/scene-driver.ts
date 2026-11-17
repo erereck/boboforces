@@ -1,7 +1,13 @@
 import type { BotDirectorWithStats } from '@boboforces/ai';
 import type { Sim } from '@boboforces/sim';
 import { createLocalDriver, createMatchSim, type LocalDriverConfig, type MatchDriver } from '../local-driver.ts';
-import { HOST_AWAY_END_S, waitsForHost, type OnlineHostLink, type OnlineSession } from '../online-api.ts';
+import {
+  HOST_AWAY_END_S,
+  ONLINE_CONTROL,
+  waitsForHost,
+  type OnlineHostLink,
+  type OnlineSession,
+} from '../online-api.ts';
 
 /**
  * O que conduz a partida da cena (M5 fase 4b): o `LocalDriver` de sempre (solo e sofá), ele mesmo com os amigos
@@ -20,6 +26,8 @@ export interface SceneDriver extends MatchDriver {
   readonly online: boolean;
   /** M5 (fase 5a): o cliente online: há quantos segundos o host está ausente (0 = presente, e sempre 0 fora dele). */
   readonly hostAbsentS: number;
+  /** M5 (fase 5a): a ausência veio do aviso do host (só aí o PvP acaba em 10 s). */
+  readonly hostAwayNotified: boolean;
   /**
    * M5 (fase 5a): a aba sumiu (`true`) ou voltou, com o relógio da plataforma em ms. O host online avisa os amigos e,
    * num PvP, volta de mais de `HOST_AWAY_END_S` encerrando a partida. Fora do host online, nada.
@@ -46,6 +54,7 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       },
       setHumanControlled: (c, on) => d.setHumanControlled(c, on),
       hostAbsentS: 0,
+      hostAwayNotified: false,
       setHidden: () => undefined,
       update: (s) => d.update(s),
       dispose: () => d.dispose(),
@@ -72,6 +81,9 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       lastSimMs: 0,
       get hostAbsentS(): number {
         return link.hostAbsentS;
+      },
+      get hostAwayNotified(): boolean {
+        return link.hostAwayNotified;
       },
       setHidden: () => undefined,
       setHumanControlled: () => undefined,
@@ -123,6 +135,7 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
     },
     setHumanControlled: (c, on) => d.setHumanControlled(c, on),
     hostAbsentS: 0,
+    hostAwayNotified: false,
     setHidden(hidden, nowMs): void {
       if (hidden === hiddenAt >= 0) return;
       link!.setAway(hidden);
@@ -145,18 +158,20 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       // M5 (fase 5a): AFK (60 s sem entrada) passa ao bot; a primeira entrada de verdade devolve.
       const k = l.takeControl(control);
       for (let i = 0; i < k; i++) {
-        const c = control[i]! >> 1;
-        const back = (control[i]! & 1) === 1;
-        // M5 (fase 5b): quem caiu e voltou é do time da rede de novo.
-        if (back) remote.add(c);
+        const c = control[i]! >> 2;
+        const kind = control[i]! & 3;
+        // M5 (fase 5b): só quem caiu e voltou é da rede de novo (um "voltou do AFK" de quem já saiu não conta).
+        if (kind === ONLINE_CONTROL.rejoined) remote.add(c);
         if (!remote.has(c)) continue;
-        if (back) away.delete(c);
-        else {
+        if (kind === ONLINE_CONTROL.away) {
           away.add(c);
           // O tiro do bot não volta no tempo pelo que o amigo via (fase 2d).
           d.sim.rewind.set(c, 0);
+          d.setHumanControlled(c, false);
+        } else {
+          away.delete(c);
+          d.setHumanControlled(c, true);
         }
-        d.setHumanControlled(c, back);
       }
       const ticks = d.update(s);
       if (ticks > 0) l.afterTicks();

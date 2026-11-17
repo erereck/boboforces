@@ -2554,10 +2554,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return;
     }
     if (resultShown) return;
-    const coop = waitsForHost(recipe.mode);
+    // Só o aviso do host conta os 10 s do PvP: o silêncio sozinho pode ser a minha conexão caindo (aí a sala tenta
+    // voltar, e a partida não deve acabar antes).
+    const coop = waitsForHost(recipe.mode) || !driver.hostAwayNotified;
     const left = coop ? -1 : Math.max(0, Math.ceil(HOST_AWAY_END_S - absent));
     if (left !== hostAwayShown) {
-      if (hostAwayShown === -2) host.log(`[partida] host ausente (${coop ? 'coop: espera' : 'PvP: 10 s'})`);
+      if (hostAwayShown === -2) host.log(`[partida] host ausente (${coop ? 'espera' : 'PvP: 10 s'})`);
       hostAwayShown = left;
       hostAwayText = coop ? t('match.hostAway') : t('match.hostAwayEnds', { s: left });
     }

@@ -35,6 +35,8 @@ export interface WebRoomsDeps {
   readonly now: () => number;
   /** Em [0, 1) (o código da sala novo). */
   readonly random: () => number;
+  /** M5 (fase 5b): 16 dígitos hexadecimais do sorteio forte (o id do aparelho). */
+  readonly randomHex16: () => string;
   /** O link da sala (`https://…/#sala=XXXXX`). */
   linkFor(code: string): string;
   /** Copia para a área de transferência; `false` se recusou. */
@@ -48,11 +50,16 @@ export interface WebRoomsDeps {
 export const JOIN_TIMEOUT_MS = 20_000;
 /** M5 (fase 5b): quem perdeu o host sem o "fechei a sala" tenta voltar por este tempo. */
 export const RECONNECT_TIMEOUT_MS = 20_000;
+/** M5 (fase 5b): voltando, o host ainda com o lugar antigo ("trancada"/"cheia"): a próxima tentativa sai depois disto. */
+export const RECONNECT_RETRY_MS = 1500;
 /** M5 (fase 5b): o host fecha a sala e espera isto antes de soltar a conexão (o aviso tem que sair). */
 export const CLOSE_GRACE_MS = 300;
 /** O ritmo da partida online (o welcome leva; tecnico.md §13.3). */
 export const ONLINE_HZ = 60;
 export const ONLINE_SNAPSHOT_HZ = 30;
+
+const NONE: readonly number[] = [];
+const NONE_REJOINED: readonly LobbyRejoin[] = [];
 
 const toLobby = (c: OnlineRoomChoice): LobbyChoice => ({ name: c.name, team: c.team, bobo: null, ready: c.ready });
 
@@ -104,6 +111,9 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     lobby.onRejoin = (r) => {
       if (status !== 'playing') return;
       deps.log(`[online] sala ${code}: o lugar ${r.oldSlot} voltou (agora ${r.slot})`);
+      // Caiu e voltou na mesma leitura do lobby (a aba do host estava parada): a diferença do estado não viu a saída,
+      // então ela entra aqui, antes da volta (a sessão lê as saídas antes das voltas).
+      if (inMatch.delete(r.oldSlot)) left.push(r.oldSlot);
       inMatch.add(r.slot);
       rejoined.push(r);
     };
@@ -175,8 +185,9 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
           welcome: null,
           snapshotHz: ONLINE_SNAPSHOT_HZ,
           isClosed: () => closed,
-          takeLeftSlots: () => left.splice(0),
-          takeRejoined: () => rejoined.splice(0),
+          // Quase sempre vazias: a mesma lista vazia, sem alocar a cada quadro.
+          takeLeftSlots: () => (left.length === 0 ? NONE : left.splice(0)),
+          takeRejoined: () => (rejoined.length === 0 ? NONE_REJOINED : rejoined.splice(0)),
           onAttached: (on) => {
             attached = on;
           },
@@ -221,6 +232,8 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     let closed = false;
     /** Desde quando procura o host (a 1ª vez ou voltando depois de cair). */
     let since = deps.now();
+    /** Voltando: a próxima tentativa (depois de ouvir "trancada" ou "cheia" do host que ainda não viu a queda). */
+    let retryAt = -1;
     // A conexão de agora (cada volta abre outra, com o mesmo código e o mesmo aparelho).
     let transport!: RoomTransport;
     let matchEp!: NetEndpoint;
@@ -233,10 +246,13 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       void transport.leave();
     };
     /** M5 (fase 5b): o host sumiu sem fechar a sala: a conexão caiu (a minha ou a dele). Tenta voltar por 20 s. */
-    const reconnect = (): void => {
-      deps.log(`[online] sala ${code}: a conexão com o host caiu, voltando`);
+    const reconnect = (again = false): void => {
+      if (!again) {
+        deps.log(`[online] sala ${code}: a conexão com o host caiu, voltando`);
+        since = deps.now();
+      }
       status = 'reconnecting';
-      since = deps.now();
+      retryAt = -1;
       const old = transport;
       // O Trystero só entra de novo na mesma sala depois de sair da anterior.
       void Promise.resolve(old.leave()).then(() => {
@@ -286,8 +302,14 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
           }
           match = { recipe: start.recipe, seed: start.seed, session };
         }
-      } else if (st === 'rejected') finish(lc.rejection === null || lc.rejection === 'ok' ? 'mismatch' : lc.rejection);
-      else if (st === 'kicked') finish('kicked');
+      } else if (st === 'rejected') {
+        // Voltando, "trancada" e "cheia" são o lugar antigo ainda ocupado do lado do host: tenta de novo daqui a pouco.
+        if (status === 'reconnecting' && (lc.rejection === 'locked' || lc.rejection === 'full')) {
+          retryAt = deps.now() + RECONNECT_RETRY_MS;
+          return;
+        }
+        finish(lc.rejection === null || lc.rejection === 'ok' ? 'mismatch' : lc.rejection);
+      } else if (st === 'kicked') finish('kicked');
       else if (st === 'closed' && !closed) {
         if (lc.hostClosed || lc.welcome === null) finish('host-left');
         else reconnect();
@@ -329,6 +351,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
         const waited = deps.now() - since;
         if (status === 'connecting' && waited > timeout) finish('not-found');
         if (status === 'reconnecting' && waited > RECONNECT_TIMEOUT_MS) finish('host-left');
+        else if (status === 'reconnecting' && retryAt >= 0 && deps.now() >= retryAt) reconnect(true);
         if (!attached && status !== 'playing') drain(matchEp);
       },
       setChoice: (c) => {
@@ -360,5 +383,6 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     codeAlphabet: net.ROOM_CODE_ALPHABET,
     codeLength: net.ROOM_CODE_LENGTH,
     codeFromLink: (text) => net.parseRoomHash(text),
+    newDeviceId: () => deps.randomHex16(),
   };
 }

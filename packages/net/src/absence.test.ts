@@ -86,6 +86,19 @@ describe('as ausências (M5 fase 5a)', () => {
     p.client.dispose();
   });
 
+  it('antes do 1º snapshot não é ausência (o host ainda carregando a cena)', () => {
+    const p = pair();
+    p.run(60 * 6, false);
+    expect(p.client.hostAbsentS).toBe(0);
+    expect(p.client.hostAwayNotified).toBe(false);
+    p.netHost.setAway(true);
+    p.run(10, false);
+    expect(p.client.hostAbsentS).toBeGreaterThan(0);
+    expect(p.client.hostAwayNotified).toBe(true);
+    p.host.dispose();
+    p.client.dispose();
+  });
+
   it('sem aviso (o celular suspendeu a aba), 3 s sem snapshot contam como host ausente', () => {
     const p = pair();
     p.run(60);

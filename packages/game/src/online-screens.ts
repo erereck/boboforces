@@ -195,10 +195,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
    * volta, e barra quem ele tirou.
    */
   function deviceId(): string {
-    if (profile.id === '') {
-      const hex = (n: number): string => (n >>> 0).toString(16).padStart(8, '0');
-      saveProfile({ ...profile, id: hex(deps.seed()) + hex(deps.seed()) });
-    }
+    if (profile.id === '') saveProfile({ ...profile, id: rooms.newDeviceId() });
     return profile.id;
   }
 

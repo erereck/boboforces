@@ -290,6 +290,16 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     reply.reset();
     const slot = slotOfPeer(peer);
     const id = theirs.deviceId ?? '';
+    // M5 (fase 5b): o mesmo aparelho voltou por outra conexão antes de o host ver a antiga cair (o celular trocou de
+    // rede): a antiga sai agora (fica lembrada como quem caiu) e a nova entra como volta.
+    if (slot < 0 && started && id !== '' && !banned.has(id)) {
+      for (const [s, sid] of idOfSlot) {
+        if (sid === id && peers.get(s) !== peer) {
+          remove(s);
+          break;
+        }
+      }
+    }
     const back = slot < 0 && started && id !== '' ? dropped.get(id) : undefined;
     const verdict = checkHello(hello, theirs);
     if (verdict !== 'ok') {

@@ -1,5 +1,5 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { createSceneDriver, onlineRecipe } from '@boboforces/game';
+import { createSceneDriver, ONLINE_CONTROL, onlineRecipe } from '@boboforces/game';
 import { quantizeAxis } from '@boboforces/input';
 import * as net from '@boboforces/net';
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
@@ -137,9 +137,11 @@ describe('o AFK pela rede de mentira (M5 fase 5a)', () => {
         { slot: 1, name: 'Bia', team: 1, bobo: null, ready: true, controller: placed.controllers[1]! },
       ],
     };
+    const leftSlots: number[] = [];
     const common = { net, start, snapshotHz: 30, isClosed: () => false, takeLeftSlots: () => [] } as const;
     const hostSession = createOnlineSession({
       ...common,
+      takeLeftSlots: () => leftSlots.splice(0),
       role: 'host',
       endpoint: loop.endpoint(0),
       mySlot: 0,
@@ -201,11 +203,18 @@ describe('o AFK pela rede de mentira (M5 fase 5a)', () => {
     moving.on = false;
     frames(61 * 60);
     const c = placed.controllers[1]!;
-    expect(decided).toEqual([c * 2]);
+    expect(decided).toEqual([c * 4 + ONLINE_CONTROL.away]);
     // Um passo: a vaga volta para ele.
     moving.on = true;
     frames(30);
-    expect(decided).toEqual([c * 2, c * 2 + 1]);
+    expect(decided).toEqual([c * 4 + ONLINE_CONTROL.away, c * 4 + ONLINE_CONTROL.back]);
+    // AFK de novo e saiu de vez (fechou a aba): a saída não vira "voltou" (o bot segue no lugar).
+    moving.on = false;
+    frames(61 * 60);
+    expect(decided.at(-1)).toBe(c * 4 + ONLINE_CONTROL.away);
+    leftSlots.push(1);
+    frames(30);
+    expect(decided.at(-1)).toBe(c * 4 + ONLINE_CONTROL.away);
     host.dispose();
     client.dispose();
   }, 120_000);

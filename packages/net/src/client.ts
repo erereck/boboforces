@@ -91,6 +91,11 @@ export interface ClientDriver extends NetMatchDriver {
    * snapshot quando passa de `HOST_SILENT_S` sem nada.
    */
   readonly hostAbsentS: number;
+  /**
+   * M5 (fase 5a): a ausência veio do aviso do host (ele saiu da tela). Só o silêncio pode ser a minha conexão caindo
+   * (aí quem resolve é a volta da sala, não o fim da partida).
+   */
+  readonly hostAwayNotified: boolean;
 }
 
 /** Fila de ticks locais por frame (como o `LocalDriver`): frame limitado a 0,1 s, no máximo 4 ticks. */
@@ -161,6 +166,8 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   let awaySince = 0;
   const absentS = (): number => {
     if (hostAway) return Math.max(clientTime - awaySince, 1e-3);
+    // Antes do 1º snapshot não é ausência: o host pode estar só carregando a cena (o celular leva mais).
+    if (arrivalTick < 0) return 0;
     const silent = clientTime - arrivalTime;
     return silent >= HOST_SILENT_S ? silent : 0;
   };
@@ -300,6 +307,9 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     },
     get hostAbsentS(): number {
       return absentS();
+    },
+    get hostAwayNotified(): boolean {
+      return hostAway;
     },
     update(frameSeconds: number): number {
       if (!helloSent) {

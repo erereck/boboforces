@@ -2073,9 +2073,9 @@ interface FakeRoom extends OnlineRoom {
 function fakeSession(
   role: 'host' | 'client',
   calls: string[],
-): { session: OnlineSession; close(): void; absent: { s: number } } {
+): { session: OnlineSession; close(): void; absent: { s: number; notified: boolean } } {
   let closed = false;
-  const absent = { s: 0 };
+  const absent = { s: 0, notified: false };
   const session: OnlineSession = {
     role,
     humans: 2,
@@ -2107,6 +2107,9 @@ function fakeSession(
         alpha: 0,
         get hostAbsentS() {
           return absent.s;
+        },
+        get hostAwayNotified() {
+          return absent.notified;
         },
         dispose: () => void calls.push('client-dispose'),
       };
@@ -2184,6 +2187,7 @@ async function bootWithOnline(store: Readonly<Record<string, string>> = {}, onli
     codeAlphabet: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
     codeLength: 5,
     codeFromLink: (text) => /sala=([a-z2-9]{5})/i.exec(text)?.[1]?.toUpperCase() ?? null,
+    newDeviceId: () => '0123456789abcdef',
   };
   const game = startGame({
     platform,
@@ -2377,6 +2381,15 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     room.match = { recipe: DEBUT_PRESET, seed: 7, session: fake.session };
     platform.pump(1);
     await untilRunning(platform, game);
+    // Só silêncio (pode ser a minha conexão): a faixa, sem contagem e sem fim.
+    fake.absent.s = 12;
+    platform.pump(2);
+    expect(platform.logLines.some((l) => l.includes('[partida] host ausente (espera)'))).toBe(true);
+    expect(platform.logLines.some((l) => l.includes('o host não voltou em 10 s'))).toBe(false);
+    fake.absent.s = 0;
+    platform.pump(1);
+    // O aviso do host: a contagem do PvP.
+    fake.absent.notified = true;
     fake.absent.s = 4;
     platform.pump(2);
     expect(platform.logLines.some((l) => l.includes('[partida] host ausente (PvP: 10 s)'))).toBe(true);

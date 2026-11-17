@@ -106,8 +106,6 @@ export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[]
     ['kind', 'u8'],
   ] as EvField<'pickup'>[],
   unstuck: [['entity', 'u32'], ...XYZ('from'), ...XYZ(), ['respawned', 'bool']] as EvField<'unstuck'>[],
-  // M5 (fase 5d): ping (kind 0) e emotes (1..4).
-  signal: [['entity', 'u32'], ['kind', 'u8'], ...XYZ()] as EvField<'signal'>[],
   barricade: [
     ['index', 'u8'],
     ['action', ['tear', 'break', 'repair']],
@@ -134,6 +132,8 @@ export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[]
     ['weapon', 'u8'],
     ['by', 'u32'],
   ],
+  // M5 (fase 5d): ping (kind 0) e emotes (1..4).
+  signal: [['entity', 'u32'], ['kind', 'u8'], ...XYZ()] as EvField<'signal'>[],
 };
 
 /** Índice de cada tipo (a ordem do `EVENT_SCHEMA`). */

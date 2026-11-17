@@ -1,4 +1,4 @@
-import type { OnlineClientLink, OnlineHostLink, OnlineSession } from '@boboforces/game';
+import { ONLINE_CONTROL, type OnlineClientLink, type OnlineHostLink, type OnlineSession } from '@boboforces/game';
 import type { LobbyStart, NetEndpoint, NetWelcome } from '@boboforces/net';
 import type { NetModule } from './online.ts';
 
@@ -84,22 +84,28 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
               seenActivity[i] = -1;
               away[i] = 0;
             }
-            out.push(c * 2 + 1);
+            out.push(c * 4 + ONLINE_CONTROL.rejoined);
           }
           for (let i = 0; i < remote.length; i++) {
             const c = remote[i]!.controller;
             const a = host.activity(c);
+            // Sem cliente nesse controlador (saiu, ou caiu e ainda não voltou): nada a medir.
+            if (a < 0) {
+              seenActivity[i] = -1;
+              away[i] = 0;
+              continue;
+            }
             if (a !== seenActivity[i]) {
               const first = seenActivity[i] === -1;
               seenActivity[i] = a;
               seenTick[i] = sim.tick;
               if (!first && away[i] === 1) {
                 away[i] = 0;
-                out.push(c * 2 + 1);
+                out.push(c * 4 + ONLINE_CONTROL.back);
               }
             } else if (away[i] === 0 && sim.tick - seenTick[i]! >= afkTicks) {
               away[i] = 1;
-              out.push(c * 2);
+              out.push(c * 4 + ONLINE_CONTROL.away);
             }
           }
           return out.length;
@@ -143,6 +149,9 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
         },
         get hostAbsentS(): number {
           return client.hostAbsentS;
+        },
+        get hostAwayNotified(): boolean {
+          return client.hostAwayNotified;
         },
         dispose: () => {
           client.dispose();
