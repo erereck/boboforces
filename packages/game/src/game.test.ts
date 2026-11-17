@@ -2066,6 +2066,7 @@ interface FakeRoom extends OnlineRoom {
   match: OnlineMatchStart | null;
   readonly calls: string[];
   readonly choices: OnlineRoomChoice[];
+  readonly notices: ('friend' | 'host')[];
 }
 
 /** Uma sessão de mentira: o host lê o amigo parado; o cliente só manda a entrada; `close()` fecha a partida. */
@@ -2117,6 +2118,7 @@ function fakeSession(
 function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
   const calls: string[] = [];
   const choices: OnlineRoomChoice[] = [];
+  const notices: ('friend' | 'host')[] = [];
   const room: FakeRoom = {
     role,
     code,
@@ -2137,6 +2139,8 @@ function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
     match: null,
     calls,
     choices,
+    notices,
+    takeVersionNotice: () => notices.shift() ?? null,
     update: () => void (calls.length < 5000 && calls.push('update')),
     setChoice: (c) => void choices.push(c),
     setSummary: (text, teams) => void calls.push(`summary:${text}:${teams}`),
@@ -2415,6 +2419,46 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.pump(2);
     expect(game.screen).toBe('scene');
     game.dispose();
+  }, 60_000);
+
+  it('M5 (fase 5c): versão antiga: procura a nova, o Atualizar acende quando ela chega e aplica; o host é avisado', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store, '#sala=AB3CD');
+    const updates = { ready: false, checks: 0, applied: 0 };
+    (platform as { updates?: Platform['updates'] }).updates = {
+      get ready() {
+        return updates.ready;
+      },
+      apply: () => void updates.applied++,
+      check: () => void updates.checks++,
+    };
+    await settle();
+    platform.pump(2);
+    platform.tap('Enter');
+    const room = made[0]!;
+    room.status = 'ended';
+    room.end = 'update-self';
+    platform.pump(2);
+    expect(updates.checks).toBe(1);
+    // Ainda sem a versão nova, o Atualizar fica apagado; quando ela chega, ele acende.
+    updates.ready = true;
+    platform.pump(2);
+    // Chegou: o foco vai para o Atualizar, e o Enter aplica.
+    platform.tap('Enter');
+    expect(updates.applied).toBe(1);
+    expect(platform.logLines.some((l) => l.includes('[online] atualizando para a versão nova'))).toBe(true);
+    game.dispose();
+    // O host: alguém com o jogo desatualizado tentou entrar.
+    const second = await bootWithOnline(store);
+    await openOnlineFromTitle(second.platform);
+    second.platform.tap('Enter');
+    const hostRoom = second.made[0]!;
+    hostRoom.notices.push('friend');
+    second.platform.pump(2);
+    expect(second.platform.logLines.some((l) => l.includes('aviso de versão: o amigo está desatualizado'))).toBe(true);
+    second.game.dispose();
   }, 60_000);
 
   it('a receita do host que não passa no validador não abre: a sala acaba com o aviso', async () => {

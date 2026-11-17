@@ -25,6 +25,8 @@ export const ONLINE_ACTION = {
   lock: 'lock',
   copy: 'copy',
   leave: 'leave',
+  /** M5 (fase 5c): aplica a versão nova (o jogo recarrega). */
+  update: 'update',
   /** `kick:<slot>`: tira o amigo daquele lugar (só o host). */
   kickPrefix: 'kick:',
 } as const;
@@ -247,17 +249,39 @@ export interface OnlineStatusState {
   readonly message: string;
   /** Ainda esperando (Cancelar) ou acabou (OK). */
   readonly busy: boolean;
+  /** M5 (fase 5c): uma linha embaixo (a procura da versão nova); `''` = nenhuma. */
+  readonly detail?: string;
+  /** M5 (fase 5c): o botão Atualizar (`ready` = a versão nova chegou; sem ela, apagado). Ausente = sem o botão. */
+  readonly update?: { readonly ready: boolean };
 }
 
 export const onlineStatusScreen: Screen<OnlineStatusState> = {
   id: 'onlineStatus',
   build(state) {
+    const update = state.update;
     return page('online.title', [
       text('message', { literal: state.message }, 'body', state.busy ? COLORS.texto : COLORS.perigo),
+      ...(state.detail !== undefined && state.detail !== ''
+        ? [text('detail', { literal: state.detail }, 'body', COLORS.textoBaixo)]
+        : []),
       { kind: 'box', height: 12 },
       state.busy
         ? button('cancel', 'online.cancel', ONLINE_ACTION.cancel, { autofocus: true })
-        : button('ok', 'online.ok', ONLINE_ACTION.ok, { variant: 'primary', autofocus: true }),
+        : update !== undefined
+          ? ({
+              kind: 'row',
+              id: 'actions',
+              gap: 14,
+              children: [
+                button('update', 'online.update', ONLINE_ACTION.update, {
+                  variant: 'primary',
+                  disabled: !update.ready,
+                  autofocus: update.ready,
+                }),
+                button('ok', 'online.ok', ONLINE_ACTION.ok, { autofocus: !update.ready }),
+              ],
+            } as UiNode)
+          : button('ok', 'online.ok', ONLINE_ACTION.ok, { variant: 'primary', autofocus: true }),
     ]);
   },
 };

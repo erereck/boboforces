@@ -141,7 +141,8 @@ cada uma verde e commitada:
     sala trancada ou jogando, e recebe o snapshot completo; quem foi tirado não volta naquela sala.
   - **feita em 16/11** (ARCHITECTURE §16.11; o protocolo passou a 2).
 - **5c, versões diferentes:** "Atualize a página" com o botão Atualizar quando o service worker já baixou a versão
-  nova, e "Seu amigo precisa atualizar" do outro lado (as mensagens já existem desde a 4a).
+  nova, e "Seu amigo precisa atualizar" do outro lado (as mensagens já existem desde a 4a). **Feita em 16/11**
+  (ARCHITECTURE §16.12; o host também fica sabendo de quem a versão recusou).
 - **5d, ping e emotes** (sem chat de texto):
   - **ping:** o botão de aviso (botão do meio do mouse ou N, direcional para cima) marca o ponto onde a mira está, para
     o próprio time; passa pela sim como os outros botões, então vale no online e no sofá;

@@ -95,6 +95,12 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     const inMatch = new Set<number>();
     /** M5 (fase 5b): quem caiu na partida e voltou (a sessão devolve o controlador). */
     const rejoined: LobbyRejoin[] = [];
+    /** M5 (fase 5c): o último aviso de versão para a tela do host. */
+    let versionNotice: 'friend' | 'host' | null = null;
+    lobby.onVersionReject = (verdict) => {
+      deps.log(`[online] sala ${code}: recusado pela versão (${verdict})`);
+      versionNotice = verdict === 'update-self' ? 'host' : 'friend';
+    };
     lobby.onRejoin = (r) => {
       if (status !== 'playing') return;
       deps.log(`[online] sala ${code}: o lugar ${r.oldSlot} voltou (agora ${r.slot})`);
@@ -186,6 +192,11 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
         status = 'lobby';
       },
       copyLink: () => deps.copy(deps.linkFor(code)),
+      takeVersionNotice() {
+        const n = versionNotice;
+        versionNotice = null;
+        return n;
+      },
       leave(): void {
         if (closed) return;
         closed = true;
@@ -332,6 +343,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       },
       reopen: () => undefined,
       copyLink: () => deps.copy(deps.linkFor(code)),
+      takeVersionNotice: () => null,
       leave(): void {
         if (closed) return;
         lc.leave();

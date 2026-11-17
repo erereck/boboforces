@@ -265,6 +265,11 @@ export interface UpdateService {
   readonly ready: boolean;
   /** Troca para a versão nova e recarrega. Sem versão pronta, não faz nada. */
   apply(): void;
+  /**
+   * M5 (fase 5c): procura uma versão nova agora (sem esperar a próxima procura). Quando ela chega, `ready` vira
+   * verdadeiro. Opcional: quem não sabe procurar sob pedido não implementa.
+   */
+  check?(): void;
 }
 
 export interface Platform {

@@ -27,8 +27,10 @@ export function createWebUpdates(
   let timer = 0;
   let interval = 0;
   let disposed = false;
+  let registration: ServiceWorkerRegistration | null = null;
 
   const track = (reg: ServiceWorkerRegistration): void => {
+    registration = reg;
     // Só é "atualização" se a página já tem um controlador (na 1ª visita, o worker novo é a 1ª instalação).
     if (reg.waiting && container.controller) waiting = reg.waiting;
     reg.addEventListener('updatefound', () => {
@@ -71,6 +73,12 @@ export function createWebUpdates(
       applying = true;
       log('[web] aplicando a versão nova');
       waiting.postMessage(APPLY_UPDATE);
+    },
+    check() {
+      // M5 (fase 5c): o Online achou uma versão diferente: procura agora (o registro ainda pode não ter saído).
+      if (registration === null || waiting !== null) return;
+      log('[web] procurando versão nova (pedido do Online)');
+      void registration.update().catch(() => undefined);
     },
     dispose() {
       disposed = true;

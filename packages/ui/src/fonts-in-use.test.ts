@@ -619,6 +619,26 @@ describe('estouro de texto com o atlas real', () => {
       onlineJoinScreen.build({ code: 'AB3CD', length: 5, ready: true, note: '' }),
       onlineStatusScreen.build({ message: t('online.end.notFound'), busy: false }),
       onlineStatusScreen.build({ message: t('online.status.joining', { code: 'WWWWW' }), busy: true }),
+      // M5 (fase 5c): versão antiga, com a linha da procura e o Atualizar.
+      onlineStatusScreen.build({
+        message: t('online.end.updateSelf'),
+        busy: false,
+        detail: t('online.update.ready'),
+        update: { ready: true },
+      }),
+      onlineStatusScreen.build({
+        message: t('online.status.reconnecting', { code: 'WWWWW' }),
+        busy: true,
+      }),
+      onlineRoomScreen.build({
+        code: 'WWWWW',
+        summary: 'Times · De boa · 4 contra 4 · Construto',
+        host: true,
+        members: [],
+        team: null,
+        locked: false,
+        note: t('online.room.friendOutdated'),
+      }),
       room(true, t('online.team.any')),
       room(false, t('online.team.any')),
       room(false, null),

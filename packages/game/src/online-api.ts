@@ -164,6 +164,11 @@ export interface OnlineRoom {
   copyLink(): Promise<boolean>;
   /** Sai da sala (o host a fecha para todos) e solta a conexão. */
   leave(): void;
+  /**
+   * M5 (fase 5c), host: alguém foi recusado pela versão desde a última chamada (`friend` = o amigo está desatualizado;
+   * `host` = o host é que precisa atualizar); `null` = ninguém.
+   */
+  takeVersionNotice(): 'friend' | 'host' | null;
 }
 
 export interface OnlineRooms {

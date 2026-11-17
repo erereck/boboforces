@@ -229,6 +229,11 @@ export interface LobbyHost {
   onRejoin: ((rejoin: LobbyRejoin) => void) | null;
   /** M5 (fase 5b): fecha a sala de propósito (os amigos não tentam voltar). */
   close(): void;
+  /**
+   * M5 (fase 5c): alguém foi recusado pela versão; o veredito visto deste lado (`update-friend` = o amigo está na mais
+   * antiga; `update-self` = o host é que precisa atualizar; `mismatch` = mesma versão com conteúdo diferente).
+   */
+  onVersionReject: ((verdict: HelloVerdict) => void) | null;
 }
 
 /** M5 (fase 5b): quem caiu na partida e voltou. */
@@ -286,8 +291,10 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     const slot = slotOfPeer(peer);
     const id = theirs.deviceId ?? '';
     const back = slot < 0 && started && id !== '' ? dropped.get(id) : undefined;
-    if (checkHello(hello, theirs) !== 'ok') {
+    const verdict = checkHello(hello, theirs);
+    if (verdict !== 'ok') {
       writeReject(reply, REJECT_REASON.version, hello);
+      api.onVersionReject?.(verdict);
     } else if (slot < 0 && id !== '' && banned.has(id)) {
       writeReject(reply, REJECT_REASON.kicked, hello);
     } else if (back !== undefined) {
@@ -373,6 +380,7 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     },
     onChange: null,
     onRejoin: null,
+    onVersionReject: null,
     peerOfSlot: (slot) => peers.get(slot) ?? -1,
     update(): void {
       endpoint.poll(onMessage);

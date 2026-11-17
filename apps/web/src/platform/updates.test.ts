@@ -53,7 +53,15 @@ function fakeWorld(withController: boolean) {
     worker.state = 'installed';
     fire(workerListeners, 'statechange');
   };
-  return { win, container, worker, reload, newVersion, controllerChange: () => fire(listeners, 'controllerchange') };
+  return {
+    win,
+    container,
+    worker,
+    reg,
+    reload,
+    newVersion,
+    controllerChange: () => fire(listeners, 'controllerchange'),
+  };
 }
 
 describe('createWebUpdates (fase 8c)', () => {
@@ -88,6 +96,23 @@ describe('createWebUpdates (fase 8c)', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(flush).toHaveBeenCalled();
     expect(w.reload).toHaveBeenCalled();
+  });
+
+  it('M5 (fase 5c): check procura a versão nova na hora (antes do registro e com uma já esperando, nada)', async () => {
+    const w = fakeWorld(true);
+    const updates = createWebUpdates(
+      w.win,
+      () => {},
+      () => Promise.resolve(),
+    )!;
+    updates.check?.();
+    expect(w.reg.update).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(REGISTER_DELAY_MS);
+    updates.check?.();
+    expect(w.reg.update).toHaveBeenCalledTimes(1);
+    w.newVersion();
+    updates.check?.();
+    expect(w.reg.update).toHaveBeenCalledTimes(1);
   });
 
   it('na 1ª visita (sem controlador) a instalação não conta como atualização', async () => {

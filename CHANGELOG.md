@@ -41,6 +41,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A queda e a volta (fase 5b):** se a conexão de um amigo cai no meio da partida, ele volta sozinho em até 20 s
   ("A conexão caiu: voltando à sala") e pega o boneco dele de volta, que estava com um bot. Quem o host tirou não
   volta naquela sala. Quando o host fecha a sala, ela acaba na hora para todos.
+- **Versões diferentes (fase 5c):** quem está com o jogo desatualizado vê o botão Atualizar acender quando a versão
+  nova chega; o host fica sabendo quando um amigo com outra versão tenta entrar.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

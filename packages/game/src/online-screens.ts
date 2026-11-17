@@ -164,6 +164,9 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   let note = '';
   let statusText = '';
   let statusBusy = false;
+  /** M5 (fase 5c): a sala acabou por versão antiga deste lado: a tela oferece Atualizar (e a procura começa). */
+  let offerUpdate = false;
+  let updateReady = false;
   let room: OnlineRoom | null = null;
   let team = -1;
   let ready = true;
@@ -219,6 +222,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   function showStatus(text: string, busy: boolean): void {
     statusText = text;
     statusBusy = busy;
+    offerUpdate = false;
     go('status');
   }
 
@@ -412,7 +416,22 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     if (r.status === 'ended') {
       deps.log(`[online] sala ${r.code} acabou: ${r.end ?? '?'}`);
       closeRoom(t(END_TEXT[r.end ?? 'network']));
+      // M5 (fase 5c): versão antiga deste lado: procura a nova agora e oferece Atualizar.
+      if (r.end === 'update-self') {
+        offerUpdate = true;
+        platform.updates?.check?.();
+      }
       return;
+    }
+    // M5 (fase 5c): o host fica sabendo de quem foi recusado pela versão.
+    const notice = r.takeVersionNotice();
+    if (notice !== null) {
+      deps.log(
+        `[online] aviso de versão: ${notice === 'friend' ? 'o amigo está desatualizado' : 'o host está desatualizado'}`,
+      );
+      note = t(notice === 'friend' ? 'online.room.friendOutdated' : 'online.room.hostOutdated');
+      if (notice === 'host') platform.updates?.check?.();
+      rebuild();
     }
     // M5 (fase 5b): a conexão caiu: "voltando à sala" (a partida, se estava nela, já fechou).
     if (r.status === 'reconnecting') {
@@ -488,8 +507,23 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     else if (page === 'home') menu.setRoot(onlineHomeScreen.build({ name: nameDraft ?? profile.name, note }));
     else if (page === 'join') {
       menu.setRoot(onlineJoinScreen.build({ code, length: rooms.codeLength, ready: codeReady(), note }));
-    } else if (page === 'status') menu.setRoot(onlineStatusScreen.build({ message: statusText, busy: statusBusy }));
-    else if (room !== null) {
+    } else if (page === 'status') {
+      const updates = platform.updates;
+      menu.setRoot(
+        onlineStatusScreen.build({
+          message: statusText,
+          busy: statusBusy,
+          ...(offerUpdate
+            ? updates !== undefined
+              ? {
+                  detail: t(updateReady ? 'online.update.ready' : 'online.update.searching'),
+                  update: { ready: updateReady },
+                }
+              : { detail: t('online.update.reload') }
+            : {}),
+        }),
+      );
+    } else if (room !== null) {
       const view = room.view;
       const host = room.role === 'host';
       menu.setRoot(
@@ -536,7 +570,10 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       } else if (a === ONLINE_ACTION.type) startTyping('code');
       else if (a === ONLINE_ACTION.go) joinRoom();
     } else if (page === 'status') {
-      if (statusBusy && (nav.back || a === ONLINE_ACTION.cancel)) closeRoom(null);
+      if (a === ONLINE_ACTION.update && updateReady) {
+        deps.log('[online] atualizando para a versão nova');
+        platform.updates?.apply();
+      } else if (statusBusy && (nav.back || a === ONLINE_ACTION.cancel)) closeRoom(null);
       else if (!statusBusy && (nav.back || a === ONLINE_ACTION.ok)) {
         note = '';
         go('home', 'create');
@@ -593,6 +630,14 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     },
     frame(input, raw, ui, list): void {
       follow();
+      // M5 (fase 5c): a versão nova chegou enquanto a tela oferece Atualizar.
+      const ready = platform.updates?.ready === true;
+      if (offerUpdate && ready !== updateReady) {
+        updateReady = ready;
+        rebuild();
+        // O foco vai para o Atualizar (o OK continua ali do lado).
+        if (ready) menu.focus(ONLINE_ACTION.update);
+      }
       if (inMatch) return;
       build();
       if (hold && !anyHeld(raw)) hold = false;

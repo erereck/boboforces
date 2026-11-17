@@ -3325,3 +3325,19 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   349,4 KB.
 - **De passagem:** os testes de áudio que sintetizam e renderizam (o `synth-game` e a música do Bobo Zombies) ganharam
   30 s de prazo: sozinhos levam ~2 s, mas passavam dos 5 s com a suíte inteira em paralelo.
+
+### 16.12 Fase 5c: versões diferentes (16/11/2026)
+
+- **Quem está na versão antiga** (a sala acabou com `update-self`): a tela diz "Seu jogo está desatualizado: falta a
+  versão nova", o jogo pede ao service worker que procure agora (`UpdateService.check()`, novo e opcional: a web chama
+  o `registration.update()`) e o botão Atualizar acende quando ela chega ("A versão nova chegou: aperte Atualizar.",
+  com o foco nele); apertar aplica e recarrega (`apply()`, o mesmo do título). Sem service worker (o servidor de
+  desenvolvimento), a linha diz para recarregar a página.
+- **O host** fica sabendo de quem a versão recusou (`LobbyHost.onVersionReject`, com o veredito do lado dele, e
+  `OnlineRoom.takeVersionNotice()`): "Um amigo tentou entrar com o jogo desatualizado: ele precisa recarregar a
+  página." ou, quando é o host que está atrás, "Um amigo tem uma versão mais nova: atualize o jogo antes da próxima
+  partida." (e a procura começa).
+- **Quem está na mais nova** continua ouvindo "O jogo do host está desatualizado: ele precisa recarregar a página."
+  (desde a 4a).
+- **De passagem:** dois testes do `mapc` que montam o mundo e compilam o Construto ganharam prazo (6,4 s e 32,9 s com a
+  suíte inteira em paralelo).

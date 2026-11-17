@@ -75,6 +75,9 @@ describe('lobby pela rede de mentira (M5 fase 4a)', () => {
       snapshotHz: 30,
     });
     const clients: LobbyClient[] = [];
+    // M5 (fase 5c): o host fica sabendo de quem a versão recusou (visto do lado dele).
+    const versionRejects: string[] = [];
+    host.onVersionReject = (v) => versionRejects.push(v);
     const join = (id: number, hello = localHello()): LobbyClient => {
       const [ep] = createEndpointMux(net.endpoint(id), isLobbyMessage);
       const c = createLobbyClient({ endpoint: ep, choice: choice(`Amigo${id}`, id % 2), hello });
@@ -96,6 +99,7 @@ describe('lobby pela rede de mentira (M5 fase 4a)', () => {
     pump(net, 30, step);
     expect(newer.status).toBe('rejected');
     expect(newer.rejection).toBe('update-friend');
+    expect(versionRejects).toEqual(['update-self']);
     // A variação da rede embaralha a chegada dos oi: 3 entram (slots 1..3, na ordem em que chegaram) e 1 ouve "cheia".
     const inside = clients.slice(0, 4).filter((c) => c.status === 'in');
     const full = clients.slice(0, 4).filter((c) => c.status === 'rejected');

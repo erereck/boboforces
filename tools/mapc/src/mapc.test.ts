@@ -304,7 +304,7 @@ describe('mapc: validações com o mundo', () => {
     expect(empty.doc.light.emitters).toHaveLength(0);
     expect(r.doc.light.emitters).toHaveLength(1);
     expect(r.doc.light.emitters[0]!.level).toBe(6);
-  });
+  }, 30_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M5, fase 5c).
 
   it('em pé pede ceil(aabbHeight / 0,5) células livres: 4 com o bobo de 1,75 m (decisões #53 e #55)', () => {
     expect(STAND_CELLS).toBe(Math.ceil(METRICS.aabbHeight / BLOCK_SIZE));
@@ -614,7 +614,7 @@ describe('mapc: Construto', () => {
     expect(back.grid.sizeX).toBe(160);
     const png = decodePng(renderTopView(a));
     expect([png.width, png.height]).toEqual([640, 640]);
-  }, 30000);
+  }, 90_000); // Compila o Construto inteiro: com o portão em paralelo passou dos 30 s (M5, fase 5c).
 
   it('olho do METRICS nas câmeras e rotas; régua de métricas fora da área e fora dos outros prints (#53)', () => {
     const r = compileMap(construto, { ...OPTIONS, requirePrintMarkers: true, maxSightLimitM: 50 });
