@@ -2385,6 +2385,38 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     game.dispose();
   }, 60_000);
 
+  it('M5 (fase 5b): a conexão cai no meio da partida: "voltando à sala" e de volta à partida', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store, '#sala=AB3CD');
+    await settle();
+    platform.pump(2);
+    platform.tap('Enter');
+    const room = made[0]!;
+    // O aparelho ganhou um id (sorteado e guardado no perfil) e ele foi com o Entrar.
+    const saved = JSON.parse(platform.storage.get(ONLINE.ONLINE_PROFILE_KEY)!) as { id: string };
+    expect(saved.id).toMatch(/^[0-9a-f]{16}$/);
+    room.status = 'playing';
+    room.mySlot = 1;
+    const first = fakeSession('client', room.calls);
+    room.match = { recipe: DEBUT_PRESET, seed: 7, session: first.session };
+    platform.pump(1);
+    await untilRunning(platform, game);
+    // Caiu: a partida fecha para este aparelho e o Online mostra "voltando".
+    first.close();
+    room.status = 'reconnecting';
+    platform.pump(3);
+    expect(game.screen).toBe('online');
+    expect(platform.logLines.some((l) => l.includes('[online] voltando à sala AB3CD'))).toBe(true);
+    // Voltou: o host mandou o começo de novo; o amigo entra na partida.
+    room.status = 'playing';
+    room.match = { recipe: DEBUT_PRESET, seed: 7, session: fakeSession('client', room.calls).session };
+    platform.pump(2);
+    expect(game.screen).toBe('scene');
+    game.dispose();
+  }, 60_000);
+
   it('a receita do host que não passa no validador não abre: a sala acaba com o aviso', async () => {
     const store = {
       [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: '', privacy: 1 }),

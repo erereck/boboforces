@@ -10,7 +10,8 @@ const hash = (pcm: Float32Array): string => {
   return fnv1a32(new Uint8Array(q.buffer)).toString(16);
 };
 
-describe('música do Bobo Zombies', () => {
+// Renderizar as camadas leva ~2 s sozinho, mas passa dos 5 s padrão com a suíte inteira rodando em paralelo.
+describe('música do Bobo Zombies', { timeout: 30_000 }, () => {
   // Taxa baixa no teste (a composição não depende dela): 8 compassos a 100 BPM = 19,2 s.
   const rate = 8000;
 

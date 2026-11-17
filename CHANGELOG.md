@@ -38,6 +38,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Quando alguém some (fase 5a):** se o host sai da tela, os amigos veem "O host saiu do jogo"; no Bobo Zombies a
   partida espera, nos outros modos ela acaba em 10 s com o placar daquela hora. Quem fica 60 s parado (ou com a aba
   escondida) dá a vaga a um bot até voltar.
+- **A queda e a volta (fase 5b):** se a conexão de um amigo cai no meio da partida, ele volta sozinho em até 20 s
+  ("A conexão caiu: voltando à sala") e pega o boneco dele de volta, que estava com um bot. Quem o host tirou não
+  volta naquela sala. Quando o host fecha a sala, ela acaba na hora para todos.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

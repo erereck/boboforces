@@ -37,7 +37,7 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -57,6 +57,8 @@ export const MSG = {
   leave: 11,
   /** M5 (fase 5a): o host foi para segundo plano (1) ou voltou (0); pelo canal confiável, do lado "partida". */
   hostAway: 12,
+  /** M5 (fase 5b): o host fechou a sala de propósito (quem cair sem isto tenta voltar). Do lado "lobby". */
+  close: 13,
 } as const;
 
 /** Canal da mensagem: confiável e ordenado (handshake, lobby, eventos) ou não confiável (entradas e snapshots). */
@@ -116,7 +118,15 @@ export interface NetHello {
   /** `GAME_VERSION` (version.json): só ASCII visível, até 32 caracteres. */
   readonly gameVersion: string;
   readonly contentHash: number;
+  /**
+   * M5 (fase 5b, protocolo 2): o id do aparelho (16 dígitos hexadecimais; `''` = nenhum). O host reconhece quem caiu e
+   * volta (o boneco é dele de novo) e quem ele tirou (não volta naquela sala).
+   */
+  readonly deviceId?: string;
 }
+
+/** Id do aparelho: 16 dígitos hexadecimais em minúscula (64 bits). */
+export const DEVICE_ID_RE = /^[0-9a-f]{16}$/;
 
 /** O hello desta build. */
 export function localHello(): NetHello {
@@ -146,13 +156,28 @@ export function writeHello(w: BitWriter, hello: NetHello): void {
   w.writeBits(hello.protocolVersion, 16);
   w.writeBits(hello.contentHash >>> 0, 32);
   writeAscii(w, hello.gameVersion);
+  // Protocolo 2: o id do aparelho em 2 × 32 bits (zeros = nenhum).
+  const id = hello.deviceId !== undefined && DEVICE_ID_RE.test(hello.deviceId) ? hello.deviceId : '';
+  w.writeBits(id === '' ? 0 : Number.parseInt(id.slice(0, 8), 16) >>> 0, 32);
+  w.writeBits(id === '' ? 0 : Number.parseInt(id.slice(8), 16) >>> 0, 32);
+}
+
+/** O hello sem o id do aparelho (a recusa do host leva só isto). */
+function readHelloCore(r: BitReader): NetHello {
+  const protocolVersion = r.readBits(16);
+  const contentHash = r.readBits(32) >>> 0;
+  return { protocolVersion, gameVersion: readAscii(r), contentHash };
 }
 
 /** Lê o corpo de um hello (o tipo já foi lido). */
 export function readHello(r: BitReader): NetHello {
-  const protocolVersion = r.readBits(16);
-  const contentHash = r.readBits(32) >>> 0;
-  return { protocolVersion, gameVersion: readAscii(r), contentHash };
+  const core = readHelloCore(r);
+  // Um hello do protocolo 1 acaba aqui: a versão já o recusa, sem id.
+  if (core.protocolVersion < 2) return core;
+  const hi = r.readBits(32) >>> 0;
+  const lo = r.readBits(32) >>> 0;
+  if (hi === 0 && lo === 0) return core;
+  return { ...core, deviceId: hi.toString(16).padStart(8, '0') + lo.toString(16).padStart(8, '0') };
 }
 
 /** Compara versões "a.b.c" (partes que faltam valem 0; texto depois de "-" é ignorado). */
@@ -184,7 +209,7 @@ export function checkHello(local: NetHello, remote: NetHello): HelloVerdict {
 }
 
 /** Motivo de recusa do host (`MSG.reject`). Valor novo entra no fim. */
-export const REJECT_REASON = { version: 1, full: 2, locked: 3 } as const;
+export const REJECT_REASON = { version: 1, full: 2, locked: 3, kicked: 4 } as const;
 export type RejectReason = (typeof REJECT_REASON)[keyof typeof REJECT_REASON];
 
 /** Resposta do host ao hello: o controlador (slot) do cliente e o ritmo da partida. */
@@ -218,7 +243,7 @@ export function writeReject(w: BitWriter, reason: RejectReason, host: NetHello):
 
 export function readReject(r: BitReader): { readonly reason: number; readonly host: NetHello } {
   const reason = r.readBits(8);
-  return { reason, host: readHello(r) };
+  return { reason, host: readHelloCore(r) };
 }
 
 /** Diferença entre dois `seq` de 16 bits (com a volta): positivo = `a` depois de `b`. */

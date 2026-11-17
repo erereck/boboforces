@@ -3298,3 +3298,30 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
   nem no coop); a faixa e o resultado no jogo inteiro. 1.804 testes; menu em 349,4 KB.
 - **No Edge headless** a aba de trás não fica "escondida" (o `online:web` não vê o aviso); o aviso fica coberto pelos
   testes do `net` e da cena.
+
+### 16.11 Fase 5b: a queda e a volta (16/11/2026)
+
+- **O id do aparelho:** 16 dígitos hexadecimais, sorteados na 1ª vez e guardados no perfil `online@1` (campo `id`). Vai
+  no hello, que ganhou 64 bits no fim: o **protocolo passou a 2** (quem estiver no 1 ouve "atualize"; o `net.json`
+  publicado acompanha). A recusa do host continua levando só o hello sem id.
+- **O host lembra:**
+  - quem sai durante a partida (por queda, pelo Sair ou pelo aviso do transporte) fica guardado pelo id; se o mesmo
+    aparelho voltar com a partida rodando, entra mesmo com a sala trancada, no lugar antigo se estiver livre, e recebe
+    o começo com o lugar novo. A sessão do host devolve a ele o controlador (que estava com um bot): o cliente antigo
+    sai do `NetHost`, o novo entra, e o primeiro snapshot vai completo;
+  - quem ele tirou fica barrado por id (`REJECT_REASON.kicked`: "O host tirou você da sala"), mesmo com a sala aberta;
+  - de volta ao lobby, a lista de quem caiu se apaga (quem voltar entra como qualquer um).
+- **O amigo que perde o host:**
+  - se o host fechou a sala de propósito, ele avisa antes (`MSG.close`; a conexão só fecha 300 ms depois): "O host
+    saiu: a sala acabou";
+  - sem o aviso, a conexão caiu (a do amigo ou a do host): o amigo sai da sala do Trystero, entra de novo no mesmo
+    código e manda o hello com o mesmo id, por até 20 s (`RECONNECT_TIMEOUT_MS`), com a tela "A conexão caiu: voltando à
+    sala XXXXX…". No meio de uma partida, a cena fecha e abre de novo quando o começo chega (decisão menor revisável:
+    trocar a conexão por baixo da cena seria mais trabalho para um caso raro).
+- **Testes:** o lobby e o hello com o id; na sala da web, a queda no meio da partida (a internet de mentira derruba a
+  conexão sem aviso): o amigo volta jogando, com o mesmo controlador, e o link do host entrega a volta; quem foi tirado
+  é barrado ao tentar de novo e outro aparelho entra; o host que fecha não faz ninguém tentar voltar; sem o host,
+  desiste em 20 s; no jogo, "voltando à sala" e de volta à partida. `online:web`, `rtc:web` e o smoke verdes; menu em
+  349,4 KB.
+- **De passagem:** os testes de áudio que sintetizam e renderizam (o `synth-game` e a música do Bobo Zombies) ganharam
+  30 s de prazo: sozinhos levam ~2 s, mas passavam dos 5 s com a suíte inteira em paralelo.

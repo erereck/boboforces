@@ -131,12 +131,16 @@ export interface OnlineMatchStart {
   readonly session: OnlineSession;
 }
 
-export type OnlineRoomStatus = 'connecting' | 'lobby' | 'playing' | 'ended';
+/** M5 (fase 5b): `reconnecting` = a conexão com o host caiu e o amigo tenta voltar (20 s), no mesmo código. */
+export type OnlineRoomStatus = 'connecting' | 'reconnecting' | 'lobby' | 'playing' | 'ended';
 
 export interface OnlineRoom {
   readonly role: 'host' | 'client';
   readonly code: string;
-  /** `connecting` (o cliente procurando o host), `lobby`, `playing` (a partida começou) ou `ended` (veja `end`). */
+  /**
+   * `connecting` (o cliente procurando o host), `reconnecting` (voltando depois de a conexão cair), `lobby`, `playing`
+   * (a partida começou) ou `ended` (veja `end`).
+   */
   readonly status: OnlineRoomStatus;
   readonly end: OnlineRoomEnd | null;
   /** `null` até o cliente entrar. */
@@ -164,7 +168,11 @@ export interface OnlineRoom {
 
 export interface OnlineRooms {
   create(choice: OnlineRoomChoice): OnlineRoom;
-  join(code: string, choice: OnlineRoomChoice): OnlineRoom;
+  /**
+   * `deviceId` (M5 fase 5b): o id do aparelho, no perfil do Online. Com ele o host devolve o boneco a quem caiu e volta,
+   * e barra quem ele tirou.
+   */
+  join(code: string, choice: OnlineRoomChoice, deviceId: string): OnlineRoom;
   /** O alfabeto e o tamanho do código (o teclado do jogo filtra por ele). */
   readonly codeAlphabet: string;
   readonly codeLength: number;

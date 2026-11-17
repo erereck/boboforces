@@ -187,6 +187,18 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   let dirty = true;
   let builtView: unknown = null;
 
+  /**
+   * M5 (fase 5b): o id deste aparelho (sorteado na 1ª vez e guardado no perfil): o host devolve o boneco a quem cai e
+   * volta, e barra quem ele tirou.
+   */
+  function deviceId(): string {
+    if (profile.id === '') {
+      const hex = (n: number): string => (n >>> 0).toString(16).padStart(8, '0');
+      saveProfile({ ...profile, id: hex(deps.seed()) + hex(deps.seed()) });
+    }
+    return profile.id;
+  }
+
   function saveProfile(next: OnlineProfileDocument): void {
     profile = next;
     platform.storage.set(ONLINE_PROFILE_KEY, JSON.stringify({ ...next, format: ONLINE_PROFILE_FORMAT }));
@@ -345,7 +357,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     }
     team = -1;
     ready = true;
-    room = rooms.join(code, choice());
+    room = rooms.join(code, choice(), deviceId());
     deps.log(`[online] entrando na sala ${code}`);
     note = '';
     showStatus(t('online.status.joining', { code }), true);
@@ -400,6 +412,15 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     if (r.status === 'ended') {
       deps.log(`[online] sala ${r.code} acabou: ${r.end ?? '?'}`);
       closeRoom(t(END_TEXT[r.end ?? 'network']));
+      return;
+    }
+    // M5 (fase 5b): a conexão caiu: "voltando à sala" (a partida, se estava nela, já fechou).
+    if (r.status === 'reconnecting') {
+      const text = t('online.status.reconnecting', { code: r.code });
+      if (page !== 'status' || statusText !== text) {
+        deps.log(`[online] voltando à sala ${r.code}`);
+        showStatus(text, true);
+      }
       return;
     }
     if (page === 'status' && statusBusy && r.status !== 'connecting') {

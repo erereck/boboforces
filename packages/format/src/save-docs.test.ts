@@ -284,8 +284,16 @@ describe('online@1 (M5 fase 4c)', () => {
       value: DEFAULT_ONLINE_PROFILE,
       warnings: [],
     });
-    const r = validateOnlineProfile({ format: ONLINE_PROFILE_FORMAT, name: 'Erick do Bobo Forces', privacy: 2.6 });
-    expect(r.ok && [r.value.name, r.value.privacy]).toEqual(['Erick do Bobo Fo', 3]);
+    const r = validateOnlineProfile({
+      format: ONLINE_PROFILE_FORMAT,
+      name: 'Erick do Bobo Forces',
+      privacy: 2.6,
+      id: '0123456789abcdef',
+    });
+    expect(r.ok && [r.value.name, r.value.privacy, r.value.id]).toEqual(['Erick do Bobo Fo', 3, '0123456789abcdef']);
+    // M5 (fase 5b): id torto vira "sem id" (o jogo sorteia outro).
+    const torto = validateOnlineProfile({ format: ONLINE_PROFILE_FORMAT, id: 'XYZ' });
+    expect(torto.ok && torto.value.id).toBe('');
     const bad = validateOnlineProfile({ format: ONLINE_PROFILE_FORMAT, name: 7, privacy: -4 });
     expect(bad.ok && [bad.value.name, bad.value.privacy]).toEqual(['', 0]);
     if (bad.ok) codesKnown(bad.warnings);

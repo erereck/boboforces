@@ -139,6 +139,7 @@ cada uma verde e commitada:
     ("Reconectando…"), no mesmo código;
   - o host reconhece o id: quem caiu no meio da partida volta para o boneco dele (que estava com um bot), mesmo com a
     sala trancada ou jogando, e recebe o snapshot completo; quem foi tirado não volta naquela sala.
+  - **feita em 16/11** (ARCHITECTURE §16.11; o protocolo passou a 2).
 - **5c, versões diferentes:** "Atualize a página" com o botão Atualizar quando o service worker já baixou a versão
   nova, e "Seu amigo precisa atualizar" do outro lado (as mensagens já existem desde a 4a).
 - **5d, ping e emotes** (sem chat de texto):

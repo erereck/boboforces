@@ -34,6 +34,7 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.join.invalid': 'Código incompleto ou com letra que não existe (0, O, 1 e I ficam de fora).',
   'online.status.creating': 'Abrindo a sala…',
   'online.status.joining': 'Procurando a sala {code}…',
+  'online.status.reconnecting': 'A conexão caiu: voltando à sala {code}…',
   'online.cancel': 'Cancelar',
   'online.ok': 'OK',
   'online.end.full': 'A sala está cheia (4 jogadores).',

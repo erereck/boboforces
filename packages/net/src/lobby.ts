@@ -40,6 +40,8 @@ export const LOBBY_MSG = {
   start: MSG.start,
   kick: MSG.kick,
   leave: MSG.leave,
+  /** M5 (fase 5b): o host fechou a sala de propósito. */
+  close: MSG.close,
 } as const;
 
 /** O tipo é do lobby (o handshake inclusive)? O repartidor (`createEndpointMux`) usa. */
@@ -48,7 +50,8 @@ export function isLobbyMessage(type: number): boolean {
     type === MSG.hello ||
     type === MSG.welcome ||
     type === MSG.reject ||
-    (type >= LOBBY_MSG.lobby && type <= LOBBY_MSG.leave)
+    (type >= LOBBY_MSG.lobby && type <= LOBBY_MSG.leave) ||
+    type === LOBBY_MSG.close
   );
 }
 
@@ -219,6 +222,20 @@ export interface LobbyHost {
   reopen(): void;
   /** Mudou o estado (alguém entrou, saiu ou escolheu). */
   onChange: (() => void) | null;
+  /**
+   * M5 (fase 5b): quem caiu no meio da partida voltou (o mesmo aparelho): o lugar novo dele, o de antes e o peer. A
+   * casca devolve o controlador dele (estava com um bot); o começo, com o lugar novo, já foi a ele.
+   */
+  onRejoin: ((rejoin: LobbyRejoin) => void) | null;
+  /** M5 (fase 5b): fecha a sala de propósito (os amigos não tentam voltar). */
+  close(): void;
+}
+
+/** M5 (fase 5b): quem caiu na partida e voltou. */
+export interface LobbyRejoin {
+  readonly slot: number;
+  readonly oldSlot: number;
+  readonly peer: number;
 }
 
 export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
@@ -234,6 +251,11 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
   let teams = true;
   let started = false;
   let dirty = true;
+  /** M5 (fase 5b): o id do aparelho de cada lugar, quem caiu na partida em andamento (por id) e quem foi tirado. */
+  const idOfSlot = new Map<number, string>();
+  const dropped = new Map<string, LobbyMember>();
+  const banned = new Set<string>();
+  let lastStart: LobbyStart | null = null;
 
   const state = (): LobbyState => ({ code, locked, summary, teams, playing: started, members });
   const broadcast = (): void => {
@@ -245,17 +267,56 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     return -1;
   };
   const remove = (slot: number): void => {
+    // Na partida, quem sai fica lembrado pelo aparelho: se voltar, o boneco é dele de novo.
+    const id = idOfSlot.get(slot);
+    const member = members.find((m) => m.slot === slot);
+    if (started && id !== undefined && member !== undefined) dropped.set(id, member);
+    idOfSlot.delete(slot);
     peers.delete(slot);
     members = members.filter((m) => m.slot !== slot);
     dirty = true;
   };
+  const firstFreeSlot = (prefer: number): number => {
+    if (prefer > 0 && prefer < MAX_ROOM_PLAYERS && !peers.has(prefer)) return prefer;
+    for (let k = 1; k < MAX_ROOM_PLAYERS; k++) if (!peers.has(k)) return k;
+    return -1;
+  };
   const answer = (peer: number, theirs: NetHello): void => {
     reply.reset();
     const slot = slotOfPeer(peer);
-    if (slot < 0 && (locked || started)) {
-      writeReject(reply, REJECT_REASON.locked, hello);
-    } else if (checkHello(hello, theirs) !== 'ok') {
+    const id = theirs.deviceId ?? '';
+    const back = slot < 0 && started && id !== '' ? dropped.get(id) : undefined;
+    if (checkHello(hello, theirs) !== 'ok') {
       writeReject(reply, REJECT_REASON.version, hello);
+    } else if (slot < 0 && id !== '' && banned.has(id)) {
+      writeReject(reply, REJECT_REASON.kicked, hello);
+    } else if (back !== undefined) {
+      // M5 (fase 5b): caiu no meio da partida e voltou: entra mesmo com a sala trancada ou jogando, de volta ao boneco
+      // dele (o começo vai junto, com o lugar novo no lugar do antigo).
+      const s = firstFreeSlot(back.slot);
+      if (s < 0) {
+        writeReject(reply, REJECT_REASON.full, hello);
+      } else {
+        dropped.delete(id);
+        idOfSlot.set(s, id);
+        peers.set(s, peer);
+        members = [...members, { ...back, slot: s, ready: false }].sort((a, b) => a.slot - b.slot);
+        dirty = true;
+        writeWelcome(reply, { slot: s, hz: config.hz, snapshotHz: config.snapshotHz });
+        endpoint.send(peer, 'reliable', reply.bytes());
+        if (lastStart !== null) {
+          const start: LobbyStart = {
+            ...lastStart,
+            members: lastStart.members.map((m) => (m.slot === back.slot ? { ...m, slot: s } : m)),
+          };
+          lastStart = start;
+          endpoint.send(peer, 'reliable', encodeLobbyMessage(LOBBY_MSG.start, start));
+        }
+        api.onRejoin?.({ slot: s, oldSlot: back.slot, peer });
+        return;
+      }
+    } else if (slot < 0 && (locked || started)) {
+      writeReject(reply, REJECT_REASON.locked, hello);
     } else {
       let s = slot;
       if (s < 0) {
@@ -266,6 +327,7 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       } else {
         if (slot < 0) {
           peers.set(s, peer);
+          if (id !== '') idOfSlot.set(s, id);
           members = [...members, { name: `Amigo ${s}`, team: -1, bobo: null, ready: false, slot: s }].sort(
             (a, b) => a.slot - b.slot,
           );
@@ -310,6 +372,7 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       return started;
     },
     onChange: null,
+    onRejoin: null,
     peerOfSlot: (slot) => peers.get(slot) ?? -1,
     update(): void {
       endpoint.poll(onMessage);
@@ -336,7 +399,17 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       const peer = peers.get(slot);
       if (peer === undefined) return;
       endpoint.send(peer, 'reliable', encodeLobbyMessage(LOBBY_MSG.kick, {}));
+      // Tirado não volta naquela sala (GDD §3.7): o aparelho fica barrado, e não lembrado como quem caiu.
+      const id = idOfSlot.get(slot);
       remove(slot);
+      if (id !== undefined) {
+        banned.add(id);
+        dropped.delete(id);
+      }
+    },
+    close(): void {
+      const bytes = encodeLobbyMessage(LOBBY_MSG.close, {});
+      for (const peer of peers.values()) endpoint.send(peer, 'reliable', bytes);
     },
     removePeer(peer): void {
       const slot = slotOfPeer(peer);
@@ -344,6 +417,8 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     },
     start(s): void {
       started = true;
+      lastStart = s;
+      dropped.clear();
       const bytes = encodeLobbyMessage(LOBBY_MSG.start, s);
       for (const peer of peers.values()) endpoint.send(peer, 'reliable', bytes);
       dirty = true;
@@ -351,6 +426,9 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     reopen(): void {
       if (!started) return;
       started = false;
+      // De volta ao lobby, quem caiu entra como qualquer um.
+      dropped.clear();
+      lastStart = null;
       members = members.map((m) => (m.slot === 0 ? m : { ...m, ready: false }));
       dirty = true;
     },
@@ -369,6 +447,8 @@ export interface LobbyClientConfig {
   readonly endpoint: NetEndpoint;
   readonly choice: LobbyChoice;
   readonly hello?: NetHello;
+  /** M5 (fase 5b): o id do aparelho (vai no hello; o host reconhece quem volta e quem tirou). */
+  readonly deviceId?: string;
 }
 
 export interface LobbyClient {
@@ -378,8 +458,10 @@ export interface LobbyClient {
   readonly welcome: NetWelcome | null;
   readonly state: LobbyState | null;
   readonly start: LobbyStart | null;
-  /** Por que o host recusou: sala cheia, travada ou o veredito de versão deste lado. */
-  readonly rejection: HelloVerdict | 'full' | 'locked' | null;
+  /** Por que o host recusou: sala cheia, travada, quem já foi tirado dela ou o veredito de versão deste lado. */
+  readonly rejection: HelloVerdict | 'full' | 'locked' | 'kicked' | null;
+  /** M5 (fase 5b): o host fechou a sala de propósito (`closed` sem isto = a conexão caiu). */
+  readonly hostClosed: boolean;
   /** Um amigo apareceu na sala: manda o oi (só o host responde). */
   addPeer(peer: number): void;
   /** Um amigo saiu; se foi o host, a sala acabou ("host saiu = fim"). */
@@ -392,10 +474,12 @@ export interface LobbyClient {
 
 export function createLobbyClient(config: LobbyClientConfig): LobbyClient {
   const { endpoint } = config;
-  const hello = config.hello ?? localHello();
+  const base = config.hello ?? localHello();
+  const hello: NetHello = config.deviceId !== undefined ? { ...base, deviceId: config.deviceId } : base;
   const reader = new BitReader(new Uint8Array(0));
   const out = new BitWriter(MAX_MESSAGE_BYTES);
   let status: LobbyClientStatus = 'connecting';
+  let hostClosed = false;
   let host = -1;
   let welcome: NetWelcome | null = null;
   let state: LobbyState | null = null;
@@ -430,7 +514,9 @@ export function createLobbyClient(config: LobbyClientConfig): LobbyClient {
           ? 'full'
           : r.reason === REJECT_REASON.locked
             ? 'locked'
-            : checkHello(hello, r.host);
+            : r.reason === REJECT_REASON.kicked
+              ? 'kicked'
+              : checkHello(hello, r.host);
       status = 'rejected';
       changed = true;
       return;
@@ -457,6 +543,10 @@ export function createLobbyClient(config: LobbyClientConfig): LobbyClient {
     } else if (type === LOBBY_MSG.kick) {
       status = 'kicked';
       changed = true;
+    } else if (type === LOBBY_MSG.close) {
+      hostClosed = true;
+      status = 'closed';
+      changed = true;
     }
   };
 
@@ -478,6 +568,9 @@ export function createLobbyClient(config: LobbyClientConfig): LobbyClient {
     },
     get rejection(): LobbyClient['rejection'] {
       return rejection;
+    },
+    get hostClosed(): boolean {
+      return hostClosed;
     },
     onChange: null,
     addPeer(peer): void {

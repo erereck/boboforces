@@ -16,7 +16,8 @@ const zeroCrossings = (pcm: Float32Array): number => {
   return n / (pcm.length / SYNTH_SAMPLE_RATE);
 };
 
-describe('sons sintetizados do jogo (fase 7a)', () => {
+// Sintetizar todos os sons leva ~2 s sozinho, mas passa dos 5 s padrão com a suíte inteira rodando em paralelo.
+describe('sons sintetizados do jogo (fase 7a)', { timeout: 30_000 }, () => {
   const names = Object.keys(GAME_SYNTH_SOUNDS);
 
   it('cobre as 5 armas de fogo (perto e longe) e os sons de partida e interface', () => {

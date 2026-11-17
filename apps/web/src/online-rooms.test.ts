@@ -3,7 +3,10 @@ import { createMatchSim, onlineRecipe, type OnlineRoom } from '@boboforces/game'
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
 import * as net from '@boboforces/net';
 import { describe, expect, it } from 'vitest';
-import { createWebRooms, JOIN_TIMEOUT_MS, type RoomTransport } from './online-rooms.ts';
+import { createWebRooms, JOIN_TIMEOUT_MS, RECONNECT_TIMEOUT_MS, type RoomTransport } from './online-rooms.ts';
+
+/** Um id de aparelho por amigo (16 dígitos hexadecimais). */
+const id = (n: number): string => n.toString(16).padStart(16, '0');
 
 const recipe: MatchRecipe = {
   format: MATCH_RECIPE_FORMAT,
@@ -28,6 +31,8 @@ function fakeInternet() {
   const copied: string[] = [];
   /** Avisos de saída do transporte, entregues com atraso (o "saí" do lobby chega antes). */
   const lateLeaves: { at: number; run: () => void }[] = [];
+  /** Cada conexão, na ordem em que abriu (o `cut` derruba uma pelo número). */
+  const conns: { self: { id: number; t: RoomTransport }; members: Set<{ id: number; t: RoomTransport }> }[] = [];
   const connect = (code: string): RoomTransport => {
     const id = next++;
     const members = rooms.get(code) ?? new Set();
@@ -45,6 +50,7 @@ function fakeInternet() {
       },
     };
     self.t = t;
+    conns.push({ self, members });
     // O anúncio chega depois (o chamador ainda vai ligar os ganchos).
     queueMicrotask(() => {
       for (const m of members) {
@@ -69,8 +75,10 @@ function fakeInternet() {
     log: () => undefined,
   });
   const pump = async (frames: number, rooms: readonly OnlineRoom[]): Promise<void> => {
-    await Promise.resolve();
     for (let i = 0; i < frames; i++) {
+      // As promessas (sair e entrar de novo na sala, os anúncios) andam a cada quadro.
+      await Promise.resolve();
+      await Promise.resolve();
       loop.advance(1000 / 60);
       clock += 1000 / 60;
       for (let k = lateLeaves.length - 1; k >= 0; k--) {
@@ -79,7 +87,16 @@ function fakeInternet() {
       for (const r of rooms) r.update();
     }
   };
-  return { service, pump, copied, advanceClock: (ms: number) => (clock += ms) };
+  /** A conexão `n` cai de vez (sem avisar): os dois lados se perdem na hora, como numa queda do wi-fi. */
+  const cut = (n: number): void => {
+    const c = conns[n]!;
+    if (!c.members.delete(c.self)) return;
+    for (const m of c.members) {
+      m.t.onPeerLeave?.(c.self.id);
+      c.self.t.onPeerLeave?.(m.id);
+    }
+  };
+  return { service, pump, copied, cut, advanceClock: (ms: number) => (clock += ms) };
 }
 
 describe('a sala do Online na web (M5 fase 4c)', () => {
@@ -89,8 +106,8 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
     expect(host.code).toMatch(/^[A-Z2-9]{5}$/);
     expect(service.codeFromLink(`#sala=${host.code.toLowerCase()}`)).toBe(host.code);
     host.setSummary('Times · Construto', true);
-    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true });
-    const caio = service.join(host.code, { name: 'Caio', team: -1, ready: true });
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    const caio = service.join(host.code, { name: 'Caio', team: -1, ready: true }, id(2));
     expect(bia.status).toBe('connecting');
     await pump(30, [host, bia, caio]);
     expect([bia.status, caio.status]).toEqual(['lobby', 'lobby']);
@@ -123,7 +140,7 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
     }
     expect(started.session.names.filter(Boolean).sort()).toEqual(['Bia', 'Caio', 'Erick']);
     // Ninguém entra no meio da partida.
-    const late = service.join(host.code, { name: 'Davi', team: -1, ready: true });
+    const late = service.join(host.code, { name: 'Davi', team: -1, ready: true }, id(3));
     await pump(20, [host, bia, caio, late]);
     expect([late.status, late.end]).toEqual(['ended', 'locked']);
 
@@ -165,7 +182,9 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
   it('expulso, sala cheia, e ninguém respondendo no prazo', async () => {
     const { service, pump, advanceClock } = fakeInternet();
     const host = service.create({ name: '', team: -1, ready: true });
-    const friends = [1, 2, 3, 4].map((i) => service.join(host.code, { name: `F${i}`, team: -1, ready: true }));
+    const friends = [1, 2, 3, 4].map((i) =>
+      service.join(host.code, { name: `F${i}`, team: -1, ready: true }, id(10 + i)),
+    );
     await pump(30, [host, ...friends]);
     expect(friends.filter((f) => f.status === 'lobby')).toHaveLength(3);
     const full = friends.find((f) => f.status === 'ended')!;
@@ -175,11 +194,94 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
     await pump(10, [host, ...friends]);
     expect([kicked.status, kicked.end]).toEqual(['ended', 'kicked']);
     // Código sem ninguém do outro lado.
-    const lost = service.join('ZZZZZ', { name: 'X', team: -1, ready: true });
+    const lost = service.join('ZZZZZ', { name: 'X', team: -1, ready: true }, id(99));
     await pump(5, [lost]);
     expect(lost.status).toBe('connecting');
     advanceClock(JOIN_TIMEOUT_MS);
     await pump(1, [lost]);
     expect([lost.status, lost.end]).toEqual(['ended', 'not-found']);
+  });
+});
+
+describe('a queda e a volta (M5 fase 5b)', () => {
+  it('quem cai no meio da partida volta pelo mesmo aparelho, para o boneco dele (que estava com um bot)', async () => {
+    const { service, pump, cut } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    await pump(30, [host, bia]);
+    host.setLocked(true);
+    const placed = onlineRecipe(
+      recipe,
+      host.view!.members.map((m) => m.team),
+    );
+    const started = host.start(placed.recipe, 7, placed.controllers);
+    await pump(10, [host, bia]);
+    const first = bia.match!;
+    const { map } = buildSyntheticConstruto();
+    const link = started.session.attachHost(
+      createMatchSim({ recipe: { ...placed.recipe, seed: 7 }, map, humans: 2, writeHumanFrame: () => undefined }),
+    );
+    const biaController = placed.controllers[1]!;
+    // A conexão da Bia cai (conexão 1): ela tenta voltar; o host passa o boneco dela a um bot.
+    const statuses = new Set<string>();
+    cut(1);
+    for (let i = 0; i < 60; i++) {
+      await pump(1, [host, bia]);
+      statuses.add(bia.status);
+    }
+    expect(statuses.has('reconnecting')).toBe(true);
+    const lost: number[] = [];
+    const control: number[] = [];
+    // A volta: a sala trancada e jogando aceita o mesmo aparelho; o começo chega de novo, e o boneco volta a ela.
+    expect(bia.status).toBe('playing');
+    expect(bia.match).not.toBe(first);
+    expect(bia.match!.session.localController).toBe(biaController);
+    expect(host.view!.members.map((m) => m.name).sort()).toEqual(['Bia', 'Erick']);
+    expect(link.takeLost(lost)).toBe(1);
+    expect(lost).toEqual([biaController]);
+    expect(link.takeControl(control)).toBe(1);
+    expect(control).toEqual([biaController * 2 + 1]);
+    link.dispose();
+  });
+
+  it('quem foi tirado não volta naquela sala; o host que fecha a sala não faz ninguém tentar voltar', async () => {
+    const { service, pump } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    const caio = service.join(host.code, { name: 'Caio', team: 0, ready: true }, id(2));
+    await pump(30, [host, bia, caio]);
+    host.kick(bia.mySlot);
+    await pump(10, [host, bia, caio]);
+    expect([bia.status, bia.end]).toEqual(['ended', 'kicked']);
+    const again = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    await pump(30, [host, caio, again]);
+    expect([again.status, again.end]).toEqual(['ended', 'kicked']);
+    // Outro aparelho entra normalmente.
+    const other = service.join(host.code, { name: 'Davi', team: 1, ready: true }, id(3));
+    await pump(30, [host, caio, other]);
+    expect(other.status).toBe('lobby');
+    // O host fecha a sala: acaba na hora para os outros, sem "voltando".
+    const seen = new Set<string>();
+    host.leave();
+    for (let i = 0; i < 20; i++) {
+      await pump(1, [caio, other]);
+      seen.add(caio.status);
+    }
+    expect(seen.has('reconnecting')).toBe(false);
+    expect([caio.status, caio.end]).toEqual(['ended', 'host-left']);
+  });
+
+  it('sem o host do outro lado, voltar desiste em 20 s', async () => {
+    const { service, pump, cut, advanceClock } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    await pump(30, [host, bia]);
+    // O host some sem fechar (a aba travou de vez): a Bia tenta voltar e desiste.
+    cut(0);
+    await pump(10, [bia]);
+    expect(bia.status).toBe('reconnecting');
+    advanceClock(RECONNECT_TIMEOUT_MS);
+    await pump(2, [bia]);
+    expect([bia.status, bia.end]).toEqual(['ended', 'host-left']);
   });
 });

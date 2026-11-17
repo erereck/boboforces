@@ -27,6 +27,8 @@ export interface OnlineMatchSetup {
   readonly takeLeftSlots: () => readonly number[];
   /** M5 (fase 4c): a cena ligou (`true`) ou soltou (`false`) a partida (a sala descarta o que sobrar da rede). */
   readonly onAttached?: (attached: boolean) => void;
+  /** M5 (fase 5b), host: quem caiu e voltou desde a última chamada (o lugar novo, o de antes e o peer). */
+  readonly takeRejoined?: () => readonly { readonly slot: number; readonly oldSlot: number; readonly peer: number }[];
 }
 
 export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
@@ -48,7 +50,17 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
     attachHost(sim): OnlineHostLink {
       setup.onAttached?.(true);
       const host = net.createNetHost({ sim, endpoint: setup.endpoint, snapshotHz: setup.snapshotHz });
-      for (const m of remote) host.addClient(setup.peerOfSlot(m.slot), m.controller, true);
+      // O controlador de cada lugar e o peer de cada controlador (mudam quando alguém cai e volta, 5b).
+      const controllerOfSlot = new Map<number, number>();
+      const peerOfController = new Map<number, number>();
+      /** Quem caiu: o lugar antigo e o controlador (que está com um bot até ele voltar). */
+      const lostSlots = new Map<number, number>();
+      for (const m of remote) {
+        const peer = setup.peerOfSlot(m.slot);
+        host.addClient(peer, m.controller, true);
+        controllerOfSlot.set(m.slot, m.controller);
+        peerOfController.set(m.controller, peer);
+      }
       // M5 (fase 5a): o AFK pela última entrada de verdade que chegou de cada amigo (parado ou com a aba escondida, ela
       // não chega): 60 s sem nada e um bot assume; a próxima devolve a vaga.
       const afkTicks = Math.round(net.AFK_S * sim.hz);
@@ -59,6 +71,21 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
       return {
         takeControl(out): number {
           out.length = 0;
+          // M5 (fase 5b): quem caiu e voltou recebe o boneco dele de volta (o bot sai).
+          for (const r of setup.takeRejoined?.() ?? []) {
+            const c = lostSlots.get(r.oldSlot);
+            if (c === undefined) continue;
+            lostSlots.delete(r.oldSlot);
+            controllerOfSlot.set(r.slot, c);
+            peerOfController.set(c, r.peer);
+            host.addClient(r.peer, c, true);
+            const i = remote.findIndex((m) => m.controller === c);
+            if (i >= 0) {
+              seenActivity[i] = -1;
+              away[i] = 0;
+            }
+            out.push(c * 2 + 1);
+          }
           for (let i = 0; i < remote.length; i++) {
             const c = remote[i]!.controller;
             const a = host.activity(c);
@@ -85,8 +112,14 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
         takeLost(out): number {
           out.length = 0;
           for (const slot of setup.takeLeftSlots()) {
-            const m = remote.find((r) => r.slot === slot);
-            if (m) out.push(m.controller);
+            const c = controllerOfSlot.get(slot);
+            if (c === undefined) continue;
+            controllerOfSlot.delete(slot);
+            lostSlots.set(slot, c);
+            const peer = peerOfController.get(c);
+            if (peer !== undefined) host.removeClient(peer);
+            peerOfController.delete(c);
+            out.push(c);
           }
           return out.length;
         },

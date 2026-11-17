@@ -146,8 +146,10 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       const k = l.takeControl(control);
       for (let i = 0; i < k; i++) {
         const c = control[i]! >> 1;
-        if (!remote.has(c)) continue;
         const back = (control[i]! & 1) === 1;
+        // M5 (fase 5b): quem caiu e voltou é do time da rede de novo.
+        if (back) remote.add(c);
+        if (!remote.has(c)) continue;
         if (back) away.delete(c);
         else {
           away.add(c);

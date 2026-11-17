@@ -8,7 +8,7 @@ import type {
   OnlineRoomStatus,
   OnlineRoomView,
 } from '@boboforces/game';
-import type { LobbyChoice, LobbyStart, LobbyState, NetEndpoint } from '@boboforces/net';
+import type { LobbyChoice, LobbyClient, LobbyRejoin, LobbyStart, LobbyState, NetEndpoint } from '@boboforces/net';
 import type { NetModule } from './online.ts';
 import { createOnlineSession } from './online-session.ts';
 
@@ -46,6 +46,10 @@ export interface WebRoomsDeps {
 
 /** Sem resposta do host neste prazo: "ninguém respondeu nesse código". Os relays às vezes levam uns segundos. */
 export const JOIN_TIMEOUT_MS = 20_000;
+/** M5 (fase 5b): quem perdeu o host sem o "fechei a sala" tenta voltar por este tempo. */
+export const RECONNECT_TIMEOUT_MS = 20_000;
+/** M5 (fase 5b): o host fecha a sala e espera isto antes de soltar a conexão (o aviso tem que sair). */
+export const CLOSE_GRACE_MS = 300;
 /** O ritmo da partida online (o welcome leva; tecnico.md §13.3). */
 export const ONLINE_HZ = 60;
 export const ONLINE_SNAPSHOT_HZ = 30;
@@ -89,6 +93,14 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     const left: number[] = [];
     /** Os lugares na partida em andamento (quem some do lobby enquanto ela roda vai para `left`). */
     const inMatch = new Set<number>();
+    /** M5 (fase 5b): quem caiu na partida e voltou (a sessão devolve o controlador). */
+    const rejoined: LobbyRejoin[] = [];
+    lobby.onRejoin = (r) => {
+      if (status !== 'playing') return;
+      deps.log(`[online] sala ${code}: o lugar ${r.oldSlot} voltou (agora ${r.slot})`);
+      inMatch.add(r.slot);
+      rejoined.push(r);
+    };
     lobby.onChange = () => {
       view = toView(lobby.state);
       // Pela diferença do estado, e não pelo aviso do transporte: o "saí" do amigo (ou o Tirar) pode chegar antes dele,
@@ -158,10 +170,12 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
           snapshotHz: ONLINE_SNAPSHOT_HZ,
           isClosed: () => closed,
           takeLeftSlots: () => left.splice(0),
+          takeRejoined: () => rejoined.splice(0),
           onAttached: (on) => {
             attached = on;
           },
         });
+        rejoined.length = 0;
         match = { recipe, seed, session };
         deps.log(`[online] sala ${code}: começou (${start.members.length} jogador(es))`);
         return match;
@@ -176,17 +190,16 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
         if (closed) return;
         closed = true;
         status = 'ended';
-        void transport.leave();
+        // De propósito: os amigos não tentam voltar (5b). O aviso sai antes de a conexão fechar.
+        lobby.close();
+        setTimeout(() => void transport.leave(), CLOSE_GRACE_MS);
       },
     };
   }
 
-  function clientRoom(code: string, choice: OnlineRoomChoice): OnlineRoom {
-    const transport = deps.connect(code);
-    const [lobbyEp, matchEp] = net.createEndpointMux(transport.endpoint, net.isLobbyMessage);
-    const lc = net.createLobbyClient({ endpoint: lobbyEp, choice: toLobby(choice) });
-    const startedAt = deps.now();
+  function clientRoom(code: string, choice: OnlineRoomChoice, deviceId: string): OnlineRoom {
     const timeout = deps.joinTimeoutMs ?? JOIN_TIMEOUT_MS;
+    let current = choice;
     let status: OnlineRoomStatus = 'connecting';
     let end: OnlineRoomEnd | null = null;
     let view: OnlineRoomView | null = null;
@@ -195,8 +208,12 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
     let lastStart: LobbyStart | null = null;
     let attached = false;
     let closed = false;
-    transport.onPeerJoin = (peer) => lc.addPeer(peer);
-    transport.onPeerLeave = (peer) => lc.removePeer(peer);
+    /** Desde quando procura o host (a 1ª vez ou voltando depois de cair). */
+    let since = deps.now();
+    // A conexão de agora (cada volta abre outra, com o mesmo código e o mesmo aparelho).
+    let transport!: RoomTransport;
+    let matchEp!: NetEndpoint;
+    let lc!: LobbyClient;
     const finish = (why: OnlineRoomEnd): void => {
       if (status === 'ended') return;
       status = 'ended';
@@ -204,14 +221,26 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       closed = true;
       void transport.leave();
     };
-    lc.onChange = () => {
+    /** M5 (fase 5b): o host sumiu sem fechar a sala: a conexão caiu (a minha ou a dele). Tenta voltar por 20 s. */
+    const reconnect = (): void => {
+      deps.log(`[online] sala ${code}: a conexão com o host caiu, voltando`);
+      status = 'reconnecting';
+      since = deps.now();
+      const old = transport;
+      // O Trystero só entra de novo na mesma sala depois de sair da anterior.
+      void Promise.resolve(old.leave()).then(() => {
+        if (!closed && status === 'reconnecting') open();
+      });
+    };
+    const onChange = (mine: LobbyClient): void => {
+      if (mine !== lc) return;
       if (lc.state !== null && lc.state !== lastState) {
         lastState = lc.state;
         view = toView(lc.state);
       }
-      const s = lc.status;
-      if (s === 'in') status = 'lobby';
-      else if (s === 'started' && lc.start !== null && lc.welcome !== null) {
+      const st = lc.status;
+      if (st === 'in') status = 'lobby';
+      else if (st === 'started' && lc.start !== null && lc.welcome !== null) {
         status = 'playing';
         if (lc.start !== lastStart) {
           const start = lc.start;
@@ -231,8 +260,8 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
               hostPeer: lc.host,
               welcome,
               snapshotHz: ONLINE_SNAPSHOT_HZ,
-              // A partida acaba para este aparelho quando a sala volta ao lobby, acaba ou começa outra.
-              isClosed: () => closed || lc.status !== 'started' || lc.start !== start,
+              // A partida acaba para este aparelho quando a sala volta ao lobby, acaba, começa outra ou a conexão cai.
+              isClosed: () => closed || mine !== lc || mine.status !== 'started' || mine.start !== start,
               takeLeftSlots: () => [],
               onAttached: (on) => {
                 attached = on;
@@ -246,10 +275,24 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
           }
           match = { recipe: start.recipe, seed: start.seed, session };
         }
-      } else if (s === 'rejected') finish(lc.rejection === null || lc.rejection === 'ok' ? 'mismatch' : lc.rejection);
-      else if (s === 'kicked') finish('kicked');
-      else if (s === 'closed' && !closed) finish('host-left');
+      } else if (st === 'rejected') finish(lc.rejection === null || lc.rejection === 'ok' ? 'mismatch' : lc.rejection);
+      else if (st === 'kicked') finish('kicked');
+      else if (st === 'closed' && !closed) {
+        if (lc.hostClosed || lc.welcome === null) finish('host-left');
+        else reconnect();
+      }
     };
+    const open = (): void => {
+      transport = deps.connect(code);
+      const [lobbyEp, m] = net.createEndpointMux(transport.endpoint, net.isLobbyMessage);
+      matchEp = m;
+      const mine = net.createLobbyClient({ endpoint: lobbyEp, choice: toLobby(current), deviceId });
+      lc = mine;
+      transport.onPeerJoin = (peer) => mine.addPeer(peer);
+      transport.onPeerLeave = (peer) => mine.removePeer(peer);
+      mine.onChange = () => onChange(mine);
+    };
+    open();
     return {
       role: 'client',
       code,
@@ -272,10 +315,15 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
         if (closed) return;
         transport.update();
         lc.update();
-        if (status === 'connecting' && deps.now() - startedAt > timeout) finish('not-found');
+        const waited = deps.now() - since;
+        if (status === 'connecting' && waited > timeout) finish('not-found');
+        if (status === 'reconnecting' && waited > RECONNECT_TIMEOUT_MS) finish('host-left');
         if (!attached && status !== 'playing') drain(matchEp);
       },
-      setChoice: (c) => lc.setChoice(toLobby(c)),
+      setChoice: (c) => {
+        current = c;
+        lc.setChoice(toLobby(c));
+      },
       setSummary: () => undefined,
       setLocked: () => undefined,
       kick: () => undefined,
