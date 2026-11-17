@@ -117,7 +117,7 @@ jogadores remotos e o cliente sem diretor de bots) e as telas. Cada parte termin
   uma rodada pelos relays de verdade entre duas abas, só de leitura e escrita efêmera de sinalização, como o jogo faz.
   **Feita em 16/11** (`npm run online:web`, ARCHITECTURE §16.9): do título à sala, à partida pela rede e de volta, e o
   "host saiu"; o amigo entrou em 1,9 s pela sinalização local e em 4,4 s pelos relays de verdade.
-- **4f, a rodada de prints** (as telas e o texto do aviso de privacidade).
+- **4f, a rodada de prints** (as telas e o texto do aviso de privacidade). **Feita em 16/11:** `npm run online:web -- --prints` captura as 21 telas (o caminho inteiro em 1280×720 e o host num celular de 667×375); rodada 19 da página de prints (S1–S6, com O3 e O6 do plano).
 
 ## Riscos
 

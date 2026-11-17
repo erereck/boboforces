@@ -5,16 +5,21 @@
 //   3. o host começa; os dois jogam pela rede (WebRTC de verdade entre as abas) por alguns segundos;
 //   4. o host sai pela pausa: os dois voltam à sala; o host sai da sala e o amigo vê "o host saiu".
 // Sem relay nenhum por padrão (`?sinal=local`: as abas se acham por um BroadcastChannel). `--relays`: a mesma rodada
-// pelos relays Nostr de verdade da `net.json` (só a sinalização efêmera, como o jogo faz). Relatório em
-// `local/m5/online-web.json`.
+// pelos relays Nostr de verdade da `net.json` (só a sinalização efêmera, como o jogo faz). `--prints`: as capturas de cada
+// tela em `local/m5/prints/` (1280×720, mais uma passada do host num celular de 667×375 com toque), com o Escolher
+// partida, a pausa e o resultado do amigo no caminho. Relatório em `local/m5/online-web.json`.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { Page } from 'playwright-core';
+import type { Browser, Page } from 'playwright-core';
 import { launchEdge, REPO_ROOT, startPreview, waitForTitle, type PageWindow } from './edge.ts';
 
 const PLAY_S = 10;
 const STEP_TIMEOUT_MS = 30_000;
 const relays = process.argv.includes('--relays');
+const printsDir = process.argv.includes('--prints') ? join(REPO_ROOT, 'local', 'm5', 'prints') : null;
+/** O perfil do Online já gravado (`online@1`), para cada aba ter o seu nome nas capturas. */
+const profile = (name: string, privacy: number): string =>
+  JSON.stringify({ format: 'boboforces/online@1', name, privacy });
 
 interface OnlineState {
   readonly code: string;
@@ -70,11 +75,66 @@ async function tap(page: Page, key: string): Promise<void> {
   await wait(3);
 }
 
+/** Espera o jogo desenhar `count` quadros (a aba na frente). */
+async function frames(page: Page, count: number): Promise<void> {
+  const now = (): Promise<number> => page.evaluate(() => (window as unknown as PageWindow).__bfDebug?.frames ?? 0);
+  const target = (await now()) + count;
+  for (let i = 0; i < 200 && (await now()) < target; i++) await page.waitForTimeout(16);
+}
+
+/**
+ * Abre a pausa. A aba que foi para trás já volta pausada (o navegador avisa que ela sumiu e o jogo pausa; no online a
+ * partida não para): aí o Esc fecharia a pausa em vez de abrir.
+ */
+async function openPause(page: Page): Promise<void> {
+  await page.bringToFront();
+  await frames(page, 3);
+  if (!(await page.evaluate(() => (window as unknown as PageWindow).__bfDebug?.paused ?? false)))
+    await tap(page, 'Escape');
+}
+
+/** Uma captura (só com `--prints`). */
+async function shot(page: Page, name: string): Promise<void> {
+  if (printsDir === null) return;
+  await page.bringToFront();
+  // A aba aberta direto no Online (pelo link) ainda pode estar com o splash saindo.
+  await page.waitForFunction(() => document.getElementById('bf-splash') === null, undefined, { timeout: 10_000 });
+  await frames(page, 4);
+  await page.screenshot({ path: join(printsDir, `${name}.png`) });
+}
+
+/** O celular (só com `--prints`): o título sem a Cena-vitrine, o aviso e a sala do host, pela sinalização local. */
+async function phonePass(browser: Browser, url: string): Promise<void> {
+  const context = await browser.newContext({
+    viewport: { width: 667, height: 375 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 14; SM-A366B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+  });
+  const phone = await context.newPage();
+  await phone.goto(`${url}?sinal=local`);
+  await waitForTitle(phone);
+  await phone.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Erick', 0));
+  await shot(phone, 'celular-titulo');
+  for (const key of ['ArrowDown', 'ArrowRight', 'Enter']) await tap(phone, key);
+  await until(phone, 'o Online no celular', (s) => s.screen === 'online');
+  await shot(phone, 'celular-aviso');
+  await tap(phone, 'Enter');
+  await shot(phone, 'celular-casa');
+  await tap(phone, 'Enter');
+  await until(phone, 'a sala no celular', (s) => s.online?.status === 'lobby');
+  await shot(phone, 'celular-sala');
+  await context.close();
+}
+
 async function main(): Promise<number> {
   const server = await startPreview();
   const { browser } = await launchEdge();
   const failures: string[] = [];
   const steps: Record<string, unknown> = {};
+  if (printsDir !== null) mkdirSync(printsDir, { recursive: true });
   const query = relays ? '' : '?sinal=local';
   try {
     // Um contexto só: o BroadcastChannel da sinalização local não atravessa contextos (e o aviso já lido vale nos dois).
@@ -90,22 +150,46 @@ async function main(): Promise<number> {
     // 1. O host: título → Online (Modos | Online na 1ª fileira da grade) → aviso → Criar sala.
     await host.goto(`${server.url}${query}`);
     await waitForTitle(host);
+    // Os nomes da sala: o do host aqui (o aviso ainda por ler); o do amigo antes de abrir o link.
+    await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Erick', 0));
+    await shot(host, 'titulo');
     for (const key of ['ArrowDown', 'ArrowRight', 'Enter']) await tap(host, key);
     await until(host, 'a tela do Online', (s) => s.screen === 'online');
+    await shot(host, 'aviso');
     await tap(host, 'Enter');
+    await shot(host, 'casa');
     await tap(host, 'Enter');
     const created = await until(host, 'a sala criada', (s) => s.online?.status === 'lobby');
     const code = created.online!.code;
     steps['sala'] = code;
+    await shot(host, 'sala-host-sozinho');
+    if (printsDir !== null) {
+      // Escolher partida: a Partida personalizada com "Usar na sala"; Voltar não muda nada.
+      await tap(host, 'ArrowDown');
+      await tap(host, 'Enter');
+      await until(host, 'a Partida personalizada', (s) => s.screen === 'custom');
+      await shot(host, 'escolher-partida');
+      await tap(host, 'Escape');
+      await until(host, 'a sala de novo', (s) => s.screen === 'online');
+      await tap(host, 'ArrowUp');
+    }
 
     // 2. O amigo: o link da sala abre direto no Entrar.
+    await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Bia', 1));
     const joinStart = Date.now();
     await friend.goto(`${server.url}${query}#sala=${code}`);
     await until(friend, 'o Entrar com o código do link', (s) => s.screen === 'online');
+    await shot(friend, 'entrar-pelo-link');
     await tap(friend, 'Enter');
+    await shot(friend, 'procurando');
     await until(friend, 'entrar na sala', (s) => s.online?.status === 'lobby');
     await until(host, 'o amigo na sala', (s) => (s.online?.members ?? 0) === 2);
     steps['entrouMs'] = Date.now() - joinStart;
+    // A Bia escolhe o azul (tanto faz → laranja → azul).
+    await tap(friend, 'ArrowRight');
+    await tap(friend, 'ArrowRight');
+    await shot(friend, 'sala-amigo');
+    await shot(host, 'sala-host');
 
     // 3. O host começa; os dois na partida pela rede.
     await tap(host, 'Enter');
@@ -113,22 +197,40 @@ async function main(): Promise<number> {
     await until(friend, 'a partida do amigo', (s) => s.screen === 'scene' && s.simTick > 0);
     await host.waitForTimeout(PLAY_S * 1000);
     const [h, f] = [await snap(host), await snap(friend)];
+    await shot(host, 'partida-host');
+    await shot(friend, 'partida-amigo');
     steps['ticks'] = { host: h.simTick, amigo: f.simTick };
     // O amigo mostra o host 100 ms atrás (6 ticks) mais o caminho da rede entre as abas.
     if (Math.abs(h.simTick - f.simTick) > 30) failures.push(`o amigo está longe do host: ${h.simTick} × ${f.simTick}`);
     if (h.simTick < PLAY_S * 50) failures.push(`a partida do host andou pouco: ${h.simTick} ticks em ${PLAY_S} s`);
 
+    if (printsDir !== null) {
+      // A pausa do amigo (sem o Ajustar desafio; a partida não para) e o resultado online dele, que volta à sala antes
+      // do host (e espera lá).
+      await openPause(friend);
+      await shot(friend, 'pausa-amigo');
+      await tap(friend, 'Escape');
+      await friend.evaluate(() => (window as unknown as PageWindow).__bfDebug?.print?.showResult());
+      await shot(friend, 'resultado-amigo');
+      await tap(friend, 'Enter');
+      await until(friend, 'o amigo esperando na sala', (s) => s.screen === 'online');
+      await shot(friend, 'sala-amigo-esperando');
+    }
     // 4. O host sai pela pausa (Continuar, Ajustar desafio, Ajustes, Destravar, Sair): os dois voltam à sala.
-    await tap(host, 'Escape');
+    await openPause(host);
+    await shot(host, 'pausa-host');
     for (let i = 0; i < 4; i++) await tap(host, 'ArrowDown');
     await tap(host, 'Enter');
     await until(host, 'o host de volta à sala', (s) => s.screen === 'online' && s.online?.status === 'lobby');
     await until(friend, 'o amigo de volta à sala', (s) => s.screen === 'online' && s.online?.status === 'lobby');
+    await shot(host, 'sala-de-volta');
     // O host sai da sala (Voltar põe o foco no Sair da sala): ela acaba para o amigo.
     await tap(host, 'Escape');
     await tap(host, 'Enter');
     await until(friend, 'o aviso de que o host saiu', (s) => s.online === null || s.online.end === 'host-left');
+    await shot(friend, 'host-saiu');
     steps['fim'] = 'ok';
+    if (printsDir !== null) await phonePass(browser, server.url);
     const logs = await Promise.all(
       [host, friend].map((p) => p.evaluate(() => (window as unknown as PageWindow).__bfDebug?.log?.(30) ?? [])),
     );

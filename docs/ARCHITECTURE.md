@@ -3272,3 +3272,7 @@ Plano em `docs/PLANO_M5.md`. O pacote `packages/net` nasce aqui (só web; `apps/
     atrás do host (os 100 ms da interpolação);
   - **relays de verdade** (`--relays`, uma rodada só, como o jogo faz: eventos efêmeros de sinalização nos relays da
     `net.json` e o STUN da Cloudflare): o amigo entrou em 4,4 s; 8 ticks atrás do host; a volta à sala e o fim, iguais.
+- **Os prints (4f):** `npm run online:web -- --prints` guarda em `local/m5/prints/` as 21 telas do caminho (título, aviso,
+  casa, link, procurando, as salas do host e do amigo, Escolher partida, as duas partidas e pausas, o resultado online, a
+  volta e o "host saiu") e o host num celular de 667×375 com toque. A aba que vai para trás volta pausada (o jogo pausa
+  quando ela some; no online a partida não para): o roteiro só aperta Esc quando ela não está.
