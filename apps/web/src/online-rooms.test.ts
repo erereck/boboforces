@@ -112,7 +112,7 @@ function fakeInternet() {
 describe('a sala do Online na web (M5 fase 4c)', () => {
   it('cria, entra, escolhe time, começa, volta ao lobby, e quem sai no meio vira bot', async () => {
     const { service, pump, copied } = fakeInternet();
-    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
     expect(host.code).toMatch(/^[A-Z2-9]{5}$/);
     expect(service.codeFromLink(`#sala=${host.code.toLowerCase()}`)).toBe(host.code);
     host.setSummary('Times · Construto', true);
@@ -137,7 +137,7 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
       recipe,
       host.view!.members.map((m) => m.team),
     );
-    const started = host.start(placed.recipe, 77, placed.controllers);
+    const started = host.start(placed.recipe, 77, placed.controllers, 0);
     expect(started.session.role).toBe('host');
     expect(started.session.humans).toBe(3);
     await pump(10, [host, bia, caio]);
@@ -177,7 +177,7 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
     await pump(10, [host, bia]);
     expect([host.status, bia.status, bia.view!.playing]).toEqual(['lobby', 'lobby', false]);
     expect(bia.match!.session.closed).toBe(true);
-    const again = host.start(placed.recipe, 78, [0, 1]);
+    const again = host.start(placed.recipe, 78, [0, 1], 0);
     await pump(10, [host, bia]);
     expect(bia.match!.seed).toBe(78);
     expect(bia.match).not.toBe(started);
@@ -191,7 +191,7 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
 
   it('expulso, sala cheia, e ninguém respondendo no prazo', async () => {
     const { service, pump, advanceClock } = fakeInternet();
-    const host = service.create({ name: '', team: -1, ready: true });
+    const host = service.create({ name: '', team: -1, ready: true }, 30);
     const friends = [1, 2, 3, 4].map((i) =>
       service.join(host.code, { name: `F${i}`, team: -1, ready: true }, id(10 + i)),
     );
@@ -216,7 +216,7 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
 describe('a queda e a volta (M5 fase 5b)', () => {
   it('quem cai no meio da partida volta pelo mesmo aparelho, para o boneco dele (que estava com um bot)', async () => {
     const { service, pump, cut } = fakeInternet();
-    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
     const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
     await pump(30, [host, bia]);
     host.setLocked(true);
@@ -224,7 +224,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
       recipe,
       host.view!.members.map((m) => m.team),
     );
-    const started = host.start(placed.recipe, 7, placed.controllers);
+    const started = host.start(placed.recipe, 7, placed.controllers, 0);
     await pump(10, [host, bia]);
     const first = bia.match!;
     const { map } = buildSyntheticConstruto();
@@ -256,7 +256,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
 
   it('a volta chega antes de o host ver a queda: a conexão antiga sai e a nova pega o boneco', async () => {
     const { service, pump, cutOneSide } = fakeInternet();
-    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
     const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
     await pump(30, [host, bia]);
     host.setLocked(true);
@@ -264,7 +264,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
       recipe,
       host.view!.members.map((m) => m.team),
     );
-    const started = host.start(placed.recipe, 7, placed.controllers);
+    const started = host.start(placed.recipe, 7, placed.controllers, 0);
     await pump(10, [host, bia]);
     const first = bia.match!;
     const { map } = buildSyntheticConstruto();
@@ -297,7 +297,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
 
   it('quem foi tirado não volta naquela sala; o host que fecha a sala não faz ninguém tentar voltar', async () => {
     const { service, pump } = fakeInternet();
-    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
     const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
     const caio = service.join(host.code, { name: 'Caio', team: 0, ready: true }, id(2));
     await pump(30, [host, bia, caio]);
@@ -324,7 +324,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
 
   it('sem o host do outro lado, voltar desiste em 20 s', async () => {
     const { service, pump, cut, advanceClock } = fakeInternet();
-    const host = service.create({ name: 'Erick', team: 0, ready: true });
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
     const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
     await pump(30, [host, bia]);
     // O host some sem fechar (a aba travou de vez): a Bia tenta voltar e desiste.
@@ -334,5 +334,27 @@ describe('a queda e a volta (M5 fase 5b)', () => {
     advanceClock(RECONNECT_TIMEOUT_MS);
     await pump(2, [bia]);
     expect([bia.status, bia.end]).toEqual(['ended', 'host-left']);
+  });
+});
+
+describe('o host no celular (M5 fase 6b)', () => {
+  it('o celular vai na escolha e aparece na sala; o pool de zumbis do host chega à sessão do amigo', async () => {
+    const { service, pump } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true, mobile: true }, 20);
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true, mobile: true }, id(1));
+    const caio = service.join(host.code, { name: 'Caio', team: -1, ready: true }, id(2));
+    await pump(30, [host, bia, caio]);
+    const mobileOf = (name: string) => host.view!.members.find((m) => m.name === name)?.mobile === true;
+    expect([mobileOf('Erick'), mobileOf('Bia'), mobileOf('Caio')]).toEqual([true, true, false]);
+    expect(bia.view).toEqual(host.view);
+    const placed = onlineRecipe(
+      recipe,
+      host.view!.members.map((m) => m.team),
+    );
+    const started = host.start(placed.recipe, 9, placed.controllers, 16);
+    await pump(10, [host, bia, caio]);
+    expect(started.session.zombiePool).toBe(16);
+    for (const c of [bia, caio]) expect(c.match!.session.zombiePool).toBe(16);
+    host.leave();
   });
 });

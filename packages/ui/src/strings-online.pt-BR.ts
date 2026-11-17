@@ -89,6 +89,9 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.mode.zombies.desc': 'Todos juntos contra as ondas. Caiu? O colega levanta.',
   'online.mode.surprise.desc': 'O jogo sorteia a partida. Escolha de novo para sortear outra.',
   'online.mode.custom.desc': 'Todas as regras, como no jogo sozinho.',
+  // M5 (fase 6b): o host no celular e o menor teto da sala (tecnico.md §13.4; GDD §2).
+  'online.room.phoneHost': 'Você é o host: não troque de app durante a partida.',
+  'online.room.capped': 'Com celular na sala, a partida vai com até {n} bots.',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type OnlineStringKey = keyof typeof STRINGS_ONLINE_PT_BR;

@@ -2149,7 +2149,8 @@ function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
     setSummary: (text, teams) => void calls.push(`summary:${text}:${teams}`),
     setLocked: (on) => void calls.push(`lock:${on}`),
     kick: (slot) => void calls.push(`kick:${slot}`),
-    start(recipe, seed, controllers) {
+    start(recipe, seed, controllers, zombies) {
+      calls.push(`pool:${zombies}`);
       calls.push(`start:${seed}:${controllers.join(',')}`);
       room.status = 'playing';
       room.match = { recipe, seed, session: fakeSession('host', calls).session };
@@ -2168,12 +2169,15 @@ function fakeRoom(role: 'host' | 'client', code: string): FakeRoom {
   return room;
 }
 
-async function bootWithOnline(store: Readonly<Record<string, string>> = {}, onlineLink?: string) {
+async function bootWithOnline(store: Readonly<Record<string, string>> = {}, onlineLink?: string, mobile = false) {
   const platform = createFakePlatform({ store });
+  // M5 (fase 6b): um celular (o host com o teto menor e os snapshots a 20 Hz).
+  if (mobile) (platform.features as { profileHint: string }).profileHint = 'mobile';
   const made: FakeRoom[] = [];
   const rooms: OnlineRooms = {
-    create: (choice) => {
+    create: (choice, snapshotHz) => {
       const r = fakeRoom('host', 'BOBOS');
+      r.calls.push(`hz:${snapshotHz}`);
       r.choices.push(choice);
       made.push(r);
       return r;
@@ -2577,6 +2581,69 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.tap('Enter');
     expect(summaries().length).toBe(before + 1);
     expect(summaries().at(-1)).toMatch(/^summary:(Times|Todos).*Construto:(true|false)$/);
+    game.dispose();
+  }, 60_000);
+
+  it('M5 (fase 6b): o host no celular: snapshots a 20 Hz, o celular na escolha, até 8 bots e 16 zumbis', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({
+        format: 'boboforces/online@1',
+        name: 'Erick',
+        privacy: ONLINE.ONLINE_PRIVACY_VERSION,
+      }),
+    };
+    const { platform, game, made } = await bootWithOnline(store, undefined, true);
+    await openOnlineFromTitle(platform);
+    expect(game.screen).toBe('online');
+    platform.tap('Enter');
+    const room = made[0]!;
+    expect(room.calls).toContain('hz:20');
+    expect(room.choices[0]!.mobile).toBe(true);
+    expect(platform.logLines.some((l) => l.includes('criada (snapshots a 20 Hz)'))).toBe(true);
+    // Um amigo no PC: o teto continua o do host no celular.
+    room.view = {
+      ...room.view!,
+      members: [
+        { slot: 0, name: 'Erick', team: -1, ready: true, mobile: true },
+        { slot: 1, name: 'Bia', team: -1, ready: true },
+      ],
+    };
+    platform.pump(2);
+    platform.tap('Enter');
+    expect(room.calls).toContain('pool:16');
+    expect(platform.logLines.some((l) => l.includes('até 8 bots e 16 zumbis'))).toBe(true);
+    game.dispose();
+  }, 60_000);
+
+  it('M5 (fase 6b): host no PC com um amigo no celular: o teto do celular (12 bots, 24 zumbis) e o resumo muda', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({
+        format: 'boboforces/online@1',
+        name: 'Erick',
+        privacy: ONLINE.ONLINE_PRIVACY_VERSION,
+      }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    await openOnlineFromTitle(platform);
+    platform.tap('Enter');
+    const room = made[0]!;
+    expect(room.calls).toContain('hz:30');
+    const summaries = () => room.calls.filter((c) => c.startsWith('summary:'));
+    const first = summaries().length;
+    // O amigo no celular entra: a partida da sala (a de estreia, dentro dos 12) não muda, e o resumo não é mandado de
+    // novo.
+    room.view = {
+      ...room.view!,
+      members: [
+        { slot: 0, name: 'Erick', team: -1, ready: true },
+        { slot: 1, name: 'Bia', team: -1, ready: true, mobile: true },
+      ],
+    };
+    platform.pump(2);
+    expect(summaries().length).toBe(first);
+    platform.tap('Enter');
+    expect(room.calls).toContain('pool:24');
+    expect(platform.logLines.some((l) => l.includes('até 12 bots e 24 zumbis'))).toBe(true);
     game.dispose();
   }, 60_000);
 

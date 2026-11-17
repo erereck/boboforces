@@ -11,6 +11,7 @@ import {
   createLobbyHost,
   isLobbyMessage,
   parseLobbyChoice,
+  parseLobbyStart,
   type LobbyChoice,
   type LobbyClient,
 } from './lobby.ts';
@@ -239,5 +240,25 @@ describe('lobby pela rede de mentira (M5 fase 4a)', () => {
     expect(lobby.state.members.map((m) => m.slot)).toEqual([0]);
     host.dispose();
     client.dispose();
+  });
+});
+
+describe('o celular e o pool de zumbis (M5 fase 6b)', () => {
+  it('a escolha diz se é celular (só o `true` conta); o começo leva o pool de zumbis do host (0..64)', () => {
+    expect(parseLobbyChoice({ name: 'Bia', team: 0, ready: true, mobile: true }, 'x')?.mobile).toBe(true);
+    // Um jogo de antes da 6b não manda: não é celular (e a escolha continua igual à de antes).
+    expect(parseLobbyChoice({ name: 'Bia', team: 0, ready: true }, 'x')).toEqual({
+      name: 'Bia',
+      team: 0,
+      bobo: null,
+      ready: true,
+    });
+    expect(parseLobbyChoice({ name: 'Bia', mobile: 'sim' }, 'x')?.mobile).toBeUndefined();
+    const member = { slot: 0, name: 'Host', team: 0, bobo: null, ready: true, controller: 0 };
+    expect(parseLobbyStart({ recipe: {}, seed: 1, members: [member], zombies: 16 })?.zombies).toBe(16);
+    expect(parseLobbyStart({ recipe: {}, seed: 1, members: [member] })?.zombies).toBeUndefined();
+    for (const bad of [-1, 65, 2.5, '16']) {
+      expect(parseLobbyStart({ recipe: {}, seed: 1, members: [member], zombies: bad })?.zombies).toBeUndefined();
+    }
   });
 });

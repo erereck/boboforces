@@ -335,6 +335,11 @@ export interface OnlineRoomState {
   readonly team: string | null;
   readonly locked: boolean;
   readonly note: string;
+  /**
+   * M5 (fase 6b), host: as linhas fixas da sala ("Você é o host: não troque de app", a partida cortada pelo teto);
+   * ausente = nenhuma.
+   */
+  readonly hints?: readonly string[];
 }
 
 export const ONLINE_ROOM_SEATS = 4;
@@ -444,7 +449,9 @@ export const onlineRoomScreen: Screen<OnlineRoomState> = {
             } as UiNode,
           ]
         : []),
-      ...(state.host ? [] : [text('wait', { key: 'online.room.wait' }, 'body', COLORS.textoBaixo)]),
+      ...(state.host
+        ? (state.hints ?? []).map((h, i) => text(`hint${i}`, { literal: h }, 'body', COLORS.textoBaixo))
+        : [text('wait', { key: 'online.room.wait' }, 'body', COLORS.textoBaixo)]),
       ...(state.note !== '' ? [text('note', { literal: state.note }, 'body', COLORS.acao)] : []),
     ];
     return page({ literal: t('online.room.code', { code: state.code }) }, [

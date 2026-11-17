@@ -44,6 +44,8 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
     localController: me.controller,
     remoteControllers: remote.map((m) => m.controller),
     names,
+    // M5 (fase 6b): o pool de zumbis do host (o amigo cria a sim com o mesmo número).
+    ...(start.zombies !== undefined ? { zombiePool: start.zombies } : {}),
     get closed(): boolean {
       return setup.isClosed();
     },

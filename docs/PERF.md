@@ -271,6 +271,13 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   captura de 178 para **133 µs** (antes disso, com uma closure por campo e item, a captura era 635 µs).
 - **Orçamento do host no celular** (tecnico.md §13.4: rede 2 ms com 3 clientes e 8 bots): no PC, 17 + 3 × 39 =
   **134 µs** por snapshot. Ainda falta medir no celular (fase 7).
+- **Os modos da sala (fase 6a, `apps/web/src/online-modes.test.ts`):** os mapas de verdade pela rede de mentira (60 ms
+  ± 15 ms, 3% de perda), host → cada amigo: Todos contra todos (3 humanos e 5 bots, Construto) **6,0 KB/s**; X1 (só os
+  2, Ringue) **3,0 KB/s**; Bobo Zombies (2 humanos, 1 bot de apoio, pool de 16, Base Abandonada) **5,3 KB/s**.
+- **O host no celular, snapshots a 20 Hz (fase 6b):** a partida do `match.test` (80 ms ± 25 ms, 5% de perda, 4
+  humanos e 8 bots) a 20 Hz: host → cliente **7,3 KB/s** (9,8 a 30 Hz); a interpolação fica a **0,52 cm** do host em
+  média e **5,3 cm** no p99 (0,37 e 2,0 a 30 Hz: a espera de 100 ms cobre só 2 snapshots); a predição não muda (erro
+  médio 0,02–0,14 cm). Nos mapas de verdade, Times com o host e 1 amigo: **4,3 KB/s** a 20 Hz contra 5,8 a 30 Hz.
 
 ## 2. Frame no aparelho (painel F2)
 

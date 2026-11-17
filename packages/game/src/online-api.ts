@@ -75,6 +75,11 @@ export interface OnlineSession {
   readonly remoteControllers: readonly number[];
   /** M5 (fase 4c): o nome de cada humano na sala, pelo controlador (o placar, o kill feed e o resultado usam). */
   readonly names: readonly (string | undefined)[];
+  /**
+   * M5 (fase 6b): o pool de zumbis da sim do host (o menor teto da sala); a cena do amigo cria a dela com o mesmo número.
+   * Ausente = o teto do aparelho.
+   */
+  readonly zombiePool?: number;
   /** A sala acabou (o host saiu, fui expulso, a conexão caiu): a cena volta ao menu. */
   readonly closed: boolean;
   attachHost(sim: Sim): OnlineHostLink;
@@ -117,6 +122,8 @@ export interface OnlineRoomChoice {
   readonly team: number;
   /** Está na tela da sala (falso enquanto vê o resultado da partida). */
   readonly ready: boolean;
+  /** M5 (fase 6b): o aparelho é um celular (a sala usa o menor teto entre os participantes). */
+  readonly mobile?: boolean;
 }
 
 export interface OnlineRoomMember extends OnlineRoomChoice {
@@ -168,8 +175,11 @@ export interface OnlineRoom {
   setSummary(text: string, teams: boolean): void;
   setLocked(on: boolean): void;
   kick(slot: number): void;
-  /** Host: começa com a receita já com os amigos nos times (`controllers` na ordem de `view.members`). */
-  start(recipe: MatchRecipe, seed: number, controllers: readonly number[]): OnlineMatchStart;
+  /**
+   * Host: começa com a receita já com os amigos nos times (`controllers` na ordem de `view.members`). `zombies` (M5
+   * fase 6b): o pool de zumbis da sim do host, que vai aos amigos.
+   */
+  start(recipe: MatchRecipe, seed: number, controllers: readonly number[], zombies: number): OnlineMatchStart;
   /** Host: a partida acabou e a sala volta ao lobby. */
   reopen(): void;
   /** Copia o link da sala (`#sala=XXXXX`); `false` se a área de transferência recusou. */
@@ -184,7 +194,8 @@ export interface OnlineRoom {
 }
 
 export interface OnlineRooms {
-  create(choice: OnlineRoomChoice): OnlineRoom;
+  /** `snapshotHz` (M5 fase 6b): o ritmo dos snapshots do host (20 Hz no celular; o welcome leva aos amigos). */
+  create(choice: OnlineRoomChoice, snapshotHz: number): OnlineRoom;
   /**
    * `deviceId` (M5 fase 5b): o id do aparelho, no perfil do Online. Com ele o host devolve o boneco a quem caiu e volta,
    * e barra quem ele tirou.

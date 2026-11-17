@@ -656,6 +656,22 @@ describe('estouro de texto com o atlas real', () => {
       room(false, null),
       // M5 (fase 6a): a Partida da sala (os 6 cards dos Modos).
       onlineMatchScreen.build(null),
+      // M5 (fase 6b): o host no celular, com a partida cortada pelo teto da sala e um aviso por cima.
+      onlineRoomScreen.build({
+        code: 'WWWWW',
+        summary: 'Todos contra todos · Pela vibe · 12 bobos · Construto',
+        host: true,
+        members: [
+          member(0, wide, 0, t('online.room.host'), false),
+          member(1, wide, 1, t('online.room.away'), true),
+          member(2, wide, -1, '', true),
+          member(3, wide, -1, '', true),
+        ],
+        team: t('online.team.any'),
+        locked: true,
+        note: t('online.room.copyFailed', { code: 'WWWWW' }),
+        hints: [t('online.room.phoneHost'), t('online.room.capped', { n: 12 })],
+      }),
     ];
     for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
       for (const tree of screens) {

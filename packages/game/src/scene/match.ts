@@ -1813,9 +1813,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       onEvents,
       ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
       // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11); no bench do Zombies
-      // (fase 7b), o `zombies=` da URL ou o mesmo teto.
+      // (fase 7b), o `zombies=` da URL ou o mesmo teto. M5 (fase 6b): no online, o pool que o host escolheu (o menor
+      // teto da sala), igual nos dois lados.
       ...(zombiesMode && (!bench || bench.zombies <= 0)
-        ? { zombies: Math.min(MAX_ZOMBIES, setup.profile.maxZombies) }
+        ? { zombies: Math.min(MAX_ZOMBIES, request.online?.zombiePool ?? setup.profile.maxZombies) }
         : {}),
       budget: aiBudgetFor(profile),
       now,

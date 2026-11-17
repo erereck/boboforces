@@ -61,6 +61,11 @@ export interface LobbyChoice {
   readonly team: number;
   readonly bobo: string | null;
   readonly ready: boolean;
+  /**
+   * M5 (fase 6b): o aparelho é um celular (o host usa o menor teto entre os participantes: GDD §2). Ausente = não
+   * (um jogo de antes da 6b também manda sem).
+   */
+  readonly mobile?: boolean;
 }
 
 export interface LobbyMember extends LobbyChoice {
@@ -89,7 +94,15 @@ export interface LobbyStart {
   readonly recipe: unknown;
   readonly seed: number;
   readonly members: readonly LobbyStartMember[];
+  /**
+   * M5 (fase 6b): o pool de zumbis da sim do host (o teto do aparelho dele ou o menor da sala): o amigo cria a sim com o
+   * mesmo número. Ausente = cada um com o seu.
+   */
+  readonly zombies?: number;
 }
+
+/** O maior pool de zumbis que o começo aceita (`MAX_ZOMBIES` da sim). */
+export const MAX_START_ZOMBIES = 64;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -133,6 +146,7 @@ export function parseLobbyChoice(v: unknown, fallbackName: string): LobbyChoice 
     team: typeof team === 'number' && Number.isInteger(team) && team >= -1 && team <= 3 ? team : -1,
     bobo: typeof bobo === 'string' && bobo.length <= MAX_BOBO_CHARS ? bobo : null,
     ready: o['ready'] === true,
+    ...(o['mobile'] === true ? { mobile: true } : {}),
   };
 }
 
@@ -180,7 +194,12 @@ export function parseLobbyStart(v: unknown): LobbyStart | null {
     }
     out.push({ ...base, controller });
   }
-  return { recipe: o['recipe'], seed, members: out };
+  const zombies = o['zombies'];
+  const pool =
+    typeof zombies === 'number' && Number.isInteger(zombies) && zombies >= 0 && zombies <= MAX_START_ZOMBIES
+      ? { zombies }
+      : {};
+  return { recipe: o['recipe'], seed, members: out, ...pool };
 }
 
 // ---------------------------------------------------------------------------------------------------------------

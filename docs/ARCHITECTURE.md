@@ -3408,3 +3408,30 @@ Um revisor (Opus) leu as 4 partes e achou 5 problemas e 3 menores, todos corrigi
   botão em 1280×720 (440 px em 416) e, no celular de 1334×750, o título entrava na margem de cima. O card agora diz
   "Personalizada" (`mode.name.custom`; o título da tela continua "Partida personalizada") e os cards ficaram mais
   justos (respiros menores). O teste monta os 6 cards nos dois lugares.
+
+### 16.16 Fase 6b: o host no celular (17/11/2026)
+
+- **O teto da sala** (`roomLimits` e `capRoomRecipe`, em `game/src/online-presets.ts`): o do aparelho do host como
+  host (`hostMaxBots`/`hostMaxZombies` dos perfis: 8 e 16 no celular, 40 e 60 no PC). **Decisão menor revisável:**
+  com um celular entre os amigos, vale também o teto do celular (12 bots, 24 zumbis, 90 m de visão), pela regra do GDD
+  §2 ("no online vale o menor teto entre os participantes"), para o amigo no celular não desenhar 40 bots. A escolha de
+  cada um leva `mobile` (`LobbyChoice.mobile`, só quando é `true`: um jogo de antes manda sem, e o protocolo não
+  muda). O corte tira bots do lado com mais bobos, um de cada vez, do fim da lista (empate: o adversário do host), e
+  baixa o `viewDistanceM`; dentro do teto, a receita fica a mesma (o mesmo objeto). O resumo que os amigos veem é o
+  da partida cortada e muda quando um celular entra ou sai; o host vê "Com celular na sala, a partida vai com até N
+  bots".
+- **O pool de zumbis** (`LobbyStart.zombies`, 0..64): o host manda o dele (o `maxZombies` da sala) no começo, e a
+  cena do amigo cria a sim com o mesmo número (`OnlineSession.zombiePool`). Antes, um amigo no celular (24) com host no
+  PC (60) tinha uma sim de outro tamanho que a do host.
+- **Os snapshots a 20 Hz:** `OnlineRooms.create(choice, snapshotHz)`; o flow pede 20 no celular e 30 no PC
+  (`hostSnapshotHz`). O welcome leva o ritmo ao amigo, e a sessão do cliente usa o do welcome. A interpolação continua
+  em 100 ms: a 20 Hz o p99 sobe de 2 para 5 cm (PERF §1i), invisível num bobo, e não vale somar 25 ms de atraso a
+  todos os amigos de um host no celular.
+- **O aviso:** na sala, o host no celular vê "Você é o host: não troque de app durante a partida" (`hints` da
+  `onlineRoomScreen`, no lugar onde o amigo vê "Esperando o host começar"). O Wake Lock da partida já existia
+  (`platform/lifecycle.ts`).
+- **Testes:** os tetos e o corte (`online-presets.test.ts`); a escolha com `mobile` e o pool no começo
+  (`lobby.test.ts`); a sala da web com celulares e o pool chegando à sessão do amigo (`online-rooms.test.ts`); o host
+  no celular e o host no PC com um amigo no celular pelo jogo (`game.test.ts`); a partida do `match.test` também a
+  20 Hz; e Times nos mapas de verdade a 20 e a 30 Hz (`online-modes.test.ts`). O layout da sala com as duas linhas
+  novas cabe nos 6 alvos.

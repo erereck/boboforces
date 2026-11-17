@@ -183,6 +183,18 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 120_000);
 
+  it('M5 (fase 6b): host no celular: Times a 20 Hz (o host e 1 amigo, 6 bots); o mesmo resultado, menos banda', () => {
+    const at30 = playRoom(short('warfare.tdm', 30), [0, 1], { snapshotHz: 30, zombies: 0, maxS: 120 });
+    const at20 = playRoom(short('warfare.tdm', 30), [0, 1], { snapshotHz: 20, zombies: 0, maxS: 120 });
+    expectSameResult(at30);
+    expectSameResult(at20);
+    expect(at20.hostBytesPerClient).toBeLessThan(at30.hostBytesPerClient * 0.85);
+    const kb = (run: RoomRun): string => (run.hostBytesPerClient / 1024).toFixed(2);
+    console.log(`[modos] Times: 30 Hz ${kb(at30)} KB/s, 20 Hz ${kb(at20)} KB/s por amigo`);
+    dispose(at30);
+    dispose(at20);
+  }, 240_000);
+
   it('Bobo Zombies na Base Abandonada: 2 humanos e 1 bot de apoio, 1 onda; a mesma onda, os mesmos pontos', () => {
     const r = roomPreset('zombies');
     const run = playRoom({ ...r, zombies: { waves: 1 } }, [-1, -1], { snapshotHz: 30, zombies: 16, maxS: 240 });

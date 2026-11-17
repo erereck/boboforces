@@ -48,7 +48,15 @@ import {
   type OnlineRooms,
   type OnlineSession,
 } from './online-api.ts';
-import { ROOM_MODES, roomPreset, type RoomMode } from './online-presets.ts';
+import {
+  capRoomRecipe,
+  hostSnapshotHz,
+  ROOM_MODES,
+  roomLimits,
+  roomPreset,
+  type RoomLimits,
+  type RoomMode,
+} from './online-presets.ts';
 import type { KeyboardResult, OnscreenKeyboard, OnscreenKeyboardOptions } from './onscreen-keyboard.ts';
 
 registerStrings(STRINGS_ONLINE_PT_BR);
@@ -164,6 +172,8 @@ function teamLabel(team: number): string {
 
 export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   const { platform, rooms } = deps;
+  /** M5 (fase 6b): este aparelho é um celular (host com teto menor, snapshots a 20 Hz e o aviso na sala). */
+  const mobile = platform.features.profileHint === 'mobile';
   const menu = createMenuController();
   let profile = loadOnlineProfile(platform);
   let page: Page = 'home';
@@ -180,6 +190,9 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   let recipe: MatchRecipe = deps.initialRecipe();
   /** M5 (fase 6a): o card da Partida da sala escolhido por último (o foco volta nele). */
   let lastCard: RoomMode = ROOM_MODES[0];
+  /** M5 (fase 6b): o resumo que os amigos já receberam (muda também quando um celular entra ou sai). */
+  let sentSummary = '';
+  let summaryView: unknown = null;
   /** M5 (fase 4d): o código do link, esperando o aviso de privacidade ser lido. */
   let linkCode: string | null = null;
   /** A partida que este aparelho já abriu (o cliente não reabre a mesma). */
@@ -212,7 +225,30 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     platform.storage.set(ONLINE_PROFILE_KEY, JSON.stringify({ ...next, format: ONLINE_PROFILE_FORMAT }));
   }
 
-  const choice = () => ({ name: profile.name, team, ready });
+  const choice = () => ({ name: profile.name, team, ready, mobile });
+
+  /** M5 (fase 6b): o teto da sala de agora (o do host e, com um celular entre os amigos, o do celular). */
+  function limits(r: OnlineRoom): RoomLimits {
+    const friends = r.view?.members ?? [];
+    return roomLimits(
+      platform.features.profileHint,
+      friends.some((m) => m.slot !== 0 && m.mobile === true),
+    );
+  }
+
+  /** A partida que a sala joga: a escolhida, dentro do teto. */
+  function roomRecipe(r: OnlineRoom): MatchRecipe {
+    return capRoomRecipe(recipe, limits(r));
+  }
+
+  /** Host: manda o resumo aos amigos quando ele muda (a partida nova ou o teto da sala). */
+  function publishSummary(r: OnlineRoom): void {
+    summaryView = r.view;
+    const text = deps.summary(roomRecipe(r));
+    if (text === sentSummary) return;
+    sentSummary = text;
+    r.setSummary(text, recipeHasTeams(recipe));
+  }
 
   function rebuild(): void {
     dirty = true;
@@ -351,7 +387,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   function useRecipe(r: OnlineRoom, picked: MatchRecipe, card: RoomMode): void {
     recipe = picked;
     lastCard = card;
-    r.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
+    sentSummary = '';
+    publishSummary(r);
     deps.log(`[online] partida da sala: ${card} (${recipe.mode}, ${recipe.map})`);
   }
 
@@ -359,9 +396,10 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     recipe = deps.initialRecipe();
     team = -1;
     ready = true;
-    room = rooms.create(choice());
-    room.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
-    deps.log(`[online] sala ${room.code} criada`);
+    room = rooms.create(choice(), hostSnapshotHz(mobile));
+    sentSummary = '';
+    publishSummary(room);
+    deps.log(`[online] sala ${room.code} criada (snapshots a ${hostSnapshotHz(mobile)} Hz)`);
     note = '';
     go('room', 'start');
   }
@@ -404,13 +442,16 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       rebuild();
       return;
     }
+    const lim = limits(r);
     const placed = onlineRecipe(
-      recipe,
+      capRoomRecipe(recipe, lim),
       view.members.map((m) => m.team),
     );
     const seed = deps.seed() >>> 0;
-    const match = r.start(placed.recipe, seed, placed.controllers);
-    deps.log(`[online] partida ${placed.recipe.mode} com ${view.members.length} jogador(es), semente ${seed}`);
+    const match = r.start(placed.recipe, seed, placed.controllers, lim.maxZombies);
+    deps.log(
+      `[online] partida ${placed.recipe.mode} com ${view.members.length} jogador(es), semente ${seed}, até ${lim.maxBots} bots e ${lim.maxZombies} zumbis`,
+    );
     enter(match, placed.recipe);
   }
 
@@ -473,6 +514,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       ready = true;
       setChoice();
     }
+    // M5 (fase 6b): um celular entrou ou saiu: o teto (e o resumo) da sala pode mudar.
+    if (r.role === 'host' && r.view !== summaryView) publishSummary(r);
   }
 
   // --- as telas ---
@@ -540,11 +583,16 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     } else if (room !== null) {
       const view = room.view;
       const host = room.role === 'host';
+      // M5 (fase 6b): o host no celular (o aviso) e a partida cortada pelo teto da sala.
+      const hints: string[] = [];
+      if (host && mobile) hints.push(t('online.room.phoneHost'));
+      if (host && roomRecipe(room) !== recipe) hints.push(t('online.room.capped', { n: limits(room).maxBots }));
       menu.setRoot(
         onlineRoomScreen.build({
           code: room.code,
           // O resumo do host veio de outro aparelho: só o que o atlas desenha.
-          summary: host ? deps.summary(recipe) : cleanHudText(view?.summary ?? '', 80),
+          summary: host ? deps.summary(roomRecipe(room)) : cleanHudText(view?.summary ?? '', 80),
+          hints,
           host,
           members: roomRows(room),
           team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true)) ? teamLabel(team) : null,

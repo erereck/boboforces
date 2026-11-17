@@ -1,4 +1,11 @@
-import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import {
+  builtinBotRef,
+  MATCH_RECIPE_FORMAT,
+  PLATFORM_PROFILES,
+  selectPlatformProfile,
+  type MatchRecipe,
+  type PlatformFamily,
+} from '@boboforces/format';
 
 /**
  * M5 (fase 6a): as partidas da sala (GDD §7, a linha do M5: TDM, FFA, X1, Surpreenda-me e Bobo Zombies coop). Cada
@@ -59,4 +66,82 @@ export function roomPreset(mode: RoomPresetMode): MatchRecipe {
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }],
       };
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// M5 (fase 6b): o host no celular e o menor teto da sala.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Os snapshots do host (tecnico.md §13.3 e §13.4): 30 Hz no PC, 20 Hz no celular. */
+export function hostSnapshotHz(mobile: boolean): number {
+  return mobile ? 20 : 30;
+}
+
+export interface RoomLimits {
+  readonly maxBots: number;
+  /** O pool de zumbis da sim do host (o amigo cria a dele com o mesmo número). */
+  readonly maxZombies: number;
+  readonly maxViewM: number;
+}
+
+/**
+ * O teto da sala: o do aparelho do host como host (no celular, 8 bots e 16 zumbis) e, com um celular entre os amigos,
+ * o do celular também (GDD §2: "no online vale o menor teto entre os participantes"), para o amigo no celular não
+ * desenhar mais bobos do que o aparelho dele aguenta.
+ */
+export function roomLimits(hostFamily: PlatformFamily, mobileFriend: boolean): RoomLimits {
+  const host = selectPlatformProfile(hostFamily, 1);
+  const out = { maxBots: host.hostMaxBots, maxZombies: host.hostMaxZombies, maxViewM: host.maxViewDistanceM };
+  if (!mobileFriend) return out;
+  const phone = PLATFORM_PROFILES.mobile;
+  return {
+    maxBots: Math.min(out.maxBots, phone.maxBots),
+    maxZombies: Math.min(out.maxZombies, phone.maxZombies),
+    maxViewM: Math.min(out.maxViewM, phone.maxViewDistanceM),
+  };
+}
+
+/**
+ * A receita dentro do teto da sala: tira bots do lado com mais bobos (humanos e bots), um de cada vez, do fim da lista
+ * dele (empate: o lado de trás, o adversário do host), e baixa o alcance de visão. Dentro do teto, devolve a mesma
+ * receita (o mesmo objeto).
+ */
+export function capRoomRecipe(recipe: MatchRecipe, limits: RoomLimits): MatchRecipe {
+  const counts = recipe.teams.map((t) => t.bots.map((b) => b.count));
+  const humans = recipe.teams.map((t) => (t.humans === 'all' ? 1 : (t.humans ?? 0)));
+  const sum = (list: readonly number[]): number => list.reduce((a, b) => a + b, 0);
+  let total = counts.reduce((a, list) => a + sum(list), 0);
+  let trimmed = false;
+  while (total > Math.max(0, limits.maxBots)) {
+    let pick = -1;
+    let size = -1;
+    for (let i = 0; i < counts.length; i++) {
+      const bots = sum(counts[i]!);
+      if (bots > 0 && humans[i]! + bots >= size) {
+        size = humans[i]! + bots;
+        pick = i;
+      }
+    }
+    if (pick < 0) break;
+    const list = counts[pick]!;
+    for (let k = list.length - 1; k >= 0; k--) {
+      if (list[k]! > 0) {
+        list[k]!--;
+        break;
+      }
+    }
+    total--;
+    trimmed = true;
+  }
+  const view = recipe.match?.viewDistanceM;
+  const farther = view !== undefined && view > limits.maxViewM;
+  if (!trimmed && !farther) return recipe;
+  return {
+    ...recipe,
+    ...(farther ? { match: { ...recipe.match, viewDistanceM: limits.maxViewM } } : {}),
+    teams: recipe.teams.map((t, i) => ({
+      ...t,
+      bots: t.bots.map((b, k) => ({ ...b, count: counts[i]![k]! })).filter((b) => b.count > 0),
+    })),
+  };
 }

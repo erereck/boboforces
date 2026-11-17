@@ -51,6 +51,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   o lugar de um bot do time que escolheu. Pela rede de mentira, com os mapas de verdade, cada modo termina igual no
   host e no amigo. De quebra, os 6 cards dos Modos voltaram a caber: o "Partida personalizada" estourava o botão em
   1280×720 e, no celular, o título entrava na margem de cima (agora é "Personalizada", com os cards mais justos).
+- **O host no celular (fase 6b):** quem cria a sala no celular joga com até 8 bots (16 zumbis), manda os snapshots a
+  20 Hz (26% menos dados para cada amigo) e vê na sala "Você é o host: não troque de app durante a partida". Com um
+  amigo no celular, a sala usa o teto do celular (12 bots, 24 zumbis, 90 m de visão): a partida escolhida perde bots
+  do lado maior, e o host vê o aviso.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

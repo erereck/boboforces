@@ -54,14 +54,19 @@ export const RECONNECT_TIMEOUT_MS = 20_000;
 export const RECONNECT_RETRY_MS = 1500;
 /** M5 (fase 5b): o host fecha a sala e espera isto antes de soltar a conexão (o aviso tem que sair). */
 export const CLOSE_GRACE_MS = 300;
-/** O ritmo da partida online (o welcome leva; tecnico.md §13.3). */
+/** O ritmo da partida online (o welcome leva; tecnico.md §13.3). Os snapshots: o host escolhe (20 Hz no celular). */
 export const ONLINE_HZ = 60;
-export const ONLINE_SNAPSHOT_HZ = 30;
 
 const NONE: readonly number[] = [];
 const NONE_REJOINED: readonly LobbyRejoin[] = [];
 
-const toLobby = (c: OnlineRoomChoice): LobbyChoice => ({ name: c.name, team: c.team, bobo: null, ready: c.ready });
+const toLobby = (c: OnlineRoomChoice): LobbyChoice => ({
+  name: c.name,
+  team: c.team,
+  bobo: null,
+  ready: c.ready,
+  ...(c.mobile === true ? { mobile: true } : {}),
+});
 
 function toView(s: LobbyState): OnlineRoomView {
   return {
@@ -70,7 +75,13 @@ function toView(s: LobbyState): OnlineRoomView {
     summary: s.summary,
     teams: s.teams,
     playing: s.playing,
-    members: s.members.map((m) => ({ slot: m.slot, name: m.name, team: m.team, ready: m.ready })),
+    members: s.members.map((m) => ({
+      slot: m.slot,
+      name: m.name,
+      team: m.team,
+      ready: m.ready,
+      ...(m.mobile === true ? { mobile: true } : {}),
+    })),
   };
 }
 
@@ -80,7 +91,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
   /** O que sobra do lado "partida" sem partida ligada (o fim da anterior) vai fora: não chega à próxima. */
   const drain = (ep: NetEndpoint): void => ep.poll(() => undefined);
 
-  function hostRoom(choice: OnlineRoomChoice): OnlineRoom {
+  function hostRoom(choice: OnlineRoomChoice, snapshotHz: number): OnlineRoom {
     const code = net.newRoomCode(deps.random);
     const transport = deps.connect(code);
     const [lobbyEp, matchEp] = net.createEndpointMux(transport.endpoint, net.isLobbyMessage);
@@ -89,7 +100,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       code,
       host: toLobby(choice),
       hz: ONLINE_HZ,
-      snapshotHz: ONLINE_SNAPSHOT_HZ,
+      snapshotHz,
     });
     let status: OnlineRoomStatus = 'lobby';
     let view = toView(lobby.state);
@@ -154,12 +165,13 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       setSummary: (text, teams) => lobby.setSummary(text, teams),
       setLocked: (on) => lobby.setLocked(on),
       kick: (slot) => lobby.kick(slot),
-      start(recipe: MatchRecipe, seed: number, controllers: readonly number[]): OnlineMatchStart {
+      start(recipe: MatchRecipe, seed: number, controllers: readonly number[], zombies: number): OnlineMatchStart {
         // Os jogadores na ordem do estado que a tela mostrou (é nessa ordem que vieram os controladores).
         const start: LobbyStart = {
           recipe,
           seed,
           members: view.members.map((m, i) => ({ ...toLobby(m), slot: m.slot, controller: controllers[i] ?? i })),
+          zombies,
         };
         lobby.start(start);
         status = 'playing';
@@ -183,7 +195,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
           peerOfSlot: (slot) => lobby.peerOfSlot(slot),
           hostPeer: -1,
           welcome: null,
-          snapshotHz: ONLINE_SNAPSHOT_HZ,
+          snapshotHz,
           isClosed: () => closed,
           // Quase sempre vazias: a mesma lista vazia, sem alocar a cada quadro.
           takeLeftSlots: () => (left.length === 0 ? NONE : left.splice(0)),
@@ -286,7 +298,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
               peerOfSlot: () => -1,
               hostPeer: lc.host,
               welcome,
-              snapshotHz: ONLINE_SNAPSHOT_HZ,
+              snapshotHz: welcome.snapshotHz,
               // A partida acaba para este aparelho quando a sala volta ao lobby, acaba, começa outra ou a conexão cai.
               isClosed: () => closed || mine !== lc || mine.status !== 'started' || mine.start !== start,
               takeLeftSlots: () => [],
