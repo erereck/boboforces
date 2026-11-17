@@ -82,6 +82,13 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.room.leave': 'Sair da sala',
   'online.room.wait': 'Esperando o host começar.',
   'online.room.hostQuit': 'O host encerrou a partida.',
+  // M5 (fase 6a): a "Partida da sala" (os cards dos Modos, com os modos do online).
+  'online.match.title': 'Partida da sala',
+  'online.mode.x1': 'X1',
+  'online.mode.x1.desc': '1 contra 1 no Ringue. Com mais gente, cada um no lugar de um bot.',
+  'online.mode.zombies.desc': 'Todos juntos contra as ondas. Caiu? O colega levanta.',
+  'online.mode.surprise.desc': 'O jogo sorteia a partida. Escolha de novo para sortear outra.',
+  'online.mode.custom.desc': 'Todas as regras, como no jogo sozinho.',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type OnlineStringKey = keyof typeof STRINGS_ONLINE_PT_BR;

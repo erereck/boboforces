@@ -46,6 +46,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Ping e emotes (fase 5d):** o botão do meio do mouse (ou o direcional para cima) marca onde você está mirando
   para o seu time; o B (ou o direcional para baixo) mostra um balão em cima do seu bobo: "Boa!", "Valeu!", "Bora!" ou
   "Ops!", um a cada aperto. Vale no online e no sofá.
+- **A partida da sala (fase 6a):** o Escolher partida do host abre os cards da sala: Times, Todos contra todos, X1
+  (1 contra 1 no Ringue), Bobo Zombies (todos juntos contra as ondas), Surpreenda-me e Personalizada. Cada amigo toma
+  o lugar de um bot do time que escolheu. Pela rede de mentira, com os mapas de verdade, cada modo termina igual no
+  host e no amigo. De quebra, os 6 cards dos Modos voltaram a caber: o "Partida personalizada" estourava o botão em
+  1280×720 e, no celular, o título entrava na margem de cima (agora é "Personalizada", com os cards mais justos).
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

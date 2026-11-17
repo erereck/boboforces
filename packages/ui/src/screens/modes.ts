@@ -20,6 +20,8 @@ export interface ModeCard {
 
 export interface ModesState {
   readonly modes: readonly ModeCard[];
+  /** M5 (fase 6a): o título (padrão "Modos"; a sala do Online usa os mesmos cards para a "Partida da sala"). */
+  readonly titleKey?: StringKey;
 }
 
 /** Largura de cada card (px de referência). */
@@ -33,12 +35,12 @@ export const modesScreen: Screen<ModesState> = {
       id: `card:${m.id}`,
       color: COLORS.chapa,
       chamfer: true,
-      padding: 14,
+      padding: 10,
       width: MODES_CARD_WIDTH,
       children: [
         {
           kind: 'column',
-          gap: 8,
+          gap: 6,
           children: [
             {
               kind: 'button',
@@ -46,7 +48,7 @@ export const modesScreen: Screen<ModesState> = {
               text: { key: m.nameKey },
               action: `${MODES_PREFIX}${m.id}`,
               variant: i === 0 ? 'primary' : 'secondary',
-              width: MODES_CARD_WIDTH - 28,
+              width: MODES_CARD_WIDTH - 20,
               ...(i === 0 ? { autofocus: true } : {}),
             },
             { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo },
@@ -64,15 +66,21 @@ export const modesScreen: Screen<ModesState> = {
           id: 'main',
           anchor: 'left',
           children: [
-            { kind: 'text', id: 'heading', text: { key: 'modes.title' }, style: 'title', color: COLORS.texto },
+            {
+              kind: 'text',
+              id: 'heading',
+              text: { key: state.titleKey ?? 'modes.title' },
+              style: 'title',
+              color: COLORS.texto,
+            },
             { kind: 'box', height: 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 22 },
+            { kind: 'box', height: 14 },
             // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card).
             {
               kind: 'column',
               id: 'cards',
-              gap: 14,
+              gap: 10,
               children: Array.from({ length: Math.ceil(cards.length / 2) }, (_, r) => ({
                 kind: 'row',
                 id: `cards${r}`,
@@ -80,7 +88,7 @@ export const modesScreen: Screen<ModesState> = {
                 children: cards.slice(r * 2, r * 2 + 2),
               })) as UiNode[],
             },
-            { kind: 'box', height: 20 },
+            { kind: 'box', height: 12 },
             {
               kind: 'button',
               id: 'back',

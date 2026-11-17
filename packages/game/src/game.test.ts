@@ -2532,6 +2532,54 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     bad.game.dispose();
   });
 
+  it('M5 (fase 6a): a Partida da sala: X1, Bobo Zombies, a personalizada (Voltar não muda) e o Surpreenda-me', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({
+        format: 'boboforces/online@1',
+        name: 'Erick',
+        privacy: ONLINE.ONLINE_PRIVACY_VERSION,
+      }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    await openOnlineFromTitle(platform);
+    platform.tap('Enter');
+    const room = made[0]!;
+    const summaries = () => room.calls.filter((c) => c.startsWith('summary:'));
+    // Começar → (baixo) Escolher partida: os cards, com o foco no Times.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('online');
+    // X1 (o 3º card, embaixo do Times): o Ringue, 1 contra 1, com times.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(summaries().at(-1)).toBe('summary:Times · Normal · 1 contra 1 · Ringue:true');
+    expect(platform.logLines.some((l) => l.includes('[online] partida da sala: x1 (warfare.tdm, ringue)'))).toBe(true);
+    // De novo: o foco volta no X1; o Bobo Zombies (do lado) é coop, sem times.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(summaries().at(-1)).toBe('summary:Zombies · 10 ondas · Base Abandonada:false');
+    // A personalizada (embaixo do Zombies) abre a tela de sempre; Voltar não muda a partida e volta aos cards.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('custom');
+    const before = summaries().length;
+    platform.tap('Escape');
+    expect(game.screen).toBe('online');
+    expect(summaries().length).toBe(before);
+    // O Surpreenda-me (do lado): uma partida sorteada, TDM ou FFA no Construto.
+    platform.tap('ArrowLeft');
+    platform.tap('Enter');
+    expect(summaries().length).toBe(before + 1);
+    expect(summaries().at(-1)).toMatch(/^summary:(Times|Todos).*Construto:(true|false)$/);
+    game.dispose();
+  }, 60_000);
+
   it('sem `loadOnline` (o Switch) o título não tem o Online', async () => {
     const { platform, game } = await bootToTitle('switch');
     platform.tap('ArrowDown');

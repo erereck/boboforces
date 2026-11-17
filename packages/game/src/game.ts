@@ -739,7 +739,7 @@ export function startGame(deps: GameDeps): GameHandle {
         { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
         // Refino R3b (#79): o Surpreenda-me e a Partida personalizada (com a última partida) moram aqui agora.
         { id: 'surprise', nameKey: 'title.surprise' as const, descKey: 'mode.desc.surprise' as const },
-        { id: 'custom', nameKey: 'custom.title' as const, descKey: 'mode.desc.custom' as const },
+        { id: 'custom', nameKey: 'mode.name.custom' as const, descKey: 'mode.desc.custom' as const },
       ],
     }),
   );
@@ -868,6 +868,7 @@ export function startGame(deps: GameDeps): GameHandle {
           initialRecipe: () => (currentPreset().mode === 'training' ? DEBUT_PRESET : currentPreset()),
           summary: presetSummary,
           pickMatch: (recipe, done) => openCustom(recipe, 'online', done),
+          surprise: () => rollSurprise(surpriseRng),
           play: (recipe, seed, session) => requestScene('play', null, recipe, false, { session, seed }),
           exit: () => {
             screen = 'title';

@@ -153,6 +153,30 @@ cada uma verde e commitada:
 - **Fica para a fase 6:** o aviso "Você é o host: não troque de app", o teto de 8 bots e os snapshots a 20 Hz com host
   no celular.
 
+## Fase 6 em detalhe (17/11/2026)
+
+Os modos da sala e o host no celular, em 3 partes, cada uma verde e commitada:
+
+- **6a, a partida da sala:** o "Escolher partida" do host abre os cards da sala, no mesmo desenho dos Modos:
+  - **Times:** 4 contra 4 no Construto, Normal, 5 min ou 30 abates;
+  - **Todos contra todos:** 8 bobos no Construto, 5 min ou 15 abates;
+  - **X1:** 1 contra 1 no Ringue, 5 min ou 15 abates; com mais gente, cada amigo toma o lugar de um bot;
+  - **Bobo Zombies:** coop na Base Abandonada, 10 ondas, com 3 bots de apoio que os amigos substituem;
+  - **Surpreenda-me:** o sorteio de sempre, feito no aparelho do host; escolher de novo sorteia outro;
+  - **Partida personalizada:** a de sempre.
+
+  Os humanos tomam o lugar de bots, como no sofá. Teste: cada modo pela rede de mentira, com os mapas de verdade,
+  termina igual no host e no amigo. **Feita em 17/11** (ARCHITECTURE §16.15).
+- **6b, o host no celular:**
+  - **o teto:** 8 bots e 16 zumbis com host no celular;
+  - **o menor teto entre os participantes** (GDD §2): com um celular na sala, 12 bots, 24 zumbis e 90 m de visão. A
+    escolha de cada um diz se é celular. A sala corta os bots do lado maior, um de cada vez, e avisa o host;
+  - **o pool de zumbis do host** vai no começo: o amigo cria a sim com o mesmo número;
+  - **os snapshots a 20 Hz** com host no celular (o welcome leva o ritmo ao amigo);
+  - **o aviso na sala:** "Você é o host: não troque de app durante a partida". O Wake Lock da partida já existe.
+- **6c, a prova:** as duas abas do Edge passam pelos cards da sala, e os testes das partes ficam no portão. Depois, a
+  revisão.
+
 ## Riscos
 
 - **O menu da web está em 349,2 de 350 KB** (depois da 4c). O item "Online" e a tela de código precisam caber: a tela

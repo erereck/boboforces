@@ -346,6 +346,8 @@ export const STRINGS_PT_BR = {
   // Refino R3b (#79): os dois cards novos dos Modos.
   'mode.desc.surprise': 'Modo, mapa e regras sorteados.',
   'mode.desc.custom': 'Todas as regras; salve como preset.',
+  // M5 (fase 6a): o nome no card ("Partida personalizada" estourava o botão do card em 1280×720).
+  'mode.name.custom': 'Personalizada',
   'preset.name.vibe': 'Vibe',
   'preset.name.tryhard': 'Tryhard',
   'preset.name.immortals': 'Imortais',

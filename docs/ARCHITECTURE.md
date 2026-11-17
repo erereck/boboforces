@@ -3386,3 +3386,25 @@ Um revisor (Opus) leu as 4 partes e achou 5 problemas e 3 menores, todos corrigi
 - **Testes novos:** a queda só do lado do amigo (a volta pega o boneco e o aviso atrasado da conexão antiga não a
   tira), o AFK seguido da saída, o 1º snapshot demorado e o silêncio sem fim no PvP. O teste de capacidade da sim
   ganhou prazo (passava dos 5 s com a suíte em paralelo).
+
+### 16.15 Fase 6a: a partida da sala (17/11/2026)
+
+- **Os cards da sala** (`onlineMatchScreen`, no pedaço do Online): o mesmo desenho dos Modos (`modesScreen`, que
+  ganhou o `titleKey`), com Times, Todos contra todos, X1, Bobo Zombies, Surpreenda-me e Personalizada. O Escolher
+  partida do host abre os cards com o foco no último escolhido; Voltar volta à sala.
+- **As receitas** (`game/src/online-presets.ts`, puro): feitas para 1 humano no time 0, como os presets do sofá, e o
+  `onlineRecipe` põe os amigos no lugar de bots. Times: 4 contra 4 no Construto; Todos contra todos: 8 bobos; X1: TDM de
+  1 por lado no Ringue, que não tem FFA (com 4 jogadores vira 2 contra 2); Bobo Zombies: o Sofá Zombies (Base
+  Abandonada, 10 ondas, 3 bots de apoio). Todas com 5 min (o Zombies, sem tempo). O Surpreenda-me é o sorteio de
+  sempre (`rollSurprise`, por `OnlineFlowDeps.surprise`); a Personalizada é a de sempre, e o Voltar dela volta aos
+  cards sem mudar a partida.
+- **Decisão menor revisável:** o X1 é um TDM e não um FFA, porque a arena pequena (o Ringue) não tem FFA. Com 2
+  jogadores dá no mesmo; os presets "X1 Sniper" e "X1 livre" do GDD continuam para quando o FFA tiver arena pequena.
+- **Teste** (`apps/web/src/online-modes.test.ts`): FFA (3 humanos e 5 bots), X1 (só os 2) e Bobo Zombies (2 humanos e
+  1 bot de apoio, 1 onda, pool de 16) pela rede de mentira (60 ms, variação e 3% de perda), com os mapas de verdade. O
+  amigo termina com o mesmo fim, placar, mortes, pontos, onda e portas que o host. FFA: 6,0 KB/s do host para cada
+  amigo; X1: 3,0 KB/s; Zombies: 5,3 KB/s. Os 3 rodam em 12 s.
+- **A tela dos Modos:** o teste de layout só montava 3 cards. Com os 6 de verdade, "PARTIDA PERSONALIZADA" passava do
+  botão em 1280×720 (440 px em 416) e, no celular de 1334×750, o título entrava na margem de cima. O card agora diz
+  "Personalizada" (`mode.name.custom`; o título da tela continua "Partida personalizada") e os cards ficaram mais
+  justos (respiros menores). O teste monta os 6 cards nos dois lugares.

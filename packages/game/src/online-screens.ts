@@ -5,7 +5,7 @@
  *
  * O fluxo: o aviso de privacidade na 1ª vez → a casa (o nome, Criar sala, Entrar com código) → a sala (os 4 lugares, o
  * time, e para o host Começar, Escolher partida, Trancar e Tirar) → a partida (a cena de sempre, com a sessão online)
- * → de volta à sala. O nome e o aviso lido ficam no perfil `online@1`, numa chave própria do storage.
+ * → de volta à sala. M5 (fase 6a): o Escolher partida abre a "Partida da sala" (os cards dos modos do online). O nome e o aviso lido ficam no perfil `online@1`, numa chave própria do storage.
  */
 import {
   DEFAULT_ONLINE_PROFILE,
@@ -20,9 +20,12 @@ import type { Platform, TextInputSession } from '@boboforces/platform-api';
 import { isFfaMode } from '@boboforces/sim';
 import {
   COLORS,
+  MODES_ACTION,
+  MODES_PREFIX,
   ONLINE_ACTION,
   onlineHomeScreen,
   onlineJoinScreen,
+  onlineMatchScreen,
   onlinePrivacyScreen,
   onlineRoomScreen,
   onlineStatusScreen,
@@ -45,6 +48,7 @@ import {
   type OnlineRooms,
   type OnlineSession,
 } from './online-api.ts';
+import { ROOM_MODES, roomPreset, type RoomMode } from './online-presets.ts';
 import type { KeyboardResult, OnscreenKeyboard, OnscreenKeyboardOptions } from './onscreen-keyboard.ts';
 
 registerStrings(STRINGS_ONLINE_PT_BR);
@@ -65,6 +69,8 @@ export interface OnlineFlowDeps {
   summary(recipe: MatchRecipe): string;
   /** A Partida personalizada para o host; volta com a receita escolhida (`null` = Voltar, sem mudar). */
   pickMatch(recipe: MatchRecipe, done: (recipe: MatchRecipe | null) => void): void;
+  /** M5 (fase 6a): o sorteio do Surpreenda-me (o mesmo do jogo sozinho), no aparelho do host. */
+  surprise(): MatchRecipe;
   /** Entra na partida (a cena, com a sessão online). */
   play(recipe: MatchRecipe, seed: number, session: OnlineSession): void;
   /** Sai do Online (o título). */
@@ -99,7 +105,7 @@ export interface OnlineFlow {
   dispose(): void;
 }
 
-type Page = 'privacy' | 'home' | 'join' | 'status' | 'room';
+type Page = 'privacy' | 'home' | 'join' | 'status' | 'room' | 'match';
 
 const END_TEXT: Readonly<Record<OnlineRoomEnd, StringKey>> = {
   full: 'online.end.full',
@@ -172,6 +178,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   let ready = true;
   /** O host: a partida da sala (a Partida personalizada muda). */
   let recipe: MatchRecipe = deps.initialRecipe();
+  /** M5 (fase 6a): o card da Partida da sala escolhido por último (o foco volta nele). */
+  let lastCard: RoomMode = ROOM_MODES[0];
   /** M5 (fase 4d): o código do link, esperando o aviso de privacidade ser lido. */
   let linkCode: string | null = null;
   /** A partida que este aparelho já abriu (o cliente não reabre a mesma). */
@@ -339,6 +347,14 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
 
   // --- a sala ---
 
+  /** M5 (fase 6a): a partida nova da sala (os amigos veem o resumo). */
+  function useRecipe(r: OnlineRoom, picked: MatchRecipe, card: RoomMode): void {
+    recipe = picked;
+    lastCard = card;
+    r.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
+    deps.log(`[online] partida da sala: ${card} (${recipe.mode}, ${recipe.map})`);
+  }
+
   function createRoom(): void {
     recipe = deps.initialRecipe();
     team = -1;
@@ -502,6 +518,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     builtView = view;
     if (page === 'privacy') menu.setRoot(onlinePrivacyScreen.build({}));
     else if (page === 'home') menu.setRoot(onlineHomeScreen.build({ name: nameDraft ?? profile.name, note }));
+    else if (page === 'match') menu.setRoot(onlineMatchScreen.build(null));
     else if (page === 'join') {
       menu.setRoot(onlineJoinScreen.build({ code, length: rooms.codeLength, ready: codeReady(), note }));
     } else if (page === 'status') {
@@ -575,6 +592,26 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
         note = '';
         go('home', 'create');
       }
+    } else if (page === 'match') {
+      const r = room;
+      if (r === null) return;
+      if (nav.back || a === MODES_ACTION.back) go('room', ONLINE_ACTION.match);
+      else if (a !== null && a.startsWith(MODES_PREFIX)) {
+        const card = a.slice(MODES_PREFIX.length) as RoomMode;
+        if (card === 'custom') {
+          deps.pickMatch(recipe, (picked) => {
+            if (picked === null) {
+              go('match', a);
+              return;
+            }
+            useRecipe(r, picked, card);
+            go('room', ONLINE_ACTION.start);
+          });
+        } else if ((ROOM_MODES as readonly string[]).includes(card)) {
+          useRecipe(r, card === 'surprise' ? deps.surprise() : roomPreset(card), card);
+          go('room', ONLINE_ACTION.start);
+        }
+      }
     } else if (room !== null) {
       const r = room;
       // Voltar não sai da sala (o host fecharia para todos sem querer): o foco vai para o Sair da sala.
@@ -591,15 +628,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       } else if (r.role === 'host') {
         if (a === ONLINE_ACTION.start) startMatch(r);
         else if (a === ONLINE_ACTION.lock) r.setLocked(!(r.view?.locked ?? false));
-        else if (a === ONLINE_ACTION.match) {
-          deps.pickMatch(recipe, (picked) => {
-            if (picked !== null) {
-              recipe = picked;
-              r.setSummary(deps.summary(recipe), recipeHasTeams(recipe));
-            }
-            rebuild();
-          });
-        } else if (a !== null && a.startsWith(ONLINE_ACTION.kickPrefix)) {
+        else if (a === ONLINE_ACTION.match) go('match', MODES_PREFIX + lastCard);
+        else if (a !== null && a.startsWith(ONLINE_ACTION.kickPrefix)) {
           r.kick(Number(a.slice(ONLINE_ACTION.kickPrefix.length)));
           menu.focus('start');
         }
@@ -673,3 +703,6 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     },
   };
 }
+
+// M5 (fase 6a): as partidas da sala (o teste da web joga cada uma pela rede de mentira).
+export { ROOM_MODES, roomPreset, type RoomMode, type RoomPresetMode } from './online-presets.ts';

@@ -18,6 +18,7 @@ import {
   ONLINE_ROOM,
   onlineHomeScreen,
   onlineJoinScreen,
+  onlineMatchScreen,
   onlinePrivacyScreen,
   onlineRoomScreen,
   onlineStatusScreen,
@@ -525,6 +526,17 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
         ],
       }),
+      // Os 6 cards de verdade (refino R3b): o Surpreenda-me e a Partida personalizada.
+      modesScreen.build({
+        modes: [
+          { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
+          { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
+          { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'mode.desc.zombies' },
+          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+          { id: 'surprise', nameKey: 'title.surprise', descKey: 'mode.desc.surprise' },
+          { id: 'custom', nameKey: 'mode.name.custom', descKey: 'mode.desc.custom' },
+        ],
+      }),
       customMatchScreen.build({
         tabs: [
           'custom.tab.match',
@@ -642,6 +654,8 @@ describe('estouro de texto com o atlas real', () => {
       room(true, t('online.team.any')),
       room(false, t('online.team.any')),
       room(false, null),
+      // M5 (fase 6a): a Partida da sala (os 6 cards dos Modos).
+      onlineMatchScreen.build(null),
     ];
     for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
       for (const tree of screens) {

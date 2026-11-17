@@ -2,6 +2,7 @@ import type { StringKey } from '../strings.pt-BR.ts';
 import { t } from '../text.ts';
 import { COLORS } from '../tokens.ts';
 import type { Screen, TextContent, UiNode } from '../tree.ts';
+import { modesScreen, type ModeCard } from './modes.ts';
 
 /**
  * M5 (fase 4c): as telas do Online (GDD §3.7; PLANO_M5 fase 4): o aviso de privacidade na 1ª vez, a casa do Online
@@ -284,6 +285,26 @@ export const onlineStatusScreen: Screen<OnlineStatusState> = {
           : button('ok', 'online.ok', ONLINE_ACTION.ok, { variant: 'primary', autofocus: true }),
     ]);
   },
+};
+
+// --- M5 (fase 6a): a partida da sala ---
+
+/**
+ * Os cards da "Partida da sala", no desenho dos Modos (a ação de cada um é `mode:<id>`, o `MODES_PREFIX`). Os ids são
+ * os `ROOM_MODES` do `game`.
+ */
+export const ONLINE_MATCH_CARDS: readonly ModeCard[] = [
+  { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
+  { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
+  { id: 'x1', nameKey: 'online.mode.x1', descKey: 'online.mode.x1.desc' },
+  { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'online.mode.zombies.desc' },
+  { id: 'surprise', nameKey: 'title.surprise', descKey: 'online.mode.surprise.desc' },
+  { id: 'custom', nameKey: 'mode.name.custom', descKey: 'online.mode.custom.desc' },
+];
+
+export const onlineMatchScreen: Screen<null> = {
+  id: 'onlineMatch',
+  build: () => modesScreen.build({ modes: ONLINE_MATCH_CARDS, titleKey: 'online.match.title' }),
 };
 
 // --- a sala ---
