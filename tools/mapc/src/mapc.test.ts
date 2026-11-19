@@ -280,6 +280,24 @@ describe('mapc: validações com o mundo', () => {
     expect(r.errors.some((e) => e.includes('usado como step'))).toBe(true);
   });
 
+  it('M7 (fase 5, revisão): acusa ponto de loot dentro de bloco e ilhado', () => {
+    const r = compileMap(
+      arena((b) => {
+        b.box(1, 1, 20, 30, 6, 20, 'concrete'); // parede alta sem porta: o sul fica ilhado
+        b.box(10, 1, 10, 11, 2, 11, 'concrete'); // um bloco de 1 m no meio do norte
+        b.spawn({ x: 6.5, y: 0.5, z: 2.5, yaw: 0, team: -1 }); // o norte é a área principal
+        b.lootSpot({ id: 'ok', x: 3.5, y: 0.5, z: 3.5, radius: 0.6 });
+        b.lootSpot({ id: 'bloco', x: 5.5, y: 0.5, z: 5.5, radius: 0.6 });
+        b.lootSpot({ id: 'ilha', x: 5.5, y: 0.5, z: 13.5, radius: 0.6 });
+      }),
+      OPTIONS,
+    );
+    const loot = r.errors.filter((e) => e.startsWith('ponto de loot'));
+    expect(loot.some((e) => e.includes('ok'))).toBe(false);
+    expect(loot.some((e) => e.startsWith('ponto de loot bloco'))).toBe(true);
+    expect(loot.some((e) => e.startsWith('ponto de loot ilha') && e.includes('principal'))).toBe(true);
+  });
+
   it('prop do dobro (dose 2) é do jogo: colisor, buraco na navegação e fonte de luz (decisão #52)', () => {
     const empty = compileMap(
       arena(() => {}),

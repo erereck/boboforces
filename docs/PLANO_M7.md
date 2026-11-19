@@ -78,6 +78,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 5. **Ilha Tropical** (mapa `island`, Royale Mini, ~200 × 200 m):
    - praia, vila genérica, morro e farol; pontos de loot; a memória (só os chunks não vazios), o tempo de loading e o
      orçamento de download (≤ 10 MB) e o bench no Switch.
+   - **feita em 19/11** (ARCHITECTURE §18.6, PERF §1k): 28 KB de download; 10,7 MB de grade; loading de 13,4 s no Eden.
 6. **Bobo Royale Mini na sim:**
    - 24 participantes, sem respawn, solo, duplas e quartetos (em grupo, o caído e o reviver do Zombies);
    - o **loot no chão**: armas em 3 raridades que melhoram recoil e pente, **sem mais dano**; coletes 50/100; kits de

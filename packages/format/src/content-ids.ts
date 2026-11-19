@@ -59,6 +59,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:base',
   // M7 (fase 1): a Base Bobo, o mapa do BoboStrike (só acrescentado, regra 20)
   'map:airbase',
+  // M7 (fase 5): a Ilha Tropical, o mapa do Bobo Royale (só acrescentado, regra 20)
+  'map:island',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',
@@ -124,6 +126,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'block:exit-sign',
   'block:danger-sign-a',
   'block:danger-sign-b',
+  // M7 (fase 5): a areia da Ilha Tropical (só acrescentado, regra 20)
+  'block:sand',
   // Bots de fábrica (um por nível rápido)
   'bot:vibe-bob',
   'bot:chill-bob',

@@ -19,6 +19,7 @@
     "maps/posto.bfmap": "maps/generated/posto.bfmap",
     "maps/base.bfmap": "maps/generated/base.bfmap",
     "maps/airbase.bfmap": "maps/generated/airbase.bfmap",
+    "maps/island.bfmap": "maps/generated/island.bfmap",
     "audio/t0-tiro.mp3": "audio/generated/t0-tiro.mp3",
     "audio/t0-impacto.mp3": "audio/generated/t0-impacto.mp3",
     "audio/t0-passo.mp3": "audio/generated/t0-passo.mp3",

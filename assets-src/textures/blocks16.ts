@@ -15,7 +15,7 @@ import type { LayerRecipe } from '../../tools/texgen/src/paint.ts';
 import { BENCH_TEXTURES } from './blocos16/bancada.ts';
 import { CONSTRUTO_TEXTURES } from './blocos16/construto.ts';
 import { METAL_WOOD_TEXTURES } from './blocos16/metal-madeira.ts';
-import { NATURE_TEXTURES } from './blocos16/natureza.ts';
+import { ISLAND_TEXTURES, NATURE_TEXTURES } from './blocos16/natureza.ts';
 import { SIGN_TEXTURES } from './blocos16/sinais.ts';
 
 export const BLOCK_TEXTURES: readonly LayerRecipe[] = [
@@ -24,4 +24,5 @@ export const BLOCK_TEXTURES: readonly LayerRecipe[] = [
   ...NATURE_TEXTURES,
   ...SIGN_TEXTURES,
   ...BENCH_TEXTURES,
+  ...ISLAND_TEXTURES,
 ];

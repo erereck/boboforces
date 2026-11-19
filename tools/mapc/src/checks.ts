@@ -201,6 +201,31 @@ export function runChecks(input: CheckInput): CheckReport {
       errors.push(`spawn ${i} ${at(s.x, s.y, s.z)} fora da área navegável principal (ilhado)`);
     }
   });
+  // M7 (fase 5, revisão): o ponto de loot precisa de um nó da navegação principal no chão dele (fora de bloco e de
+  // colisor de prop); senão o item nasce onde ninguém pega.
+  for (const p of doc.markers.lootSpots ?? []) {
+    const cx = Math.floor(p.x * 2);
+    const cy = Math.floor(p.y * 2 + 0.01);
+    const cz = Math.floor(p.z * 2);
+    if (collides(cx, cy, cz) || collides(cx, cy + 1, cz)) {
+      errors.push(`ponto de loot ${p.id} ${at(p.x, p.y, p.z)} dentro de bloco`);
+      continue;
+    }
+    const n = nav.nearestNode(p.x, p.y, p.z);
+    const pos = new Float64Array(3);
+    if (n === NO_NAV_NODE) {
+      errors.push(`ponto de loot ${p.id} ${at(p.x, p.y, p.z)} sem nó de navegação a menos de 2 m`);
+      continue;
+    }
+    nav.nodePosition(n, pos);
+    if (Math.abs(pos[1]! - p.y) > 0.6 || Math.hypot(pos[0]! - p.x, pos[2]! - p.z) > 1.0) {
+      errors.push(
+        `ponto de loot ${p.id} ${at(p.x, p.y, p.z)} longe do nó mais próximo ${at(pos[0]!, pos[1]!, pos[2]!)}`,
+      );
+    } else if (nav.component[n] !== mainComponent) {
+      errors.push(`ponto de loot ${p.id} ${at(p.x, p.y, p.z)} fora da área navegável principal`);
+    }
+  }
 
   const path = createNavPath(nav, 1024);
   const times: number[] = [];

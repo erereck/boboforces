@@ -35,8 +35,14 @@ export const MIN_TDM_SPAWNS_PER_TEAM = 6;
 export const MIN_FFA_SPAWNS = 16;
 /** Domination precisa de pelo menos 3 pontos (A, B, C). */
 export const MIN_DOMINATION_POINTS = 3;
-/** Maior linha de visão que um mapa pode declarar (teto do PC; Switch 3–4P pede ≤ 50 m, mas isso é do mapa). */
-export const MAX_DECLARED_SIGHT_LINE_M = 140;
+/**
+ * Maior linha de visão que um mapa pode declarar (teto do PC; Switch 3–4P pede ≤ 50 m, mas isso é do mapa). M7 (fase
+ * 5): 200 m, a ilha do Royale Mini (~200 m de lado, decisão #35); a distância de visão da partida limita o que se vê.
+ */
+export const MAX_DECLARED_SIGHT_LINE_M = 200;
+/** M7 (fase 5): o Royale pede pontos de loot (um item por ponto, às vezes dois); o teto cabe no pool da sim. */
+export const MIN_ROYALE_LOOT_SPOTS = 24;
+export const MAX_LOOT_SPOTS = 96;
 /** Teto de um nome de câmera, rota ou manequim. */
 const MAX_MARKER_NAME = 64;
 /**
@@ -295,6 +301,20 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
   sites.forEach((d) => {
     if (!finite(d.x, d.y, d.z, d.radius) || d.radius <= 0) err(`site ${d.id} inválido`);
     else if (!inArea(d.x, d.z)) err(`site ${d.id} fora da playArea`);
+  });
+  // M7 (fase 5): o Royale pede pontos de loot (dentro da área, com nome único).
+  const loot = mk.lootSpots ?? [];
+  if (modes.has('royale.mini') && loot.length < MIN_ROYALE_LOOT_SPOTS) {
+    err(`Royale: ${loot.length} pontos de loot (mínimo ${MIN_ROYALE_LOOT_SPOTS})`);
+  }
+  if (loot.length > MAX_LOOT_SPOTS) err(`${loot.length} pontos de loot (máximo ${MAX_LOOT_SPOTS})`);
+  unique(
+    'ponto de loot',
+    loot.map((d) => d.id),
+  );
+  loot.forEach((d) => {
+    if (!finite(d.x, d.y, d.z, d.radius) || d.radius <= 0) err(`ponto de loot ${d.id} inválido`);
+    else if (!inArea(d.x, d.z)) err(`ponto de loot ${d.id} fora da playArea`);
   });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);

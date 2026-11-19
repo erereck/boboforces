@@ -109,6 +109,8 @@ export interface MapBuilder {
   domination(point: MapPointMarker): void;
   /** M7 (fase 1): site da bomba do BoboStrike (letra, centro dos pés e raio, em metros). */
   bombSite(site: MapPointMarker): void;
+  /** M7 (fase 5): ponto de loot do Bobo Royale (id, o chão onde o item aparece e um raio, em metros). */
+  lootSpot(spot: MapPointMarker): void;
   camera(camera: MapCamera): void;
   route(route: MapCameraRoute): void;
   mannequin(mannequin: MapMannequin): void;
@@ -132,6 +134,8 @@ export interface MapBuilder {
 export interface MapScript {
   readonly id: string;
   build(b: MapBuilder): void;
+  /** M7 (fase 5): opções da análise do `mapc` (o teto da maior linha de visão; padrão 50 m, o do Switch 3–4P). */
+  readonly analysis?: { readonly sightLimitM?: number };
 }
 
 /** Formas que cada operação exige do bloco (conferidas contra o registro real no `mapc`). */

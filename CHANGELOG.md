@@ -38,6 +38,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   bomba, "Segure usar: desarmar"; plantando ou desarmando, os segundos que faltam no meio. A Boom Box (um rádio de
   brinquedo vermelho) aparece no chão e tem a plaquinha através das paredes (a largada só para o ataque). Quem morre
   vê a câmera de morte e, depois de 3 s, assiste um aliado vivo até a próxima rodada.
+- **Ilha Tropical (fase 5):** o mapa do Bobo Royale Mini (~200 × 200 m, de dia): o mar raso em volta, a praia de
+  areia, o morro com o farol ao norte, a vila de 10 casas em volta da praça, o píer e as barracas na praia, estradas de
+  terra e 140 árvores; 54 pontos de loot e 32 largadas. Só joga o Royale (que chega na fase 6); por enquanto aparece no
+  bench. O download do mapa é de 28 KB.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

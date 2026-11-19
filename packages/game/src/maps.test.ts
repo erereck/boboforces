@@ -19,10 +19,20 @@ describe('mapas dos menus', () => {
       expect([...map.meta.modes].sort(), id).toEqual([...MAP_MODES[id]].sort());
     }
     expect(mapsForMode('warfare.ffa')).toEqual(['construto']);
+    expect(mapsForMode('royale.mini')).toEqual(['island']);
     expect(mapForMode('ringue', 'warfare.ffa')).toBe('construto');
     expect(mapBotCap('ringue', 40)).toBe(7);
     expect(mapBotCap('airbase', 40)).toBe(9);
     expect(mapBotCap('construto', 12)).toBe(12);
+  });
+
+  it('a Ilha Tropical (M7, fase 5): 200 m, pontos de loot e 32 largadas sem time', () => {
+    const map = decodeMap(new Uint8Array(readFileSync(join(ROOT, 'assets-src', 'maps', 'generated', 'island.bfmap'))));
+    expect(map.grid.sizeX / 2).toBe(200);
+    expect(map.grid.sizeZ / 2).toBe(200);
+    expect(map.markers.lootSpots!.length).toBeGreaterThanOrEqual(24);
+    expect(map.markers.spawns.length).toBe(32);
+    expect(map.markers.spawns.every((sp) => sp.team === -1)).toBe(true);
   });
 
   it('Partida Rápida: o Ringue só no TDM, até 4 contra 4; trocar para FFA volta ao Construto', () => {

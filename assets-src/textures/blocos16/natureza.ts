@@ -178,4 +178,29 @@ const bush: LayerRecipe = {
   },
 };
 
+/** M7 (fase 5): a areia da praia da Ilha Tropical: base clara, manchas ±1 tom e grãos e conchinhas soltos. */
+const sand: LayerRecipe = {
+  name: 'sand',
+  kind: 'opaque',
+  material: 'continuo',
+  variants: 3,
+  draw(p, variant) {
+    const a = p.ramp('areia');
+    p.fill(a[2]!);
+    p.blotches(6, a[1]!);
+    p.blotches(5, a[3]!);
+    for (let i = 0; i < 4; i++) p.px(p.rng.int(0, 16), p.rng.int(0, 16), a[4] ?? a[3]!);
+    if (variant === 2) {
+      // Uma conchinha.
+      const x = p.rng.int(1, 14);
+      const y = p.rng.int(1, 14);
+      p.px(x, y, a[4] ?? a[3]!);
+      p.px(x + 1, y, a[3]!);
+      p.px(x, y + 1, a[1]!);
+    }
+  },
+};
+
 export const NATURE_TEXTURES: readonly LayerRecipe[] = [grass, grassSide, dirt, leaves, tallGrass, flowers, bush];
+/** M7 (fase 5): as camadas da Ilha Tropical (no fim da tira: as de antes não mudam de lugar). */
+export const ISLAND_TEXTURES: readonly LayerRecipe[] = [sand];

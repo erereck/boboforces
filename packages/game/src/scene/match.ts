@@ -627,6 +627,16 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
         zombies: { waves: 0, quantity: 3, hpMul: 5, selfRevives: -1 },
         teams: [{ bots: [{ ref, count: bench.views }] }],
       };
+    } else if (bench.scene === 'island') {
+      // M7 (fase 5): o FFA na Ilha Tropical (os pontos de largada são sem time; o Royale entra na fase 6).
+      recipe = {
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'warfare.ffa',
+        map: 'island',
+        seed: bench.seed >>> 0,
+        match: { timeLimitS: 0, scoreLimit: 0, viewDistanceM: bench.viewDistanceM },
+        teams: [{ bots: [{ ref, count: bench.views + bots }] }],
+      };
     } else {
       const total = bench.views + bots;
       const a = Math.ceil(total / 2);

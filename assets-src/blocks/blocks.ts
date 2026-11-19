@@ -296,6 +296,8 @@ export const BLOCK_DEFS: readonly BlockSourceDef[] = [
     flags: SOLID,
     stepSound: 'concrete',
   }),
+  // M7 (fase 5): a areia da praia da Ilha Tropical.
+  def({ key: 'sand', shape: 'cube', faces: all('sand'), flags: CONCRETE_FLAGS, variants: 3, stepSound: 'dirt' }),
 ];
 
 /** Blocos novos desta frente que a integração precisa registrar em `CONTENT_IDS` (`block:<key>`). */

@@ -5,7 +5,7 @@
 //
 // Validações (tecnico.md §15.3): IDs de bloco e modelo registrados, spawns alcançáveis pela navegação (`buildNavGrid`
 // com `BOBO_NAV_METRICS`) e invisíveis para o inimigo, portas de 1,0 m, corredores ≥ 1,0 m, maior linha de visão
-// medida ≤ declarada ≤ 50 m, teto de tamanho, câmeras dos prints, rotas do bench e manequins obrigatórios
+// medida ≤ declarada (≤ `MAX_DECLARED_SIGHT_LINE_M`; a análise vai até 50 m ou o `analysis.sightLimitM` do mapa), teto de tamanho, câmeras dos prints, rotas do bench e manequins obrigatórios
 // (`validateMap` com `requirePrintMarkers`, que também confere os opcionais do boneco do FutBobo). Com erro, o .bfmap
 // NÃO é gravado e o processo sai com 1. Avisos não barram: travessia TDM fora de 12–18 s, cobertura longe, "visto sem
 // ver" (parede entre o olho e o topo da hitbox em pé, 1,81 m), cobertura rente ao agachado (topo em [0,95; 0,98)) e
@@ -37,7 +37,7 @@ for (const id of MAP_IDS) {
     blocks,
     models,
     requirePrintMarkers: id === 'construto',
-    maxSightLimitM: 50,
+    maxSightLimitM: mod.default.analysis?.sightLimitM ?? 50,
   });
   if (!quiet) console.log(formatReport(result));
   const out = join(MAPS_OUT_DIR, `${id}.bfmap`);

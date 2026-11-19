@@ -112,6 +112,9 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
     ...(m.bombSites && m.bombSites.length > 0
       ? { bombSites: m.bombSites.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, radius: d.radius })) }
       : {}),
+    ...(m.lootSpots && m.lootSpots.length > 0
+      ? { lootSpots: m.lootSpots.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
     cameras: m.cameras.map((c) => ({
       name: c.name,
       x: c.x,
@@ -684,11 +687,27 @@ function parseMarkers(json: Json): MapMarkers {
             radius: num(d['radius'], p),
           };
         });
+  // M7 (fase 5): os pontos de loot do Royale (opcional).
+  const lootSpots =
+    m['lootSpots'] === undefined
+      ? []
+      : arr(m['lootSpots'], 'lootSpots').map((v, i): MapPointMarker => {
+          const d = obj(v, `lootSpots[${i}]`);
+          const p = `lootSpots[${i}]`;
+          return {
+            id: str(d['id'], p),
+            x: num(d['x'], p),
+            y: num(d['y'], p),
+            z: num(d['z'], p),
+            radius: num(d['radius'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
     domination,
     ...(bombSites.length > 0 ? { bombSites } : {}),
+    ...(lootSpots.length > 0 ? { lootSpots } : {}),
     cameras,
     routes,
     mannequins,

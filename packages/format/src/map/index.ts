@@ -23,8 +23,10 @@ export {
 } from './codec.ts';
 export {
   MAX_DECLARED_SIGHT_LINE_M,
+  MAX_LOOT_SPOTS,
   MIN_DOMINATION_POINTS,
   MIN_FFA_SPAWNS,
+  MIN_ROYALE_LOOT_SPOTS,
   MIN_TDM_SPAWNS_PER_TEAM,
 } from './validate.ts';
 

@@ -407,6 +407,24 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "sand",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sand_b",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "sand_c",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

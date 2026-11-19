@@ -67,6 +67,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
   const spawns: MapSpawnMarker[] = [];
   const domination: MapPointMarker[] = [];
   const bombSites: MapPointMarker[] = [];
+  const lootSpots: MapPointMarker[] = [];
   const cameras: MapCamera[] = [];
   const routes: MapCameraRoute[] = [];
   const mannequins: MapMannequin[] = [];
@@ -230,6 +231,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
     spawn: (m) => void spawns.push(m),
     domination: (p) => void domination.push(p),
     bombSite: (p) => void bombSites.push(p),
+    lootSpot: (p) => void lootSpots.push(p),
     camera: (c) => void cameras.push(c),
     route: (r) => void routes.push(r),
     mannequin: (q) => void mannequins.push(q),
@@ -293,6 +295,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
           spawns,
           domination,
           ...(bombSites.length > 0 ? { bombSites } : {}),
+          ...(lootSpots.length > 0 ? { lootSpots } : {}),
           cameras,
           routes,
           mannequins,

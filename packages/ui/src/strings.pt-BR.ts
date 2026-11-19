@@ -670,6 +670,7 @@ export const STRINGS_PT_BR = {
   // M3 (fase 5a): o mapa do Bobo Zombies (nome provisório, pergunta I1).
   'map.base': 'Base Abandonada',
   'map.airbase': 'Base Bobo',
+  'map.island': 'Ilha Tropical',
   'mode.training': 'Bobo Training',
   // M3 (fase 2d): Bobo Zombies.
   'mode.zombies': 'Bobo Zombies',

@@ -12,8 +12,11 @@ import type { StringKey, TestScreenModel } from '@boboforces/ui';
  * Cena do bench: o Construto inteiro, o canto de 32×32 m da cena-vitrine (arte-ux.md §5.2) ou, desde o M3 (fase 7b),
  * o Bobo Zombies na Base Abandonada (`zombies`: as vistas são bots de apoio; o pool no teto de zumbis do perfil).
  */
-/** M7 (fase 1): `airbase` = o TDM na Base Bobo (o mapa do BoboStrike). */
-export type BenchScene = 'construto' | 'vitrine' | 'zombies' | 'airbase';
+/**
+ * M7 (fase 1): `airbase` = o TDM na Base Bobo (o mapa do BoboStrike). M7 (fase 5): `island` = o FFA na Ilha Tropical
+ * (o mapa do Royale Mini; a memória da grade, o loading e o quadro no mapa grande antes do modo existir).
+ */
+export type BenchScene = 'construto' | 'vitrine' | 'zombies' | 'airbase' | 'island';
 
 /**
  * Uma rodada do bench (tecnico.md §24.1). A mesma cena vira o `/bench` da web e o NRO de teste do Switch.

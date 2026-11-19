@@ -4038,3 +4038,36 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   todas as vistas; a Boom Box sumia ao ser desarmada.
 - **Fica para depois:** os sons do modo (o bipe da bomba, plantar e desarmar), largar a bomba de propósito, a escolha
   de quem assistir (hoje é o primeiro aliado vivo) e o modelo da Boom Box nas costas de quem carrega.
+
+### 18.6 Fase 5: a Ilha Tropical (19/11/2026)
+
+- **O mapa** (`assets-src/maps/island.ts`, `map:island`, "Ilha Tropical", nome provisório): grade de 200 × 32 × 200 m
+  (400 × 64 × 400 células), área jogável de 184 × 184 m (a água rasa em volta entra), de dia; modo só `royale.mini`
+  (aberta demais para os outros: o FFA pediria largadas que não se enxergam). Gerado por código: o relevo é um ruído de
+  valor da semente do mapa, em degraus de meio bloco, com a borda da ilha ondulada. O morro com o farol (só de enfeite)
+  e a casinha do faroleiro ao norte; a vila (praça e 10 casas de 3 m com porta, janela e luminária) ao sul do centro; o
+  píer de tábua e 3 barracas na praia; estradas de terra; 140 árvores, mato e arbustos na grama.
+  - **54 pontos de loot** (2 em cada casa, o píer, as barracas e caixotes soltos no campo, só em chão plano) e **32
+    largadas sem time** (um anel pela ilha e 4 na praça; o Royale sorteia). As árvores evitam as largadas, os
+    declives e umas às outras; o mato e os caixotes evitam os troncos; as barracas ganham um chão aplainado.
+  - O `mapc`: 39.668 nós (33.068 jogáveis), maior linha de visão 189 m (declarada 190); 2 avisos que ficam (a
+    cobertura do campo aberto, até 14,8 m, e a grade de 10,7 MB, PERF §1k). `.bfmap` de 28 KB.
+- **O marcador `lootSpots`** (`MapMarkers.lootSpots`, opcional como os sites: os mapas sem ele saem com os mesmos
+  bytes): id, o chão onde o item aparece e um raio. O validador pede 24 ou mais com `royale.mini` nos modos, com nome
+  único e dentro da área; o `mapc` ganhou `lootSpot` e desenha os pontos na vista de cima.
+- **O formato:** `MAX_DECLARED_SIGHT_LINE_M` foi de 140 para 200 m (o mapa do Royale; a distância de visão da partida
+  continua limitando o que se vê). O `MapScript` ganhou `analysis.sightLimitM` (o teto da análise de linhas de visão
+  do `mapc`; padrão 50 m).
+- **O bloco `sand`** (`block:sand`, 3 variações, passo de terra) com as texturas `sand`, `sand_b` e `sand_c`
+  (`ISLAND_TEXTURES`).
+- **O jogo:** a ilha na lista de mapas só para o `royale.mini` (some da Partida rápida e da personalizada até o modo
+  existir) e a cena de bench `scene=island` (o FFA com as vistas e os bots, para medir a memória, o loading e o quadro
+  no mapa grande), que serve aos prints das câmeras `print:island`, `print:vila`, `print:farol` e `print:praia`.
+- **A revisão (Opus) achou 4 coisas no mapa, corrigidas antes do commit:** o loot das barracas dentro da lona (agora na
+  frente da porta); a casinha do faroleiro na encosta com grama dentro e um vão sob a laje (as casas ganharam alicerce e
+  o interior limpo); árvores no meio da estrada oeste e mato na terra das estradas e dentro das barracas (a vegetação
+  só nasce onde o topo é grama); arbustos flutuando ou afundados (encaixados na célula antes de medir a altura, e
+  cruzados como o mato). Também: os caixotes longe das largadas, a base do farol meio bloco abaixo, o `mapc` confere
+  os pontos de loot como as largadas (fora de bloco, perto de um nó da navegação principal) e o validador exporta
+  `MIN_ROYALE_LOOT_SPOTS` (24) e o teto `MAX_LOOT_SPOTS` (96, o pool da sim).
+- **Fica para a fase 6:** o `SimMap` com os pontos de loot (a sim do Royale).

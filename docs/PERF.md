@@ -329,6 +329,30 @@ esquentando: o p99 dele sai alto).
   4 min): eles caíram na onda 3, 4, 5 e 2 (de 112 a 218 s; 10 a 34 abates). Antes do ajuste (3 soldados em jogo na
   1ª onda, granada desde o começo e a horda mirando em caído), caíam na onda 2 ou 3 em 68 a 110 s.
 
+## 1k. A Ilha Tropical (M7, fase 5; 19/11/2026, 0.0.1 local, i5-12450H)
+
+O mapa do Royale Mini (`island`, 200 × 200 m). O FFA com 24 bots é o modo de bench (`scene=island`) até o Royale
+existir (fase 6). Sondas em `local/m7/medir-ilha.ts` (headless) e `local/m7/travadas-ilha.ts` (as travadas no Edge).
+
+| Medida | Ilha Tropical | Referência |
+|---|---|---|
+| `.bfmap` (download) | 28,3 KB | orçamento do mapa: ≤ 10 MB |
+| Grade em memória | 171 chunks densos = 10,7 MB (13 × 13 no chão; o farol sobe para a 2ª camada) | Construto < 2 MB |
+| Navegação (`mapc`) | 39.668 nós (33.068 jogáveis), montagem 92 ms; maior linha de visão 189 m | Base Bobo: 2.683 jogáveis |
+| Montar o mapa no Node (grade + nav + sim) | 260 ms | — |
+| Sim + IA headless, FFA 24 bots, 180 s (2 sementes) | 0,10 ms por passo (p95 0,19, p99 0,33–0,40); 23 de 24 andaram mais de 10 m; ~240 abates | TDM 8 no Construto: 0,04 ms |
+| Edge 157 headless (Intel UHD), `views=1&bots=23&visao=140`, 60 s | loading 3.060 ms (assets 731, malha 323, luz 313, nav 174, shaders 284); 52,7 fps, p50 17,9 / p99 20,0; cpu p50 2,4 / p99 4,4; 59,8 draws e 78,7 mil triângulos; heap máx 171 MB; malhas 2,9 MB | Construto no mesmo dia e na mesma linha: loading 1.281 ms, heap 113 MB |
+| Eden, portátil (`switch1p`, 50 m), `views=1&bots=23`, 30 s | loading 13.358 ms (assets 1.612, malha 2.206, luz 2.283, nav 2.830, shaders 847); 35,2 draws e 56 mil triângulos (metas 60 e 200 mil); sim 1,32 e IA 1,33 ms por tick; heap máx 45 MB (limite 537) | Construto no Eden (09/11): loading 6.990 ms, heap 40 MB |
+
+- **As travadas de ~1 s a cada ~11 s no Edge headless** (6 no bench da ilha, `acima250`) não são do mapa: a sonda
+  mostra os mesmos quadros na Base Bobo e no Construto no mesmo dia, sem longtask nem queda de heap (a espera é fora do
+  JS). Os benches de 16/11 no Construto não tinham: é do Edge 157 headless (ou da máquina) neste dia.
+- **O que pesa é o loading no Switch:** a malha, a luz e a nav crescem com a área (~5× a do Construto). No console, o
+  Construto carrega bem mais rápido que no Eden; o bench do Royale no console (fase 8) diz se a ilha precisa da nav
+  pré-calculada no `.bfmap` ou de malha por partes.
+- A grade densa (2 bytes por célula) é a mesma do resto do jogo: 10,7 MB cabem no Switch (o heap do JS fica em 45 MB no
+  Eden; os `ArrayBuffer` grandes não entram nessa conta) e no celular (o perfil do celular já tem 90 m de visão).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |
@@ -376,6 +400,7 @@ esquentando: o p99 dele sai alto).
 
 | Data | Build | Onde (Eden / dock / portátil) | Cena | Jogadores | Bots | FPS mínimo | Boot até o menu | Heap | romfs | Observação |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 19/11/2026 | 0.0.1 local (M7 fase 5), NRO 60,63 MB | Eden, portátil | **Ilha Tropical**, bench 30 s (`scene=island&views=1&bots=23&duration=30&warmup=5`, `switch1p`, 50 m) | 1 (bot) | 23 | 46,63 fps; p50 17 / p90 22 / p99 110, máx 521 (o Eden não serve para tempo de quadro) | — | 45,2 MB (limite 537) | — | O mapa de 200 m: loading 13.358 ms (assets 1.612, malha 2.206, luz 2.283, nav 2.830, shaders 847), o dobro do Construto no Eden; 35,2 draws e 56 mil triângulos; sim 1,32 e IA 1,33 ms por tick; 7 programas, 0 erro, 0 aviso; 36 pausas de GC. Log em `local/eden/runtime-2026-11-19T15-24-36-657Z.log` |
 | 09/11/2026 | 0.0.1 local (M2 até a fase 7 + teste do sofá), NRO 59,61 MB | Eden, portátil | Construto, bench 30 s (`views=3&bots=12&duration=30&warmup=5`, `switch34p`) | 3 (bots) | 12 | 54,27 fps; p50 17 / p90 25 / p99 66, máx 207 (o Eden não serve para tempo de quadro) | 1,5 s | 40 MB (limite 537) | 5,78 MB | Primeiro NRO com o código do M2: 7 programas, 0 erro, 0 aviso; por vista 25,8–35,3 draws e 51,6–74,8 mil triângulos (metas 45 e 120 mil); loading 6.990 ms (assets 1.465, nav 980, luz 940, malha 828, shaders 674); os 33 sons e a música carregam depois do menu (`[audio]` no log). Log em `local/eden/runtime-2026-11-09T22-00-01-067Z.log` |
 | 08/11/2026 | 0.0.1 local (`2d17e81+`, `nxjs.ini` sem Sparkplug; NRO 60.466.365 B) | **console, dock** (Horizon 22.5.0, Atmosphère 1.11.2 emuMMC, nx.js 1.0.0-beta.7 com JIT) | Construto, bench `dock` **600 s** (50 m, `switch34p`) | 4 (bots) | 12 | **59,57 fps**; p50 17 / p90 17 / **p99 18**, máx 321; `frames_lentos` 40–60: 9, 60–100: 19, 100–250: 7, ≥ 250: 2; `vaos_1s` 0 | 540–583 ms | 41,3 MB (limite 537) | — | **critério 1 do Teste Zero cumprido com folga** (30 fps estáveis, p99 ≤ 40). Item 16 ok: p50 17 ms no 1º minuto e nos últimos 60 s. Por vista 28,5–30,1 draws e 64,4–68,5 mil triângulos (metas 45 e 120 mil); 7 programas, 0 erro, 0 aviso; CPU p50 16 / p99 17; sim 0,30 e IA 0,31 ms por tick; 21 pausas de GC. Instanciamento detectado como normal (4/4), contorno do Eden desligado. `figure_lod` l0 4,8 / l1 5,5 / l2 2,6. Os picos (`[bench] pico`) têm CPU de 11–27 ms: a espera é fora do JS. Log em `local/console/runtime-2026-11-08-b.log` |
 | 08/11/2026 | idem | console, portátil | Construto, bench `solo` 300 s (90 m, `switch1p`) | 1 (bot) | 24 | **57,55 fps**; p50 17 / p90 17 / p99 34, máx 315; `frames_lentos` 8 / 17 / 3 / 3; `vaos_1s` 0 | 544 ms | 39,2 MB | — | **critério 2 cumprido** (30 fps; p99 34 contra o alvo × 1,2 = 40). Item 16 ok no portátil (p50 17 no início e no fim). 30,2 draws, 69,2 mil triângulos (metas 60 e 200 mil); CPU p50 16 / p99 32; sim 0,44 e IA 0,43 ms por tick; `figure_lod` l0 3 / l1 4,9 / l2 12,3; 18 pausas de GC |

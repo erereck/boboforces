@@ -524,3 +524,53 @@ describe('map@1: os sites do BoboStrike (M7, fase 1)', () => {
     expect(issues).toContain('site A fora da playArea');
   });
 });
+
+describe('map@1: os pontos de loot do Royale (M7, fase 5)', () => {
+  const withLoot = (modes: readonly string[], n: number): MapDocument => {
+    const doc = syntheticMap();
+    return {
+      ...doc,
+      meta: { ...doc.meta, modes },
+      markers: {
+        ...doc.markers,
+        lootSpots: Array.from({ length: n }, (_, i) => ({
+          id: `l${i}`,
+          x: 2 + (i % 8) * 3,
+          y: 0.5,
+          z: 2 + i,
+          radius: 0.6,
+        })),
+      },
+    };
+  };
+
+  it('ida e volta; sem loot, o campo não aparece', () => {
+    const doc = withLoot(syntheticMap().meta.modes, 3);
+    expect(decodeMap(encodeMap(doc)).markers).toEqual(doc.markers);
+    expect(decodeMap(encodeMap(syntheticMap())).markers.lootSpots).toBeUndefined();
+  });
+
+  it('o Royale pede ao menos 24 pontos, com nome único e dentro da área', () => {
+    expect(validateMap(withLoot(['royale.mini'], 24)).filter((i) => i.includes('loot'))).toEqual([]);
+    expect(validateMap(withLoot(['royale.mini'], 23))).toContain('Royale: 23 pontos de loot (mínimo 24)');
+    // O teto cabe no pool da sim (M7, fase 5, revisão).
+    expect(validateMap(withLoot(['royale.mini'], 97))).toContain('97 pontos de loot (máximo 96)');
+    // Fora do Royale, o mapa pode ter (ou não) pontos de loot.
+    expect(validateMap(withLoot(['warfare.tdm'], 2)).filter((i) => i.includes('loot'))).toEqual([]);
+    const doc = withLoot(['warfare.tdm'], 2);
+    const bad: MapDocument = {
+      ...doc,
+      markers: {
+        ...doc.markers,
+        lootSpots: [
+          { id: 'x', x: 4, y: 0.5, z: 4, radius: -1 },
+          { id: 'x', x: 999, y: 0.5, z: 4, radius: 0.6 },
+        ],
+      },
+    };
+    const issues = validateMap(bad);
+    expect(issues).toContain('ponto de loot repetido: x');
+    expect(issues).toContain('ponto de loot x inválido');
+    expect(issues).toContain('ponto de loot x fora da playArea');
+  });
+});

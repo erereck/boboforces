@@ -520,6 +520,16 @@
       "frames": 1,
       "variants": 1,
       "stepSound": "concrete"
+    },
+    {
+      "key": "sand",
+      "shape": "cube",
+      "faces": ["sand", "sand", "sand", "sand", "sand", "sand"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation", "randomUv"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 3,
+      "stepSound": "dirt"
     }
   ]
 }
