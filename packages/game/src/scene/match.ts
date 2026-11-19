@@ -294,7 +294,7 @@ import {
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
 import { cleanTypedName } from '../names.ts';
-import { HOST_AWAY_END_S, waitsForHost } from '../online-api.ts';
+import { HOST_AWAY_END_S, waitsForHost, type OnlineNetStats } from '../online-api.ts';
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
 import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
@@ -4627,37 +4627,52 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let netLogSent = 0;
   let netLogReceived = 0;
   let netLogSnapshots = 0;
-  /** Quando foram a 1ª amostra, a última e a última linha (ms da plataforma; -1 = ainda não). */
-  let netStartAt = -1;
-  let netSampleAt = 0;
+  /** Quando foram a última amostra e a última linha (ms da plataforma; -1 = sem base ainda). */
+  let netSampleAt = -1;
   let netLogAt = 0;
+  /** O tempo desde a 1ª base (s), somado só nas janelas que valeram (a aba de trás não conta). */
+  let netClockS = 0;
+  /** Amigos × segundos na janela da linha (o "por amigo" com quem estava em cada segundo). */
+  let netPeerS = 0;
   let netMsSum = 0;
   let netMsFrames = 0;
   /** A sim e a IA do host na janela da linha (a CPU do host no celular contra o tecnico.md §13.4). */
   let netSimSum = 0;
   let netAiSum = 0;
+  /** Uma amostra que chega depois disto (ms) veio de uma parada (a aba atrás, o app trocado): a janela recomeça. */
+  const NET_GAP_MS = 2500;
+  /** A base das contas: tudo o que veio antes dela não entra (as janelas recomeçam daqui). */
+  function netBaseline(n: OnlineNetStats, t: number): void {
+    netSampleAt = netLogAt = t;
+    netSent = netLogSent = n.sentBytes;
+    netReceived = netLogReceived = n.receivedBytes;
+    netSnapshots = netLogSnapshots = n.snapshots;
+    netPeerS = 0;
+    netMsSum = 0;
+    netSimSum = 0;
+    netAiSum = 0;
+    netMsFrames = 0;
+  }
   function sampleNet(): void {
     const n = driver.net;
     if (n === null) return;
     const t = platform.now();
-    // A 1ª amostra é a base: o que passou antes dela (a carga, o 1º snapshot completo) não entra na conta.
-    if (netStartAt < 0) {
-      netStartAt = netSampleAt = netLogAt = t;
-      netSent = netLogSent = n.sentBytes;
-      netReceived = netLogReceived = n.receivedBytes;
-      netSnapshots = netLogSnapshots = n.snapshots;
-      netMsSum = 0;
-      netSimSum = 0;
-      netAiSum = 0;
-      netMsFrames = 0;
+    const isHost = driver.director !== null;
+    // A 1ª base só com a partida andando (o host mandou o 1º snapshot; o amigo já mostra um): a carga de cada lado e o
+    // 1º snapshot completo não entram. Uma parada longa (a aba atrás) também recomeça a janela, senão a média do fps e
+    // dos KB/s sairia diluída pelo tempo parado.
+    if (netSampleAt < 0 || t - netSampleAt > NET_GAP_MS) {
+      if (isHost ? n.snapshots > 0 : n.lagTicks >= 0) netBaseline(n, t);
       return;
     }
-    const isHost = driver.director !== null;
+    const dtS = Math.max(0.001, (t - netSampleAt) / 1000);
+    netClockS += dtS;
+    // Host: bytes por amigo; os snapshots são do host (um por vez, para todos), sem dividir.
     const friends = isHost ? Math.max(1, n.peers) : 1;
-    const per = 1000 / Math.max(1, t - netSampleAt) / friends;
-    panel.netUpKBps = ((n.sentBytes - netSent) / 1024) * per;
-    panel.netDownKBps = ((n.receivedBytes - netReceived) / 1024) * per;
-    panel.netSnapshotsPerS = (n.snapshots - netSnapshots) * per;
+    netPeerS += friends * dtS;
+    panel.netUpKBps = (n.sentBytes - netSent) / 1024 / dtS / friends;
+    panel.netDownKBps = (n.receivedBytes - netReceived) / 1024 / dtS / friends;
+    panel.netSnapshotsPerS = (n.snapshots - netSnapshots) / dtS;
     panel.netPeers = n.peers;
     panel.netLagTicks = n.lagTicks;
     panel.netMispredicts = n.mispredicts;
@@ -4667,14 +4682,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     netSnapshots = n.snapshots;
     if (t - netLogAt < NET_LOG_EVERY_S * 1000) return;
     // A cada 30 s: as médias da janela (o texto pode alocar).
-    const span = ((t - netLogAt) / 1000) * friends;
-    const up = (n.sentBytes - netLogSent) / 1024 / span;
-    const down = (n.receivedBytes - netLogReceived) / 1024 / span;
-    const snaps = (n.snapshots - netLogSnapshots) / span;
+    const spanS = (t - netLogAt) / 1000;
+    const peerS = Math.max(0.001, netPeerS);
+    const up = (n.sentBytes - netLogSent) / 1024 / peerS;
+    const down = (n.receivedBytes - netLogReceived) / 1024 / peerS;
+    const snaps = (n.snapshots - netLogSnapshots) / spanS;
     const frames = Math.max(1, netMsFrames);
     const ms = netMsSum / frames;
-    const fps = netMsFrames / ((t - netLogAt) / 1000);
-    const clock = Math.round((t - netStartAt) / 1000);
+    const fps = netMsFrames / spanS;
+    const clock = Math.round(netClockS);
     host.log(
       isHost
         ? `[rede] host t=${clock}s rede_ms=${ms.toFixed(3)} sobe_kbs=${up.toFixed(1)} desce_kbs=${down.toFixed(1)}` +
@@ -4688,6 +4704,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     netLogSent = n.sentBytes;
     netLogReceived = n.receivedBytes;
     netLogSnapshots = n.snapshots;
+    netPeerS = 0;
     netMsSum = 0;
     netSimSum = 0;
     netAiSum = 0;

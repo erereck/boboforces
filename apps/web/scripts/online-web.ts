@@ -306,12 +306,15 @@ async function main(): Promise<number> {
       const cdp = await host.context().newCDPSession(host);
       await cdp.send('Debugger.enable');
       await cdp.send('Debugger.pause');
-      await friend.bringToFront();
-      await friend.waitForTimeout(4500);
-      await shot(friend, 'host-ausente-zombies');
-      await cdp.send('Debugger.resume');
-      await cdp.send('Debugger.disable');
-      await cdp.detach();
+      try {
+        await friend.bringToFront();
+        await friend.waitForTimeout(4500);
+        await shot(friend, 'host-ausente-zombies');
+      } finally {
+        await cdp.send('Debugger.resume');
+        await cdp.send('Debugger.disable');
+        await cdp.detach();
+      }
       await frames(host, 10);
     }
     if (Math.abs(hz.simTick - fz.simTick) > 30)

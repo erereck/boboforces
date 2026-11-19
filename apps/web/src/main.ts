@@ -71,15 +71,18 @@ const ONLINE_OPEN = false;
 const ONLINE_TEST_KEY = 'boboforces:online-teste';
 
 function onlineVisible(search: URLSearchParams, roomLink: boolean): boolean {
-  if (ONLINE_OPEN || import.meta.env.DEV || roomLink || search.get('sinal') === 'local') return true;
+  if (ONLINE_OPEN || import.meta.env.DEV || search.get('sinal') === 'local') return true;
+  const asked = roomLink || search.has('online');
   try {
-    if (search.has('online')) {
+    // Lembrado também para quem veio pelo link: o hash sai da barra no boot, e o Atualizar (versão antiga) ou a aba
+    // que o celular descarta recarregam sem ele.
+    if (asked) {
       localStorage.setItem(ONLINE_TEST_KEY, '1');
       return true;
     }
     return localStorage.getItem(ONLINE_TEST_KEY) === '1';
   } catch {
-    return search.has('online');
+    return asked;
   }
 }
 

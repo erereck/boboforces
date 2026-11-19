@@ -3515,3 +3515,21 @@ Um revisor (Opus) leu as 3 partes. Nada grave; 2 problemas e 6 menores, todos co
 - **A página** (`local/m2/montar-pagina-r20.mjs`, por cima do montador gerado da rodada 19): seções 88–94 e as
   perguntas T1–T5; as imagens da rodada 19 saem das cópias dela (`pagina-r19/`), porque o `local/m5/prints` foi
   recapturado com outras partidas. Publicada como versão 24 da página das rodadas.
+
+### 16.22 A revisão da fase 7 (19/11/2026)
+
+Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigidos:
+
+- **Os snapshots por segundo do host saíam divididos pelos amigos:** o contador do `NetHost` é um por snapshot (para
+  todos), não um por amigo. Com 3 amigos a 20 Hz, o F2 mostrava 7. Agora só os bytes são por amigo.
+- **O Online escondido sumia para quem veio pelo link e recarregou:** o hash sai da barra no boot, e o Atualizar (versão
+  antiga) ou a aba que o Android descarta recarregam sem ele. O link agora também fica lembrado no aparelho.
+- **A aba de trás diluía a média de 30 s:** o `sampleNet` só roda com quadros, e a janela seguinte dividia pelo tempo
+  parado (2 min no WhatsApp viravam "fps 7"). Uma amostra que chega depois de 2,5 s recomeça a janela.
+- **O "por amigo" usava os amigos do fim da janela:** agora soma amigos × segundos a cada amostra.
+- **A base:** a 1ª janela começa quando a partida anda (o host mandou o 1º snapshot; o amigo já mostra um), sem a carga
+  de cada lado nem o 1º snapshot completo.
+- **Menores:** o roteiro das abas solta o JS do host num `finally` (uma captura que falha não deixa a aba parada); o
+  repassador dos bytes devolve o handler de antes; o PERF diz que os KB/s são da carga útil (sem o envelope da WebRTC).
+- **Testes novos:** a linha do host com 3 amigos (10 snapshots/s, 10 KB/s por amigo) e 2 min de aba atrás que não diluem
+  a linha seguinte do amigo.

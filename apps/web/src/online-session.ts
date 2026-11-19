@@ -59,11 +59,12 @@ function countingEndpoint(inner: NetEndpoint): { endpoint: NetEndpoint; sent: ()
         inner.send(to, channel, bytes);
       },
       poll(h): void {
+        const before = handler;
         handler = h;
         try {
           inner.poll(relay);
         } finally {
-          handler = null;
+          handler = before;
         }
       },
     },

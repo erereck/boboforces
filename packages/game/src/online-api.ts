@@ -20,7 +20,7 @@ export interface OnlineNetStats {
   readonly receivedBytes: number;
   /** Host: amigos ligados agora. Amigo: 1 (o host). */
   readonly peers: number;
-  /** Host: snapshots montados (um por amigo). Amigo: snapshots aplicados. */
+  /** Host: snapshots do host (um por vez, para todos os amigos). Amigo: snapshots aplicados. */
   readonly snapshots: number;
   /** Amigo: quantos ticks o que ele mostra está atrás do snapshot mais novo (-1 no host ou antes do 1º). */
   readonly lagTicks: number;

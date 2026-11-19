@@ -2077,6 +2077,15 @@ function fakeSession(
 ): { session: OnlineSession; close(): void; absent: { s: number; notified: boolean } } {
   let closed = false;
   const absent = { s: 0, notified: false };
+  const hostStats = {
+    sentBytes: 0,
+    receivedBytes: 0,
+    peers: 3,
+    snapshots: 0,
+    lagTicks: -1,
+    reconciles: 0,
+    mispredicts: 0,
+  };
   const session: OnlineSession = {
     role,
     humans: 2,
@@ -2091,11 +2100,16 @@ function fakeSession(
       receive: () => void calls.push('receive'),
       writeRemoteFrame: () => true,
       recordEvents: () => undefined,
-      afterTicks: () => undefined,
+      // M5 (fase 7a): um snapshot por quadro com ticks para os 3 amigos (1 KB para cada).
+      afterTicks: () => {
+        hostStats.snapshots++;
+        hostStats.sentBytes += 3 * 1024;
+        hostStats.receivedBytes += 3 * 512;
+      },
       takeLost: () => 0,
       takeControl: () => 0,
       setAway: (on) => void calls.push(`away:${on}`),
-      stats: { sentBytes: 0, receivedBytes: 0, peers: 1, snapshots: 0, lagTicks: -1, reconciles: 0, mispredicts: 0 },
+      stats: hostStats,
       dispose: () => void calls.push('host-dispose'),
     }),
     attachClient: (_sim, write) => {
@@ -2715,6 +2729,41 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     expect(line).toBeDefined();
     expect(line).toContain('desce_kbs=20.0 sobe_kbs=10.0 snapshots_s=10.0');
     expect(line).toContain('atraso_ticks=6.0 predicao_errada=0/0 host_ausente_s=0.0 fps=10.0');
+    // Revisão da fase 7: 2 min com a aba atrás (um quadro só) não diluem a média da próxima linha.
+    const before = platform.logLines.filter((l) => l.includes('[rede] amigo')).length;
+    platform.pump(1, 120_000);
+    platform.pump(360, 100);
+    const lines = platform.logLines.filter((l) => l.includes('[rede] amigo'));
+    expect(lines.length).toBe(before + 1);
+    expect(lines.at(-1)).toContain('desce_kbs=20.0 sobe_kbs=10.0 snapshots_s=10.0');
+    expect(lines.at(-1)).toContain('fps=10.0');
+    game.dispose();
+  }, 60_000);
+
+  it('revisão da fase 7: a linha [rede] do host com 3 amigos (snapshots do host; bytes por amigo)', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Erick', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    await openOnlineFromTitle(platform);
+    platform.tap('Enter');
+    const room = made[0]!;
+    room.view = {
+      ...room.view!,
+      members: [
+        { slot: 0, name: 'Erick', team: -1, ready: true },
+        { slot: 1, name: 'Bia', team: -1, ready: true },
+      ],
+    };
+    platform.pump(2);
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    platform.pump(360, 100);
+    const line = platform.logLines.find((l) => /\[rede\] host t=3\ds/.test(l));
+    expect(line).toBeDefined();
+    // 10 quadros por segundo: 10 snapshots/s do host (sem dividir pelos 3) e 1 KB por amigo em cada um.
+    expect(line).toContain('sobe_kbs=10.0 desce_kbs=5.0 amigos=3 snapshots_s=10.0');
+    expect(line).toContain('fps=10.0');
     game.dispose();
   }, 60_000);
 

@@ -293,6 +293,8 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   No PC, a rede do host fica abaixo de 0,5 ms por quadro em todos os casos (o orçamento do celular é 2 ms). Com 40 bots,
   o host manda 17,3 KB/s para cada amigo, um pouco acima dos ~16 KB/s estimados no tecnico.md §13.3 (44 entidades);
   com 3 amigos, ~52 KB/s de subida. A CPU do celular sai do F2 e da linha `[rede]` no teste real (ROTEIRO_M5).
+  Os KB/s daqui, do F2 e da linha `[rede]` contam só a carga útil das mensagens: o envelope da WebRTC (cerca de
+  50–70 B por pacote, a 20–30 por segundo) fica de fora, então o tráfego de verdade no plano de dados é um pouco maior.
 - **No navegador, pela WebRTC de verdade (fase 7a, `npm run online:web -- --partida 40`):** a linha `[rede]` de 30 s
   do X1 (2 humanos, sem bot) no host: rede **0,16 ms** por quadro, sim 0,15, IA 0,02, 60 fps, sobe 2,5 KB/s, 29,6
   snapshots/s; no amigo: desce 2,2 KB/s, sobe 3,4, atraso de 4 ticks, 0 predições erradas em 846. O F2 mostra o último
