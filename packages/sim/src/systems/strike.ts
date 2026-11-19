@@ -267,6 +267,7 @@ function buy(ctx: SimContext, e: number, item: number): void {
       s.slot[e] = WEAPON_SLOT.primary;
       s.weapon[e] = code;
       s.inWeapon[e] = WEAPON_SLOT.primary;
+      ctx.events.weapon(ctx.tick, s.idOf(e), code, 'switch');
     }
   }
   s.points[e] = s.points[e]! - def.price;

@@ -74,6 +74,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    - **feita em 19/11** (ARCHITECTURE §18.4).
 4. **HUD e telas do BoboStrike:** o dinheiro, a rodada e o placar, a bomba (plantada, o tempo, o desarme), o
    **radial de compra** (D-pad e mouse), o card na página Mais modos, o online e a rodada de prints.
+   - **feita em 19/11** (ARCHITECTURE §18.5): o card BoboStrike na página Mais modos.
 5. **Ilha Tropical** (mapa `island`, Royale Mini, ~200 × 200 m):
    - praia, vila genérica, morro e farol; pontos de loot; a memória (só os chunks não vazios), o tempo de loading e o
      orçamento de download (≤ 10 MB) e o bench no Switch.

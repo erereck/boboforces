@@ -179,6 +179,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:chalk-outline',
   // M6 (fase 3): a Big Brrt, a minigun do Jugg (só acrescentado, regra 20)
   'model:big-brrt',
+  // M7 (fase 4): a Boom Box do BoboStrike (só acrescentado, regra 20)
+  'model:boom-box',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

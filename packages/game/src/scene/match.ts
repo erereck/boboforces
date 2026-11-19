@@ -154,6 +154,11 @@ import {
   ZOMBIES_DOWN,
   ROUND,
   ROUND_PHASE,
+  BOMB,
+  STRIKE,
+  STRIKE_BUY_BASE,
+  STRIKE_DATA,
+  STRIKE_SHOP,
 } from '@boboforces/sim';
 import {
   ageKillFeed,
@@ -456,6 +461,25 @@ function cameraGroup(name: string): number {
 }
 
 /** Empunhadura do modelo de arma pelo id (`''` = sem arma; desconhecido = fuzil, a pose de duas mãos). */
+/** M7 (fase 4): quem morre no BoboStrike passa a assistir um aliado depois de tantos segundos; a câmera atrás dele. */
+const STRIKE_SPECTATE_S = 3;
+
+/** M7 (fase 4): o dinheiro com o ponto do milhar ("2.700"), sem `Intl` (regra 13). */
+function moneyText(n: number): string {
+  const v = Math.max(0, Math.floor(n));
+  return v >= 1000 ? `${Math.floor(v / 1000)}.${String(v % 1000).padStart(3, '0')}` : String(v);
+}
+
+/** M7 (fase 4): o primeiro aliado vivo de `e` (índice), ou -1. */
+function livingMate(v: SimView, e: number): number {
+  const team = v.team[e];
+  for (let i = 0; i < v.count; i++) {
+    if (i === e || v.alive[i] !== 1 || v.kind[i] !== ENTITY_KIND.bobo || v.team[i] !== team) continue;
+    if ((v.flags[i]! & ENTITY_FLAG.dead) === 0) return i;
+  }
+  return -1;
+}
+
 export function gripOfWeaponModel(id: string): FigureGrip {
   if (id === '') return FIGURE_GRIP.none;
   for (let c = 0; c < WEAPONS.length; c++) if (WEAPONS[c]!.id === id) return WEAPONS[c]!.grip;
@@ -699,6 +723,21 @@ interface ViewSlot {
   shake: number;
   /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
   readonly death: DeathState;
+  /** M7 (fase 4): o cursor do anel da compra do BoboStrike e a opção apontada (-1 = nenhuma). */
+  readonly buy: DeathState;
+  buyPick: number;
+  /**
+   * M7 (fase 4, revisão): o anel aberto e a mira guardada na abertura (a câmera fica nela; o giro move o cursor), o
+   * título por vista (o dinheiro de cada um) e o toque curto em curso (o dedo, a opção onde começou e a de agora).
+   */
+  buyOpen: boolean;
+  buyYaw: number;
+  buyPitch: number;
+  buyMoney: number;
+  buyTitle: string;
+  tapId: number;
+  tapOpt: number;
+  tapNow: number;
   /**
    * M2 (fase 6b): 3ª pessoa nesta vista no último frame, a câmera de ombro e onde ela ficou em relação ao olho (o
    * quadro do humano mira pelo raio da câmera).
@@ -771,6 +810,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * vencedor são de cada um (os pontos de Jugg): `solo` vale para o resultado e o placar do alto.
    */
   const juggernaut = recipe.mode === 'juggernaut';
+  /** M7 (fase 4): o BoboStrike (o dinheiro, a compra, a Boom Box e quem morre assiste um aliado). */
+  const strikeMode = recipe.mode === 'strike';
   const solo = ffa || juggernaut;
   const warnings: string[] = [...request.benchWarnings, ...setup.warnings, ...setup.recipe.warnings];
   // Alarme do orçamento de skins (#56, PLANO §B15): conjunto além da reserva veste o padrão do próprio time.
@@ -1097,6 +1138,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       flash: 0,
       shake: 0,
       death: createDeathState(),
+      buy: createDeathState(),
+      buyPick: -1,
+      buyOpen: false,
+      buyYaw: 0,
+      buyPitch: 0,
+      buyMoney: -1,
+      buyTitle: '',
+      tapId: -1,
+      tapOpt: -1,
+      tapNow: -1,
       third: false,
       shoulder: createShoulderPose(),
       camOffX: 0,
@@ -1246,6 +1297,38 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const juggWon = d[ROUND.winner] === 1;
       sharedHud.trainingLine = t((juggWon ? 'hud.round.juggHeld' : 'hud.round.juggDown') as StringKey);
     }
+  }
+
+  /** M7 (fase 4): no BoboStrike, o relógio da rodada (o da bomba plantada) e o estado embaixo do placar. */
+  const strikeLineKey = new Int32Array(4).fill(-2);
+  function refreshStrikeLine(): void {
+    const v = sim.view();
+    const rv = v.rounds!;
+    const d = rv.data;
+    const phase = d[ROUND.phase]!;
+    sharedHud.trainingLine = '';
+    sharedHud.timeLeftS = phase === ROUND_PHASE.over || d[ROUND.round] === 0 ? -1 : d[ROUND.ticks]! / sim.hz;
+    const bomb = v.strike !== null ? v.strike.data[STRIKE_DATA.bomb]! : -1;
+    const site = v.strike !== null ? v.strike.data[STRIKE_DATA.site]! : -1;
+    const k = strikeLineKey;
+    if (k[0] === d[ROUND.round] && k[1] === phase && k[2] === bomb && k[3] === d[ROUND.winner]) return;
+    k[0] = d[ROUND.round]!;
+    k[1] = phase;
+    k[2] = bomb;
+    k[3] = d[ROUND.winner]!;
+    const round = d[ROUND.round]!;
+    const atk = d[ROUND.swapped] === 1 ? 1 : 0;
+    let line: string;
+    if (round === 0) line = '';
+    else if (phase === ROUND_PHASE.buy) line = t('hud.strike.buy' as StringKey, { round });
+    else if (phase === ROUND_PHASE.over) {
+      line = t((d[ROUND.winner] === atk ? 'hud.strike.atkWon' : 'hud.strike.defWon') as StringKey);
+      if (rv.swapAfter > 0 && round === rv.swapAfter) line += ` · ${t('hud.strike.half' as StringKey)}`;
+    } else if (bomb === BOMB.planted) {
+      line = t('hud.strike.planted' as StringKey, { site: String.fromCharCode(65 + Math.max(0, site)) });
+    } else line = t('hud.strike.live' as StringKey, { round });
+    sharedHud.modsLine = line.toUpperCase();
+    sharedHud.modsWarn = bomb === BOMB.planted && phase === ROUND_PHASE.live;
   }
 
   function refreshTrainingLine(): void {
@@ -3482,11 +3565,33 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     n = fillPickups(alpha, n);
     n = fillMapObjects(n);
     n = fillFortress(n);
+    n = fillBomb(n);
     projectiles.count = n;
   }
 
   /** M6 (fase 6a): o gerador do Fortress (o modelo de prop), no mesmo buffer das caixinhas. */
   const generatorModel = modelIndex.get('generator') ?? NO_MODEL;
+  /** M7 (fase 4): a Boom Box no chão (largada ou plantada; com o portador, não aparece). */
+  const boomBoxModel = modelIndex.get('boom-box') ?? NO_MODEL;
+  function fillBomb(first: number): number {
+    const sv = sim.view().strike;
+    if (sv === null || boomBoxModel === NO_MODEL || first >= projectiles.capacity) return first;
+    const bomb = sv.data[STRIKE_DATA.bomb];
+    if (bomb !== BOMB.dropped && bomb !== BOMB.planted && bomb !== BOMB.defused) return first;
+    const n = first;
+    projectiles.model[n] = boomBoxModel;
+    projectiles.position[n * 3] = sv.pos[0]!;
+    projectiles.position[n * 3 + 1] = sv.pos[1]!;
+    projectiles.position[n * 3 + 2] = sv.pos[2]!;
+    projectiles.yaw[n] = 0;
+    projectiles.pitch[n] = 0;
+    projectiles.roll[n] = 0;
+    sampleLightGrid(loaded.lightGrid, sv.pos[0]!, sv.pos[1]! + 0.3, sv.pos[2]!, lightScratch, 0);
+    projectiles.light[n * 3] = lightScratch[0]!;
+    projectiles.light[n * 3 + 1] = lightScratch[1]!;
+    projectiles.light[n * 3 + 2] = lightScratch[2]!;
+    return n + 1;
+  }
   function fillFortress(first: number): number {
     const f = sim.view().fortress;
     if (f === null || generatorModel === NO_MODEL || first >= projectiles.capacity) return first;
@@ -3807,6 +3912,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   /** M6 (fase 6a): o rótulo da plaquinha do gerador. */
   const generatorLabel = t('hud.generator' as StringKey).toUpperCase();
+  // M7 (fase 4): os textos do BoboStrike e a loja (os nomes e os preços, prontos).
+  const sk = (key: string): string => t(key as StringKey);
+  const strikeTx = {
+    money: sk('hud.strike.money'),
+    plant: sk('hud.strike.plant').toUpperCase(),
+    defuse: sk('hud.strike.defuse').toUpperCase(),
+    planting: sk('hud.strike.planting').toUpperCase(),
+    defusing: sk('hud.strike.defusing').toUpperCase(),
+    wait: sk('hud.strike.waitRound').toUpperCase(),
+    bomb: sk('hud.strike.bomb').toUpperCase(),
+  };
+  const strikeItems = STRIKE_SHOP.map((it) => sk(`strike.item.${it.id}`));
+  const strikePrices = STRIKE_SHOP.map((it) => `$${moneyText(it.price)}`);
+
   /** M6 (fase 4b): o modificador está ligado agora (pela máscara que a view mostra)? */
   function chaosOn(bit: number): boolean {
     const c = sim.view().chaos;
@@ -4017,6 +4136,143 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
+  /**
+   * M7 (fase 4): o HUD do BoboStrike desta vista: plantar (o portador no site) e desarmar (o defensor perto da bomba
+   * plantada) embaixo da mira; a plaquinha do meio enquanto planta ou desarma; o anel da compra (o humano vivo, na
+   * compra).
+   */
+  function fillStrikeHud(m: HudModel, v: SimView, e: number, slot: ViewSlot): void {
+    const sv = v.strike;
+    const rv = v.rounds;
+    if (sv === null || rv === null || m.dead) return;
+    const d = sv.data;
+    const me = (v.generation[e]! * 65536 + e) >>> 0;
+    const phase = rv.data[ROUND.phase];
+    const atk = rv.data[ROUND.swapped] === 1 ? 1 : 0;
+    // A contagem antes da 1ª rodada também é a fase 0 (a compra): o anel só com a rodada valendo.
+    if (phase === ROUND_PHASE.buy && rv.data[ROUND.round]! > 0 && humans > 0 && seatOf(slot.controller) >= 0) {
+      const money = v.points[e]!;
+      if (money !== slot.buyMoney) {
+        slot.buyMoney = money;
+        slot.buyTitle = t('hud.strike.buyTitle' as StringKey, { money: moneyText(money) }).toUpperCase();
+      }
+      m.buyTitle = slot.buyTitle;
+      return;
+    }
+    if (phase !== ROUND_PHASE.live) return;
+    const x = v.position[e * 3]!;
+    const y = v.position[e * 3 + 1]!;
+    const z = v.position[e * 3 + 2]!;
+    if (d[STRIKE_DATA.planter]! >>> 0 === me && d[STRIKE_DATA.plantTicks]! > 0) {
+      m.centerLabel = strikeTx.planting;
+      m.centerValue = (STRIKE.plantS * sim.hz - d[STRIKE_DATA.plantTicks]!) / sim.hz;
+      return;
+    }
+    if (d[STRIKE_DATA.defuser]! >>> 0 === me && d[STRIKE_DATA.defuseTicks]! > 0) {
+      const need = (v.kit[e] === 1 ? STRIKE.kitDefuseS : STRIKE.defuseS) * sim.hz;
+      m.centerLabel = strikeTx.defusing;
+      m.centerValue = (need - d[STRIKE_DATA.defuseTicks]!) / sim.hz;
+      return;
+    }
+    const bomb = d[STRIKE_DATA.bomb];
+    if (bomb === BOMB.carried && d[STRIKE_DATA.carrier]! >>> 0 === me) {
+      for (const site of sv.sites) {
+        const dx = x - site.x;
+        const dz = z - site.z;
+        if (dx * dx + dz * dz <= site.radius * site.radius && Math.abs(y - site.y) < 2) {
+          m.interact = HUD_INTERACT.text;
+          m.interactName = strikeTx.plant;
+        }
+      }
+    } else if (bomb === BOMB.planted && v.team[e] !== atk) {
+      const dx = x - sv.pos[0]!;
+      const dy = y - sv.pos[1]!;
+      const dz = z - sv.pos[2]!;
+      if (dx * dx + dy * dy + dz * dz <= STRIKE.defuseReachM * STRIKE.defuseReachM) {
+        m.interact = HUD_INTERACT.text;
+        m.interactName = strikeTx.defuse;
+      }
+    }
+  }
+
+  /**
+   * M7 (fase 4): o anel da compra de cada humano vivo, na compra: o giro de mira move o cursor (como o radial da morte),
+   * o tiro compra a opção apontada (no toque, tocar nela compra). O pedido vai no `InputFrame.primary` e a sim compra
+   * na borda: fora da compra o quadro volta a 0. A mão do mapeador acompanha a da sim (a arma comprada).
+   */
+  function updateBuys(raw: RawInputState): void {
+    const v = sim.view();
+    const rv = v.rounds;
+    if (!strikeMode || rv === null || humans <= 0) return;
+    const buying = rv.data[ROUND.phase] === ROUND_PHASE.buy && rv.data[ROUND.round]! > 0;
+    const n = STRIKE_SHOP.length;
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const slot = slots[sIdx]!;
+      const seat = seatOf(slot.controller);
+      if (seat < 0) continue;
+      const m = seat === 0 ? player : extras[seat - 1]!;
+      const e = entityIndex(sim.controllerEntity(slot.controller));
+      const alive = e >= 0 && (v.flags[e]! & ENTITY_FLAG.dead) === 0;
+      if (!buying || !alive) {
+        if (m.primary >= STRIKE_BUY_BASE) m.setPrimary(0);
+        slot.buy.cursorX = 0;
+        slot.buy.cursorY = 0;
+        slot.buyPick = -1;
+        slot.buyOpen = false;
+        slot.tapId = -1;
+        continue;
+      }
+      if (paused) continue;
+      // Na abertura, guarda a mira (a do spawn da rodada): a câmera fica nela e o giro do quadro move o cursor.
+      if (!slot.buyOpen) {
+        slot.buyOpen = true;
+        slot.buyYaw = m.yaw;
+        slot.buyPitch = m.pitch;
+        slot.buy.cursorX = 0;
+        slot.buy.cursorY = 0;
+      }
+      const dyaw = wrapAngle(m.yaw - slot.buyYaw);
+      const dpitch = m.pitch - slot.buyPitch;
+      m.setAngles(slot.buyYaw, slot.buyPitch);
+      if (dyaw !== 0 || dpitch !== 0) {
+        moveRadialCursor(slot.buy, dyaw, dpitch);
+        const aimed = radialIndex(slot.buy.cursorX, slot.buy.cursorY, n);
+        if (aimed >= 0) slot.buyPick = aimed;
+      }
+      // A troca de arma (e o D-pad) anda pelas opções; o tiro ou o usar compra a apontada.
+      if (m.wasPressed('nextWeapon')) slot.buyPick = (Math.max(-1, slot.buyPick) + 1) % n;
+      if (m.wasPressed('prevWeapon')) slot.buyPick = (Math.max(0, slot.buyPick) + n - 1) % n;
+      let pick = m.wasPressed('fire') || m.wasPressed('use') ? slot.buyPick : -1;
+      if (seat === 0 && device === 'touch') {
+        // No toque, só o toque curto que começa e termina na mesma opção (arrastar o dedo não compra).
+        const hit = slot.model.primaryHit;
+        let still = false;
+        for (let k = 0; k < raw.touches.length; k++) {
+          const touch = raw.touches[k]!;
+          if (!touch.active) continue;
+          if (slot.tapId < 0) {
+            const at = hitPrimaryOption(hit, touch.startX, touch.startY);
+            if (at >= 0) {
+              slot.tapId = touch.id;
+              slot.tapOpt = at;
+            }
+          }
+          if (touch.id === slot.tapId) {
+            still = true;
+            slot.tapNow = hitPrimaryOption(hit, touch.x, touch.y);
+          }
+        }
+        if (slot.tapId >= 0 && !still) {
+          if (slot.tapNow === slot.tapOpt) pick = slot.tapOpt;
+          slot.tapId = -1;
+        }
+      }
+      if (pick >= 0) m.setPrimary(STRIKE_BUY_BASE + pick);
+      // A mão segue a da sim (a arma comprada vai para a mão).
+      if (m.weapon !== v.slot[e]) m.setWeapon(v.slot[e]!);
+    }
+  }
+
   function updateView(s: number, dt: number, alpha: number, lay: HudScreenLayout): void {
     const slot = slots[s]!;
     const desc = slot.desc;
@@ -4063,6 +4319,30 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     c.y = lerp(v.prevPosition[o + 1]!, v.position[o + 1]!, alpha) + slot.eye;
     c.z = lerp(v.prevPosition[o + 2]!, v.position[o + 2]!, alpha);
     const st = slot.death;
+    // M7 (fase 4): no BoboStrike, passada a câmera de morte, assiste um aliado vivo (em 3ª pessoa, atrás dele).
+    const mate = dead && strikeMode && st.t >= STRIKE_SPECTATE_S ? livingMate(v, e) : -1;
+    if (mate >= 0) {
+      const q = mate * 3;
+      const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
+      const my = lerp(v.prevPosition[q + 1]!, v.position[q + 1]!, alpha) + eyeHeightFor(v.flags[mate]!);
+      const mz = lerp(v.prevPosition[q + 2]!, v.position[q + 2]!, alpha);
+      const myaw = lerpAngle(v.prevYaw[mate]!, v.yaw[mate]!, alpha);
+      const mpitch = lerp(v.prevPitch[mate]!, v.pitch[mate]!, alpha) * 0.5;
+      placeShoulderCamera(v, mx, my, mz, myaw, mpitch, 0, dt, slot.shoulder);
+      c.x = slot.shoulder.x;
+      c.y = slot.shoulder.y;
+      c.z = slot.shoulder.z;
+      c.yaw = myaw;
+      c.pitch = clamp(mpitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+      c.fovY = verticalFov(fovDeg, aspect);
+      slot.adsBlend = 0;
+      desc.localSlot = -1;
+      desc.team = v.team[e]!;
+      desc.thirdPerson = false;
+      slot.third = false;
+      vm.visible = false;
+      return;
+    }
     if (dead && st.t >= 0) {
       // M2 (fase 2c): câmera de morte, um pouco acima do olho, virando para quem matou.
       c.y += DEATH_CAM.riseM * Math.min(1, st.t / DEATH_CAM.turnS);
@@ -4261,13 +4541,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M3 (fase 2d): Bobo Zombies.
     // M6 (fase 2): no Gun Game, o nível (de 1 até o tamanho da escada).
     // M6 (fase 3): no Juggernaut, os pontos de Jugg; a vida do Jugg é a dele (300 por caçador).
-    m.points = zombiesMode || juggernaut ? v.points[e]! : gunGame ? v.points[e]! + 1 : -1;
+    m.points = zombiesMode || juggernaut || strikeMode ? v.points[e]! : gunGame ? v.points[e]! + 1 : -1;
+    m.pointsLabel = strikeMode ? strikeTx.money : '';
     if (juggernaut && v.team[e] === 1) m.maxHealth = Math.max(juggernautHp(huntersOf(v)), m.health);
     m.pointsIsLevel = gunGame;
     // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
     m.perks = zombiesMode ? v.perks[e]! : 0;
     if ((m.perks & PERK.chonky) !== 0) m.maxHealth = Math.round(m.maxHealth * ZOMBIE_PERKS.chonkyHpMul);
-    m.waitWave = zombiesMode && m.dead;
+    m.waitWave = (zombiesMode || strikeMode) && m.dead;
+    m.waitText = strikeMode ? strikeTx.wait : '';
     if (zombiesMode && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
       if (v.selfUp[e] === 1) {
         m.downed = HUD_DOWNED.selfUp;
@@ -4282,6 +4564,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     } else m.downed = HUD_DOWNED.none;
     // M3 (fase 3d): o aviso de consertar a janela ou abrir a porta paga (as mesmas regras de `barricadesSystem`).
     m.interact = HUD_INTERACT.none;
+    m.centerLabel = '';
+    m.buyTitle = '';
+    if (strikeMode) fillStrikeHud(m, v, e, slot);
     const mo = v.mapObjects;
     if (zombiesMode && mo !== null && !m.dead && m.downed === HUD_DOWNED.none) {
       const x = v.position[e * 3]!;
@@ -4491,6 +4776,27 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.juggMarkOn = true;
       m.juggMarkLabel = generatorLabel;
     }
+    const sv = v.strike;
+    if (sv !== null && v.rounds !== null) {
+      const bomb = sv.data[STRIKE_DATA.bomb];
+      const atk = v.rounds.data[ROUND.swapped] === 1 ? 1 : 0;
+      if (bomb === BOMB.planted || (bomb === BOMB.dropped && v.team[e] === atk)) {
+        const rect = lay.rects[s]!;
+        projectToEdge(
+          desc.camera,
+          rect,
+          sv.pos[0]!,
+          sv.pos[1]! + 0.9,
+          sv.pos[2]!,
+          Math.max(16, rect.height * 0.06),
+          projected,
+        );
+        m.juggMark[0] = projected[0]!;
+        m.juggMark[1] = projected[1]!;
+        m.juggMarkOn = true;
+        m.juggMarkLabel = strikeTx.bomb;
+      }
+    }
     if (juggernaut && v.team[e] !== 1) {
       const j = juggIndex(v);
       if (j >= 0) {
@@ -4541,14 +4847,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const seat = humans > 0 ? seatOf(slot.controller) : -1;
       const human = seat >= 0;
       // M6 (fase 2): no Gun Game e no Infection a arma é do modo: sem o radial.
-      m.primaryNames = human && !fixedLoadout ? primaryNames : NO_PRIMARIES;
-      m.primaryCategories = human && !fixedLoadout ? primaryCategories : NO_PRIMARIES;
+      // M7 (fase 4): no BoboStrike a arma se compra (sem o radial da morte).
+      m.primaryNames = human && !fixedLoadout && !strikeMode ? primaryNames : NO_PRIMARIES;
+      m.primaryCategories = human && !fixedLoadout && !strikeMode ? primaryCategories : NO_PRIMARIES;
       m.primarySelected = human ? seatPrimary[seatNum[seat]!]! : 0;
       m.hardTimeHint = st.hint;
     } else {
       m.deathName = '';
       m.primaryNames = NO_PRIMARIES;
       m.hardTimeHint = false;
+    }
+    // M7 (fase 4): o anel da compra (vivo, na compra) usa as opções do radial.
+    if (m.buyTitle !== '') {
+      m.primaryNames = strikeItems;
+      m.primaryCategories = strikePrices;
+      m.primarySelected = slot.buyPick;
     }
     m.playerSlot = slot.seat;
     m.team = ffa ? 255 : v.team[e]!;
@@ -5405,6 +5718,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
       const lay = syncLayout(ui);
       updateDeaths(running ? dt : 0, raw, lay);
+      updateBuys(raw);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
       // M2 (fase 7b): cada vista ouve da própria câmera; passos, coração e contagem andam com a partida.
       matchSound.setListenerCount(slots.length);
@@ -5473,8 +5787,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
           // M7 (fase 0): nas rodadas, a linha da rodada (com o relógio dela) no lugar do relógio da partida.
           if (sim.view().rounds !== null) {
-            sharedHud.timeLeftS = -1;
-            refreshRoundLine();
+            if (strikeMode) refreshStrikeLine();
+            else {
+              sharedHud.timeLeftS = -1;
+              refreshRoundLine();
+            }
           }
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
           // M6 (fase 1): os pontos do Domination embaixo do placar.

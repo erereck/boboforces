@@ -138,6 +138,7 @@ const LOCKED_IDS = [
   'model:chalk-outline',
   // M6 (fase 3)
   'model:big-brrt',
+  'model:boom-box',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',

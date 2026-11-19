@@ -4009,3 +4009,32 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   site) já é o comportamento de sempre: eles passeiam pelo site da rodada desde a largada.
 - **Golden** (5 contra 5, semente 42, a partida inteira): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). Os goldens dos
   outros modos não mudaram (o `primary` dos bots já era 0).
+
+### 18.5 Fase 4: o BoboStrike no jogo (19/11/2026)
+
+- **O card** `strike` (`moreModePreset('strike')`): 5 contra 5 na Base Bobo (o humano e 4 bots contra 5). A página
+  Mais modos tem 11 cards (4 linhas, o Voltar na última).
+- **O HUD** (`ui/src/screens/hud.ts`, campos novos e genéricos do `HudModel`): `pointsLabel` (o "$" do dinheiro no
+  lugar de PONTOS), `waitText` (quem morreu: "Volta na próxima rodada"), `centerLabel`/`centerValue` (a plaquinha do
+  meio: PLANTANDO e DESARMANDO com os segundos que faltam), `HUD_INTERACT.text` (o aviso de plantar ou desarmar em
+  `interactName`) e `buyTitle` (o anel da compra vivo: as opções do radial da primária com os preços; o título é o
+  "COMPRAR · $800"). No alto, o placar das rodadas (o `teamScore`) com o relógio da rodada (o da bomba depois de
+  plantada) e, na linha de baixo (`modsLine`), o estado: "Rodada 3 · Compra", "Rodada 3", "Boom Box no A!" (em
+  destaque) ou "Vitória do ataque/da defesa" (com "Troca de lado" na 6ª).
+- **A compra** (`updateBuys`): na compra (com a rodada já valendo: a contagem antes da 1ª também é a fase 0), o
+  giro de mira do humano move o cursor do anel a partir da mira da abertura (a câmera fica nela), a troca de arma e o
+  D-pad andam pelas opções, e o tiro ou o usar compra a apontada; no toque, só o toque curto que começa e termina na
+  mesma opção. O pedido vai no `primary` (`STRIKE_BUY_BASE` + item) e volta a 0 fora da compra (a sim compra na
+  borda e avisa a troca de arma: a mão do mapeador segue a arma comprada).
+- **A Boom Box** (o modelo `boom-box`, na camada compartilhada dos modelos pequenos: o pacote continua com 31 das 32
+  camadas): desenhada no chão largada ou plantada (`fillBomb`, no buffer dinâmico do gerador), com a plaquinha BOOM
+  BOX através das paredes (a do Jugg): a largada só para o ataque, a plantada para todos.
+- **Quem morre** vê a câmera de morte e, depois de 3 s, assiste o primeiro aliado vivo em 3ª pessoa (a câmera de ombro,
+  centrada, que encurta na parede) até a próxima rodada; sem o radial da primária (a arma se compra).
+- **A revisão (Opus) achou 8 coisas, corrigidas antes do commit:** a compra travava a mira no ângulo 0 do mundo e o
+  cursor pulava no 1º quadro (agora parte da mira da abertura); no toque, arrastar o dedo comprava (agora só o toque
+  curto); a câmera de quem assiste atravessava parede; o anel não andava pelo D-pad; o anel abria na contagem inicial;
+  a arma comprada no último tick da compra saía da mão (a sim avisa a troca); o título da compra era um cache só para
+  todas as vistas; a Boom Box sumia ao ser desarmada.
+- **Fica para depois:** os sons do modo (o bipe da bomba, plantar e desarmar), largar a bomba de propósito, a escolha
+  de quem assistir (hoje é o primeiro aliado vivo) e o modelo da Boom Box nas costas de quem carrega.

@@ -31,6 +31,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   kit na defesa; granada), os atacantes vão todos ao site sorteado da rodada e o portador planta; com a bomba no chão,
   o atacante mais perto vai buscar; os defensores se dividem pelos dois sites e, com a bomba plantada, vão todos a
   ela e o mais perto desarma.
+- **BoboStrike (fase 4):** o card na página Mais modos (5 contra 5 na Base Bobo). Na compra, o anel com os 8 itens e os
+  preços abre no meio da tela: a mira move o cursor e o tiro compra (no toque, tocar no item). No alto, o placar das
+  rodadas e o relógio da rodada (o da bomba, depois de plantada), com "Rodada 3 · Compra", "Boom Box no A!" ou quem
+  venceu embaixo; o dinheiro no lugar dos pontos. O portador no site vê "Segure usar: plantar"; o defensor perto da
+  bomba, "Segure usar: desarmar"; plantando ou desarmando, os segundos que faltam no meio. A Boom Box (um rádio de
+  brinquedo vermelho) aparece no chão e tem a plaquinha através das paredes (a largada só para o ataque). Quem morre
+  vê a câmera de morte e, depois de 3 s, assiste um aliado vivo até a próxima rodada.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

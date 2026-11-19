@@ -139,6 +139,16 @@ export interface HudModel {
   /** M6 (fase 2): `points` é o nível do Gun Game (o rótulo diz NÍVEL). */
   pointsIsLevel: boolean;
   /**
+   * M7 (fase 4): o BoboStrike. `pointsLabel` troca o rótulo dos pontos (o dinheiro: "$"); `waitText` o "Volta na
+   * próxima onda" de quem morreu; `centerLabel` e `centerValue` uma plaquinha no meio ("PLANTANDO 2"); `buyTitle`
+   * (não vazio) abre o anel da compra vivo, com as opções em `primaryNames` e os preços em `primaryCategories`.
+   */
+  pointsLabel: string;
+  waitText: string;
+  centerLabel: string;
+  centerValue: number;
+  buyTitle: string;
+  /**
    * M6 (fase 3): o marcador do Jugg (x, y em px da superfície; o `game` põe na borda da vista quando ele está fora: o
    * Jugg aparece sempre), ligado por `juggMarkOn`.
    */
@@ -284,6 +294,11 @@ export function createHudModel(): HudModel {
     pointMarkOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
     pointMarkCount: 0,
     pointsIsLevel: false,
+    pointsLabel: '',
+    waitText: '',
+    centerLabel: '',
+    centerValue: 0,
+    buyTitle: '',
     juggMark: new Float32Array(2),
     juggMarkOn: false,
     juggMarkLabel: '',
@@ -383,7 +398,8 @@ export const HUD_DOWNED = { none: 0, bleeding: 1, reviving: 2, selfUp: 3 } as co
 const PERK_COLORS: readonly number[] = [COLORS.perigo, TEAM_COLORS[2]!, TEAM_COLORS[1]!];
 
 /** M3 (fase 3d): o aviso de interagir do Bobo Zombies. */
-export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4, box: 5, boxTake: 6 } as const;
+/** M7 (fase 4): `text` = o aviso em `interactName` (plantar e desarmar a Boom Box). */
+export const HUD_INTERACT = { none: 0, repair: 1, door: 2, buy: 3, buyAmmo: 4, box: 5, boxTake: 6, text: 7 } as const;
 
 interface HudTexts {
   readonly health: string;
@@ -855,7 +871,13 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     let w = pad;
     if (multi) w += icon + gap / 2 + textWidth(hud, tx.players[slot] as string, labelPx) + gap * 1.5;
     const zm = model.points >= 0;
-    const firstLabel = zm ? (model.pointsIsLevel ? tx.level : tx.points) : tx.kills;
+    const firstLabel = zm
+      ? model.pointsLabel !== ''
+        ? model.pointsLabel
+        : model.pointsIsLevel
+          ? tx.level
+          : tx.points
+      : tx.kills;
     const firstValue = zm ? model.points : model.kills;
     const secondLabel = zm ? tx.kills : tx.deaths;
     const secondValue = zm ? model.kills : model.deaths;
@@ -1068,7 +1090,7 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     // baixa que cabe no meio do anel; sem anel, no título grande de antes.
     const showCount = model.respawnS > 0 && !model.waitWave;
     const count = Math.ceil(model.respawnS);
-    const respawning = model.waitWave ? tx.waitWave : tx.respawning;
+    const respawning = model.waitWave ? (model.waitText !== '' ? model.waitText : tx.waitWave) : tx.respawning;
     const smallH = Math.round(pad * 2 + capL + (showCount ? gap + capN : 0));
     const r =
       model.primaryNames.length > 0 && !compact ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s) : 0;
@@ -1111,6 +1133,28 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     drawDeathBanner(out, hud, model, tx, cx, bannerTop, labelPx, pad, gap, s);
   }
 
+  // M7 (fase 4): o anel da compra do BoboStrike (vivo, na compra), como o da primária da tela de morte.
+  if (!model.dead && model.buyTitle !== '' && model.primaryNames.length > 0) {
+    const ringH = Math.round(pad * 2 + capL);
+    const r = ringRadius(view, hud, ringH, labelPx, numberPx, pad, gap, s);
+    model.primaryHit.layout = PRIMARY_LAYOUT.none;
+    model.primaryHit.count = 0;
+    if (r > 0) drawPrimaryRing(out, hud, model, tx, cx, cy, r, labelPx, pad, gap, s, model.buyTitle);
+  }
+  // M7 (fase 4): plantando ou desarmando, no meio (o rótulo e os segundos que faltam).
+  if (!model.dead && model.downed === HUD_DOWNED.none && model.centerLabel !== '') {
+    const value = Math.max(0, Math.ceil(model.centerValue));
+    const w = Math.max(
+      textWidth(hud, model.centerLabel, labelPx, M.labelTracking),
+      numberWidth(hud, value, 0, numberPx),
+    );
+    const h = Math.round(pad * 2 + capL + gap + capN);
+    const y = Math.round(cy + capN * 2);
+    plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
+    paintText(out, hud, model.centerLabel, cx, y + pad, labelPx, COLORS.acao, M.labelTracking, 0.5);
+    paintNumber(out, hud, value, 0, cx, y + pad + capL + gap, numberPx, COLORS.texto, 0.5);
+  }
+
   if (!model.dead && model.downed !== HUD_DOWNED.none) {
     const label =
       model.downed === HUD_DOWNED.reviving ? tx.reviving : model.downed === HUD_DOWNED.selfUp ? tx.selfUp : tx.downed;
@@ -1124,14 +1168,20 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     paintNumber(out, hud, value, 0, cx, y + pad + capL + gap, numberPx, COLORS.texto, 0.5);
   }
 
-  if (!model.dead && model.downed === HUD_DOWNED.none && model.interact !== HUD_INTERACT.none) {
+  if (
+    !model.dead &&
+    model.downed === HUD_DOWNED.none &&
+    model.centerLabel === '' &&
+    model.interact !== HUD_INTERACT.none
+  ) {
     // M3 (fase 3d): consertar a janela / abrir a porta, numa plaquinha embaixo da mira.
     const y = Math.round(cy + capN * 2);
     const h = Math.round(pad * 2 + capL);
-    if (model.interact === HUD_INTERACT.repair) {
-      const w = textWidth(hud, tx.repair, labelPx, M.labelTracking);
+    if (model.interact === HUD_INTERACT.repair || model.interact === HUD_INTERACT.text) {
+      const label = model.interact === HUD_INTERACT.text ? model.interactName : tx.repair;
+      const w = textWidth(hud, label, labelPx, M.labelTracking);
       plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
-      paintText(out, hud, tx.repair, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
+      paintText(out, hud, label, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
     } else if (model.interact === HUD_INTERACT.boxTake) {
       // Pegar a arma da caixa: [antes, depois] do nome.
       const a = tx.boxTake[0] as string;
@@ -1309,6 +1359,7 @@ function drawPrimaryRing(
   pad: number,
   gap: number,
   s: number,
+  title: string = tx.choose,
 ): number {
   const n = model.primaryNames.length;
   const capL = capHeightPx(hud, labelPx);
@@ -1336,10 +1387,10 @@ function drawPrimaryRing(
     if (py + h > bottom) bottom = py + h;
     if (py < topY) topY = py;
   }
-  const lw = textWidth(hud, tx.choose, smallPx, 0.08);
+  const lw = textWidth(hud, title, smallPx, 0.08);
   const ly = Math.round(topY - gap - capS - pad * 2);
   plate(out, cx - lw / 2 - pad, ly, lw + pad * 2, capS + pad * 2, s);
-  paintText(out, hud, tx.choose, cx, ly + pad, smallPx, COLORS.textoBaixo, 0.08, 0.5);
+  paintText(out, hud, title, cx, ly + pad, smallPx, COLORS.textoBaixo, 0.08, 0.5);
   model.primaryHit.layout = PRIMARY_LAYOUT.ring;
   return bottom;
 }

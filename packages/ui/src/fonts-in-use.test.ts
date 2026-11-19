@@ -580,6 +580,7 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
           { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
           { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
+          { id: 'strike', nameKey: 'mode.name.strike', descKey: 'mode.desc.strike' },
         ],
         titleKey: 'modes.more.title',
       }),
@@ -761,6 +762,7 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
           { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
           { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
+          { id: 'strike', nameKey: 'mode.name.strike', descKey: 'mode.desc.strike' },
         ],
         titleKey: 'modes.more.title',
       });

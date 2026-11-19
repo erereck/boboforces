@@ -317,6 +317,38 @@ export function chalkOutline(shared: PickupLayers): BuiltModel {
 }
 
 /**
+ * M7 (fase 4): a Boom Box do BoboStrike (a bomba de brinquedo: um rádio de 40 × 22 × 14 cm), origem no chão, frente em
+ * -Z: o corpo vermelho, dois alto-falantes escuros na frente, a alça e a antena de aço e a luzinha amarela em cima.
+ * Na camada compartilhada (o pacote está com 31 das 32 camadas).
+ */
+export function boomBox(shared: PickupLayers): BuiltModel {
+  const m = new ModelBuilder('boom-box', 'pickup', { flags: 0, debrisColor: tone('tijolo', 2), blocksNav: false });
+  const L = shared.misc;
+  const red = m.tile(L, 4, 4, (p) => {
+    p.fill(tone('tijolo', 3));
+    p.px(0, 0, tone('tijolo', 4));
+    p.px(3, 3, tone('tijolo', 2));
+  });
+  const dark = m.tile(L, 4, 4, (p) => {
+    p.fill(tone('aco', 0));
+    p.px(1, 1, tone('aco', 1));
+    p.px(2, 2, tone('aco', 1));
+  });
+  const steel = m.tile(L, 2, 2, (p) => p.fill(tone('aco', 2)));
+  const light = m.tile(L, 2, 2, (p) => p.fill(tone('amarelo', 3)));
+  const body = m.part('body');
+  body.tiledBox([-6.5, 0, -2], [6.5, 7, 2], red);
+  body.tiledBox([-5.5, 1.5, -2.5], [-1.5, 5.5, -2], dark);
+  body.tiledBox([1.5, 1.5, -2.5], [5.5, 5.5, -2], dark);
+  body.tiledBox([-4, 7, -0.5], [-3, 9, 0.5], steel);
+  body.tiledBox([3, 7, -0.5], [4, 9, 0.5], steel);
+  body.tiledBox([-4, 9, -0.5], [4, 10, 0.5], steel);
+  body.tiledBox([5, 7, 1], [5.5, 13, 1.5], steel);
+  body.tiledBox([-0.5, 7, -1.5], [0.5, 7.5, -0.5], light);
+  return m.build();
+}
+
+/**
  * M3 (fase 5c): camada compartilhada pelos modelos pequenos do Bobo Zombies (tábua, moeda x2, raio do Desmontador e
  * giz): o orçamento é de 32 camadas de modelo (`modelos64`) e cada modelo com camada própria passava dele. Criada a
  * cada geração (`buildModels`), como a camada de brilho das props.
@@ -341,4 +373,5 @@ export const PICKUP_RECIPES: readonly ((shared: PickupLayers) => BuiltModel)[] =
   dropDouble,
   desmontadorBolt,
   chalkOutline,
+  boomBox,
 ];

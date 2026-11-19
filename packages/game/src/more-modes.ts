@@ -24,6 +24,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
   // M7 (fase 0).
   { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
+  // M7 (fase 4).
+  { id: 'strike', nameKey: 'mode.name.strike', descKey: 'mode.desc.strike' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -117,6 +119,16 @@ export function moreModePreset(id: string): MatchRecipe | null {
         match: { timeLimitS: 0, scoreLimit: 0 },
         zombies: { variant: 'fortress' },
         teams: [{ humans: 'all', bots: [] }],
+      };
+    case 'strike':
+      // GDD §4.1.2: o BoboStrike 5 contra 5 na Base Bobo (MR12); você e 4 bots contra 5.
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'BoboStrike',
+        mode: 'strike',
+        map: 'airbase',
+        seed: 0,
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 4 }] }, { bots: [{ ref: normal, count: 5 }] }],
       };
     case 'juggernautFixed':
       // GDD §4.1.2: a variante Fixo (rodadas de 3 min com rodízio, o "1 contra 3" do sofá) no Construto; com os 3 bots,
