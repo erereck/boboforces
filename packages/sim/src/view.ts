@@ -225,6 +225,8 @@ export function heldReserve(view: SimView, e: number): number {
  */
 export interface MapObjectsView {
   readonly barricades: number;
+  /** M6 (fase 6b): na Horda armada as janelas são vãos abertos (sem tábua nem conserto). */
+  readonly openWindows: boolean;
   readonly doors: number;
   readonly bx: Float32Array;
   readonly by: Float32Array;

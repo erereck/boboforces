@@ -151,6 +151,8 @@ export class MapObjects {
   readonly zombieColliders: StaticColliders;
   private readonly base: number;
   private readonly nav: NavGrid | null;
+  /** M6 (fase 6b): na Horda armada as janelas são vãos abertos (sem tábua, todo mundo passa). */
+  readonly openWindows: boolean;
 
   constructor(
     props: StaticColliders | null,
@@ -160,7 +162,9 @@ export class MapObjects {
     wallBuys: readonly WallBuyDef[] = [],
     boxSpots: readonly BoxSpotDef[] = [],
     machines: readonly PerkMachineDef[] = [],
+    openWindows = false,
   ) {
+    this.openWindows = openWindows;
     const nb = barricades.length;
     const nd = doors.length;
     assert(nb <= MAX_BARRICADES && nd <= MAX_DOORS, `sim: até ${MAX_BARRICADES} janelas e ${MAX_DOORS} portas`);
@@ -317,7 +321,7 @@ export class MapObjects {
 
   /** Estado do começo da partida: janelas com todas as tábuas e portas fechadas. */
   reset(): void {
-    this.planks.fill(ZOMBIE_BARRICADES.planks);
+    this.planks.fill(this.openWindows ? 0 : ZOMBIE_BARRICADES.planks);
     this.tearTicks.fill(0);
     this.repairTicks.fill(0);
     this.repairer.fill(0);
@@ -343,6 +347,12 @@ export class MapObjects {
 
   syncBarricade(i: number): void {
     const k = this.base + i;
+    if (this.openWindows) {
+      this.boboColliders.flags[k] = 0;
+      this.zombieColliders.flags[k] = 0;
+      this.nav?.setGateBlock(i, 0);
+      return;
+    }
     // Bobo nunca atravessa a janela (tiro e visão passam); o zumbi, só sem tábua.
     this.boboColliders.flags[k] = COLLIDER_FLAG.solid;
     this.zombieColliders.flags[k] = this.planks[i]! > 0 ? COLLIDER_FLAG.solid : 0;

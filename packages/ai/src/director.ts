@@ -188,6 +188,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   ctx.zombiesMode = recipe.mode === 'zombies';
   ctx.juggernaut = recipe.mode === 'juggernaut';
   ctx.noRegen = recipe.mode === 'paintball';
+  ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';
   const createFlow = api.createFlowField;
   const flow = zombies > 0 && createFlow !== undefined ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick) : null;
   ctx.flow = flow;

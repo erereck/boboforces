@@ -271,6 +271,10 @@ export const STRINGS_EXTRA_PT_BR = {
   'mode.name.zombiesFortress': 'Fortaleza',
   'mode.desc.zombiesFortress': 'Zumbis contra o gerador.',
   'hud.zombies.generator': 'Gerador {pct}%',
+  // M6 (fase 6b): a Horda armada.
+  'mode.name.zombiesArmed': 'Horda Armada',
+  'mode.desc.zombiesArmed': 'Ondas de soldados armados.',
+  'hud.horde.wave': 'Onda {wave} · {left} soldados',
   'hud.generator': 'Gerador',
   'mode.name.chaos': 'Bobo Chaos',
   'mode.desc.chaos': 'A Roleta troca as regras.',

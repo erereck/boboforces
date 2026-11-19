@@ -86,6 +86,9 @@ export function zombieRecordKey(recipe: MatchRecipe, players: number): string {
     `e${z.economy ?? D.economy}`,
     `r${z.selfRevives ?? D.selfRevives}`,
     `p${Math.max(1, Math.round(players))}`,
+    // M6 (fase 6b): a Horda armada e o Fortress têm recorde próprio (a variante clássica não entra: as chaves antigas
+    // continuam valendo).
+    ...(z.variant !== undefined && z.variant !== 'classic' ? [z.variant] : []),
   ]
     .join('|')
     .slice(0, STATS_RANGES.zombieKeyLength);

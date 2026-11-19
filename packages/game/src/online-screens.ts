@@ -157,9 +157,14 @@ export function cleanRoomName(text: string): string {
 
 /** A partida tem times (a escolha do time vale)? No FFA, no treino e nos modos de um time, não. */
 export function recipeHasTeams(recipe: MatchRecipe): boolean {
-  // M6 (fase 3): no Juggernaut todos começam caçando (o Jugg é sorteado).
+  // M6 (fase 3): no Juggernaut todos começam caçando (o Jugg é sorteado). Fase 6b: o Bobo Zombies é cooperativo (na
+  // Horda armada o time 1 é só de bots).
   return (
-    recipe.mode !== 'training' && recipe.mode !== 'juggernaut' && !isFfaMode(recipe.mode) && recipe.teams.length >= 2
+    recipe.mode !== 'training' &&
+    recipe.mode !== 'juggernaut' &&
+    recipe.mode !== 'zombies' &&
+    !isFfaMode(recipe.mode) &&
+    recipe.teams.length >= 2
   );
 }
 

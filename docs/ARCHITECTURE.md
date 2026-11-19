@@ -3823,3 +3823,45 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   zumbi ficou 103 s do lado de fora de uma janela que os bots consertavam sem parar (ele arranca, eles repõem, ninguém
   atira): é um laço da IA do Bobo Zombies (as janelas), não do Fortress; e há uma prop de gerador no Posto e na Base a
   6 a 9 m do objetivo (só a plaquinha separa os dois).
+
+### 17.9 Fase 6b: Bobo Zombies Armed Horde (19/11/2026)
+
+- **A receita:** `zombies.variant: 'armed'` (`ZOMBIES_VARIANTS` volta a ter as três). O card Horda Armada
+  (`moreModePreset('zombiesArmed')`) é o Bobo Zombies na Base Abandonada com o time 1 só de bots (6 Chill + 6 Normal) e
+  2 bots Normal de apoio no time 0.
+- **A sim** (`ctx.zombieArmed`; `HORDE`, `hordeInWave`, `hordeMaxAlive`, `hordeHpMul` em `config/zombie.ts`):
+  - A horda são os bobos do time 1 (`isHorde` no `context.ts`: o zumbi ou, na Horda armada, o bobo do time 1). Eles
+    começam mortos e sem contagem (fora de jogo), sem pontos, e o pool de zumbis fica vazio. Humano é sempre do time 0.
+  - O diretor de ondas conta os soldados como os zumbis da onda; o lado dos humanos é só o time 0. O `spawnHorde`
+    solta o soldado morto de índice menor no ponto dos zumbis (a horda reusa os primeiros: os Chill), com uma primária
+    sorteada entre as liberadas (2 na 1ª onda, mais uma a cada 2) e a vida da onda (o `maxHpOf` do soldado cresce 10%
+    por onda, derivado da onda: nada novo no snapshot). Total da onda: metade da dos zumbis (mínimo 2); em jogo ao mesmo
+    tempo: 2 + 0,5 por onda + 2 por humano a mais (até o tamanho da horda); um a cada 1,5 s; sem chefão; a granada só
+    da 3ª onda em diante.
+  - O soldado da horda morre (não cai), dá os pontos do acerto e do abate, pode deixar drop (o Carpinteiro vira Munição
+    Máxima), morre na bomba e no insta-kill, não pega drop nem recebe a Munição Máxima.
+  - **As janelas abertas** (`MapObjects.openWindows`): 0 tábua, o colisor dos bobos e o portão da navegação abertos
+    (todo mundo passa pelo vão); o `barricadesSystem` não roda e o HUD não oferece o conserto.
+- **A IA:** `AiContext.hordeArmed`. O passeio do soldado do time 1 é caçar o bobo de pé do time 0 mais perto (a até
+  3 m dele, para chegar por janelas diferentes); o do bot de apoio é ficar a até 3 m do humano mais perto (com as
+  janelas abertas, o passeio do Warfare o levaria para fora). O apoio não conserta janela. O resto é a IA do Warfare.
+- **O jogo:** o pool 0 (o mesmo nos dois lados do online), a linha "Onda 2 · 7 soldados", o placar do Tab sem a horda;
+  o Bobo Zombies (todas as variantes) passou a não ter escolha de time no sofá e no online (`placeHumans` põe todo
+  humano no time 0).
+- **Golden** (Base Abandonada, 4 bots Normal de apoio contra 12 Normal, semente 42, 7.200 ticks): `0bc0e8ca` (o apoio
+  derruba 4 dos 5 soldados da 1ª onda em 2 min; sem humano, ele passeia como no Warfare). **Online:** 1 onda com 2 amigos parados (um pediu o time 1): os dois no time 0, nenhum zumbi e o
+  mesmo fim nos dois lados.
+- **A revisão (Opus) achou 9 coisas, corrigidas antes do commit:**
+  - As portas pagas continuam valendo com as janelas abertas (o `barricadesSystem` pula só as janelas).
+  - Quem entra no meio da partida no sofá só assume bot de apoio (no Bobo Zombies, o time 0).
+  - No Bobo Zombies a IA não mira em caído (o dano nele não pega).
+  - O recorde de onda tem a variante na chave (`|armed`, `|fortress`; a clássica continua igual).
+  - Sem bot no time 1, a onda passa.
+  - O abate não soma no placar dos times no Bobo Zombies.
+  - O humano que a receita pôs no time 1 nasce com o time 0.
+  - A música e o minimapa contam os soldados.
+  - O apoio levanta o caído só sem soldado perto.
+  - O soldado destravado no ponto continua com a vida que tinha.
+- **Limitações conhecidas:** a horda nasce nos pontos dos zumbis (fora da base) e entra pelas janelas; a dificuldade
+  (o tamanho da onda, o teto em jogo e os níveis dos bots do card) é um palpite e fica para a rodada de testes com o
+  Erick.

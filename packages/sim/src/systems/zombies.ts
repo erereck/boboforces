@@ -1,5 +1,8 @@
-import { BUTTON } from '@boboforces/input';
+import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
+  HORDE,
+  hordeInWave,
+  hordeMaxAlive,
   PERK,
   runnerChance,
   ZOMBIE_KINDS,
@@ -15,7 +18,9 @@ import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { barricadesSystem } from './barricades.ts';
 import { mysteryBoxSystem, perkSystem, wallBuySystem } from './shop.ts';
-import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
+import { bleedOut, maxHpOf, pickSpawn, respawn, standUp } from './life.ts';
+import { isHorde, WEAPON_NONE } from '../context.ts';
+import { WEAPON_SLOT } from '../config/weapons.ts';
 import { fortressSystem } from './fortress.ts';
 
 const F = ENTITY_FLAG;
@@ -28,6 +33,8 @@ const F = ENTITY_FLAG;
  * - Fase 2c: os caídos sangram, levantam sozinhos ou pelo colega (`updateDowned`). Ninguém de pé e nenhum "levanta
  *   sozinho" a caminho = derrota.
  * O fim usa a fase `ended` da partida: `winnerTeam` 0 = vitória, -1 = derrota.
+ * M6 (fase 6b): na Horda armada a horda são os soldados do time 1 (`isHorde`): eles contam como os zumbis da onda e o
+ * lado dos humanos é só o time 0.
  */
 export function zombiesSystem(ctx: SimContext): void {
   if (!ctx.zombiesMode) return;
@@ -48,17 +55,21 @@ export function zombiesSystem(ctx: SimContext): void {
   let selfComing = false;
   let alive = 0;
   let last = -1;
+  let pool = 0;
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0) continue;
     const dead = (s.flags[e]! & F.dead) !== 0;
-    if (s.kind[e] === ENTITY_KIND.bobo) {
+    if (isHorde(ctx, e)) {
+      pool++;
+      if (!dead) {
+        alive++;
+        last = e;
+      }
+    } else if (s.kind[e] === ENTITY_KIND.bobo) {
       bobos++;
       const down = (s.flags[e]! & F.downed) !== 0;
       if (!dead && !down) bobosUp++;
       if (down && s.selfUp[e] === 1) selfComing = true;
-    } else if (s.kind[e] === ENTITY_KIND.zombie && !dead) {
-      alive++;
-      last = e;
     }
   }
   if (bobos > 0 && bobosUp === 0 && !selfComing) {
@@ -70,6 +81,8 @@ export function zombiesSystem(ctx: SimContext): void {
     endZombies(ctx, false);
     return;
   }
+  // M6 (fase 6b): a Horda armada sem bot no time 1 (receita importada): a onda não tem quem soltar.
+  if (ctx.zombieArmed && pool === 0) w.toSpawn = 0;
   if (w.resting === 1) {
     if (w.restTicks > 0) w.restTicks--;
     if (w.restTicks === 0) startWave(ctx);
@@ -79,11 +92,12 @@ export function zombiesSystem(ctx: SimContext): void {
   if (w.toSpawn > 0) {
     if (w.spawnTicks > 0) w.spawnTicks--;
     if (w.spawnTicks === 0) {
-      if (spawnZombie(ctx)) {
+      const armed = ctx.zombieArmed;
+      if (armed ? alive < hordeMaxAlive(w.wave, ctx.humans, pool) && spawnHorde(ctx) : spawnZombie(ctx)) {
         w.toSpawn--;
         alive++;
       }
-      w.spawnTicks = ctx.zombieRules.spawnIntervalTicks;
+      w.spawnTicks = armed ? ctx.zombieRules.hordeSpawnTicks : ctx.zombieRules.spawnIntervalTicks;
     }
   }
   w.left = w.toSpawn + alive;
@@ -92,7 +106,9 @@ export function zombiesSystem(ctx: SimContext): void {
     const id = s.idOf(last);
     if (w.lastZombie !== id) {
       w.lastZombie = id;
-      if (s.zombieType[last] === ZOMBIE_TYPE.walker) s.zombieType[last] = ZOMBIE_TYPE.runner;
+      if (s.kind[last] === ENTITY_KIND.zombie && s.zombieType[last] === ZOMBIE_TYPE.walker) {
+        s.zombieType[last] = ZOMBIE_TYPE.runner;
+      }
     }
   } else if (alive !== 1) w.lastZombie = NULL_ENTITY;
   if (w.left === 0) waveCleared(ctx);
@@ -167,20 +183,23 @@ function startWave(ctx: SimContext): void {
   w.wave++;
   w.resting = 0;
   w.restTicks = 0;
-  w.toSpawn = zombiesInWave(w.wave, ctx.humans, r.quantity);
+  w.toSpawn = ctx.zombieArmed
+    ? hordeInWave(w.wave, ctx.humans, r.quantity)
+    : zombiesInWave(w.wave, ctx.humans, r.quantity);
   w.spawnTicks = 1;
   w.waveHp = zombieWaveHp(w.wave, r.hpMul);
   w.runChance = runnerChance(w.wave);
   w.lastZombie = NULL_ENTITY;
   // M3 (fase 3b): o chefão sai primeiro, a cada `bossEvery` ondas (a mais no total da onda).
-  w.bossPending = r.bosses && w.wave % ZOMBIE_SPECIALS.bossEvery === 0 ? 1 : 0;
+  w.bossPending = r.bosses && !ctx.zombieArmed && w.wave % ZOMBIE_SPECIALS.bossEvery === 0 ? 1 : 0;
   w.toSpawn += w.bossPending;
   // M3 (fase 3d): o teto dos pontos de conserto é por onda.
   s.repairPoints.fill(0);
   w.drops = 0;
-  // Quem caiu na onda passada volta agora.
+  // Quem caiu na onda passada volta agora (o soldado da horda, não: quem solta é o diretor).
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) === 0) continue;
+    if (isHorde(ctx, e)) continue;
     respawn(ctx, e, pickSpawn(ctx, e));
   }
   ctx.events.wave(ctx.tick, w.wave, 'start');
@@ -213,6 +232,32 @@ function spawnZombie(ctx: SimContext): boolean {
       type === ZOMBIE_TYPE.boss
         ? Math.round(ZOMBIE_SPECIALS.bossHpPerHuman * Math.max(1, ctx.humans) * ctx.zombieRules.hpMul)
         : Math.max(1, Math.round(w.waveHp * kind.hpMul));
+    return true;
+  }
+  return false;
+}
+
+/**
+ * M6 (fase 6b): um soldado da horda (do time 1, fora de jogo) entra no ponto dos zumbis, com uma primária sorteada entre
+ * as liberadas na onda e a vida da onda (o `maxHpOf` dele cresce com a onda). `false` = todos já estão em jogo.
+ */
+function spawnHorde(ctx: SimContext): boolean {
+  const s = ctx.s;
+  const w = ctx.waves;
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) === 0 || !isHorde(ctx, e)) {
+      continue;
+    }
+    const unlocked = Math.min(HORDE.primaries.length, 2 + Math.floor((Math.max(1, w.wave) - 1) / HORDE.unlockEvery));
+    s.primaryChoice[e] = HORDE.primaries[Math.floor(ctx.rngZombies.next() * unlocked)]!;
+    respawn(ctx, e, pickZombieSpawn(ctx));
+    s.health[e] = maxHpOf(ctx, e);
+    if (w.wave < HORDE.grenadesFrom) {
+      const k = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable;
+      s.loadout[k] = WEAPON_NONE;
+      s.slotClip[k] = 0;
+      s.slotReserve[k] = 0;
+    }
     return true;
   }
   return false;
@@ -294,6 +339,7 @@ function nearestBobo2(ctx: SimContext, x: number, z: number): number {
   let best = Number.POSITIVE_INFINITY;
   for (let e = 0; e < s.count; e++) {
     if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) !== 0) continue;
+    if (isHorde(ctx, e)) continue;
     const dx = s.position[e * 3]! - x;
     const dz = s.position[e * 3 + 2]! - z;
     const d = dx * dx + dz * dz;

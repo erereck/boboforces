@@ -53,12 +53,13 @@ export function seatRecipe(recipe: MatchRecipe, seats: readonly LocalSeat[]): Se
 
 /**
  * M5 (fase 4b): os humanos na receita pelo lado de cada um (0 ou 1), na ordem dada: o sofá (o P1 sempre no 0) e o
- * online (cada um no time que escolheu). No FFA, no treino e nos modos de um time só, todos ficam no 0.
+ * online (cada um no time que escolheu). No FFA, no treino e nos modos de um time só, todos ficam no 0. M6 (fase 6b): no
+ * Bobo Zombies também (na Horda armada o time 1 é só a horda de bots).
  */
 export function placeHumans(recipe: MatchRecipe, chosen: readonly (0 | 1)[]): SeatedRecipe {
   const n = chosen.length;
   const training = recipe.mode === 'training';
-  const oneTeam = training || isFfaMode(recipe.mode) || recipe.teams.length < 2;
+  const oneTeam = training || isFfaMode(recipe.mode) || recipe.mode === 'zombies' || recipe.teams.length < 2;
   const sides = chosen.map((s) => (oneTeam ? 0 : s));
   const want = [0, 0];
   for (const s of sides) want[s]!++;

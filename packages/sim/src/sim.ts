@@ -35,6 +35,7 @@ import {
   ZOMBIES_DOWN,
   ZOMBIES_MODE,
   ZOMBIE_DROPS,
+  HORDE,
 } from './config/zombie.ts';
 import {
   MAX_CONTROLLERS_WITH_ZOMBIES,
@@ -436,7 +437,10 @@ export function createSim(config: SimConfig): Sim {
   const { recipe, map, humans } = config;
   // M3 (fase 2a): no Bobo Zombies, `zombies` é o pool (o teto do aparelho); os zumbis começam fora de jogo.
   const zombiesMode = recipe.mode === 'zombies';
-  const zombies = config.zombies ?? (zombiesMode ? ZOMBIES_MODE.poolDefault : 0);
+  // M6 (fase 6b): a Horda armada: as ondas são os bots do time 1 (o pool de zumbis fica vazio, a não ser que o
+  // chamador peça).
+  const zombieArmed = zombiesMode && recipe.zombies?.variant === 'armed';
+  const zombies = config.zombies ?? (zombiesMode && !zombieArmed ? ZOMBIES_MODE.poolDefault : 0);
   assert(map.spawns.length > 0, 'sim: o mapa precisa de pelo menos 1 spawn');
   assert(Number.isInteger(zombies) && zombies >= 0 && zombies <= MAX_ZOMBIES, `sim: 0 a ${MAX_ZOMBIES} zumbis`);
   const slots = expandRecipe(recipe, humans);
@@ -467,6 +471,7 @@ export function createSim(config: SimConfig): Sim {
           map.wallBuys ?? [],
           map.boxSpots ?? [],
           map.perkMachines ?? [],
+          zombieArmed,
         )
       : null;
   // M6 (fase 1): os pontos do Domination (só no modo dele e num mapa que os tem).
@@ -538,6 +543,7 @@ export function createSim(config: SimConfig): Sim {
     rewind: null,
     signals: createSignalState(MAX_ENTITIES),
     zombiesMode,
+    zombieArmed,
     zombieRunProfile: zombieSpeed(MOVEMENT_ZOMBIE_RUNNER, recipe),
     zombieRules: {
       waves: recipe.zombies?.waves ?? ZOMBIES_DEFAULTS.waves,
@@ -547,6 +553,7 @@ export function createSim(config: SimConfig): Sim {
       firstWaveTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.firstWaveS, hz)),
       intermissionTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.intermissionS, hz)),
       spawnIntervalTicks: Math.max(1, secondsToTicks(ZOMBIES_MODE.spawnIntervalS, hz)),
+      hordeSpawnTicks: Math.max(1, secondsToTicks(HORDE.spawnIntervalS, hz)),
       bleedTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.bleedS, hz)),
       reviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.reviveS, hz)),
       selfReviveTicks: Math.max(1, secondsToTicks(ZOMBIES_DOWN.selfReviveS, hz)),
@@ -589,23 +596,34 @@ export function createSim(config: SimConfig): Sim {
   slots.forEach((slot, i) => {
     // M6 (fase 3, revisão): no Juggernaut todo mundo começa caçando (o time 1 é só do Jugg, que o modo sorteia), mesmo
     // que a sala ou o sofá tenha posto alguém do outro lado.
-    const id = s.allocate(ENTITY_KIND.bobo, ctx.party.jugg !== null ? 0 : slot.team, slot.controller);
+    // M6 (fase 6b): na Horda armada, humano é sempre do time 0 (o time 1 é só a horda de bots).
+    const sideless = ctx.party.jugg !== null || (zombieArmed && slot.bot === null);
+    const id = s.allocate(ENTITY_KIND.bobo, sideless ? 0 : slot.team, slot.controller);
     assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
     s.controllerEntity[slot.controller] = id;
     s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
-    // M3 (fase 2b): os pontos do começo no Bobo Zombies.
-    if (zombiesMode) s.points[id & 0xffff] = ZOMBIE_POINTS.start;
+    // M3 (fase 2b): os pontos do começo no Bobo Zombies (M6, fase 6b: o soldado da horda não tem).
+    const horde = zombieArmed && slot.bot !== null && slot.team === 1;
+    if (zombiesMode && !horde) s.points[id & 0xffff] = ZOMBIE_POINTS.start;
     if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, ctx.maxHp);
     applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
-    const k = perTeam[slot.team]!;
-    perTeam[slot.team] = k + 1;
+    // M6 (fase 6b): o humano que a receita pôs no time 1 da Horda armada nasce com o time 0.
+    const team = zombieArmed && slot.bot === null ? 0 : slot.team;
+    const k = perTeam[team]!;
+    perTeam[team] = k + 1;
     // M6 (fase 3): no Juggernaut todo mundo começa espalhado (o Jugg sorteado não nasce no meio dos caçadores).
     const spread = ctx.ffa || ctx.party.jugg !== null;
-    respawn(
-      ctx,
-      id & 0xffff,
-      initialSpawn(map.spawns, slot.team, spread, spread ? i : k, ctx.training && slot.team !== 0),
-    );
+    if (horde) {
+      // M6 (fase 6b): o soldado da horda começa fora de jogo (morto e sem contagem), até o diretor de ondas soltar.
+      s.flags[id & 0xffff] = ENTITY_FLAG.dead;
+      s.respawnTicks[id & 0xffff] = 0;
+    } else {
+      respawn(
+        ctx,
+        id & 0xffff,
+        initialSpawn(map.spawns, team, spread, spread ? i : k, ctx.training && slot.team !== 0),
+      );
+    }
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
   if (zombies > 0) {

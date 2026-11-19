@@ -99,7 +99,9 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - **Armed Horde:** as ondas são de bots soldados, com a IA do Warfare;
    - **Fortress:** um gerador com HP (entidade, não cenário) que os zumbis atacam e os humanos defendem.
    - **6a feita em 19/11** (ARCHITECTURE §17.8): o Fortress, no card Fortaleza da página Mais modos (no Posto
-     Avançado). **6b:** a Armed Horde.
+     Avançado).
+   - **6b feita em 19/11** (ARCHITECTURE §17.9): a Armed Horde, no card Horda Armada (na Base Abandonada, com as
+     janelas abertas).
 7. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

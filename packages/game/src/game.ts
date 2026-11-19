@@ -1246,6 +1246,7 @@ export function startGame(deps: GameDeps): GameHandle {
       r.mode !== 'warfare.ffa' &&
       r.mode !== 'training' &&
       r.mode !== 'juggernaut' &&
+      r.mode !== 'zombies' &&
       r.teams.length >= 2
     );
   }

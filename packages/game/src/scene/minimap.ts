@@ -167,6 +167,8 @@ export interface MinimapFrame {
   readonly allyTeam: number;
   /** Bobo Zombies: os zumbis aparecem. */
   readonly zombies: boolean;
+  /** M6 (fase 6b): o time da horda de bots, que aparece como os zumbis (a Horda armada: 1; -1 = nenhum). */
+  readonly hordeTeam?: number;
 }
 
 /** Desenha o minimapa centrado na área (sem alocar: os pontos saem direto da vista). */
@@ -216,7 +218,7 @@ export function drawMinimap(list: DrawList, plan: MinimapPlan, v: SimView, f: Mi
     const kind = v.kind[i];
     const px = ox + v.position[i * 3]! * k;
     const pz = oy + v.position[i * 3 + 2]! * k;
-    if (kind === ENTITY_KIND.zombie) {
+    if (kind === ENTITY_KIND.zombie || (kind === ENTITY_KIND.bobo && v.team[i] === (f.hordeTeam ?? -1))) {
       if (f.zombies) dot(list, px, pz, MINIMAP.zombiePx * s, C.zombie);
     } else if (kind === ENTITY_KIND.bobo && f.allyTeam >= 0 && v.team[i] === f.allyTeam && !f.locals.includes(i)) {
       dot(list, px, pz, MINIMAP.allyPx * s, C.ally);

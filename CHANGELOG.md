@@ -53,6 +53,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   Segurar o usar perto conserta (60 por segundo). O gerador no zero perde a partida. A vida dele aparece na linha da
   onda ("Gerador 72%") e a plaquinha GERADOR fica sempre na tela. A página Mais modos passou a ter 3 colunas (são 9
   cards), com as frases mais curtas.
+- **Bobo Zombies: Horda Armada (fase 6b):** o card na página Mais modos (na Base Abandonada). As ondas são de soldados
+  com a IA do Warfare (12 bots: os 6 Chill entram primeiro, os Normal quando a onda deixa mais gente em jogo), contra
+  você e 2 bots de apoio. As janelas ficam abertas (sem tábua): a horda entra por elas. A onda tem metade dos zumbis
+  da onda normal (no mínimo 2), entra aos poucos (de 2 em jogo na 1ª onda a 6 na 10ª) e cada soldado tem 10% a mais
+  de vida por onda; as armas da horda liberam com as ondas (SMG e fuzil, depois escopeta, metralhadora e sniper; a
+  granada da 3ª onda em diante).
+  Pontos, abates, drops, a loja e os perks valem como no Bobo Zombies; o Carpinteiro vira Munição Máxima.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

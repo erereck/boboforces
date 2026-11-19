@@ -263,6 +263,8 @@ export interface SimContext {
   readonly signals: SignalState;
   /** M3 (fase 2a): Bobo Zombies (`mode: 'zombies'`): o diretor de ondas, os renascimentos e o pool de zumbis. */
   readonly zombiesMode: boolean;
+  /** M6 (fase 6b): a Horda armada (as ondas são os bots do time 1; janelas abertas, sem tábua). */
+  readonly zombieArmed: boolean;
   readonly zombieRunProfile: MovementProfile;
   /** As regras do modo já resolvidas (padrões do `ZOMBIES_DEFAULTS`) e os tempos em ticks. */
   readonly zombieRules: ZombieModeRules;
@@ -298,6 +300,8 @@ export interface ZombieModeRules {
   readonly firstWaveTicks: number;
   readonly intermissionTicks: number;
   readonly spawnIntervalTicks: number;
+  /** M6 (fase 6b): o intervalo entre dois soldados da Horda armada. */
+  readonly hordeSpawnTicks: number;
   /** M3 (fase 2c): caído e reviver em ticks, e o "levanta sozinho" da partida (-1 = sem limite). */
   readonly bleedTicks: number;
   readonly reviveTicks: number;
@@ -340,6 +344,12 @@ export interface WaveState {
  * `a` e `b` são inimigos? Zumbis são inimigos de todo bobo e nunca uns dos outros. Entre bobos: no FFA todo mundo é;
  * nos outros modos, times diferentes.
  */
+/** M6 (fase 6b): `e` é da horda do Bobo Zombies: um zumbi ou, na Horda armada, um soldado do time 1. */
+export function isHorde(ctx: SimContext, e: number): boolean {
+  const kind = ctx.s.kind[e];
+  return kind === ENTITY_KIND.zombie || (ctx.zombieArmed && kind === ENTITY_KIND.bobo && ctx.s.team[e] === 1);
+}
+
 export function hostile(ctx: SimContext, a: number, b: number): boolean {
   if (a === b) return false;
   const s = ctx.s;

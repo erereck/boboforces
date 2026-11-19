@@ -36,6 +36,8 @@ export interface ZombieMusicState {
   readonly musicInMatch: boolean;
   /** Os jogadores locais (índices de entidade; -1 = nenhum). */
   readonly locals: readonly number[];
+  /** M6 (fase 6b): o time da horda de bots (a Horda armada: 1; -1 = só os zumbis). */
+  readonly hordeTeam?: number;
 }
 
 export interface ZombieMusic extends Disposable {
@@ -45,11 +47,12 @@ export interface ZombieMusic extends Disposable {
 }
 
 /** O que a horda deve tocar agora (0..1): zumbis perto dos locais, o piso, e cheia com o chefão vivo. */
-export function hordeIntensity(v: SimView, locals: readonly number[]): number {
+export function hordeIntensity(v: SimView, locals: readonly number[], hordeTeam = -1): number {
   const near2 = ZOMBIE_MUSIC_MIX.nearM * ZOMBIE_MUSIC_MIX.nearM;
   let near = 0;
   for (let i = 0; i < v.count; i++) {
-    if (v.kind[i] !== ENTITY_KIND.zombie || v.alive[i] !== 1 || v.flags[i]! & ENTITY_FLAG.dead) continue;
+    const soldier = hordeTeam >= 0 && v.kind[i] === ENTITY_KIND.bobo && v.team[i] === hordeTeam;
+    if ((v.kind[i] !== ENTITY_KIND.zombie && !soldier) || v.alive[i] !== 1 || v.flags[i]! & ENTITY_FLAG.dead) continue;
     if (v.zombieType[i] === ZOMBIE_TYPE.boss) return 1;
     const o = i * 3;
     for (const h of locals) {
@@ -123,7 +126,7 @@ export function createZombieMusic(mixer: Mixer, assets: Assets, log: (line: stri
       }
       if (clock > 0 && hordeGain >= 0) return;
       clock = ZOMBIE_MUSIC_MIX.everyS;
-      const target = hordeIntensity(v, state.locals);
+      const target = hordeIntensity(v, state.locals, state.hordeTeam ?? -1);
       if (hordeGain < 0 || Math.abs(target - hordeGain) >= ZOMBIE_MUSIC_MIX.step) {
         mixer.setMusicLayer(horde.id, target, ZOMBIE_MUSIC_MIX.fadeS);
         hordeGain = target;

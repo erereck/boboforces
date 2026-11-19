@@ -5,6 +5,7 @@ import { roomPreset, type RoomPresetMode } from '@boboforces/game/online';
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import * as net from '@boboforces/net';
 import { yawToU16 } from '@boboforces/shared';
+import { ENTITY_KIND } from '@boboforces/sim';
 import { describe, expect, it } from 'vitest';
 import { loadRealMap } from '../scripts/real-maps.ts';
 import { createOnlineSession } from './online-session.ts';
@@ -260,6 +261,23 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     const h = run.host.sim.view();
     console.log(
       `[modos] Infection: ${run.seconds.toFixed(1)} s, sobreviventes ${h.match.teamScore[0]} × infectados ${h.match.teamScore[1]}, vencedor ${h.match.winnerTeam}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 240_000);
+
+  it('M6 (fase 6b): Horda armada na Base, 1 onda: os 2 no time 0, a horda é de bots e o fim é o mesmo no amigo', () => {
+    const base = moreModePreset('zombiesArmed')!;
+    const r: MatchRecipe = { ...base, zombies: { ...base.zombies, waves: 1 } };
+    const run = playRoom(r, [-1, 1], { snapshotHz: 30, zombies: 0, maxS: 240 });
+    expectSameResult(run);
+    const h = run.host.sim.view();
+    // Ninguém humano na horda (mesmo quem pediu o time 1) e nenhum zumbi; a onda acabou (vitória ou derrota).
+    for (let c = 0; c < 2; c++) expect(h.team[run.host.sim.controllerEntity(c) & 0xffff]).toBe(0);
+    let zombies = 0;
+    for (let i = 0; i < h.count; i++) if (h.alive[i] === 1 && h.kind[i] === ENTITY_KIND.zombie) zombies++;
+    expect(zombies).toBe(0);
+    console.log(
+      `[modos] Horda armada: ${run.seconds.toFixed(1)} s, onda ${h.match.zombieWave}, vencedor ${h.match.winnerTeam}`,
     );
     dispose(run);
   }, 240_000);

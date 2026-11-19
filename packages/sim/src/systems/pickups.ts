@@ -8,7 +8,7 @@ import { PICKUP_KIND } from '../view.ts';
 import { ZOMBIE_BARRICADES, ZOMBIE_DROPS } from '../config/zombie.ts';
 import { secondsToTicks } from '../constants.ts';
 import { NULL_ENTITY } from '../entity.ts';
-import { PART_TORSO, WEAPON_NUKE } from '../context.ts';
+import { isHorde, PART_TORSO, WEAPON_NUKE } from '../context.ts';
 import { FIGURE_BONE } from '@boboforces/format';
 
 /**
@@ -107,6 +107,8 @@ export function pickupSystem(ctx: SimContext): void {
     }
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || (s.flags[e]! & F.dead) !== 0) continue;
+      // M6 (fase 6b): o soldado da horda não pega nada.
+      if (ctx.zombieArmed && isHorde(ctx, e)) continue;
       const e3 = e * 3;
       const dx = s.position[e3]! - x;
       const dz = s.position[e3 + 2]! - z;
@@ -162,6 +164,7 @@ function applyDrop(ctx: SimContext, e: number, kind: number): void {
     // Todos os bobos: pente e reserva cheios em todo slot (e as granadas).
     for (let b = 0; b < s.count; b++) {
       if (s.alive[b] === 0 || s.kind[b] !== ENTITY_KIND.bobo || (s.flags[b]! & F.dead) !== 0) continue;
+      if (isHorde(ctx, b)) continue;
       for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
         const k = b * WEAPON_SLOT_COUNT + slot;
         const def = weaponDef(s.loadout[k]!);
@@ -171,9 +174,10 @@ function applyDrop(ctx: SimContext, e: number, kind: number): void {
       }
     }
   } else if (kind === PICKUP_KIND.nuke) {
-    // A bomba: todo zumbi em jogo morre (sem dono: sem pontos por abate nem drop); quem pegou ganha os pontos.
+    // A bomba: todo zumbi em jogo morre (sem dono: sem pontos por abate nem drop); quem pegou ganha os pontos. M6
+    // (fase 6b): na Horda armada, todo soldado.
     for (let z = 0; z < s.count; z++) {
-      if (s.alive[z] === 0 || s.kind[z] !== ENTITY_KIND.zombie || (s.flags[z]! & F.dead) !== 0) continue;
+      if (s.alive[z] === 0 || !isHorde(ctx, z) || (s.flags[z]! & F.dead) !== 0) continue;
       const z3 = z * 3;
       ctx.damage.push(
         z,
@@ -194,7 +198,7 @@ function applyDrop(ctx: SimContext, e: number, kind: number): void {
     w.instaTicks = effect;
   } else if (kind === PICKUP_KIND.carpenter) {
     const mo = ctx.mapObjects;
-    if (mo !== null) {
+    if (mo !== null && !mo.openWindows) {
       for (let i = 0; i < mo.barricades; i++) {
         mo.planks[i] = ZOMBIE_BARRICADES.planks;
         mo.tearTicks[i] = 0;

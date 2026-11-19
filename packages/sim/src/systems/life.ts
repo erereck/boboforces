@@ -1,4 +1,4 @@
-import { DROP_KINDS } from '../view.ts';
+import { DROP_KINDS, PICKUP_KIND } from '../view.ts';
 import { partyActive, partyKill, partyLoadout } from './party.ts';
 import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
 import { paintDamage, paintLoadout } from './paintball.ts';
@@ -6,7 +6,15 @@ import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN, PERK, ZOMBIE_PERKS, ZOMBIE_DROPS } from '../config/zombie.ts';
+import {
+  hordeHpMul,
+  ZOMBIE_POINTS,
+  ZOMBIE_TYPE,
+  ZOMBIES_DOWN,
+  PERK,
+  ZOMBIE_PERKS,
+  ZOMBIE_DROPS,
+} from '../config/zombie.ts';
 import { BOT_CONTROLLER_BASE, MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
@@ -28,6 +36,7 @@ import {
   HIT_PARTS,
   hostile,
   isBody,
+  isHorde,
   PART_HEAD,
   PART_TORSO,
   RULE_FLAG,
@@ -75,16 +84,18 @@ export function damageSystem(ctx: SimContext): void {
       if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
       if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
     }
-    // M3 (fase 4d): insta-kill: qualquer dano de bobo mata o zumbi (menos o chefão).
+    // M3 (fase 4d): insta-kill: qualquer dano de bobo mata o zumbi (menos o chefão). M6 (fase 6b): e o soldado da
+    // horda (pelo dano de quem não é da horda).
     if (
       ctx.zombiesMode &&
       ctx.waves.instaTicks > 0 &&
       amount > 0 &&
-      s.kind[t] === ENTITY_KIND.zombie &&
-      s.zombieType[t] !== ZOMBIE_TYPE.boss &&
+      isHorde(ctx, t) &&
+      (s.kind[t] !== ENTITY_KIND.zombie || s.zombieType[t] !== ZOMBIE_TYPE.boss) &&
       source !== NULL_ENTITY &&
       s.isCurrent(source) &&
-      s.kind[source & 0xffff] === ENTITY_KIND.bobo
+      s.kind[source & 0xffff] === ENTITY_KIND.bobo &&
+      !isHorde(ctx, source & 0xffff)
     ) {
       amount = Math.max(amount, s.health[t]!);
     }
@@ -118,7 +129,7 @@ export function damageSystem(ctx: SimContext): void {
       s.lastAttacker[t] = attacker;
       if (source !== NULL_ENTITY) noteAttacker(ctx, t, source, amount);
       // M3 (fase 2b): o bobo que tira vida de um zumbi ganha os pontos do acerto.
-      if (ctx.zombiesMode && s.kind[t] === ENTITY_KIND.zombie) award(ctx, attacker, ZOMBIE_POINTS.hit);
+      if (ctx.zombiesMode && isHorde(ctx, t)) award(ctx, attacker, ZOMBIE_POINTS.hit);
     }
     ctx.events.hit(ctx.tick, attacker, id, HIT_PARTS[part]!, bodyPart, amount, q.point, q.dir, i);
     if (s.health[t]! <= 0) {
@@ -126,6 +137,7 @@ export function damageSystem(ctx: SimContext): void {
       const canFall =
         ctx.zombiesMode &&
         s.kind[t] === ENTITY_KIND.bobo &&
+        !isHorde(ctx, t) &&
         (s.flags[t]! & F.downed) === 0 &&
         weaponOf !== WEAPON_KILL_PLANE &&
         weaponOf !== WEAPON_BLEED_OUT;
@@ -171,6 +183,9 @@ function knockDown(ctx: SimContext, t: number, by: EntityId): void {
 /** M3 (fase 4c): a vida máxima de `e` (a da regra, × 1,5 com a Chonky Cola no Bobo Zombies). */
 export function maxHpOf(ctx: SimContext, e: number): number {
   const base = ctx.rules.maxHp[e]!;
+  // M6 (fase 6b): o soldado da horda fica mais forte a cada onda.
+  if (ctx.zombieArmed && isHorde(ctx, e))
+    return Math.max(1, Math.round(base * hordeHpMul(ctx.waves.wave, ctx.zombieRules.hpMul)));
   return ctx.zombiesMode && (ctx.s.perks[e]! & PERK.chonky) !== 0 ? Math.round(base * ZOMBIE_PERKS.chonkyHpMul) : base;
 }
 
@@ -210,7 +225,7 @@ function award(ctx: SimContext, who: EntityId, base: number): void {
   const s = ctx.s;
   if (who === NULL_ENTITY || !s.isCurrent(who)) return;
   const e = who & 0xffff;
-  if (s.kind[e] !== ENTITY_KIND.bobo) return;
+  if (s.kind[e] !== ENTITY_KIND.bobo || isHorde(ctx, e)) return;
   // M3 (fase 4d): pontos em dobro.
   const mul = ctx.waves.doubleTicks > 0 ? 2 : 1;
   s.points[e] = s.points[e]! + Math.round(base * mul * ctx.zombieRules.economy);
@@ -336,8 +351,9 @@ function kill(
   s.recoilPitch[t] = 0;
   s.recoilYaw[t] = 0;
   s.deaths[t] = s.deaths[t]! + 1;
-  // M3 (fase 2b): o bônus do abate de zumbi (na cabeça e de faca valem mais).
-  if (ctx.zombiesMode && zombie) {
+  // M3 (fase 2b): o bônus do abate de zumbi (na cabeça e de faca valem mais). M6 (fase 6b): e do soldado da horda.
+  const horde = ctx.zombiesMode && isHorde(ctx, t);
+  if (horde) {
     const bonus =
       weapon === WEAPON_CODE.knife
         ? ZOMBIE_POINTS.knifeKill
@@ -355,6 +371,7 @@ function kill(
       if (
         !ctx.ffa &&
         !zombie &&
+        !ctx.zombiesMode &&
         s.kind[k] === ENTITY_KIND.bobo &&
         ctx.domination === null &&
         ctx.party.infectedSpeed <= 0 &&
@@ -372,19 +389,21 @@ function kill(
   if (ctx.zombiesMode && zombie && s.zombieType[t] === ZOMBIE_TYPE.chonker && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, ZOMBIE_GOO, s.idOf(t), -1);
   }
-  // M3 (fase 4d): o zumbi abatido por um bobo (não no vazio nem pela bomba) pode deixar um drop.
+  // M3 (fase 4d): o zumbi abatido por um bobo (não no vazio nem pela bomba) pode deixar um drop. M6 (fase 6b): o
+  // soldado da horda também (o Carpinteiro, sem tábua na Horda armada, vira munição).
   if (
-    ctx.zombiesMode &&
-    zombie &&
+    horde &&
     weapon !== WEAPON_KILL_PLANE &&
     killer !== NULL_ENTITY &&
     s.isCurrent(killer) &&
     s.kind[killer & 0xffff] === ENTITY_KIND.bobo &&
+    !isHorde(ctx, killer & 0xffff) &&
     ctx.waves.drops < ZOMBIE_DROPS.perWave &&
     ctx.rngZombies.next() < ctx.dropChance
   ) {
     ctx.waves.drops++;
-    dropZombieDrop(ctx, t, 1 + ctx.rngZombies.int(0, DROP_KINDS));
+    const kind = 1 + ctx.rngZombies.int(0, DROP_KINDS);
+    dropZombieDrop(ctx, t, ctx.zombieArmed && kind === PICKUP_KIND.carpenter ? PICKUP_KIND.maxAmmo : kind);
   }
   // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
   if (ctx.warfare && ctx.paintHits === 0 && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);

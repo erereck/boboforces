@@ -1,5 +1,6 @@
 import type { MovementProfile } from './movement.ts';
 import { METRICS } from './metrics.ts';
+import { WEAPON_CODE } from './weapons.ts';
 
 /**
  * Zumbi do teste de estresse do M1 (tecnico.md §24.1: "24 zumbis"; gameplay.md, Bobo Zombies). Corpo e hitboxes do
@@ -189,6 +190,47 @@ export function zombieWaveHp(wave: number, hpMul: number): number {
   const linear = Z.hpBase + Z.hpPerWave * (Math.min(wave, Z.hpLinearUntil) - 1);
   const grown = wave > Z.hpLinearUntil ? linear * Z.hpGrowth ** (wave - Z.hpLinearUntil) : linear;
   return Math.max(1, Math.round(grown * hpMul));
+}
+
+/**
+ * M6 (fase 6b): a Horda armada (`zombies.variant: 'armed'`): as ondas são de soldados (os bots do time 1, com a IA do
+ * Warfare) no lugar dos zumbis. Os números são escolhas minhas (revisáveis): o soldado atira de longe, então a onda é
+ * menor e entra aos poucos.
+ */
+export const HORDE = {
+  /** O total da onda é o dos zumbis vezes isto (no mínimo `minCount`). */
+  countMul: 0.5,
+  minCount: 2,
+  /** Soldados em jogo ao mesmo tempo: base + por onda + por humano a mais (no máximo os bots do time 1). */
+  aliveBase: 2,
+  alivePerWave: 0.5,
+  alivePerHuman: 2,
+  /** Um soldado novo a cada tanto, s. */
+  spawnIntervalS: 1.5,
+  /** A vida cresce isto por onda (vezes o `hpMul` da partida). */
+  hpPerWave: 0.1,
+  /** As primárias da horda na ordem em que liberam: 2 na 1ª onda e mais uma a cada `unlockEvery` ondas. */
+  primaries: [WEAPON_CODE.smg, WEAPON_CODE.rifle, WEAPON_CODE.shotgun, WEAPON_CODE.lmg, WEAPON_CODE.sniper],
+  unlockEvery: 2,
+  /** A granada da horda só a partir desta onda (antes, o slot dela fica vazio). */
+  grenadesFrom: 3,
+} as const;
+
+/** M6 (fase 6b): quantos soldados a onda `wave` (1..) da Horda armada solta. */
+export function hordeInWave(wave: number, humans: number, quantity: number): number {
+  return Math.max(HORDE.minCount, Math.round(zombiesInWave(wave, humans, quantity) * HORDE.countMul));
+}
+
+/** M6 (fase 6b): quantos soldados ficam em jogo ao mesmo tempo na onda `wave` (`pool` = os bots do time 1). */
+export function hordeMaxAlive(wave: number, humans: number, pool: number): number {
+  const H = HORDE;
+  const n = H.aliveBase + H.alivePerWave * (Math.max(1, wave) - 1) + H.alivePerHuman * (Math.max(1, humans) - 1);
+  return Math.min(pool, Math.max(1, Math.floor(n)));
+}
+
+/** M6 (fase 6b): o multiplicador da vida do soldado da onda `wave`. */
+export function hordeHpMul(wave: number, hpMul: number): number {
+  return (1 + HORDE.hpPerWave * (Math.max(1, wave) - 1)) * hpMul;
 }
 
 /** Chance de um zumbi da onda `wave` correr: 0 até a 4, cresce até a 9, 1 da 10 em diante. */

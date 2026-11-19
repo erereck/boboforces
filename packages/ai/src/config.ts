@@ -302,6 +302,12 @@ export const AI_SOLDIER = {
    */
   juggSpreadM: 5,
   /**
+   * M6 (fase 6b): na Horda armada, o soldado vai num ponto a até tantos metros do bobo do time dos humanos mais perto (a
+   * horda chega por janelas diferentes); o bot de apoio fica a até `hordeGuardM` do humano.
+   */
+  hordeSpreadM: 3,
+  hordeGuardM: 3,
+  /**
    * Refaz a escolha da parte visível da cabeça ou do tronco do alvo (`visibleAimOffset`, ~26 raios: ~10 µs com JIT e
    * 0,23–0,26 ms jitless) a cada (s), além de na troca de alvo e de postura dele.
    */

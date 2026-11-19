@@ -38,6 +38,11 @@ export class AiContext {
   juggernaut = false;
   /** M6 (fase 5): a vida não volta (Paintball): recuar para regenerar não adianta. */
   noRegen = false;
+  /**
+   * M6 (fase 6b): a Horda armada do Bobo Zombies: o soldado do time 1 caça o lado dos humanos; o bot de apoio fica com
+   * o humano (as janelas estão abertas) e não conserta janela.
+   */
+  hordeArmed = false;
   readonly viewDistance: number;
   readonly paths: PathService;
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */

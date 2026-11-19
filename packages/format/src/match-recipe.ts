@@ -225,12 +225,12 @@ export interface ZombiesRules {
   readonly economy?: number;
   /** "Levanta sozinho" no solo por partida; -1 = sem limite. */
   readonly selfRevives?: number;
-  /** M6 (fase 6): a variante: as ondas de zumbis (padrão) ou o gerador a defender (`fortress`). */
+  /** M6 (fase 6): a variante: as ondas de zumbis (padrão), de soldados (`armed`) ou o gerador a defender (`fortress`). */
   readonly variant?: ZombiesVariant;
 }
 
 /** M6 (fase 6): as variantes do Bobo Zombies (GDD §4.1.5). */
-export const ZOMBIES_VARIANTS = ['classic', 'fortress'] as const;
+export const ZOMBIES_VARIANTS = ['classic', 'armed', 'fortress'] as const;
 export type ZombiesVariant = (typeof ZOMBIES_VARIANTS)[number];
 
 /** M3 (fase 2a): as durações do Bobo Zombies (Relâmpago, Curta, sem fim). */

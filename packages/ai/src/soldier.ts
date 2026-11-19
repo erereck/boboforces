@@ -15,6 +15,7 @@ import {
   aimPointWorld,
   ENTITY_FLAG,
   ENTITY_KIND,
+  MAX_HUMANS,
   eyeHeightFor,
   figurePostureOf,
   secondsToTicks,
@@ -451,14 +452,16 @@ const steer = createSteer();
 const push = { x: 0, z: 0 };
 const nodePos = new Float64Array(3);
 
-function targetValid(view: SimView, b: SoldierBrain): boolean {
+function targetValid(view: SimView, b: SoldierBrain, zombies = false): boolean {
   const t = b.target;
   return (
     t >= 0 &&
     t < view.count &&
     view.alive[t] === 1 &&
     view.generation[t] === b.targetGen &&
-    (view.flags[t]! & F.dead) === 0
+    (view.flags[t]! & F.dead) === 0 &&
+    // M6 (fase 6b): no Bobo Zombies, o caído não toma dano (a horda armada troca de alvo).
+    (!zombies || (view.flags[t]! & F.downed) === 0)
   );
 }
 
@@ -513,7 +516,7 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
       return;
     }
   }
-  if (targetValid(view, b) && c.canSee(ex, ey, ez, b.target)) {
+  if (targetValid(view, b, c.zombiesMode) && c.canSee(ex, ey, ez, b.target)) {
     b.targetVisible = true;
     remember(view, b, b.target, tick);
     return;
@@ -528,6 +531,7 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
   let heardD2 = Infinity;
   for (let j = 0; j < view.count; j++) {
     if (!c.living(j) || !c.hostile(e, j)) continue;
+    if (c.zombiesMode && (view.flags[j]! & F.downed) !== 0) continue;
     const dx = view.position[j * 3]! - ex;
     const dz = view.position[j * 3 + 2]! - ez;
     const d2 = dx * dx + dz * dz;
@@ -630,6 +634,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     if (view.controlPoints !== null && e >= 0 && pickPointGoal(c, b, e, team, x, y, z, from)) return;
     // M6 (fase 3): no Juggernaut o passeio é o Jugg (ou, para o Jugg, o caçador mais perto).
     if (c.juggernaut && e >= 0 && pickJuggGoal(c, b, e, x, y, z, from)) return;
+    // M6 (fase 6b): na Horda armada a horda caça e o apoio fica com o humano.
+    if (c.hordeArmed && e >= 0 && pickHordeGoal(c, b, e, x, y, z, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -782,6 +788,52 @@ function pickJuggGoal(
   }
   if (target < 0) return false;
   const r = jugg ? 0 : AI_SOLDIER.juggSpreadM;
+  const n = nav.nearestNode(
+    view.position[target * 3]! + b.rng.range(-r, r),
+    view.position[target * 3 + 1]!,
+    view.position[target * 3 + 2]! + b.rng.range(-r, r),
+  );
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
+}
+
+/**
+ * M6 (fase 6b): o passeio da Horda armada: o soldado do time 1 vai no bobo de pé do time 0 mais perto (num ponto a até
+ * `hordeSpreadM` dele); o bot de apoio do time 0 fica perto do humano mais perto. `false` = ninguém (segue o passeio
+ * do Warfare).
+ */
+function pickHordeGoal(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  x: number,
+  y: number,
+  z: number,
+  from: number,
+): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  const horde = view.team[e] === 1;
+  let target = -1;
+  let best = Infinity;
+  for (let i = 0; i < view.count; i++) {
+    if (i === e || view.kind[i] !== ENTITY_KIND.bobo || !c.living(i) || view.team[i] !== 0) continue;
+    // A horda caça quem está de pé; o apoio fica com o humano, caído ou não.
+    if (horde && (view.flags[i]! & F.downed) !== 0) continue;
+    if (!horde) {
+      const ctrl = view.controller[i]!;
+      if (ctrl < 0 || ctrl >= MAX_HUMANS) continue;
+    }
+    const d = Math.hypot(view.position[i * 3]! - x, view.position[i * 3 + 2]! - z);
+    if (d < best) {
+      best = d;
+      target = i;
+    }
+  }
+  if (target < 0) return false;
+  const r = horde ? AI_SOLDIER.hordeSpreadM : AI_SOLDIER.hordeGuardM;
   const n = nav.nearestNode(
     view.position[target * 3]! + b.rng.range(-r, r),
     view.position[target * 3 + 1]!,
@@ -1381,9 +1433,16 @@ function repairStep(
   return BUTTON.use;
 }
 
-/** M3 (fase 3a): o alvo visível é um zumbi a menos de `fightM` (atira em vez de ir levantar alguém). */
-function zombieClose(view: SimView, b: SoldierBrain, e: number): boolean {
-  if (b.target < 0 || !b.targetVisible || view.kind[b.target] !== ENTITY_KIND.zombie) return false;
+/**
+ * M3 (fase 3a): o alvo visível é um zumbi a menos de `fightM` (atira em vez de ir levantar alguém). M6 (fase 6b): ou um
+ * soldado da Horda armada (o time 1).
+ */
+function zombieClose(c: AiContext, view: SimView, b: SoldierBrain, e: number): boolean {
+  if (b.target < 0 || !b.targetVisible) return false;
+  const kind = view.kind[b.target];
+  if (kind !== ENTITY_KIND.zombie && !(c.hordeArmed && kind === ENTITY_KIND.bobo && view.team[b.target] === 1)) {
+    return false;
+  }
   return targetDistance(view, e, b.target) < AI_SUPPORT.fightM;
 }
 
@@ -1489,10 +1548,10 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   const closeFight = b.targetVisible && b.target >= 0 && targetDistance(view, e, b.target) < AI_COVER.fightBelowM;
   // M3 (fase 3a): no Bobo Zombies, o colega caído mais perto (sem zumbi colado: aí atira primeiro).
   b.reviveTarget =
-    c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(view, b, e) ? downedAlly(c, e) : -1;
+    c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(c, view, b, e) ? downedAlly(c, e) : -1;
   // M3 (fase 3d): sem ninguém para levantar e sem alvo à vista, conserta a janela mais perto.
   const repairWindow =
-    c.zombiesMode && b.reviveTarget < 0 && !b.targetVisible && (view.flags[e]! & F.downed) === 0
+    c.zombiesMode && !c.hordeArmed && b.reviveTarget < 0 && !b.targetVisible && (view.flags[e]! & F.downed) === 0
       ? brokenWindow(view, e)
       : -1;
   if (repairWindow !== b.repairWindow) b.follower.invalidate();

@@ -1108,6 +1108,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
   const zombiesMode = recipe.mode === 'zombies';
+  /** M6 (fase 6b): a Horda armada (a horda são os bots do time 1; eles ficam fora do placar). */
+  const hordeArmed = zombiesMode && recipe.zombies?.variant === 'armed';
   /** M6 (fase 2): o Gun Game (a escada) e o Infection; nos dois, a arma é do modo (sem o radial da morte). */
   const gunGame = (recipe.weapons?.ladder?.length ?? 0) > 0;
   const infection = recipe.infection !== undefined;
@@ -1200,7 +1202,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? t('hud.zombies.rest', { wave: mv.zombieWave + 1, s: rest })
         : last === 1
           ? t('hud.zombies.last', { wave: mv.zombieWave })
-          : t('hud.zombies.wave', { wave: mv.zombieWave, left: mv.zombiesLeft });
+          : hordeArmed
+            ? t('hud.horde.wave' as StringKey, { wave: mv.zombieWave, left: mv.zombiesLeft })
+            : t('hud.zombies.wave', { wave: mv.zombieWave, left: mv.zombiesLeft });
     const parts = [base];
     if (announce > 0) parts.unshift(t(DROP_TEXT[announce - 1]!));
     if (double > 0) parts.push(t('hud.zombies.double', { s: double }));
@@ -1949,8 +1953,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // M3 (fase 2d): no Bobo Zombies o pool é o teto de zumbis do aparelho (gameplay.md §6.11); no bench do Zombies
       // (fase 7b), o `zombies=` da URL ou o mesmo teto. M5 (fase 6b): no online, o pool que o host escolheu (o menor
       // teto da sala), igual nos dois lados.
+      // M6 (fase 6b): na Horda armada a horda são os bots do time 1 (sem pool de zumbis).
       ...(zombiesMode && (!bench || bench.zombies <= 0)
-        ? { zombies: Math.min(MAX_ZOMBIES, request.online?.zombiePool ?? setup.profile.maxZombies) }
+        ? {
+            zombies: hordeArmed ? 0 : Math.min(MAX_ZOMBIES, request.online?.zombiePool ?? setup.profile.maxZombies),
+          }
         : {}),
       budget: aiBudgetFor(profile),
       now,
@@ -2341,7 +2348,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     let pick = -1;
     let best = Number.POSITIVE_INFINITY;
     for (const s of recipeSlots) {
-      if (s.bot === null || seatOf(s.controller) >= 0) continue;
+      if (s.bot === null || seatOf(s.controller) >= 0 || !seatableBot(s.team)) continue;
       const n = ffa ? 0 : (humansIn[s.team] ?? 0);
       if (n < best) {
         best = n;
@@ -2476,8 +2483,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }));
   /** Há um bot no lugar do qual alguém pode entrar. */
   function botSeatFree(): boolean {
-    for (const s of recipeSlots) if (s.bot !== null && seatOf(s.controller) < 0) return true;
+    for (const s of recipeSlots) if (s.bot !== null && seatOf(s.controller) < 0 && seatableBot(s.team)) return true;
     return false;
+  }
+  /** M6 (fase 6b): no Bobo Zombies, só o bot de apoio (time 0) cede o lugar (o time 1 da Horda armada é a horda). */
+  function seatableBot(team: number): boolean {
+    return !zombiesMode || team === 0;
   }
   /** Abre (ou refaz) a página: a pausa passa a ser do P1. */
   function openPlayers(): void {
@@ -3100,6 +3111,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // Aliados: o time dos locais (no versus do sofá, ninguém; no FFA também não).
       allyTeam: ffa ? -1 : team,
       zombies: zombiesMode,
+      hordeTeam: hordeArmed ? 1 : -1,
     });
   }
 
@@ -3868,6 +3880,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     let n = 0;
     for (let i = 0; i < v.count && n < SCOREBOARD_MAX_ROWS; i++) {
       if (v.alive[i] !== 1 || v.kind[i] !== ENTITY_KIND.bobo) continue;
+      if (hordeArmed && v.team[i] === 1) continue;
       let k = n++;
       while (k > 0) {
         const p = scoreOrder[k - 1]!;
@@ -3883,7 +3896,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       scoreOrder[k] = i;
     }
     scoreboard.rowCount = n;
-    scoreboard.teamCount = solo ? 0 : recipe.teams.length;
+    scoreboard.teamCount = solo ? 0 : hordeArmed ? 1 : recipe.teams.length;
     for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
       scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;
     const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
@@ -4241,7 +4254,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const z = v.position[e * 3 + 2]!;
       const B = ZOMBIE_BARRICADES;
       for (let i = 0; i < mo.barricades && m.interact === HUD_INTERACT.none; i++) {
-        if (mo.planks[i]! >= B.planks || Math.abs(y - mo.by[i]!) > 1) continue;
+        if (mo.openWindows || mo.planks[i]! >= B.planks || Math.abs(y - mo.by[i]!) > 1) continue;
         const dx = x - mo.bx[i]!;
         const dz = z - mo.bz[i]!;
         const dn = dx * mo.bnx[i]! + dz * mo.bnz[i]!;
@@ -5374,6 +5387,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           result: resultShown,
           musicInMatch: host.settings.current.audio.musicInMatch,
           locals: musicLocals,
+          hordeTeam: hordeArmed ? 1 : -1,
         });
       }
       trace('vfx e câmeras');

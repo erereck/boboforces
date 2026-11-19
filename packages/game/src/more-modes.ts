@@ -20,6 +20,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
   // M6 (fase 6a).
   { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
+  // M6 (fase 6b).
+  { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -113,6 +115,28 @@ export function moreModePreset(id: string): MatchRecipe | null {
         match: { timeLimitS: 0, scoreLimit: 0 },
         zombies: { variant: 'fortress' },
         teams: [{ humans: 'all', bots: [] }],
+      };
+    case 'zombiesArmed':
+      // GDD §4.1.5: o Bobo Zombies com ondas de soldados (a IA do Warfare) na Base Abandonada, com as janelas abertas. A
+      // horda são 12 bots do time 1: os 6 Chill entram primeiro (a horda reusa os de índice menor), os Normal aparecem
+      // quando a onda deixa mais soldados em jogo; 2 bots Normal de apoio (no Switch e no celular, a horda cai para 10).
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Bobo Zombies: Horda Armada',
+        mode: 'zombies',
+        map: 'base',
+        seed: 0,
+        match: { timeLimitS: 0, scoreLimit: 0 },
+        zombies: { variant: 'armed' },
+        teams: [
+          { humans: 'all', bots: [{ ref: normal, count: 2 }] },
+          {
+            bots: [
+              { ref: builtinBotRef('chill'), count: 6 },
+              { ref: normal, count: 6 },
+            ],
+          },
+        ],
       };
     default:
       return null;

@@ -3,7 +3,7 @@ import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { BOT_CONTROLLER_BASE } from '../constants.ts';
-import type { SimContext } from '../context.ts';
+import { isHorde, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
 import { isLivePhase } from '../view.ts';
 import { pickSpawn, respawn } from './life.ts';
@@ -71,7 +71,8 @@ function unstuck(ctx: SimContext, e: number): void {
   s.unstuckCount[e] = Math.min(255, s.unstuckCount[e]! + 1);
   if ((bot && s.unstuckCount[e]! >= MATCH_DEFAULTS.botUnstuckRespawnAt) || !findNode(ctx, bot)) {
     // M6 (fase 3, revisão): o Jugg destravado no spawn continua com a vida que tinha e sem proteção.
-    const jugg = ctx.party.jugg !== null && s.team[e] === 1;
+    // M6 (fase 6b): o soldado da Horda armada também (a vida dele é a da onda).
+    const jugg = (ctx.party.jugg !== null && s.team[e] === 1) || (ctx.zombieArmed && isHorde(ctx, e));
     const health = s.health[e]!;
     respawn(ctx, e, pickSpawn(ctx, e));
     if (jugg) {

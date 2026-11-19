@@ -11,7 +11,7 @@ import {
   type MatchRecipe,
 } from '@boboforces/format';
 import { hashToHex } from '@boboforces/shared';
-import { WEAPON_CODE } from '@boboforces/sim';
+import { ENTITY_FLAG, ENTITY_KIND, WEAPON_CODE } from '@boboforces/sim';
 import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
@@ -661,5 +661,63 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
     expect(a.low, msg).toBeLessThan(4000);
     expect(a.wave, msg).toBeGreaterThanOrEqual(2);
     expect(a.hash, msg).toBe(GOLDEN_FORTRESS_HASH);
+  }, 240_000);
+});
+
+/**
+ * M6 (fase 6b): a Horda armada na Base Abandonada: 4 bots Normal de apoio contra a horda de 12 bots Normal (o time 1),
+ * semente 42, até 7.200 ticks. Confere que a horda entra (o apoio abate soldados) e o hash entre
+ * execuções. Gravado na fase 6b (19/11/2026): `0bc0e8ca` (o apoio derruba 4 dos 5 soldados da 1ª onda, 2 em jogo por vez). MUDA com a sim, a IA ou o mapa.
+ */
+const GOLDEN_HORDE_HASH = '0bc0e8ca';
+
+function runHordeGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
+  const { map } = loadWorld('base');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'base',
+      seed: 42,
+      zombies: { variant: 'armed' },
+      teams: [
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 12 }] },
+      ],
+    },
+    map,
+    humans: 0,
+  });
+  let downs = 0;
+  for (let t = 0; t < GOLDEN_ZOMBIES_TICKS && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    const v = match.sim.view();
+    for (let i = 0; i < v.count; i++) if (v.team[i] === 0 && (v.flags[i]! & ENTITY_FLAG.downed) !== 0) downs++;
+  }
+  const v = match.sim.view();
+  let kills = 0;
+  for (let i = 0; i < v.count; i++)
+    if (v.alive[i] === 1 && v.team[i] === 0 && v.kind[i] === ENTITY_KIND.bobo) kills += v.kills[i]!;
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    wave: v.match.zombieWave,
+    kills,
+    downs,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada', () => {
+  it('a horda de soldados entra e o apoio troca tiro; hash estável', () => {
+    const a = runHordeGolden();
+    const b = runHordeGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `onda ${a.wave}, abates do apoio ${a.kills}, ticks caídos ${a.downs}, fase ${a.phase}`;
+    console.log(`[horda] ${msg} · hash ${a.hash}`);
+    expect(a.kills, msg).toBeGreaterThan(0);
+    expect(a.wave, msg).toBeGreaterThanOrEqual(1);
+    expect(a.hash, msg).toBe(GOLDEN_HORDE_HASH);
   }, 240_000);
 });

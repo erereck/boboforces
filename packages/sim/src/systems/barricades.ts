@@ -20,7 +20,9 @@ export function barricadesSystem(ctx: SimContext): void {
   const s = ctx.s;
   const tearTicks = Math.max(1, secondsToTicks(B.tearS, ctx.hz));
   const repairTicks = Math.max(1, secondsToTicks(B.repairS, ctx.hz));
-  for (let i = 0; i < mo.barricades; i++) {
+  // M6 (fase 6b): na Horda armada as janelas são vãos abertos (ninguém arranca nem conserta); as portas valem.
+  const windows = mo.openWindows ? 0 : mo.barricades;
+  for (let i = 0; i < windows; i++) {
     const bx = mo.bx[i]!;
     const by = mo.by[i]!;
     const bz = mo.bz[i]!;
