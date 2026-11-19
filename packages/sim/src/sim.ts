@@ -66,6 +66,7 @@ import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './
 import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
 import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
+import { applyChaos, ChaosState, chaosOf, chaosSystem } from './systems/chaos.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -218,6 +219,11 @@ export interface SimPredict {
   load(e: number, from: Float64Array): void;
   /** Um tick do movimento de `e` com `frame` (`prev*` ← atual, entrada, movimento); eventos e dano descartados. */
   step(e: number, frame: Readonly<InputFrame>): void;
+  /**
+   * M6 (fase 4): a máscara dos modificadores do snapshot mais novo (a base da predição); a gravidade e a velocidade
+   * da predição saem dela, não da que a view mostra. Sem modificadores, nada.
+   */
+  modifiers(mask: number): void;
 }
 
 /**
@@ -466,6 +472,10 @@ export function createSim(config: SimConfig): Sim {
     recipe.mode === 'warfare.domination' && (map.controlPoints?.length ?? 0) > 0
       ? new ControlPoints(map.controlPoints!)
       : null;
+  // M6 (fase 4): os modificadores (o perfil e as regras de arma da partida são a base deles).
+  const baseProfile = resolveMovementProfile(recipe.players);
+  const baseMods = matchModsOf(recipe);
+  const chaos = chaosOf(recipe) ? new ChaosState(recipe, baseProfile, baseMods, hz) : null;
   const match: MatchState = {
     phase: countdownTicks > 0 ? 'warmup' : 'playing',
     ticksLeft: timeLimitS > 0 ? Math.max(1, secondsToTicks(timeLimitS, hz)) : -1,
@@ -487,7 +497,7 @@ export function createSim(config: SimConfig): Sim {
     domination,
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
-    profile: resolveMovementProfile(recipe.players),
+    profile: baseProfile,
     zombieProfile: zombieSpeed(MOVEMENT_ZOMBIE, recipe),
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
@@ -511,7 +521,7 @@ export function createSim(config: SimConfig): Sim {
     navMainComponent: map.nav ? mainComponent(map.nav) : -1,
     ammoBoxTicks: secondsToTicks(MATCH_DEFAULTS.ammoBoxLifeS, hz),
     rules: createEntityRules(recipe.players?.hp ?? BASE_HP),
-    mods: matchModsOf(recipe),
+    mods: chaos?.mods ?? baseMods,
     killPlaneY: map.killPlaneY ?? lowestBlockY(map.grid) - METRICS.killPlaneBelow,
     playArea: map.playArea ?? null,
     zombieHp: ZOMBIE_RULES.hp,
@@ -560,11 +570,15 @@ export function createSim(config: SimConfig): Sim {
     rngZombies: root.fork('zombies'),
     rngParty: root.fork('party'),
     party: createPartyState(recipe),
+    rngChaos: root.fork('chaos'),
+    chaos,
     downedProfile: MOVEMENT_DOWNED,
     sprinterProfile: zombieSpeed(MOVEMENT_ZOMBIE_SPRINTER, recipe),
     slowProfile: zombieSpeed(MOVEMENT_ZOMBIE_SLOW, recipe),
   };
 
+  // Os modificadores fixos valem desde o tick 0.
+  applyChaos(ctx);
   const perTeam = new Int32Array(MAX_TEAMS);
   let controllerCount = 0;
   slots.forEach((slot, i) => {
@@ -689,6 +703,7 @@ export function createSim(config: SimConfig): Sim {
     nav: map.nav ?? null,
     mapObjects,
     controlPoints: domination,
+    chaos,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
   };
@@ -805,6 +820,8 @@ export function createSim(config: SimConfig): Sim {
       }
       // M6 (fase 3): as regras do Jugg (a velocidade dele) também saem do time.
       syncJuggRules(ctx);
+      // M6 (fase 4): os modificadores que chegaram (a gravidade e a velocidade da predição).
+      applyChaos(ctx);
       mapObjects?.sync();
       ctx.figures.invalidate();
       events.clear();
@@ -837,6 +854,7 @@ export function createSim(config: SimConfig): Sim {
       // M6 (fase 3, revisão): o próprio time chega do snapshot mais novo (os outros, do atrasado): as regras do Jugg
       // (a velocidade) saem dele antes de refazer as entradas.
       syncJuggRules(ctx);
+      applyChaos(ctx);
       const e3 = e * 3;
       s.position[e3] = from[0]!;
       s.position[e3 + 1] = from[1]!;
@@ -854,6 +872,12 @@ export function createSim(config: SimConfig): Sim {
       s.slideDir[e * 2 + 1] = from[13]!;
       s.airPeakY[e] = from[14]!;
       s.sprintFireDelayTicks[e] = from[15]!;
+    },
+    modifiers(mask): void {
+      // M6 (fase 4, revisão): a máscara do snapshot mais novo para a predição (a view fica com a do atrasado).
+      if (ctx.chaos === null) return;
+      ctx.chaos.predictMask = mask;
+      applyChaos(ctx);
     },
     step(e, frame): void {
       if (e < 0 || e >= s.count || s.alive[e] !== 1) return;
@@ -921,6 +945,8 @@ export function createSim(config: SimConfig): Sim {
       for (let p = 0; p < s.projCount * 3; p++) s.projPrevPosition[p] = s.projPosition[p]!;
       // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (8) o diretor de ondas do Bobo Zombies.
       applyInputs(inputs);
+      // M6 (fase 4): a Roleta (antes do movimento: a gravidade nova vale neste tick).
+      chaosSystem(ctx);
       unstuckSystem(ctx);
       movementSystem(ctx);
       weaponSystem(ctx);

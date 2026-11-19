@@ -508,3 +508,56 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
     expect(a.hash, msg).toBe(GOLDEN_JUGGERNAUT_HASH);
   }, 240_000);
 });
+
+/**
+ * M6 (fase 4): o Bobo Chaos (Times 4 contra 4 com a Roleta) com 8 bots Normal no Construto, semente 42, 3 min. Confere
+ * que a Roleta troca 1 modificador por minuto, que os bots jogam com eles (abates) e o hash entre execuções. Gravado na
+ * fase 4 (19/11/2026): `9c9aabae` (pesada, pressa e tudo explode; sai a pesada e entra a troca por abate; sai a
+ * troca e entra a Lua; 24 × 21). MUDA com a sim, a IA, o mapa ou os modificadores.
+ */
+const GOLDEN_CHAOS_HASH = '9c9aabae';
+
+function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
+  const { map } = loadWorld();
+  const normal = builtinBotRef('normal');
+  const recipe: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'warfare.tdm',
+    map: 'construto',
+    seed: 42,
+    match: { timeLimitS: 180, scoreLimit: 0 },
+    chaos: {},
+    teams: [{ bots: [{ ref: normal, count: 4 }] }, { bots: [{ ref: normal, count: 4 }] }],
+  };
+  const match = createHeadlessMatch({ recipe, map, humans: 0 });
+  const masks: number[] = [];
+  let t = 0;
+  for (; t < 10_900 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    const m = match.sim.view().chaos!.masks[0]!;
+    if (masks[masks.length - 1] !== m) masks.push(m);
+  }
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    masks,
+    score: [v.match.teamScore[0]!, v.match.teamScore[1]!],
+    ticks: t,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
+  it('a Roleta troca 1 por minuto e os bots jogam; hash estável', () => {
+    const a = runChaosGolden();
+    const b = runChaosGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `máscaras ${a.masks.map((m) => m.toString(2)).join(' → ')}, placar ${a.score.join('×')} em ${a.ticks} ticks`;
+    console.log(`[chaos] ${msg} · hash ${a.hash}`);
+    // A largada (3 ligados) e as trocas dos minutos 1 e 2 (o fim é no minuto 3).
+    expect(a.masks.length, msg).toBeGreaterThanOrEqual(3);
+    expect(a.score[0]! + a.score[1]!, msg).toBeGreaterThan(10);
+    expect(a.hash, msg).toBe(GOLDEN_CHAOS_HASH);
+  }, 240_000);
+});

@@ -33,6 +33,7 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, eyeHeightFor, figurePostureOf, weaponGrip, type AimPoint } from '../hitbox.ts';
 import { isLivePhase } from '../view.ts';
 import { explode, launchProjectile, rocketFuseTicks } from './projectiles.ts';
+import { MOD, modOn } from './chaos.ts';
 
 /**
  * Passo 3: armas (tecnico.md §7.2; M2 fase 1: as 8 armas). Troca de slot, ADS com tempo de entrada, recarga (pente
@@ -129,13 +130,18 @@ export function weaponSystem(ctx: SimContext): void {
     }
     if (s.switchTicks[e]! > 0) s.switchTicks[e]!--;
     // M2 (fase 3b): munição infinita (regra do bot): pente ou reserva voltam ao cheio a cada tick.
-    const ammoRule = ctx.rules.ammo[e]!;
-    if (ammoRule !== AMMO_RULE.normal) {
+    // M6 (fase 4): o modificador "munição infinita sem recarga" vale como pente infinito nas armas de tiro (a granada e
+    // a Big Brrt, que usa o pente como calor, ficam com a regra de cada um).
+    const ruleAmmo = ctx.rules.ammo[e]!;
+    const chaosAmmo = modOn(ctx, MOD.infiniteAmmo);
+    if (ruleAmmo !== AMMO_RULE.normal || chaosAmmo) {
       for (let q = 0; q < S; q++) {
         const d = weaponDef(s.loadout[base + q]!);
         if (d === null) continue;
+        const ammoRule =
+          chaosAmmo && d.fire !== WEAPON_FIRE.thrown && d.code !== WEAPON_BIG_BRRT ? AMMO_RULE.infiniteClip : ruleAmmo;
         if (ammoRule === AMMO_RULE.infiniteClip) s.slotClip[base + q] = d.clipSize;
-        else s.slotReserve[base + q] = d.reserve;
+        else if (ammoRule === AMMO_RULE.infiniteReserve) s.slotReserve[base + q] = d.reserve;
       }
     }
     // Refino R2 (#79): arremesso rápido no botão granada (G, RB, o botão do toque), de qualquer arma: segurar

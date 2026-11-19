@@ -580,6 +580,57 @@ describe('placar e tempo compartilhados', () => {
     expect(bars.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('M6 (fase 4): a linha dos modificadores embaixo do placar (o aviso da Roleta em destaque); sem placar, sozinha', () => {
+    const screen = layoutHudScreen(1, 640, 360, { minTextPx: 12 });
+    const model = createHudSharedModel();
+    model.timeLeftS = 300;
+    model.teamCount = 2;
+    model.modsLine = 'LUA · VAMPIRO';
+    const list = createDrawList();
+    drawHudShared(list, fonts, model, screen.shared);
+    expect(syntheticGlyphText(list)).toContain('LUA·VAMPIRO');
+    for (const c of drawnCommands(list)) {
+      expect(c.x).toBeGreaterThanOrEqual(0);
+      expect(c.x + c.w).toBeLessThanOrEqual(640);
+      expect(c.y + c.h).toBeLessThanOrEqual(360);
+    }
+    expect(glyphs(list).some((g) => g.color === COLORS.acao)).toBe(false);
+    // O aviso: em destaque.
+    model.modsWarn = true;
+    const warn = createDrawList();
+    drawHudShared(warn, fonts, model, screen.shared);
+    expect(glyphs(warn).some((g) => g.color === COLORS.acao)).toBe(true);
+    // Sem relógio e sem placar (FFA sem tempo): só a linha.
+    const alone = createHudSharedModel();
+    alone.modsLine = 'PRESSA';
+    const only = createDrawList();
+    drawHudShared(only, fonts, alone, screen.shared);
+    expect(syntheticGlyphText(only)).toBe('PRESSA');
+    // Revisão: comprida demais para a vista, vai em duas linhas, tudo dentro.
+    const long = createHudSharedModel();
+    long.timeLeftS = 300;
+    long.modsLine = 'GRAVIDADE PESADA · MUNIÇÃO INFINITA · TROCA POR ABATE · TUDO EXPLODE · SÓ NA CABEÇA';
+    const two = createDrawList();
+    drawHudShared(two, fonts, long, screen.shared);
+    expect(syntheticGlyphText(two)).toContain('GRAVIDADEPESADA');
+    expect(syntheticGlyphText(two)).toContain('SÓNACABEÇA');
+    for (const c of drawnCommands(two)) {
+      expect(c.x).toBeGreaterThanOrEqual(0);
+      expect(c.x + c.w).toBeLessThanOrEqual(640);
+    }
+    // Revisão: com a linha da onda (Bobo Zombies) e no quadrante livre do 3P, a linha também aparece.
+    const wave = createHudSharedModel();
+    wave.trainingLine = 'ONDA 3';
+    wave.modsLine = 'VAMPIRO';
+    const w1 = createDrawList();
+    drawHudShared(w1, fonts, wave, screen.shared);
+    expect(syntheticGlyphText(w1)).toContain('VAMPIRO');
+    const spare = createDrawList();
+    model.modsWarn = false;
+    drawHudShared(spare, fonts, model, layoutHudScreen(3, 1280, 720, { minTextPx: 16 }).shared);
+    expect(syntheticGlyphText(spare)).toContain('LUA·VAMPIRO');
+  });
+
   it('vistas locais (ViewDesc.hud): origem 0,0 e mesmo tamanho', () => {
     const screen = layoutHudScreen(4, 1920, 1080, { minTextPx: 16, viewLocal: true });
     expect(screen.views[3]).toMatchObject({ x: 0, y: 0, width: 960, height: 540, scale: 1.5 });

@@ -10,6 +10,7 @@ import {
   FIGURE_PITCH_SAMPLES,
   MANNEQUIN_KIND,
   MATCH_RECIPE_FORMAT,
+  MODIFIERS,
   normalizeFigureLook,
   PLATFORM_PROFILES,
   recipeLimitsFor,
@@ -124,6 +125,7 @@ import {
   MAX_CONTROLLERS,
   WEAPON_CODE,
   WEAPON_BIG_BRRT,
+  WEAPON_CHAOS_BLAST,
   WEAPON_DESMONTADOR,
   WEAPON_GOO,
   WEAPON_SPIT,
@@ -864,8 +866,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
   // M3 (fase 4e): o Desmontador fica fora de `WEAPONS` (só da caixa), mas tem nome e categoria no HUD.
   weaponNames[WEAPON_DESMONTADOR] = t('weapon.desmontador');
-  // M6 (fase 3): a Big Brrt (só do Jugg) também.
+  // M6 (fase 3): a Big Brrt (só do Jugg) também. Fase 4: a explosão do "tudo explode" no kill feed.
   weaponNames[WEAPON_BIG_BRRT] = t('weapon.big-brrt' as StringKey);
+  weaponNames[WEAPON_CHAOS_BLAST] = t('weapon.chaos-blast' as StringKey);
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
@@ -3574,6 +3577,33 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     lost: t('feed.pointLost'),
     points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
   };
+  /** M6 (fase 4): os nomes dos modificadores (pelo bit) e a chave da última linha montada. */
+  const modNames = MODIFIERS.map((id) => t(`mod.${id}` as StringKey).toUpperCase());
+  let modsKey = -1;
+  /** Remonta a linha dos modificadores só quando a máscara (ou o aviso) muda. */
+  function refreshModsLine(masks: Int32Array): void {
+    const active = masks[0]!;
+    const next = masks[1]!;
+    const key = active * 65536 + next;
+    if (key === modsKey) return;
+    modsKey = key;
+    const nameOf = (mask: number): string => {
+      for (let i = 0; i < modNames.length; i++) if ((mask & (1 << i)) !== 0) return modNames[i]!;
+      return '';
+    };
+    if (next !== active) {
+      sharedHud.modsLine = t('hud.chaosSwap' as StringKey, {
+        out: nameOf(active & ~next),
+        in: nameOf(next & ~active),
+      }).toUpperCase();
+      sharedHud.modsWarn = true;
+      return;
+    }
+    const names: string[] = [];
+    for (let i = 0; i < modNames.length; i++) if ((active & (1 << i)) !== 0) names.push(modNames[i]!);
+    sharedHud.modsLine = names.join(' · ');
+    sharedHud.modsWarn = false;
+  }
   /** M6 (fase 3): o Jugg vivo agora (índice), ou -1. */
   function juggIndex(v: SimView): number {
     for (let i = 0; i < v.count; i++) {
@@ -5167,8 +5197,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             sharedHud.pointOwner[i] = cpv!.owner[i]!;
             sharedHud.pointProgress[i] = cpv!.progress[i]!;
           }
+          // M6 (fase 4): os modificadores ligados (ou o aviso da Roleta) embaixo do placar.
+          const chv = sim.view().chaos;
+          if (chv !== null) refreshModsLine(chv.masks);
           sharedHud.spareMap = viewCount === 3 && sharedArea.mode === 'spare';
-          if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training || zombiesMode) {
+          if (
+            viewCount === 3 ||
+            sharedHud.teamCount > 0 ||
+            sharedHud.timeLeftS >= 0 ||
+            training ||
+            zombiesMode ||
+            sharedHud.modsLine !== ''
+          ) {
             drawHudShared(list, fonts, sharedHud, sharedArea);
           }
           if (sharedHud.spareMap) drawSpareMinimap(list, sharedArea);

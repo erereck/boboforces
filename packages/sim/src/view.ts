@@ -111,6 +111,12 @@ export interface SimView {
   /** M6 (fase 1): os pontos do Domination (`null` fora dele). */
   readonly controlPoints: ControlPointsView | null;
   /**
+   * M6 (fase 4): os modificadores (`null` sem nenhum): `masks[0]` os ligados agora (bits de `MODIFIERS`), `masks[1]` os
+   * da próxima troca da Roleta (iguais fora do aviso) e `masks[2]` os ticks até ela (-1 = sem Roleta ou antes da
+   * largada). A rede escreve direto aqui no amigo.
+   */
+  readonly chaos: ChaosView | null;
+  /**
    * M1 (integração): área jogável em metros (`SimMap.playArea`; paredes invisíveis em X/Z), ou `null` = a grade
    * inteira. A IA não escolhe destino fora dela.
    */
@@ -257,4 +263,9 @@ export interface MapObjectsView {
   readonly pmnz: Float32Array;
   readonly pmPerk: Uint8Array;
   readonly pmCost: Int32Array;
+}
+
+/** M6 (fase 4): o que a view mostra dos modificadores. */
+export interface ChaosView {
+  readonly masks: Int32Array;
 }

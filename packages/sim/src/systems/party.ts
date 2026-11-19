@@ -8,10 +8,10 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.
 
 /**
  * M6 (fase 2): os modos de festa que são regra sobre o Warfare (GDD §4.1.2):
- * - **Gun Game** (\`weapons.ladder\`, sobre o FFA): cada bobo só tem a arma do nível dele (o nível mora nos pontos,
- *   \`SimState.points\`, que o snapshot e a rede já levam); cada abate sobe um nível e troca a arma na hora; morrer pela
+ * - **Gun Game** (`weapons.ladder`, sobre o FFA): cada bobo só tem a arma do nível dele (o nível mora nos pontos,
+ *   `SimState.points`, que o snapshot e a rede já levam); cada abate sobe um nível e troca a arma na hora; morrer pela
  *   faca desce um; quem abate com a última arma vence. No fim do tempo, vence o nível mais alto.
- * - **Infection** (\`infection\`, sobre os Times): o time 0 são os sobreviventes e o time 1 os infectados (só a faca,
+ * - **Infection** (`infection`, sobre os Times): o time 0 são os sobreviventes e o time 1 os infectados (só a faca,
  *   mais rápidos). Na largada, se não houver infectado, um sobrevivente sorteado vira um; quem morre vira infectado (ao
  *   renascer). Os infectados vencem quando não sobra sobrevivente; os sobreviventes, no fim do tempo. O placar mostra
  *   quantos há de cada lado.
@@ -41,13 +41,13 @@ interface JuggRules {
   readonly ammo: Uint8Array;
 }
 export interface PartyState {
-  /** Códigos das armas da escada do Gun Game, ou \`null\`. */
+  /** Códigos das armas da escada do Gun Game, ou `null`. */
   readonly ladder: Uint8Array | null;
   /** A velocidade dos infectados, ou -1 sem Infection. */
   readonly infectedSpeed: number;
   /** O Infection já sorteou o 1º infectado. */
   started: boolean;
-  /** Quem fechou a escada (\`NULL_ENTITY\` = ninguém ainda). */
+  /** Quem fechou a escada (`NULL_ENTITY` = ninguém ainda). */
   winnerEntity: EntityId;
   /** O time que o modo deu como vencedor (-2 = ninguém ainda; -1 = empate). */
   winnerTeam: number;
@@ -89,7 +89,7 @@ export function createPartyState(recipe: MatchRecipe): PartyState {
   };
 }
 
-/** O bobo \`e\` fica só com a arma \`code\` (pente e reserva cheios, na mão), sem nada pela metade da anterior. */
+/** O bobo `e` fica só com a arma `code` (pente e reserva cheios, na mão), sem nada pela metade da anterior. */
 function holdOnly(ctx: SimContext, e: number, code: number): void {
   const s = ctx.s;
   const def = weaponDef(code);
@@ -206,14 +206,14 @@ export function currentJugg(ctx: SimContext): number {
   return -1;
 }
 
-/** O sobrevivente \`e\` vira infectado (o time 1 e a velocidade; a faca vem no próximo spawn, ou agora se \`now\`). */
+/** O sobrevivente `e` vira infectado (o time 1 e a velocidade; a faca vem no próximo spawn, ou agora se `now`). */
 function infect(ctx: SimContext, e: number, now: boolean): void {
   ctx.s.team[e] = 1;
   ctx.rules.speed[e] = ctx.party.infectedSpeed;
   if (now) holdOnly(ctx, e, WEAPON_CODE.knife);
 }
 
-/** Um abate (chamado por \`kill\` depois do placar): o nível do Gun Game e a infecção. */
+/** Um abate (chamado por `kill` depois do placar): o nível do Gun Game e a infecção. */
 export function partyKill(ctx: SimContext, victim: number, killer: EntityId, weapon: number): void {
   const p = ctx.party;
   const s = ctx.s;
@@ -222,7 +222,13 @@ export function partyKill(ctx: SimContext, victim: number, killer: EntityId, wea
     if (weapon === WEAPON_CODE.knife) s.points[victim] = Math.max(0, s.points[victim]! - 1);
     if (killer !== NULL_ENTITY && s.isCurrent(killer)) {
       const k = killer & 0xffff;
-      if (k !== victim && s.kind[k] === ENTITY_KIND.bobo && s.alive[k] === 1) {
+      // Só quem está vivo sobe (no "tudo explode", o abate da explosão é de quem já morreu).
+      if (
+        k !== victim &&
+        s.kind[k] === ENTITY_KIND.bobo &&
+        s.alive[k] === 1 &&
+        (s.flags[k]! & ENTITY_FLAG.dead) === 0
+      ) {
         const level = s.points[k]! + 1;
         s.points[k] = level;
         if (level >= p.ladder.length) {

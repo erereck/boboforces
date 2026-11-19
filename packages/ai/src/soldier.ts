@@ -467,7 +467,9 @@ function acquire(view: SimView, b: SoldierBrain, t: number, tick: number): void 
   b.targetGen = view.generation[t]!;
   b.reactionReadyTick = tick + b.reactionTicks;
   b.acquireStartTick = b.reactionReadyTick;
-  b.aimHead = b.rng.chance(b.skill.headPreference);
+  // M6 (fase 4): com "só na cabeça" ligado (na receita ou pela Roleta), todo bot mira na cabeça.
+  const prefersHead = b.rng.chance(b.skill.headPreference);
+  b.aimHead = prefersHead || view.mods.headshotOnly;
   b.aimOffset.x = 0;
   b.aimOffset.y = 0;
   b.aimOffset.z = 0;

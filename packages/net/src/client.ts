@@ -121,6 +121,8 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   const { sim, endpoint, host, writeLocalFrame } = config;
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
+  /** M6 (fase 4): o global da máscara dos modificadores (-1 = partida sem eles). */
+  const chaosSlot = layout.globals.findIndex((g) => g.name === 'chaosActive');
   const assembler = new SnapshotAssembler(layout);
   const events = new EventQueue();
   const onEvents = config.onEvents;
@@ -229,6 +231,8 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         if (err > 0.1) stats.mispredicts++;
       }
     }
+    // M6 (fase 4): a predição anda com os modificadores do snapshot mais novo (a view mostra os do atrasado).
+    if (chaosSlot >= 0) sim.predict.modifiers(newest.glob[chaosSlot]!);
     sim.predict.load(own, newest.priv);
     if (used >= 0) {
       for (let q = (used + 1) & 0xffff; seqDiff(seq, q) >= 0; q = (q + 1) & 0xffff) {

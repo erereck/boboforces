@@ -1437,6 +1437,12 @@ export interface HudSharedModel {
   points: number;
   readonly pointOwner: Int8Array;
   readonly pointProgress: Float32Array;
+  /**
+   * M6 (fase 4): a linha dos modificadores embaixo do placar (`''` = nenhum): os ligados ("LUA · VAMPIRO") ou, no aviso
+   * da Roleta (`modsWarn`), o que sai e o que entra. O `game` só refaz a string quando a máscara muda.
+   */
+  modsLine: string;
+  modsWarn: boolean;
 }
 
 export function createHudSharedModel(): HudSharedModel {
@@ -1446,6 +1452,8 @@ export function createHudSharedModel(): HudSharedModel {
     teamScores: [0, 0, 0, 0],
     suddenDeath: false,
     trainingLine: '',
+    modsLine: '',
+    modsWarn: false,
     spareMap: false,
     points: 0,
     pointOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
@@ -1604,6 +1612,73 @@ function paintTeamScore(
   return icon + gap / 2 + paintNumber(out, font, score, 0, x + icon + gap / 2, capTop, numberPx, color);
 }
 
+/** M6 (fase 4): as duas metades da linha dos modificadores quando ela não cabe (refeitas só quando a linha muda). */
+let modsSplitOf = '';
+let modsSplitA = '';
+let modsSplitB = '';
+const MODS_SEPARATOR = ' · ';
+
+function splitModsLine(line: string): void {
+  if (line === modsSplitOf) return;
+  modsSplitOf = line;
+  // O separador (ou, no aviso, o espaço) mais perto do meio.
+  const mid = line.length / 2;
+  let best = -1;
+  let bestLen = 0;
+  for (const sep of [MODS_SEPARATOR, ', ', ' ']) {
+    for (let i = line.indexOf(sep); i >= 0; i = line.indexOf(sep, i + 1)) {
+      if (best < 0 || Math.abs(i - mid) < Math.abs(best - mid)) {
+        best = i;
+        bestLen = sep.length;
+      }
+    }
+    if (best >= 0) break;
+  }
+  if (best < 0) {
+    modsSplitA = line;
+    modsSplitB = '';
+    return;
+  }
+  // A vírgula do aviso fica na 1ª metade.
+  modsSplitA = line.slice(0, line[best] === ',' ? best + 1 : best);
+  modsSplitB = line.slice(best + bestLen);
+}
+
+/**
+ * M6 (fase 4): a linha dos modificadores centrada em `cx`, a partir de `top` (em duas linhas quando passa de `maxW`);
+ * devolve a altura usada (0 sem linha). O aviso da Roleta vai em destaque.
+ */
+function drawModsLine(
+  out: DrawList,
+  font: MsdfFont | null,
+  model: Readonly<HudSharedModel>,
+  cx: number,
+  top: number,
+  s: number,
+  minTextPx: number,
+  maxW: number,
+): number {
+  if (model.modsLine === '') return 0;
+  const pad = hudPad(s);
+  const px = hudLabelPx(s, minTextPx);
+  const color = model.modsWarn ? COLORS.acao : COLORS.texto;
+  const lineH = Math.round(capHeightPx(font, px) + pad * 2);
+  const one = (text: string, y: number): void => {
+    const w = textWidth(font, text, px, HUD_METRICS.labelTracking);
+    plate(out, Math.round(cx - w / 2 - pad), y, Math.round(w + pad * 2), lineH, s);
+    paintText(out, font, text, cx, y + pad, px, color, HUD_METRICS.labelTracking, 0.5);
+  };
+  if (textWidth(font, model.modsLine, px, HUD_METRICS.labelTracking) + pad * 2 <= maxW) {
+    one(model.modsLine, Math.round(top));
+    return lineH;
+  }
+  splitModsLine(model.modsLine);
+  one(modsSplitA, Math.round(top));
+  if (modsSplitB === '') return lineH;
+  one(modsSplitB, Math.round(top + lineH));
+  return lineH * 2;
+}
+
 /**
  * Desenha o placar e o tempo na área compartilhada (ver `layoutHudScreen`). Sem relógio e sem times, só o fundo do
  * quadrante livre (3P). Sem alocação.
@@ -1632,6 +1707,7 @@ export function drawHudShared(
         : Math.round(area.y + (area.height - h) / 2);
     plate(out, x, y, w, h, s);
     paintText(out, font, model.trainingLine, x + pad, y + pad, px, COLORS.texto);
+    drawModsLine(out, font, model, area.x + area.width / 2, y + h + gap, s, area.minTextPx, area.width - pad * 2);
     return;
   }
 
@@ -1644,7 +1720,10 @@ export function drawHudShared(
       Math.round(area.height),
       COLORS.bunker,
     );
-    if (!hasContent) return;
+    if (!hasContent) {
+      drawModsLine(out, font, model, area.x + area.width / 2, area.y + gap, s, area.minTextPx, area.width - pad * 2);
+      return;
+    }
     if (model.spareMap) {
       // M3 (fase 7a): com o minimapa embaixo, o placar no alto do quadrante, no tamanho normal.
       const numberPx = hudNumberPx(s, area.minTextPx);
@@ -1656,6 +1735,7 @@ export function drawHudShared(
       const y = Math.round(area.y + gap);
       plate(out, x, y, w, h, s);
       paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
+      drawModsLine(out, font, model, area.x + area.width / 2, y + h + gap, s, area.minTextPx, area.width - pad * 2);
       return;
     }
     // Quadrante livre: o mesmo placar, em dobro, centrado.
@@ -1665,9 +1745,19 @@ export function drawHudShared(
     const capN = capHeightPx(font, numberPx);
     const x = area.x + (area.width - w) / 2;
     paintSharedLine(out, font, model, x, area.y + (area.height - capN) / 2, numberPx, icon, gap, tx);
+    const below3 = area.y + (area.height + capN) / 2 + gap;
+    drawModsLine(out, font, model, area.x + area.width / 2, below3, s, area.minTextPx, area.width - pad * 2);
     return;
   }
-  if (!hasContent) return;
+  if (!hasContent) {
+    // M6 (fase 4): sem relógio e sem placar (FFA sem tempo), só a linha dos modificadores, no lugar do placar.
+    const top =
+      area.mode === 'top'
+        ? area.y + Math.max(area.insetTop, HUD_METRICS.marginY * s)
+        : area.y + area.height / 2 - (capHeightPx(font, hudLabelPx(s, area.minTextPx)) / 2 + pad);
+    drawModsLine(out, font, model, area.x + area.width / 2, top, s, area.minTextPx, area.width - pad * 2);
+    return;
+  }
   const numberPx = hudNumberPx(s, area.minTextPx);
   const capN = capHeightPx(font, numberPx);
   const icon = Math.round(capN * 0.8);
@@ -1682,10 +1772,12 @@ export function drawHudShared(
   paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
   // M6 (fase 1): os pontos do Domination embaixo do placar (a morte súbita vai embaixo deles).
   const rowH = paintPointsRow(out, font, model, area.x + area.width / 2, Math.round(y + h + gap), s, area.minTextPx);
+  let below = Math.round(y + h + gap + (rowH > 0 ? rowH + gap : 0));
   if (model.suddenDeath) {
     const px = hudLabelPx(s, area.minTextPx);
     const sw = textWidth(font, tx.suddenDeath, px, HUD_METRICS.labelTracking);
-    const sy = Math.round(y + h + gap + (rowH > 0 ? rowH + gap : 0));
+    const sy = below;
+    below += Math.round(capHeightPx(font, px) + pad * 2 + gap);
     plate(out, area.x + (area.width - sw) / 2 - pad, sy, sw + pad * 2, capHeightPx(font, px) + pad * 2, s);
     paintText(
       out,
@@ -1699,6 +1791,7 @@ export function drawHudShared(
       0.5,
     );
   }
+  drawModsLine(out, font, model, area.x + area.width / 2, below, s, area.minTextPx, area.width - pad * 2);
 }
 
 // --- Divisão da tela (1 a 4 vistas) --------------------------------------------------------------------------------

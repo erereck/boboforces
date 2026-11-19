@@ -115,6 +115,8 @@ function expectSameResult(run: RoomRun): void {
       expect([v.kills[e], v.deaths[e], v.points[e]], `entidade ${e}`).toEqual([h.kills[e], h.deaths[e], h.points[e]]);
     }
     if (h.mapObjects !== null) expect([...v.mapObjects!.doorOpen]).toEqual([...h.mapObjects.doorOpen]);
+    // M6 (fase 4): os modificadores ligados.
+    if (h.chaos !== null) expect(v.chaos!.masks[0]).toBe(h.chaos.masks[0]);
     // M6 (fase 1): os pontos do Domination (o dono e o progresso, em milésimos).
     if (h.controlPoints !== null) {
       expect([...v.controlPoints!.owner]).toEqual([...h.controlPoints.owner]);
@@ -189,6 +191,24 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     expect(h.match.teamScore[0]! + h.match.teamScore[1]!).toBeGreaterThan(0);
     console.log(
       `[modos] Domination: ${run.seconds.toFixed(1)} s, placar ${h.match.teamScore[0]} × ${h.match.teamScore[1]}, pontos ${[...h.controlPoints!.owner].join(' ')}, host→amigo ${(run.hostBytesPerClient / 1024).toFixed(2)} KB/s`,
+    );
+    dispose(run);
+  }, 240_000);
+
+  it('M6 (fase 4): Bobo Chaos com a Roleta a cada 20 s: os modificadores chegam iguais e a predição anda com eles', () => {
+    const base = moreModePreset('chaos')!;
+    // 90 s com a troca a cada 20 s: a largada e 4 trocas; o amigo no time 0.
+    const r: MatchRecipe = { ...base, match: { ...base.match, timeLimitS: 90 }, chaos: { everyS: 20 } };
+    const run = playRoom(r, [0, 0], { snapshotHz: 30, zombies: 0, maxS: 120 });
+    expectSameResult(run);
+    const h = run.host.sim.view().chaos!.masks;
+    const v = run.clients[0]!.sim.view().chaos!.masks;
+    expect(v[0]).toBe(h[0]);
+    const net = run.clients[0]!.net!;
+    expect(net.reconciles).toBeGreaterThan(1000);
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    console.log(
+      `[modos] Bobo Chaos: ${run.seconds.toFixed(1)} s, máscara final ${h[0]!.toString(2)}, placar ${run.host.sim.view().match.teamScore[0]}×${run.host.sim.view().match.teamScore[1]}, predição errada ${net.mispredicts}/${net.reconciles}`,
     );
     dispose(run);
   }, 240_000);

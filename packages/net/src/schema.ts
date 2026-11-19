@@ -484,6 +484,22 @@ export function createNetLayout(view: SimView): NetLayout {
       );
     }
   }
+  // M6 (fase 4): os modificadores (a máscara ligada, a da próxima troca e os ticks até ela), só com eles.
+  if (view.chaos !== null) {
+    const names = ['chaosActive', 'chaosNext', 'chaosLeft'] as const;
+    names.forEach((name, i) => {
+      globals.push(
+        g(
+          name,
+          i < 2 ? u(16) : s(16, 8),
+          (v) => v.chaos!.masks[i]!,
+          (v, _st, q) => {
+            v.chaos!.masks[i] = q;
+          },
+        ),
+      );
+    });
+  }
   // A tabela de codecs dos globais reaproveita o formato das outras (campo = um escalar).
   const asFields: NetField<SimView>[] = globals.map((gs) => ({
     name: gs.name,

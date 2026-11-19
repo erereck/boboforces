@@ -4,6 +4,7 @@ import type { SimContext } from './context.ts';
 import type { StateArray } from './state.ts';
 import type { MatchPhase } from './view.ts';
 import { partyActive, syncJuggRules } from './systems/party.ts';
+import { applyChaos } from './systems/chaos.ts';
 
 /**
  * Snapshot simples (M0) e hash do estado. Os dois percorrem a MESMA lista (`SimState.fields`, na ordem fixa) até
@@ -20,7 +21,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 13;
+const SNAPSHOT_VERSION = 14;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -77,6 +78,13 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     ctx.rngParty.saveState(rngScratch);
     h.bytes(rngScratch);
     if (party.jugg !== null) h.i32(party.juggTicks);
+  }
+  // M6 (fase 4): os modificadores e a Roleta (só com eles).
+  const chaos = ctx.chaos;
+  if (chaos !== null) {
+    h.bytes(chaos.masks);
+    ctx.rngChaos.saveState(rngScratch);
+    h.bytes(rngScratch);
   }
   return h.digest();
 }
@@ -174,6 +182,12 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, rngScratch, RNG_STATE_WORDS);
       if (party.jugg !== null) w.writeBits(party.juggTicks >>> 0, 32);
     }
+    const chaos = ctx.chaos;
+    if (chaos !== null) {
+      writeArray(w, chaos.masks, chaos.masks.length);
+      ctx.rngChaos.saveState(rngScratch);
+      writeArray(w, rngScratch, RNG_STATE_WORDS);
+    }
   }
 }
 
@@ -265,6 +279,13 @@ export function readState(ctx: SimContext, r: BitReader): void {
         // As regras saem do time que acabou de chegar.
         syncJuggRules(ctx);
       }
+    }
+    const chaos = ctx.chaos;
+    if (chaos !== null) {
+      readArray(r, chaos.masks, chaos.masks.length);
+      readArray(r, rngScratch, RNG_STATE_WORDS);
+      ctx.rngChaos.loadState(rngScratch);
+      applyChaos(ctx);
     }
   }
 }

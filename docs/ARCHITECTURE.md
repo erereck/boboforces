@@ -3659,3 +3659,51 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   um navegador recém-aberto paga a partida do processo da GPU), e o CI do 72a34e5 caiu por isso. Acima do limite, o
   splash é medido de novo em até 2 abas novas e vale a menor (`splashTriesMs` no relatório). Decisão minha, revisável.
 - **Online:** o amigo caçando numa sala de 90 s (a meta não chega): o Jugg troca de mãos igual nos dois lados, o mesmo fim e os mesmos pontos, 0,33% de predições erradas (9 em 2.694).
+
+### 17.5 Fase 4a: os modificadores e o Bobo Chaos (19/11/2026)
+
+- **A receita** (`format`): `modifiers` (lista de ids de `MODIFIERS`, em qualquer modo; o índice na lista é o bit da
+  máscara da sim, então a lista só cresce no fim) e `chaos` (a Roleta: `count`, padrão 3; `everyS`, padrão 60). O
+  validador tira repetidos, desconhecidos e os que conflitam (`MODIFIER_CONFLICTS`: a Lua e a gravidade pesada).
+- **A sim** (`sim/src/systems/chaos.ts`, `ctx.chaos`):
+  - O estado são 3 números (`masks`): a máscara ligada, a da próxima troca (igual fora do aviso) e os ticks até ela.
+    Entram no hash e no snapshot (`SNAPSHOT_VERSION` 14), com o `rngChaos`.
+  - O `chaosSystem` roda antes do movimento (a gravidade nova vale no mesmo tick): na largada sorteia `count` do que
+    não está ligado e não conflita; 5 s antes da troca, um da Roleta (nunca um fixo) sai e outro entra; na troca, a
+    próxima vira a ligada.
+  - O `applyChaos` (quando a máscara muda) troca o perfil de movimento da partida (`ctx.profile`, agora mutável: um dos
+    6 feitos na criação, gravidade × velocidade, sem alocar; o `ProfileTicks` do movimento recalcula pela identidade
+    do perfil) e liga só na cabeça e um tiro mata na cópia das regras de arma (`ctx.mods`). Os outros olham a máscara
+    na hora (`modOn`): munição infinita (`weaponSystem`, como o pente infinito), Vampiro (`damageSystem`: quem fere um
+    inimigo ganha o que tirou, até a vida máxima), Tudo explode (`kill`: a explosão `CHAOS_BLAST`, código 13, de quem
+    morreu) e a troca por abate (`kill`: uma primária sorteada, fora dos modos de festa).
+- **A rede:** os 3 números vão como globais (`chaosActive`, `chaosNext`, `chaosLeft`) só nas partidas com
+  modificador; o `Sim.remote.commit` aplica a máscara que chegou (a predição do amigo anda com a gravidade e a
+  velocidade do host). `PROTOCOL_VERSION` 4.
+- **O jogo:** o card Bobo Chaos (Times 4 contra 4, 50 abates ou 10 min); a linha dos ligados embaixo do placar
+  (`HudSharedModel.modsLine`, refeita só quando a máscara muda) e, no aviso, "ROLETA: SAI X, ENTRA Y" em destaque; a
+  aba Modificadores da Personalizada com Pressa, Vampiro, Tudo explode, troca por abate e a Roleta (a gravidade, só na
+  cabeça e um tiro mata já estavam lá).
+- **Golden** (Bobo Chaos, 8 bots Normal, semente 42, 3 min): `9c9aabae` (a largada e 2 trocas; 24 × 21). Os outros
+  não mudaram. **Online:** a Roleta a cada 20 s numa sala de 90 s, a máscara igual nos dois lados e 0,45% de predições
+  erradas (12 em 2.685).
+- **A revisão (Opus)** achou 12 coisas (7 médias, 5 baixas; nenhuma de determinismo), corrigidas antes do commit:
+  - a predição do amigo usava a máscara do snapshot atrasado (um puxão a cada troca de gravidade ou de velocidade):
+    agora o `reconcile` passa a do snapshot mais novo (`SimPredict.modifiers`, `ChaosState.predictMask`), e a view
+    continua com a do atrasado;
+  - a **gravidade pesada** não baixa mais o pulo (a 0,44 m, nem o Tático nem o Bobo alcançavam as ligações de pulo de
+    1 m da navegação, e os bots travavam): ela só faz cair mais rápido. A **Lua** não tem dano de queda (o pulo dela
+    passa da queda segura de 5 m);
+  - o Vampiro só cura bobo (no zumbi, o teto era a vida de bobo e cortava a do zumbi);
+  - o Tudo explode não roda no Infection e no Juggernaut (o time de quem morre troca antes de a explosão ferir); no Gun
+    Game, quem já morreu não sobe de nível pelo abate da própria explosão;
+  - a munição infinita não vale para a granada (saíam 8 por segundo) nem para a Big Brrt (o pente dela é o calor);
+  - a troca por abate respeita as armas permitidas, não dá primária a quem não tem (só faca), não roda no Bobo Zombies
+    e troca de verdade (o tempo de troca, o evento e o som);
+  - a Roleta não põe "um tiro mata" com "tudo explode" (a corrente matava todo mundo em volta), e os bots miram na
+    cabeça quando só a cabeça fere;
+  - a linha dos modificadores aparece também com a linha da onda e no quadrante livre do 3P, e quebra em duas quando
+    não cabe;
+  - a Personalizada mostra e desliga os 9 (Lua e gravidade pesada ganharam linha; "só na cabeça", "um tiro mata" e a
+    munição mostram e desligam também o modificador).
+- **O menu:** 349,5 de 350 KB (o validador mora no menu). Ver os riscos do PLANO_M6.

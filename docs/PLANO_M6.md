@@ -82,6 +82,12 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - a lista do GDD §4.5.3, cada um ligável em qualquer modo pela Partida personalizada;
    - o **Chaos**: 3 modificadores sorteados, e a Roleta troca 1 a cada 60 s, com aviso 5 s antes. O sorteio evita
      combinações que quebram a partida.
+   - **4a feita em 19/11** (ARCHITECTURE §17.5): a Roleta e o card do Bobo Chaos, com 9 modificadores (Lua, gravidade
+     pesada, Pressa, só na cabeça, um tiro mata, munição infinita, Vampiro, Tudo explode e troca de arma por abate),
+     ligáveis em qualquer modo pela aba Modificadores da Personalizada.
+   - **4b:** Cabeção, Invisíveis (menos quando atiram) e Festa (confete). Mini, Bots gigantes, Arcade (bhop, wall jump,
+     pulo duplo) e Ricochete pedem colisão, navegação ou movimento novos: entram se couberem, senão ficam para o
+     fechamento.
 5. **Paintball:**
    - 1 tiro mata (configurável 1–3), respawn de 1 s, 50 abates ou 5 min;
    - os marcadores com o projétil visível;
@@ -105,7 +111,8 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
 ## Riscos
 
 - **O menu no teto:** cada texto novo no menu pesa. Por isso a fase 0 leva os cards e os textos dos modos novos para
-  o pedaço dos editores.
+  o pedaço dos editores. Na fase 4a o menu chegou a 349,5 de 350 KB (o validador da receita mora no menu e ganhou os
+  blocos `modifiers` e `chaos`): a próxima coisa que entrar no validador precisa abrir espaço antes.
 - **O protocolo:** o estado de cada modo entra no fim do esquema do snapshot e sobe o `PROTOCOL_VERSION`. Quem está com
   o jogo velho vê "Atualize a página", como já acontece.
 - **O Switch:** a IA de objetivo e as manchas pesam. Cada modo passa pelo bench; o que não couber fica marcado

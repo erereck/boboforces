@@ -14,6 +14,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
   // M6 (fase 3).
   { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
+  // M6 (fase 4).
+  { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -68,6 +70,19 @@ export function moreModePreset(id: string): MatchRecipe | null {
         seed: 0,
         match: { timeLimitS: 600, scoreLimit: 150 },
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 7 }] }, { bots: [] }],
+      };
+    case 'chaos':
+      // Os Times de sempre (4 contra 4 no Construto) com a Roleta: 3 modificadores, 1 troca por minuto; 50 abates ou
+      // 10 min.
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Bobo Chaos',
+        mode: 'warfare.tdm',
+        map: 'construto',
+        seed: 0,
+        match: { timeLimitS: 600, scoreLimit: 50 },
+        chaos: {},
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
       };
     default:
       return null;

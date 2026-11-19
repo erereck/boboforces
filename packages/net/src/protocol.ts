@@ -1,10 +1,12 @@
-import { CONTENT_IDS, GAME_VERSION } from '@boboforces/format';
+import { CHAOS_DEFAULTS, CONTENT_IDS, GAME_VERSION, MODIFIER_CONFLICTS, MODIFIERS } from '@boboforces/format';
 import { StateHasher, type BitReader, type BitWriter } from '@boboforces/shared';
 import {
   BASE_HP,
   BIG_BRRT,
   BIG_BRRT_COOL,
   BOBO_NAV_METRICS,
+  CHAOS_BLAST,
+  CHAOS_MODS,
   DESMONTADOR,
   DOMINATION,
   HEADSHOT_MULTIPLIER,
@@ -41,7 +43,7 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -112,6 +114,12 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   BIG_BRRT,
   BIG_BRRT_COOL,
   JUGGERNAUT,
+  // Fase 4: os modificadores e a Roleta.
+  MODIFIERS,
+  MODIFIER_CONFLICTS,
+  CHAOS_DEFAULTS,
+  CHAOS_MODS,
+  CHAOS_BLAST,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */

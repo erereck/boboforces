@@ -30,6 +30,15 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   vira o próximo Jugg, e cada segundo de Jugg vale 1 ponto: vence quem chegar a 150 (ou quem tiver mais em 10 min). O
   Jugg aparece sempre na tela (a plaquinha JUGG vai para a borda quando ele está fora da vista) e o kill feed avisa
   quem virou o Jugg. Os bots caçam o Jugg em grupo, e o bot Jugg avança.
+- **Bobo Chaos e os modificadores (fase 4a):** o card **Bobo Chaos** na página Mais modos (Times 4 contra 4 com a
+  Roleta): 3 modificadores sorteados, e a cada minuto um sai e outro entra, com o aviso 5 s antes ("ROLETA: SAI
+  PRESSA, ENTRA TUDO EXPLODE"). Os ligados aparecem embaixo do placar. São 9: **Lua** (gravidade 0,35x, sem dano de
+  queda),
+  **gravidade pesada** (1,8x: cai mais rápido, o pulo é o mesmo), **Pressa** (1,5x), **só na cabeça**, **um tiro mata**, **munição infinita** (sem
+  recarga), **Vampiro** (o dano que você causa volta como vida), **Tudo explode** (quem morre explode: 60 de dano em
+  3 m) e **troca de arma por abate**. A aba Modificadores da Partida personalizada liga cada um em qualquer modo, e a
+  Roleta também. Online, a Roleta chega igual para todos (protocolo 4: quem está com o jogo velho vê "Atualize a
+  página").
 
 ### M5: online P2P (planejado em 16/11/2026)
 

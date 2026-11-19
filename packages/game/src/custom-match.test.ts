@@ -50,6 +50,34 @@ describe('Partida personalizada', () => {
     expect(checked.ok && checked.warnings).toEqual([]);
   });
 
+  it('M6 (fase 4): os modificadores e a Roleta na aba Modificadores; todo modificador da receita aparece e desliga', () => {
+    let r = DEBUT_PRESET;
+    r = stepCustom('mods', r, 'lowGravity', 0, PC);
+    r = stepCustom('mods', r, 'vampire', 0, PC);
+    r = stepCustom('mods', r, 'chaos', 0, PC);
+    expect(r.modifiers).toEqual(['lowGravity', 'vampire']);
+    expect(r.chaos).toEqual({});
+    // Ligar a pesada tira a Lua (conflitam).
+    r = stepCustom('mods', r, 'heavyGravity', 0, PC);
+    expect(r.modifiers).toEqual(['heavyGravity', 'vampire']);
+    const checked = validateMatchRecipe(r, { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 });
+    expect(checked.ok && checked.warnings).toEqual([]);
+    // Um preset com os modificadores de arma: as linhas de sempre mostram ligado, e desligar tira o modificador.
+    let p: MatchRecipe = { ...DEBUT_PRESET, modifiers: ['headshotOnly', 'oneShot', 'infiniteAmmo'] };
+    expect(value('mods', p, 'headshot')).toBe('Ligado');
+    expect(value('mods', p, 'oneShot')).toBe('Ligado');
+    expect(value('weapons', p, 'ammo')).toBe(
+      value('weapons', { ...DEBUT_PRESET, weapons: { ammo: 'infiniteClip' } }, 'ammo'),
+    );
+    p = stepCustom('mods', p, 'headshot', 0, PC);
+    p = stepCustom('mods', p, 'oneShot', 0, PC);
+    p = stepCustom('weapons', p, 'ammo', 1, PC);
+    expect(p.modifiers).toBeUndefined();
+    expect(p.weapons).toEqual({ headshotOnly: false, oneShot: false, ammo: 'normal' });
+    r = stepCustom('mods', r, 'chaos', 0, PC);
+    expect(r.chaos).toBeUndefined();
+  });
+
   it('M2 (fase 6a): o perfil de movimento; velocidade e pulo só aparecem no Personalizado', () => {
     const ids = (r: MatchRecipe): string[] => customRows('players', r).map((x) => x.id);
     expect(value('players', DEBUT_PRESET, 'movement')).toBe('Bobo');

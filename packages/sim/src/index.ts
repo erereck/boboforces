@@ -33,6 +33,7 @@ export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './r
 // M6 (fase 1): o Domination.
 export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView } from './systems/domination.ts';
 export { JUGGERNAUT, juggernautHp } from './systems/party.ts';
+export { CHAOS_MODS, MOD } from './systems/chaos.ts';
 export {
   aimPointLocal,
   aimPointWorld,

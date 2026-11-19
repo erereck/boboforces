@@ -1,3 +1,4 @@
+import type { ChaosState } from './systems/chaos.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
@@ -203,7 +204,8 @@ export interface SimContext {
   readonly domination: ControlPoints | null;
   readonly spawns: readonly SpawnPoint[];
   /** Perfil de movimento do bobo (da receita) e do zumbi. */
-  readonly profile: MovementProfile;
+  /** M6 (fase 4): troca com a gravidade e a velocidade dos modificadores (`applyChaos`). */
+  profile: MovementProfile;
   readonly zombieProfile: MovementProfile;
   readonly ffa: boolean;
   readonly warfare: boolean;
@@ -268,6 +270,10 @@ export interface SimContext {
   readonly rngZombies: Rng;
   /** M6 (fase 2): o sorteio dos modos de festa (o 1º infectado). */
   readonly rngParty: Rng;
+  /** M6 (fase 4): o sorteio da Roleta e da troca de arma por abate. */
+  readonly rngChaos: Rng;
+  /** M6 (fase 4): os modificadores e a Roleta (`null` sem nenhum). */
+  readonly chaos: ChaosState | null;
   /** M6 (fase 2): o Gun Game e o Infection (inativos fora deles). */
   readonly party: PartyState;
   readonly downedProfile: MovementProfile;

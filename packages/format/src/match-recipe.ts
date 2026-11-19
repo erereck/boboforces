@@ -141,6 +141,48 @@ export interface InfectionRules {
 /** M6 (fase 2): os padrões do Infection. */
 export const INFECTION_DEFAULTS = { speed: 1.2 } as const;
 
+/**
+ * M6 (fase 4): os modificadores (GDD §4.5.3), ligáveis em qualquer modo pela receita (`modifiers`) e sorteados pela
+ * Roleta do Bobo Chaos (`chaos`). O índice na lista é o bit da máscara da sim: só acrescentar no fim (os ids vão em
+ * presets salvos e nunca mudam).
+ */
+export const MODIFIERS = [
+  'lowGravity',
+  'heavyGravity',
+  'speed',
+  'headshotOnly',
+  'oneShot',
+  'infiniteAmmo',
+  'vampire',
+  'explosive',
+  'swapOnKill',
+] as const;
+export type ModifierId = (typeof MODIFIERS)[number];
+
+/** Pares que não andam juntos: o validador fica com o primeiro, e a Roleta nunca põe os dois. */
+export const MODIFIER_CONFLICTS: readonly (readonly [ModifierId, ModifierId])[] = [
+  ['lowGravity', 'heavyGravity'],
+  // Toda explosão mataria todo mundo a 3 m, em corrente.
+  ['oneShot', 'explosive'],
+];
+
+/** Os dois modificadores conflitam? */
+export function modifiersConflict(a: ModifierId, b: ModifierId): boolean {
+  return MODIFIER_CONFLICTS.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+}
+
+/**
+ * M6 (fase 4): a Roleta do Bobo Chaos (GDD §4.1.2): `count` modificadores sorteados na largada; a cada `everyS`, um
+ * sai e outro entra, com aviso 5 s antes. Vale sobre qualquer modo; os `modifiers` fixos da receita ficam sempre.
+ */
+export interface ChaosRules {
+  readonly count?: number;
+  readonly everyS?: number;
+}
+
+/** M6 (fase 4): os padrões da Roleta. */
+export const CHAOS_DEFAULTS = { count: 3, everyS: 60, warnS: 5 } as const;
+
 /** M2 (fase 4e): o que a HUD mostra (gameplay.md §10.3, "Tela da partida"). Ausente = tudo ligado. */
 export interface HudRules {
   readonly killFeed?: boolean;
@@ -204,6 +246,10 @@ export interface MatchRecipe {
   readonly zombies?: ZombiesRules;
   /** M6 (fase 2): o Infection (sobre os Times). */
   readonly infection?: InfectionRules;
+  /** M6 (fase 4): os modificadores ligados a partida toda (qualquer modo). */
+  readonly modifiers?: readonly ModifierId[];
+  /** M6 (fase 4): a Roleta do Bobo Chaos. */
+  readonly chaos?: ChaosRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -236,6 +282,9 @@ export const RECIPE_RANGES = {
   // M6 (fase 2): o Gun Game e o Infection.
   ladderLength: { min: 2, max: 12 },
   infectedSpeed: { min: 0.5, max: 2 },
+  // M6 (fase 4): a Roleta.
+  chaosCount: { min: 1, max: 4 },
+  chaosEveryS: { min: 20, max: 300 },
   zombieHpMul: { min: 0.25, max: 5 },
   zombieSpeed: { min: 0.5, max: 2 },
   zombieEconomy: { min: 0.5, max: 3 },
@@ -257,6 +306,8 @@ const TOP_KEYS = [
   'hud',
   'zombies',
   'infection',
+  'modifiers',
+  'chaos',
   'teams',
   'embeddedBots',
 ] as const;
@@ -523,6 +574,44 @@ function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
 }
 
 const INFECTION_KEYS = ['speed'] as const;
+const CHAOS_KEYS = ['count', 'everyS'] as const;
+
+/** M6 (fase 4): os modificadores fixos (conhecidos, sem repetir e sem conflito; o que sobra vira aviso). */
+function readModifiers(ctx: Ctx, value: unknown): ModifierId[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    warn(ctx, 'modifiers', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: ModifierId[] = [];
+  for (const id of value) {
+    if (typeof id !== 'string' || !(MODIFIERS as readonly string[]).includes(id)) {
+      warn(ctx, 'modifiers', 'recipe.invalidField', describe(id));
+      continue;
+    }
+    const m = id as ModifierId;
+    if (out.includes(m)) continue;
+    if (out.some((o) => modifiersConflict(o, m))) {
+      warn(ctx, 'modifiers', 'recipe.invalidField', describe(id));
+      continue;
+    }
+    out.push(m);
+  }
+  return out;
+}
+
+/** M6 (fase 4): a Roleta do Bobo Chaos. */
+function readChaos(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'chaos', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readRange(ctx, value, 'count', 'chaos', RECIPE_RANGES.chaosCount, out);
+  readRange(ctx, value, 'everyS', 'chaos', RECIPE_RANGES.chaosEveryS, out);
+  return Object.assign(out, unknownFields(value, CHAOS_KEYS));
+}
 
 /** M6 (fase 2): o bloco do Infection. */
 function readInfection(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
@@ -812,6 +901,10 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (zombies !== undefined) out['zombies'] = zombies;
   const infection = readInfection(ctx, doc['infection']);
   if (infection !== undefined) out['infection'] = infection;
+  const modifiers = readModifiers(ctx, doc['modifiers']);
+  if (modifiers !== undefined) out['modifiers'] = modifiers;
+  const chaos = readChaos(ctx, doc['chaos']);
+  if (chaos !== undefined) out['chaos'] = chaos;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

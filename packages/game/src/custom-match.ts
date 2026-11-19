@@ -3,12 +3,15 @@ import {
   BOT_LEVELS,
   builtinBotRef,
   FRIENDLY_FIRE_LEVELS,
+  MODIFIERS,
+  modifiersConflict,
   REGEN_RULES,
   ZOMBIES_DEFAULTS,
   ZOMBIES_WAVE_CHOICES,
   type BotDocument,
   type BotRef,
   type MatchRecipe,
+  type ModifierId,
   type PlayerRules,
   type WeaponRules,
   type HudRules,
@@ -545,10 +548,13 @@ const WEAPON_ROWS: readonly RowDef[] = [
   {
     id: 'ammo',
     labelKey: 'custom.row.ammo',
-    value: (r) => t(`custom.ammo.${weapons(r).ammo ?? 'normal'}` as StringKey),
+    // M6 (fase 4): o modificador "munição infinita" aparece como o pente infinito; mexer na linha tira o modificador.
+    value: (r) => t(`custom.ammo.${ammoOf(r)}` as StringKey),
     step: (r, d) => {
-      const i = AMMO_MODES.indexOf(weapons(r).ammo ?? 'normal');
-      return withWeapons(r, { ammo: AMMO_MODES[cycleIndex(AMMO_MODES.length, i, d)]! });
+      const i = AMMO_MODES.indexOf(ammoOf(r));
+      return withWeapons(withModifier(r, 'infiniteAmmo', false), {
+        ammo: AMMO_MODES[cycleIndex(AMMO_MODES.length, i, d)]!,
+      });
     },
   },
   {
@@ -603,18 +609,48 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
   return ffa(r) ? [choose(0), count(0)] : [choose(0), count(0), choose(1), count(1)];
 }
 
+/** M6 (fase 4): liga ou desliga um modificador fixo (na ordem da lista; ligar tira o que conflita com ele). */
+function withModifier(r: MatchRecipe, id: ModifierId, on: boolean): MatchRecipe {
+  const now = r.modifiers ?? [];
+  const list = MODIFIERS.filter((m) => (m === id ? on : now.includes(m) && !(on && modifiersConflict(m, id))));
+  const { modifiers: _drop, ...rest } = r;
+  return list.length > 0 ? { ...rest, modifiers: list } : rest;
+}
+
+const hasModifier = (r: MatchRecipe, id: ModifierId): boolean => (r.modifiers ?? []).includes(id);
+
+/** A munição como a linha mostra: o modificador "munição infinita" vale como o pente infinito. */
+const ammoOf = (r: MatchRecipe): (typeof AMMO_MODES)[number] =>
+  hasModifier(r, 'infiniteAmmo') ? 'infiniteClip' : (weapons(r).ammo ?? 'normal');
+
+function modifierFlag(id: ModifierId, rowId: string, labelKey: StringKey): RowDef {
+  return flag(
+    rowId,
+    labelKey,
+    (r) => (r.modifiers ?? []).includes(id),
+    (r, v) => withModifier(r, id, v),
+  );
+}
+
+/** M6 (fase 4): a Roleta do Bobo Chaos (ligada com os padrões: 3 modificadores, troca a cada 60 s). */
+function withChaos(r: MatchRecipe, on: boolean): MatchRecipe {
+  const { chaos: _drop, ...rest } = r;
+  return on ? { ...rest, chaos: {} } : rest;
+}
+
 const MOD_ROWS: readonly RowDef[] = [
+  // M6 (fase 4): ligada pela regra de arma ou pelo modificador; desligar tira os dois.
   flag(
     'headshot',
     'custom.row.headshotOnly',
-    (r) => weapons(r).headshotOnly ?? false,
-    (r, v) => withWeapons(r, { headshotOnly: v }),
+    (r) => (weapons(r).headshotOnly ?? false) || hasModifier(r, 'headshotOnly'),
+    (r, v) => withWeapons(withModifier(r, 'headshotOnly', false), { headshotOnly: v }),
   ),
   flag(
     'oneShot',
     'custom.row.oneShot',
-    (r) => weapons(r).oneShot ?? false,
-    (r, v) => withWeapons(r, { oneShot: v }),
+    (r) => (weapons(r).oneShot ?? false) || hasModifier(r, 'oneShot'),
+    (r, v) => withWeapons(withModifier(r, 'oneShot', false), { oneShot: v }),
   ),
   flag(
     'sniperBody',
@@ -658,6 +694,19 @@ const MOD_ROWS: readonly RowDef[] = [
     value: (r) => mult(players(r).gravity ?? 1),
     step: (r, d) => withPlayers(r, { gravity: stepList(GRAVITIES, players(r).gravity ?? 1, d) }),
   },
+  // M6 (fase 4): os modificadores de festa (GDD §4.5.3) e a Roleta, em qualquer modo.
+  modifierFlag('lowGravity', 'lowGravity', 'custom.row.lowGravity'),
+  modifierFlag('heavyGravity', 'heavyGravity', 'custom.row.heavyGravity'),
+  modifierFlag('speed', 'speedMod', 'custom.row.speedMod'),
+  modifierFlag('vampire', 'vampire', 'custom.row.vampire'),
+  modifierFlag('explosive', 'explosive', 'custom.row.explosive'),
+  modifierFlag('swapOnKill', 'swapOnKill', 'custom.row.swapOnKill'),
+  flag(
+    'chaos',
+    'custom.row.chaos',
+    (r) => r.chaos !== undefined,
+    (r, v) => withChaos(r, v),
+  ),
 ];
 
 const HUD_ROWS: readonly RowDef[] = [

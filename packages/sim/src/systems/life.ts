@@ -1,5 +1,6 @@
 import { DROP_KINDS } from '../view.ts';
 import { partyActive, partyKill, partyLoadout } from './party.ts';
+import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -8,6 +9,7 @@ import { ZOMBIE_POINTS, ZOMBIE_TYPE, ZOMBIES_DOWN, PERK, ZOMBIE_PERKS, ZOMBIE_DR
 import { BOT_CONTROLLER_BASE, MAX_TEAMS, RECENT_ATTACKERS } from '../constants.ts';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
+  CHAOS_BLAST,
   DEFAULT_LOADOUT_REST,
   DEFAULT_PRIMARY,
   isPrimaryWeapon,
@@ -92,6 +94,19 @@ export function damageSystem(ctx: SimContext): void {
     const part = q.part[i]!;
     const bodyPart = q.bodyPart[i]! as FigurePart;
     if (amount > 0) {
+      // M6 (fase 4): vampiro: quem fere um inimigo recupera o que tirou (até a vida dele).
+      if (source !== NULL_ENTITY && modOn(ctx, MOD.vampire) && s.isCurrent(source)) {
+        const a = source & 0xffff;
+        if (
+          a !== t &&
+          s.kind[a] === ENTITY_KIND.bobo &&
+          hostile(ctx, a, t) &&
+          s.alive[a] === 1 &&
+          (s.flags[a]! & F.dead) === 0
+        ) {
+          s.health[a] = Math.min(maxHpOf(ctx, a), s.health[a]! + Math.min(amount, Math.max(0, s.health[t]!)));
+        }
+      }
       s.health[t] = s.health[t]! - amount;
       s.lastDamageTick[t] = ctx.tick;
       s.lastAttacker[t] = attacker;
@@ -370,6 +385,26 @@ function kill(
   // M2 (fase 3b): "explode ao morrer" (regra do bot): a explosão do foguete no peito, de quem morreu.
   if ((ctx.rules.flags[t]! & RULE_FLAG.explodeOnDeath) !== 0 && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, WEAPON_ROCKET, s.idOf(t), -1);
+  }
+  // M6 (fase 4): tudo explode (quem morre, menos no vazio; não no Infection e no Juggernaut, que trocam o time de
+  // quem morre antes de a explosão ferir) e a troca de arma por abate (fora dos modos de festa e do Bobo Zombies).
+  if (
+    modOn(ctx, MOD.explosive) &&
+    weapon !== WEAPON_KILL_PLANE &&
+    ctx.party.infectedSpeed <= 0 &&
+    ctx.party.jugg === null
+  ) {
+    explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, CHAOS_BLAST, s.idOf(t), -1);
+  }
+  if (
+    modOn(ctx, MOD.swapOnKill) &&
+    !partyActive(ctx.party) &&
+    !ctx.zombiesMode &&
+    killer !== NULL_ENTITY &&
+    s.isCurrent(killer)
+  ) {
+    const k = killer & 0xffff;
+    if (k !== t && hostile(ctx, k, t) && canSwap(ctx, k)) swapPrimary(ctx, k);
   }
   const assister = creditAssists(ctx, t, killer);
   ctx.events.kill(ctx.tick, killer, s.idOf(t), weapon, headshot, bodyPart, q.dir, q.force[item]!, item, assister);

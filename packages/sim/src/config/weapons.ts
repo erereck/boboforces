@@ -510,7 +510,9 @@ export function weaponDef(code: number): WeaponDef | null {
         ? DESMONTADOR
         : code === WEAPON_BIG_BRRT
           ? BIG_BRRT
-          : null;
+          : code === WEAPON_CHAOS_BLAST
+            ? CHAOS_BLAST
+            : null;
 }
 
 /**
@@ -640,3 +642,20 @@ export const BIG_BRRT: WeaponDef = {
 
 /** A Big Brrt esfria depois de `delayS` sem atirar: o pente volta `perS` tiros por segundo (cheio em 2 s). */
 export const BIG_BRRT_COOL = { delayS: 0.3, perS: 60 } as const;
+
+/**
+ * M6 (fase 4): a explosão do modificador "tudo explode" (GDD §4.5.3: 60 de dano em 3 m), de quem morreu. Não é arma de
+ * ninguém (fora de `WEAPONS`), como a gosma do Chonker; o abate de quem ela pega vai para quem explodiu.
+ */
+export const WEAPON_CHAOS_BLAST = 13;
+
+export const CHAOS_BLAST: WeaponDef = {
+  ...WEAPON_ROCKET,
+  id: 'chaos-blast',
+  code: WEAPON_CHAOS_BLAST,
+  damage: 0,
+  blastDamage: 60,
+  blastRadiusM: 3,
+  selfDamageMul: 0,
+  killForce: 6,
+};
