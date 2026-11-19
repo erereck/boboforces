@@ -298,13 +298,15 @@ export const ONLINE_MATCH_CARDS: readonly ModeCard[] = [
   { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
   { id: 'x1', nameKey: 'online.mode.x1', descKey: 'online.mode.x1.desc' },
   { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'online.mode.zombies.desc' },
+  // M7 (fase 8): o Bobo Royale em duplas.
+  { id: 'royale', nameKey: 'online.mode.royale', descKey: 'online.mode.royale.desc' },
   { id: 'surprise', nameKey: 'title.surprise', descKey: 'online.mode.surprise.desc' },
   { id: 'custom', nameKey: 'mode.name.custom', descKey: 'online.mode.custom.desc' },
 ];
 
 export const onlineMatchScreen: Screen<null> = {
   id: 'onlineMatch',
-  build: () => modesScreen.build({ modes: ONLINE_MATCH_CARDS, titleKey: 'online.match.title' }),
+  build: () => modesScreen.build({ modes: ONLINE_MATCH_CARDS, titleKey: 'online.match.title', wide: true }),
 };
 
 // --- a sala ---

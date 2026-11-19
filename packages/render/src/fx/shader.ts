@@ -22,6 +22,11 @@ export const PARTICLE_KIND = {
   star: 6,
   /** M6 (fase 5): mancha de tinta: como a marca de tiro (na superfície, normal em `pC`), com o respingo na cor. */
   paint: 7,
+  /**
+   * M7 (fase 8): um pedaço da parede da zona do Royale: quad em pé, do chão (`pA.xyz`) para cima (`pB.x` m de altura),
+   * com a largura `2 × pA.w` na direção `pC.xyz` (a tangente do círculo); faixas diagonais que somem para o alto.
+   */
+  wall: 8,
 } as const;
 
 export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive'] as const;
@@ -35,6 +40,7 @@ const int BF_P_DECAL = 4;
 const int BF_P_BLOB = 5;
 const int BF_P_STAR = 6;
 const int BF_P_PAINT = 7;
+const int BF_P_WALL = 8;
 `;
 
 export const PARTICLE_VERTEX = /* glsl */ `
@@ -108,6 +114,10 @@ void main() {
     vec3 t2 = cross(n, t1);
     vNormal = n;
     world = pA.xyz + n * 0.004 + (t1 * rc.x + t2 * rc.y) * size;
+  } else if (kind == BF_P_WALL) {
+    vec3 tang = normalize(pC.xyz + vec3(1e-5, 0.0, 0.0));
+    vNormal = normalize(cross(tang, vec3(0.0, 1.0, 0.0)));
+    world = pA.xyz + tang * (c.x * 2.0 * size) + vec3(0.0, (c.y + 0.5) * pB.x, 0.0);
   } else {
     vNormal = normalize(cameraPosition - pos);
     world = pos + (camRight * rc.x + camUp * rc.y) * size;
@@ -176,6 +186,11 @@ void main() {
     // de 1,0 (com 2,0 o resultado é indefinido e, na prática, dava 1 → alfa 0 → discard: a sombra nunca aparecia).
     shape = floor(clamp(1.0 - r, 0.0, 1.0) * 4.0) / 4.0;
     fadeStart = 0.99;
+  } else if (vKind == BF_P_WALL) {
+    // A parede da zona: faixas diagonais (em pixels de 1/8 do pedaço), mais forte embaixo e sumindo para o alto.
+    float band = mod(floor(pq.x * 8.0 + pq.y * 8.0), 2.0);
+    shape = (0.45 + 0.35 * band) * clamp(0.65 - q.y, 0.0, 1.0);
+    fadeStart = 0.999;
   } else if (vKind == BF_P_STAR) {
     float ax = abs(q.x) * 2.0;
     float ay = abs(q.y) * 2.0;

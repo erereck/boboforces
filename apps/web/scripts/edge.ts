@@ -24,6 +24,8 @@ export interface PageDebugApi {
   readonly readyForPrint: boolean;
   readonly cameras: readonly string[];
   setCamera(name: string | null): boolean;
+  /** M7 (fase 8): no Royale, fixa a zona no círculo (cx, cz, r) em metros (prints da parede). */
+  setZone?(cx: number, cz: number, r: number): void;
   setTimeOfDay(timeOfDay: string): void;
   setPropDose(dose: string): void;
   setGrayscale(on: boolean): void;

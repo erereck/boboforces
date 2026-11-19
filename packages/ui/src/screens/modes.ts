@@ -22,6 +22,8 @@ export interface ModesState {
   readonly modes: readonly ModeCard[];
   /** M5 (fase 6a): o título (padrão "Modos"; a sala do Online usa os mesmos cards para a "Partida da sala"). */
   readonly titleKey?: StringKey;
+  /** M7 (fase 8): sempre 2 colunas de cards largos (a Partida da sala, com nomes longos como "Todos contra todos"). */
+  readonly wide?: boolean;
 }
 
 /** Largura de cada card (px de referência). */
@@ -32,9 +34,9 @@ export const MODES_CARD_WIDTH_DENSE = 370;
 export const modesScreen: Screen<ModesState> = {
   id: 'modes',
   build(state) {
-    const dense = state.modes.length > 6;
+    const dense = state.modes.length > 6 && state.wide !== true;
     // M7 (fase 0): com mais de 9 cards (4 linhas), tudo mais junto para caber no celular (750 px de altura).
-    const tight = state.modes.length > 9;
+    const tight = state.modes.length > 9 || (state.wide === true && state.modes.length > 6);
     const perRow = dense ? 3 : 2;
     const cardWidth = dense ? MODES_CARD_WIDTH_DENSE : MODES_CARD_WIDTH;
     const cards: UiNode[] = state.modes.map((m, i) => ({
@@ -73,6 +75,8 @@ export const modesScreen: Screen<ModesState> = {
     // M7 (fase 0): apertado, o Voltar entra na última linha quando ela tem lugar (uma linha a menos de altura).
     const rowCount = Math.ceil(cards.length / perRow);
     const backInRow = tight && cards.length % perRow !== 0;
+    // M7 (fase 8): com a última linha cheia (12 cards), o Voltar sobe para a linha do título (a mesma altura).
+    const backInHeading = tight && !backInRow;
     const rows: UiNode[] = Array.from({ length: rowCount }, (_, r) => ({
       kind: 'row',
       id: `cards${r}`,
@@ -90,11 +94,19 @@ export const modesScreen: Screen<ModesState> = {
           anchor: 'left',
           children: [
             {
-              kind: 'text',
-              id: 'heading',
-              text: { key: state.titleKey ?? 'modes.title' },
-              style: tight ? 'heading' : 'title',
-              color: COLORS.texto,
+              kind: 'row',
+              id: 'headingRow',
+              gap: 24,
+              children: [
+                {
+                  kind: 'text',
+                  id: 'heading',
+                  text: { key: state.titleKey ?? 'modes.title' },
+                  style: tight ? 'heading' : 'title',
+                  color: COLORS.texto,
+                },
+                ...(backInHeading ? [back] : []),
+              ],
             },
             { kind: 'box', height: tight ? 6 : 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: tight ? 6 : 8, color: COLORS.acao, chamfer: true },
@@ -106,7 +118,7 @@ export const modesScreen: Screen<ModesState> = {
               gap: tight ? 6 : 10,
               children: rows,
             },
-            ...(backInRow ? [] : ([{ kind: 'box', height: tight ? 6 : 12 }, back] as UiNode[])),
+            ...(backInRow || backInHeading ? [] : ([{ kind: 'box', height: tight ? 6 : 12 }, back] as UiNode[])),
           ],
         },
       ],

@@ -13,7 +13,7 @@ import {
 } from './online-presets.ts';
 import { STORAGE_RECIPE_LIMITS } from './save-store.ts';
 
-const PRESETS: readonly RoomPresetMode[] = ['warfare.tdm', 'warfare.ffa', 'x1', 'zombies'];
+const PRESETS: readonly RoomPresetMode[] = ['warfare.tdm', 'warfare.ffa', 'x1', 'zombies', 'royale'];
 
 describe('as partidas da sala (M5 fase 6a)', () => {
   it('os cards da tela são os modos da sala, na mesma ordem', () => {

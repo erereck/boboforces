@@ -185,6 +185,9 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:big-brrt',
   // M7 (fase 4): a Boom Box do BoboStrike (só acrescentado, regra 20)
   'model:boom-box',
+  // M7 (fase 8): o colete e o kit de cura do Bobo Royale (só acrescentado, regra 20)
+  'model:armor-vest',
+  'model:medkit',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

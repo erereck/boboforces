@@ -15,7 +15,7 @@ import {
  */
 
 /** Os cards, na ordem da tela. */
-export const ROOM_MODES = ['warfare.tdm', 'warfare.ffa', 'x1', 'zombies', 'surprise', 'custom'] as const;
+export const ROOM_MODES = ['warfare.tdm', 'warfare.ffa', 'x1', 'zombies', 'royale', 'surprise', 'custom'] as const;
 export type RoomMode = (typeof ROOM_MODES)[number];
 /** Os cards que já são uma receita (o Surpreenda-me sorteia; a personalizada abre a tela de sempre). */
 export type RoomPresetMode = Exclude<RoomMode, 'surprise' | 'custom'>;
@@ -64,6 +64,17 @@ export function roomPreset(mode: RoomPresetMode): MatchRecipe {
         match: { timeLimitS: 0, scoreLimit: 0 },
         zombies: { waves: 10 },
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }],
+      };
+    case 'royale':
+      // M7 (fase 8): o Bobo Royale em duplas na Ilha Tropical: o host e o 1º amigo na mesma dupla; 24 participantes
+      // (cada amigo toma o lugar de um bot; o teto da sala corta com celular).
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'royale.mini',
+        map: 'island',
+        seed: 0,
+        royale: { squad: 'duo' },
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 23 }] }],
       };
   }
 }

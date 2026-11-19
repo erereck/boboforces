@@ -141,6 +141,8 @@ const LOCKED_IDS = [
   // M6 (fase 3)
   'model:big-brrt',
   'model:boom-box',
+  'model:armor-vest',
+  'model:medkit',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',

@@ -11,6 +11,7 @@ import {
   WEAPON_NONE,
   WEAPONS,
   type SimView,
+  WEAPON_ZONE,
 } from '@boboforces/sim';
 import { t, type HudModel, type StringKey } from '@boboforces/ui';
 
@@ -227,6 +228,8 @@ export interface DeathTexts {
   readonly pushedVoid: string;
   readonly bite: string;
   readonly zombie: string;
+  /** M7 (fase 8): a zona do Bobo Royale. */
+  readonly zone: string;
 }
 
 export function deathTexts(): DeathTexts {
@@ -238,6 +241,7 @@ export function deathTexts(): DeathTexts {
     pushedVoid: t('death.pushedVoid'),
     bite: t('death.bite'),
     zombie: t('zombie.name'),
+    zone: t('death.zone' as StringKey),
   };
 }
 
@@ -308,7 +312,7 @@ export function fillDeathBanner(
   m.deathWeapon = '';
   m.deathHp = -1;
   if (st.killer === NULL_ENTITY) {
-    m.deathName = st.weapon === WEAPON_KILL_PLANE ? tx.void : tx.fall;
+    m.deathName = st.weapon === WEAPON_KILL_PLANE ? tx.void : st.weapon === WEAPON_ZONE ? tx.zone : tx.fall;
     return;
   }
   if (st.killer === st.victim) {

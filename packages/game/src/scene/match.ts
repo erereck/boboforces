@@ -143,9 +143,17 @@ import {
   WEAPON_PAINT_SNIPER,
   WEAPON_SLOT,
   WEAPON_SPIT,
+  WEAPON_ZONE,
+  weaponBase,
   weaponDef,
   weaponGrip,
+  weaponRarity,
   WEAPONS,
+  ROYALE_WEAPONS,
+  ROYALE,
+  CIRCLE,
+  ZONE,
+  pickupWeapon,
   ZOMBIE_BARRICADES,
   ZOMBIE_BOX,
   ZOMBIE_PERKS,
@@ -372,6 +380,8 @@ const MAX_HUMAN_PINGS = 8;
 const EMOTE_HEIGHT_M = 2.35;
 /** M2 (fase 2e): o resultado aparece este tempo depois do fim da partida (s). */
 const RESULT_DELAY_S = 2.5;
+/** M7 (fase 8, revisão): no Royale, o resultado de quem saiu vem depois da câmera de morte (s). */
+const ROYALE_RESULT_DELAY_S = 4;
 /** Cubinhos por impacto (o render limita pelo teto do perfil). */
 const CUBES_BLOCK = 6;
 const CUBES_ACTOR = 5;
@@ -463,6 +473,9 @@ function cameraGroup(name: string): number {
 /** Empunhadura do modelo de arma pelo id (`''` = sem arma; desconhecido = fuzil, a pose de duas mãos). */
 /** M7 (fase 4): quem morre no BoboStrike passa a assistir um aliado depois de tantos segundos; a câmera atrás dele. */
 const STRIKE_SPECTATE_S = 3;
+/** M7 (fase 8): a cura e o alcance da troca do Royale (os da sim: `ROYALE`). */
+const ROYALE_HEAL_S = ROYALE.healUseS;
+const ROYALE_SWAP_REACH_M = ROYALE.swapReachM;
 
 /** M7 (fase 4): o dinheiro com o ponto do milhar ("2.700"), sem `Intl` (regra 13). */
 function moneyText(n: number): string {
@@ -628,13 +641,16 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
         teams: [{ bots: [{ ref, count: bench.views }] }],
       };
     } else if (bench.scene === 'island') {
-      // M7 (fase 5): o FFA na Ilha Tropical (os pontos de largada são sem time; o Royale entra na fase 6).
+      // M7 (fase 5): a Ilha Tropical. Fase 8: o Royale solo (as vistas e os bots; a partida acaba no último vivo).
       recipe = {
         format: MATCH_RECIPE_FORMAT,
-        mode: 'warfare.ffa',
+        mode: 'royale.mini',
         map: 'island',
         seed: bench.seed >>> 0,
-        match: { timeLimitS: 0, scoreLimit: 0, viewDistanceM: bench.viewDistanceM },
+        match: { viewDistanceM: bench.viewDistanceM },
+        // Muita vida para todos (como o bench do Zombies): a partida dura o bench todo e as vistas não morrem.
+        players: { hp: 1000 },
+        royale: { squad: 'solo' },
         teams: [{ bots: [{ ref, count: bench.views + bots }] }],
       };
     } else {
@@ -733,6 +749,13 @@ interface ViewSlot {
   shake: number;
   /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
   readonly death: DeathState;
+  /** M7 (fase 8): o Royale: a colocação e o texto de quem saiu, a arma da troca e o aviso dela (feitos ao mudar). */
+  royalePlace: number;
+  royaleOut: string;
+  royaleArmor: number;
+  royaleArmorText: string;
+  royaleSwapCode: number;
+  royaleSwapText: string;
   /** M7 (fase 4): o cursor do anel da compra do BoboStrike e a opção apontada (-1 = nenhuma). */
   readonly buy: DeathState;
   buyPick: number;
@@ -822,6 +845,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const juggernaut = recipe.mode === 'juggernaut';
   /** M7 (fase 4): o BoboStrike (o dinheiro, a compra, a Boom Box e quem morre assiste um aliado). */
   const strikeMode = recipe.mode === 'strike';
+  /** M7 (fase 8): o Bobo Royale (o `team` é o esquadrão: sem colete de time; a zona, o loot e a colocação). */
+  const royaleMode = recipe.mode === 'royale.mini';
   const solo = ffa || juggernaut;
   const warnings: string[] = [...request.benchWarnings, ...setup.warnings, ...setup.recipe.warnings];
   // Alarme do orçamento de skins (#56, PLANO §B15): conjunto além da reserva veste o padrão do próprio time.
@@ -949,6 +974,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   for (const code of [WEAPON_PAINT_MARKER, WEAPON_PAINT_PUMP, WEAPON_PAINT_SNIPER, WEAPON_PAINT_BUCKET]) {
     weaponNames[code] = t(`weapon.${weaponDef(code)!.id}` as StringKey);
   }
+  // M7 (fase 8): as armas raras e épicas do Royale: o nome da base com a raridade ("Rattler épica").
+  for (const w of ROYALE_WEAPONS) {
+    const key = weaponRarity(w.code) >= 2 ? 'weapon.rarity.epic' : 'weapon.rarity.rare';
+    weaponNames[w.code] = t(key as StringKey, { name: weaponNames[weaponBase(w.code)] ?? '' });
+  }
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
@@ -957,6 +987,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   for (const code of [WEAPON_PAINT_MARKER, WEAPON_PAINT_PUMP, WEAPON_PAINT_SNIPER, WEAPON_PAINT_BUCKET]) {
     weaponCategories[code] = t('weapon.category.paint' as StringKey);
   }
+  for (const w of ROYALE_WEAPONS) weaponCategories[w.code] = weaponCategories[weaponBase(w.code)] ?? '';
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
   // M5 (fase 4c): online, cada humano com o nome que escolheu na sala (o filtro do atlas: veio de outro aparelho).
@@ -1042,10 +1073,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? (presetLevel(request.recipe) ?? 'normal')
         : (request.level ?? 'normal');
   /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
-  const challengeTeam = solo ? -1 : 1;
+  const challengeTeam = solo || royaleMode ? -1 : 1;
   let unstuckPending = false;
   let matchStats = createMatchStats(1);
   let endedAt = -1;
+  /** M7 (fase 8, revisão): quando todo humano local ficou fora do Royale (-1 = ainda não). */
+  let royaleOutAt = -1;
   let resultShown = false;
   const resultMenu = createMenuController();
   // M2: o foguete em voo tem modelo próprio; a granada em voo usa o da mão.
@@ -1093,7 +1126,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             ? weaponModel[WEAPON_CODE.grenade]!
             : code >= 0 && code < weaponModel.length
               ? weaponModel[code]!
-              : NO_MODEL;
+              : weaponBase(code) !== code
+                ? (weaponModel[weaponBase(code)] ?? NO_MODEL)
+                : NO_MODEL;
+  /** M7 (fase 8): o colete e o kit de cura do Royale no chão. */
+  const armorVestModel = modelIndex.get('armor-vest') ?? NO_MODEL;
+  const medkitModel = modelIndex.get('medkit') ?? NO_MODEL;
   /** M3 (fase 4d): o modelo de cada drop (munição cheia, bomba, pontos em dobro, insta-kill, carpinteiro). */
   const dropModels = [
     ammoBoxModel,
@@ -1148,6 +1186,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       flash: 0,
       shake: 0,
       death: createDeathState(),
+      royalePlace: -1,
+      royaleOut: '',
+      royaleArmor: -1,
+      royaleArmorText: '',
+      royaleSwapCode: -1,
+      royaleSwapText: '',
       buy: createDeathState(),
       buyPick: -1,
       buyOpen: false,
@@ -1706,7 +1750,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       skinLayer[i] = figures.zombieSkinOf(type);
       return;
     }
-    const team = ffa || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
+    const team = ffa || royaleMode || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
     // M2 (fase 6c): o jogador 1 veste o Meu Bobo.
     if (humans > 0 && v.controller[i] === me) {
       // M6 (fase 3): o Meu Bobo só existe no time 0; o P1 que vira o Jugg continua com ele.
@@ -2020,7 +2064,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         case 'pickup':
           // M3 (fase 4d): pegou um drop do Bobo Zombies: o anúncio na linha das ondas por 2,5 s.
-          if (ev.action === 'take' && ev.kind >= PICKUP_KIND.maxAmmo) {
+          if (ev.action === 'take' && ev.kind >= PICKUP_KIND.maxAmmo && ev.kind <= PICKUP_KIND.carpenter) {
             dropAnnounce = ev.kind;
             dropAnnounceUntil = timeS + 2.5;
           }
@@ -2251,6 +2295,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return !disposed && stableFrames >= 3 && !clipPending();
     },
     cameras: cameraNames,
+    setZone(cx: number, cz: number, r: number): void {
+      const rv = sim.view().royale;
+      if (rv === null || request.online) return;
+      const c = rv.circle;
+      c[CIRCLE.cx] = c[CIRCLE.fromCx] = c[CIRCLE.toCx] = cx;
+      c[CIRCLE.cz] = c[CIRCLE.fromCz] = c[CIRCLE.toCz] = cz;
+      c[CIRCLE.r] = c[CIRCLE.fromR] = c[CIRCLE.toR] = r;
+      rv.data[ZONE.shrinking] = 0;
+      rv.data[ZONE.ticks] = 45 * sim.hz;
+      changed();
+    },
     setCamera(name: string | null): boolean {
       if (name === null) {
         overrideCamera = null;
@@ -3176,12 +3231,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           : solo && sum.winner >= 0
             ? t('result.ffaWinner', { name: nm(sum.winner) })
             : t('result.loss');
+    // M7 (fase 8): no Royale, a colocação do esquadrão do jogador ("3º de 24").
+    const rov = v.royale;
+    const royalePlace = rov !== null && human >= 0 ? (rov.place[v.team[human]!] ?? 0) : 0;
+    const royalePlaceLine =
+      royalePlace > 0 ? t('result.royalePlace' as StringKey, { place: royalePlace, squads: rov!.squads }) : '';
     const data: ResultScreenData = {
       title,
       titleColor: sum.outcome === 'win' ? COLORS.acao : sum.outcome === 'loss' ? COLORS.perigo : COLORS.texto,
       own: sum.ownScore,
       other: sum.otherScore,
       ...(zombiesMode ? { scoreLine: t('result.zombiesWave', { wave }) } : {}),
+      ...(royalePlaceLine !== '' ? { scoreLine: royalePlaceLine } : {}),
       mvp: nm(sum.mvp),
       nemesis: nm(sum.nemesis),
       ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
@@ -3640,9 +3701,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // M3 (fase 4d): os drops do Zombies flutuam, giram mais rápido e brilham (o modelo pelo tipo).
       const kind = pv.kind[i]!;
       const drop = kind !== PICKUP_KIND.ammoBox;
-      const model = drop ? (dropModels[kind - 1] ?? NO_MODEL) : ammoBoxModel;
+      // M7 (fase 8): os itens do Royale (a arma pelo modelo dela, o colete, o kit); a arma rara e a épica brilham mais.
+      const royaleItem = kind >= PICKUP_KIND.armor50;
+      const code = pickupWeapon(kind);
+      const model = royaleItem
+        ? code !== WEAPON_NONE
+          ? modelOf(code)
+          : kind === PICKUP_KIND.heal
+            ? medkitModel
+            : armorVestModel
+        : drop
+          ? (dropModels[kind - 1] ?? NO_MODEL)
+          : ammoBoxModel;
       if (model === NO_MODEL) continue;
-      if (drop) y += 0.55 + Math.sin(timeS * 3 + i) * 0.08;
+      if (drop) y += (royaleItem ? 0.3 : 0.55) + Math.sin(timeS * 3 + i) * 0.08;
       projectiles.model[n] = model;
       projectiles.position[n * 3] = x;
       projectiles.position[n * 3 + 1] = y;
@@ -3651,10 +3723,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.pitch[n] = 0;
       projectiles.roll[n] = 0;
       sampleLightGrid(loaded.lightGrid, x, y + 0.2, z, lightScratch, 0);
-      const glow = drop ? 0.35 : 0;
-      projectiles.light[n * 3] = Math.min(1.6, lightScratch[0]! + glow);
-      projectiles.light[n * 3 + 1] = Math.min(1.6, lightScratch[1]! + glow);
-      projectiles.light[n * 3 + 2] = Math.min(1.6, lightScratch[2]! + glow * 0.6);
+      const rarity = code !== WEAPON_NONE ? weaponRarity(code) : kind === PICKUP_KIND.armor100 ? 1 : 0;
+      const glow = royaleItem ? 0.15 + rarity * 0.3 : drop ? 0.35 : 0;
+      // A épica puxa para o roxo; a rara, para o azul (o brilho do "pegue-me").
+      projectiles.light[n * 3] = Math.min(1.6, lightScratch[0]! + glow * (rarity === 1 ? 0.5 : 1));
+      projectiles.light[n * 3 + 1] = Math.min(1.6, lightScratch[1]! + glow * (rarity >= 1 ? 0.5 : 1));
+      projectiles.light[n * 3 + 2] = Math.min(1.6, lightScratch[2]! + glow * (rarity >= 1 ? 1 : 0.6));
       n++;
     }
     return n;
@@ -3840,7 +3914,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return v.kind[i] === ENTITY_KIND.zombie ? deathTx.zombie : (names[v.controller[i]!] ?? deathTx.zombie);
   }
   function colorOf(v: SimView, i: number): number {
-    if (!ffa && v.kind[i] !== ENTITY_KIND.zombie) return TEAM_COLORS[v.team[i]!] ?? COLORS.texto;
+    if (!ffa && !royaleMode && v.kind[i] !== ENTITY_KIND.zombie) return TEAM_COLORS[v.team[i]!] ?? COLORS.texto;
     return v.controller[i] === me && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
   }
 
@@ -3851,7 +3925,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (vi >= v.count) return;
     const ki = entityIndex(killer);
     if (killer === NULL_ENTITY || killer === victim || ki >= v.count) {
-      const cause = killer === victim ? deathTx.self : weapon === WEAPON_KILL_PLANE ? deathTx.void : deathTx.fall;
+      const cause =
+        killer === victim
+          ? deathTx.self
+          : weapon === WEAPON_KILL_PLANE
+            ? deathTx.void
+            : weapon === WEAPON_ZONE
+              ? deathTx.zone
+              : deathTx.fall;
       pushKillFeed(killFeed, '', COLORS.texto, cause, nameOf(v, vi), colorOf(v, vi), false);
       return;
     }
@@ -3934,6 +4015,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     bomb: sk('hud.strike.bomb').toUpperCase(),
   };
   const strikeItems = STRIKE_SHOP.map((it) => sk(`strike.item.${it.id}`));
+  // M7 (fase 8): os textos do Bobo Royale.
+  const royaleTx = {
+    kits: sk('hud.royale.kits').toUpperCase(),
+    armor50: t('hud.royale.armorKits' as StringKey, { armor: 50 }).toUpperCase(),
+    armor100: t('hud.royale.armorKits' as StringKey, { armor: 100 }).toUpperCase(),
+    healing: sk('hud.royale.healing').toUpperCase(),
+    zone: sk('hud.royale.zone').toUpperCase(),
+    spectate: sk('hud.royale.spectate').toUpperCase(),
+  };
   const strikePrices = STRIKE_SHOP.map((it) => `$${moneyText(it.price)}`);
 
   /** M6 (fase 4b): o modificador está ligado agora (pela máscara que a view mostra)? */
@@ -4206,6 +4296,121 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   /**
+   * M7 (fase 8): o HUD do Royale desta vista: o colete e os kits no lugar dos pontos; a troca de arma embaixo da mira
+   * (com a arma do chão ao alcance); a cura em curso na plaquinha do meio; fora da zona (ou com ela para fechar), a
+   * marca da zona na borda da tela; morto, a colocação.
+   */
+  function fillRoyaleHud(m: HudModel, v: SimView, e: number, slot: ViewSlot): void {
+    const rv = v.royale;
+    if (rv === null) return;
+    // O colete se gasta (o do BoboStrike): o valor que sobra, montado só quando muda.
+    const armor = v.armor[e]!;
+    if (armor !== slot.royaleArmor) {
+      slot.royaleArmor = armor;
+      slot.royaleArmorText =
+        armor > 0 ? t('hud.royale.armorKits' as StringKey, { armor }).toUpperCase() : royaleTx.kits;
+    }
+    m.points = v.heals[e]!;
+    m.pointsLabel = slot.royaleArmorText;
+    if (m.dead) {
+      const place = rv.place[v.team[e]!] ?? 0;
+      if (place !== slot.royalePlace) {
+        slot.royalePlace = place;
+        // Com o esquadrão ainda vivo (o colega de pé), assiste ele; fora, a colocação.
+        slot.royaleOut = place > 0 ? t('hud.royale.out' as StringKey, { place }).toUpperCase() : royaleTx.spectate;
+      }
+      m.waitText = slot.royaleOut;
+      return;
+    }
+    if (v.healTicks[e]! > 0) {
+      m.centerLabel = royaleTx.healing;
+      m.centerValue = (ROYALE_HEAL_S * sim.hz - v.healTicks[e]!) / sim.hz;
+    }
+    // A troca: a arma do chão que a sim trocaria pelo usar (com a primária ocupada).
+    if (
+      v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.primary] !== WEAPON_NONE &&
+      (v.flags[e]! & ENTITY_FLAG.downed) === 0 &&
+      v.cookTicks[e]! < 0
+    ) {
+      const code = swapWeaponNear(v, e);
+      if (code !== WEAPON_NONE) {
+        if (code !== slot.royaleSwapCode) {
+          slot.royaleSwapCode = code;
+          slot.royaleSwapText = t('hud.royale.swap' as StringKey, { name: weaponNames[code] ?? '' }).toUpperCase();
+        }
+        m.interact = HUD_INTERACT.text;
+        m.interactName = slot.royaleSwapText;
+      }
+    }
+  }
+
+  /** M7 (fase 8): a arma do chão que a sim trocaria agora pelo usar de `e` (a mais perto ao alcance), ou nenhuma. */
+  function swapWeaponNear(v: SimView, e: number): number {
+    const p = v.pickups;
+    let best = WEAPON_NONE;
+    let bestD = ROYALE_SWAP_REACH_M * ROYALE_SWAP_REACH_M;
+    for (let i = 0; i < p.count; i++) {
+      if (p.alive[i] !== 1) continue;
+      const code = pickupWeapon(p.kind[i]!);
+      if (code === WEAPON_NONE) continue;
+      const dx = p.position[i * 3]! - v.position[e * 3]!;
+      const dy = p.position[i * 3 + 1]! - v.position[e * 3 + 1]!;
+      const dz = p.position[i * 3 + 2]! - v.position[e * 3 + 2]!;
+      const d = dx * dx + dz * dz;
+      if (d <= bestD && dy > -0.6 && dy < 1.8) {
+        bestD = d;
+        best = code;
+      }
+    }
+    return best;
+  }
+
+  /** M7 (fase 8, revisão): o esquadrão de todo humano local já tem colocação (está fora ou venceu). */
+  function royaleLocalsOut(): boolean {
+    const v = sim.view();
+    const rv = v.royale;
+    if (rv === null) return false;
+    for (let p = 0; p < humans; p++) {
+      const h = entityIndex(sim.controllerEntity(p));
+      if (h >= v.count || (rv.place[v.team[h]!] ?? 0) === 0) return false;
+    }
+    return true;
+  }
+
+  /** M7 (fase 8): no Royale, os vivos e a zona (o relógio é o da espera ou do encolher). */
+  const royaleLineKey = new Int32Array(3).fill(-2);
+  function refreshRoyaleLine(): void {
+    const v = sim.view();
+    const rv = v.royale!;
+    const d = rv.data;
+    const stage = d[ZONE.stage]!;
+    sharedHud.trainingLine = '';
+    sharedHud.timeLeftS = stage < rv.zone.length ? d[ZONE.ticks]! / sim.hz : -1;
+    let alive = 0;
+    for (let i = 0; i < v.count; i++) {
+      if (v.alive[i] === 1 && v.kind[i] === ENTITY_KIND.bobo && (v.flags[i]! & ENTITY_FLAG.dead) === 0) alive++;
+    }
+    const state = stage >= rv.zone.length ? 2 : d[ZONE.shrinking]!;
+    // O aviso: a zona fechando, ou o jogador (o 1º humano) fora dela.
+    const h = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
+    let outside = false;
+    if (h >= 0 && h < v.count && (v.flags[h]! & ENTITY_FLAG.dead) === 0) {
+      const c = rv.circle;
+      const dx = v.position[h * 3]! - c[CIRCLE.cx]!;
+      const dz = v.position[h * 3 + 2]! - c[CIRCLE.cz]!;
+      outside = dx * dx + dz * dz >= c[CIRCLE.r]! * c[CIRCLE.r]!;
+    }
+    sharedHud.modsWarn = state === 1 || outside;
+    const k = royaleLineKey;
+    if (k[0] === alive && k[1] === state && k[2] === stage) return;
+    k[0] = alive;
+    k[1] = state;
+    k[2] = stage;
+    const key = state === 2 ? 'hud.royale.closed' : state === 1 ? 'hud.royale.shrink' : 'hud.royale.wait';
+    sharedHud.modsLine = t(key as StringKey, { alive, stage: stage + 1, stages: rv.zone.length }).toUpperCase();
+  }
+
+  /**
    * M7 (fase 4): o anel da compra de cada humano vivo, na compra: o giro de mira move o cursor (como o radial da morte),
    * o tiro compra a opção apontada (no toque, tocar nela compra). O pedido vai no `InputFrame.primary` e a sim compra
    * na borda: fora da compra o quadro volta a 0. A mão do mapeador acompanha a da sim (a arma comprada).
@@ -4330,7 +4535,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     c.z = lerp(v.prevPosition[o + 2]!, v.position[o + 2]!, alpha);
     const st = slot.death;
     // M7 (fase 4): no BoboStrike, passada a câmera de morte, assiste um aliado vivo (em 3ª pessoa, atrás dele).
-    const mate = dead && strikeMode && st.t >= STRIKE_SPECTATE_S ? livingMate(v, e) : -1;
+    const mate = dead && (strikeMode || royaleMode) && st.t >= STRIKE_SPECTATE_S ? livingMate(v, e) : -1;
     if (mate >= 0) {
       const q = mate * 3;
       const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
@@ -4432,7 +4637,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const kick = recoil[e] ?? 0;
     // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
     // M6 (fase 5): a sniper de tinta usa o modelo (e o ajuste) da sniper.
-    const vmCode = v.weapon[e] === WEAPON_PAINT_SNIPER ? WEAPON_CODE.sniper : v.weapon[e]!;
+    const vmCode = v.weapon[e] === WEAPON_PAINT_SNIPER ? WEAPON_CODE.sniper : weaponBase(v.weapon[e]!);
     const tweak = VIEWMODEL_TWEAK[vmCode] ?? null;
     const away = 1 - ads;
     // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
@@ -4558,9 +4763,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
     m.perks = zombiesMode ? v.perks[e]! : 0;
     if ((m.perks & PERK.chonky) !== 0) m.maxHealth = Math.round(m.maxHealth * ZOMBIE_PERKS.chonkyHpMul);
-    m.waitWave = (zombiesMode || strikeMode) && m.dead;
+    m.waitWave = (zombiesMode || strikeMode || royaleMode) && m.dead;
     m.waitText = strikeMode ? strikeTx.wait : '';
-    if (zombiesMode && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
+    if ((zombiesMode || royaleMode) && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
       if (v.selfUp[e] === 1) {
         m.downed = HUD_DOWNED.selfUp;
         m.downedValue = v.downTicks[e]! / sim.hz;
@@ -4577,6 +4782,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.centerLabel = '';
     m.buyTitle = '';
     if (strikeMode) fillStrikeHud(m, v, e, slot);
+    if (royaleMode) fillRoyaleHud(m, v, e, slot);
     const mo = v.mapObjects;
     if (zombiesMode && mo !== null && !m.dead && m.downed === HUD_DOWNED.none) {
       const x = v.position[e * 3]!;
@@ -4786,6 +4992,34 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.juggMarkOn = true;
       m.juggMarkLabel = generatorLabel;
     }
+    const rov = v.royale;
+    if (rov !== null && (flags & ENTITY_FLAG.dead) === 0) {
+      const c = rov.circle;
+      const px = v.position[e * 3]!;
+      const pz = v.position[e * 3 + 2]!;
+      const dx = px - c[CIRCLE.cx]!;
+      const dz = pz - c[CIRCLE.cz]!;
+      const tx = px - c[CIRCLE.toCx]!;
+      const tz = pz - c[CIRCLE.toCz]!;
+      const outsideNow = dx * dx + dz * dz >= c[CIRCLE.r]! * c[CIRCLE.r]!;
+      const outsideNext = rov.data[ZONE.shrinking] === 1 && tx * tx + tz * tz >= c[CIRCLE.toR]! * c[CIRCLE.toR]!;
+      if (outsideNow || outsideNext) {
+        const rect = lay.rects[s]!;
+        projectToEdge(
+          desc.camera,
+          rect,
+          c[CIRCLE.toCx]!,
+          v.position[e * 3 + 1]! + 1.5,
+          c[CIRCLE.toCz]!,
+          Math.max(16, rect.height * 0.06),
+          projected,
+        );
+        m.juggMark[0] = projected[0]!;
+        m.juggMark[1] = projected[1]!;
+        m.juggMarkOn = true;
+        m.juggMarkLabel = royaleTx.zone;
+      }
+    }
     const sv = v.strike;
     if (sv !== null && v.rounds !== null) {
       const bomb = sv.data[STRIKE_DATA.bomb];
@@ -4829,7 +5063,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.markerCount = 0;
     if (!ffa && showAllyMarkers) {
       const team = v.team[e]!;
-      m.markerColor = TEAM_COLORS[team] ?? COLORS.texto;
+      m.markerColor = royaleMode ? TEAM_COLORS[0]! : (TEAM_COLORS[team] ?? COLORS.texto);
       const c = desc.camera;
       const rect = lay.rects[s]!;
       for (let j = 0; j < v.count && m.markerCount < MAX_ALLY_MARKERS; j++) {
@@ -4858,8 +5092,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const human = seat >= 0;
       // M6 (fase 2): no Gun Game e no Infection a arma é do modo: sem o radial.
       // M7 (fase 4): no BoboStrike a arma se compra (sem o radial da morte).
-      m.primaryNames = human && !fixedLoadout && !strikeMode ? primaryNames : NO_PRIMARIES;
-      m.primaryCategories = human && !fixedLoadout && !strikeMode ? primaryCategories : NO_PRIMARIES;
+      m.primaryNames = human && !fixedLoadout && !strikeMode && !royaleMode ? primaryNames : NO_PRIMARIES;
+      m.primaryCategories = human && !fixedLoadout && !strikeMode && !royaleMode ? primaryCategories : NO_PRIMARIES;
       m.primarySelected = human ? seatPrimary[seatNum[seat]!]! : 0;
       m.hardTimeHint = st.hint;
     } else {
@@ -5721,6 +5955,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       else fillProjectiles(alpha, running);
       renderer.setProjectiles(projectiles);
       renderer.setEnvironment(env);
+      // M7 (fase 8): a parede da zona do Royale (o render só reescreve quando o círculo muda).
+      const zoneView = sim.view().royale;
+      if (zoneView !== null) {
+        const zc = zoneView.circle;
+        renderer.setZone(zc[CIRCLE.cx]!, zc[CIRCLE.cz]!, zc[CIRCLE.r]!);
+      }
       trace('atores', actors.count);
       if (fx.count > 0) {
         if (!bench || bench.fx) renderer.submitFx(fx);
@@ -5784,6 +6024,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           } else if (zombiesMode) {
             sharedHud.teamCount = 0;
             refreshZombieLine();
+          } else if (royaleMode) {
+            sharedHud.teamCount = 0;
           } else if (!ffa && !juggernaut && request.kind === 'play') {
             sharedHud.teamCount = 2;
             const score = sim.view().match.teamScore;
@@ -5803,6 +6045,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               refreshRoundLine();
             }
           }
+          // M7 (fase 8): no Royale, os vivos e a zona.
+          if (royaleMode && sim.view().royale !== null) refreshRoyaleLine();
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
           // M6 (fase 1): os pontos do Domination embaixo do placar.
           const cpv = sim.view().controlPoints;
@@ -5866,6 +6110,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         if (paused) pauseMenu.draw(list, ui);
         // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
         if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult(true);
+        // M7 (fase 8, revisão): no Royale (fora do online), com todo humano local fora, o resultado sai depois da câmera
+        // de morte, sem esperar os bots acabarem (a partida segue por trás, como depois do fim).
+        if (!resultShown && endedAt < 0 && royaleMode && !request.online && humans > 0 && !benchState) {
+          if (!royaleLocalsOut()) royaleOutAt = -1;
+          else if (royaleOutAt < 0) royaleOutAt = timeS;
+          else if (timeS - royaleOutAt >= ROYALE_RESULT_DELAY_S) showResult(true);
+        }
         if (resultShown) resultMenu.draw(list, ui);
         if (panel.visible) {
           fillPanel();

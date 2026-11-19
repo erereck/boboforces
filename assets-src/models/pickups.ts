@@ -349,6 +349,60 @@ export function boomBox(shared: PickupLayers): BuiltModel {
 }
 
 /**
+ * M7 (fase 8): o colete do Bobo Royale no chão (um colete dobrado de 36 × 8 × 28 cm, azul-escuro com as placas cinza e
+ * as tiras de velcro), origem no chão. Na camada compartilhada.
+ */
+export function armorVest(shared: PickupLayers): BuiltModel {
+  const m = new ModelBuilder('armor-vest', 'pickup', { flags: 0, debrisColor: tone('time', 0), blocksNav: false });
+  const L = shared.misc;
+  const cloth = m.tile(L, 4, 4, (p) => {
+    p.fill(tone('time', 0));
+    p.px(1, 1, tone('time', 1));
+    p.px(3, 2, tone('aco', 0));
+  });
+  const plate = m.tile(L, 4, 4, (p) => {
+    p.fill(tone('aco', 2));
+    p.px(0, 0, tone('aco', 3));
+  });
+  const strap = m.tile(L, 2, 2, (p) => p.fill(tone('aco', 0)));
+  const body = m.part('body');
+  body.tiledBox([-5.5, 0, -4.5], [5.5, 2, 4.5], cloth);
+  body.tiledBox([-4, 2, -3.5], [4, 2.5, 3.5], plate);
+  body.tiledBox([-5.5, 0.5, -2.5], [5.5, 1.5, -1.5], strap);
+  body.tiledBox([-5.5, 0.5, 1.5], [5.5, 1.5, 2.5], strap);
+  return m.build();
+}
+
+/**
+ * M7 (fase 8): o kit de cura do Bobo Royale (uma maleta branca de 28 × 16 × 9 cm com a cruz vermelha e a alça), origem
+ * no chão, frente em -Z. Na camada compartilhada.
+ */
+export function medkit(shared: PickupLayers): BuiltModel {
+  const m = new ModelBuilder('medkit', 'pickup', { flags: 0, debrisColor: tone('placa', 3), blocksNav: false });
+  const L = shared.misc;
+  const face = m.tile(L, 8, 6, (p) => {
+    p.fill(tone('placa', 3));
+    p.rect(3, 1, 2, 4, tone('tijolo', 3));
+    p.rect(2, 2, 4, 2, tone('tijolo', 3));
+  });
+  const side = m.tile(L, 2, 2, (p) => p.fill(tone('placa', 2)));
+  const handle = m.tile(L, 2, 2, (p) => p.fill(tone('aco', 1)));
+  const body = m.part('body');
+  body.tiledBox([-4.5, 0, -1.5], [4.5, 5, 1.5], {
+    front: face,
+    back: face,
+    left: side,
+    right: side,
+    top: side,
+    bottom: side,
+  });
+  body.tiledBox([-2, 5, -0.5], [-1.5, 6.5, 0.5], handle);
+  body.tiledBox([1.5, 5, -0.5], [2, 6.5, 0.5], handle);
+  body.tiledBox([-2, 6.5, -0.5], [2, 7, 0.5], handle);
+  return m.build();
+}
+
+/**
  * M3 (fase 5c): camada compartilhada pelos modelos pequenos do Bobo Zombies (tábua, moeda x2, raio do Desmontador e
  * giz): o orçamento é de 32 camadas de modelo (`modelos64`) e cada modelo com camada própria passava dele. Criada a
  * cada geração (`buildModels`), como a camada de brilho das props.
@@ -374,4 +428,7 @@ export const PICKUP_RECIPES: readonly ((shared: PickupLayers) => BuiltModel)[] =
   desmontadorBolt,
   chalkOutline,
   boomBox,
+  // M7 (fase 8): o colete e o kit de cura do Bobo Royale.
+  armorVest,
+  medkit,
 ];

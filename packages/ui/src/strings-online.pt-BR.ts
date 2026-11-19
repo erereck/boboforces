@@ -87,6 +87,8 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.mode.x1': 'X1',
   'online.mode.x1.desc': '1 contra 1 no Ringue; com 4, vira 2 contra 2.',
   'online.mode.zombies.desc': 'Juntos contra as ondas de zumbis.',
+  'online.mode.royale': 'Bobo Royale',
+  'online.mode.royale.desc': 'Em dupla na Ilha; o último de pé vence.',
   'online.mode.surprise.desc': 'Sorteia a partida; de novo, sorteia outra.',
   'online.mode.custom.desc': 'Todas as regras, como no jogo sozinho.',
   // M5 (fase 6b): o host no celular e o menor teto da sala (tecnico.md §13.4; GDD §2).

@@ -105,6 +105,14 @@ const CONFETTI = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff, 0xffd23f, 0xff6fb5, 0x
 /** M2: cores dos cubinhos da explosão (carvão, cinza e laranja da paleta mestra). */
 const EXPLOSION_CUBES = [0x2c2f3b, 0x454955, 0x9a4f30, 0xc4723f] as const;
 
+/**
+ * M7 (fase 8): a parede da zona do Royale: pedaços em pé em volta do círculo (o raio de 130 m da ilha dá ~13 m por
+ * pedaço), do chão até 60 m.
+ */
+export const ZONE_WALL_SEGMENTS = 64;
+const ZONE_WALL_BOTTOM_M = -4;
+const ZONE_WALL_HEIGHT_M = 64;
+
 export function createFxPass(ctx: PassContext): FxPass {
   const link = linkFor(ctx.scene);
   const perView = createInstancedUniforms();
@@ -160,6 +168,8 @@ export function createFxPass(ctx: PassContext): FxPass {
     // em voo, num anel delas também (uma partícula por bola por quadro não empurra a fumaça do anel alfa).
     paint: createParticleRing(PAINT_RING_SIZE),
     balls: createParticleRing(PAINT_BALL_RING_SIZE),
+    // M7 (fase 8): a parede da zona do Royale (os pedaços do círculo, reescritos quando ele muda).
+    zone: createParticleRing(ZONE_WALL_SEGMENTS),
   };
   const ringMeshes: [ParticleRing, ParticleMesh][] = [
     [rings.additive, createParticleMesh(quad, rings.additive.data, additive, 'fx-aditivo')],
@@ -167,6 +177,7 @@ export function createFxPass(ctx: PassContext): FxPass {
     [rings.decal, createParticleMesh(quad, rings.decal.data, decal, 'fx-marcas')],
     [rings.paint, createParticleMesh(quad, rings.paint.data, decal, 'fx-tinta')],
     [rings.balls, createParticleMesh(quad, rings.balls.data, alpha, 'fx-bolas')],
+    [rings.zone, createParticleMesh(quad, rings.zone.data, additive, 'fx-zona')],
   ];
   for (const [, pm] of ringMeshes) root.add(pm.mesh);
 
@@ -187,6 +198,8 @@ export function createFxPass(ctx: PassContext): FxPass {
   let map: RenderMap | null = null;
   let clock = 0;
   let disposed = false;
+  /** M7 (fase 8): o círculo da parede da zona que está no anel (centro e raio). */
+  const zoneKey = new Float64Array([NaN, NaN, NaN]);
   // Gabaritos do boneco do FutBobo (#56): o desmonte e a caixa do cubinho saem deles.
   let figureTemplates: FigureTemplateSet | null = null;
 
@@ -896,6 +909,8 @@ export function createFxPass(ctx: PassContext): FxPass {
   }
 
   function clearAll(): void {
+    // M7 (fase 8, revisão): o anel da zona sai junto; a próxima chamada reescreve mesmo com o mesmo círculo.
+    zoneKey.fill(NaN);
     clearDebris(debris);
     clearFigureCorpses(figureCorpses);
     for (const [ring] of ringMeshes) clearParticleRing(ring);
@@ -932,6 +947,44 @@ export function createFxPass(ctx: PassContext): FxPass {
       map = next;
       // Troca de mapa: nada do mapa anterior sobrevive (regra 21).
       clearAll();
+    },
+
+    setZone(cx, cz, r) {
+      if (disposed) return;
+      // Raio inválido (NaN) vale como sem parede (e não reescreve o anel todo frame).
+      if (!(r >= 0)) r = 0;
+      if (Math.abs(cx - zoneKey[0]!) < 0.01 && Math.abs(cz - zoneKey[1]!) < 0.01 && Math.abs(r - zoneKey[2]!) < 0.01) {
+        return;
+      }
+      zoneKey[0] = cx;
+      zoneKey[1] = cz;
+      zoneKey[2] = r;
+      const ring = rings.zone;
+      clearParticleRing(ring);
+      if (!(r >= 0.25)) return;
+      const n = ZONE_WALL_SEGMENTS;
+      const half = (Math.PI * r) / n + 0.05;
+      for (let k = 0; k < n; k++) {
+        const a = ((k + 0.5) / n) * Math.PI * 2;
+        resetParticleSpec(spec);
+        spec.kind = PARTICLE_KIND.wall;
+        spec.x = cx + Math.sin(a) * r;
+        spec.y = ZONE_WALL_BOTTOM_M;
+        spec.z = cz + Math.cos(a) * r;
+        spec.size = half;
+        // A altura no lugar da velocidade (`pB.x`); a tangente no lugar do fim do traçante (`pC`).
+        spec.vx = ZONE_WALL_HEIGHT_M;
+        spec.x1 = Math.cos(a);
+        spec.y1 = 0;
+        spec.z1 = -Math.sin(a);
+        spec.r = 0.45;
+        spec.g = 0.55;
+        spec.b = 1;
+        spec.a = 0.42;
+        // Vive "para sempre" (o fade do shader nem começa): só some quando o círculo muda ou o modo acaba.
+        spec.life = 1e7;
+        emitParticle(ring, spec, clock);
+      }
     },
 
     setDebrisBudget(maxDebris) {

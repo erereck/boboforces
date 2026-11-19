@@ -157,6 +157,9 @@ export function createMenuRenderer(
     submitFx(queue: FxQueue): void {
       void queue;
     },
+    setZone(cx: number, cz: number, r: number): void {
+      void [cx, cz, r];
+    },
     setDebug(debug: RenderDebug): void {
       void debug;
     },

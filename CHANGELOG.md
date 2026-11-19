@@ -52,6 +52,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   para dentro da zona quando ela vai fechar, se curam escondidos e levantam o colega caído. No começo evitam briga e o
   item que outro bot já está pegando; com a zona fechando, ficam mais agressivos e vão atrás de onde ouviram tiro. Os
   bots longe de todo humano pensam menos (1 vez por segundo).
+- **Bobo Royale (fase 8):** o card na página Mais modos (você e 23 bots na Ilha Tropical) e, na partida da sala, o
+  Royale em duplas. A zona é uma parede translúcida que fecha; no alto, o relógio dela e quantos estão vivos; fora
+  dela, a marca ZONA na borda da tela. As armas raras e épicas brilham no chão (azul e roxo) e têm o nome com a
+  raridade; o colete e o kit de cura têm modelo próprio. O colete e os kits aparecem no lugar dos pontos; com uma arma
+  no pé, "Usar: trocar por…". No fim, a colocação ("3º de 24").
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

@@ -4170,3 +4170,41 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   arma (na sim) e a arma trocada cai na altura certa. Sem JIT (como no nx.js), a IA do Royale custa 4,2 ms por tick com
   24 bots nos primeiros 10 s (1,0–1,4 ms no FFA na mesma ilha; já era assim antes desta fase): o bench do console da
   fase 8 diz se o LOD C precisa ir além.
+
+### 18.9 Fase 8: o Bobo Royale no jogo (19/11/2026)
+
+- **O card** `royale` (`moreModePreset('royale')`): o Royale solo na Ilha Tropical, você e 23 bots (o teto de bots do
+  aparelho corta no celular e no Switch com 2 ou mais: pergunta Y5, no padrão). A página Mais modos tem 12 cards; com a
+  última linha cheia, o Voltar sobe para a linha do título (a mesma altura de antes no celular). Na **partida da sala**
+  (online), o card Bobo Royale em duplas (o host e o 1º amigo juntos); a tela da sala ficou em 2 colunas (`wide`), com
+  o "Todos contra todos" inteiro.
+- **O HUD:** no alto, o relógio da zona (a espera ou o encolher) e "12 VIVOS · ZONA 2 DE 5" ("A ZONA ESTÁ FECHANDO!" em
+  destaque, e também com o jogador fora dela); o colete e os kits no lugar dos pontos ("COLETE 100 · KITS 2"); "USAR:
+  TROCAR POR RATTLER ÉPICA" embaixo da mira com uma arma ao alcance; "CURANDO" com os segundos na plaquinha do meio; a
+  marca ZONA na borda da tela com o jogador fora dela (ou fora do próximo círculo, com ela fechando); o caído do Bobo
+  Zombies; morto, "FORA · 3º LUGAR" e, em grupo, assiste um colega vivo (o do BoboStrike). O resultado mostra a
+  colocação do esquadrão ("3º de 24"); a morte pela zona aparece como "A zona" no kill feed e na faixa.
+- **A parede da zona** (`Renderer.setZone`, `PARTICLE_KIND.wall`): 64 pedaços em pé em volta do círculo (do chão a
+  60 m, faixas diagonais translúcidas que somem para o alto), no material aditivo do programa 5 (sem programa novo: os
+  7 continuam 7). O render só reescreve o anel quando o círculo muda.
+- **Os itens no chão:** a arma pelo modelo da base (a rara e a épica brilham azul e roxo); o colete (`armor-vest`) e o
+  kit (`medkit`) são modelos novos na camada compartilhada dos pickups (o pacote continua com 31 de 32 camadas).
+  Flutuam e giram como os drops do Zombies, sem o anúncio nem a fanfarra deles (só quem pega ouve).
+- **As armas raras e épicas** (códigos 19 a 26): o modelo, o som do tiro e a categoria da base; o nome com a raridade
+  ("Rattler épica").
+- **O resto:** sem colete de time no Royale (o esquadrão vai até 24); os marcadores dos colegas numa cor só; o "Ajustar
+  desafio" vale para todos os bots; sem o radial da arma na morte (ninguém volta).
+- **O bench** `scene=island` agora é o Royale solo (as vistas e os bots); os prints usam o gancho novo `setZone` (fixa
+  a zona num círculo, só para os prints: `local/m7/capturar-royale.ts`).
+- **O bench no Eden** (PERF §4, pergunta Y5): o Royale com 24 participantes a 58 fps com 1 vista e a 57 fps com 2 vistas
+  (sim 0,75 e IA 1,25 ms por tick; até 48 draws e 65 mil triângulos por vista; 7 programas; heap 45 MB). O console e
+  o celular ainda confirmam o tempo de quadro; até lá vale o teto de bots de cada aparelho.
+- **A revisão (Opus) achou 5 coisas, corrigidas antes do commit:** quem morria em dupla via "volta na próxima onda"
+  (agora "assistindo o colega"); no solo, quem morria ficava preso até o último bot (agora o resultado sai 4 s depois,
+  fora do online, e a partida segue por trás); o colete mostrava a faixa e não o que sobra (agora o valor); a sniper rara
+  e a épica ficavam sem o ajuste do viewmodel; e o resultado podia mostrar "1º de 24" com o esquadrão vivo (agora só com
+  a colocação). Também: as faixas da parede de fato diagonais, a parede que volta depois de trocar de mapa, o gancho
+  `setZone` fora do online, o bench com 1.000 de vida (a partida dura o bench todo), o colete de 100 brilhando no chão e
+  o aviso de troca só quando a sim troca. O resultado (e o registro) dá a vitória ou a derrota pela colocação.
+- **Fica para depois:** a zona no minimapa (o minimapa só aparece no 4º quadrante de 3 jogadores), o modelo da arma nas
+  costas e a escolha do formato (duplas e quartetos) no card.

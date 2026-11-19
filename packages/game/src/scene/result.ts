@@ -225,6 +225,13 @@ function outcomeOf(view: SimView, human: number, ffa: boolean): MatchOutcome {
   const m = view.match;
   // M3 (fase 2d): Bobo Zombies (já abriu alguma onda): passou da última ou caiu; não existe empate.
   if (m.zombieWave > 0) return m.winnerTeam === 0 ? 'win' : 'loss';
+  // M7 (fase 8): no Royale, a colocação do esquadrão (1º vence; quem saiu perdeu, mesmo com a partida seguindo).
+  const rv = view.royale;
+  if (rv !== null && human >= 0) {
+    const place = rv.place[view.team[human]!] ?? 0;
+    if (place === 1) return 'win';
+    if (place > 1) return 'loss';
+  }
   if (ffa) {
     const winner = m.winnerEntity !== NULL_ENTITY ? entityIndex(m.winnerEntity) : -1;
     return winner < 0 ? 'draw' : winner === human ? 'win' : 'loss';

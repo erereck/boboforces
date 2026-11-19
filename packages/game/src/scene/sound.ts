@@ -27,6 +27,7 @@ import {
   WEAPON_PAINT_SNIPER,
   WEAPON_SPIT,
   ZOMBIE_TYPE,
+  weaponBase,
 } from '@boboforces/sim';
 import { BLOCK_FLAG, cellBlock, CELLS_PER_METER, createRayHit, raycastGrid } from '@boboforces/world';
 import { SOUND_IDS, SOUND_RANK, SOUNDS, type SoundId } from '../sound-bank.ts';
@@ -551,7 +552,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
       if (disposed) return;
       switch (ev.type) {
         case 'shot': {
-          const pair = shotSounds(ev.weapon);
+          const pair = shotSounds(weaponBase(ev.weapon));
           if (!pair) break;
           const rank = rankOf(v, ev.shooter);
           // M6 (fase 3): a Big Brrt é o tiro da SMG uma quarta abaixo (o "brrt" grave da minigun), um pouco mais baixo.
@@ -751,6 +752,11 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           break;
         }
         case 'pickup':
+          // M7 (fase 8): os itens do Royale (o loot nasce aos montes no tick 0): só quem pega ouve.
+          if (ev.kind >= PICKUP_KIND.armor50) {
+            if (ev.action === 'take' && localIndex(ev.entity) >= 0) playFlat('municao', nowS);
+            break;
+          }
           if (ev.kind === PICKUP_KIND.ammoBox) {
             if (ev.action === 'take' && localIndex(ev.entity) >= 0) playFlat('municao', nowS);
             break;

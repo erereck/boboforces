@@ -92,6 +92,7 @@ const GAME_DEBUG_MEMBERS = {
   readyForPrint: true,
   cameras: true,
   setCamera: true,
+  setZone: true,
   setTimeOfDay: true,
   setPropDose: true,
   setGrayscale: true,

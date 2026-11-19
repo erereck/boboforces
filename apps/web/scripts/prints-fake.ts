@@ -117,6 +117,7 @@ export function fakePrintsPage(): string {
     get readyForPrint() { return ready; },
     cameras: cameras,
     setCamera: function (name) { if (name !== null && cameras.indexOf(name) < 0) return false; state.camera = name; return true; },
+    setZone: function () {},
     setTimeOfDay: function (v) { state.tod = v; },
     setPropDose: function (v) { state.dose = v; },
     setGrayscale: function (v) { state.gray = !!v; },

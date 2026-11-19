@@ -139,6 +139,11 @@ export interface GameDebugApi {
   readonly cameras: readonly string[];
   /** Fixa a vista 0 numa câmera nomeada (`null` volta ao jogador). `false` se o nome não existe. */
   setCamera(name: string | null): boolean;
+  /**
+   * M7 (fase 8): no Bobo Royale, fixa a zona no círculo (cx, cz, r) em metros, parada (prints da parede e do HUD fora
+   * dela); fora do Royale não faz nada. Mexe no estado da partida: só para os prints.
+   */
+  setZone?(cx: number, cz: number, r: number): void;
   setTimeOfDay(timeOfDay: TimeOfDay): void;
   /**
    * Dose de props VISÍVEL (`RenderDebug.propDose`). Só visual: a colisão, a bala, a navegação e a luz são sempre as do

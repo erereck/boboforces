@@ -2646,10 +2646,13 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(summaries().at(-1)).toBe('summary:Zombies · 10 ondas · Base Abandonada:false');
-    // A personalizada (embaixo do Zombies) abre a tela de sempre; Voltar não muda a partida e volta aos cards.
+    // A personalizada (M7, fase 8: na última linha, ao lado do Voltar, embaixo do Royale e do Surpreenda-me) abre a
+    // tela de sempre; Voltar não muda a partida e volta aos cards.
     platform.tap('ArrowDown');
     platform.tap('Enter');
     platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowLeft');
     platform.tap('Enter');
     await settle();
     platform.pump(2);
@@ -2658,8 +2661,9 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.tap('Escape');
     expect(game.screen).toBe('online');
     expect(summaries().length).toBe(before);
-    // O Surpreenda-me (do lado): uma partida sorteada, TDM ou FFA no Construto.
-    platform.tap('ArrowLeft');
+    // O Surpreenda-me (em cima, à direita do Royale): uma partida sorteada, TDM ou FFA no Construto.
+    platform.tap('ArrowUp');
+    platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(summaries().length).toBe(before + 1);
     expect(summaries().at(-1)).toMatch(/^summary:(Times|Todos).*Construto:(true|false)$/);

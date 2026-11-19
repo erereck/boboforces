@@ -493,6 +493,11 @@ export interface Renderer extends Disposable {
   setEnvironment(env: EnvironmentState): void;
   /** VFX do frame (clarão, traçante, impacto, cubinhos, desmonte). Consumido no próximo `renderViews`. */
   submitFx(queue: FxQueue): void;
+  /**
+   * M7 (fase 8): a parede da zona do Bobo Royale no círculo (cx, cz, r) em metros (programa 5, sem programa novo); raio
+   * 0 = sem parede. Pode chamar todo frame: só reescreve quando o círculo muda.
+   */
+  setZone(cx: number, cz: number, r: number): void;
   setDebug(debug: RenderDebug): void;
   /** Compila os 7 programas e desenha 1 frame fora da tela (loading; o Switch não tem compilação paralela). */
   warmup(): void;

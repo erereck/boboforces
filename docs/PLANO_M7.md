@@ -92,6 +92,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
      (o tiro é barato) e a rede ficou sem o LOD (4,2 KB/s por amigo com 24 bobos). Pergunta Y7.
 8. **HUD e telas do Royale:** os vivos, o tempo da zona, a zona no minimapa e a **parede translúcida** (dentro do teto
    de 7 programas de shader), o card, o online, os prints e o bench (24 no celular e no Switch 2P+, pergunta Y5).
+   - **feita em 19/11** (ARCHITECTURE §18.9): o card Bobo Royale (12º da página Mais modos) e o Royale em duplas na
+     partida da sala; a parede é um tipo de partícula do programa 5 (os 7 programas continuam 7).
 9. **Aquário:** assistir uma partida só de bots, com a câmera livre e a lista de jogadores grande, e entrar no meio
    (assumindo um bot), em qualquer modo; a aceleração até 4x no PC e 2x no Switch.
 10. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.

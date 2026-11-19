@@ -226,6 +226,8 @@ export interface FxPass extends ScenePass {
   setDebrisBudget(maxDebris: number): void;
   /** #56: gabaritos da partida (o desmonte usa as caixas do boneco); `null` solta. */
   setFigures(templates: FigureTemplateSet | null): void;
+  /** M7 (fase 8): a parede da zona do Royale no círculo (cx, cz, r) em metros; raio 0 = sem parede. */
+  setZone(cx: number, cz: number, r: number): void;
 }
 
 export type ActorPassFactory = (ctx: PassContext) => ActorPass;

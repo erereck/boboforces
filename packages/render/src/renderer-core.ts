@@ -687,6 +687,11 @@ export function createRendererCore(
       gpuTextures.setMinFilter(next.mipFilter);
     },
 
+    setZone(cx: number, cz: number, r: number): void {
+      if (disposed) return;
+      ensurePasses().fx.setZone(cx, cz, r);
+    },
+
     setDebrisBudget(maxDebris: number): void {
       if (disposed) return;
       debrisBudget = maxDebris;
