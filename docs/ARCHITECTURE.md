@@ -3447,3 +3447,21 @@ Um revisor (Opus) leu as 4 partes e achou 5 problemas e 3 menores, todos corrigi
   as capturas mostraram as descrições do X1 e do Surpreenda-me passando por baixo do card vizinho. Com a checagem nova
   nos 8 alvos, apareceram também as do Bobo Zombies (3 px) e do Training (12 px) nos Modos do Switch 4:3. Todas
   ficaram mais curtas; o respiro entre o botão e a descrição voltou a 8 (o contorno do foco encostava no texto).
+
+### 16.18 A revisão da fase 6 (18/11/2026)
+
+Um revisor (Opus) leu as 3 partes. Nada grave; 2 problemas e 6 menores, todos corrigidos:
+
+- **O resumo era o da partida escolhida, não o da jogada:** no X1 com 4, os amigos liam "1 contra 1" e jogavam 2
+  contra 2, sem bot (e sem o "Normal"). Agora o resumo sai da receita com os jogadores de agora nos times
+  (`playedRecipe`: o teto e o `onlineRecipe`, o mesmo que o Começar monta) e muda quando alguém troca de time.
+- **O aviso "até N bots" com bot nenhum cortado:** o `capRoomRecipe` devolve outra receita também quando só baixa a
+  visão. O aviso agora compara o total de bots (`botsCut`).
+- **Menores:** o foco do Escolher partida voltava no card da sala anterior (o `lastCard` volta ao Times numa sala
+  nova); o comentário de um teste do corte dizia 7 bots onde são 8; a checagem do card confere também a borda de
+  baixo, e o comentário do `expectNoOverflow` voltou para cima dele.
+- **Testes que faltavam:** a cena do amigo cria a sim com o pool que veio na sessão (`game.test.ts`: 2 humanos e 5
+  zumbis, e não os 60 do PC); o resumo cortado quando um celular entra e o inteiro quando ele sai ("10 contra 10" →
+  "7 contra 6" → "10 contra 10"); o começo que volta para quem caiu leva o pool; e o teste dos modos cria cada sim com o
+  pool da própria sessão, como a cena faz. Os mapas de verdade no Node ficaram num ajudante só
+  (`apps/web/scripts/real-maps.ts`), que o bench de rede também usa.

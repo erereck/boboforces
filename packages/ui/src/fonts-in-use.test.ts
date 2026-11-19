@@ -352,10 +352,6 @@ function reachable(layout: LayoutResult, start: string): Set<string> {
 }
 
 /**
- * Sem estouro: texto de botão cabe na largura menos o respiro (2·padX·escala) e dentro da altura; texto solto cabe na
- * área útil; botão com pelo menos o alvo mínimo. Devolve as larguras medidas (para a mensagem de erro ser útil).
- */
-/**
  * M5 (fase 6c): o texto de um card (um `box` com id `card:*`) fica dentro dele. O `expectNoOverflow` só confere a tela:
  * a descrição longa do X1 passava por baixo do card vizinho e o teste não via.
  */
@@ -376,10 +372,18 @@ function expectCardsFit(layout: LayoutResult, t: Target): void {
       expect(r.x + text.width, `${t.name}: "${text.text}" no ${node.id}`).toBeLessThanOrEqual(
         card.x + card.w - pad + 0.5,
       );
+      // E embaixo: o texto não passa da borda de baixo do card.
+      expect(r.y + text.height, `${t.name}: "${text.text}" embaixo do ${node.id}`).toBeLessThanOrEqual(
+        card.y + card.h - pad + 1,
+      );
     }
   }
 }
 
+/**
+ * Sem estouro: texto de botão cabe na largura menos o respiro (2·padX·escala) e dentro da altura; texto solto cabe na
+ * área útil; botão com pelo menos o alvo mínimo. Devolve as larguras medidas (para a mensagem de erro ser útil).
+ */
 function expectNoOverflow(layout: LayoutResult, t: Target): void {
   const c = layout.content;
   for (const node of layout.order) {

@@ -11,6 +11,7 @@ import {
   DEFAULT_ONLINE_PROFILE,
   ONLINE_PROFILE_FORMAT,
   ONLINE_PROFILE_RANGES,
+  presetBotCounts,
   validateOnlineProfile,
   type MatchRecipe,
   type OnlineProfileDocument,
@@ -236,15 +237,26 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     );
   }
 
-  /** A partida que a sala joga: a escolhida, dentro do teto. */
-  function roomRecipe(r: OnlineRoom): MatchRecipe {
-    return capRoomRecipe(recipe, limits(r));
+  /**
+   * A partida que a sala vai jogar: a escolhida, dentro do teto, com os jogadores de agora nos times (é o que o
+   * Começar monta). O resumo sai daqui: no X1 com 4, "2 contra 2", e não "1 contra 1".
+   */
+  function playedRecipe(r: OnlineRoom): MatchRecipe {
+    const members = r.view?.members ?? [];
+    return onlineRecipe(capRoomRecipe(recipe, limits(r)), members.length > 0 ? members.map((m) => m.team) : [team])
+      .recipe;
   }
 
-  /** Host: manda o resumo aos amigos quando ele muda (a partida nova ou o teto da sala). */
+  /** O teto da sala tirou bots da partida escolhida (o host vê o aviso; só baixar a visão não conta). */
+  function botsCut(r: OnlineRoom): boolean {
+    const total = (x: MatchRecipe): number => presetBotCounts(x).reduce((a, b) => a + b, 0);
+    return total(capRoomRecipe(recipe, limits(r))) < total(recipe);
+  }
+
+  /** Host: manda o resumo aos amigos quando ele muda (a partida nova, o teto ou os times da sala). */
   function publishSummary(r: OnlineRoom): void {
     summaryView = r.view;
-    const text = deps.summary(roomRecipe(r));
+    const text = deps.summary(playedRecipe(r));
     if (text === sentSummary) return;
     sentSummary = text;
     r.setSummary(text, recipeHasTeams(recipe));
@@ -394,6 +406,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
 
   function createRoom(): void {
     recipe = deps.initialRecipe();
+    lastCard = ROOM_MODES[0];
     team = -1;
     ready = true;
     room = rooms.create(choice(), hostSnapshotHz(mobile));
@@ -586,12 +599,12 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       // M5 (fase 6b): o host no celular (o aviso) e a partida cortada pelo teto da sala.
       const hints: string[] = [];
       if (host && mobile) hints.push(t('online.room.phoneHost'));
-      if (host && roomRecipe(room) !== recipe) hints.push(t('online.room.capped', { n: limits(room).maxBots }));
+      if (host && botsCut(room)) hints.push(t('online.room.capped', { n: limits(room).maxBots }));
       menu.setRoot(
         onlineRoomScreen.build({
           code: room.code,
           // O resumo do host veio de outro aparelho: só o que o atlas desenha.
-          summary: host ? deps.summary(roomRecipe(room)) : cleanHudText(view?.summary ?? '', 80),
+          summary: host ? deps.summary(playedRecipe(room)) : cleanHudText(view?.summary ?? '', 80),
           hints,
           host,
           members: roomRows(room),

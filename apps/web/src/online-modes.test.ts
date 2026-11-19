@@ -1,16 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { decodeMap, decodeModelPack, parseLayerManifest, type MatchRecipe } from '@boboforces/format';
-import { createSceneDriver, onlineRecipe, type SceneDriver } from '@boboforces/game';
+import type { MatchRecipe } from '@boboforces/format';
+import { createSceneDriver, onlineRecipe, type OnlineSession, type SceneDriver } from '@boboforces/game';
 import { roomPreset, type RoomPresetMode } from '@boboforces/game/online';
-import { buildMapNav, buildMapWorld, buildSimMap } from '@boboforces/game/scene';
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import * as net from '@boboforces/net';
 import { yawToU16 } from '@boboforces/shared';
-import type { SimMap } from '@boboforces/sim';
-import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
+import { loadRealMap } from '../scripts/real-maps.ts';
 import { createOnlineSession } from './online-session.ts';
 
 /**
@@ -18,31 +13,6 @@ import { createOnlineSession } from './online-session.ts';
  * Abandonada): o host com os bots e um ou mais amigos, 60 ms de ida, variação e perda. No fim, o amigo mostra o mesmo
  * placar, as mesmas mortes e (no Bobo Zombies) a mesma onda, os mesmos pontos e as mesmas portas que o host.
  */
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const RUNTIME = JSON.parse(readFileSync(join(ROOT, 'assets-src', 'runtime-assets.json'), 'utf8')) as {
-  files: Record<string, string>;
-};
-const asset = (logical: string): Uint8Array =>
-  new Uint8Array(readFileSync(join(ROOT, 'assets-src', RUNTIME.files[logical]!)));
-const text = (logical: string): string => new TextDecoder().decode(asset(logical));
-
-const maps = new Map<string, SimMap>();
-function loadMap(id: string): SimMap {
-  const known = maps.get(id);
-  if (known) return known;
-  const manifest = parseLayerManifest(JSON.parse(text('textures/blocos16.json')) as unknown);
-  const layers = new Map(manifest.layers.map((l, i) => [l.name, i] as const));
-  const world = buildMapWorld({
-    map: decodeMap(asset(`maps/${id}.bfmap`)),
-    blockDefs: parseBlockDefs(JSON.parse(text('blocks/blocks.json')) as unknown),
-    blockLayer: (name) => layers.get(name),
-    models: decodeModelPack(asset('models/modelos.bfmodel')).models,
-  });
-  const map = buildSimMap(world, buildMapNav(world));
-  maps.set(id, map);
-  return map;
-}
 
 /** Cada humano anda, vira e atira, igual em qualquer aparelho (depende só do seq). */
 function play(slot: number, out: InputFrame, seq: number): void {
@@ -66,7 +36,7 @@ function playRoom(
   teams: readonly number[],
   options: { readonly snapshotHz: number; readonly zombies: number; readonly maxS: number },
 ): RoomRun {
-  const map = loadMap(recipe.map);
+  const map = loadRealMap(recipe.map);
   const loop = net.createLoopback({ seed: 13, latencyMs: 60, jitterMs: 15, loss: 0.03 });
   const placed = onlineRecipe(recipe, teams);
   const start: net.LobbyStart = {
@@ -80,17 +50,20 @@ function playRoom(
       ready: true,
       controller: placed.controllers[i]!,
     })),
+    // Revisão da fase 6: o pool de zumbis do host vai no começo, e cada lado cria a sim com o da própria sessão.
+    ...(options.zombies > 0 ? { zombies: options.zombies } : {}),
   };
   const common = { net, start, snapshotHz: options.snapshotHz, isClosed: () => false, takeLeftSlots: () => [] };
-  const driverConfig = {
+  /** Como a cena faz: o pool do Bobo Zombies é o da sessão (o host mandou no começo). */
+  const configFor = (session: OnlineSession) => ({
     recipe: { ...placed.recipe, seed: 77 },
     map,
     humans: teams.length,
     writeHumanFrame: play,
-    ...(options.zombies > 0 ? { zombies: options.zombies } : {}),
-  };
-  const host = createSceneDriver(
-    driverConfig,
+    ...(session.zombiePool !== undefined && recipe.mode === 'zombies' ? { zombies: session.zombiePool } : {}),
+  });
+  const drive = (session: OnlineSession): SceneDriver => createSceneDriver(configFor(session), session);
+  const host = drive(
     createOnlineSession({
       ...common,
       role: 'host',
@@ -102,8 +75,7 @@ function playRoom(
     }),
   );
   const clients = teams.slice(1).map((_team, k) =>
-    createSceneDriver(
-      driverConfig,
+    drive(
       createOnlineSession({
         ...common,
         role: 'client',

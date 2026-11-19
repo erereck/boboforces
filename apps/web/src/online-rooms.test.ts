@@ -224,9 +224,11 @@ describe('a queda e a volta (M5 fase 5b)', () => {
       recipe,
       host.view!.members.map((m) => m.team),
     );
-    const started = host.start(placed.recipe, 7, placed.controllers, 0);
+    // Revisão da fase 6: com o pool de zumbis do host (o começo que volta para quem caiu leva o mesmo).
+    const started = host.start(placed.recipe, 7, placed.controllers, 16);
     await pump(10, [host, bia]);
     const first = bia.match!;
+    expect(first.session.zombiePool).toBe(16);
     const { map } = buildSyntheticConstruto();
     const link = started.session.attachHost(
       createMatchSim({ recipe: { ...placed.recipe, seed: 7 }, map, humans: 2, writeHumanFrame: () => undefined }),
@@ -246,6 +248,7 @@ describe('a queda e a volta (M5 fase 5b)', () => {
     expect(bia.status).toBe('playing');
     expect(bia.match).not.toBe(first);
     expect(bia.match!.session.localController).toBe(biaController);
+    expect(bia.match!.session.zombiePool).toBe(16);
     expect(host.view!.members.map((m) => m.name).sort()).toEqual(['Bia', 'Erick']);
     expect(link.takeLost(lost)).toBe(1);
     expect(lost).toEqual([biaController]);

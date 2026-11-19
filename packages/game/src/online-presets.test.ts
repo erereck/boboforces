@@ -73,7 +73,7 @@ describe('o teto da sala (M5 fase 6b)', () => {
       ],
     };
     const phone = capRoomRecipe(six, roomLimits('mobile', false));
-    // 6 contra 6 (11 bots) vira 4 contra 4 (7 bots, dentro dos 8, e o lado do adversário perde o 8º).
+    // 6 contra 6 (11 bots) vira 5 contra 4 (8 bots: o host e 4 contra 4; no empate o lado do adversário perde primeiro).
     expect(presetBotCounts(phone)).toEqual([4, 4]);
     expect(phone.teams[1]!.bots).toEqual([
       { ref: normal, count: 3 },

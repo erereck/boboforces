@@ -2073,12 +2073,14 @@ interface FakeRoom extends OnlineRoom {
 function fakeSession(
   role: 'host' | 'client',
   calls: string[],
+  zombiePool?: number,
 ): { session: OnlineSession; close(): void; absent: { s: number; notified: boolean } } {
   let closed = false;
   const absent = { s: 0, notified: false };
   const session: OnlineSession = {
     role,
     humans: 2,
+    ...(zombiePool !== undefined ? { zombiePool } : {}),
     localController: role === 'host' ? 0 : 1,
     remoteControllers: role === 'host' ? [1] : [0],
     names: ['Erick', 'Bia'],
@@ -2612,6 +2614,96 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.tap('Enter');
     expect(room.calls).toContain('pool:16');
     expect(platform.logLines.some((l) => l.includes('até 8 bots e 16 zumbis'))).toBe(true);
+    game.dispose();
+  }, 60_000);
+
+  it('revisão da fase 6: o resumo é o da partida jogada; um celular corta os bots e, saindo, devolve', async () => {
+    // A última partida (a da sala nova): 10 contra 10, 19 bots.
+    const big: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'construto',
+      seed: 0,
+      match: { timeLimitS: 600, scoreLimit: 75 },
+      teams: [
+        { humans: 'all', bots: [{ ref: builtinBotRef('normal'), count: 9 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 10 }] },
+      ],
+    };
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({
+        format: 'boboforces/online@1',
+        name: 'Erick',
+        privacy: ONLINE.ONLINE_PRIVACY_VERSION,
+      }),
+      presets: JSON.stringify({ recent: [big], saved: [], favorites: [], botFavorites: [] }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    await openOnlineFromTitle(platform);
+    platform.tap('Enter');
+    const room = made[0]!;
+    const summaries = () => room.calls.filter((c) => c.startsWith('summary:'));
+    expect(summaries().at(-1)).toContain('10 contra 10');
+    const host = { slot: 0, name: 'Erick', team: -1, ready: true };
+    // Um amigo no PC: o mesmo tamanho (ele toma o lugar de um bot do outro lado).
+    room.view = { ...room.view!, members: [host, { slot: 1, name: 'Bia', team: -1, ready: true }] };
+    platform.pump(2);
+    expect(summaries().at(-1)).toContain('10 contra 10');
+    // Ele está no celular: 12 bots no máximo; o resumo é o cortado.
+    room.view = { ...room.view, members: [host, { slot: 1, name: 'Bia', team: -1, ready: true, mobile: true }] };
+    platform.pump(2);
+    const cut = summaries().at(-1)!;
+    expect(cut).not.toContain('10 contra 10');
+    expect(cut).toContain('7 contra 6');
+    // Ele saiu: a partida inteira de novo.
+    room.view = { ...room.view, members: [host] };
+    platform.pump(2);
+    expect(summaries().at(-1)).toContain('10 contra 10');
+    game.dispose();
+  }, 60_000);
+
+  it('revisão da fase 6: o amigo cria a sim do Bobo Zombies com o pool que o host mandou', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    const keyboard = systemKeyboard(platform);
+    await openOnlineFromTitle(platform);
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    keyboard.listener!.onSubmit('AB3CD');
+    platform.pump(2);
+    const room = made[0]!;
+    room.status = 'lobby';
+    room.mySlot = 1;
+    room.view = {
+      code: 'AB3CD',
+      locked: false,
+      summary: 'Zombies · 10 ondas · Base Abandonada',
+      teams: false,
+      playing: false,
+      members: [
+        { slot: 0, name: 'Erick', team: -1, ready: true },
+        { slot: 1, name: 'Bia', team: -1, ready: true },
+      ],
+    };
+    platform.pump(3);
+    const zombies: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'base',
+      seed: 0,
+      match: { timeLimitS: 0, scoreLimit: 0 },
+      zombies: { waves: 10 },
+      teams: [{ humans: 2, bots: [] }],
+    };
+    const fake = fakeSession('client', room.calls, 5);
+    room.status = 'playing';
+    room.match = { recipe: zombies, seed: 7, session: fake.session };
+    platform.pump(1);
+    await untilRunning(platform, game);
+    // Os 2 humanos e os 5 do pool do host (sem o pool, seriam os 60 do PC).
+    expect(game.match!.sim.view().count).toBe(7);
     game.dispose();
   }, 60_000);
 
