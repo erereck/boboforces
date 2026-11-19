@@ -75,7 +75,8 @@ entra na fase 3, com o OK do download.
    e snapshots a 20 Hz; o aviso "Você é o host: não troque de app".
 7. **Medição e roteiro:** o bench de rede (banda por cliente, tempo de serialização no host, a CPU do host no celular
    contra a tabela do §13.4), o `docs/ROTEIRO_M5.md` para o teste real com amigos, e a rodada de prints.
-8. **Checkpoint com gente de verdade** (o Erick e amigos, 4G e wi-fi).
+8. **Checkpoint com gente de verdade** (o Erick e amigos, 4G e wi-fi). **O Online foi ao ar aberto em 19/11** (decisão
+   #80; ARCHITECTURE §16.23): o teste espera o Erick e os amigos, pelo `docs/ROTEIRO_M5.md`.
 9. **Fechamento:** TURN decidido, aviso de privacidade revisado, `CHANGELOG`, `ARCHITECTURE` §16, `PERF`. Publicar o
    online só com o pedido do Erick.
 

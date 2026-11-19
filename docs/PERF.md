@@ -299,6 +299,9 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   do X1 (2 humanos, sem bot) no host: rede **0,16 ms** por quadro, sim 0,15, IA 0,02, 60 fps, sobe 2,5 KB/s, 29,6
   snapshots/s; no amigo: desce 2,2 KB/s, sobe 3,4, atraso de 4 ticks, 0 predições erradas em 846. O F2 mostra o último
   quadro (um quadro que manda snapshot chega a ~2 ms); a média é a da linha.
+- **No site publicado (19/11/2026):** `npm run online:web -- --relays --url https://erereck.github.io/boboforces/`,
+  duas abas do Edge pelos relays de verdade: o amigo entrou em **5,0 s** pelo link; o X1 e o Bobo Zombies rodaram com o
+  amigo a 5–6 ticks do host.
 
 ## 2. Frame no aparelho (painel F2)
 

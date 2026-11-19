@@ -173,7 +173,11 @@ async function phonePass(browser: Browser, url: string): Promise<void> {
 }
 
 async function main(): Promise<number> {
-  const server = await startPreview();
+  // `--url <site>`: contra o site publicado (sem o servidor local; com `--relays`, a prova do Online no ar).
+  const urlArg = process.argv.indexOf('--url');
+  const remote = urlArg > 0 ? (process.argv[urlArg + 1] ?? null) : null;
+  const server = remote === null ? await startPreview() : null;
+  const base = remote ?? server!.url;
   const { browser } = await launchEdge();
   const failures: string[] = [];
   const steps: Record<string, unknown> = {};
@@ -191,12 +195,12 @@ async function main(): Promise<number> {
     }
 
     // 1. O host: título → Online (Modos | Online na 1ª fileira da grade) → aviso → Criar sala.
-    await host.goto(`${server.url}${query}`);
+    await host.goto(`${base}${query}`);
     await waitForTitle(host);
     // Os nomes da sala: o do host aqui (o aviso ainda por ler); o do amigo antes de abrir o link.
     await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Erick', 0));
     await shot(host, 'titulo');
-    await modesShot(host, `${server.url}${query}`, 'modos');
+    await modesShot(host, `${base}${query}`, 'modos');
     for (const key of ['ArrowDown', 'ArrowRight', 'Enter']) await tap(host, key);
     await until(host, 'a tela do Online', (s) => s.screen === 'online');
     await shot(host, 'aviso');
@@ -226,7 +230,7 @@ async function main(): Promise<number> {
     // 2. O amigo: o link da sala abre direto no Entrar.
     await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Bia', 1));
     const joinStart = Date.now();
-    await friend.goto(`${server.url}${query}#sala=${code}`);
+    await friend.goto(`${base}${query}#sala=${code}`);
     await until(friend, 'o Entrar com o código do link', (s) => s.screen === 'online');
     await shot(friend, 'entrar-pelo-link');
     await tap(friend, 'Enter');
@@ -337,7 +341,7 @@ async function main(): Promise<number> {
     await until(friend, 'o aviso de que o host saiu', (s) => s.online === null || s.online.end === 'host-left');
     await shot(friend, 'host-saiu');
     steps['fim'] = 'ok';
-    if (printsDir !== null) await phonePass(browser, server.url);
+    if (printsDir !== null) await phonePass(browser, base);
     const logs = await Promise.all(
       [host, friend].map((p) => p.evaluate(() => (window as unknown as PageWindow).__bfDebug?.log?.(30) ?? [])),
     );
@@ -360,7 +364,7 @@ async function main(): Promise<number> {
     }
   } finally {
     await browser.close();
-    await server.close();
+    await server?.close();
   }
   const out = join(REPO_ROOT, 'local', 'm5', relays ? 'online-web-relays.json' : 'online-web.json');
   mkdirSync(dirname(out), { recursive: true });

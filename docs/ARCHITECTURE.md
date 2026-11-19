@@ -3533,3 +3533,14 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   repassador dos bytes devolve o handler de antes; o PERF diz que os KB/s são da carga útil (sem o envelope da WebRTC).
 - **Testes novos:** a linha do host com 3 amigos (10 snapshots/s, 10 KB/s por amigo) e 2 min de aba atrás que não diluem
   a linha seguinte do amigo.
+
+### 16.23 O Online no ar (19/11/2026)
+
+- **Decisão #80:** o Erick pediu para publicar e deixar o Online aberto. `ONLINE_OPEN = true`; o push `153bcce..2980ed8`
+  levou o refino, o M4 sem o console e o M5 até a fase 7 (46 commits). CI e deploy no Pages verdes.
+- **No site publicado:** o `smoke:web -- --url` passou (na 1ª rodada o splash levou 1,13 s, com a CDN fria logo depois
+  do deploy; na seguinte, dentro do 1 s). O `online:web -- --relays --url https://erereck.github.io/boboforces/` (a
+  opção nova `--url` roda o roteiro das abas contra o site, sem o servidor local) jogou o X1 e o Bobo Zombies entre duas
+  abas pelos relays de verdade: o amigo entrou em 5,0 s, e a sala acabou para ele quando o host saiu.
+- **O que fica para o Erick** (fases 8 e 9 do plano): o teste com amigos (`docs/ROTEIRO_M5.md`), o TURN (O3) e a revisão
+  do aviso de privacidade (O5), que foi ao ar com o texto do Claude.
