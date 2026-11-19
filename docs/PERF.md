@@ -278,6 +278,25 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   humanos e 8 bots) a 20 Hz: host → cliente **7,3 KB/s** (9,8 a 30 Hz); a interpolação fica a **0,52 cm** do host em
   média e **5,3 cm** no p99 (0,37 e 2,0 a 30 Hz: a espera de 100 ms cobre só 2 snapshots); a predição não muda (erro
   médio 0,02–0,14 cm). Nos mapas de verdade, Times com o host e 1 amigo: **4,3 KB/s** a 20 Hz contra 5,8 a 30 Hz.
+- **O bench de rede (fase 7a, `npm run bench:rede`, 18/11/2026):** o host com os mapas de verdade, a IA e 3 amigos pela
+  rede de mentira (40 ms ± 10 ms, 1% de perda), 60 s de partida depois de 5 s de aquecimento. Custo por quadro a
+  30 fps (o custo de cada segundo ÷ 30), contra o orçamento do host no celular do tecnico.md §13.4 (sim 2,5, IA 1,0,
+  rede 2,0 ms). Os amigos de mentira rodam no mesmo processo, medidos à parte:
+
+  | Caso | Bobos (em jogo) | Sim | IA | Rede | Host → amigo | Amigo → host | Maior mensagem |
+  |---|---|---|---|---|---|---|---|
+  | Host no celular: 4 humanos + 8 bots, 20 Hz | 12 (10,9) | 0,07 ms | 0,06 ms | **0,06 ms** | 5,3 KB/s | 3,6 KB/s | 785 B |
+  | Host no PC: 4 humanos + 40 bots, 30 Hz | 44 (39,6) | 0,40 ms | 0,41 ms | **0,44 ms** | **17,3 KB/s** | 3,6 KB/s | 1.091 B |
+  | Bobo Zombies, host no celular: pool de 16, 20 Hz | 20 (18,7) | 0,21 ms | 0,09 ms | **0,16 ms** | 3,7 KB/s | 3,6 KB/s | 509 B |
+  | Bobo Zombies, host no PC: pool de 60, 30 Hz | 64 (42,4) | 0,22 ms | 0,17 ms | **0,28 ms** | 6,1 KB/s | 3,6 KB/s | 1.094 B |
+
+  No PC, a rede do host fica abaixo de 0,5 ms por quadro em todos os casos (o orçamento do celular é 2 ms). Com 40 bots,
+  o host manda 17,3 KB/s para cada amigo, um pouco acima dos ~16 KB/s estimados no tecnico.md §13.3 (44 entidades);
+  com 3 amigos, ~52 KB/s de subida. A CPU do celular sai do F2 e da linha `[rede]` no teste real (ROTEIRO_M5).
+- **No navegador, pela WebRTC de verdade (fase 7a, `npm run online:web -- --partida 40`):** a linha `[rede]` de 30 s
+  do X1 (2 humanos, sem bot) no host: rede **0,16 ms** por quadro, sim 0,15, IA 0,02, 60 fps, sobe 2,5 KB/s, 29,6
+  snapshots/s; no amigo: desce 2,2 KB/s, sobe 3,4, atraso de 4 ticks, 0 predições erradas em 846. O F2 mostra o último
+  quadro (um quadro que manda snapshot chega a ~2 ms); a média é a da linha.
 
 ## 2. Frame no aparelho (painel F2)
 

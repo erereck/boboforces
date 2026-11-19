@@ -1,5 +1,11 @@
-import { ONLINE_CONTROL, type OnlineClientLink, type OnlineHostLink, type OnlineSession } from '@boboforces/game';
-import type { LobbyStart, NetEndpoint, NetWelcome } from '@boboforces/net';
+import {
+  ONLINE_CONTROL,
+  type OnlineClientLink,
+  type OnlineHostLink,
+  type OnlineNetStats,
+  type OnlineSession,
+} from '@boboforces/game';
+import type { LobbyStart, NetChannel, NetEndpoint, NetWelcome } from '@boboforces/net';
 import type { NetModule } from './online.ts';
 
 /**
@@ -31,8 +37,44 @@ export interface OnlineMatchSetup {
   readonly takeRejoined?: () => readonly { readonly slot: number; readonly oldSlot: number; readonly peer: number }[];
 }
 
+type Handler = (from: number, channel: NetChannel, bytes: Uint8Array) => void;
+
+/**
+ * M5 (fase 7a): o lado "partida" com os bytes contados (o F2 e a linha `[rede]`). Sem alocar por quadro: o `poll` passa
+ * sempre o mesmo repassador.
+ */
+function countingEndpoint(inner: NetEndpoint): { endpoint: NetEndpoint; sent: () => number; received: () => number } {
+  let sent = 0;
+  let received = 0;
+  let handler: Handler | null = null;
+  const relay: Handler = (from, channel, bytes) => {
+    received += bytes.length;
+    handler!(from, channel, bytes);
+  };
+  return {
+    endpoint: {
+      id: inner.id,
+      send(to, channel, bytes): void {
+        sent += bytes.length;
+        inner.send(to, channel, bytes);
+      },
+      poll(h): void {
+        handler = h;
+        try {
+          inner.poll(relay);
+        } finally {
+          handler = null;
+        }
+      },
+    },
+    sent: () => sent,
+    received: () => received,
+  };
+}
+
 export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
   const { net, start } = setup;
+  const counted = countingEndpoint(setup.endpoint);
   const me = start.members.find((m) => m.slot === setup.mySlot);
   if (!me) throw new Error(`online: o slot ${setup.mySlot} não está no começo`);
   const remote = start.members.filter((m) => m.slot !== setup.mySlot);
@@ -51,7 +93,7 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
     },
     attachHost(sim): OnlineHostLink {
       setup.onAttached?.(true);
-      const host = net.createNetHost({ sim, endpoint: setup.endpoint, snapshotHz: setup.snapshotHz });
+      const host = net.createNetHost({ sim, endpoint: counted.endpoint, snapshotHz: setup.snapshotHz });
       // O controlador de cada lugar e o peer de cada controlador (mudam quando alguém cai e volta, 5b).
       const controllerOfSlot = new Map<number, number>();
       const peerOfController = new Map<number, number>();
@@ -70,7 +112,25 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
       const seenActivity = new Float64Array(remote.length).fill(-1);
       const seenTick = new Float64Array(remote.length);
       const away = new Uint8Array(remote.length);
+      const stats: OnlineNetStats = {
+        get sentBytes() {
+          return counted.sent();
+        },
+        get receivedBytes() {
+          return counted.received();
+        },
+        get peers() {
+          return peerOfController.size;
+        },
+        get snapshots() {
+          return host.stats.snapshots;
+        },
+        lagTicks: -1,
+        reconciles: 0,
+        mispredicts: 0,
+      };
       return {
+        stats,
         takeControl(out): number {
           out.length = 0;
           // M5 (fase 5b): quem caiu e voltou recebe o boneco dele de volta (o bot sai).
@@ -138,13 +198,36 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
       setup.onAttached?.(true);
       const client = net.createClientDriver({
         sim,
-        endpoint: setup.endpoint,
+        endpoint: counted.endpoint,
         host: setup.hostPeer,
         ...(setup.welcome ? { welcome: setup.welcome } : {}),
         writeLocalFrame,
         onEvents,
       });
+      const stats: OnlineNetStats = {
+        get sentBytes() {
+          return counted.sent();
+        },
+        get receivedBytes() {
+          return counted.received();
+        },
+        peers: 1,
+        get snapshots() {
+          return client.stats.snapshotsApplied;
+        },
+        get lagTicks() {
+          const newest = client.assembler.newest;
+          return newest === null || client.renderTick < 0 ? -1 : newest.tick - client.renderTick;
+        },
+        get reconciles() {
+          return client.stats.reconciles;
+        },
+        get mispredicts() {
+          return client.stats.mispredicts;
+        },
+      };
       return {
+        stats,
         update: (s) => client.update(s),
         get alpha(): number {
           return client.alpha;

@@ -41,7 +41,8 @@
     "fontbake": "node tools/fontbake/src/index.ts",
     "check": "npm run typecheck && npm test && npm run format:check && npm run guard",
     "rtc:web": "node apps/web/scripts/rtc-web.ts",
-    "online:web": "node apps/web/scripts/online-web.ts"
+    "online:web": "node apps/web/scripts/online-web.ts",
+    "bench:rede": "node apps/web/scripts/bench-rede.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

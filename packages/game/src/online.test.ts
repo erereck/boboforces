@@ -75,6 +75,7 @@ function fakeOnline(role: 'host' | 'client'): {
       return out.length;
     },
     setAway: (on) => calls.push(`away:${on}`),
+    stats: { sentBytes: 0, receivedBytes: 0, peers: 1, snapshots: 0, lagTicks: -1, reconciles: 0, mispredicts: 0 },
     dispose: () => calls.push('dispose'),
   };
   const session: OnlineSession = {
@@ -90,6 +91,7 @@ function fakeOnline(role: 'host' | 'client'): {
     attachClient: (sim: Sim, write: (out: InputFrame, seq: number) => void) => {
       const f: InputFrame = { seq: 0, buttons: 0, moveX: 0, moveY: 0, yaw: 0, pitch: 0, weapon: 0, primary: 0 };
       const link: OnlineClientLink = {
+        stats: { sentBytes: 0, receivedBytes: 0, peers: 1, snapshots: 0, lagTicks: -1, reconciles: 0, mispredicts: 0 },
         update: () => {
           write(f, 1);
           calls.push(`client-update:${sim.tick}`);

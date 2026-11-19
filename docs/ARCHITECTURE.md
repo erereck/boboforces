@@ -3465,3 +3465,25 @@ Um revisor (Opus) leu as 3 partes. Nada grave; 2 problemas e 6 menores, todos co
   "7 contra 6" → "10 contra 10"); o começo que volta para quem caiu leva o pool; e o teste dos modos cria cada sim com o
   pool da própria sessão, como a cena faz. Os mapas de verdade no Node ficaram num ajudante só
   (`apps/web/scripts/real-maps.ts`), que o bench de rede também usa.
+
+### 16.19 Fase 7a: a rede à vista (18/11/2026)
+
+- **Os números** (`OnlineNetStats` no `online-api`, `stats` nos dois links): bytes mandados e recebidos pela partida,
+  amigos ligados, snapshots (montados no host, aplicados no amigo), o atraso do que o amigo mostra (ticks atrás do
+  snapshot mais novo) e as reconciliações e predições erradas. A casca web conta os bytes num repassador do lado
+  "partida" do repartidor (`countingEndpoint`, sem alocar por quadro: o `poll` passa sempre o mesmo repassador); o
+  resto vem do `NetHost` e do `ClientDriver`. O `SceneDriver` expõe `net` e `lastNetMs` (o host mede o `receive`
+  e o `afterTicks` com o `now` da cena).
+- **O F2** (`DebugPanelModel.net*`): uma linha a mais só no online, "Rede (host)" ou "Rede (amigo)", com as taxas de
+  cada segundo. Os textos ficam na tabela extra (o menu não paga).
+- **A linha `[rede]`** a cada 30 s de partida online, com as médias da janela: no host, a rede, a sim e a IA por
+  quadro, o fps, o que sobe e desce por amigo e os snapshots por segundo; no amigo, o que desce e sobe, os snapshots,
+  o atraso, as predições erradas, o host ausente e o fps. As janelas usam o relógio da plataforma (KB/s de verdade): o
+  `dt` da cena tem teto de 0,1 s, e a aba de trás contaria o tempo devagar. A 1ª amostra é a base (a carga e o 1º
+  snapshot completo não entram).
+- **O bench de rede** (`npm run bench:rede`, `apps/web/scripts/bench-rede.ts`, no Node): o host com os mapas de verdade
+  (`real-maps.ts`), a IA e 3 amigos pela rede de mentira, nos casos do celular (8 bots, 20 Hz), do PC (40 bots, 30 Hz)
+  e do Bobo Zombies (pool de 16 e de 60, com a horda no máximo). O relógio da rede envolve o `receive` e o
+  `afterTicks` do link; o trabalho dos amigos de mentira fica à parte. Números no PERF §1i.
+- **`online:web`:** `--partida N` deixa o X1 rodar N segundos (com 40, sai uma linha `[rede]` de cada lado, que o
+  relatório guarda em `steps.rede`); com `--prints`, o F2 do host e do amigo.

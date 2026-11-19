@@ -6,6 +6,7 @@ import {
   ONLINE_CONTROL,
   waitsForHost,
   type OnlineHostLink,
+  type OnlineNetStats,
   type OnlineSession,
 } from '../online-api.ts';
 
@@ -19,6 +20,10 @@ export interface SceneDriver extends MatchDriver {
   readonly director: BotDirectorWithStats | null;
   readonly lastAiMs: number;
   readonly lastSimMs: number;
+  /** M5 (fase 7a): ms da rede do host no último `update` (receber e mandar os snapshots); 0 fora dele ou sem `now`. */
+  readonly lastNetMs: number;
+  /** M5 (fase 7a): os números da rede da partida online; `null` no solo e no sofá. */
+  readonly net: OnlineNetStats | null;
   setHumanControlled(controller: number, on: boolean): void;
   /** Online: a sala acabou (a cena volta ao menu). */
   readonly closed: boolean;
@@ -52,9 +57,11 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       get lastSimMs(): number {
         return d.lastSimMs;
       },
+      lastNetMs: 0,
+      net: null,
       setHumanControlled: (c, on) => d.setHumanControlled(c, on),
-      hostAbsentS: 0,
       hostAwayNotified: false,
+      hostAbsentS: 0,
       setHidden: () => undefined,
       update: (s) => d.update(s),
       dispose: () => d.dispose(),
@@ -79,6 +86,8 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       },
       lastAiMs: 0,
       lastSimMs: 0,
+      lastNetMs: 0,
+      net: link.stats,
       get hostAbsentS(): number {
         return link.hostAbsentS;
       },
@@ -117,10 +126,18 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
   const control: number[] = [];
   /** Quando a aba do host sumiu (ms da plataforma; -1 = à vista). */
   let hiddenAt = -1;
+  const now = config.now;
+  let netMs = 0;
   return {
     sim: d.sim,
     director: d.director,
     online: true,
+    get lastNetMs(): number {
+      return netMs;
+    },
+    get net(): OnlineNetStats {
+      return link!.stats;
+    },
     get closed(): boolean {
       return online.closed;
     },
@@ -149,7 +166,9 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
     },
     update(s): number {
       const l = link!;
+      const t0 = now ? now() : 0;
       l.receive();
+      netMs = now ? now() - t0 : 0;
       const n = l.takeLost(lost);
       for (let i = 0; i < n; i++) {
         remote.delete(lost[i]!);
@@ -174,7 +193,11 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
         }
       }
       const ticks = d.update(s);
-      if (ticks > 0) l.afterTicks();
+      if (ticks > 0) {
+        const t1 = now ? now() : 0;
+        l.afterTicks();
+        if (now) netMs += now() - t1;
+      }
       return ticks;
     },
     dispose(): void {

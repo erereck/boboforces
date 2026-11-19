@@ -10,6 +10,25 @@ import { placeHumans, type SeatedRecipe } from './scene/seats.ts';
  * não existe (#1) e o `platform.online` continua nulo (regra 18).
  */
 
+/**
+ * M5 (fase 7a): os números da rede de uma partida (o F2 e a linha `[rede]` do registro). Contadores desde o começo;
+ * quem lê faz a conta por segundo.
+ */
+export interface OnlineNetStats {
+  /** Bytes mandados e recebidos pela partida (os dois canais; o lobby não conta). */
+  readonly sentBytes: number;
+  readonly receivedBytes: number;
+  /** Host: amigos ligados agora. Amigo: 1 (o host). */
+  readonly peers: number;
+  /** Host: snapshots montados (um por amigo). Amigo: snapshots aplicados. */
+  readonly snapshots: number;
+  /** Amigo: quantos ticks o que ele mostra está atrás do snapshot mais novo (-1 no host ou antes do 1º). */
+  readonly lagTicks: number;
+  /** Amigo: reconciliações da predição e as que erraram mais de 10 cm (0 no host). */
+  readonly reconciles: number;
+  readonly mispredicts: number;
+}
+
 /** O lado do host numa partida: a sim é a dele, os amigos mandam entradas e recebem o estado. */
 export interface OnlineHostLink {
   /** Lê o que chegou (entradas, acks). Antes dos ticks do frame. */
@@ -29,6 +48,8 @@ export interface OnlineHostLink {
   takeControl(out: number[]): number;
   /** M5 (fase 5a): o host foi para segundo plano (`true`) ou voltou: os amigos ficam sabendo na hora. */
   setAway(away: boolean): void;
+  /** M5 (fase 7a): os números da rede (vivos: o mesmo objeto, lido quando quiser). */
+  readonly stats: OnlineNetStats;
   dispose(): void;
 }
 
@@ -40,6 +61,8 @@ export interface OnlineClientLink {
   readonly hostAbsentS: number;
   /** M5 (fase 5a): a ausência veio do aviso do host (sem ele, só silêncio: pode ser a minha conexão). */
   readonly hostAwayNotified: boolean;
+  /** M5 (fase 7a): os números da rede (vivos: o mesmo objeto, lido quando quiser). */
+  readonly stats: OnlineNetStats;
   dispose(): void;
 }
 

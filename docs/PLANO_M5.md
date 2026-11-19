@@ -178,6 +178,28 @@ Os modos da sala e o host no celular, em 3 partes, cada uma verde e commitada:
 - **6c, a prova:** as duas abas do Edge passam pelos cards da sala, e os testes das partes ficam no portão. Depois, a
   revisão. **Feita em 17/11** (ARCHITECTURE §16.17).
 
+## Fase 7 em detalhe (18/11/2026)
+
+O que dá para medir sem gente de verdade, e o que fica pronto para medir com ela (a fase 8), em 3 partes:
+
+- **7a, a rede à vista:**
+  - **o F2 com a rede.** No host: o tempo da rede por quadro (receber e montar os snapshots), o que sobe para cada
+    amigo (KB/s), os snapshots por segundo e quantos amigos. No amigo: o que desce (KB/s), o atraso em ticks, o host
+    ausente e as predições que erraram;
+  - **o registro.** Uma linha `[rede]` a cada 30 s de partida online, com os mesmos números. Ela vai no "Copiar
+    relatório" dos Ajustes: é por ali que os números do teste real chegam;
+  - **o bench de rede** (`npm run bench:rede`, no Node). O host com os mapas de verdade, a IA e 3 amigos pela rede de
+    mentira, em 3 casos: o host no celular (4 humanos e 8 bots a 20 Hz), o PC cheio (4 humanos e 40 bots a 30 Hz) e o
+    Bobo Zombies (pool de 16 e de 60). Ele mede, por quadro, a sim, a IA e a rede do host, separadas do trabalho dos
+    amigos de mentira, e a banda por amigo. Os números do PC vão para o `PERF.md`, ao lado da tabela do tecnico.md
+    §13.4. A CPU do host no celular sai do F2 no teste real.
+  - **feita em 18/11** (ARCHITECTURE §16.19).
+- **7b, o roteiro:** o `docs/ROTEIRO_M5.md`, o passo a passo do teste real com amigos (fase 8). O host no PC e no
+  celular, 4G e wi-fi, cada modo, as quedas, o "Copiar relatório" de cada um. Diz também o que anotar.
+- **7c, a rodada de prints:** as telas da fase 5 e da fase 6 que ainda não foram à página (os cards da sala, o aviso
+  do host no celular, a faixa do host ausente, o "voltando à sala", o Atualizar). Ela vai à página das rodadas com as
+  perguntas novas e as que seguem abertas.
+
 ## Riscos
 
 - **O menu da web está em 349,2 de 350 KB** (depois da 4c). O item "Online" e a tela de código precisam caber: a tela

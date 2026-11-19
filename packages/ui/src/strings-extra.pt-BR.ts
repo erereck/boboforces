@@ -244,6 +244,18 @@ export const STRINGS_EXTRA_PT_BR = {
   'debug.on': 'ligado',
   'debug.off': 'desligado',
   'debug.unknown': '—',
+  // M5 (fase 7a): a linha da rede no F2 (online).
+  'debug.netHost': 'Rede (host)',
+  'debug.netClient': 'Rede (amigo)',
+  'debug.netUp': 'sobe',
+  'debug.netDown': 'desce',
+  'debug.kbs': 'KB/s',
+  'debug.perFriend': 'por amigo',
+  'debug.friends': 'amigos',
+  'debug.snapshotsPerS': 'snapshots/s',
+  'debug.lag': 'atraso',
+  'debug.ticks': 'ticks',
+  'debug.mispredicts': 'predição errada',
   /** Folha das fontes em uso (decisão #54): o print de regressão das fontes. */
   'fontSpecimen.title': 'Fontes em uso',
   'fontSpecimen.display': 'Display',

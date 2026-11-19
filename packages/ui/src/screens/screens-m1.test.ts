@@ -121,9 +121,43 @@ describe('painel F2', () => {
     expect(text).toContain('gl.finishdesligado');
   });
 
+  it('M5 (fase 7a): a linha da rede do host e a do amigo (só no online)', () => {
+    const host = sampleModel();
+    host.netRole = 1;
+    host.netMs = 0.07;
+    host.netUpKBps = 5.27;
+    host.netPeers = 3;
+    host.netSnapshotsPerS = 20;
+    const a = list(1280, 720);
+    drawDebugPanel(a, fonts, host, 1280, 720);
+    const hostText = syntheticGlyphText(a);
+    expect(hostText).toContain('Rede(host)0,07ms');
+    expect(hostText).toContain('sobe5,3KB/sporamigo');
+    expect(hostText).toContain('amigos3');
+    expect(hostText).toContain('snapshots/s20');
+    const friend = sampleModel();
+    friend.netRole = 2;
+    friend.netDownKBps = 5.27;
+    friend.netUpKBps = 3.6;
+    friend.netLagTicks = 6.4;
+    friend.netMispredicts = 2;
+    const b = list(1280, 720);
+    drawDebugPanel(b, fonts, friend, 1280, 720);
+    const friendText = syntheticGlyphText(b);
+    expect(friendText).toContain('Rede(amigo)desce5,3');
+    expect(friendText).toContain('atraso6,4ticks');
+    expect(friendText).toContain('prediçãoerrada2');
+    // Sem rede, a linha não aparece.
+    const solo = list(1280, 720);
+    drawDebugPanel(solo, fonts, sampleModel(), 1280, 720);
+    expect(syntheticGlyphText(solo)).not.toContain('Rede');
+  });
+
   it('programas acima de 7 em perigo; fundo cobre o conteúdo e cabe na tela nas 4 resoluções', () => {
     const m = sampleModel();
     m.programs = 9;
+    // M5 (fase 7a): com a linha da rede (o painel mais alto).
+    m.netRole = 2;
     for (const [w, h] of SIZES) {
       const l = list(w, h);
       drawDebugPanel(l, fonts, m, w, h);

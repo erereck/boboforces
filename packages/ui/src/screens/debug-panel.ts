@@ -66,6 +66,19 @@ export interface DebugPanelModel {
   viewDistanceM: number;
   /** `gl.finish()` por frame ligado (rodada de medição de GPU, item 10 do T0). */
   gpuFinish: boolean;
+  /**
+   * M5 (fase 7a): a rede da partida online. `netRole` 0 = sem rede (a linha não aparece), 1 = host, 2 = amigo. Host:
+   * `netMs` (receber e mandar, por quadro), `netUpKBps` por amigo, `netPeers` e `netSnapshotsPerS` por amigo. Amigo:
+   * `netDownKBps`, `netUpKBps`, `netLagTicks` e `netMispredicts` (desde o começo).
+   */
+  netRole: number;
+  netMs: number;
+  netUpKBps: number;
+  netDownKBps: number;
+  netPeers: number;
+  netSnapshotsPerS: number;
+  netLagTicks: number;
+  netMispredicts: number;
 }
 
 export function createDebugPanelModel(): DebugPanelModel {
@@ -106,6 +119,14 @@ export function createDebugPanelModel(): DebugPanelModel {
     vertexAttributes: 'int',
     viewDistanceM: -1,
     gpuFinish: false,
+    netRole: 0,
+    netMs: 0,
+    netUpKBps: 0,
+    netDownKBps: 0,
+    netPeers: 0,
+    netSnapshotsPerS: 0,
+    netLagTicks: -1,
+    netMispredicts: 0,
   };
 }
 
@@ -155,6 +176,17 @@ interface PanelTexts {
   readonly off: string;
   readonly unknown: string;
   readonly slash: string;
+  readonly netHost: string;
+  readonly netClient: string;
+  readonly netUp: string;
+  readonly netDown: string;
+  readonly kbs: string;
+  readonly perFriend: string;
+  readonly friends: string;
+  readonly snapshotsPerS: string;
+  readonly lag: string;
+  readonly ticks: string;
+  readonly mispredicts: string;
 }
 
 let cachedTexts: PanelTexts | null = null;
@@ -203,6 +235,17 @@ function panelTexts(): PanelTexts {
     on: t('debug.on'),
     off: t('debug.off'),
     unknown: t('debug.unknown'),
+    netHost: t('debug.netHost'),
+    netClient: t('debug.netClient'),
+    netUp: t('debug.netUp'),
+    netDown: t('debug.netDown'),
+    kbs: t('debug.kbs'),
+    perFriend: t('debug.perFriend'),
+    friends: t('debug.friends'),
+    snapshotsPerS: t('debug.snapshotsPerS'),
+    lag: t('debug.lag'),
+    ticks: t('debug.ticks'),
+    mispredicts: t('debug.mispredicts'),
     slash: (templateParts('hud.ammo', ['clip', 'reserve'])[1] as string).trim(),
   };
   return cachedTexts;
@@ -327,6 +370,41 @@ export function drawDebugPanel(
   penNumber(model.uiMs, 2);
   penLabel(tx.ms);
   penNewline();
+
+  // M5 (fase 7a): a rede (só no online).
+  if (model.netRole === 1) {
+    penLiteral(tx.netHost, COLORS.acao);
+    penNumber(model.netMs, 2);
+    penLabel(tx.ms);
+    penGroup();
+    penLabel(tx.netUp);
+    penNumber(model.netUpKBps, 1);
+    penLabel(tx.kbs);
+    penLabel(tx.perFriend);
+    penGroup();
+    penLabel(tx.friends);
+    penNumber(model.netPeers, 0);
+    penGroup();
+    penLabel(tx.snapshotsPerS);
+    penNumber(model.netSnapshotsPerS, 0);
+    penNewline();
+  } else if (model.netRole === 2) {
+    penLiteral(tx.netClient, COLORS.acao);
+    penLabel(tx.netDown);
+    penNumber(model.netDownKBps, 1);
+    penGroup();
+    penLabel(tx.netUp);
+    penNumber(model.netUpKBps, 1);
+    penLabel(tx.kbs);
+    penGroup();
+    penLabel(tx.lag);
+    penNumber(model.netLagTicks, 1, COLORS.texto, true);
+    penLabel(tx.ticks);
+    penGroup();
+    penLabel(tx.mispredicts);
+    penNumber(model.netMispredicts, 0);
+    penNewline();
+  }
 
   penLabel(tx.drawCalls);
   penNumber(model.drawCalls, 0);

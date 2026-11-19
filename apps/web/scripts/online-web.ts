@@ -15,7 +15,9 @@ import { dirname, join } from 'node:path';
 import type { Browser, Page } from 'playwright-core';
 import { launchEdge, REPO_ROOT, startPreview, waitForTitle, type PageWindow } from './edge.ts';
 
-const PLAY_S = 10;
+/** Segundos do X1 (`--partida 40`: o bastante para a linha `[rede]` de 30 s sair no registro). */
+const playArg = process.argv.indexOf('--partida');
+const PLAY_S = playArg > 0 ? Math.max(5, Number(process.argv[playArg + 1]) || 10) : 10;
 /** A 2ª partida (o Bobo Zombies): só o bastante para os dois estarem jogando. */
 const ZOMBIES_S = 4;
 const STEP_TIMEOUT_MS = 30_000;
@@ -230,6 +232,18 @@ async function main(): Promise<number> {
     const [h, f] = [await snap(host), await snap(friend)];
     await shot(host, 'partida-host');
     await shot(friend, 'partida-amigo');
+    if (printsDir !== null) {
+      // M5 (fase 7a): o F2 com a linha da rede, no host e no amigo (aperta, captura, fecha).
+      for (const [page, name] of [
+        [host, 'f2-host'],
+        [friend, 'f2-amigo'],
+      ] as const) {
+        await tap(page, 'F2');
+        await frames(page, 70);
+        await shot(page, name);
+        await tap(page, 'F2');
+      }
+    }
     steps['ticks'] = { host: h.simTick, amigo: f.simTick };
     // O amigo mostra o host 100 ms atrás (6 ticks) mais o caminho da rede entre as abas.
     if (Math.abs(h.simTick - f.simTick) > 30) failures.push(`o amigo está longe do host: ${h.simTick} × ${f.simTick}`);
@@ -295,6 +309,11 @@ async function main(): Promise<number> {
       [host, friend].map((p) => p.evaluate(() => (window as unknown as PageWindow).__bfDebug?.log?.(30) ?? [])),
     );
     steps['logs'] = { host: logs[0], amigo: logs[1] };
+    // M5 (fase 7a): as linhas `[rede]` de cada aba (saem a cada 30 s de partida; com `--partida 40`, uma no X1).
+    const rede = await Promise.all(
+      [host, friend].map(async (p) => (await logOf(p, 400)).filter((l) => l.includes('[rede]'))),
+    );
+    steps['rede'] = { host: rede[0], amigo: rede[1] };
   } catch (error) {
     failures.push(error instanceof Error ? error.message : String(error));
     // O que estava na tela de cada aba quando parou.

@@ -456,6 +456,8 @@ interface ViewmodelTweak {
 }
 /** M4 (fase 7a): de quanto em quanto tempo (s de partida) o Switch grava a linha `[mem]`. */
 const MEMORY_LOG_EVERY_S = 60;
+/** M5 (fase 7a): de quanto em quanto tempo (s) a partida online grava a linha `[rede]` (vai no "Copiar relatório"). */
+const NET_LOG_EVERY_S = 30;
 /** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
 const PROGRAM_CHECK_FRAMES = 120;
 
@@ -4613,6 +4615,83 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     panel.gcPauses = benchState?.gcPauses ?? panel.gcPauses;
     panel.voices = host.audio.mixer.stats.activeVoices;
     panel.voicesPeak = host.audio.mixer.stats.peakVoices;
+    // M5 (fase 7a): a rede (as taxas por segundo saem do `sampleNet`).
+    panel.netRole = driver.net === null ? 0 : driver.director !== null ? 1 : 2;
+    panel.netMs = driver.lastNetMs;
+  }
+  // M5 (fase 7a): a rede da partida online, uma vez por segundo (o F2) e a cada 30 s no registro. As janelas usam o
+  // relógio da plataforma (KB/s de verdade): o `dt` da cena tem teto, e a aba de trás andaria devagar.
+  let netSent = 0;
+  let netReceived = 0;
+  let netSnapshots = 0;
+  let netLogSent = 0;
+  let netLogReceived = 0;
+  let netLogSnapshots = 0;
+  /** Quando foram a 1ª amostra, a última e a última linha (ms da plataforma; -1 = ainda não). */
+  let netStartAt = -1;
+  let netSampleAt = 0;
+  let netLogAt = 0;
+  let netMsSum = 0;
+  let netMsFrames = 0;
+  /** A sim e a IA do host na janela da linha (a CPU do host no celular contra o tecnico.md §13.4). */
+  let netSimSum = 0;
+  let netAiSum = 0;
+  function sampleNet(): void {
+    const n = driver.net;
+    if (n === null) return;
+    const t = platform.now();
+    // A 1ª amostra é a base: o que passou antes dela (a carga, o 1º snapshot completo) não entra na conta.
+    if (netStartAt < 0) {
+      netStartAt = netSampleAt = netLogAt = t;
+      netSent = netLogSent = n.sentBytes;
+      netReceived = netLogReceived = n.receivedBytes;
+      netSnapshots = netLogSnapshots = n.snapshots;
+      netMsSum = 0;
+      netSimSum = 0;
+      netAiSum = 0;
+      netMsFrames = 0;
+      return;
+    }
+    const isHost = driver.director !== null;
+    const friends = isHost ? Math.max(1, n.peers) : 1;
+    const per = 1000 / Math.max(1, t - netSampleAt) / friends;
+    panel.netUpKBps = ((n.sentBytes - netSent) / 1024) * per;
+    panel.netDownKBps = ((n.receivedBytes - netReceived) / 1024) * per;
+    panel.netSnapshotsPerS = (n.snapshots - netSnapshots) * per;
+    panel.netPeers = n.peers;
+    panel.netLagTicks = n.lagTicks;
+    panel.netMispredicts = n.mispredicts;
+    netSampleAt = t;
+    netSent = n.sentBytes;
+    netReceived = n.receivedBytes;
+    netSnapshots = n.snapshots;
+    if (t - netLogAt < NET_LOG_EVERY_S * 1000) return;
+    // A cada 30 s: as médias da janela (o texto pode alocar).
+    const span = ((t - netLogAt) / 1000) * friends;
+    const up = (n.sentBytes - netLogSent) / 1024 / span;
+    const down = (n.receivedBytes - netLogReceived) / 1024 / span;
+    const snaps = (n.snapshots - netLogSnapshots) / span;
+    const frames = Math.max(1, netMsFrames);
+    const ms = netMsSum / frames;
+    const fps = netMsFrames / ((t - netLogAt) / 1000);
+    const clock = Math.round((t - netStartAt) / 1000);
+    host.log(
+      isHost
+        ? `[rede] host t=${clock}s rede_ms=${ms.toFixed(3)} sobe_kbs=${up.toFixed(1)} desce_kbs=${down.toFixed(1)}` +
+            ` amigos=${n.peers} snapshots_s=${snaps.toFixed(1)} sim_ms=${(netSimSum / frames).toFixed(2)}` +
+            ` ia_ms=${(netAiSum / frames).toFixed(2)} fps=${fps.toFixed(1)}`
+        : `[rede] amigo t=${clock}s desce_kbs=${down.toFixed(1)} sobe_kbs=${up.toFixed(1)} snapshots_s=${snaps.toFixed(1)}` +
+            ` atraso_ticks=${n.lagTicks.toFixed(1)} predicao_errada=${n.mispredicts}/${n.reconciles}` +
+            ` host_ausente_s=${driver.hostAbsentS.toFixed(1)} fps=${fps.toFixed(1)}`,
+    );
+    netLogAt = t;
+    netLogSent = n.sentBytes;
+    netLogReceived = n.receivedBytes;
+    netLogSnapshots = n.snapshots;
+    netMsSum = 0;
+    netSimSum = 0;
+    netAiSum = 0;
+    netMsFrames = 0;
   }
   let heapNowMb = -1;
   let memoryCheckS = 0;
@@ -4628,9 +4707,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M4 (fase 7b): o heap (MB) no fim de cada minuto (o índice é o minuto); -1 = sem amostra. */
   const heapByMinute = new Float32Array(64).fill(-1);
   function sampleMemory(dt: number): void {
+    if (driver.net !== null) {
+      netMsSum += driver.lastNetMs;
+      netSimSum += driver.lastSimMs;
+      netAiSum += driver.lastAiMs;
+      netMsFrames++;
+    }
     heapCheckS -= dt;
     if (heapCheckS > 0) return;
     heapCheckS = 1;
+    sampleNet();
     const m = platform.diagnostics.memoryUsage?.() ?? null;
     if (m) {
       heapNowMb = Math.round((m.usedHeapBytes / 1e6) * 10) / 10;

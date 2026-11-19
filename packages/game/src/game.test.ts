@@ -2095,14 +2095,29 @@ function fakeSession(
       takeLost: () => 0,
       takeControl: () => 0,
       setAway: (on) => void calls.push(`away:${on}`),
+      stats: { sentBytes: 0, receivedBytes: 0, peers: 1, snapshots: 0, lagTicks: -1, reconciles: 0, mispredicts: 0 },
       dispose: () => void calls.push('host-dispose'),
     }),
     attachClient: (_sim, write) => {
       const f = { seq: 0, buttons: 0, moveX: 0, moveY: 0, yaw: 0, pitch: 0, weapon: 0, primary: 0 };
       let seq = 0;
+      // M5 (fase 7a): 2 KB descem e 1 KB sobe a cada quadro de atualização (a conta do F2 e da linha `[rede]`).
+      const stats = {
+        sentBytes: 0,
+        receivedBytes: 0,
+        peers: 1,
+        snapshots: 0,
+        lagTicks: 6,
+        reconciles: 0,
+        mispredicts: 0,
+      };
       return {
+        stats,
         update: () => {
           write(f, ++seq);
+          stats.sentBytes += 1024;
+          stats.receivedBytes += 2048;
+          stats.snapshots++;
           calls.push('client-update');
           return 0;
         },
@@ -2659,6 +2674,47 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     room.view = { ...room.view, members: [host] };
     platform.pump(2);
     expect(summaries().at(-1)).toContain('10 contra 10');
+    game.dispose();
+  }, 60_000);
+
+  it('M5 (fase 7a): a linha [rede] a cada 30 s de partida online, com as médias da janela', async () => {
+    const store = {
+      [ONLINE.ONLINE_PROFILE_KEY]: JSON.stringify({ format: 'boboforces/online@1', name: 'Bia', privacy: 1 }),
+    };
+    const { platform, game, made } = await bootWithOnline(store);
+    const keyboard = systemKeyboard(platform);
+    await openOnlineFromTitle(platform);
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    keyboard.listener!.onSubmit('AB3CD');
+    platform.pump(2);
+    const room = made[0]!;
+    room.status = 'lobby';
+    room.mySlot = 1;
+    room.view = {
+      code: 'AB3CD',
+      locked: false,
+      summary: 'Times · Construto',
+      teams: true,
+      playing: false,
+      members: [
+        { slot: 0, name: 'Erick', team: 0, ready: true },
+        { slot: 1, name: 'Bia', team: 1, ready: true },
+      ],
+    };
+    platform.pump(3);
+    const fake = fakeSession('client', room.calls);
+    room.status = 'playing';
+    room.match = { recipe: DEBUT_PRESET, seed: 3, session: fake.session };
+    platform.pump(1);
+    await untilRunning(platform, game);
+    // ~36 s a 10 quadros por segundo (o passo da cena vai até 0,1 s): o link de mentira desce 2 KB e sobe 1 KB por
+    // quadro, ou seja 20 e 10 KB/s.
+    platform.pump(360, 100);
+    const line = platform.logLines.find((l) => /\[rede\] amigo t=3\ds/.test(l));
+    expect(line).toBeDefined();
+    expect(line).toContain('desce_kbs=20.0 sobe_kbs=10.0 snapshots_s=10.0');
+    expect(line).toContain('atraso_ticks=6.0 predicao_errada=0/0 host_ausente_s=0.0 fps=10.0');
     game.dispose();
   }, 60_000);
 

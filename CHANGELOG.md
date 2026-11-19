@@ -58,6 +58,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A prova dos modos (fase 6c):** as duas abas do Edge jogam o X1 no Ringue e depois o Bobo Zombies na Base
   Abandonada, escolhidos nos cards da sala, e voltam à sala entre um e outro. As descrições dos cards ficaram mais
   curtas: as do X1 e do Surpreenda-me passavam do card, e no Switch 4:3 as do Bobo Zombies e do Training também.
+- **A rede à vista (fase 7a):** no online, o F2 ganhou a linha da rede: no host, o tempo da rede por quadro, o que
+  sobe para cada amigo e os snapshots por segundo; no amigo, o que desce e sobe, o atraso e as predições erradas. A cada
+  30 s de partida, uma linha `[rede]` com as médias vai para o "Copiar relatório" (é por ela que os números do teste
+  com amigos chegam). E o `npm run bench:rede` mede o host com 8 e com 40 bots e o Bobo Zombies: no PC, a rede do host
+  fica abaixo de 0,5 ms por quadro.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 
