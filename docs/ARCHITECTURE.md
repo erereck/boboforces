@@ -3793,3 +3793,33 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   - **Ficam anotados:** a bola acerta sempre o tronco (o "só na cabeça" não vale para ela, como para o foguete); a
     normal da mancha é a do bloco inteiro (numa rampa ela deita); a mancha nova fica por baixo das velhas depois que o
     anel dá a volta; a tela de morte ainda oferece as 6 primárias (fuzil, SMG, LMG e foguete viram o Marcador).
+
+### 17.8 Fase 6a: Bobo Zombies Fortress (19/11/2026)
+
+- **A receita:** `zombies.variant` (`classic`, `armed` ou `fortress`; `ZOMBIES_VARIANTS`). O card Fortaleza
+  (`moreModePreset('zombiesFortress')`) é o Bobo Zombies no Posto Avançado com `variant: 'fortress'`.
+- **A sim** (`sim/src/systems/fortress.ts`, `ctx.fortress`):
+  - O gerador é estado (a vida, `FortressState.hp`: hash, snapshot v15 e rede), não cenário. O lugar sai do mapa: o
+    ponto de spawn humano mais perto do centro deles, 1,5 m para um lado livre com chão (sem marcador novo). Não tem
+    colisão.
+  - O `fortressSystem` (no diretor de ondas): cada zumbi colado (1,8 m) tira 20/s (o chefão, 4x); o humano de pé
+    segurando o usar a até 2,2 m conserta 60/s; o gerador no zero perde a partida.
+- **A rede:** a vida inteira no global `fortressHp`, só no modo. `PROTOCOL_VERSION` 5.
+- **A IA:** metade dos zumbis (pelo índice e pela onda: o chefão, sempre o primeiro, vai em metade das ondas) vai no
+  gerador, a não ser com um bobo a menos de 5 m ou sendo o último da onda (que corre atrás dos bobos). O caminho é um
+  segundo flow field, com o gerador de fonte fixa (`ZombieFlow` com `fixed`, calculado uma vez): ele atravessa as
+  janelas com tábua, como o dos bobos (a rota A* direto no gerador tratava a janela como fechada e o zumbi parava do
+  lado de fora, travando a onda). Colados no mesmo andar, batem; presos no caminho, Destravar.
+- **O jogo:** o modelo de prop `generator` no buffer dinâmico (o das tábuas e portas); a vida em % na linha da onda; a
+  plaquinha GERADOR sempre na tela (a do Jugg, com `HudModel.juggMarkLabel`).
+- **A página Mais modos:** com mais de 6 cards, a tela dos Modos usa 3 colunas de cards de 370 px; as frases da página
+  ficaram curtas para caber (o teste de caber no card passou a montar a página inteira).
+- **Golden** (Fortress no Posto, 4 bots Normal de apoio, semente 42, 7.200 ticks): `cfb8db3d` (onda 3, o gerador cai
+  para 2.541 e a partida acaba). **Online:** 1 onda com 2 amigos parados: o mesmo fim e a mesma vida do gerador nos dois lados.
+- **A revisão (Opus)** achou 7 coisas (1 alta: o zumbi do gerador parava do lado de fora da parede e travava a onda),
+  corrigidas antes do commit: o campo até o gerador, a linha da onda no quadrante livre do 3P, o chefão em metade das
+  ondas, o golpe só no mesmo andar e a variante `armed` fora do validador até a 6b. O bot de apoio também conserta o
+  gerador (de pé, segurando o usar). **Fica anotado:** numa simulação de 30.000 ticks no Posto (semente 7), o último
+  zumbi ficou 103 s do lado de fora de uma janela que os bots consertavam sem parar (ele arranca, eles repõem, ninguém
+  atira): é um laço da IA do Bobo Zombies (as janelas), não do Fortress; e há uma prop de gerador no Posto e na Base a
+  6 a 9 m do objetivo (só a plaquinha separa os dois).

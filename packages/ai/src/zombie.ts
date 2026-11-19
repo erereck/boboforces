@@ -173,7 +173,52 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
   /** M3 (fase 3b): o Spitter mirando para cuspir (vira para o alvo em vez do caminho) e o pitch da mira. */
   let spitting = false;
   let pitch = 0;
-  if (zb.target >= 0) {
+  // M6 (fase 6a): no Fortress, metade dos zumbis vai no gerador (pelo índice e pela onda: o chefão, que é sempre o
+  // primeiro, vai em metade das ondas), a não ser com um bobo a menos de 5 m ou sendo o último da onda.
+  const fort = v.fortress;
+  let fortGo = false;
+  if (
+    fort !== null &&
+    fort.hp[0]! > 0 &&
+    (zb.index + v.match.zombieWave) % 2 === 0 &&
+    v.match.lastZombie !== v.generation[e]! * 65536 + e
+  ) {
+    fortGo = true;
+    if (zb.target >= 0) {
+      const t3 = zb.target * 3;
+      fortGo = Math.hypot(v.position[t3]! - x, v.position[t3 + 2]! - z) >= AI_ZOMBIE.fortressPreyM;
+    }
+  }
+  if (fortGo && fort !== null) {
+    const fx = fort.x - x;
+    const fz = fort.z - z;
+    const fd = Math.sqrt(fx * fx + fz * fz);
+    if (fd <= AI_ZOMBIE.attackM + 0.4 && Math.abs(fort.y - y) < 1.5) {
+      // Colado (no mesmo andar): bate no gerador (a sim tira a vida dele pela proximidade; o golpe é a cara).
+      buttons |= BUTTON.melee;
+      zb.aimYaw = turnToward(zb.aimYaw, Math.atan2(-fx, -fz), t.turnStep);
+    } else if (c.fortFlow !== null && c.fortFlow.steer(x, y, z, (v.flags[e]! & F.onGround) !== 0, steer)) {
+      // O campo até o gerador (atravessa as janelas com tábua, como o dos bobos).
+      wx = steer.x;
+      wz = steer.z;
+      if (steer.jump) buttons |= BUTTON.jump;
+      if (steer.crouch) buttons |= BUTTON.crouch;
+    } else if (fd > 1e-6) {
+      wx = fx / fd;
+      wz = fz / fd;
+    }
+    // Preso no caminho (sem andar nem bater): Destravar, como na perseguição.
+    const pmx = x - zb.progressX;
+    const pmz = z - zb.progressZ;
+    if ((buttons & BUTTON.melee) !== 0 || pmx * pmx + pmz * pmz >= AI_PATH.unstuckMoveM * AI_PATH.unstuckMoveM) {
+      zb.progressTick = tick;
+      zb.progressX = x;
+      zb.progressZ = z;
+    } else if (tick - zb.progressTick >= t.unstuck) {
+      buttons |= BUTTON.unstuck;
+      zb.progressTick = tick;
+    }
+  } else if (zb.target >= 0) {
     const t3 = zb.target * 3;
     const tx = v.position[t3]!;
     const ty = v.position[t3 + 1]!;

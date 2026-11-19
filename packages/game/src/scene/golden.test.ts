@@ -610,3 +610,56 @@ describe('golden do Bobo Paintball (M6, fase 5) com bots no Construto', () => {
     expect(a.hash, msg).toBe(GOLDEN_PAINTBALL_HASH);
   }, 240_000);
 });
+
+/**
+ * M6 (fase 6a): o Bobo Zombies Fortress no Posto Avançado com 4 bots Normal de apoio, semente 42, até 7.200 ticks.
+ * Confere que os zumbis vão no gerador (a vida dele cai) e o hash entre execuções. Gravado na fase 6a (19/11/2026):
+ * `cfb8db3d` (os zumbis pelo campo até o gerador; onda 3, o gerador cai para 2.541 e a partida acaba). MUDA com a sim, a
+ * IA, o mapa ou o gerador.
+ */
+const GOLDEN_FORTRESS_HASH = 'cfb8db3d';
+
+function runFortressGolden(): { hash: string; wave: number; hp: number; low: number; phase: string } {
+  const { map } = loadWorld('posto');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'posto',
+      seed: 42,
+      zombies: { variant: 'fortress' },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 4 }] }],
+    },
+    map,
+    humans: 0,
+    zombies: 24,
+  });
+  let low = Infinity;
+  for (let t = 0; t < GOLDEN_ZOMBIES_TICKS && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    low = Math.min(low, match.sim.view().fortress!.hp[0]!);
+  }
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    wave: v.match.zombieWave,
+    hp: Math.round(v.fortress!.hp[0]!),
+    low: Math.round(low),
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () => {
+  it('os zumbis atacam o gerador; hash estável', () => {
+    const a = runFortressGolden();
+    const b = runFortressGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `onda ${a.wave}, gerador ${a.hp} (o mínimo ${a.low}), fase ${a.phase}`;
+    console.log(`[fortress] ${msg} · hash ${a.hash}`);
+    expect(a.low, msg).toBeLessThan(4000);
+    expect(a.wave, msg).toBeGreaterThanOrEqual(2);
+    expect(a.hash, msg).toBe(GOLDEN_FORTRESS_HASH);
+  }, 240_000);
+});

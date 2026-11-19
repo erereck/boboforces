@@ -475,7 +475,7 @@ export const STRINGS_PT_BR = {
   // M2 (fase 5d): Bobo Training.
   'training.line': 'Precisão {accuracy} · TTK médio {ttk} · Na cabeça {head} · Abates {kills}',
   'mode.name.training': 'Bobo Training',
-  'mode.desc.training': 'Alvos parados e andando, sem placar.',
+  'mode.desc.training': 'Alvos parados e andando.',
   // M6 (fase 0): o card que abre a página dos modos novos (o Bobo Training foi para lá).
   'mode.name.more': 'Mais modos',
   'mode.desc.more': 'Training, Domination e os de festa.',

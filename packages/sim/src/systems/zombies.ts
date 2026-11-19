@@ -16,6 +16,7 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { barricadesSystem } from './barricades.ts';
 import { mysteryBoxSystem, perkSystem, wallBuySystem } from './shop.ts';
 import { bleedOut, pickSpawn, respawn, standUp } from './life.ts';
+import { fortressSystem } from './fortress.ts';
 
 const F = ENTITY_FLAG;
 
@@ -61,6 +62,11 @@ export function zombiesSystem(ctx: SimContext): void {
     }
   }
   if (bobos > 0 && bobosUp === 0 && !selfComing) {
+    endZombies(ctx, false);
+    return;
+  }
+  // M6 (fase 6a): o Fortress: o gerador no zero perde a partida.
+  if (fortressSystem(ctx)) {
     endZombies(ctx, false);
     return;
   }

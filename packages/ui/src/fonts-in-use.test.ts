@@ -573,6 +573,11 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
           { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
           { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
+          // M6: os cards das fases 3 a 6 (a página inteira).
+          { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
+          { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
+          { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
+          { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
         ],
         titleKey: 'modes.more.title',
       }),
@@ -747,6 +752,11 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
           { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
           { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
+          // M6: os cards das fases 3 a 6 (a página inteira).
+          { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
+          { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
+          { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
+          { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
         ],
         titleKey: 'modes.more.title',
       });

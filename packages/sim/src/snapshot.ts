@@ -21,7 +21,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 14;
+const SNAPSHOT_VERSION = 15;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -79,6 +79,8 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     h.bytes(rngScratch);
     if (party.jugg !== null) h.i32(party.juggTicks);
   }
+  // M6 (fase 6a): a vida do gerador do Fortress (só nele).
+  if (ctx.fortress !== null) h.bytes(ctx.fortress.hp);
   // M6 (fase 4): os modificadores e a Roleta (só com eles).
   const chaos = ctx.chaos;
   if (chaos !== null) {
@@ -182,6 +184,7 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, rngScratch, RNG_STATE_WORDS);
       if (party.jugg !== null) w.writeBits(party.juggTicks >>> 0, 32);
     }
+    if (ctx.fortress !== null) writeArray(w, ctx.fortress.hp, 1);
     const chaos = ctx.chaos;
     if (chaos !== null) {
       writeArray(w, chaos.masks, chaos.masks.length);
@@ -280,6 +283,7 @@ export function readState(ctx: SimContext, r: BitReader): void {
         syncJuggRules(ctx);
       }
     }
+    if (ctx.fortress !== null) readArray(r, ctx.fortress.hp, 1);
     const chaos = ctx.chaos;
     if (chaos !== null) {
       readArray(r, chaos.masks, chaos.masks.length);

@@ -18,6 +18,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
   // M6 (fase 5).
   { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
+  // M6 (fase 6a).
+  { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -99,6 +101,18 @@ export function moreModePreset(id: string): MatchRecipe | null {
         weapons: { ammo: 'infiniteReserve' },
         paintball: {},
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
+      };
+    case 'zombiesFortress':
+      // GDD §4.1.5: o Bobo Zombies com o gerador a defender, no Posto Avançado (a Curta, 10 ondas).
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Bobo Zombies: Fortaleza',
+        mode: 'zombies',
+        map: 'posto',
+        seed: 0,
+        match: { timeLimitS: 0, scoreLimit: 0 },
+        zombies: { variant: 'fortress' },
+        teams: [{ humans: 'all', bots: [] }],
       };
     default:
       return null;

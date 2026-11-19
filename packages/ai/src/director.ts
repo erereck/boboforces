@@ -191,6 +191,12 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const createFlow = api.createFlowField;
   const flow = zombies > 0 && createFlow !== undefined ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick) : null;
   ctx.flow = flow;
+  // M6 (fase 6a): no Fortress, o campo até o gerador (fonte fixa).
+  const fortFlow =
+    zombies > 0 && createFlow !== undefined && recipe.zombies?.variant === 'fortress'
+      ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick, true)
+      : null;
+  ctx.fortFlow = fortFlow;
   const total = soldiers.length + zombieBrains.length;
 
   let disposed = false;
@@ -202,6 +208,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       ctx.begin(view);
       paths.service();
       flow?.update(ctx);
+      fortFlow?.update(ctx);
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
       ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa);

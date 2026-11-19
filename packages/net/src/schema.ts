@@ -484,6 +484,19 @@ export function createNetLayout(view: SimView): NetLayout {
       );
     }
   }
+  // M6 (fase 6a): a vida do gerador do Fortress (inteira), só nele.
+  if (view.fortress !== null) {
+    globals.push(
+      g(
+        'fortressHp',
+        u(16, 8),
+        (v) => Math.max(0, Math.round(v.fortress!.hp[0]!)),
+        (v, _st, q) => {
+          v.fortress!.hp[0] = q;
+        },
+      ),
+    );
+  }
   // M6 (fase 4): os modificadores (a máscara ligada, a da próxima troca e os ticks até ela), só com eles.
   if (view.chaos !== null) {
     const names = ['chaosActive', 'chaosNext', 'chaosLeft'] as const;

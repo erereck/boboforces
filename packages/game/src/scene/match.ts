@@ -488,6 +488,8 @@ const PAINT_JUMP_M = 12;
 const CONFETTI_PER_FRAME = 4;
 /** M6 (fase 3): a altura da plaquinha JUGG acima dos pés do Jugg (m). */
 const JUGG_MARK_HEIGHT_M = 2.4;
+/** M6 (fase 6a): a altura da plaquinha do gerador acima da base dele (m). */
+const GENERATOR_MARK_HEIGHT_M = 2;
 /** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
 const PROGRAM_CHECK_FRAMES = 120;
 
@@ -1123,7 +1125,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let minimapPlan: MinimapPlan | null = null;
   const minimapLocals: number[] = [];
   const minimapColors: number[] = [];
-  const zombieLineKey = new Int32Array(6).fill(-2);
+  const zombieLineKey = new Int32Array(7).fill(-2);
   /** M3 (fase 4d): o anúncio do último drop pego (tipo e até quando, em s de relógio da cena). */
   let dropAnnounce = 0;
   let dropAnnounceUntil = 0;
@@ -1172,6 +1174,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const double = Math.ceil(mv.doublePointsTicks / sim.hz);
     const insta = Math.ceil(mv.instaKillTicks / sim.hz);
     const announce = timeS < dropAnnounceUntil ? dropAnnounce : 0;
+    // M6 (fase 6a): a vida do gerador do Fortress, em %.
+    const fort = sim.view().fortress;
+    const genPct = fort !== null ? Math.ceil((fort.hp[0]! / fort.maxHp) * 100) : -1;
     const k = zombieLineKey;
     if (
       k[0] === mv.zombieWave &&
@@ -1179,7 +1184,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       k[2] === (rest >= 0 ? -1 : last) &&
       k[3] === double &&
       k[4] === insta &&
-      k[5] === announce
+      k[5] === announce &&
+      k[6] === genPct
     )
       return;
     k[0] = mv.zombieWave;
@@ -1188,6 +1194,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     k[3] = double;
     k[4] = insta;
     k[5] = announce;
+    k[6] = genPct;
     const base =
       rest >= 0
         ? t('hud.zombies.rest', { wave: mv.zombieWave + 1, s: rest })
@@ -1198,6 +1205,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (announce > 0) parts.unshift(t(DROP_TEXT[announce - 1]!));
     if (double > 0) parts.push(t('hud.zombies.double', { s: double }));
     if (insta > 0) parts.push(t('hud.zombies.insta', { s: insta }));
+    if (genPct >= 0) parts.push(t('hud.zombies.generator' as StringKey, { pct: genPct }));
     sharedHud.trainingLine = parts.join(' · ');
   }
 
@@ -3426,7 +3434,28 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     n = fillPickups(alpha, n);
     n = fillMapObjects(n);
+    n = fillFortress(n);
     projectiles.count = n;
+  }
+
+  /** M6 (fase 6a): o gerador do Fortress (o modelo de prop), no mesmo buffer das caixinhas. */
+  const generatorModel = modelIndex.get('generator') ?? NO_MODEL;
+  function fillFortress(first: number): number {
+    const f = sim.view().fortress;
+    if (f === null || generatorModel === NO_MODEL || first >= projectiles.capacity) return first;
+    const n = first;
+    projectiles.model[n] = generatorModel;
+    projectiles.position[n * 3] = f.x;
+    projectiles.position[n * 3 + 1] = f.y;
+    projectiles.position[n * 3 + 2] = f.z;
+    projectiles.yaw[n] = 0;
+    projectiles.pitch[n] = 0;
+    projectiles.roll[n] = 0;
+    sampleLightGrid(loaded.lightGrid, f.x, f.y + 0.5, f.z, lightScratch, 0);
+    projectiles.light[n * 3] = lightScratch[0]!;
+    projectiles.light[n * 3 + 1] = lightScratch[1]!;
+    projectiles.light[n * 3 + 2] = lightScratch[2]!;
+    return n + 1;
   }
 
   /**
@@ -3729,6 +3758,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     pushDebris(fx, x, y, z, 0, 1.5, 0, color, radius > 0 ? 14 : 5, radius > 0 ? 3 : 1.6);
   }
+  /** M6 (fase 6a): o rótulo da plaquinha do gerador. */
+  const generatorLabel = t('hud.generator' as StringKey).toUpperCase();
   /** M6 (fase 4b): o modificador está ligado agora (pela máscara que a view mostra)? */
   function chaosOn(bit: number): boolean {
     const c = sim.view().chaos;
@@ -4391,8 +4422,27 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.pointMarkOwner[k] = cp.owner[i]!;
       }
     }
-    // M6 (fase 3): o Jugg aparece sempre para quem caça (na borda da vista quando está fora dela).
+    // M6 (fase 3): o Jugg aparece sempre para quem caça (na borda da vista quando está fora dela). Fase 6a: no
+    // Fortress, a mesma plaquinha mostra o gerador.
     m.juggMarkOn = false;
+    m.juggMarkLabel = '';
+    const fortMark = v.fortress;
+    if (fortMark !== null) {
+      const rect = lay.rects[s]!;
+      projectToEdge(
+        desc.camera,
+        rect,
+        fortMark.x,
+        fortMark.y + GENERATOR_MARK_HEIGHT_M,
+        fortMark.z,
+        Math.max(16, rect.height * 0.06),
+        projected,
+      );
+      m.juggMark[0] = projected[0]!;
+      m.juggMark[1] = projected[1]!;
+      m.juggMarkOn = true;
+      m.juggMarkLabel = generatorLabel;
+    }
     if (juggernaut && v.team[e] !== 1) {
       const j = juggIndex(v);
       if (j >= 0) {

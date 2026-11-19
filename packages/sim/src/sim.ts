@@ -68,6 +68,7 @@ import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
 import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
 import { applyChaos, ChaosState, chaosOf, chaosSystem } from './systems/chaos.ts';
+import { createFortress } from './systems/fortress.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -503,6 +504,8 @@ export function createSim(config: SimConfig): Sim {
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
     paintHits: recipe.mode === 'paintball' ? (recipe.paintball?.hits ?? PAINTBALL_DEFAULTS.hits) : 0,
+    fortress:
+      zombiesMode && recipe.zombies?.variant === 'fortress' ? createFortress(map.spawns, map.grid, map.blocks) : null,
     training: recipe.mode === 'training',
     hz,
     dt: 1 / hz,
@@ -706,6 +709,7 @@ export function createSim(config: SimConfig): Sim {
     mapObjects,
     controlPoints: domination,
     chaos,
+    fortress: ctx.fortress,
     lastShotTick: s.lastShotTick,
     playArea: map.playArea ?? null,
     mods: ctx.mods,

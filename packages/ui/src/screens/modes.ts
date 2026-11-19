@@ -26,17 +26,22 @@ export interface ModesState {
 
 /** Largura de cada card (px de referência). */
 export const MODES_CARD_WIDTH = 500;
+/** M6 (fase 6): com mais de 6 cards (a página Mais modos), 3 colunas de cards mais estreitos. */
+export const MODES_CARD_WIDTH_DENSE = 370;
 
 export const modesScreen: Screen<ModesState> = {
   id: 'modes',
   build(state) {
+    const dense = state.modes.length > 6;
+    const perRow = dense ? 3 : 2;
+    const cardWidth = dense ? MODES_CARD_WIDTH_DENSE : MODES_CARD_WIDTH;
     const cards: UiNode[] = state.modes.map((m, i) => ({
       kind: 'box',
       id: `card:${m.id}`,
       color: COLORS.chapa,
       chamfer: true,
       padding: 10,
-      width: MODES_CARD_WIDTH,
+      width: cardWidth,
       children: [
         {
           kind: 'column',
@@ -48,7 +53,7 @@ export const modesScreen: Screen<ModesState> = {
               text: { key: m.nameKey },
               action: `${MODES_PREFIX}${m.id}`,
               variant: i === 0 ? 'primary' : 'secondary',
-              width: MODES_CARD_WIDTH - 20,
+              width: cardWidth - 20,
               ...(i === 0 ? { autofocus: true } : {}),
             },
             { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo },
@@ -76,16 +81,16 @@ export const modesScreen: Screen<ModesState> = {
             { kind: 'box', height: 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
             { kind: 'box', height: 14 },
-            // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card).
+            // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card); M6: 3 com mais de 6 cards.
             {
               kind: 'column',
               id: 'cards',
               gap: 10,
-              children: Array.from({ length: Math.ceil(cards.length / 2) }, (_, r) => ({
+              children: Array.from({ length: Math.ceil(cards.length / perRow) }, (_, r) => ({
                 kind: 'row',
                 id: `cards${r}`,
-                gap: 20,
-                children: cards.slice(r * 2, r * 2 + 2),
+                gap: dense ? 14 : 20,
+                children: cards.slice(r * perRow, r * perRow + perRow),
               })) as UiNode[],
             },
             { kind: 'box', height: 12 },

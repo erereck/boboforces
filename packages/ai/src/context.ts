@@ -42,6 +42,8 @@ export class AiContext {
   readonly paths: PathService;
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */
   flow: ZombieFlow | null = null;
+  /** M6 (fase 6a): o campo até o gerador do Fortress (`null` fora dele). */
+  fortFlow: ZombieFlow | null = null;
   readonly ctrlToEntity = new Int32Array(MAX_CONTROLLERS_WITH_ZOMBIES);
   /** Raios de percepção que ainda cabem neste tick. */
   raysLeft = 0;

@@ -1743,8 +1743,9 @@ describe('Bobo Training (M2, fase 5d)', () => {
     await settle();
     platform.pump(2);
     expect(game.screen).toBe('more');
-    // O Gun Game: embaixo do Training.
-    platform.tap('ArrowDown');
+    // O Gun Game: o 3º card da 1ª linha (M6, fase 6: com mais de 6 cards, a página tem 3 colunas).
+    platform.tap('ArrowRight');
+    platform.tap('ArrowRight');
     platform.tap('Enter');
     await untilRunning(platform, game);
     expect(game.save.presets.recent[0]!.weapons?.ladder?.[0]).toBe('rifle');

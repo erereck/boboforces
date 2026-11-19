@@ -264,6 +264,20 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M6 (fase 6a): Zombies Fortress no Posto, 1 onda: o mesmo fim e a vida do gerador igual no amigo', () => {
+    const base = moreModePreset('zombiesFortress')!;
+    const r: MatchRecipe = { ...base, zombies: { ...base.zombies, waves: 1 }, teams: [{ humans: 'all', bots: [] }] };
+    const run = playRoom(r, [-1, -1], { snapshotHz: 30, zombies: 16, maxS: 240 });
+    expectSameResult(run);
+    const h = run.host.sim.view().fortress!;
+    const c = run.clients[0]!.sim.view().fortress!;
+    expect(Math.abs(c.hp[0]! - h.hp[0]!)).toBeLessThan(1);
+    console.log(
+      `[modos] Zombies Fortress: ${run.seconds.toFixed(1)} s, onda ${run.host.sim.view().match.zombieWave}, vencedor ${run.host.sim.view().match.winnerTeam}, gerador ${Math.round(h.hp[0]!)}`,
+    );
+    dispose(run);
+  }, 240_000);
+
   it('Bobo Zombies na Base Abandonada: 2 humanos e 1 bot de apoio, 1 onda; a mesma onda, os mesmos pontos', () => {
     const r = roomPreset('zombies');
     const run = playRoom({ ...r, zombies: { waves: 1 } }, [-1, -1], { snapshotHz: 30, zombies: 16, maxS: 240 });

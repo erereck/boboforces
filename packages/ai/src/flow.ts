@@ -30,7 +30,14 @@ export class ZombieFlow {
   private srcZ = new Float32Array(0);
   private srcCount = 0;
 
-  constructor(create: (nav: NavGrid) => FlowField, hz: number, nodesPerTick: number) {
+  /**
+   * M6 (fase 6a): o campo do gerador do Fortress: a fonte é o gerador (fixo), não os bobos; só refaz quando um zumbi
+   * fica fora dele (ou antes do primeiro).
+   */
+  private readonly fixed: boolean;
+
+  constructor(create: (nav: NavGrid) => FlowField, hz: number, nodesPerTick: number, fixed = false) {
+    this.fixed = fixed;
     this.create = create;
     this.periodTicks = Math.max(1, secondsToTicks(AI_FLOW.rebuildS, hz));
     this.nodesPerTick = Math.max(1, nodesPerTick);
@@ -58,6 +65,15 @@ export class ZombieFlow {
   private stale(c: AiContext, nav: NavGrid, field: FlowField): boolean {
     if (field.ready === 0) return true;
     const v = c.view!;
+    if (this.fixed) {
+      for (let j = 0; j < v.count; j++) {
+        if (!c.living(j) || v.kind[j] !== ENTITY_KIND.zombie) continue;
+        const j3 = j * 3;
+        const n = nav.nearestNode(v.position[j3]!, v.position[j3 + 1]!, v.position[j3 + 2]!);
+        if (n !== NO_NAV_NODE && field.distance(n) === Infinity) return true;
+      }
+      return false;
+    }
     const max2 = AI_FLOW.sourceMoveM * AI_FLOW.sourceMoveM;
     let sources = 0;
     for (let j = 0; j < v.count; j++) {
@@ -88,6 +104,8 @@ export class ZombieFlow {
     this.srcMark.fill(0);
     this.srcCount = 0;
     field.begin();
+    const fort = this.fixed ? v.fortress : null;
+    if (fort !== null) field.addSource(nav.nearestNode(fort.x, fort.y, fort.z));
     for (let j = 0; j < v.count; j++) {
       if (!c.living(j)) continue;
       const kind = v.kind[j];
@@ -97,7 +115,7 @@ export class ZombieFlow {
       const z = v.position[j3 + 2]!;
       if (kind === ENTITY_KIND.zombie) {
         field.addTarget(nav.nearestNode(x, y, z));
-      } else if (kind === ENTITY_KIND.bobo && (v.flags[j]! & ENTITY_FLAG.downed) === 0) {
+      } else if (!this.fixed && kind === ENTITY_KIND.bobo && (v.flags[j]! & ENTITY_FLAG.downed) === 0) {
         field.addSource(nav.nearestNode(x, y, z));
         this.srcMark[j] = 1;
         this.srcX[j] = x;

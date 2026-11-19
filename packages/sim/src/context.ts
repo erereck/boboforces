@@ -1,4 +1,5 @@
 import type { ChaosState } from './systems/chaos.ts';
+import type { FortressState } from './systems/fortress.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
@@ -211,6 +212,8 @@ export interface SimContext {
   readonly warfare: boolean;
   /** M6 (fase 5): o Bobo Paintball: os acertos de tinta que derrubam (0 = fora dele). */
   readonly paintHits: number;
+  /** M6 (fase 6a): o gerador do Bobo Zombies Fortress (`null` fora dele). */
+  readonly fortress: FortressState | null;
   /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
   readonly training: boolean;
   readonly hz: number;

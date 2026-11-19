@@ -116,6 +116,8 @@ export interface SimView {
    * largada). A rede escreve direto aqui no amigo.
    */
   readonly chaos: ChaosView | null;
+  /** M6 (fase 6a): o gerador do Bobo Zombies Fortress (`null` fora dele; `hp[0]` é a vida, que a rede escreve). */
+  readonly fortress: FortressView | null;
   /** M6 (fase 4b): o tick do último tiro de cada entidade (os Invisíveis aparecem ao atirar; a IA olha daqui). */
   readonly lastShotTick: Int32Array;
   /**
@@ -270,4 +272,13 @@ export interface MapObjectsView {
 /** M6 (fase 4): o que a view mostra dos modificadores. */
 export interface ChaosView {
   readonly masks: Int32Array;
+}
+
+/** M6 (fase 6a): o que a view mostra do gerador do Fortress. */
+export interface FortressView {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly maxHp: number;
+  readonly hp: Float32Array;
 }

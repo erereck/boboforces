@@ -48,6 +48,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   caindo com a distância; no lugar da granada, o **Balde de tinta**, que espirra em 3 m. Cada estouro deixa uma mancha
   na cor do time no chão ou na parede (até 96 no PC, 48 no celular e 32 no Switch; a mais velha some). Os bots
   adiantam a mira pela bola e pela queda.
+- **Bobo Zombies: Fortaleza (fase 6a):** o card na página Mais modos (no Posto Avançado). Um gerador ao lado de onde os
+  humanos nascem, com 4.000 de vida: metade dos zumbis vai nele, e cada um colado tira 20 por segundo (o chefão, 80).
+  Segurar o usar perto conserta (60 por segundo). O gerador no zero perde a partida. A vida dele aparece na linha da
+  onda ("Gerador 72%") e a plaquinha GERADOR fica sempre na tela. A página Mais modos passou a ter 3 colunas (são 9
+  cards), com as frases mais curtas.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

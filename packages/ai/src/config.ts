@@ -380,6 +380,8 @@ export const AI_FLOW = {
 } as const;
 
 export const AI_ZOMBIE = {
+  /** M6 (fase 6a): no Fortress, o zumbi que vai no gerador troca por um bobo a menos disto (m). */
+  fortressPreyM: 5,
   /** Reavalia o alvo (o bobo vivo mais perto) a cada (s), no LOD A e no B. */
   retargetSA: 0.5,
   retargetSB: 1,

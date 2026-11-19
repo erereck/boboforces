@@ -144,6 +144,8 @@ export interface HudModel {
    */
   readonly juggMark: Float32Array;
   juggMarkOn: boolean;
+  /** M6 (fase 6a): o rótulo da plaquinha (`''` = JUGG); o Fortress usa a mesma para o gerador. */
+  juggMarkLabel: string;
   /**
    * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
    * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
@@ -284,6 +286,7 @@ export function createHudModel(): HudModel {
     pointsIsLevel: false,
     juggMark: new Float32Array(2),
     juggMarkOn: false,
+    juggMarkLabel: '',
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
@@ -840,7 +843,8 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       );
     }
     if (model.juggMarkOn) {
-      drawJuggMark(out, hud, hudTexts().jugg, model.juggMark[0]!, model.juggMark[1]!, labelPx, s, view);
+      const label = model.juggMarkLabel !== '' ? model.juggMarkLabel : hudTexts().jugg;
+      drawJuggMark(out, hud, label, model.juggMark[0]!, model.juggMark[1]!, labelPx, s, view);
     }
   }
 
@@ -1721,7 +1725,18 @@ export function drawHudShared(
       COLORS.bunker,
     );
     if (!hasContent) {
-      drawModsLine(out, font, model, area.x + area.width / 2, area.y + gap, s, area.minTextPx, area.width - pad * 2);
+      // M6 (fase 6a): o Bobo Zombies (sem relógio nem placar) mostra a linha da onda (com o gerador) no quadrante.
+      let top = area.y + gap;
+      if (model.trainingLine !== '') {
+        const px = hudLabelPx(s, area.minTextPx);
+        const w = textWidth(font, model.trainingLine, px) + pad * 2;
+        const h = capHeightPx(font, px) + pad * 2;
+        const x = Math.round(area.x + (area.width - w) / 2);
+        plate(out, x, Math.round(top), w, h, s);
+        paintText(out, font, model.trainingLine, x + pad, Math.round(top) + pad, px, COLORS.texto);
+        top += h + gap;
+      }
+      drawModsLine(out, font, model, area.x + area.width / 2, top, s, area.minTextPx, area.width - pad * 2);
       return;
     }
     if (model.spareMap) {

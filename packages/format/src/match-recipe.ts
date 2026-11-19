@@ -225,7 +225,13 @@ export interface ZombiesRules {
   readonly economy?: number;
   /** "Levanta sozinho" no solo por partida; -1 = sem limite. */
   readonly selfRevives?: number;
+  /** M6 (fase 6): a variante: as ondas de zumbis (padrão) ou o gerador a defender (`fortress`). */
+  readonly variant?: ZombiesVariant;
 }
+
+/** M6 (fase 6): as variantes do Bobo Zombies (GDD §4.1.5). */
+export const ZOMBIES_VARIANTS = ['classic', 'fortress'] as const;
+export type ZombiesVariant = (typeof ZOMBIES_VARIANTS)[number];
 
 /** M3 (fase 2a): as durações do Bobo Zombies (Relâmpago, Curta, sem fim). */
 export const ZOMBIES_WAVE_CHOICES = [5, 10, 0] as const;
@@ -566,7 +572,17 @@ function readRange(
   if (v !== undefined) out[key] = clampWarn(ctx, v, range.min, range.max, `${block}.${key}`);
 }
 
-const ZOMBIES_KEYS = ['waves', 'quantity', 'hpMul', 'speed', 'specials', 'bosses', 'economy', 'selfRevives'] as const;
+const ZOMBIES_KEYS = [
+  'waves',
+  'quantity',
+  'hpMul',
+  'speed',
+  'specials',
+  'bosses',
+  'economy',
+  'selfRevives',
+  'variant',
+] as const;
 
 /** M3 (fase 2a): o bloco do Bobo Zombies (a duração só nas escolhas; o resto limitado à faixa). */
 function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
@@ -586,6 +602,7 @@ function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   readRange(ctx, value, 'speed', 'zombies', RECIPE_RANGES.zombieSpeed, out);
   readFlag(ctx, value, 'specials', 'zombies', out);
   readFlag(ctx, value, 'bosses', 'zombies', out);
+  readChoice(ctx, value, 'variant', 'zombies', ZOMBIES_VARIANTS, out);
   readRange(ctx, value, 'economy', 'zombies', RECIPE_RANGES.zombieEconomy, out);
   readRange(ctx, value, 'selfRevives', 'zombies', RECIPE_RANGES.selfRevives, out);
   if (typeof out['selfRevives'] === 'number') out['selfRevives'] = Math.round(out['selfRevives']);
