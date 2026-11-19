@@ -3602,3 +3602,6 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **O jogo:** os cards Gun Game e Infection na página Mais modos (`moreModePreset`). No Gun Game, o HUD mostra "NÍVEL n"
   no lugar dos abates (`HudModel.pointsIsLevel`); nos dois, a tela de morte não oferece a escolha da arma. O infectado
   tem a cara do bobo-zumbi comum (a figura troca quando o time muda, inclusive o 1º infectado, que muda vivo).
+- **Espaço no menu:** as ações das telas de edição (Partida personalizada, Laboratório e Oficina) foram para um módulo só
+  delas (`ui/src/screens/editor-actions.ts`). Com as ações no mesmo arquivo da tela, o `game.ts` (o menu) puxava a tela
+  inteira para o pedaço do menu; agora as telas vão com os editores, e o menu caiu de 349,8 para 349,1 KB.

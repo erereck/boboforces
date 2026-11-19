@@ -7,16 +7,9 @@ import type { Screen, UiNode } from '../tree.ts';
  * rolagem (favoritos, os seus e os de fábrica; o escolhido em âmbar); à direita, o card do bot escolhido com toda regra
  * ativa à vista (§6.5) e as ações. Todo texto vem montado do `game`.
  */
-export const WORKSHOP_ACTION = {
-  edit: 'edit',
-  duplicate: 'duplicate',
-  favorite: 'favorite',
-  delete: 'delete',
-  back: 'back',
-} as const;
-
-/** Ação de um bot da lista: `bot:<grupo>:<id>` (o mesmo bot pode estar nos favoritos e no grupo dele). */
-export const WORKSHOP_BOT_PREFIX = 'bot:';
+// M6 (fase 2): as ações moram em `editor-actions.ts` (o menu da web não leva a tela por causa delas).
+import { WORKSHOP_ACTION, WORKSHOP_BOT_PREFIX } from './editor-actions.ts';
+export { WORKSHOP_ACTION, WORKSHOP_BOT_PREFIX };
 
 export interface WorkshopGroup {
   readonly id: string;

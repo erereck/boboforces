@@ -1,13 +1,15 @@
 import type { StringKey } from '../strings.pt-BR.ts';
 import type { Screen, UiNode } from '../tree.ts';
 import { buildTabbed, type TabbedRow } from './tabbed.ts';
+// M6 (fase 2): as ações moram em `editor-actions.ts` (o menu da web não leva a tela por causa delas).
+import { LAB_ACTION } from './editor-actions.ts';
+export { LAB_ACTION };
 
 /**
  * M2 (fase 5b): o Laboratório (gameplay.md §6), o editor de um bot por vez, no molde das telas de abas: as abas Nível,
  * Habilidade, Inteligência, Personalidade, Regras e Nome; embaixo do título, o resumo do bot (ou o aviso); no canto,
  * Voltar e Salvar. As linhas vêm montadas do `game`.
  */
-export const LAB_ACTION = { back: 'back', test: 'test', save: 'save' } as const;
 
 export interface LabScreenState {
   readonly tabs: readonly StringKey[];

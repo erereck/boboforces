@@ -1,6 +1,9 @@
 import type { StringKey } from '../strings.pt-BR.ts';
 import type { Screen } from '../tree.ts';
-import { buildTabbed, TABBED_LAYOUT, TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from './tabbed.ts';
+import { buildTabbed, TABBED_LAYOUT } from './tabbed.ts';
+// M6 (fase 2): as ações moram em `editor-actions.ts` (o menu da web não leva a tela por causa delas).
+import { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_TAB_PREFIX } from './editor-actions.ts';
+export { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_TAB_PREFIX };
 
 /**
  * M2 (fase 4e): Partida personalizada (gameplay.md §10.1 e §10.3; arte-ux.md §6.3), no esqueleto de abas com linhas
@@ -8,10 +11,6 @@ import { buildTabbed, TABBED_LAYOUT, TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from
  * o resumo (ou o aviso de preset salvo) embaixo do título e, no canto, Voltar, Salvar preset e COMEÇAR (fixo, com o
  * foco). Os textos de valor vêm do `game`.
  */
-export const CUSTOM_ACTION = { start: 'start', save: 'save', back: 'back' } as const;
-/** Ação de uma aba (`tab:<índice>`) e de uma linha (`row:<id>`). */
-export const CUSTOM_TAB_PREFIX = TABBED_TAB_PREFIX;
-export const CUSTOM_ROW_PREFIX = TABBED_ROW_PREFIX;
 
 export interface CustomRowView {
   readonly id: string;
