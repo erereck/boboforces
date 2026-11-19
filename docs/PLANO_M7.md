@@ -96,6 +96,9 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
      partida da sala; a parede é um tipo de partícula do programa 5 (os 7 programas continuam 7).
 9. **Aquário:** assistir uma partida só de bots, com a câmera livre e a lista de jogadores grande, e entrar no meio
    (assumindo um bot), em qualquer modo; a aceleração até 4x no PC e 2x no Switch.
+   - **feita em 19/11** (ARCHITECTURE §18.10): pelo botão Aquário da página Mais modos e pelo "Assistir" da Partida
+     personalizada (fora do menu principal: o menu da web está no teto); 4 câmeras, a lista, a velocidade na pausa e
+     "Assumir o bobo" / "Largar o bobo". Pergunta Y8.
 10. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
@@ -108,6 +111,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 | Y4 | **A Boom Box:** plantar leva 3 s segurando o usar (o GDD não diz); a explosão mata a até 10 m e fere até 20 m. | Assim |
 | Y5 | **O Royale no celular e no Switch 2P+** (tetos de bots 12 e 16): 24 se o bench com o LOD C deixar; se não, vale o teto do aparelho até a sua resposta (a #35 pede a sua decisão para reduzir). | Assim |
 | Y6 | **O Bobo Sandbox completo** (as Ferramentas do Dono pedem telas e regras ao vivo) fica para depois do M7; o Aquário entra. | Sim |
+| Y8 | **Onde fica o Aquário:** o GDD o põe no menu principal; está no botão da página Mais modos e no "Assistir" da Partida personalizada (o menu da web está a 1,6 KB do teto de 350 KB). Um card no menu principal custaria espaço do menu. | Assim |
 | Y7 | **O Royale só com bots acaba em 1 a 3 min** (24 bobos numa ilha de ~150 m de terra se acham logo, mesmo com os bots evitando briga no começo); a zona de ~8 min pesa nas partidas com humanos. Encurtar a zona ou deixar os bots ainda mais passivos? | Como está |
 
 ## Riscos

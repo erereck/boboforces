@@ -1,5 +1,5 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import type { ModeCard } from '@boboforces/ui';
+import { modesScreen, type ModeCard, type UiNode } from '@boboforces/ui';
 
 /**
  * M6 (fase 0): a página "Mais modos" (o card dos Modos que entrou no lugar do Bobo Training). Mora no pedaço dos
@@ -29,6 +29,27 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   // M7 (fase 8).
   { id: 'royale', nameKey: 'mode.name.royale', descKey: 'mode.desc.royale' },
 ];
+
+/** M7 (fase 9): a ação do botão do Aquário na linha do título. */
+export const MORE_WATCH_ACTION = 'more:watch';
+
+/**
+ * M7 (fase 9): a página com o liga/desliga do Aquário: ligado, o card escolhido começa só com bots, para assistir (o
+ * Bobo Training continua sendo jogado).
+ */
+export function moreModesRoot(watch: boolean): UiNode {
+  return modesScreen.build({
+    modes: MORE_MODE_CARDS,
+    titleKey: 'modes.more.title',
+    headingExtra: {
+      kind: 'button',
+      id: 'watch',
+      text: { key: watch ? 'modes.watch.on' : 'modes.watch.off' },
+      action: MORE_WATCH_ACTION,
+      variant: watch ? 'primary' : 'secondary',
+    },
+  });
+}
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
 export const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'] as const;

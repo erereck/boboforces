@@ -49,6 +49,10 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       buttons: [
         { id: CUSTOM_ACTION.back, labelKey: 'menu.back', variant: 'secondary' },
         { id: CUSTOM_ACTION.save, labelKey: 'custom.save', variant: 'secondary' },
+        // M7 (fase 9): o Aquário (a mesma partida só com bots, para assistir); da sala do Online, não.
+        ...(state.forRoom === true
+          ? []
+          : [{ id: CUSTOM_ACTION.watch, labelKey: 'custom.watch' as const, variant: 'secondary' as const }]),
         {
           id: CUSTOM_ACTION.start,
           labelKey: state.forRoom === true ? 'custom.useInRoom' : 'quick.start',

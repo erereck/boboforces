@@ -372,6 +372,22 @@ Sim + IA headless (Node 26.7) na Ilha Tropical. Sondas em `local/m7/medir-royale
   4,2 ms por tick com 24 bots nos primeiros 10 s, contra 1,0–1,4 ms no FFA na mesma ilha (o loot e a zona olham todos
   os itens). Sem humano na partida o LOD C não liga; com humano, os bots longe pensam a 1 Hz.
 
+## 1m. O Aquário (M7, fase 9; 19/11/2026, 0.0.1 local, i5-12450H)
+
+A aceleração é `driver.update(dt × velocidade)`, com o teto de 4 ticks por frame do passo fixo.
+
+| Cenário | Medida | Observação |
+|---|---|---|
+| Royale só com bots, 4×, Edge headless 1280×720 | 668 ticks em 3 s (3,7×) | o Edge headless não segura 60 fps o tempo todo |
+| Royale só com bots, 0,25× | 45 ticks em 3 s | exato |
+| Domination com um bot assumido (1×) | 121 ticks em 2 s | exato |
+| Royale só com bots a 4× até o fim | 13.500 ticks (3 min 45 s de partida) em ~1 min | o resultado do Aquário saiu certo |
+
+- **O Switch a 2×** são 4 ticks por frame a 30 fps. No Aquário não há observador do LOD da IA, então o LOD C não liga:
+  no Royale, sem JIT, a IA custaria até 4 × 4,2 ms por frame nos primeiros segundos (§1l); no Eden, a sim e a IA somam
+  2 ms por tick (8 ms por frame a 2×). Se o console não segurar, a aceleração fica no teto sem travar (o passo fixo
+  descarta o tempo que sobra) e a câmera do Aquário como observador do LOD vira o próximo passo.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

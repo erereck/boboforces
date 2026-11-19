@@ -50,6 +50,11 @@ export interface ResultScreenData {
   readonly record?: 'kills' | 'streak' | 'both';
   /** M5 (fase 4c): partida online: embaixo, só Voltar à sala (a próxima partida é o host quem escolhe, na sala). */
   readonly online?: boolean;
+  /**
+   * M7 (fase 9): o Aquário só assistido: sem o Nêmesis, o Freguês e os seus números (ninguém jogou). Com `scoreLine`
+   * vazio, sem a linha do placar (o FFA e o Royale, em que o "0 × 0" não diz nada).
+   */
+  readonly watching?: boolean;
 }
 
 const RECORD_TITLE = {
@@ -118,34 +123,42 @@ export const resultScreen: Screen<ResultScreenData> = {
           gap: 10,
           children: [
             { kind: 'text', id: 'title', text: { literal: d.title }, style: 'title', color: d.titleColor },
-            {
-              kind: 'text',
-              id: 'score',
-              text:
-                d.scoreLine !== undefined
-                  ? { literal: d.scoreLine }
-                  : { key: 'result.score', params: { own: d.own, other: d.other } },
-              style: 'heading',
-              color: COLORS.texto,
-            },
+            ...(d.scoreLine === ''
+              ? []
+              : [
+                  {
+                    kind: 'text',
+                    id: 'score',
+                    text:
+                      d.scoreLine !== undefined
+                        ? { literal: d.scoreLine }
+                        : { key: 'result.score', params: { own: d.own, other: d.other } },
+                    style: 'heading',
+                    color: COLORS.texto,
+                  } as UiNode,
+                ]),
             line('level', 'result.level', { level: d.level }, COLORS.textoBaixo),
             { kind: 'box', height: 6 },
             d.mvp !== ''
               ? line('mvp', 'result.mvp', { name: d.mvp })
               : line('mvp', 'result.noMvp', {}, COLORS.textoBaixo),
-            ...nemesis,
-            d.victim !== ''
-              ? line('victim', 'result.victim', { name: d.victim, n: d.victimKills })
-              : line('victim', 'result.noVictim', {}, COLORS.textoBaixo),
-            { kind: 'box', height: 6 },
-            {
-              kind: 'text',
-              id: 'numbersTitle',
-              text: { key: d.record ? RECORD_TITLE[d.record] : 'result.numbersTitle' },
-              style: 'label',
-              color: d.record ? COLORS.acao : COLORS.textoBaixo,
-            },
-            line('numbers', 'result.numbers', { kills: d.kills, accuracy: d.accuracy, streak: d.bestStreak }),
+            ...(d.watching === true
+              ? []
+              : [
+                  ...nemesis,
+                  d.victim !== ''
+                    ? line('victim', 'result.victim', { name: d.victim, n: d.victimKills })
+                    : line('victim', 'result.noVictim', {}, COLORS.textoBaixo),
+                  { kind: 'box', height: 6 } as UiNode,
+                  {
+                    kind: 'text',
+                    id: 'numbersTitle',
+                    text: { key: d.record ? RECORD_TITLE[d.record] : 'result.numbersTitle' },
+                    style: 'label',
+                    color: d.record ? COLORS.acao : COLORS.textoBaixo,
+                  } as UiNode,
+                  line('numbers', 'result.numbers', { kills: d.kills, accuracy: d.accuracy, streak: d.bestStreak }),
+                ]),
             ...(d.prizes.length > 0
               ? [
                   {

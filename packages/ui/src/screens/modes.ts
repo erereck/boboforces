@@ -24,6 +24,8 @@ export interface ModesState {
   readonly titleKey?: StringKey;
   /** M7 (fase 8): sempre 2 colunas de cards largos (a Partida da sala, com nomes longos como "Todos contra todos"). */
   readonly wide?: boolean;
+  /** M7 (fase 9): um botão a mais na linha do título (o Aquário da página Mais modos). */
+  readonly headingExtra?: UiNode;
 }
 
 /** Largura de cada card (px de referência). */
@@ -106,6 +108,7 @@ export const modesScreen: Screen<ModesState> = {
                   color: COLORS.texto,
                 },
                 ...(backInHeading ? [back] : []),
+                ...(state.headingExtra ? [state.headingExtra] : []),
               ],
             },
             { kind: 'box', height: tight ? 6 : 12 },

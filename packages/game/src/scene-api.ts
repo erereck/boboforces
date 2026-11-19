@@ -71,6 +71,11 @@ export interface SceneRequest {
    * inteira: o cliente não corta bots pelo aparelho) e a `seed` do começo.
    */
   readonly online?: OnlineSession;
+  /**
+   * M7 (fase 9): o Aquário: a `recipe` só com bots (o lugar do jogador vira um bot), assistida com a câmera livre ou
+   * seguindo um bot, com a aceleração e o "assumir um bot". Fora do online e fora do Bobo Training.
+   */
+  readonly spectate?: boolean;
 }
 
 /**

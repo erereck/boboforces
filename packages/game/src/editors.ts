@@ -26,4 +26,4 @@ export { STRINGS_EXTRA_PT_BR as EXTRA_STRINGS };
 export { importWorkshopFiles } from './workshop-files.ts';
 export { createOnscreenKeyboard } from './onscreen-keyboard.ts';
 // M6 (fase 0): a página "Mais modos" (os cards e as receitas dos modos novos).
-export { MORE_MODE_CARDS, moreModePreset } from './more-modes.ts';
+export { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } from './more-modes.ts';

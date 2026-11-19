@@ -4208,3 +4208,62 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   o aviso de troca só quando a sim troca. O resultado (e o registro) dá a vitória ou a derrota pela colocação.
 - **Fica para depois:** a zona no minimapa (o minimapa só aparece no 4º quadrante de 3 jogadores), o modelo da arma nas
   costas e a escolha do formato (duplas e quartetos) no card.
+
+### 18.10 Fase 9: o Aquário (19/11/2026)
+
+- **Onde entra:** o botão "Aquário: desligado/ligado" na linha do título da página Mais modos (ligado, o card escolhido
+  começa só com bots; o Bobo Training continua sendo jogado) e o "Assistir" da Partida personalizada (o TDM, o FFA e o
+  Zombies com as regras dela). Decisão menor revisável: o GDD põe o Aquário no menu principal, mas o menu da web está
+  a 1,6 KB do teto de 350 KB; os dois botões moram no pedaço dos editores (o menu cresceu 0,1 KB). Fora do online (a
+  partida da sala é a do host) e sem virar o último preset do JOGAR; o "De novo" do resultado repete o Aquário.
+- **A receita** (`spectateRecipe`, `SceneRequest.spectate`): o lugar do jogador vira um bot do mesmo time (o 1º bot
+  daquele time, ou o do pedido), então os times ficam do mesmo tamanho e o Royale continua com 24; a cena começa com
+  `humans = 0`. O teto de bots do aparelho corta depois, no validador, como sempre.
+- **As câmeras** (o botão da câmera troca, na ordem): seguindo (a câmera de ombro atrás do bot, com a HUD dele), nos
+  olhos (a 1ª pessoa do bot), livre (voa com o mapeador do P1: andar e olhar, pular sobe, agachar desce, correr 3×;
+  presa na área jogável com 20 m de folga) e de cima (24 m sobre o bot, um pouco para trás, girando com a mira). A roda
+  (ou o botão de trocar arma) passa para o próximo bobo vivo. Com o bobo seguido morto, a câmera de morte e, depois de
+  3,5 s, quem matou (ou o próximo vivo).
+- **A lista grande:** o botão do placar liga e desliga o placar do Tab (a linha do bobo seguido em destaque); também
+  pelo item "Mostrar a lista" da pausa (o toque não tem o botão do placar).
+- **A faixa** embaixo, no meio: "AQUÁRIO · 2× · SEGUINDO NORMAL BOB" e os botões do dispositivo, lidos do perfil ("T:
+  câmera · Roda para baixo: outro bobo · E: assumir · Tab: lista · Esc: pausa"). Os textos só são refeitos quando a
+  câmera, o bobo seguido, a velocidade ou o dispositivo mudam.
+- **A pausa** assistindo: Continuar, a velocidade, "Assumir o bobo", a lista, os Ajustes e Sair (6 itens, o que cabe no
+  celular; a Dificuldade fica para o bot assumido e para o "Mais fácil/Mais difícil" do resultado, e no Aquário ela vale
+  para todos os bots).
+- **A velocidade** (na pausa; cada aperto passa para a próxima): 0,25×, 0,5×, 1×, 2× e 4× no PC; até 2× no celular e
+  no Switch (`aquariumMaxSpeed`, pela família do perfil). É só `driver.update(dt × velocidade)`: o passo fixo faz no
+  máximo 4 ticks por frame (`MAX_STEPS_PER_FRAME`) e corta o frame em 0,1 s, então 4× a 60 fps e 2× a 30 fps cabem;
+  abaixo disso, a aceleração fica no teto sem avisar (e a sim continua determinística: são os mesmos ticks). O resto da
+  cena (a câmera de morte, o kill feed, o som) anda no relógio do render.
+- **Assumir um bot** (o usar, ou o item da pausa): o bobo seguido vira o P1, com a posição, a vida e a arma dele; a IA
+  para de pensar por ele (`setHumanControlled`, o mesmo do "entrar no meio" do sofá). Na cena, `humans` e `me`
+  viraram `let`: 0 assistindo e 1 com o bot (`me` = o controlador dele, `seatCtrl = [ele]`); a receita, os nomes e as
+  regras continuam os da criação. Com o bot, a partida anda a 1× e a pausa troca a velocidade por "Largar o bobo"
+  (devolve à IA e volta a seguir ele). No Royale, morto e sem colega vivo, volta a assistir sozinho depois de 3,5 s (no
+  BoboStrike o mesmo bot volta na próxima rodada). Assumir e largar zeram o mapeador do P1 (os apertos guardados
+  enquanto se assistia não vão para o bot) e o usar que assumiu só vale depois de solto; o bot assumido continua com a
+  cara dele (sem o Meu Bobo). A assistência de mira passou a ler o bobo do P1 (`me`) e não o do controlador 0: no online, o
+  cliente que não era o 0 lia o bobo do host.
+- **O resultado** assistindo: quem venceu ("Normal Bob venceu", "Vitória do time Azul"), o MVP e os prêmios, sem o
+  Nêmesis, o Freguês e os seus números (`ResultScreenData.watching`); no FFA e no Royale, sem a linha do placar. O
+  Aquário não grava estatística (nem com um bot assumido).
+- **A IA:** os observadores do LOD são os controladores 0..3; no Aquário não há nenhum, então todos os bots pensam no
+  ritmo cheio (o LOD C fica desligado, inclusive com um bot assumido). Ver o PERF §1m (o Royale a 2× no Switch).
+- **Os testes:** a receita, as velocidades, as câmeras, a câmera livre e o próximo bobo vivo (`aquarium.test.ts`); o
+  botão do Mais modos; o resultado sem os números pessoais; a pausa (assistindo e com o bot), o botão do Mais modos e o
+  "Assistir" cabem nas 6 telas do teste de textos (web, celular e Switch). No Edge (`local/m7/capturar-aquario.ts`):
+  o Domination e o Royale com as 4 câmeras, a lista, a pausa, a velocidade, assumir e largar, e o Royale a 4× até o
+  resultado.
+- **A revisão (Opus) achou 8 coisas, corrigidas antes do commit:** os apertos guardados enquanto se assistia (o clique
+  que trava o mouse, pular e agachar da câmera livre, o próprio usar) iam todos para o bot no primeiro tick; acelerado,
+  a sonda da qualidade contava os frames de 4 ticks e podia baixar a qualidade de vez (agora não conta acima de 1×); o
+  "Ajustar desafio" mexia só no time 1; o bot assumido vestia o Meu Bobo de outro; a volta sozinha no BoboStrike a cada
+  rodada perdida; o resultado do Zombies assistindo ("0 jogadores" e o recorde); os botões da faixa depois de trocar um
+  botão nos Ajustes; e a troca de câmera do morto contava no relógio do render (agora no da partida). Também: a vista do
+  P1 começava seguindo o controlador 0, e não o `me` (no online, o cliente que não é o 0 começava na vista do host).
+- **Fica para depois:** o Aquário no sofá (cada controle assume um bot), a camada da IA (ícones de intenção, linha de
+  visão e rota: gameplay.md §6.9), o "Entrar no time X" (um lugar novo), o Aquário pela sala online (a 1×) e a câmera
+  do Aquário como observador do LOD da IA.
+

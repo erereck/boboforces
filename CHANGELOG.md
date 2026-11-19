@@ -57,6 +57,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   dela, a marca ZONA na borda da tela. As armas raras e épicas brilham no chão (azul e roxo) e têm o nome com a
   raridade; o colete e o kit de cura têm modelo próprio. O colete e os kits aparecem no lugar dos pontos; com uma arma
   no pé, "Usar: trocar por…". No fim, a colocação ("3º de 24").
+- **Aquário (fase 9):** assistir uma partida só de bots em qualquer modo: o botão "Aquário" na página Mais modos e o
+  "Assistir" da Partida personalizada. A câmera segue um bot (3ª pessoa), fica nos olhos dele, voa livre ou olha de
+  cima; a roda troca o bobo, o Tab liga a lista grande. Na pausa, a velocidade (de 0,25× a 4× no PC; até 2× no celular e
+  no Switch) e "Assumir o bobo": você entra no lugar dele, com a vida e a arma, e "Largar o bobo" devolve à IA. No fim,
+  quem venceu, sem os seus números.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

@@ -72,6 +72,7 @@ import {
   uiScale,
   type StringKey,
   type TestScreenModel,
+  type UiNode,
 } from '@boboforces/ui';
 import { buildTestArena } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
@@ -85,6 +86,7 @@ import { pauseScreen, playersScreen } from './pause.ts';
 import type { BatteryReading, SceneBundle, SceneRequest } from './scene-api.ts';
 import { createConstrutoLoader } from './scene/load.ts';
 import { SCENE_MODULE } from './scene/index.ts';
+import { aquariumPauseItems } from './scene/aquarium.ts';
 import {
   createSceneFigures,
   FIGURE_DEFAULT_LOOK,
@@ -1081,6 +1083,85 @@ describe('textos do game com o atlas real (#54)', () => {
       for (let i = 0; i + 1 < order.length; i++) {
         expect(moveFocus(layout, order[i]!, 'down'), t.name).toBe(order[i + 1]);
         expect(moveFocus(layout, order[i + 1]!, 'up'), t.name).toBe(order[i]);
+      }
+    }
+  });
+
+  it('M7 (fase 9): o Aquário cabe: a pausa (assistindo e com o bot), o botão do Mais modos e o Assistir', () => {
+    const help = t_('pause.help.speed');
+    const custom: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'construto',
+      seed: 0,
+      teams: [{ humans: 'all', bots: [] }, { bots: [] }],
+    };
+    const tabs = EDITORS.customTabs(custom);
+    const roots: readonly (readonly [string, UiNode, readonly string[]])[] = [
+      [
+        'pausa assistindo',
+        pauseScreen.build({
+          challenge: true,
+          help,
+          items: aquariumPauseItems({ speed: '0,25×', piloting: false, canTake: true, challenge: true, list: true }),
+        }),
+        ['resume', 'speed', 'take', 'list', 'settings', 'quit'],
+      ],
+      [
+        'pausa com o bot',
+        pauseScreen.build({
+          challenge: true,
+          help: t_('pause.help.take'),
+          items: aquariumPauseItems({ speed: '4×', piloting: true, canTake: false, challenge: true, list: false }),
+        }),
+        ['resume', 'watch', 'challenge', 'settings', 'unstuck', 'quit'],
+      ],
+      ['Mais modos', EDITORS.moreModesRoot(true), []],
+      [
+        'Partida personalizada',
+        EDITORS.customMatchScreen.build({
+          tabs: tabs.map((id) => EDITORS.CUSTOM_TAB_LABELS[id]),
+          tab: 0,
+          rows: EDITORS.customRows(tabs[0]!, custom).map((r) => ({
+            id: r.id,
+            labelKey: r.labelKey,
+            value: r.value(custom),
+          })),
+          summary: 'Times · De boa · 4 contra 4 · Construto',
+          note: '',
+        }),
+        [],
+      ],
+    ];
+    for (const t of TARGETS) {
+      for (const [name, root, order] of roots) {
+        const layout = layoutTree(root, { x: 0, y: 0, w: t.w, h: t.h }, 1, {
+          fonts,
+          minTextPx: t.minTextPx,
+          minTarget: t.minTarget,
+        });
+        const c = layout.content;
+        for (const node of layout.order) {
+          const r = layout.rects.get(node)!;
+          const text = layout.texts.get(node);
+          if (!text || node.kind !== 'button') continue;
+          // As abas da Partida personalizada e os cards são de antes (só os botões de baixo e o do título aqui).
+          if (!name.startsWith('pausa') && !['back', 'save', 'watch', 'start'].includes(node.id ?? '')) continue;
+          const room = r.w - 2 * BUTTON.padX * layout.scale;
+          expect(text.width, `${t.name} ${name}: "${text.text}" em ${room.toFixed(1)} px`).toBeLessThanOrEqual(room);
+          expect(r.h, `${t.name} ${name}`).toBeGreaterThanOrEqual(t.minTarget);
+          expect(r.x, `${t.name} ${name}: ${node.id}`).toBeGreaterThanOrEqual(c.x - 0.5);
+          expect(r.x + r.w, `${t.name} ${name}: ${node.id}`).toBeLessThanOrEqual(c.x + c.w + 0.5);
+          expect(r.y + r.h, `${t.name} ${name}: ${node.id}`).toBeLessThanOrEqual(c.y + c.h + 0.5);
+        }
+        for (let i = 0; i + 1 < order.length; i++) {
+          expect(moveFocus(layout, order[i]!, 'down'), `${t.name} ${name}`).toBe(order[i + 1]);
+        }
+        for (const id of ['watch', 'start']) {
+          if (name === 'Mais modos' && id === 'watch') expect(layout.byId.get(id), t.name).toBeDefined();
+          if (name === 'Partida personalizada' && id === 'start')
+            expect(layout.byId.get('watch'), t.name).toBeDefined();
+        }
       }
     }
   });

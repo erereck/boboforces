@@ -290,6 +290,7 @@ import {
   DEATH_CAM,
   endDeath,
   fillDeathBanner,
+  isCurrentEntity,
   HARD_TIME,
   losingBadly,
   moveRadialCursor,
@@ -312,6 +313,25 @@ import {
 import { bareLookId, botLookIndices, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
+import {
+  AQUARIUM,
+  AQUARIUM_ACTION,
+  AQUARIUM_CAMERA,
+  aquariumMaxSpeed,
+  aquariumPauseHelp,
+  aquariumPauseItems,
+  aquariumSpeedText,
+  drawAquariumBar,
+  livingBobo,
+  nextAquariumCamera,
+  nextAquariumSpeed,
+  nextLivingBobo,
+  spectateRecipe,
+  stepFlyCamera,
+  type AquariumCamera,
+  type FlyBounds,
+  type FlyCamera,
+} from './aquarium.ts';
 import { createWardrobe, WARDROBE, type Wardrobe } from './wardrobe.ts';
 import {
   aimFromCamera,
@@ -696,6 +716,12 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
   } else if (request.kind === 'play' && request.recipe) {
     // M2 (fase 4c): o preset pedido, com a semente desta partida (o validador abaixo corta no teto do aparelho).
     recipe = { ...request.recipe, seed: request.seed >>> 0 };
+    // M7 (fase 9): o Aquário: o lugar do jogador vira um bot do mesmo time (a partida é só de bots).
+    if (request.spectate === true && recipe.mode !== 'training') {
+      recipe = spectateRecipe(recipe, ref);
+      humans = 0;
+      seatControllers = [];
+    }
   } else {
     const bots = Math.min(PLAY_BOTS, profile.maxBots);
     const enemies = Math.ceil(bots / 2);
@@ -719,7 +745,10 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
           { ...recipeLimitsFor(profile), maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4 }
         : recipeLimitsFor(profile);
   // M3 (fase 1a): o sofá, até o teto de humanos locais do aparelho.
-  const seats = request.kind === 'play' && !request.online ? (request.seats ?? []).slice(0, limits.maxLocalHumans) : [];
+  const seats =
+    request.kind === 'play' && !request.online && humans > 0
+      ? (request.seats ?? []).slice(0, limits.maxLocalHumans)
+      : [];
   if (seats.length >= 2) {
     const seated = seatRecipe(recipe, seats);
     recipe = seated.recipe;
@@ -836,7 +865,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const doc = loaded.doc;
   const bench = request.kind === 'bench' ? request.bench : null;
   const recipe = setup.recipe.recipe;
-  const humans = setup.recipe.humans;
+  /**
+   * Os jogadores locais (no online, todos os humanos da partida). M7 (fase 9): no Aquário começa em 0 e vira 1 enquanto
+   * um bot está assumido (`pilot`); o resto da partida (nomes, regras, a expansão da receita) é de antes, com 0.
+   */
+  let humans = setup.recipe.humans;
+  /** M7 (fase 9): o Aquário (só bots, fora do online). */
+  const aquarium = request.kind === 'play' && request.spectate === true && !request.online && humans === 0;
   const ffa = isFfaMode(recipe.mode);
   /**
    * M6 (fase 3): o Juggernaut. Os caçadores são um time (sem fogo amigo, os marcadores dos aliados), mas o placar e o
@@ -909,7 +944,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * M5 (fase 4b): o controlador do jogador deste aparelho (o P1). No solo e no sofá é o 0; no online, o que o lobby deu
    * (o host pode estar no time 1, e cada cliente tem o seu).
    */
-  const me = seatCtrl[0] ?? 0;
+  let me = seatCtrl[0] ?? 0;
   /**
    * M3 (fase 1e): o perfil do jogador de número `num` (0 = P1, que usa os Ajustes): o do dispositivo com a mira e o Y do
    * ajuste dele (`settings.couch`, mudado na tela do sofá).
@@ -1073,7 +1108,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? (presetLevel(request.recipe) ?? 'normal')
         : (request.level ?? 'normal');
   /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
-  const challengeTeam = solo || royaleMode ? -1 : 1;
+  const challengeTeam = solo || royaleMode || aquarium ? -1 : 1;
   let unstuckPending = false;
   let matchStats = createMatchStats(1);
   let endedAt = -1;
@@ -1752,7 +1787,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     const team = ffa || royaleMode || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
     // M2 (fase 6c): o jogador 1 veste o Meu Bobo.
-    if (humans > 0 && v.controller[i] === me) {
+    if (humans > 0 && !aquarium && v.controller[i] === me) {
       // M6 (fase 3): o Meu Bobo só existe no time 0; o P1 que vira o Jugg continua com ele.
       figureOf[i] = figures.playerFigure(juggernaut ? 0 : team);
       skinLayer[i] = figures.playerSkin(juggernaut ? 0 : team);
@@ -2105,6 +2140,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           return;
         }
         player.writeFrame(out, seq);
+        if (aqUseLock) {
+          if (player.isDown('use')) out.buttons &= ~BUTTON.use;
+          else aqUseLock = false;
+        }
         // M2 (fase 6b): em 3ª pessoa, o tiro mira o ponto que a câmera mira (do olho).
         if (thirdPersonAim()) {
           out.yaw = yawToU16(thirdAim[0]!);
@@ -2154,7 +2193,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   // Quem cada vista segue: o humano 0, ou (bench) bots espalhados pelos dois times.
   if (humans > 0) {
-    slots[0]!.controller = 0;
+    slots[0]!.controller = me;
     const v = sim.view();
     const e = entityIndex(sim.controllerEntity(me));
     player.setAngles(v.yaw[e]!, 0);
@@ -2173,6 +2212,231 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const team = byTeam[i % 2]!.length > Math.floor(i / 2) ? i % 2 : (i + 1) % 2;
       slots[i]!.controller = byTeam[team]![Math.floor(i / 2)] ?? byTeam[0]![i] ?? -1;
     }
+  }
+
+  // --- M7 (fase 9): o Aquário ---
+  let aqCam: AquariumCamera = AQUARIUM_CAMERA.follow;
+  let aqSpeed = 1;
+  const aqMaxSpeed = aquariumMaxSpeed(profile.family);
+  /** A lista de jogadores grande (o botão do placar liga e desliga). */
+  let aqList = false;
+  /** Há quanto tempo (s, do relógio do render) o bobo seguido está morto, e quem o matou (`NULL_ENTITY` = ninguém). */
+  let aqDeadS = 0;
+  let aqKiller: number = NULL_ENTITY;
+  /** O bot assumido (controlador; -1 = assistindo). */
+  let pilot = -1;
+  /** M7 (fase 9, revisão): o usar que assumiu o bot ainda apertado (o bot não usa nada até ele ser solto). */
+  let aqUseLock = false;
+  const fly: FlyCamera = { x: 0, y: 0, z: 0 };
+  const flyBounds: FlyBounds = (() => {
+    const v = sim.view();
+    const pa = v.playArea;
+    const m = AQUARIUM.flyMarginM;
+    return {
+      minX: (pa?.minX ?? 0) - m,
+      maxX: (pa?.maxX ?? v.world.sizeX / CELLS_PER_METER) + m,
+      minY: 0.5,
+      maxY: v.world.sizeY / CELLS_PER_METER + m,
+      minZ: (pa?.minZ ?? 0) - m,
+      maxZ: (pa?.maxZ ?? v.world.sizeZ / CELLS_PER_METER) + m,
+    };
+  })();
+  /** Os textos da faixa (refeitos só quando a câmera, o bobo seguido, a velocidade ou o dispositivo mudam). */
+  let aqStatus = '';
+  let aqShownCam = -1;
+  let aqShownCtrl = -2;
+  let aqShownSpeed = -1;
+  let aqHint = '';
+  let aqHintDevice: DeviceKind | null = null;
+  const AQ_HINTS = [
+    ['camera', 'aquarium.hint.camera'],
+    ['nextWeapon', 'aquarium.hint.next'],
+    ['use', 'aquarium.hint.take'],
+    ['scoreboard', 'aquarium.hint.list'],
+    ['pause', 'aquarium.hint.pause'],
+  ] as const;
+
+  /** O bobo que a vista do Aquário segue (índice; -1 = nenhum). */
+  function aqFollowed(): number {
+    const c = slots[0]!.controller;
+    if (c < 0) return -1;
+    const id = sim.controllerEntity(c);
+    return id === NULL_ENTITY ? -1 : entityIndex(id);
+  }
+  /** Passa a seguir o bobo `i` (índice): a câmera de morte e o braço da câmera de ombro recomeçam. */
+  function aqFollow(i: number): void {
+    const v = sim.view();
+    if (i < 0 || i >= v.count) return;
+    const slot = slots[0]!;
+    aqDeadS = 0;
+    aqKiller = NULL_ENTITY;
+    if (slot.controller === v.controller[i]) return;
+    slot.controller = v.controller[i]!;
+    endDeath(slot.death);
+    slot.shoulder.arm = -1;
+    slot.eye = -1;
+  }
+  /** A entrada do Aquário assistindo (fora da pausa): câmeras, o bobo seguido, a lista, assumir e pausar. */
+  function aquariumInput(raw: Readonly<RawInputState>, dt: number): void {
+    player.update(raw, dt);
+    const slot = slots[0]!;
+    const v = sim.view();
+    if (player.wasPressed('camera')) {
+      const c = slot.desc.camera;
+      aqCam = nextAquariumCamera(aqCam);
+      // A câmera livre sai de onde a câmera estava; a de cima gira com a mira (começa no rumo atual).
+      if (aqCam === AQUARIUM_CAMERA.free) {
+        fly.x = c.x;
+        fly.y = c.y;
+        fly.z = c.z;
+        player.setAngles(c.yaw, c.pitch);
+      } else if (aqCam === AQUARIUM_CAMERA.top) player.setAngles(c.yaw, 0);
+      slot.shoulder.arm = -1;
+    }
+    const dir = player.wasPressed('nextWeapon') ? 1 : player.wasPressed('prevWeapon') ? -1 : 0;
+    if (dir !== 0) {
+      aqFollow(nextLivingBobo(v, aqFollowed(), dir));
+      if (aqCam === AQUARIUM_CAMERA.free) aqCam = AQUARIUM_CAMERA.follow;
+    }
+    if (player.wasPressed('scoreboard')) aqList = !aqList;
+    if (player.wasPressed('use')) takeBot();
+    else if (player.wasPressed('pause')) pause();
+    if (aqCam === AQUARIUM_CAMERA.free) {
+      const up = (player.isDown('jump') ? 1 : 0) - (player.isDown('crouch') ? 1 : 0);
+      const fast = player.isDown('sprint');
+      stepFlyCamera(fly, player.yaw, player.pitch, player.moveX, player.moveY, up, fast, dt, flyBounds);
+    }
+    // O bobo seguido morto: passada a câmera de morte, quem matou (vivo) ou o próximo vivo; sem ninguém, o 1º vivo.
+    const i = aqFollowed();
+    if (i >= 0 && livingBobo(v, i)) aqDeadS = 0;
+    else {
+      aqDeadS += dt * aqSpeed;
+      if (i < 0 || aqDeadS >= AQUARIUM.switchAfterDeadS) {
+        const k = aqKiller !== NULL_ENTITY && isCurrentEntity(v, aqKiller) ? entityIndex(aqKiller) : -1;
+        const next = k >= 0 && livingBobo(v, k) ? k : nextLivingBobo(v, i, 1);
+        if (next >= 0 && next !== i) aqFollow(next);
+      }
+    }
+  }
+  /**
+   * M7 (fase 9, revisão): zera o mapeador do P1 (os toggles, o que está apertado e os apertos guardados enquanto se
+   * assistia, sem `writeFrame`), a escolha do radial e a compra da vista; o usar fica de fora até ser solto.
+   */
+  function aqResetInput(): void {
+    player.setDevice(bindingFor(device, padIndex));
+    player.writeFrame(drain, 0);
+    player.setPrimary(0);
+    seatPrimary[0] = 0;
+    const slot = slots[0]!;
+    slot.buyOpen = false;
+    slot.buyPick = -1;
+    slot.tapId = -1;
+    aqUseLock = true;
+  }
+  /**
+   * Assume o bobo seguido (vivo): ele vira o jogador local (o P1, no lugar do bot) com a posição, a vida e a arma dele;
+   * a IA para de pensar por ele (`setHumanControlled`, o mesmo do "entrar no meio" do sofá).
+   */
+  function takeBot(): void {
+    if (!aquarium || pilot >= 0 || resultShown) return;
+    const v = sim.view();
+    const i = aqFollowed();
+    if (i < 0 || !livingBobo(v, i)) return;
+    const c = slots[0]!.controller;
+    pilot = c;
+    me = c;
+    humans = 1;
+    seatCtrl.length = 0;
+    seatCtrl.push(c);
+    seatNum.length = 0;
+    seatNum.push(0);
+    seatPadId.length = 0;
+    seatPadId.push('');
+    aqResetInput();
+    player.setAngles(v.yaw[i]!, v.pitch[i]!);
+    player.setWeapon(v.slot[i]!);
+    const slot = slots[0]!;
+    endDeath(slot.death);
+    slot.shoulder.arm = -1;
+    driver.setHumanControlled(c, true);
+    aqList = false;
+    aqDeadS = 0;
+    host.log(`[partida] aquário: assumiu ${nameOf(v, i)}`);
+  }
+  /** Devolve o bot para a IA e volta a assistir, seguindo ele. */
+  function releaseBot(): void {
+    if (pilot < 0) return;
+    driver.setHumanControlled(pilot, false);
+    host.log('[partida] aquário: voltou a assistir');
+    pilot = -1;
+    humans = 0;
+    me = 0;
+    seatCtrl.length = 0;
+    seatNum.length = 0;
+    seatPadId.length = 0;
+    aqResetInput();
+    aqCam = AQUARIUM_CAMERA.follow;
+    slots[0]!.shoulder.arm = -1;
+  }
+  /**
+   * Com um bot assumido no Royale (ninguém volta), morto e sem colega vivo para assistir: passada a câmera de morte,
+   * volta a assistir (seguindo quem matou). No BoboStrike o mesmo bot volta na próxima rodada.
+   */
+  function checkPilotOut(dt: number): void {
+    if (pilot < 0 || !royaleMode) return;
+    const v = sim.view();
+    const i = aqFollowed();
+    if (i < 0 || livingBobo(v, i) || livingMate(v, i) >= 0) {
+      aqDeadS = 0;
+      return;
+    }
+    aqDeadS += dt;
+    if (aqDeadS >= AQUARIUM.switchAfterDeadS) releaseBot();
+  }
+  /** A faixa do Aquário: o estado ("AQUÁRIO · 2× · SEGUINDO JORGE") e os botões do dispositivo. */
+  function refreshAquariumTexts(): void {
+    const ctrl = slots[0]!.controller;
+    if (aqCam !== aqShownCam || ctrl !== aqShownCtrl || aqSpeed !== aqShownSpeed) {
+      aqShownCam = aqCam;
+      aqShownCtrl = ctrl;
+      aqShownSpeed = aqSpeed;
+      const i = aqFollowed();
+      const name = i >= 0 ? nameOf(sim.view(), i) : '';
+      const cam =
+        aqCam === AQUARIUM_CAMERA.free
+          ? t('aquarium.cam.free')
+          : aqCam === AQUARIUM_CAMERA.eyes
+            ? t('aquarium.cam.eyes', { name })
+            : aqCam === AQUARIUM_CAMERA.top
+              ? t('aquarium.cam.top', { name })
+              : t('aquarium.cam.follow', { name });
+      aqStatus = `${t('aquarium.title')} · ${aquariumSpeedText(aqSpeed)} · ${cam}`.toUpperCase();
+    }
+    if (device !== aqHintDevice) {
+      aqHintDevice = device;
+      const parts: string[] = [];
+      for (const [action, key] of AQ_HINTS) {
+        const src = profiles[device].game[action]?.[0];
+        if (src !== undefined) parts.push(t('aquarium.hint.item', { key: bindingLabel(src), action: t(key) }));
+      }
+      aqHint = parts.join(' · ');
+    }
+  }
+  /** O título do resultado assistindo: quem venceu (o bobo, o esquadrão ou o time), sem "vitória" nem "derrota". */
+  function aquariumResultTitle(v: SimView, winner: number): string {
+    const rv = v.royale;
+    if (rv !== null) {
+      for (let i = 0; i < v.count; i++) {
+        if (v.alive[i] === 1 && v.kind[i] === ENTITY_KIND.bobo && rv.place[v.team[i]!] === 1) {
+          return t('result.ffaWinner', { name: nameOf(v, i) });
+        }
+      }
+    } else if (solo) {
+      if (winner >= 0) return t('result.ffaWinner', { name: nameOf(v, winner) });
+    } else if (v.match.winnerTeam === 0 || v.match.winnerTeam === 1) {
+      return t('result.aquarium.team', { team: t(`feed.teamName.${v.match.winnerTeam}` as StringKey) });
+    }
+    return t('result.draw');
   }
 
   // --- mapeador, pausa, painel F2 ---
@@ -2858,7 +3122,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
 
   function pause(seat = 0): void {
-    if (paused || disposed || humans === 0 || resultShown) return;
+    if (paused || disposed || (humans === 0 && !aquarium) || resultShown) return;
     paused = true;
     pausedBy = seat > 0 && seat < seatCtrl.length ? seat : 0;
     menuOwnerFor(pausedBy);
@@ -2939,8 +3203,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // O item Jogadores é da LOCAL EDITION (na web, a página abre sozinha quando um controle cai).
       players: couch && host.localEdition === true,
       battery: batteryLine(),
+      // M7 (fase 9): os itens do Aquário (a velocidade, assumir e voltar a assistir).
+      ...(aquarium
+        ? {
+            items: aquariumPauseItems({
+              speed: aquariumSpeedText(aqSpeed),
+              piloting: pilot >= 0,
+              canTake: aqFollowed() >= 0 && livingBobo(sim.view(), aqFollowed()),
+              list: aqList,
+              challenge: pauseState.challenge,
+            }),
+          }
+        : {}),
     };
-    pauseMenu.setRoot(pauseScreen.build({ ...st, help: pauseHelp(pauseMainFocus, st) }));
+    const help = (aquarium ? aquariumPauseHelp(pauseMainFocus) : null) ?? pauseHelp(pauseMainFocus, st);
+    pauseMenu.setRoot(pauseScreen.build({ ...st, help }));
   }
 
   function startCalibration(): void {
@@ -3021,6 +3298,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function applySettings(): void {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
+    aqHintDevice = null;
     for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(seatProfile(seatNum[k + 1]!, extraDevices[k]!.kind));
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
@@ -3120,6 +3398,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === PAUSE_ACTION.players) {
         openPlayers();
         return 'none';
+      } else if (a === AQUARIUM_ACTION.speed) {
+        // M7 (fase 9): a próxima velocidade (a pausa fica aberta, com o foco no item).
+        aqSpeed = nextAquariumSpeed(aqSpeed, aqMaxSpeed);
+        host.log(`[partida] aquário: velocidade ${aquariumSpeedText(aqSpeed)}`);
+        pauseMain();
+        return 'none';
+      } else if (a === AQUARIUM_ACTION.list) {
+        aqList = !aqList;
+        resume();
+      } else if (a === AQUARIUM_ACTION.take) {
+        resume();
+        takeBot();
+      } else if (a === AQUARIUM_ACTION.watch) {
+        resume();
+        releaseBot();
       } else if (a === PAUSE_ACTION.quit) return request.online?.role === 'client' ? 'leave' : 'quit';
       // Refino R4: a frase de ajuda segue o foco.
       if (paused && pausePage === 'main' && pauseMenu.focusedId !== pauseMainFocus) pauseMain();
@@ -3197,7 +3490,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M3 (fase 6a): a onda máxima desta configuração antes da partida (o recorde é por mapa, regras e jogadores).
     const zombieKey = zombiesMode ? zombieRecordKey(recipe, humans) : '';
     const previousWave = zombiesMode ? zombieRecord(host.stats.current, zombieKey) : 0;
-    if (record && human >= 0 && !benchState) {
+    if (record && human >= 0 && !benchState && !aquarium) {
       const locals: number[] = [];
       for (let p = 0; p < humans; p++) locals.push(entityIndex(sim.controllerEntity(p)));
       const zombies = zombiesMode ? { key: zombieKey, wave: v.match.zombieWave } : undefined;
@@ -3220,17 +3513,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               : null;
     const nm = (i: number): string => (i >= 0 ? nameOf(v, i) : '');
     const wave = v.match.zombieWave;
-    const title = zombiesMode
-      ? sum.outcome === 'win'
-        ? t('result.zombiesWin', { waves: wave })
-        : t('result.zombiesLoss', { wave })
-      : sum.outcome === 'win'
-        ? t('result.win')
-        : sum.outcome === 'draw'
-          ? t('result.draw')
-          : solo && sum.winner >= 0
-            ? t('result.ffaWinner', { name: nm(sum.winner) })
-            : t('result.loss');
+    const watching = aquarium && human < 0;
+    const title = watching
+      ? aquariumResultTitle(v, sum.winner)
+      : zombiesMode
+        ? sum.outcome === 'win'
+          ? t('result.zombiesWin', { waves: wave })
+          : t('result.zombiesLoss', { wave })
+        : sum.outcome === 'win'
+          ? t('result.win')
+          : sum.outcome === 'draw'
+            ? t('result.draw')
+            : solo && sum.winner >= 0
+              ? t('result.ffaWinner', { name: nm(sum.winner) })
+              : t('result.loss');
     // M7 (fase 8): no Royale, a colocação do esquadrão do jogador ("3º de 24").
     const rov = v.royale;
     const royalePlace = rov !== null && human >= 0 ? (rov.place[v.team[human]!] ?? 0) : 0;
@@ -3238,11 +3534,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       royalePlace > 0 ? t('result.royalePlace' as StringKey, { place: royalePlace, squads: rov!.squads }) : '';
     const data: ResultScreenData = {
       title,
-      titleColor: sum.outcome === 'win' ? COLORS.acao : sum.outcome === 'loss' ? COLORS.perigo : COLORS.texto,
+      titleColor: watching
+        ? COLORS.texto
+        : sum.outcome === 'win'
+          ? COLORS.acao
+          : sum.outcome === 'loss'
+            ? COLORS.perigo
+            : COLORS.texto,
       own: sum.ownScore,
       other: sum.otherScore,
       ...(zombiesMode ? { scoreLine: t('result.zombiesWave', { wave }) } : {}),
       ...(royalePlaceLine !== '' ? { scoreLine: royalePlaceLine } : {}),
+      // M7 (fase 9): assistindo, sem os números pessoais; no FFA e no Royale, sem o placar.
+      ...(watching ? { watching: true } : {}),
+      ...(watching && (solo || rov !== null) ? { scoreLine: '' } : {}),
       mvp: nm(sum.mvp),
       nemesis: nm(sum.nemesis),
       ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
@@ -3322,7 +3627,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const config = [
       t(`map.${recipe.map}` as StringKey),
       zombieWaves(recipe),
-      humans === 1 ? t('result.zombies.onePlayer') : t('result.zombies.players', { n: humans }),
+      aquarium
+        ? t('aquarium.title')
+        : humans === 1
+          ? t('result.zombies.onePlayer')
+          : t('result.zombies.players', { n: humans }),
       ...(customRules ? [t('result.zombies.customRules')] : []),
     ].join(' · ');
     const best = recorded ? Math.max(previousWave, wave) : previousWave;
@@ -3338,14 +3647,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         : t(humans === 1 ? 'result.zombiesLossSolo' : 'result.zombiesLoss', { wave }),
       titleColor: win ? COLORS.acao : COLORS.perigo,
       config,
-      record: recordLine,
-      newRecord,
+      // M7 (fase 9, revisão): o Aquário não grava recorde.
+      record: aquarium ? '' : recordLine,
+      newRecord: newRecord && !aquarium,
       ...(request.online ? { online: true } : {}),
       rows: zombiesRows(matchStats, v).map((r) => {
         const c = v.controller[r.entity]!;
         return {
           name: nameOf(v, r.entity),
-          color: c < humans ? (PLAYER_COLORS[c] ?? COLORS.texto) : COLORS.texto,
+          color: aquarium
+            ? seatOf(c) === 0
+              ? (PLAYER_COLORS[0] as number)
+              : COLORS.texto
+            : c < humans
+              ? (PLAYER_COLORS[c] ?? COLORS.texto)
+              : COLORS.texto,
           points: r.points,
           kills: r.kills,
           headKills: r.headKills,
@@ -4153,7 +4469,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     scoreboard.teamCount = solo ? 0 : hordeArmed ? 1 : recipe.teams.length;
     for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
       scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;
-    const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
+    const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : aquarium ? aqFollowed() : -1;
     for (let r = 0; r < n; r++) {
       const i = scoreOrder[r]!;
       scoreboard.name[r] = nameOf(v, i);
@@ -4173,6 +4489,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function onDeath(s: Sim, victim: number, killer: number, weapon: number): void {
     const human = humans > 0 ? s.controllerEntity(me) : NULL_ENTITY;
     if (human !== NULL_ENTITY && killer === human && victim !== human) deathsWithoutKill = 0;
+    // M7 (fase 9): no Aquário, quem matou o bobo seguido (a câmera passa para ele depois da câmera de morte).
+    if (aquarium && slots[0]!.controller >= 0 && s.controllerEntity(slots[0]!.controller) === victim) aqKiller = killer;
     for (let sIdx = 0; sIdx < slots.length; sIdx++) {
       const slot = slots[sIdx]!;
       if (slot.controller < 0 || s.controllerEntity(slot.controller) !== victim) continue;
@@ -4517,6 +4835,23 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       vm.visible = false;
       return;
     }
+    // M7 (fase 9): o Aquário assistindo: a câmera livre voa com o mapeador do P1 (sem bobo nenhum).
+    const watching = s === 0 && aquarium && pilot < 0;
+    if (watching && aqCam === AQUARIUM_CAMERA.free) {
+      c.x = fly.x;
+      c.y = fly.y;
+      c.z = fly.z;
+      c.yaw = player.yaw;
+      c.pitch = clamp(player.pitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+      c.fovY = verticalFov(fovDeg, aspect);
+      slot.adsBlend = 0;
+      desc.localSlot = -1;
+      desc.team = 255;
+      desc.thirdPerson = false;
+      slot.third = false;
+      vm.visible = false;
+      return;
+    }
     const v = sim.view();
     const entity = slot.controller >= 0 ? sim.controllerEntity(slot.controller) : NULL_ENTITY;
     if (entity === NULL_ENTITY) {
@@ -4534,8 +4869,45 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     c.y = lerp(v.prevPosition[o + 1]!, v.position[o + 1]!, alpha) + slot.eye;
     c.z = lerp(v.prevPosition[o + 2]!, v.position[o + 2]!, alpha);
     const st = slot.death;
+    // M7 (fase 9): o Aquário de cima (sobre o bobo seguido, um pouco para trás, girando com a mira) e seguindo (a câmera
+    // de ombro atrás dele, no rumo dele).
+    if (watching && aqCam === AQUARIUM_CAMERA.top) {
+      const back = AQUARIUM.topHeightM / Math.tan(-AQUARIUM.topPitch);
+      c.x += Math.sin(player.yaw) * back;
+      c.y += AQUARIUM.topHeightM - slot.eye;
+      c.z += Math.cos(player.yaw) * back;
+      c.yaw = player.yaw;
+      c.pitch = AQUARIUM.topPitch;
+      c.fovY = verticalFov(fovDeg, aspect);
+      slot.adsBlend = 0;
+      desc.localSlot = -1;
+      desc.team = ffa ? 255 : v.team[e]!;
+      desc.thirdPerson = false;
+      slot.third = false;
+      vm.visible = false;
+      return;
+    }
+    if (watching && aqCam === AQUARIUM_CAMERA.follow && !dead) {
+      const fyaw = lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
+      const fpitch = lerp(v.prevPitch[e]!, v.pitch[e]!, alpha) * 0.5;
+      placeShoulderCamera(v, c.x, c.y, c.z, fyaw, fpitch, 0, dt, slot.shoulder);
+      c.x = slot.shoulder.x;
+      c.y = slot.shoulder.y;
+      c.z = slot.shoulder.z;
+      c.yaw = fyaw;
+      c.pitch = clamp(fpitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+      c.fovY = verticalFov(fovDeg, aspect);
+      slot.adsBlend = 0;
+      desc.localSlot = -1;
+      desc.team = ffa ? 255 : v.team[e]!;
+      desc.thirdPerson = false;
+      slot.third = false;
+      vm.visible = false;
+      return;
+    }
     // M7 (fase 4): no BoboStrike, passada a câmera de morte, assiste um aliado vivo (em 3ª pessoa, atrás dele).
-    const mate = dead && (strikeMode || royaleMode) && st.t >= STRIKE_SPECTATE_S ? livingMate(v, e) : -1;
+    // Fase 9: no Aquário assistindo, não (a câmera passa para quem matou).
+    const mate = dead && (strikeMode || royaleMode) && st.t >= STRIKE_SPECTATE_S && !watching ? livingMate(v, e) : -1;
     if (mate >= 0) {
       const q = mate * 3;
       const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
@@ -4738,7 +5110,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const entity = slot.controller >= 0 ? sim.controllerEntity(slot.controller) : NULL_ENTITY;
     const override = s === 0 && (overrideCamera !== null || overrideRoute !== null);
     // M2 (fase 2e): com o resultado na tela, a HUD sai (o véu e os botões ficam limpos).
-    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen || resultShown) {
+    const aqNoHud =
+      s === 0 && aquarium && pilot < 0 && (aqCam === AQUARIUM_CAMERA.free || aqCam === AQUARIUM_CAMERA.top);
+    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen || resultShown || aqNoHud) {
       desc.hud = null;
       return;
     }
@@ -5803,7 +6177,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     },
     get wantsPointerLock(): boolean {
       return (
-        humans > 0 &&
+        (humans > 0 || aquarium) &&
         !paused &&
         !resultShown &&
         !disposed &&
@@ -5833,7 +6207,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // M5: a sala acabou (o host saiu, fui expulso, a conexão caiu): de volta ao menu.
       if (driver.closed && !resultShown) signal = 'quit';
       checkHostAway();
-      if (humans > 0) {
+      if (humans > 0 || aquarium) {
         const last = menu.lastDevice;
         if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
         if (resultShown) {
@@ -5862,10 +6236,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             zombiesData = { ...zombiesData, presetSaved: true };
             resultMenu.setRoot(zombiesResultScreen.build(zombiesData));
           }
+        } else if (!paused && humans === 0) {
+          // M7 (fase 9): o Aquário assistindo.
+          aquariumInput(raw, dt);
         } else if (!paused) {
           const yaw0 = player.yaw;
           const pitch0 = player.pitch;
-          const scale = frozen ? 1 : aimAssistBefore();
+          // M7 (fase 9): a assistência mira do bobo do P1 (no Aquário, o bot assumido; no online, o da sala).
+          const scale = frozen ? 1 : aimAssistBefore(player, me);
           player.update(raw, frozen ? 0 : dt, scale);
           if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
           if (!ghostDone && device === 'touch' && !frozen) {
@@ -5899,6 +6277,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const pauser = updateExtras(raw, dt, frozen, false);
           if (pauser > 0) pause(pauser);
           else if (player.wasPressed('pause')) pause();
+          if (aquarium) checkPilotOut(dt);
         } else {
           // Pausado: a sim não anda e a mira não gira (o mapeador lê só os botões).
           const yaw = player.yaw;
@@ -5923,10 +6302,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const running = (!paused || driver.online) && !frozen;
       trace('entrada');
       if (running) {
-        lastTicks = driver.update(dt);
+        // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render).
+        lastTicks = driver.update(aquarium && pilot < 0 ? dt * aqSpeed : dt);
         trace('sim e IA');
         timeS += dt;
-        probeQuality(dt);
+        // M7 (fase 9, revisão): acelerado, o frame faz mais ticks: a sonda da qualidade não conta.
+        if (!(aquarium && pilot < 0 && aqSpeed > 1)) probeQuality(dt);
         decay(dt);
         if (!resultShown && endedAt < 0) updateTips(dt);
         if (overrideRoute) routeTime += dt;
@@ -5980,7 +6361,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (zombieMusic !== null) {
         const zv = sim.view();
         musicLocals.length = 0;
-        for (let p = 0; p < humans; p++) musicLocals.push(entityIndex(sim.controllerEntity(p)));
+        for (let p = 0; p < humans; p++) musicLocals.push(entityIndex(sim.controllerEntity(aquarium ? me : p)));
         zombieMusic.frame(zv, running ? dt : 0, {
           live: zv.match.phase !== 'ended',
           result: resultShown,
@@ -6086,13 +6467,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (mv.phase === 'warmup' && mv.countdownTicks > 0) {
             drawMatchCountdown(list, fonts, mv.countdownTicks / sim.hz, todayLine, ui.width, ui.height, minText);
           }
-          let wantsScoreboard = humans > 0 && player.isDown('scoreboard');
+          let wantsScoreboard = (humans > 0 && player.isDown('scoreboard')) || (aquarium && pilot < 0 && aqList);
           for (let k = 0; k < extras.length; k++) if (extras[k]!.isDown('scoreboard')) wantsScoreboard = true;
           if (!paused && wantsScoreboard) {
             fillScoreboard(sim.view());
             drawScoreboard(list, fonts, scoreboard, ui.width, ui.height, minText);
           }
-          if (humans > 0 && device === 'touch' && !paused) {
+          // M7 (fase 9): a faixa do Aquário (o estado e os botões).
+          if (aquarium && pilot < 0 && !paused) {
+            refreshAquariumTexts();
+            drawAquariumBar(list, fonts?.hud ?? null, aqStatus, aqHint, ui.width, ui.height, hs, minText);
+          }
+          if ((humans > 0 || aquarium) && device === 'touch' && !paused) {
             const tf = touchFrame;
             tf.width = ui.width;
             tf.height = ui.height;
@@ -6109,10 +6495,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         if (wardrobe) wardrobe.draw(list, ui);
         if (paused) pauseMenu.draw(list, ui);
         // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
-        if (!resultShown && endedAt >= 0 && humans > 0 && timeS - endedAt >= RESULT_DELAY_S) showResult(true);
+        if (!resultShown && endedAt >= 0 && (humans > 0 || aquarium) && timeS - endedAt >= RESULT_DELAY_S)
+          showResult(true);
         // M7 (fase 8, revisão): no Royale (fora do online), com todo humano local fora, o resultado sai depois da câmera
         // de morte, sem esperar os bots acabarem (a partida segue por trás, como depois do fim).
-        if (!resultShown && endedAt < 0 && royaleMode && !request.online && humans > 0 && !benchState) {
+        if (!resultShown && endedAt < 0 && royaleMode && !request.online && humans > 0 && !benchState && !aquarium) {
           if (!royaleLocalsOut()) royaleOutAt = -1;
           else if (royaleOutAt < 0) royaleOutAt = timeS;
           else if (timeS - royaleOutAt >= ROYALE_RESULT_DELAY_S) showResult(true);

@@ -445,6 +445,9 @@ export function startGame(deps: GameDeps): GameHandle {
   const currentPreset = (): MatchRecipe => save.presets.recent[0] ?? DEBUT_PRESET;
   /** O preset da partida em andamento (para De novo, Mais fácil, Mais difícil, Mudar regras e Salvar preset). */
   let playingPreset: MatchRecipe | null = null;
+  /** M7 (fase 9): a última partida pedida foi um Aquário (o "De novo" repete assim) e o liga/desliga do Mais modos. */
+  let lastSpectate = false;
+  let moreWatch = false;
   /** O sorteio na tela do Surpreenda-me. */
   let surprise: MatchRecipe = DEBUT_PRESET;
   const surpriseRng = createRng(Math.floor(platform.now()) >>> 0);
@@ -1447,6 +1450,7 @@ export function startGame(deps: GameDeps): GameHandle {
     recipe: MatchRecipe | null = null,
     calibrate = false,
     online: { readonly session: OnlineSession; readonly seed: number } | null = null,
+    spectate = false,
   ): void {
     if (!deps.loadScene) {
       log('[game] cena indisponível nesta casca (sem loadScene)');
@@ -1455,7 +1459,9 @@ export function startGame(deps: GameDeps): GameHandle {
     matches++;
     // M3 (fase 1b): os assentos da tela do sofá. O Bobo Training (e a calibração) é de 1 jogador: o treino lê só o
     // humano 0.
-    const seats = kind === 'play' && couchActive && !calibrate && recipe?.mode !== 'training' ? couchSeats() : [];
+    const seats =
+      kind === 'play' && couchActive && !calibrate && !spectate && recipe?.mode !== 'training' ? couchSeats() : [];
+    lastSpectate = spectate;
     if (seats.length >= 2) {
       log(
         `[game] sofá: ${seats.length} jogadores (${seats.map((s) => couchDeviceLabel(s.device) + (s.side === 1 ? ' contra' : '')).join(', ')})`,
@@ -1474,6 +1480,7 @@ export function startGame(deps: GameDeps): GameHandle {
       ...(calibrate ? { calibrate: true } : {}),
       ...(seats.length >= 1 ? { seats } : {}),
       ...(online ? { online: online.session } : {}),
+      ...(spectate ? { spectate: true } : {}),
     };
     playingOnline = online !== null;
     screen = 'scene';
@@ -1614,10 +1621,11 @@ export function startGame(deps: GameDeps): GameHandle {
   }
 
   /** M2 (fase 4c): joga um preset: ele vira o último (o do JOGAR) e a partida começa com semente nova. */
-  function playPreset(preset: MatchRecipe): void {
+  function playPreset(preset: MatchRecipe, spectate = false): void {
     playingPreset = preset;
-    save.pushRecent({ ...preset, seed: 0 });
-    requestScene('play', null, preset);
+    // M7 (fase 9): o Aquário não vira o último preset (o JOGAR continua sendo a última partida jogada).
+    if (!spectate) save.pushRecent({ ...preset, seed: 0 });
+    requestScene('play', null, preset, false, null, spectate);
   }
 
   /** M2 (fase 5d): o treino não vira o último preset (o JOGAR continua sendo a última partida). */
@@ -1861,6 +1869,7 @@ export function startGame(deps: GameDeps): GameHandle {
           screen = customReturn;
           done?.(a === CUSTOM_ACTION.start ? customRecipe : null);
         } else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
+        else if (a === CUSTOM_ACTION.watch) playPreset(customRecipe, true);
         else if (a === CUSTOM_ACTION.save) {
           customNote = saveCustomPreset(customRecipe);
           rebuildCustom();
@@ -1897,7 +1906,8 @@ export function startGame(deps: GameDeps): GameHandle {
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
           else if (id === 'more') {
             withEditors(() => {
-              moreMenu.setRoot(modesScreen.build({ modes: editors!.MORE_MODE_CARDS, titleKey: 'modes.more.title' }));
+              moreWatch = false;
+              moreMenu.setRoot(editors!.moreModesRoot(false));
               screen = 'more';
             });
           } else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
@@ -1920,11 +1930,15 @@ export function startGame(deps: GameDeps): GameHandle {
         if (nav.back || a === MODES_ACTION.back) {
           screen = 'modes';
           modesMenu.focus(MODES_PREFIX + 'more');
+        } else if (a === editors!.MORE_WATCH_ACTION) {
+          // M7 (fase 9): o Aquário liga e desliga (o foco fica no botão).
+          moreWatch = !moreWatch;
+          moreMenu.setRoot(editors!.moreModesRoot(moreWatch));
         } else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           const preset = editors!.moreModePreset(id);
           if (id === 'training') playTraining(trainingPreset());
-          else if (preset !== null) playPreset(preset);
+          else if (preset !== null) playPreset(preset, moreWatch);
         }
         if (screen === 'more') {
           moreMenu.draw(list, u);
@@ -2045,7 +2059,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const preset = playingPreset ?? currentPreset();
         leaveScene();
         // M2 (fase 4c): o nível novo vale para todos os bots de nível do preset, e ele vira o último.
-        playPreset(withPresetLevel(preset, next));
+        playPreset(withPresetLevel(preset, next), lastSpectate);
       } else if (signal === 'rules') {
         // M2 (fase 4e): Mudar regras abre a Partida personalizada com o preset desta partida (e o sofá acaba).
         const preset = playingPreset ?? currentPreset();

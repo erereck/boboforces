@@ -91,3 +91,24 @@ describe('M5 (fase 4c): resultado de uma partida online', () => {
     }
   });
 });
+
+describe('M7 (fase 9): o resultado do Aquário só assistido', () => {
+  const ids = (node: UiNode, out: string[] = []): string[] => {
+    if (node.id !== undefined) out.push(node.id);
+    const kids = 'children' in node && node.children ? node.children : [];
+    for (const k of kids) ids(k, out);
+    return out;
+  };
+
+  it('sem Nêmesis, Freguês e os seus números; com o placar vazio, sem a linha do placar', () => {
+    const watched = ids(resultScreen.build({ ...base, title: 'Vitória do time Azul', watching: true }));
+    expect(watched).toContain('score');
+    expect(watched).toContain('mvp');
+    for (const id of ['nemesis', 'nemesisRow', 'victim', 'numbersTitle', 'numbers']) expect(watched).not.toContain(id);
+    const ffa = ids(resultScreen.build({ ...base, watching: true, scoreLine: '' }));
+    expect(ffa).not.toContain('score');
+    // Jogando, tudo como antes.
+    const played = ids(resultScreen.build(base));
+    for (const id of ['score', 'nemesisRow', 'victim', 'numbers']) expect(played).toContain(id);
+  });
+});

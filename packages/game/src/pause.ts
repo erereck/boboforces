@@ -48,6 +48,8 @@ export interface PauseState {
   readonly players?: boolean;
   /** M4 (fase 3): a linha da bateria ("Bateria 64%"); ausente ou vazia = sem a linha (web, ou sem leitura). */
   readonly battery?: string;
+  /** M7 (fase 9): os itens do P1 já montados (os do Aquário); ausente = os de sempre. */
+  readonly items?: readonly UiNode[];
 }
 
 /** Refino R4 (#79): a frase de cada item da pausa (o que ele faz), pelo id do botão. */
@@ -104,7 +106,7 @@ export const pauseScreen: Screen<PauseState | null> = {
             button('resume', 'pause.resume', PAUSE_ACTION.resume, { variant: 'primary', autofocus: true }),
             ...((state?.player ?? 0) > 0
               ? [button('leave', 'pause.leaveCouch', PAUSE_ACTION.leave, { variant: 'danger' })]
-              : mainItems(state, challenge)),
+              : (state?.items ?? mainItems(state, challenge))),
             ...(state?.help !== undefined
               ? [
                   { kind: 'box', height: 4 } as const,
