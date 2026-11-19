@@ -200,7 +200,8 @@ O que dá para medir sem gente de verdade, e o que fica pronto para medir com el
   `?online` ou para quem abre o link de uma sala.
 - **7c, a rodada de prints:** as telas da fase 5 e da fase 6 que ainda não foram à página (os cards da sala, o aviso
   do host no celular, a faixa do host ausente, o "voltando à sala", o Atualizar). Ela vai à página das rodadas com as
-  perguntas novas e as que seguem abertas.
+  perguntas novas e as que seguem abertas. **Feita em 19/11** (ARCHITECTURE §16.21): rodada 20, versão 24 da página,
+  perguntas T1–T5.
 
 ## Riscos
 

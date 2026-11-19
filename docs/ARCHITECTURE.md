@@ -3504,3 +3504,14 @@ Um revisor (Opus) leu as 3 partes. Nada grave; 2 problemas e 6 menores, todos co
   `ONLINE_OPEN = true`. O `online:web -- --relays` abre o host com `?online`. O menu continuou em 349,5 KB.
 - **No celular não há F2:** os números do host no celular (o critério 3) vêm das linhas `[rede]` do "Copiar relatório",
   que trazem o fps, a sim, a IA e a rede (fase 7a).
+
+### 16.21 Fase 7c: a rodada 20 de prints (19/11/2026)
+
+- **As capturas novas** (`npm run online:web -- --prints`): os Modos no PC e no celular (do título: baixo e
+  confirmar, e o roteiro recarrega a página para o foco voltar ao Jogar), e a faixa do host ausente no Bobo Zombies. Para
+  ela, o roteiro para o JavaScript da aba do host pelo depurador do Edge (`Debugger.pause` numa sessão CDP), como o
+  celular que suspende a aba sem avisar; o amigo vê a faixa depois de 3 s e a partida espera. O
+  `Page.setWebLifecycleState` (congelar) não pegou no headless.
+- **A página** (`local/m2/montar-pagina-r20.mjs`, por cima do montador gerado da rodada 19): seções 88–94 e as
+  perguntas T1–T5; as imagens da rodada 19 saem das cópias dela (`pagina-r19/`), porque o `local/m5/prints` foi
+  recapturado com outras partidas. Publicada como versão 24 da página das rodadas.

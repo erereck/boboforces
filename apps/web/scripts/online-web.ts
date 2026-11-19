@@ -121,6 +121,20 @@ async function pickRoomMatch(page: Page, keys: readonly string[], card: string, 
   }
 }
 
+/**
+ * M5 (fase 7c): a tela de Modos (do título: baixo e confirmar) e a volta ao título, recarregando (o foco volta ao
+ * Jogar, como o resto do roteiro espera). Só com `--prints`.
+ */
+async function modesShot(page: Page, url: string, name: string): Promise<void> {
+  if (printsDir === null) return;
+  await tap(page, 'ArrowDown');
+  await tap(page, 'Enter');
+  await until(page, 'a tela de Modos', (s) => s.screen === 'modes');
+  await shot(page, name);
+  await page.goto(url);
+  await waitForTitle(page);
+}
+
 /** Uma captura (só com `--prints`). */
 async function shot(page: Page, name: string): Promise<void> {
   if (printsDir === null) return;
@@ -146,6 +160,7 @@ async function phonePass(browser: Browser, url: string): Promise<void> {
   await waitForTitle(phone);
   await phone.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Erick', 0));
   await shot(phone, 'celular-titulo');
+  await modesShot(phone, `${url}?sinal=local`, 'celular-modos');
   for (const key of ['ArrowDown', 'ArrowRight', 'Enter']) await tap(phone, key);
   await until(phone, 'o Online no celular', (s) => s.screen === 'online');
   await shot(phone, 'celular-aviso');
@@ -181,6 +196,7 @@ async function main(): Promise<number> {
     // Os nomes da sala: o do host aqui (o aviso ainda por ler); o do amigo antes de abrir o link.
     await host.evaluate((p) => localStorage.setItem('boboforces:online', p), profile('Erick', 0));
     await shot(host, 'titulo');
+    await modesShot(host, `${server.url}${query}`, 'modos');
     for (const key of ['ArrowDown', 'ArrowRight', 'Enter']) await tap(host, key);
     await until(host, 'a tela do Online', (s) => s.screen === 'online');
     await shot(host, 'aviso');
@@ -284,6 +300,20 @@ async function main(): Promise<number> {
     const [hz, fz] = [await snap(host), await snap(friend)];
     await shot(friend, 'zombies-amigo');
     steps['ticksZombies'] = { host: hz.simTick, amigo: fz.simTick };
+    if (printsDir !== null) {
+      // M5 (fase 7c): a aba do host parada (o celular que suspende a aba sem avisar): depois de 3 s sem snapshot o
+      // amigo vê a faixa, e no Bobo Zombies a partida espera. O depurador do Edge pausa o JS do host; depois, solta.
+      const cdp = await host.context().newCDPSession(host);
+      await cdp.send('Debugger.enable');
+      await cdp.send('Debugger.pause');
+      await friend.bringToFront();
+      await friend.waitForTimeout(4500);
+      await shot(friend, 'host-ausente-zombies');
+      await cdp.send('Debugger.resume');
+      await cdp.send('Debugger.disable');
+      await cdp.detach();
+      await frames(host, 10);
+    }
     if (Math.abs(hz.simTick - fz.simTick) > 30)
       failures.push(`no Zombies, o amigo está longe do host: ${hz.simTick} × ${fz.simTick}`);
     if (!(await logOf(host, 30)).some((l) => l.includes('[online] partida zombies com 2 jogador(es)')))
