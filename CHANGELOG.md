@@ -48,6 +48,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   primária ocupada, o usar troca. Segurar o usar 3 s usa um kit (+60). A zona fecha em 5 fases (~8 min) e fere quem
   fica fora (2 a 40 HP/s). Em grupo, quem cai pode ser levantado pelo aliado. Vence o último esquadrão. Também pela
   rede.
+- **A IA do Royale (fase 7):** os bots looteiam (a arma melhor, trocando no usar; o colete; os kits; a munição), vão
+  para dentro da zona quando ela vai fechar, se curam escondidos e levantam o colega caído. No começo evitam briga e o
+  item que outro bot já está pegando; com a zona fechando, ficam mais agressivos e vão atrás de onde ouviram tiro. Os
+  bots longe de todo humano pensam menos (1 vez por segundo).
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

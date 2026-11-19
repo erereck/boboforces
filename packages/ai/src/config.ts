@@ -43,6 +43,13 @@ export const AI_LOD = {
   /** Intervalo mínimo entre pedidos de caminho do mesmo bot (s): replaneja até 2×/s no A e 0,5×/s no B. */
   replanSA: 0.5,
   replanSB: 2,
+  /**
+   * M7 (fase 7): o nível C (só no Royale): a mais de `farM` de todo humano, percebe a 1 Hz e replaneja a cada 4 s; a
+   * luta entre bots longe continua sendo a da sim (o tiro é barato), só a cabeça do bot pensa menos.
+   */
+  farM: 60,
+  perceptionHzC: 1,
+  replanSC: 4,
 } as const;
 
 /** Percepção (gameplay.md §6.3): cone de 120°, alcance = visão da partida, audição por estado do corpo. */

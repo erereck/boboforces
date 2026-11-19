@@ -88,6 +88,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 7. **A IA do Royale e o LOD C:** lootear, ir para a zona, se curar e entrar na luta alheia (3rd party); os bots a mais
    de 60 m de todo humano pensam a 1 Hz, andam por waypoints e resolvem a luta entre eles por probabilidade; o
    snapshot manda as entidades longe a 5–10 Hz.
+   - **feita em 19/11** (ARCHITECTURE §18.8): o LOD C pensa menos (1 Hz); a luta entre bots continua sendo a da sim
+     (o tiro é barato) e a rede ficou sem o LOD (4,2 KB/s por amigo com 24 bobos). Pergunta Y7.
 8. **HUD e telas do Royale:** os vivos, o tempo da zona, a zona no minimapa e a **parede translúcida** (dentro do teto
    de 7 programas de shader), o card, o online, os prints e o bench (24 no celular e no Switch 2P+, pergunta Y5).
 9. **Aquário:** assistir uma partida só de bots, com a câmera livre e a lista de jogadores grande, e entrar no meio
@@ -104,6 +106,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 | Y4 | **A Boom Box:** plantar leva 3 s segurando o usar (o GDD não diz); a explosão mata a até 10 m e fere até 20 m. | Assim |
 | Y5 | **O Royale no celular e no Switch 2P+** (tetos de bots 12 e 16): 24 se o bench com o LOD C deixar; se não, vale o teto do aparelho até a sua resposta (a #35 pede a sua decisão para reduzir). | Assim |
 | Y6 | **O Bobo Sandbox completo** (as Ferramentas do Dono pedem telas e regras ao vivo) fica para depois do M7; o Aquário entra. | Sim |
+| Y7 | **O Royale só com bots acaba em 1 a 3 min** (24 bobos numa ilha de ~150 m de terra se acham logo, mesmo com os bots evitando briga no começo); a zona de ~8 min pesa nas partidas com humanos. Encurtar a zona ou deixar os bots ainda mais passivos? | Como está |
 
 ## Riscos
 

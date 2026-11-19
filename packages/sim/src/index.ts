@@ -79,6 +79,6 @@ export {
   type BoboHit,
   type BodyArrays,
 } from './hitbox.ts';
-export { WEAPON_KILL_PLANE, WEAPON_NONE, WEAPON_NUKE } from './context.ts';
+export { WEAPON_KILL_PLANE, WEAPON_NONE, WEAPON_NUKE, WEAPON_ZONE } from './context.ts';
 // Refino R2 (#79): o arco da granada para a HUD.
 export { predictThrow } from './systems/projectiles.ts';

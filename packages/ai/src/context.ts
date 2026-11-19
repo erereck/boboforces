@@ -12,6 +12,7 @@ import {
 } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import type { TeamBoard } from './team.ts';
+import type { RoyaleClaims } from './royale.ts';
 import { AI_BUDGET, AI_LOD, AI_PATH, AI_SOLDIER } from './config.ts';
 import type { ZombieFlow } from './flow.ts';
 import type { PathService } from './paths.ts';
@@ -49,6 +50,9 @@ export class AiContext {
    * diretor).
    */
   strikeMode = false;
+  /** M7 (fase 7): o Bobo Royale (o loot, a zona e o LOD C) e quem mira cada item do chão. */
+  royaleMode = false;
+  royaleClaims: RoyaleClaims | null = null;
   strikeRound = 0;
   strikeSite = 0;
   strikeRng: Rng | null = null;
@@ -144,6 +148,17 @@ export class AiContext {
   living(i: number): boolean {
     const v = this.view!;
     return i >= 0 && i < v.count && v.alive[i] === 1 && isBodyKind(v.kind[i]!) && (v.flags[i]! & F.dead) === 0;
+  }
+
+  /** M7 (fase 7): algum humano a até `m` metros de (x, z)? Sem humano na partida, sim (todo bot pensa no ritmo cheio). */
+  observerWithin(x: number, z: number, m: number): boolean {
+    if (this.observerCount === 0) return true;
+    for (let k = 0; k < this.observerCount; k++) {
+      const dx = this.observers[k * 3]! - x;
+      const dz = this.observers[k * 3 + 2]! - z;
+      if (dx * dx + dz * dz <= m * m) return true;
+    }
+    return false;
   }
 
   /** LOD A pela distância: sem observadores (partida só de bots) ou algum a até `AI_LOD.nearM` no plano. */

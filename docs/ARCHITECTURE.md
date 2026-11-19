@@ -4128,3 +4128,45 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
 - **Fica para a fase 8** (o jogo ainda não abre o Royale): o modelo e o nome das armas raras (`weaponModel` tem o
   tamanho de `WEAPONS`), os modelos dos itens no chão (hoje o anúncio e o desenho são os dos drops do Zombies), a
   morte pela zona no kill feed (hoje sai como queda) e o retorno de dano da zona.
+
+### 18.8 Fase 7: a IA do Royale e o LOD C (19/11/2026)
+
+- **O objetivo** (`ai/src/royale.ts`, `AI_ROYALE` com as minhas escolhas): o soldado pergunta `royaleObjective` (como
+  no BoboStrike) e ganha um `ROYALE_ACT`: **zona** (fora do círculo de agora, ou fora do próximo com ele encolhendo ou
+  a menos de 20 s de encolher: vai ao ponto de loot dentro do próximo círculo mais perto, que já está na navegação),
+  **cura** (abaixo de 65% da vida, com kit, sem inimigo à vista a menos de 35 m e sem arma no pé: parado, agachado,
+  segurando o usar), **loot** (o item que mais vale pela nota valor ÷ (1 + distância/14 m), até 45 m: a arma melhor —
+  fuzil, SMG, escopeta e sniper, com a raridade —, o colete melhor, o kit até 3, a munição quando falta) ou **troca**
+  (a arma melhor com a primária ocupada: colado nela, o usar alternado, porque a sim troca na borda do botão).
+- **Sem amontoar:** quem mira cada item fica em `RoyaleClaims`; ninguém corre atrás do item que outro bobo mais perto
+  já mira, do item com um bobo de outro esquadrão a menos de 6 m e mais perto, nem do item com o inimigo à vista mais
+  perto dele (sem isso, as brigas pelo mesmo item acabavam a partida em 30–60 s).
+- **Brigar ou não** (`royaleEngage`, `royaleChase`): na 1ª espera da zona, só de muito perto (5 m) ou ferido (a até
+  40 m); depois, só de pistola a até 8 m, armado a até 30 m (45 m da 3ª fase em diante). O inimigo fora disso fica para
+  depois (o bot segue o objetivo), e a perseguição de onde o inimigo foi visto ou ouvido (a 3ª parte da luta alheia)
+  só vale armado e com a zona já fechando.
+- **O resto:** sem regeneração (`noRegen`: quem recua não espera a vida voltar); em grupo, o colega caído é levantado
+  como no Bobo Zombies; o passeio é um ponto de loot dentro do próximo círculo.
+- **O LOD C** (`AI_LOD.farM` 60 m, só no Royale e só com humano na partida): o bot a mais de 60 m de todo humano
+  percebe a 1 Hz e replaneja a cada 4 s. Decisão minha (revisável): a luta entre bots longe continua sendo a da sim
+  (hitscan determinístico, barato: o passo inteiro com 24 bobos custa < 0,1 ms no PC), sem a "luta por probabilidade" do
+  tecnico.md §8.3, que pediria uma regra nova na sim só para economizar o que já não pesa. Medido (`local/m7/
+  medir-lodc.ts`, 1 humano parado e 23 bots, 60 s): 0,079 → 0,074 ms por passo (p99 0,36 → 0,35).
+- **A rede:** o Royale em duplas pela rede de mentira gasta 4,2 KB/s por amigo (24 bobos, 30 Hz); o "snapshot manda as
+  entidades longe a 5–10 Hz" ficou de fora (pediria uma base por amigo no lugar da base comum da história de quadros).
+- **Medidas** (`local/m7/medir-royale.ts`, 24 bots Normal): solo 143 s, duplas 167 s, quartetos 63 s; 21 a 24 bots
+  acabam armados; as brigas são de perto (a ilha tem ~150 m de terra para 24). Com 6 e 12 bots, 77 a 107 s (pergunta Y7
+  do plano).
+- **Testes e golden:** `ai/src/royale.test.ts` (o valor dos itens; ir até a arma e pegar; trocar pela melhor no usar;
+  entrar na zona; curar com o kit) e o golden do Royale solo com 24 bots na Ilha Tropical (semente 42): `38d57bd4`
+  (100 s, 22 com primária). Os 14 goldens de antes não mudaram.
+- **A revisão (Opus) achou 4 coisas, corrigidas antes do commit:** na última fase da zona (raio 0) o bot ficava parado
+  no ponto sem objetivo, o Destravar o renascia longe e ele morria na zona (agora "segurar posição", `ROYALE_ACT.hold`);
+  o colega caído nunca era levantado (o caído rastejava para longe e o reviver soltava o usar: agora o caído fica
+  parado com um colega de pé perto, e o reviver segura o usar até ~1,4 m); o bot oscilava entre o loot e a zona na
+  borda do círculo (o item fora do círculo fica de fora); e a troca pegava a arma mais perto em vez da que o bot queria
+  (ele só aperta o usar em cima dela). Também: o claim guarda o tipo do item (o slot reaproveitado não herda), só é
+  gravado quando o objetivo é adotado, a rota que falha bloqueia só o loot, o usar perto de um aliado caído não troca a
+  arma (na sim) e a arma trocada cai na altura certa. Sem JIT (como no nx.js), a IA do Royale custa 4,2 ms por tick com
+  24 bots nos primeiros 10 s (1,0–1,4 ms no FFA na mesma ilha; já era assim antes desta fase): o bench do console da
+  fase 8 diz se o LOD C precisa ir além.

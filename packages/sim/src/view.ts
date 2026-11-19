@@ -317,6 +317,8 @@ export interface RoyaleView {
   readonly data: Int32Array;
   readonly circle: Float64Array;
   readonly place: Uint8Array;
+  /** M7 (fase 7): os pontos de loot do mapa (a IA usa como destinos dentro da zona: estão na navegação). */
+  readonly loot: readonly { readonly x: number; readonly y: number; readonly z: number }[];
   readonly zone: readonly {
     readonly waitS: number;
     readonly shrinkS: number;

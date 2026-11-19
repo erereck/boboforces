@@ -52,6 +52,16 @@ import {
 } from './config.ts';
 import type { AiContext } from './context.ts';
 import { STRIKE_ACT, strikeBuy, strikeGoal, strikeObjective, strikeWander } from './strike.ts';
+import {
+  ROYALE_ACT,
+  royaleChase,
+  royaleClaim,
+  royaleEngage,
+  royaleGoal,
+  royaleObjective,
+  royaleWander,
+  weaponForSwap,
+} from './royale.ts';
 import { createSteer, PathFollower } from './paths.ts';
 import {
   CAMP_PHASE,
@@ -159,6 +169,9 @@ export class SoldierTiming {
   readonly dummyStride: number;
   readonly replanA: number;
   readonly replanB: number;
+  /** M7 (fase 7): o LOD C do Royale (percepção e replanejamento). */
+  readonly perceptionC: number;
+  readonly replanC: number;
 
   constructor(hz: number) {
     this.hz = hz;
@@ -215,6 +228,8 @@ export class SoldierTiming {
     this.dummyStride = Math.max(1, secondsToTicks(P.dummyStrideS, hz));
     this.replanA = secondsToTicks(AI_LOD.replanSA, hz);
     this.replanB = secondsToTicks(AI_LOD.replanSB, hz);
+    this.perceptionC = Math.max(1, Math.round(hz / AI_LOD.perceptionHzC));
+    this.replanC = secondsToTicks(AI_LOD.replanSC, hz);
   }
 
   /** Janelas sorteadas da IA foram calibradas em ticks de 60 Hz: em outro hz, mesma duração em segundos. */
@@ -248,6 +263,8 @@ export class SoldierBrain {
   aimYaw = 0;
   aimPitch = 0;
   lodA = true;
+  /** M7 (fase 7): longe de todo humano no Royale (pensa a 1 Hz). */
+  lodC = false;
   nextPerceiveTick = 0;
 
   target = -1;
@@ -285,6 +302,12 @@ export class SoldierBrain {
   /** O objetivo foi largado (a rota falhou) até este tick; o estado da bomba que o passeio viu por último. */
   strikeBlockUntil = 0;
   strikeBomb = -1;
+  /** M7 (fase 7): o objetivo do Royale (`ROYALE_ACT`), o item que vai buscar e até quando o objetivo fica largado. */
+  royaleAct = 0;
+  royaleItem = -1;
+  royaleBlockUntil = 0;
+  /** O usar da troca de arma alterna (a sim troca na borda do botão). */
+  royaleUse = false;
   objX = 0;
   objY = 0;
   objZ = 0;
@@ -649,6 +672,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     if (c.hordeArmed && e >= 0 && pickHordeGoal(c, b, e, x, y, z, from)) return;
     // M7 (fase 3): no BoboStrike o passeio é o site (ou a bomba).
     if (c.strikeMode && e >= 0 && pickStrikeGoal(c, b, e, y, from)) return;
+    // M7 (fase 7): no Royale o passeio fica dentro do próximo círculo (por um ponto de loot dele).
+    if (c.royaleMode && e >= 0 && pickRoyaleGoal(c, b, e, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -872,6 +897,18 @@ function pickStrikeGoal(c: AiContext, b: SoldierBrain, e: number, y: number, fro
     strikeSpot[1]! || y,
     strikeSpot[2]! + b.rng.range(-r, r),
   );
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
+}
+
+/** M7 (fase 7): o passeio do Royale: um ponto de loot dentro do próximo círculo (já na navegação). */
+function pickRoyaleGoal(c: AiContext, b: SoldierBrain, e: number, from: number): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  if (!royaleWander(c, e, b.rng.int(0, 1 << 16), strikeSpot)) return false;
+  const n = nav.nearestNode(strikeSpot[0]!, strikeSpot[1]!, strikeSpot[2]!);
   if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
   nav.nodePosition(n, nodePos, 0);
   setWanderGoal(c, b, e);
@@ -1196,8 +1233,8 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     }
   }
   const scouting = !b.hasLastKnown;
-  if (b.strikeAct !== STRIKE_ACT.none) {
-    // M7 (fase 3): indo plantar, desarmar ou pegar a bomba.
+  if (b.strikeAct !== STRIKE_ACT.none || b.royaleAct !== ROYALE_ACT.none) {
+    // M7 (fase 3): indo plantar, desarmar ou pegar a bomba. Fase 7: indo ao item, à zona ou parado curando.
     gx = b.objX;
     gy = b.objY;
     gz = b.objZ;
@@ -1252,7 +1289,7 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
 
   const paths = c.paths;
   if (view.nav !== null) {
-    paths.want(f, x, y, z, gx, gy, gz, tick, b.lodA ? t.replanA : t.replanB);
+    paths.want(f, x, y, z, gx, gy, gz, tick, b.lodA ? t.replanA : b.lodC ? t.replanC : t.replanB);
     if (!paths.steer(f, x, y, z, onGround, steer)) {
       // Sem rota ainda (na fila), ou chegou: vai reto até o objetivo.
       const dx = gx - x;
@@ -1430,6 +1467,20 @@ function downedAlly(c: AiContext, e: number): number {
   return best;
 }
 
+/** M7 (fase 7, revisão): um colega de esquadrão de pé a até `reviveSeekM` do caído `e`. */
+function mateStandingNear(c: AiContext, e: number): boolean {
+  const view = c.view!;
+  const r2 = AI_SUPPORT.reviveSeekM * AI_SUPPORT.reviveSeekM;
+  for (let j = 0; j < view.count; j++) {
+    if (j === e || view.kind[j] !== ENTITY_KIND.bobo || !c.living(j) || view.team[j] !== view.team[e]) continue;
+    if ((view.flags[j]! & F.downed) !== 0) continue;
+    const dx = view.position[j * 3]! - view.position[e * 3]!;
+    const dz = view.position[j * 3 + 2]! - view.position[e * 3 + 2]!;
+    if (dx * dx + dz * dz <= r2) return true;
+  }
+  return false;
+}
+
 /** M3 (fase 3d): a janela com tábua faltando mais perto (pelo ponto de conserto, até `repairSeekM`), ou -1. */
 function brokenWindow(view: SimView, e: number): number {
   const mo = view.mapObjects;
@@ -1507,6 +1558,54 @@ function strikeStep(
   return BUTTON.use | BUTTON.crouch;
 }
 
+/**
+ * M7 (fase 7): o passo do Royale: curando, parado e agachado segurando o usar (a sim conta os 3 s); indo ao item ou à
+ * zona, o caminho; colado na arma da troca, o usar alternado (a sim troca na borda do botão).
+ */
+function royaleStep(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  t: SoldierTiming,
+  local: { x: number; y: number },
+): number {
+  const view = c.view!;
+  if (b.royaleAct === ROYALE_ACT.heal) {
+    b.progressTick = c.tick;
+    local.x = 0;
+    local.y = 0;
+    return BUTTON.use | BUTTON.crouch;
+  }
+  const dx = b.objX - view.position[e * 3]!;
+  const dz = b.objZ - view.position[e * 3 + 2]!;
+  const there = dx * dx + dz * dz <= b.objReach * b.objReach;
+  if (b.royaleAct === ROYALE_ACT.hold || (b.royaleAct === ROYALE_ACT.zone && there)) {
+    // No ponto da zona: parado não é estar preso (o Destravar renasceria o bot longe, fora da zona).
+    b.progressTick = c.tick;
+    local.x = 0;
+    local.y = 0;
+    b.royaleUse = false;
+    return 0;
+  }
+  if (b.royaleAct !== ROYALE_ACT.swap || !there) {
+    b.royaleUse = false;
+    return travel(c, b, e, t);
+  }
+  b.progressTick = c.tick;
+  // A sim troca pela arma mais perto ao alcance: com outra mais perto, anda até ficar em cima da que quer.
+  if (weaponForSwap(view, e) !== b.royaleItem) {
+    b.royaleUse = false;
+    local.x = 0;
+    local.y = 1;
+    b.aimYaw = turnToward(b.aimYaw, Math.atan2(-dx, -dz), b.turnStep);
+    return 0;
+  }
+  local.x = 0;
+  local.y = 0;
+  b.royaleUse = !b.royaleUse;
+  return b.royaleUse ? BUTTON.use : 0;
+}
+
 /** M3 (fase 3a): vai até o colega caído e, colado, olha para ele e segura o usar (a sim conta os 3 s). */
 function reviveStep(
   c: AiContext,
@@ -1519,12 +1618,20 @@ function reviveStep(
   const r = b.reviveTarget;
   const dx = view.position[r * 3]! - view.position[e * 3]!;
   const dz = view.position[r * 3 + 2]! - view.position[e * 3 + 2]!;
-  if (dx * dx + dz * dz > AI_SUPPORT.reviveReachM * AI_SUPPORT.reviveReachM) return travel(c, b, e, t);
+  const d2 = dx * dx + dz * dz;
+  if (d2 > AI_SUPPORT.reviveReachM * AI_SUPPORT.reviveReachM) {
+    const buttons = travel(c, b, e, t);
+    // M7 (fase 7, revisão): no Royale, ainda perto (o caído escorrega um pouco), o usar continua apertado.
+    return c.royaleMode && d2 < ROYALE_REVIVE_HOLD_M * ROYALE_REVIVE_HOLD_M ? buttons | BUTTON.use : buttons;
+  }
   b.aimYaw = turnToward(b.aimYaw, Math.atan2(-dx, -dz), b.turnStep);
   local.x = 0;
   local.y = 0;
   return BUTTON.use;
 }
+
+/** M7 (fase 7, revisão): até onde o reviver do Royale segura o usar andando (a sim levanta a até 1,5 m). */
+const ROYALE_REVIVE_HOLD_M = 1.4;
 
 export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: SoldierTiming): void {
   const view = c.view!;
@@ -1585,8 +1692,11 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   // Percepção no ritmo do LOD, quando o orçamento de raios do tick deixa (senão fica para o próximo tick).
   if (tick >= b.nextPerceiveTick && c.raysLeft >= 2) {
     b.lodA = b.targetVisible || c.nearObserver(view.position[e * 3]!, view.position[e * 3 + 2]!);
+    // M7 (fase 7): o LOD C do Royale (longe de todo humano).
+    b.lodC =
+      c.royaleMode && !b.lodA && !c.observerWithin(view.position[e * 3]!, view.position[e * 3 + 2]!, AI_LOD.farM);
     perceive(c, b, e, tick);
-    b.nextPerceiveTick = tick + (b.lodA ? t.perceptionA : t.perceptionB);
+    b.nextPerceiveTick = tick + (b.lodA ? t.perceptionA : b.lodC ? t.perceptionC : t.perceptionB);
   }
   if (b.target >= 0 && !targetValid(view, b)) {
     b.target = -1;
@@ -1609,7 +1719,11 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   const closeFight = b.targetVisible && b.target >= 0 && targetDistance(view, e, b.target) < AI_COVER.fightBelowM;
   // M3 (fase 3a): no Bobo Zombies, o colega caído mais perto (sem zumbi colado: aí atira primeiro).
   b.reviveTarget =
-    c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(c, view, b, e) ? downedAlly(c, e) : -1;
+    (c.zombiesMode || (c.royaleMode && view.royale !== null && view.royale.squad > 1 && !closeFight)) &&
+    (view.flags[e]! & F.downed) === 0 &&
+    !zombieClose(c, view, b, e)
+      ? downedAlly(c, e)
+      : -1;
   // M7 (fase 3): o objetivo do BoboStrike (plantar, desarmar, pegar a bomba); com inimigo perto à vista, briga antes.
   const prevAct = b.strikeAct;
   b.strikeAct = STRIKE_ACT.none;
@@ -1638,6 +1752,44 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     }
   }
   if (b.strikeAct !== prevAct) b.follower.invalidate();
+  // M7 (fase 7): o objetivo do Royale (a zona, a cura, o item); com inimigo à vista, briga antes (indo para a zona,
+  // só com quem estiver perto).
+  const prevRoyale = b.royaleAct;
+  const prevItem = b.royaleItem;
+  b.royaleAct = ROYALE_ACT.none;
+  if (c.royaleMode && b.reviveTarget < 0) {
+    if ((prevRoyale === ROYALE_ACT.loot || prevRoyale === ROYALE_ACT.swap) && b.follower.failed) {
+      b.royaleBlockUntil = tick + t.wander;
+    }
+    const enemyM = b.targetVisible && b.target >= 0 ? targetDistance(view, e, b.target) : Infinity;
+    const enemy = b.targetVisible ? b.target : -1;
+    if (royaleObjective(c, e, c.royaleClaims!, prevItem, enemyM, b.maxHp, enemy, tick < b.royaleBlockUntil)) {
+      const act = royaleGoal.act;
+      const fight =
+        act === ROYALE_ACT.zone
+          ? closeFight
+          : b.targetVisible && b.target >= 0 && royaleEngage(view, e, enemyM, tick < b.alertUntil);
+      if (!fight) {
+        b.royaleAct = act;
+        b.royaleItem = royaleGoal.item;
+        if (royaleGoal.item >= 0) royaleClaim(c, c.royaleClaims!, e, royaleGoal.item);
+        b.objX = royaleGoal.x;
+        b.objY = royaleGoal.y;
+        b.objZ = royaleGoal.z;
+        b.objReach = royaleGoal.reach;
+      }
+    }
+  }
+  if (b.royaleAct === ROYALE_ACT.none) b.royaleItem = -1;
+  // M7 (fase 7): no Royale, o inimigo longe (fora do alcance da briga e sem ter ferido o bot) fica para depois.
+  const royaleIgnore =
+    c.royaleMode &&
+    b.targetVisible &&
+    b.target >= 0 &&
+    !royaleEngage(view, e, targetDistance(view, e, b.target), tick < b.alertUntil);
+  // E não vai atrás de onde viu o inimigo enquanto o loot vem antes (a perseguição colava os bots no começo).
+  if (c.royaleMode && b.hasLastKnown && (royaleIgnore || !royaleChase(view, e))) b.hasLastKnown = false;
+  if (b.royaleAct !== prevRoyale || b.royaleItem !== prevItem) b.follower.invalidate();
   // M3 (fase 3d): sem ninguém para levantar e sem alvo à vista, conserta a janela mais perto.
   const repairWindow =
     c.zombiesMode && !c.hordeArmed && b.reviveTarget < 0 && !b.targetVisible && (view.flags[e]! & F.downed) === 0
@@ -1647,11 +1799,13 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   b.repairWindow = repairWindow;
   // M2 (fase 3g): fingir de morto e a dancinha tomam o tick inteiro.
   const override =
-    b.strikeAct !== STRIKE_ACT.none || b.reviveTarget >= 0 || b.repairWindow >= 0
+    b.strikeAct !== STRIKE_ACT.none || b.royaleAct !== ROYALE_ACT.none || b.reviveTarget >= 0 || b.repairWindow >= 0
       ? -1
       : personaOverride(view, b, e, tick, t, local);
   if (b.strikeAct !== STRIKE_ACT.none) {
     buttons = strikeStep(c, b, e, t, local);
+  } else if (b.royaleAct !== ROYALE_ACT.none) {
+    buttons = royaleStep(c, b, e, t, local);
   } else if (b.reviveTarget >= 0) {
     buttons = reviveStep(c, b, e, t, local);
     b.progressTick = tick;
@@ -1669,7 +1823,7 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     // M2 (fase 3c): correndo para a cobertura (de perto, troca tiro).
     buttons = travel(c, b, e, t);
     b.progressTick = tick;
-  } else if (b.target >= 0 && b.targetVisible) {
+  } else if (b.target >= 0 && b.targetVisible && !royaleIgnore) {
     buttons = combat(c, b, e, tick, t);
     // M3 (fase 3a): no Bobo Zombies, zumbi perto: recua atirando (o golpe dele é de perto) e sem correr.
     if (
@@ -1742,6 +1896,12 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
         b.progressTick = tick;
       } else buttons = travel(c, b, e, t);
     }
+  }
+  // M7 (fase 7, revisão): no Royale, o caído com um colega de pé perto fica parado (rastejando, escapava do reviver).
+  if (c.royaleMode && (view.flags[e]! & F.downed) !== 0 && mateStandingNear(c, e)) {
+    local.x = 0;
+    local.y = 0;
+    b.progressTick = tick;
   }
   // Pulo precisa de borda (a sim só pula ao apertar): solta um tick entre dois pulos.
   if ((buttons & BUTTON.jump) !== 0) {

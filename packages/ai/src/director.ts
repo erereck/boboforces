@@ -20,6 +20,7 @@ import {
 } from '@boboforces/sim';
 import { AiContext } from './context.ts';
 import { strikeRoundTick } from './strike.ts';
+import { RoyaleClaims } from './royale.ts';
 import { AI_BUDGET, type AiBudget } from './config.ts';
 import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
@@ -188,7 +189,10 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const ctx = new AiContext(hz, isFfaMode(recipe.mode), viewDistance, paths, budget.raysPerTick);
   ctx.zombiesMode = recipe.mode === 'zombies';
   ctx.juggernaut = recipe.mode === 'juggernaut';
-  ctx.noRegen = recipe.mode === 'paintball';
+  // M7 (fase 7): no Royale a vida também não volta (só o kit cura).
+  ctx.noRegen = recipe.mode === 'paintball' || recipe.mode === 'royale.mini';
+  ctx.royaleMode = recipe.mode === 'royale.mini';
+  ctx.royaleClaims = ctx.royaleMode ? new RoyaleClaims() : null;
   ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';
   // M7 (fase 3): o BoboStrike (o sorteio do site de cada rodada).
   ctx.strikeMode = recipe.mode === 'strike';

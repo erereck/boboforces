@@ -11,7 +11,8 @@ import {
   type MatchRecipe,
 } from '@boboforces/format';
 import { hashToHex } from '@boboforces/shared';
-import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, WEAPON_CODE } from '@boboforces/sim';
+import { WEAPON_SLOT_COUNT } from '@boboforces/input';
+import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, WEAPON_CODE, WEAPON_NONE } from '@boboforces/sim';
 import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
@@ -886,5 +887,63 @@ describe('golden do BoboStrike (M7, fase 3) com bots na Base Bobo', () => {
     expect(a.plants, msg).toBeGreaterThan(0);
     expect(a.phase, msg).toBe('ended');
     expect(a.hash, msg).toBe(GOLDEN_STRIKE_HASH);
+  }, 240_000);
+});
+
+/**
+ * M7 (fase 7): o Bobo Royale solo com 24 bots Normal na Ilha Tropical, semente 42, a partida inteira. Confere que os
+ * bots looteiam (a maioria acaba com uma primária), que a partida acaba com um vencedor e o hash entre execuções.
+ * Gravado na fase 7 (19/11/2026): `38d57bd4` (100 s, 22 com primária). MUDA com a sim, a IA ou o mapa.
+ */
+const GOLDEN_ROYALE_HASH = '38d57bd4';
+
+function runRoyaleGolden(): { hash: string; seconds: number; winner: number; armed: number; phase: string } {
+  const { map } = loadWorld('island');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'royale.mini',
+      map: 'island',
+      seed: 42,
+      royale: { squad: 'solo' },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 24 }] }],
+    },
+    map,
+    humans: 0,
+  });
+  let armedMax = 0;
+  let t = 0;
+  for (; t < 12 * 60 * 60 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    if (t % 60 === 0) {
+      const v = match.sim.view();
+      let armed = 0;
+      for (let e = 0; e < v.count; e++) if (v.loadout[e * WEAPON_SLOT_COUNT] !== WEAPON_NONE) armed++;
+      armedMax = Math.max(armedMax, armed);
+    }
+  }
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    seconds: Math.round(t / 60),
+    winner: v.match.winnerTeam,
+    armed: armedMax,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
+  it('os bots looteiam e a partida acaba com um vencedor; hash estável', () => {
+    const a = runRoyaleGolden();
+    const b = runRoyaleGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `${a.seconds} s, vencedor ${a.winner}, ${a.armed} com primária no máximo, fase ${a.phase}`;
+    console.log(`[royale] ${msg} · hash ${a.hash}`);
+    expect(a.armed, msg).toBeGreaterThanOrEqual(12);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.winner, msg).toBeGreaterThanOrEqual(0);
+    expect(a.hash, msg).toBe(GOLDEN_ROYALE_HASH);
   }, 240_000);
 });

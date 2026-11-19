@@ -278,6 +278,9 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     }
     const net = run.clients[0]!.net!;
     expect(net.mispredicts / Math.max(1, net.reconciles)).toBeLessThan(0.02);
+    // M7 (fase 7): a banda do host por amigo com 24 bobos na ilha (4,2 KB/s medidos; o LOD da rede fica para quando
+    // passar do teto).
+    expect(run.hostBytesPerClient, `${(run.hostBytesPerClient / 1024).toFixed(1)} KB/s`).toBeLessThan(20 * 1024);
     console.log(
       `[modos] Royale em duplas: ${run.seconds.toFixed(1)} s, zona ${h.royale!.data[0]}, vencedor ${h.match.winnerTeam}, predição errada ${net.mispredicts}/${net.reconciles}, ${(run.hostBytesPerClient / 1024).toFixed(1)} KB/s`,
     );

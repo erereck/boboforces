@@ -854,6 +854,7 @@ export function createSim(config: SimConfig): Sim {
             data: ctx.royale.data,
             circle: ctx.royale.circle,
             place: ctx.royale.place,
+            loot: ctx.royale.loot,
             zone: ROYALE.zone,
           },
     rounds:

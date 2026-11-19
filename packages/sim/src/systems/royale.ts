@@ -443,7 +443,8 @@ function useActions(ctx: SimContext): void {
     if (held && (s.prevButtons[e]! & BUTTON.use) === 0) {
       const i = weaponInReach(ctx, e);
       const k = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.primary;
-      if (i >= 0 && s.loadout[k] !== WEAPON_NONE && canTakeWeapon(ctx, e)) {
+      // Com um aliado caído ao alcance, o usar é do reviver (não troca a arma).
+      if (i >= 0 && s.loadout[k] !== WEAPON_NONE && canTakeWeapon(ctx, e) && !downedMateNear(ctx, e)) {
         const kind = s.pickKind[i]!;
         const ammo = s.pickTicks[i]! - ROYALE_AMMO_BASE;
         const i3 = i * 3;
@@ -453,8 +454,16 @@ function useActions(ctx: SimContext): void {
         const id = s.idOf(e);
         ctx.events.pickup(ctx.tick, 'take', i, id, x, y, z, kind);
         s.freePickup(i);
-        // A primária de agora cai no lugar da que foi pega.
-        dropItem(ctx, PICKUP_KIND.weaponBase + s.loadout[k]!, s.slotClip[k]! + s.slotReserve[k]! * 1000, x, y, z, id);
+        // A primária de agora cai no lugar da que foi pega (na altura dela: o `dropItem` soma o meio palmo da queda).
+        dropItem(
+          ctx,
+          PICKUP_KIND.weaponBase + s.loadout[k]!,
+          s.slotClip[k]! + s.slotReserve[k]! * 1000,
+          x,
+          y - 0.25,
+          z,
+          id,
+        );
         giveWeapon(ctx, e, pickupWeapon(kind), ammo);
         s.healTicks[e] = 0;
         continue;

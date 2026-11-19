@@ -353,6 +353,25 @@ existir (fase 6). Sondas em `local/m7/medir-ilha.ts` (headless) e `local/m7/trav
 - A grade densa (2 bytes por célula) é a mesma do resto do jogo: 10,7 MB cabem no Switch (o heap do JS fica em 45 MB no
   Eden; os `ArrayBuffer` grandes não entram nessa conta) e no celular (o perfil do celular já tem 90 m de visão).
 
+## 1l. O Bobo Royale (M7, fases 6 e 7; 19/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA headless (Node 26.7) na Ilha Tropical. Sondas em `local/m7/medir-royale.ts` e `local/m7/medir-lodc.ts`.
+
+| Cenário | Duração | Passo médio (ms) | p99 (ms) | Observação |
+|---|---|---|---|---|
+| Solo, 24 bots (semente 1) | 143 s | 0,059 | 0,44 | 21 de 24 armados; a zona não chega a encolher |
+| Duplas, 24 bots (semente 2) | 167 s | 0,055 | 0,31 | a zona na 2ª fase no fim |
+| Quartetos, 24 bots (semente 3) | 63 s | 0,078 | 0,36 | todos armados |
+| 1 humano parado + 23 bots, 60 s, sem o LOD C | — | 0,079 | 0,36 | (2ª rodada; a 1ª, com o JIT esquentando: 0,103 / 0,67) |
+| Idem, com o LOD C (a mais de 60 m de todo humano: 1 Hz) | — | 0,074 | 0,35 | o ganho é pequeno: a IA já é barata |
+| Duplas pela rede de mentira (host + 1 amigo + 22 bots, 30 Hz) | até o fim | — | — | 4,2 KB/s do host por amigo |
+
+- No Eden (fase 5, o FFA com 24 bots na ilha) a sim e a IA custam 1,3 ms cada por tick: o bench do Royale no console
+  (fase 8) diz se o LOD C precisa ir além.
+- **Sem JIT** (Node com `--jitless`, a referência do nx.js; medido pela revisão da fase 7): a IA do Royale custa
+  4,2 ms por tick com 24 bots nos primeiros 10 s, contra 1,0–1,4 ms no FFA na mesma ilha (o loot e a zona olham todos
+  os itens). Sem humano na partida o LOD C não liga; com humano, os bots longe pensam a 1 Hz.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |
