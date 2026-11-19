@@ -123,6 +123,9 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   const layout = createNetLayout(sim.view());
   /** M6 (fase 4): o global da máscara dos modificadores (-1 = partida sem eles). */
   const chaosSlot = layout.globals.findIndex((g) => g.name === 'chaosActive');
+  // M7 (fase 0, revisão): a fase e os ticks da rodada do snapshot mais novo vão para a predição.
+  const roundPhaseSlot = layout.globals.findIndex((g) => g.name === 'roundPhase');
+  const roundTicksSlot = layout.globals.findIndex((g) => g.name === 'roundTicks');
   const assembler = new SnapshotAssembler(layout);
   const events = new EventQueue();
   const onEvents = config.onEvents;
@@ -233,6 +236,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     }
     // M6 (fase 4): a predição anda com os modificadores do snapshot mais novo (a view mostra os do atrasado).
     if (chaosSlot >= 0) sim.predict.modifiers(newest.glob[chaosSlot]!);
+    if (roundPhaseSlot >= 0) sim.predict.round(newest.glob[roundPhaseSlot]!, newest.glob[roundTicksSlot]!);
     sim.predict.load(own, newest.priv);
     if (used >= 0) {
       for (let q = (used + 1) & 0xffff; seqDiff(seq, q) >= 0; q = (q + 1) & 0xffff) {

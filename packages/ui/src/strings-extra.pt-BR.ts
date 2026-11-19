@@ -275,6 +275,13 @@ export const STRINGS_EXTRA_PT_BR = {
   'mode.name.zombiesArmed': 'Horda Armada',
   'mode.desc.zombiesArmed': 'Ondas de soldados armados.',
   'hud.horde.wave': 'Onda {wave} · {left} soldados',
+  // M7 (fase 0): as rodadas e o Juggernaut Fixo.
+  'mode.name.juggernautFixed': 'Jugg Fixo',
+  'mode.desc.juggernautFixed': 'Cada um vira o Jugg 1 vez.',
+  'hud.round.start': 'Rodada {round} de {total} · começa em {s}',
+  'hud.round.live': 'Rodada {round} de {total} · {time}',
+  'hud.round.juggDown': 'O Jugg caiu!',
+  'hud.round.juggHeld': 'O Jugg aguentou!',
   'hud.generator': 'Gerador',
   'mode.name.chaos': 'Bobo Chaos',
   'mode.desc.chaos': 'A Roleta troca as regras.',

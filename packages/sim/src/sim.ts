@@ -70,6 +70,8 @@ import { ControlPoints, dominationSystem, type ControlPointDef } from './systems
 import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
 import { applyChaos, ChaosState, chaosOf, chaosSystem } from './systems/chaos.ts';
 import { createFortress } from './systems/fortress.ts';
+import { createRoundState, ROUND_PHASE, roundFrozen, roundsSystem } from './systems/rounds.ts';
+import { JUGG_FIXED } from './systems/party.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -227,6 +229,12 @@ export interface SimPredict {
    * da predição saem dela, não da que a view mostra. Sem modificadores, nada.
    */
   modifiers(mask: number): void;
+  /**
+   * M7 (fase 0, revisão): a fase e os ticks da rodada do snapshot mais novo (a base da predição; a view mostra os do
+   * atrasado). A partir daí, cada `step` conta um tick do host: a compra vira valendo quando os ticks acabam, e o
+   * fim do tempo congela. Sem rodadas, nada.
+   */
+  round(phase: number, ticks: number): void;
 }
 
 /**
@@ -451,7 +459,9 @@ export function createSim(config: SimConfig): Sim {
   assert(Number.isInteger(hz) && hz >= 10 && hz <= 240, `sim: hz inválido (${hz})`);
   // Tabela de jogo do boneco: a da partida, ou montada aqui (na criação; nunca no 1º raio).
   const figureTable = config.figureTable ?? createFigureGameTable();
-  const timeLimitS = recipe.match?.timeLimitS ?? 0;
+  // M7 (fase 0, revisão): nas rodadas, o tempo e a meta da receita não valem (quem acaba a partida são as rodadas).
+  const roundsMode = recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed';
+  const timeLimitS = roundsMode ? 0 : (recipe.match?.timeLimitS ?? 0);
   const countdownS = config.countdownS ?? 0;
   assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
   const countdownTicks = secondsToTicks(countdownS, hz);
@@ -511,6 +521,18 @@ export function createSim(config: SimConfig): Sim {
     paintHits: recipe.mode === 'paintball' ? (recipe.paintball?.hits ?? PAINTBALL_DEFAULTS.hits) : 0,
     fortress:
       zombiesMode && recipe.zombies?.variant === 'fortress' ? createFortress(map.spawns, map.grid, map.blocks) : null,
+    // M7 (fase 0): as rodadas do Jugg Fixo (uma por participante, até o teto).
+    rounds: roundsMode
+      ? createRoundState({
+          buyTicks: secondsToTicks(JUGG_FIXED.startS, hz),
+          liveTicks: secondsToTicks(JUGG_FIXED.roundS, hz),
+          overTicks: secondsToTicks(JUGG_FIXED.overS, hz),
+          winRounds: 0,
+          totalRounds: Math.min(slots.length, JUGG_FIXED.maxRounds),
+          swapAfter: 0,
+          respawn: true,
+        })
+      : null,
     training: recipe.mode === 'training',
     hz,
     dt: 1 / hz,
@@ -520,7 +542,7 @@ export function createSim(config: SimConfig): Sim {
     spawnProtectTicks: secondsToTicks(recipe.players?.spawnProtectionS ?? MATCH_DEFAULTS.spawnProtectionS, hz),
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
     regenPerTick: (MATCH_DEFAULTS.regenPerS * REGEN_FACTOR[recipe.players?.regen ?? 'default']) / hz,
-    scoreLimit: recipe.match?.scoreLimit ?? 0,
+    scoreLimit: roundsMode ? 0 : (recipe.match?.scoreLimit ?? 0),
     suddenDeathTicks: secondsToTicks(MATCH_DEFAULTS.suddenDeathS, hz),
     assistWindowTicks: secondsToTicks(MATCH_DEFAULTS.assistWindowS, hz),
     assistMinDamage: MATCH_DEFAULTS.assistMinDamage,
@@ -728,6 +750,18 @@ export function createSim(config: SimConfig): Sim {
     controlPoints: domination,
     chaos,
     fortress: ctx.fortress,
+    rounds:
+      ctx.rounds === null
+        ? null
+        : {
+            data: ctx.rounds.data,
+            buyTicks: ctx.rounds.rules.buyTicks,
+            liveTicks: ctx.rounds.rules.liveTicks,
+            overTicks: ctx.rounds.rules.overTicks,
+            winRounds: ctx.rounds.rules.winRounds,
+            totalRounds: ctx.rounds.rules.totalRounds,
+            swapAfter: ctx.rounds.rules.swapAfter,
+          },
     lastShotTick: s.lastShotTick,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
@@ -760,6 +794,11 @@ export function createSim(config: SimConfig): Sim {
   let disposed = false;
 
   /** Passo 1 de uma entidade: a entrada do controlador dela (mira absoluta; botões guardados para detectar bordas). */
+  /** M7 (fase 0, revisão): a rodada da predição (`round` do `SimPredict`): -1 = fora dela. */
+  let predictFreeze = -1;
+  let predictPhase = -1;
+  let predictTicks = 0;
+  let predictSteps = 0;
   const applyInput = (e: number, f: Readonly<InputFrame> | null): void => {
     s.prevButtons[e] = s.inButtons[e]!;
     if (f === null) {
@@ -769,7 +808,8 @@ export function createSim(config: SimConfig): Sim {
       return;
     }
     // Contagem inicial: só a mira e a primária valem (a troca de arma pedida agora entra quando a partida começar).
-    const frozen = match.phase === 'warmup';
+    // M7 (fase 0): e a compra e a pausa do fim da rodada (na predição, pela rodada do snapshot mais novo).
+    const frozen = match.phase === 'warmup' || (predictFreeze >= 0 ? predictFreeze === 1 : roundFrozen(ctx));
     s.inButtons[e] = frozen ? 0 : f.buttons & 0xffff;
     s.inMoveX[e] = frozen ? 0 : dequantizeAxis(f.moveX);
     s.inMoveY[e] = frozen ? 0 : dequantizeAxis(f.moveY);
@@ -898,6 +938,12 @@ export function createSim(config: SimConfig): Sim {
       s.airPeakY[e] = from[14]!;
       s.sprintFireDelayTicks[e] = from[15]!;
     },
+    round(phase, ticks): void {
+      if (ctx.rounds === null) return;
+      predictPhase = phase;
+      predictTicks = ticks;
+      predictSteps = 0;
+    },
     modifiers(mask): void {
       // M6 (fase 4, revisão): a máscara do snapshot mais novo para a predição (a view fica com a do atrasado).
       if (ctx.chaos === null) return;
@@ -912,7 +958,17 @@ export function createSim(config: SimConfig): Sim {
       s.prevPosition[e3 + 2] = s.position[e3 + 2]!;
       s.prevYaw[e] = s.yaw[e]!;
       s.prevPitch[e] = s.pitch[e]!;
+      // A entrada refeita `predictSteps` é a do tick (do host) logo depois de `predictSteps` passos da rodada mais nova:
+      // na compra, congela até os ticks acabarem; valendo, congela quando o tempo acaba; no fim, congela (vem outra
+      // compra).
+      if (predictPhase >= 0) {
+        const done = predictSteps >= predictTicks;
+        predictFreeze =
+          predictPhase === ROUND_PHASE.buy ? (done ? 0 : 1) : predictPhase === ROUND_PHASE.live ? (done ? 1 : 0) : 1;
+        predictSteps++;
+      }
       applyInput(e, frame);
+      predictFreeze = -1;
       moveOne(ctx, e);
       // O cliente não processa dano nem solta eventos da sim: quem manda nisso é o host.
       ctx.damage.count = 0;
@@ -985,6 +1041,8 @@ export function createSim(config: SimConfig): Sim {
       dominationSystem(ctx);
       // M6 (fase 2): o Infection (a largada, o placar e quem venceu).
       partySystem(ctx);
+      // M7 (fase 0): as rodadas (a largada, o vencedor da rodada e o fim da partida).
+      roundsSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);

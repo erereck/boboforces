@@ -6,6 +6,17 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M7: BoboStrike e Bobo Royale Mini (planejado em 19/11/2026)
+
+- **Plano** em `docs/PLANO_M7.md` (decisão #81): o motor de rodadas (com o Juggernaut Fixo), o BoboStrike na Base
+  Bobo, o Bobo Royale Mini na Ilha Tropical (24 participantes, loot, zona e o LOD C da IA) e o Aquário. O Bobo Sandbox
+  completo fica para depois. Perguntas Y1–Y6 no padrão.
+- **Rodadas e o Jugg Fixo (fase 0):** o card Jugg Fixo na página Mais modos (no Construto): rodadas de 3 min em que
+  cada um é o Jugg uma vez, pela ordem (os humanos primeiro). A rodada começa com 3 s de largada parada; o Jugg que cai
+  entrega a rodada aos caçadores e o que aguenta o tempo leva a dele; cada segundo de Jugg vale 1 ponto e, no fim, vence
+  quem tem mais. No alto, "Rodada 2 de 4 · 2:31". A página Mais modos ficou mais junta para caber 4 linhas no celular
+  (o Voltar vai para a última linha quando ela tem lugar).
+
 ### M6: modos de festa (planejado em 19/11/2026)
 
 - **Plano** em `docs/PLANO_M6.md`: Domination, Gun Game e Infection, Juggernaut, os modificadores e o Bobo Chaos,

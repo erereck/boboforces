@@ -195,6 +195,16 @@ export interface PaintballRules {
 
 export const PAINTBALL_DEFAULTS = { hits: 1 } as const;
 
+/**
+ * M7 (fase 0): o Juggernaut (`mode: 'juggernaut'`): o Rodízio (padrão: quem derruba o Jugg vira o Jugg) ou o Fixo
+ * (rodadas de 3 min; cada um é o Jugg uma vez, pela ordem).
+ */
+export const JUGGERNAUT_VARIANTS = ['rotation', 'fixed'] as const;
+export type JuggernautVariant = (typeof JUGGERNAUT_VARIANTS)[number];
+export interface JuggernautRules {
+  readonly variant?: JuggernautVariant;
+}
+
 /** M6 (fase 4): os padrões da Roleta. */
 export const CHAOS_DEFAULTS = { count: 3, everyS: 60, warnS: 5 } as const;
 
@@ -273,6 +283,8 @@ export interface MatchRecipe {
   readonly chaos?: ChaosRules;
   /** M6 (fase 5): o Bobo Paintball (só com `mode: 'paintball'`). */
   readonly paintball?: PaintballRules;
+  /** M7 (fase 0): o Juggernaut (só com `mode: 'juggernaut'`). */
+  readonly juggernaut?: JuggernautRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -333,6 +345,7 @@ const TOP_KEYS = [
   'modifiers',
   'chaos',
   'paintball',
+  'juggernaut',
   'teams',
   'embeddedBots',
 ] as const;
@@ -646,6 +659,18 @@ function readPaintball(ctx: Ctx, value: unknown): Record<string, unknown> | unde
   const out: Record<string, unknown> = {};
   readRange(ctx, value, 'hits', 'paintball', RECIPE_RANGES.paintHits, out);
   return Object.assign(out, unknownFields(value, ['hits']));
+}
+
+/** M7 (fase 0): o Juggernaut (a variante). */
+function readJuggernaut(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'juggernaut', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readChoice(ctx, value, 'variant', 'juggernaut', JUGGERNAUT_VARIANTS, out);
+  return Object.assign(out, unknownFields(value, ['variant']));
 }
 
 /** M6 (fase 4): a Roleta do Bobo Chaos. */
@@ -965,6 +990,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (chaos !== undefined) out['chaos'] = chaos;
   const paintball = readPaintball(ctx, doc['paintball']);
   if (paintball !== undefined) out['paintball'] = paintball;
+  const juggernaut = readJuggernaut(ctx, doc['juggernaut']);
+  if (juggernaut !== undefined) out['juggernaut'] = juggernaut;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

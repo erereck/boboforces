@@ -22,6 +22,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
   // M6 (fase 6b).
   { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
+  // M7 (fase 0).
+  { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -115,6 +117,19 @@ export function moreModePreset(id: string): MatchRecipe | null {
         match: { timeLimitS: 0, scoreLimit: 0 },
         zombies: { variant: 'fortress' },
         teams: [{ humans: 'all', bots: [] }],
+      };
+    case 'juggernautFixed':
+      // GDD §4.1.2: a variante Fixo (rodadas de 3 min com rodízio, o "1 contra 3" do sofá) no Construto; com os 3 bots,
+      // são 4 rodadas (quem entra no sofá toma o lugar de um bot).
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Juggernaut Fixo',
+        mode: 'juggernaut',
+        map: 'construto',
+        seed: 0,
+        match: { timeLimitS: 0, scoreLimit: 0 },
+        juggernaut: { variant: 'fixed' },
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [] }],
       };
     case 'zombiesArmed':
       // GDD §4.1.5: o Bobo Zombies com ondas de soldados (a IA do Warfare) na Base Abandonada, com as janelas abertas. A

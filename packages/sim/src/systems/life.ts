@@ -529,7 +529,11 @@ function leader(ctx: SimContext): number {
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
       // M6 (fase 2): no Gun Game vence o nível mais alto (os pontos), não os abates.
-      const k = ctx.party.ladder !== null || ctx.party.jugg !== null ? s.points[e]! : s.kills[e]!;
+      let k = ctx.party.ladder !== null || ctx.party.jugg !== null ? s.points[e]! : s.kills[e]!;
+      // M7 (fase 0, revisão): no Jugg Fixo, quem aguenta as rodadas empata nos pontos: desempata pelos abates e depois
+      // por menos mortes (escolha minha, revisável).
+      if (ctx.party.juggFixed)
+        k = k * 1_000_000 + Math.min(s.kills[e]!, 999) * 1000 + (999 - Math.min(s.deaths[e]!, 999));
       if (k > bestScore) {
         bestScore = k;
         best = s.team[e]!;
@@ -557,8 +561,9 @@ export function spawnSystem(ctx: SimContext): void {
     if (s.alive[e] === 0 || !isBody(s.kind[e]!)) continue;
     const fl = s.flags[e]!;
     if ((fl & F.dead) !== 0) {
-      // M3 (fase 2a): no Bobo Zombies quem volta é o diretor de ondas (bobos na onda seguinte, zumbis do pool).
-      if (ctx.zombiesMode) continue;
+      // M3 (fase 2a): no Bobo Zombies quem volta é o diretor de ondas (bobos na onda seguinte, zumbis do pool). M7
+      // (fase 0): nas rodadas sem respawn, quem morre espera a próxima.
+      if (ctx.zombiesMode || (ctx.rounds !== null && !ctx.rounds.rules.respawn)) continue;
       if (s.respawnTicks[e]! > 0) s.respawnTicks[e]!--;
       if (s.respawnTicks[e] === 0 && ctx.match.phase !== 'ended') respawn(ctx, e, pickSpawn(ctx, e));
       continue;

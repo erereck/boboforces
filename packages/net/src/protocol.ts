@@ -11,6 +11,8 @@ import {
   DOMINATION,
   FORTRESS,
   HEADSHOT_MULTIPLIER,
+  HORDE,
+  JUGG_FIXED,
   JUGGERNAUT,
   MATCH_DEFAULTS,
   METRICS,
@@ -44,7 +46,7 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -121,8 +123,11 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   CHAOS_DEFAULTS,
   CHAOS_MODS,
   CHAOS_BLAST,
-  // Fase 6: o gerador do Fortress.
+  // Fase 6: o gerador do Fortress e a Horda armada.
   FORTRESS,
+  HORDE,
+  // M7 (fase 0): o Jugg Fixo (as rodadas).
+  JUGG_FIXED,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */

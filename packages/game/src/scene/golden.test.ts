@@ -11,7 +11,7 @@ import {
   type MatchRecipe,
 } from '@boboforces/format';
 import { hashToHex } from '@boboforces/shared';
-import { ENTITY_FLAG, ENTITY_KIND, WEAPON_CODE } from '@boboforces/sim';
+import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, WEAPON_CODE } from '@boboforces/sim';
 import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
@@ -719,5 +719,71 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
     expect(a.kills, msg).toBeGreaterThan(0);
     expect(a.wave, msg).toBeGreaterThanOrEqual(1);
     expect(a.hash, msg).toBe(GOLDEN_HORDE_HASH);
+  }, 240_000);
+});
+
+/**
+ * M7 (fase 0): o Juggernaut Fixo (as rodadas) com 4 bots Normal no Construto, semente 42, até 4 rodadas de 3 min.
+ * Confere que cada bot é o Jugg numa rodada (pela ordem), que a partida acaba com um vencedor e o hash entre execuções.
+ * Gravado na fase 0 (19/11/2026): `9074d33b` (pontos 105, 180, 180 e 109, com o desempate pelos abates; 36.227 ticks). MUDA com a
+ * sim, a IA, o mapa ou as regras.
+ */
+const GOLDEN_JUGG_FIXED_HASH = '9074d33b';
+
+function runJuggFixedGolden(): {
+  hash: string;
+  holders: number[];
+  points: number[];
+  ticks: number;
+  phase: string;
+  winner: number;
+} {
+  const { map } = loadWorld();
+  const recipe: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'juggernaut',
+    map: 'construto',
+    seed: 42,
+    match: { timeLimitS: 0, scoreLimit: 0 },
+    juggernaut: { variant: 'fixed' },
+    teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 4 }] }, { bots: [] }],
+  };
+  const match = createHeadlessMatch({ recipe, map, humans: 0 });
+  const holders: number[] = [];
+  let t = 0;
+  for (; t < 50_000 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    const v = match.sim.view();
+    for (let e = 0; e < v.count; e++) {
+      if (v.alive[e] === 1 && v.team[e] === 1 && holders[holders.length - 1] !== e) holders.push(e);
+    }
+  }
+  const v = match.sim.view();
+  const points: number[] = [];
+  for (let e = 0; e < v.count; e++) if (v.alive[e] === 1) points.push(v.points[e]!);
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    holders,
+    points,
+    ticks: t,
+    phase: v.match.phase,
+    winner: v.match.winnerEntity,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
+  it('cada bot é o Jugg numa rodada, pela ordem, e a partida acaba; hash estável', () => {
+    const a = runJuggFixedGolden();
+    const b = runJuggFixedGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `Juggs ${a.holders.join(',')}, pontos ${a.points.join(',')}, fase ${a.phase} em ${a.ticks} ticks`;
+    console.log(`[jugg fixo] ${msg} · hash ${a.hash}`);
+    expect(a.holders, msg).toEqual([0, 1, 2, 3]);
+    expect(a.phase, msg).toBe('ended');
+    // Dois aguentaram as rodadas (180 pontos): o desempate pelos abates dá um vencedor.
+    expect(a.winner, msg).not.toBe(NULL_ENTITY);
+    expect(a.hash, msg).toBe(GOLDEN_JUGG_FIXED_HASH);
   }, 240_000);
 });

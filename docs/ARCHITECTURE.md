@@ -3880,3 +3880,41 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **Fica para depois do M6:** os modificadores Mini, Bots gigantes, Arcade e Ricochete; a arte própria das armas de
   tinta (o pacote de modelos está com 31 das 32 camadas); o laço do zumbi na janela em conserto e a mira da IA no
   centro da cabeça normal com o Cabeção (§17.5 a §17.8); e o ajuste da dificuldade da Horda Armada.
+
+## 18. M7: BoboStrike e Bobo Royale Mini
+
+Plano em `docs/PLANO_M7.md` (decisão #81).
+
+### 18.1 Fase 0: as rodadas e o Juggernaut Fixo (19/11/2026)
+
+- **O motor** (`sim/src/systems/rounds.ts`, `ctx.rounds`): `RoundRules` (os ticks da compra, da rodada e da pausa,
+  `winRounds`, `totalRounds`, `swapAfter` e se há respawn na rodada) e o estado num `Int32Array` (`ROUND`: a rodada,
+  a fase, os ticks na fase, as vitórias dos times 0 e 1, os lados trocados e o vencedor da rodada), que vai no hash, no
+  snapshot (v16) e na rede (7 globais; `PROTOCOL_VERSION` 6).
+  - A rodada: compra (ninguém anda nem atira: `roundFrozen` no `applyInput`, também na predição do amigo) → valendo
+    (o modo decide o vencedor; no fim do tempo, o vencedor do tempo do modo) → fim (a pausa, congelada) → a próxima
+    rodada ou o `finishMatch` (quem está na frente). As vitórias também vão para o `teamScore`.
+  - Na largada, todo mundo renasce com a vida cheia, cada um num ponto diferente (`roundSpawn`: os do time; no Jugg,
+    qualquer ponto, girando a cada rodada). Sem respawn na rodada (o BoboStrike), o `spawnSystem` deixa quem morreu
+    esperando.
+  - Roda depois do `partySystem` e antes do `rulesSystem`.
+- **O Jugg Fixo** (`recipe.juggernaut.variant: 'fixed'`, `JUGG_FIXED`): tantas rodadas quanto participantes (até 8),
+  de 3 min, com 3 s de largada e 4 s de pausa. Antes do spawn, todo mundo volta a caçar (`juggRoundReset`); depois, o da
+  vez pela ordem das entidades (os humanos primeiro) vira o Jugg (`juggRoundStart`). Derrubar o Jugg acaba a rodada (a
+  coroa não passa); o tempo acabando dá a rodada ao Jugg. Os pontos de Jugg só contam com a rodada valendo.
+- **O jogo:** o card `juggernautFixed`, a linha da rodada no lugar do relógio ("Rodada 2 de 4 · 2:31", "começa em 3",
+  "O Jugg caiu!"). A página Mais modos com mais de 9 cards fica apertada (o título menor, os cards mais juntos e o
+  Voltar na última linha quando ela tem lugar), para caber 4 linhas no celular.
+- **Golden** (Construto, 4 bots Normal, semente 42, a partida inteira): `9074d33b` (cada bot é o Jugg uma vez; pontos
+  105, 180, 180 e 109; 36.227 ticks). **Online:** o Jugg Fixo com 2 amigos, 2 rodadas: as rodadas e os pontos iguais nos
+  dois lados, 15 predições erradas em 10.948.
+- **A revisão (Opus) achou 4 coisas, corrigidas antes do commit:**
+  - O fim do Jugg Fixo empatava quase sempre (quem aguenta a rodada faz 180 pontos): agora desempata pelos abates e depois
+    por menos mortes (escolha minha, revisável).
+  - Nas rodadas, o tempo e a meta da receita não valem (`timeLimitS` e `scoreLimit` vindos da Partida personalizada
+    acabavam a partida na rodada 1 ou abriam a morte súbita congelada).
+  - A predição do amigo usava a fase da rodada atrasada: agora o `SimPredict.round` leva a fase e os ticks do snapshot
+    mais novo, e cada entrada refeita conta um tick do host (a compra vira valendo na hora certa).
+  - O 1º tick valendo, antes da rodada 1, não congelava (um tiro segurado na contagem saía do lugar antigo).
+- **O que fica para o BoboStrike:** os lados que trocam (`swapped` já existe, os spawns por lado não), a câmera de quem
+  morre e o vencedor por eliminação (já no motor, sem modo que use ainda).

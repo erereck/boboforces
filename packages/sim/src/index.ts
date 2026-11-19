@@ -32,7 +32,9 @@ export {
 export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './recipe.ts';
 // M6 (fase 1): o Domination.
 export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView } from './systems/domination.ts';
-export { JUGGERNAUT, juggernautHp } from './systems/party.ts';
+export { JUGG_FIXED, JUGGERNAUT, juggernautHp } from './systems/party.ts';
+// M7 (fase 0): as rodadas.
+export { ROUND, ROUND_PHASE, ROUND_UNDECIDED } from './systems/rounds.ts';
 export { CHAOS_MODS, MOD } from './systems/chaos.ts';
 export { FORTRESS } from './systems/fortress.ts';
 export {

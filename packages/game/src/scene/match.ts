@@ -152,6 +152,8 @@ import {
   ZOMBIE_SHOP,
   ZOMBIE_TYPE,
   ZOMBIES_DOWN,
+  ROUND,
+  ROUND_PHASE,
 } from '@boboforces/sim';
 import {
   ageKillFeed,
@@ -1211,6 +1213,38 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (insta > 0) parts.push(t('hud.zombies.insta', { s: insta }));
     if (genPct >= 0) parts.push(t('hud.zombies.generator' as StringKey, { pct: genPct }));
     sharedHud.trainingLine = parts.join(' · ');
+  }
+
+  /** M7 (fase 0): a chave da linha da rodada (refeita só quando a rodada, a fase ou os segundos mudam). */
+  const roundLineKey = new Int32Array(4).fill(-2);
+  /** M7 (fase 0): "Rodada 2 de 4 · 2:31", "Rodada 2 de 4 · começa em 3" ou o resultado da rodada. */
+  function refreshRoundLine(): void {
+    const rv = sim.view().rounds;
+    if (rv === null) return;
+    const d = rv.data;
+    const round = d[ROUND.round]!;
+    const phase = d[ROUND.phase]!;
+    const secs = Math.ceil(d[ROUND.ticks]! / sim.hz);
+    const k = roundLineKey;
+    if (k[0] === round && k[1] === phase && k[2] === secs && k[3] === d[ROUND.winner]) return;
+    k[0] = round;
+    k[1] = phase;
+    k[2] = secs;
+    k[3] = d[ROUND.winner]!;
+    if (round === 0) {
+      sharedHud.trainingLine = '';
+      return;
+    }
+    const total = rv.totalRounds;
+    if (phase === ROUND_PHASE.buy) {
+      sharedHud.trainingLine = t('hud.round.start' as StringKey, { round, total, s: secs });
+    } else if (phase === ROUND_PHASE.live) {
+      const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      sharedHud.trainingLine = t('hud.round.live' as StringKey, { round, total, time: clock });
+    } else {
+      const juggWon = d[ROUND.winner] === 1;
+      sharedHud.trainingLine = t((juggWon ? 'hud.round.juggHeld' : 'hud.round.juggDown') as StringKey);
+    }
   }
 
   function refreshTrainingLine(): void {
@@ -5436,6 +5470,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const mv = sim.view().match;
           // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
           sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
+          // M7 (fase 0): nas rodadas, a linha da rodada (com o relógio dela) no lugar do relógio da partida.
+          if (sim.view().rounds !== null) {
+            sharedHud.timeLeftS = -1;
+            refreshRoundLine();
+          }
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
           // M6 (fase 1): os pontos do Domination embaixo do placar.
           const cpv = sim.view().controlPoints;
@@ -5454,6 +5493,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             sharedHud.timeLeftS >= 0 ||
             training ||
             zombiesMode ||
+            sharedHud.trainingLine !== '' ||
             sharedHud.modsLine !== ''
           ) {
             drawHudShared(list, fonts, sharedHud, sharedArea);

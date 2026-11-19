@@ -5,6 +5,7 @@ import { WEAPON_BIG_BRRT, WEAPON_CODE, WEAPONS, weaponDef } from '../config/weap
 import { MAX_ENTITIES } from '../constants.ts';
 import { AMMO_RULE, RULE_FLAG, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
+import { roundLive } from './rounds.ts';
 
 /**
  * M6 (fase 2): os modos de festa que são regra sobre o Warfare (GDD §4.1.2):
@@ -23,6 +24,14 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.
  */
 /** M6 (fase 3): os números do Jugg (GDD §4.1.2). */
 export const JUGGERNAUT = { hpPerOpponent: 300, minHp: 1000, speed: 0.75, scoreLimit: 150 } as const;
+
+/**
+ * M7 (fase 0): o Jugg Fixo (GDD §4.1.2: rodadas de 3 min com rodízio, o "1 contra 3" do sofá). Cada rodada, o da vez
+ * (pela ordem dos controladores: os humanos primeiro) é o Jugg até cair ou o tempo acabar; cada segundo de Jugg vale 1
+ * ponto e, no fim, vence quem tiver mais. São tantas rodadas quanto participantes, até `maxRounds`. Escolhas minhas
+ * (revisáveis): 3 s de largada parada e 4 s de pausa entre as rodadas.
+ */
+export const JUGG_FIXED = { roundS: 180, startS: 3, overS: 4, maxRounds: 8 } as const;
 
 /** A vida do Jugg contra `opponents` caçadores. */
 export function juggernautHp(opponents: number): number {
@@ -55,6 +64,8 @@ export interface PartyState {
   readonly jugg: JuggRules | null;
   /** Ticks do Jugg atual desde o último ponto. */
   juggTicks: number;
+  /** M7 (fase 0): o Jugg Fixo (o Jugg é o da rodada; derrubar o Jugg acaba a rodada em vez de passar a coroa). */
+  readonly juggFixed: boolean;
 }
 
 /** O modo tem estado de festa (o hash e o snapshot levam `started`, os vencedores e o sorteio)? */
@@ -86,6 +97,7 @@ export function createPartyState(recipe: MatchRecipe): PartyState {
           }
         : null,
     juggTicks: 0,
+    juggFixed: recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed',
   };
 }
 
@@ -196,6 +208,37 @@ function randomHunter(ctx: SimContext): number {
   return -1;
 }
 
+/** M7 (fase 0): antes de a rodada do Jugg Fixo começar, todo mundo volta a caçar (as regras de antes). */
+export function juggRoundReset(ctx: SimContext): void {
+  const s = ctx.s;
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] !== 1 || s.kind[e] !== ENTITY_KIND.bobo || s.team[e] !== 1) continue;
+    s.team[e] = 0;
+    juggRules(ctx, e, false, 0);
+  }
+}
+
+/** M7 (fase 0): depois do spawn da rodada `round` (1..), o da vez vira o Jugg (pela ordem das entidades). */
+export function juggRoundStart(ctx: SimContext, round: number): void {
+  const s = ctx.s;
+  let n = 0;
+  for (let e = 0; e < s.count; e++) if (s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo) n++;
+  if (n === 0) return;
+  let k = (round - 1) % n;
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] !== 1 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    if (k-- === 0) {
+      crown(ctx, e);
+      return;
+    }
+  }
+}
+
+/** M7 (fase 0): o Jugg Fixo caiu: os caçadores (o time 0) levam a rodada. -2 = ainda não. */
+export function juggRoundWinner(ctx: SimContext): number {
+  return currentJugg(ctx) < 0 ? 0 : -2;
+}
+
 /** O Jugg vivo agora (índice), ou -1. */
 export function currentJugg(ctx: SimContext): number {
   const s = ctx.s;
@@ -242,7 +285,8 @@ export function partyKill(ctx: SimContext, victim: number, killer: EntityId, wea
   if (p.jugg !== null && s.kind[victim] === ENTITY_KIND.bobo && s.team[victim] === 1) {
     s.team[victim] = 0;
     juggRules(ctx, victim, false, 0);
-    if (killer !== NULL_ENTITY && s.isCurrent(killer)) {
+    // M7 (fase 0): no Fixo, derrubar o Jugg acaba a rodada (a coroa não passa).
+    if (!p.juggFixed && killer !== NULL_ENTITY && s.isCurrent(killer)) {
       const k = killer & 0xffff;
       if (k !== victim && huntsAlive(ctx, k)) crown(ctx, k);
     }
@@ -302,6 +346,8 @@ function juggernautSystem(ctx: SimContext): void {
   const m = ctx.match;
   if (m.phase !== 'playing' && m.phase !== 'suddenDeath') return;
   p.started = true;
+  // M7 (fase 0): no Fixo, o Jugg é o da rodada (as rodadas coroam) e só pontua com a rodada valendo.
+  if (p.juggFixed && !roundLive(ctx)) return;
   let jugg = currentJugg(ctx);
   // Um só Jugg: quem mais estiver vivo no time 1 volta a caçar (não acontece com a largada de sempre; é a garantia).
   if (jugg >= 0) {
@@ -315,6 +361,7 @@ function juggernautSystem(ctx: SimContext): void {
     }
   }
   if (jugg < 0) {
+    if (p.juggFixed) return;
     jugg = randomHunter(ctx);
     if (jugg < 0) return;
     crown(ctx, jugg);

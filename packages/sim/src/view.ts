@@ -118,6 +118,11 @@ export interface SimView {
   readonly chaos: ChaosView | null;
   /** M6 (fase 6a): o gerador do Bobo Zombies Fortress (`null` fora dele; `hp[0]` é a vida, que a rede escreve). */
   readonly fortress: FortressView | null;
+  /**
+   * M7 (fase 0): as rodadas (`null` fora dos modos de rodada): `data` pelos índices de `ROUND` (a rodada, a fase, os
+   * ticks na fase, as vitórias, os lados trocados e o vencedor; a rede escreve direto aqui no amigo) e as regras.
+   */
+  readonly rounds: RoundsView | null;
   /** M6 (fase 4b): o tick do último tiro de cada entidade (os Invisíveis aparecem ao atirar; a IA olha daqui). */
   readonly lastShotTick: Int32Array;
   /**
@@ -274,6 +279,17 @@ export interface MapObjectsView {
 /** M6 (fase 4): o que a view mostra dos modificadores. */
 export interface ChaosView {
   readonly masks: Int32Array;
+}
+
+/** M7 (fase 0): o que a view mostra das rodadas. */
+export interface RoundsView {
+  readonly data: Int32Array;
+  readonly buyTicks: number;
+  readonly liveTicks: number;
+  readonly overTicks: number;
+  readonly winRounds: number;
+  readonly totalRounds: number;
+  readonly swapAfter: number;
 }
 
 /** M6 (fase 6a): o que a view mostra do gerador do Fortress. */

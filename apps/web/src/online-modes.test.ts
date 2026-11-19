@@ -229,6 +229,25 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M7 (fase 0): Juggernaut Fixo com o amigo: as rodadas chegam iguais, a compra congela a predição e o mesmo fim', () => {
+    const base = moreModePreset('juggernautFixed')!;
+    // Só os 2 (sem bot): 2 rodadas de até 3 min.
+    const r: MatchRecipe = { ...base, teams: [{ humans: 'all', bots: [] }, { bots: [] }] };
+    const run = playRoom(r, [0, 0], { snapshotHz: 30, zombies: 0, maxS: 420 });
+    expectSameResult(run);
+    const h = run.host.sim.view();
+    const v = run.clients[0]!.sim.view();
+    expect(Array.from(v.rounds!.data)).toEqual(Array.from(h.rounds!.data));
+    expect(h.rounds!.data[0]).toBe(2);
+    for (let e = 0; e < h.count; e++) expect(v.points[e], `pontos da entidade ${e}`).toBe(h.points[e]);
+    const net = run.clients[0]!.net!;
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    console.log(
+      `[modos] Juggernaut Fixo: ${run.seconds.toFixed(1)} s, rodadas ${h.rounds!.data[3]}×${h.rounds!.data[4]}, vencedor ${h.match.winnerEntity}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 300_000);
+
   it('M6 (fase 3): Juggernaut com o amigo caçando: o Jugg troca de mãos igual nos dois lados e o mesmo fim', () => {
     const base = moreModePreset('juggernaut')!;
     // 90 s em vez de 10 min (a meta de 150 não chega: vence quem tiver mais pontos de Jugg).

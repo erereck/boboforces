@@ -33,6 +33,8 @@ export const modesScreen: Screen<ModesState> = {
   id: 'modes',
   build(state) {
     const dense = state.modes.length > 6;
+    // M7 (fase 0): com mais de 9 cards (4 linhas), tudo mais junto para caber no celular (750 px de altura).
+    const tight = state.modes.length > 9;
     const perRow = dense ? 3 : 2;
     const cardWidth = dense ? MODES_CARD_WIDTH_DENSE : MODES_CARD_WIDTH;
     const cards: UiNode[] = state.modes.map((m, i) => ({
@@ -40,12 +42,12 @@ export const modesScreen: Screen<ModesState> = {
       id: `card:${m.id}`,
       color: COLORS.chapa,
       chamfer: true,
-      padding: 10,
+      padding: tight ? 6 : 10,
       width: cardWidth,
       children: [
         {
           kind: 'column',
-          gap: 8,
+          gap: tight ? 4 : 8,
           children: [
             {
               kind: 'button',
@@ -53,13 +55,29 @@ export const modesScreen: Screen<ModesState> = {
               text: { key: m.nameKey },
               action: `${MODES_PREFIX}${m.id}`,
               variant: i === 0 ? 'primary' : 'secondary',
-              width: cardWidth - 20,
+              width: cardWidth - (tight ? 12 : 20),
               ...(i === 0 ? { autofocus: true } : {}),
             },
             { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo },
           ],
         },
       ],
+    }));
+    const back: UiNode = {
+      kind: 'button',
+      id: 'back',
+      text: { key: 'menu.back' },
+      action: MODES_ACTION.back,
+      variant: 'secondary',
+    };
+    // M7 (fase 0): apertado, o Voltar entra na última linha quando ela tem lugar (uma linha a menos de altura).
+    const rowCount = Math.ceil(cards.length / perRow);
+    const backInRow = tight && cards.length % perRow !== 0;
+    const rows: UiNode[] = Array.from({ length: rowCount }, (_, r) => ({
+      kind: 'row',
+      id: `cards${r}`,
+      gap: dense ? 14 : 20,
+      children: [...cards.slice(r * perRow, r * perRow + perRow), ...(backInRow && r === rowCount - 1 ? [back] : [])],
     }));
     return {
       kind: 'box',
@@ -75,32 +93,20 @@ export const modesScreen: Screen<ModesState> = {
               kind: 'text',
               id: 'heading',
               text: { key: state.titleKey ?? 'modes.title' },
-              style: 'title',
+              style: tight ? 'heading' : 'title',
               color: COLORS.texto,
             },
-            { kind: 'box', height: 12 },
-            { kind: 'box', id: 'headingBar', width: 120, height: 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: 14 },
+            { kind: 'box', height: tight ? 6 : 12 },
+            { kind: 'box', id: 'headingBar', width: 120, height: tight ? 6 : 8, color: COLORS.acao, chamfer: true },
+            { kind: 'box', height: tight ? 8 : 14 },
             // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card); M6: 3 com mais de 6 cards.
             {
               kind: 'column',
               id: 'cards',
-              gap: 10,
-              children: Array.from({ length: Math.ceil(cards.length / perRow) }, (_, r) => ({
-                kind: 'row',
-                id: `cards${r}`,
-                gap: dense ? 14 : 20,
-                children: cards.slice(r * perRow, r * perRow + perRow),
-              })) as UiNode[],
+              gap: tight ? 6 : 10,
+              children: rows,
             },
-            { kind: 'box', height: 12 },
-            {
-              kind: 'button',
-              id: 'back',
-              text: { key: 'menu.back' },
-              action: MODES_ACTION.back,
-              variant: 'secondary',
-            },
+            ...(backInRow ? [] : ([{ kind: 'box', height: tight ? 6 : 12 }, back] as UiNode[])),
           ],
         },
       ],

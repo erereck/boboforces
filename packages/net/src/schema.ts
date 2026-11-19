@@ -497,6 +497,23 @@ export function createNetLayout(view: SimView): NetLayout {
       ),
     );
   }
+  // M7 (fase 0): as rodadas (a rodada, a fase, os ticks na fase, as vitórias, os lados e o vencedor), só nelas.
+  if (view.rounds !== null) {
+    const codecs = [u(8), u(2), u(16, 8), u(8), u(8), u(1), s(3)] as const;
+    const names = ['round', 'roundPhase', 'roundTicks', 'roundWins0', 'roundWins1', 'roundSwapped', 'roundWinner'];
+    codecs.forEach((codec, i) => {
+      globals.push(
+        g(
+          names[i]!,
+          codec,
+          (v) => v.rounds!.data[i]!,
+          (v, _st, q) => {
+            v.rounds!.data[i] = q;
+          },
+        ),
+      );
+    });
+  }
   // M6 (fase 4): os modificadores (a máscara ligada, a da próxima troca e os ticks até ela), só com eles.
   if (view.chaos !== null) {
     const names = ['chaosActive', 'chaosNext', 'chaosLeft'] as const;
