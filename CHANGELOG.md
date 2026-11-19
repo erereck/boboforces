@@ -27,6 +27,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   4.500; colete 650 ou 1.000; granada 300; kit 400), a economia em faixas (vitória 3.000; derrota 1.900 mais 500 por
   derrota seguida, até 3.400; abate e plantar 300) e o colete (absorve metade do dano fora da cabeça). Quem sobrevive
   guarda o que tem; quem morreu volta só de pistola. Também pela rede.
+- **A IA do BoboStrike (fase 3):** os bots compram pelo dinheiro (fuzil quando sobra para o colete, senão SMG; colete;
+  kit na defesa; granada), os atacantes vão todos ao site sorteado da rodada e o portador planta; com a bomba no chão,
+  o atacante mais perto vai buscar; os defensores se dividem pelos dois sites e, com a bomba plantada, vão todos a
+  ela e o mais perto desarma.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

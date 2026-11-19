@@ -71,6 +71,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    - atacantes: escolher o site, o portador planta, os outros escoltam e seguram o site;
    - defensores: se dividir nos sites, rotacionar ao ouvir a bomba e retomar; desarmar;
    - todos: comprar pelo dinheiro e economizar quando não dá; com 30 s restantes, os atacantes vão direto ao site.
+   - **feita em 19/11** (ARCHITECTURE §18.4).
 4. **HUD e telas do BoboStrike:** o dinheiro, a rodada e o placar, a bomba (plantada, o tempo, o desarme), o
    **radial de compra** (D-pad e mouse), o card na página Mais modos, o online e a rodada de prints.
 5. **Ilha Tropical** (mapa `island`, Royale Mini, ~200 × 200 m):

@@ -833,3 +833,58 @@ describe('golden do TDM na Base Bobo (M7, fase 1)', () => {
     expect(a.hash, msg).toBe(GOLDEN_AIRBASE_HASH);
   }, 240_000);
 });
+
+/**
+ * M7 (fase 3): o BoboStrike 5 contra 5 de bots Normal na Base Bobo, semente 42, a partida inteira. Confere que os bots
+ * jogam o objetivo (plantam a Boom Box), que a partida acaba nas rodadas e o hash entre execuções. Gravado na fase 3
+ * (19/11/2026): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). MUDA com a sim, a IA ou o mapa.
+ */
+const GOLDEN_STRIKE_HASH = '9bf9f851';
+
+function runStrikeGolden(): { hash: string; rounds: number; wins: string; plants: number; phase: string } {
+  const { map } = loadWorld('airbase');
+  const normal = builtinBotRef('normal');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'strike',
+      map: 'airbase',
+      seed: 42,
+      teams: [{ bots: [{ ref: normal, count: 5 }] }, { bots: [{ ref: normal, count: 5 }] }],
+    },
+    map,
+    humans: 0,
+  });
+  let plants = 0;
+  let planted = false;
+  for (let t = 0; t < 40 * 60 * 60 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    const now = match.sim.view().strike!.data[0] === 2;
+    if (now && !planted) plants++;
+    planted = now;
+  }
+  const v = match.sim.view();
+  const r = v.rounds!.data;
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    rounds: r[0]!,
+    wins: `${r[3]}×${r[4]}`,
+    plants,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do BoboStrike (M7, fase 3) com bots na Base Bobo', () => {
+  it('os bots plantam e a partida acaba nas rodadas; hash estável', () => {
+    const a = runStrikeGolden();
+    const b = runStrikeGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `${a.rounds} rodadas, ${a.wins}, ${a.plants} plantas, fase ${a.phase}`;
+    console.log(`[strike] ${msg} · hash ${a.hash}`);
+    expect(a.plants, msg).toBeGreaterThan(0);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.hash, msg).toBe(GOLDEN_STRIKE_HASH);
+  }, 240_000);
+});

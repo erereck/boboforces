@@ -16,6 +16,7 @@ import {
   ENTITY_FLAG,
   ENTITY_KIND,
   MAX_HUMANS,
+  STRIKE_DATA,
   eyeHeightFor,
   figurePostureOf,
   secondsToTicks,
@@ -50,6 +51,7 @@ import {
   type AiWeaponUse,
 } from './config.ts';
 import type { AiContext } from './context.ts';
+import { STRIKE_ACT, strikeBuy, strikeGoal, strikeObjective, strikeWander } from './strike.ts';
 import { createSteer, PathFollower } from './paths.ts';
 import {
   CAMP_PHASE,
@@ -278,6 +280,15 @@ export class SoldierBrain {
   reviveTarget = -1;
   /** M3 (fase 3d): a janela que este bot vai consertar (índice), ou -1. */
   repairWindow = -1;
+  /** M7 (fase 3): o objetivo do BoboStrike (`STRIKE_ACT`: plantar, desarmar, pegar a bomba) e o ponto dele. */
+  strikeAct = 0;
+  /** O objetivo foi largado (a rota falhou) até este tick; o estado da bomba que o passeio viu por último. */
+  strikeBlockUntil = 0;
+  strikeBomb = -1;
+  objX = 0;
+  objY = 0;
+  objZ = 0;
+  objReach = 0;
   goalX = 0;
   goalY = 0;
   goalZ = 0;
@@ -636,6 +647,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     if (c.juggernaut && e >= 0 && pickJuggGoal(c, b, e, x, y, z, from)) return;
     // M6 (fase 6b): na Horda armada a horda caça e o apoio fica com o humano.
     if (c.hordeArmed && e >= 0 && pickHordeGoal(c, b, e, x, y, z, from)) return;
+    // M7 (fase 3): no BoboStrike o passeio é o site (ou a bomba).
+    if (c.strikeMode && e >= 0 && pickStrikeGoal(c, b, e, y, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -838,6 +851,26 @@ function pickHordeGoal(
     view.position[target * 3]! + b.rng.range(-r, r),
     view.position[target * 3 + 1]!,
     view.position[target * 3 + 2]! + b.rng.range(-r, r),
+  );
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
+}
+
+/** M7 (fase 3): rascunho do ponto de passeio do BoboStrike (x, y, z e o raio). */
+const strikeSpot = new Float64Array(4);
+
+/** M7 (fase 3): o passeio do BoboStrike: um nó perto do site da rodada (ou da bomba), espalhado pelo raio. */
+function pickStrikeGoal(c: AiContext, b: SoldierBrain, e: number, y: number, from: number): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  if (!strikeWander(c, e, b.controller, strikeSpot)) return false;
+  const r = strikeSpot[3]!;
+  const n = nav.nearestNode(
+    strikeSpot[0]! + b.rng.range(-r, r),
+    strikeSpot[1]! || y,
+    strikeSpot[2]! + b.rng.range(-r, r),
   );
   if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
   nav.nodePosition(n, nodePos, 0);
@@ -1163,7 +1196,12 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     }
   }
   const scouting = !b.hasLastKnown;
-  if (b.reviveTarget >= 0) {
+  if (b.strikeAct !== STRIKE_ACT.none) {
+    // M7 (fase 3): indo plantar, desarmar ou pegar a bomba.
+    gx = b.objX;
+    gy = b.objY;
+    gz = b.objZ;
+  } else if (b.reviveTarget >= 0) {
     // M3 (fase 3a): indo levantar o colega caído.
     const r3 = b.reviveTarget * 3;
     gx = view.position[r3]!;
@@ -1446,6 +1484,29 @@ function zombieClose(c: AiContext, view: SimView, b: SoldierBrain, e: number): b
   return targetDistance(view, e, b.target) < AI_SUPPORT.fightM;
 }
 
+/**
+ * M7 (fase 3): vai até o objetivo do BoboStrike e, chegando, para e segura o usar (plantar ou desarmar; pegar a bomba é
+ * só encostar).
+ */
+function strikeStep(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  t: SoldierTiming,
+  local: { x: number; y: number },
+): number {
+  const view = c.view!;
+  const dx = b.objX - view.position[e * 3]!;
+  const dz = b.objZ - view.position[e * 3 + 2]!;
+  if (b.strikeAct === STRIKE_ACT.pickup || dx * dx + dz * dz > b.objReach * b.objReach) return travel(c, b, e, t);
+  // Parado segurando o usar não é estar preso (andando até o objetivo, o Destravar do `travel` vale).
+  b.progressTick = c.tick;
+  local.x = 0;
+  local.y = 0;
+  b.aimPitch = moveToward(b.aimPitch, -0.6, b.turnStep);
+  return BUTTON.use | BUTTON.crouch;
+}
+
 /** M3 (fase 3a): vai até o colega caído e, colado, olha para ele e segura o usar (a sim conta os 3 s). */
 function reviveStep(
   c: AiContext,
@@ -1549,6 +1610,34 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   // M3 (fase 3a): no Bobo Zombies, o colega caído mais perto (sem zumbi colado: aí atira primeiro).
   b.reviveTarget =
     c.zombiesMode && (view.flags[e]! & F.downed) === 0 && !zombieClose(c, view, b, e) ? downedAlly(c, e) : -1;
+  // M7 (fase 3): o objetivo do BoboStrike (plantar, desarmar, pegar a bomba); com inimigo perto à vista, briga antes.
+  const prevAct = b.strikeAct;
+  b.strikeAct = STRIKE_ACT.none;
+  if (c.strikeMode) {
+    // O passeio muda quando a bomba muda de estado (plantada: todo mundo para ela).
+    const bomb = view.strike !== null ? view.strike.data[STRIKE_DATA.bomb]! : -1;
+    if (bomb !== b.strikeBomb) {
+      b.strikeBomb = bomb;
+      b.hasGoal = false;
+    }
+    // A rota até o objetivo falhou: larga por um tempo (o passeio e o Destravar resolvem) e tenta de novo.
+    if (prevAct !== STRIKE_ACT.none && b.follower.failed) b.strikeBlockUntil = tick + t.wander;
+    if (tick >= b.strikeBlockUntil && strikeObjective(c, e, prevAct)) {
+      const odx = strikeGoal.x - view.position[e * 3]!;
+      const odz = strikeGoal.z - view.position[e * 3 + 2]!;
+      const there = odx * odx + odz * odz <= strikeGoal.reach * strikeGoal.reach;
+      // Indo, briga com quem estiver à vista; chegando, só com quem estiver perto.
+      const fight = there ? closeFight : b.targetVisible && b.target >= 0;
+      if (!fight) {
+        b.strikeAct = strikeGoal.act;
+        b.objX = strikeGoal.x;
+        b.objY = strikeGoal.y;
+        b.objZ = strikeGoal.z;
+        b.objReach = strikeGoal.reach;
+      }
+    }
+  }
+  if (b.strikeAct !== prevAct) b.follower.invalidate();
   // M3 (fase 3d): sem ninguém para levantar e sem alvo à vista, conserta a janela mais perto.
   const repairWindow =
     c.zombiesMode && !c.hordeArmed && b.reviveTarget < 0 && !b.targetVisible && (view.flags[e]! & F.downed) === 0
@@ -1557,8 +1646,13 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   if (repairWindow !== b.repairWindow) b.follower.invalidate();
   b.repairWindow = repairWindow;
   // M2 (fase 3g): fingir de morto e a dancinha tomam o tick inteiro.
-  const override = b.reviveTarget >= 0 || b.repairWindow >= 0 ? -1 : personaOverride(view, b, e, tick, t, local);
-  if (b.reviveTarget >= 0) {
+  const override =
+    b.strikeAct !== STRIKE_ACT.none || b.reviveTarget >= 0 || b.repairWindow >= 0
+      ? -1
+      : personaOverride(view, b, e, tick, t, local);
+  if (b.strikeAct !== STRIKE_ACT.none) {
+    buttons = strikeStep(c, b, e, t, local);
+  } else if (b.reviveTarget >= 0) {
     buttons = reviveStep(c, b, e, t, local);
     b.progressTick = tick;
   } else if (b.repairWindow >= 0) {
@@ -1658,6 +1752,8 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   }
   f.buttons = buttons;
   f.weapon = b.wantSlot;
+  // M7 (fase 3): a compra do BoboStrike (uma por tick, só na compra).
+  f.primary = c.strikeMode ? strikeBuy(c, e) : 0;
   f.moveX = quantizeAxis(local.x);
   f.moveY = quantizeAxis(local.y);
   f.yaw = yawToU16(b.aimYaw);

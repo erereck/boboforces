@@ -1,3 +1,4 @@
+import type { Rng } from '@boboforces/shared';
 import {
   type AimPoint,
   aimPointWorld,
@@ -43,6 +44,14 @@ export class AiContext {
    * o humano (as janelas estão abertas) e não conserta janela.
    */
   hordeArmed = false;
+  /**
+   * M7 (fase 3): o BoboStrike: o site que os atacantes escolheram na rodada `strikeRound` (o sorteio de `strikeRng`, do
+   * diretor).
+   */
+  strikeMode = false;
+  strikeRound = 0;
+  strikeSite = 0;
+  strikeRng: Rng | null = null;
   readonly viewDistance: number;
   readonly paths: PathService;
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */

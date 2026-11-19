@@ -3983,3 +3983,29 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
 - **Testes:** a sim (`strike.test.ts`: comprar, plantar, desarmar, explodir, o dinheiro, o colete guardado, a troca de
   lado e o fim em 7) e a rede (o BoboStrike na Base Bobo por 3 min: a rodada, a bomba e o dinheiro iguais no amigo; 35
   predições erradas em 5.247). Ainda sem a IA do modo: os bots brigam como no Times.
+
+### 18.4 Fase 3: a IA do BoboStrike (19/11/2026)
+
+- **O módulo** (`ai/src/strike.ts`): o `soldier.ts` pergunta o objetivo, o passeio e a compra.
+  - **O site da rodada:** na largada de cada rodada, o diretor sorteia o site do ataque (`strikeRng`, o mesmo para o
+    time todo; `AiContext.strikeSite`).
+  - **O objetivo** (`strikeObjective` → `STRIKE_ACT`): o portador vai ao site e, a meio raio do centro, para,
+    agacha e segura o usar até plantar; com a bomba no chão, o atacante vivo mais perto vai buscar; com ela plantada, o
+    defensor vivo mais perto vai até ela e segura o usar. Com inimigo à vista de perto, briga antes (`closeFight`).
+  - **O passeio** (`strikeWander`): os atacantes, um nó perto do site da rodada; os defensores, um dos sites pelo
+    controlador (metade em cada); com a bomba no chão ou plantada, todos em volta dela.
+  - **A compra** (`strikeBuy`, uma por tick na compra, pela borda do `primary`): o fuzil se sobram 650 para o
+    colete; a SMG só com folga para o colete e a granada (2.600); abaixo disso, sem arma, é rodada de economia (só a
+    granada); com arma, o colete de 100 (com o fuzil) ou o de 50, o kit (defesa) e a granada. Fora da compra, o
+    `primary` dos bots é 0 (zera a borda para a rodada seguinte).
+- **A revisão (Opus) achou 7 coisas, corrigidas antes do commit:** o Destravar não valia andando até o objetivo (agora
+  só parado segurando o usar não conta como preso; a rota que falha larga o objetivo por um passeio); o "mais perto"
+  contava humanos (um humano perto da bomba deixava os bots sem desarmar); indo ao objetivo o bot não revidava de
+  longe (agora briga com quem estiver à vista, e só chegando ignora quem está longe); o desarme trocava de dono (quem já
+  desarma continua, e há uma folga de 1,5 m para trocar); não havia economia; os defensores iam à bomba largada (o
+  marcador dela é só do ataque); o passeio demorava a ir à bomba plantada (agora refaz quando ela muda de estado).
+- **Medido** (`local/m7/medir-strike.ts`, 5 contra 5 de bots Normal, 3 sementes): 7,4–8,5 min por partida, 10–12
+  rodadas, 4 plantas por partida, 0–2 desarmes, 16–28 fuzis comprados. A meta dos 30 s (os atacantes vão direto ao
+  site) já é o comportamento de sempre: eles passeiam pelo site da rodada desde a largada.
+- **Golden** (5 contra 5, semente 42, a partida inteira): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). Os goldens dos
+  outros modos não mudaram (o `primary` dos bots já era 0).

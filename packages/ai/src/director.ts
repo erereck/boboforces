@@ -19,6 +19,7 @@ import {
   type SimView,
 } from '@boboforces/sim';
 import { AiContext } from './context.ts';
+import { strikeRoundTick } from './strike.ts';
 import { AI_BUDGET, type AiBudget } from './config.ts';
 import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
@@ -189,6 +190,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   ctx.juggernaut = recipe.mode === 'juggernaut';
   ctx.noRegen = recipe.mode === 'paintball';
   ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';
+  // M7 (fase 3): o BoboStrike (o sorteio do site de cada rodada).
+  ctx.strikeMode = recipe.mode === 'strike';
+  ctx.strikeRng = ctx.strikeMode ? root.fork('strike') : null;
   const createFlow = api.createFlowField;
   const flow = zombies > 0 && createFlow !== undefined ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick) : null;
   ctx.flow = flow;
@@ -213,6 +217,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
       ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa);
+      if (ctx.strikeMode) strikeRoundTick(ctx);
       ctx.board.update(view, view.tick);
       // Ordem girando a cada tick: o orçamento de raios e a fila não favorecem sempre os mesmos.
       const start = view.tick % total;
