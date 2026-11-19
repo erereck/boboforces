@@ -63,11 +63,11 @@ async function loadBenchShell(platform: WebPlatform): Promise<BenchShell | null>
 }
 
 /**
- * M5 (fase 7b): o Online fica escondido no site até o Erick abrir ao público (PLANO_M5, O6). Ele aparece no
- * `npm run dev`, com `?online` na URL (o aparelho lembra), para quem abre o link de uma sala e no teste das abas
- * (`?sinal=local`). Abrir para todos = `ONLINE_OPEN = true`.
+ * M5 (fase 7b): o Online podia ficar escondido no site até ser aberto ao público. Com `ONLINE_OPEN = false` ele só
+ * aparece no `npm run dev`, com `?online` na URL (o aparelho lembra), para quem abre o link de uma sala e no teste das
+ * abas (`?sinal=local`). Decisão #80 (19/11): aberto a todos.
  */
-const ONLINE_OPEN = false;
+const ONLINE_OPEN = true;
 const ONLINE_TEST_KEY = 'boboforces:online-teste';
 
 function onlineVisible(search: URLSearchParams, roomLink: boolean): boolean {

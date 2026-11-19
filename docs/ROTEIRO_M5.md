@@ -15,19 +15,10 @@
 
 ## 0. Antes: como os amigos entram
 
-O Online ainda não está aberto ao público (O6). Há dois jeitos de testar, e você escolhe (pergunta T1 da página das
-rodadas):
-
-- **A. Publicar com o Online escondido** (o padrão; precisa do seu "pode publicar"):
-  - o site vai ao ar como sempre, e o botão Online só aparece:
-    - com `?online` no fim do endereço (`https://erereck.github.io/boboforces/?online`); o aparelho lembra;
-    - para quem abre o link de uma sala;
-  - você cria a sala e manda o link pelo **Copiar link**. Quem abre o link cai direto no Entrar;
-  - quem só abre o site normal não vê nada de novo.
-- **B. Só em casa, sem publicar:**
-  - `npm run build` e `npm run preview -w @boboforces/web -- --host` no PC;
-  - os aparelhos na mesma wi-fi abrem `http://<IP do PC>:4173/?online`;
-  - não testa o 4G.
+O Online está no ar, aberto a todos (decisão #80): o botão aparece no título de
+`https://erereck.github.io/boboforces/`. Você cria a sala e manda o link pelo **Copiar link**; quem abre o link cai
+direto no Entrar com o código já posto. Quem já tinha o jogo aberto pega a versão nova ao voltar ao título (o service
+worker).
 
 **Ainda sem TURN (O3):** parte do 4G (NAT simétrico) pode não conectar. Se alguém no 4G ficar 20 s em "Procurando a
 sala" e cair em "Ninguém respondeu nesse código", anote a operadora e se estava no 4G ou no wi-fi. É exatamente o caso
@@ -58,7 +49,7 @@ Anote também, de cada um: o aparelho (modelo do celular ou PC), o navegador, e 
 
 | # | O que fazer | O que esperar |
 |---|---|---|
-| 1 | No seu celular: o site com `?online` › Online › Criar sala | O aviso "Você é o host: não troque de app durante a partida" |
+| 1 | No seu celular: o site › Online › Criar sala | O aviso "Você é o host: não troque de app durante a partida" |
 | 2 | 3 amigos entram; Escolher partida › **Personalizada** com o máximo de bots | O celular deixa no máximo 8 bots ("a partida vai com até 8 bots" se pedir mais) |
 | 3 | Jogar 5 min de Times | Fluido para todos; no fim, **Copiar relatório** no celular: as linhas `[rede] host` dizem fps (meta: 30), sim, IA e rede em ms (orçamento: 2,5 / 1,0 / 2,0) |
 | 4 | **Bobo Zombies** com o celular de host | A horda de até 16 zumbis; fluido |

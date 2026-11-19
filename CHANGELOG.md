@@ -69,6 +69,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A rodada 20 de prints (fase 7c):** a partida da sala, o Bobo Zombies online, o host no celular, a faixa do host
   ausente, ping e emote, a rede no F2 e os Modos mais justos, com as perguntas T1–T5 (como testar com os amigos, o X1,
   o menor teto da sala, os 20 Hz e o que vem depois).
+- **O Online no ar (decisão #80, 19/11):** o botão Online aparece no título para todo mundo. Ainda sem TURN: parte das
+  conexões 4G pode não entrar.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 
