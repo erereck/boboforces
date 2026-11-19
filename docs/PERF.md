@@ -303,6 +303,32 @@ andando e atirando; os tempos são por snapshot, médias de 600 depois de 100 de
   duas abas do Edge pelos relays de verdade: o amigo entrou em **5,0 s** pelo link; o X1 e o Bobo Zombies rodaram com o
   amigo a 5–6 ticks do host.
 
+## 1j. Os modos do M6 (fechamento; 19/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node 26.7 com JIT), cada card da página Mais modos com a semente 42 e sem humano (o time
+dos humanos ganha 4 bots Normal quando não tem bot; os Zombies clássicos com o pool de 24 zumbis). 600 ticks de
+aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em `local/m6/medir-modos.ts`. O TDM roda primeiro (com o JIT ainda
+esquentando: o p99 dele sai alto).
+
+| Modo | Mapa | Bots (+ zumbis) | Média (ms) | p50 | p99 | Máx |
+|---|---|---|---|---|---|---|
+| TDM (referência) | Construto | 8 | 0,040 | 0,029 | 0,219 | 2,52 |
+| Domination | Construto | 7 | 0,029 | 0,022 | 0,147 | 0,77 |
+| Gun Game | Construto | 7 | 0,025 | 0,018 | 0,178 | 0,51 |
+| Infection | Construto | 7 | 0,028 | 0,020 | 0,192 | 1,46 |
+| Juggernaut | Construto | 7 | 0,024 | 0,018 | 0,135 | 0,53 |
+| Bobo Chaos (Roleta) | Construto | 7 | 0,026 | 0,018 | 0,188 | 1,05 |
+| Bobo Paintball | Construto | 7 | 0,025 | 0,019 | 0,161 | 0,84 |
+| Fortaleza | Posto Avançado | 4 (+ 24) | 0,050 | 0,043 | 0,182 | 1,25 |
+| Horda Armada | Base Abandonada | 2 + 12 da horda | 0,015 | 0,012 | 0,059 | 0,39 |
+
+- Nenhum modo novo pesa mais que o TDM ou o Bobo Zombies de antes: o mais caro é a Fortaleza (os 24 zumbis com os
+  dois flow fields, o dos humanos e o do gerador). A Horda Armada é barata porque a horda entra aos poucos (2 a 6
+  soldados em jogo).
+- **A dificuldade da Horda Armada** (`local/m6/medir-horda.ts`, 3 bots Normal de apoio sem humano, 4 sementes, até
+  4 min): eles caíram na onda 3, 4, 5 e 2 (de 112 a 218 s; 10 a 34 abates). Antes do ajuste (3 soldados em jogo na
+  1ª onda, granada desde o começo e a horda mirando em caído), caíam na onda 2 ou 3 em 68 a 110 s.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

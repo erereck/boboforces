@@ -59,7 +59,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   da onda normal (no mínimo 2), entra aos poucos (de 2 em jogo na 1ª onda a 6 na 10ª) e cada soldado tem 10% a mais
   de vida por onda; as armas da horda liberam com as ondas (SMG e fuzil, depois escopeta, metralhadora e sniper; a
   granada da 3ª onda em diante).
-  Pontos, abates, drops, a loja e os perks valem como no Bobo Zombies; o Carpinteiro vira Munição Máxima.
+  Pontos, abates, drops, a loja e os perks valem como no Bobo Zombies; o Carpinteiro vira Munição Máxima. O Bobo
+  Zombies deixou de ter escolha de time (no sofá e no online, todo humano fica do mesmo lado), e o recorde de onda é
+  separado por variante.
+- **Fechamento do M6 (fase 7):** o portão verde, a rodada de prints 23 e o custo de cada modo medido: nenhum modo novo
+  pesa mais na sim + IA que o TDM ou o Bobo Zombies de antes (o mais caro, a Fortaleza, fica em 0,05 ms por tick no PC).
 
 ### M5: online P2P (planejado em 16/11/2026)
 

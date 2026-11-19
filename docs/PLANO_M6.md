@@ -103,6 +103,10 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - **6b feita em 19/11** (ARCHITECTURE §17.9): a Armed Horde, no card Horda Armada (na Base Abandonada, com as
      janelas abertas).
 7. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
+   - **Feito em 19/11:** o portão verde (1.883 testes, menu em 347,9 de 350 KB, Switch, portcheck e smoke), a rodada de
+     prints 23 (as variantes do Bobo Zombies e a página Mais modos com os 9 cards, perguntas X1–X3) e o custo da sim + IA
+     de cada modo no `PERF` (§1j). **O M6 está fechado.** Ficam para depois: os modificadores Mini, Bots gigantes,
+     Arcade e Ricochete (W2), a arte das armas de tinta (W3) e o ajuste da dificuldade da Horda Armada com o Erick (X2).
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

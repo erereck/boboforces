@@ -3865,3 +3865,18 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **Limitações conhecidas:** a horda nasce nos pontos dos zumbis (fora da base) e entra pelas janelas; a dificuldade
   (o tamanho da onda, o teto em jogo e os níveis dos bots do card) é um palpite e fica para a rodada de testes com o
   Erick.
+
+### 17.10 Fechamento do M6 (19/11/2026)
+
+- **Os modos:** a página Mais modos tem 9 cards (o Bobo Training, Domination, Gun Game, Infection, Juggernaut, Bobo
+  Chaos, Bobo Paintball, Fortaleza e Horda Armada); os modificadores valem em qualquer modo pela Partida personalizada
+  (a aba Modificadores) e pela Roleta do Bobo Chaos. Todos rodam sozinhos com bots, no sofá, no online e no Switch.
+- **As versões:** snapshot 15 e `PROTOCOL_VERSION` 5 (cada modo pôs o estado dele no fim do esquema); as tabelas de
+  conteúdo novas entram no hash de conteúdo da sala (`SIM_CONTENT_TABLES`).
+- **Os goldens do M6** (`game/src/scene/golden.test.ts`): Domination `97f2f078`, Gun Game `6595bdd9`, Infection
+  `ffb3e5cb`, Juggernaut `f7c0ff3a`, Bobo Chaos `c1b4cd36`, Bobo Paintball `855196e7`, Fortaleza `cfb8db3d` e Horda
+  Armada `0bc0e8ca`; os de antes do M6 (TDM `b36eb8e1`, Zombies `edc93590`, Posto `6c4eaf90`) não mudaram no fechamento.
+- **O custo:** `PERF.md` §1j (sim + IA de cada card, headless).
+- **Fica para depois do M6:** os modificadores Mini, Bots gigantes, Arcade e Ricochete; a arte própria das armas de
+  tinta (o pacote de modelos está com 31 das 32 camadas); o laço do zumbi na janela em conserto e a mira da IA no
+  centro da cabeça normal com o Cabeção (§17.5 a §17.8); e o ajuste da dificuldade da Horda Armada.
