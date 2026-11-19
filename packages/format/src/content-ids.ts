@@ -175,6 +175,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:desmontador-bolt',
   // M3 (fase 5c): o contorno de giz das armas na parede (só acrescentado, regra 20)
   'model:chalk-outline',
+  // M6 (fase 3): a Big Brrt, a minigun do Jugg (só acrescentado, regra 20)
+  'model:big-brrt',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',

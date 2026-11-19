@@ -24,6 +24,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   pela faca desce um, e quem abate com a faca vence; o HUD mostra o NÍVEL. No **Infection**, um sorteado começa
   infectado (faca, mais rápido, a cara de bobo-zumbi), quem morre vira infectado, e o placar mostra quantos há de cada
   lado: os infectados vencem se não sobrar ninguém, os sobreviventes se aguentarem 3 min. Os bots jogam os dois.
+- **Juggernaut (fase 3):** no card da página Mais modos (a variante Rodízio). Um sorteado começa como o Jugg: vida de 300
+  por caçador (no mínimo 1000), mais lento, sem o dano extra na cabeça e com a **Big Brrt**, a minigun só dele (15 de
+  dano, 1200 tiros por minuto, superaquece em 6 s de fogo e esfria parada; modelo e som novos). Quem dá o golpe final
+  vira o próximo Jugg, e cada segundo de Jugg vale 1 ponto: vence quem chegar a 150 (ou quem tiver mais em 10 min). O
+  Jugg aparece sempre na tela (a plaquinha JUGG vai para a borda quando ele está fora da vista) e o kill feed avisa
+  quem virou o Jugg. Os bots caçam o Jugg em grupo, e o bot Jugg avança.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

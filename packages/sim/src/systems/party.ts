@@ -1,9 +1,10 @@
 import type { MatchRecipe } from '@boboforces/format';
 import { INFECTION_DEFAULTS } from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { WEAPON_CODE, WEAPONS, weaponDef } from '../config/weapons.ts';
-import { WEAPON_NONE, type SimContext } from '../context.ts';
-import { ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
+import { WEAPON_BIG_BRRT, WEAPON_CODE, WEAPONS, weaponDef } from '../config/weapons.ts';
+import { MAX_ENTITIES } from '../constants.ts';
+import { AMMO_RULE, RULE_FLAG, WEAPON_NONE, type SimContext } from '../context.ts';
+import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
 
 /**
  * M6 (fase 2): os modos de festa que são regra sobre o Warfare (GDD §4.1.2):
@@ -14,7 +15,31 @@ import { ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
  *   mais rápidos). Na largada, se não houver infectado, um sobrevivente sorteado vira um; quem morre vira infectado (ao
  *   renascer). Os infectados vencem quando não sobra sobrevivente; os sobreviventes, no fim do tempo. O placar mostra
  *   quantos há de cada lado.
+ * - **Juggernaut** (`mode: 'juggernaut'`, M6 fase 3, a variante Rodízio): o time 0 caça e o time 1 é o Jugg, um só (vida
+ *   de 300 por oponente, no mínimo 1000; sem o multiplicador da cabeça; 0,75x de velocidade; a Big Brrt). Na largada,
+ *   um sorteado vira o Jugg; quem dá o golpe final no Jugg vira o próximo (na hora, com a vida cheia de Jugg); sem
+ *   ninguém (o vazio sem crédito), outro sorteado. Cada segundo como Jugg vale 1 ponto (`points`); vence quem chegar à
+ *   meta (150) ou, no fim do tempo, quem tiver mais.
  */
+/** M6 (fase 3): os números do Jugg (GDD §4.1.2). */
+export const JUGGERNAUT = { hpPerOpponent: 300, minHp: 1000, speed: 0.75, scoreLimit: 150 } as const;
+
+/** A vida do Jugg contra `opponents` caçadores. */
+export function juggernautHp(opponents: number): number {
+  return Math.max(JUGGERNAUT.minHp, JUGGERNAUT.hpPerOpponent * opponents);
+}
+
+/**
+ * As regras de cada bobo de antes de virar o Jugg (fora do estado, como as regras: saem do time, que o estado leva).
+ * `crowned` diz quem está com as regras do Jugg agora.
+ */
+interface JuggRules {
+  readonly crowned: Uint8Array;
+  readonly maxHp: Float32Array;
+  readonly speed: Float32Array;
+  readonly flags: Uint8Array;
+  readonly ammo: Uint8Array;
+}
 export interface PartyState {
   /** Códigos das armas da escada do Gun Game, ou \`null\`. */
   readonly ladder: Uint8Array | null;
@@ -26,6 +51,15 @@ export interface PartyState {
   winnerEntity: EntityId;
   /** O time que o modo deu como vencedor (-2 = ninguém ainda; -1 = empate). */
   winnerTeam: number;
+  /** M6 (fase 3): as regras guardadas do Juggernaut, ou `null` fora dele. */
+  readonly jugg: JuggRules | null;
+  /** Ticks do Jugg atual desde o último ponto. */
+  juggTicks: number;
+}
+
+/** O modo tem estado de festa (o hash e o snapshot levam `started`, os vencedores e o sorteio)? */
+export function partyActive(p: PartyState): boolean {
+  return p.ladder !== null || p.infectedSpeed > 0 || p.jugg !== null;
 }
 
 export function createPartyState(recipe: MatchRecipe): PartyState {
@@ -41,6 +75,17 @@ export function createPartyState(recipe: MatchRecipe): PartyState {
     started: false,
     winnerEntity: NULL_ENTITY,
     winnerTeam: -2,
+    jugg:
+      recipe.mode === 'juggernaut'
+        ? {
+            crowned: new Uint8Array(MAX_ENTITIES),
+            maxHp: new Float32Array(MAX_ENTITIES),
+            speed: new Float32Array(MAX_ENTITIES),
+            flags: new Uint8Array(MAX_ENTITIES),
+            ammo: new Uint8Array(MAX_ENTITIES),
+          }
+        : null,
+    juggTicks: 0,
   };
 }
 
@@ -75,6 +120,90 @@ export function partyLoadout(ctx: SimContext, e: number): void {
   if (s.kind[e] !== ENTITY_KIND.bobo) return;
   if (p.ladder !== null) holdOnly(ctx, e, p.ladder[Math.min(s.points[e]!, p.ladder.length - 1)]!);
   if (p.infectedSpeed > 0 && s.team[e] === 1) holdOnly(ctx, e, WEAPON_CODE.knife);
+  if (p.jugg !== null && s.team[e] === 1) holdOnly(ctx, e, WEAPON_BIG_BRRT);
+}
+
+/** Quantos bobos caçam (fora do time do Jugg), vivos ou esperando o respawn. */
+function hunters(ctx: SimContext): number {
+  const s = ctx.s;
+  let n = 0;
+  for (let e = 0; e < s.count; e++) if (s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo && s.team[e] !== 1) n++;
+  return n;
+}
+
+/** Põe (ou tira) as regras do Jugg em `e`, guardando as de antes. Nada muda se já estiver assim. */
+function juggRules(ctx: SimContext, e: number, crown: boolean, opponents: number): void {
+  const j = ctx.party.jugg!;
+  if ((j.crowned[e] === 1) === crown) return;
+  const r = ctx.rules;
+  if (crown) {
+    j.maxHp[e] = r.maxHp[e]!;
+    j.speed[e] = r.speed[e]!;
+    j.flags[e] = r.flags[e]!;
+    j.ammo[e] = r.ammo[e]!;
+    r.maxHp[e] = juggernautHp(opponents);
+    r.speed[e] = JUGGERNAUT.speed;
+    r.flags[e] = r.flags[e]! | RULE_FLAG.headshotImmune;
+    r.ammo[e] = AMMO_RULE.infiniteReserve;
+  } else {
+    r.maxHp[e] = j.maxHp[e]!;
+    r.speed[e] = j.speed[e]!;
+    r.flags[e] = j.flags[e]!;
+    r.ammo[e] = j.ammo[e]!;
+  }
+  j.crowned[e] = crown ? 1 : 0;
+}
+
+/**
+ * As regras do Juggernaut acompanham o time (o snapshot e a rede trazem o time; as regras ficam fora do estado). O host
+ * chama a cada tick; o amigo, a cada snapshot (a predição dele anda e mira como no host).
+ */
+export function syncJuggRules(ctx: SimContext): void {
+  if (ctx.party.jugg === null) return;
+  const s = ctx.s;
+  const opponents = hunters(ctx);
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] !== 1 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+    juggRules(ctx, e, s.team[e] === 1, opponents);
+  }
+}
+
+/** `e` (vivo) vira o Jugg agora: o time, as regras, a vida cheia de Jugg e só a Big Brrt na mão. */
+function crown(ctx: SimContext, e: number): void {
+  const s = ctx.s;
+  s.team[e] = 1;
+  juggRules(ctx, e, true, hunters(ctx));
+  s.health[e] = ctx.rules.maxHp[e]!;
+  holdOnly(ctx, e, WEAPON_BIG_BRRT);
+  ctx.party.juggTicks = 0;
+}
+
+function huntsAlive(ctx: SimContext, e: number): boolean {
+  const s = ctx.s;
+  return (
+    s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo && s.team[e] !== 1 && (s.flags[e]! & ENTITY_FLAG.dead) === 0
+  );
+}
+
+/** Um caçador vivo sorteado (índice), ou -1. */
+function randomHunter(ctx: SimContext): number {
+  const s = ctx.s;
+  let n = 0;
+  for (let e = 0; e < s.count; e++) if (huntsAlive(ctx, e)) n++;
+  if (n === 0) return -1;
+  let pick = ctx.rngParty.int(0, n);
+  for (let e = 0; e < s.count; e++) if (huntsAlive(ctx, e) && pick-- === 0) return e;
+  return -1;
+}
+
+/** O Jugg vivo agora (índice), ou -1. */
+export function currentJugg(ctx: SimContext): number {
+  const s = ctx.s;
+  for (let e = 0; e < s.count; e++) {
+    if (s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo && s.team[e] === 1 && (s.flags[e]! & ENTITY_FLAG.dead) === 0)
+      return e;
+  }
+  return -1;
 }
 
 /** O sobrevivente \`e\` vira infectado (o time 1 e a velocidade; a faca vem no próximo spawn, ou agora se \`now\`). */
@@ -103,11 +232,24 @@ export function partyKill(ctx: SimContext, victim: number, killer: EntityId, wea
     }
   }
   if (p.infectedSpeed > 0 && s.kind[victim] === ENTITY_KIND.bobo && s.team[victim] === 0) infect(ctx, victim, false);
+  // Juggernaut: o Jugg caído volta a caçar (renasce como caçador) e quem deu o golpe final vira o Jugg.
+  if (p.jugg !== null && s.kind[victim] === ENTITY_KIND.bobo && s.team[victim] === 1) {
+    s.team[victim] = 0;
+    juggRules(ctx, victim, false, 0);
+    if (killer !== NULL_ENTITY && s.isCurrent(killer)) {
+      const k = killer & 0xffff;
+      if (k !== victim && huntsAlive(ctx, k)) crown(ctx, k);
+    }
+  }
 }
 
 /** Passo dos modos de festa (antes das regras do placar): a largada do Infection, o placar dele e quem venceu. */
 export function partySystem(ctx: SimContext): void {
   const p = ctx.party;
+  if (p.jugg !== null) {
+    juggernautSystem(ctx);
+    return;
+  }
   if (p.infectedSpeed <= 0) return;
   const m = ctx.match;
   if (m.phase !== 'playing') return;
@@ -145,4 +287,37 @@ export function partySystem(ctx: SimContext): void {
   // Ninguém sobrou: os infectados vencem. O tempo acabando (o último tick): os sobreviventes.
   if (survivors === 0) p.winnerTeam = 1;
   else if (m.ticksLeft >= 0 && m.ticksLeft <= 1) p.winnerTeam = 0;
+}
+
+/** O passo do Juggernaut: as regras pelo time, o Jugg (o sorteio quando falta), o ponto por segundo e a meta. */
+function juggernautSystem(ctx: SimContext): void {
+  const p = ctx.party;
+  syncJuggRules(ctx);
+  const m = ctx.match;
+  if (m.phase !== 'playing' && m.phase !== 'suddenDeath') return;
+  p.started = true;
+  let jugg = currentJugg(ctx);
+  // Um só Jugg: quem mais estiver vivo no time 1 volta a caçar (não acontece com a largada de sempre; é a garantia).
+  if (jugg >= 0) {
+    const s = ctx.s;
+    for (let e = jugg + 1; e < s.count; e++) {
+      if (s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo && s.team[e] === 1) {
+        s.team[e] = 0;
+        juggRules(ctx, e, false, 0);
+        if (s.health[e]! > ctx.rules.maxHp[e]!) s.health[e] = ctx.rules.maxHp[e]!;
+      }
+    }
+  }
+  if (jugg < 0) {
+    jugg = randomHunter(ctx);
+    if (jugg < 0) return;
+    crown(ctx, jugg);
+  }
+  if (++p.juggTicks < ctx.hz) return;
+  p.juggTicks = 0;
+  const s = ctx.s;
+  s.points[jugg] = s.points[jugg]! + 1;
+  if (ctx.scoreLimit > 0 && s.points[jugg]! >= ctx.scoreLimit && p.winnerEntity === NULL_ENTITY) {
+    p.winnerEntity = s.idOf(jugg);
+  }
 }

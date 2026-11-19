@@ -6,9 +6,11 @@ import { BLOCK_FLAG, cellBlock, createRayHit, raycastGrid } from '@boboforces/wo
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { PART_DAMAGE_MULTIPLIER } from '../config/metrics.ts';
 import {
+  BIG_BRRT_COOL,
   GRENADE_THROW,
   SPREAD_STATE_MULTIPLIER,
   SPREAD_WALKING_SPEED,
+  WEAPON_BIG_BRRT,
   WEAPON_FIRE,
   WEAPON_SLOT,
   weaponDamageAt,
@@ -223,7 +225,9 @@ export function weaponSystem(ctx: SimContext): void {
       s.switchTicks[e] === 0 &&
       def.clipSize > 0 &&
       s.slotReserve[k]! > 0 &&
-      (s.slotClip[k] === 0 || ((pressed & BUTTON.reload) !== 0 && s.slotClip[k]! < def.clipSize))
+      // M6 (fase 3): a Big Brrt não recarrega no botão (o pente é o calor: esfria sozinha; só o zero trava).
+      (s.slotClip[k] === 0 ||
+        ((pressed & BUTTON.reload) !== 0 && s.slotClip[k]! < def.clipSize && def.code !== WEAPON_BIG_BRRT))
     ) {
       s.reloadTicks[e] = Math.max(
         1,
@@ -232,6 +236,14 @@ export function weaponSystem(ctx: SimContext): void {
       ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'reloadStart');
     }
     if (s.reloadTicks[e]! > 0) fl |= F.reloading;
+    // M6 (fase 3): a Big Brrt esfria parada (o pente é o calor; no zero, a recarga acima é o superaquecimento).
+    else if (
+      def.code === WEAPON_BIG_BRRT &&
+      s.slotClip[k]! < def.clipSize &&
+      ctx.tick - s.lastShotTick[e]! > secondsToTicks(BIG_BRRT_COOL.delayS, hz)
+    ) {
+      s.slotClip[k] = Math.min(def.clipSize, s.slotClip[k]! + Math.max(1, Math.round(BIG_BRRT_COOL.perS / hz)));
+    }
 
     const ready =
       playing &&

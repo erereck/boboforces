@@ -135,6 +135,8 @@ const LOCKED_IDS = [
   'model:desmontador',
   'model:desmontador-bolt',
   'model:chalk-outline',
+  // M6 (fase 3)
+  'model:big-brrt',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',

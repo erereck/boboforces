@@ -32,6 +32,7 @@ export {
 export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './recipe.ts';
 // M6 (fase 1): o Domination.
 export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView } from './systems/domination.ts';
+export { JUGGERNAUT, juggernautHp } from './systems/party.ts';
 export {
   aimPointLocal,
   aimPointWorld,

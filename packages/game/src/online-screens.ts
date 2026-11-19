@@ -157,7 +157,10 @@ export function cleanRoomName(text: string): string {
 
 /** A partida tem times (a escolha do time vale)? No FFA, no treino e nos modos de um time, não. */
 export function recipeHasTeams(recipe: MatchRecipe): boolean {
-  return recipe.mode !== 'training' && !isFfaMode(recipe.mode) && recipe.teams.length >= 2;
+  // M6 (fase 3): no Juggernaut todos começam caçando (o Jugg é sorteado).
+  return (
+    recipe.mode !== 'training' && recipe.mode !== 'juggernaut' && !isFfaMode(recipe.mode) && recipe.teams.length >= 2
+  );
 }
 
 /** O time na sala: -1 (tanto faz) → 0 → 1 → -1. */

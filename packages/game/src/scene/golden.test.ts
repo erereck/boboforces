@@ -449,3 +449,62 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
     expect(a.hash, msg).toBe(GOLDEN_INFECTION_HASH);
   }, 240_000);
 });
+
+/**
+ * M6 (fase 3): o Juggernaut (Rodízio) com 8 bots Normal no Construto, semente 42, 3 min. Confere que os bots caçam o
+ * Jugg (ele troca de mãos várias vezes), que alguém pontua como Jugg e o hash entre execuções. Gravado na fase 3
+ * (19/11/2026): `f7c0ff3a` (4 Juggs em 3 min; o melhor fez 71 pontos). MUDA com a sim, a IA, o mapa ou as regras.
+ */
+const GOLDEN_JUGGERNAUT_HASH = 'f7c0ff3a';
+
+function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
+  const { map } = loadWorld();
+  const recipe: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'juggernaut',
+    map: 'construto',
+    seed: 42,
+    match: { timeLimitS: 180, scoreLimit: 150 },
+    teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 8 }] }, { bots: [] }],
+  };
+  const match = createHeadlessMatch({ recipe, map, humans: 0 });
+  let holders = 0;
+  let last = -1;
+  let t = 0;
+  for (; t < 10_900 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    const v = match.sim.view();
+    let jugg = -1;
+    for (let e = 0; e < v.count && jugg < 0; e++) if (v.alive[e] === 1 && v.team[e] === 1) jugg = e;
+    if (jugg >= 0 && jugg !== last) {
+      holders++;
+      last = jugg;
+    }
+  }
+  const v = match.sim.view();
+  const points: number[] = [];
+  for (let e = 0; e < v.count; e++) if (v.alive[e] === 1) points.push(v.points[e]!);
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    points: points.sort((a, b) => b - a),
+    holders,
+    ticks: t,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
+  it('os bots caçam o Jugg (ele troca de mãos) e alguém pontua; hash estável', () => {
+    const a = runJuggernautGolden();
+    const b = runJuggernautGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `pontos ${a.points.join(',')}, ${a.holders} Juggs, fase ${a.phase} em ${a.ticks} ticks`;
+    console.log(`[juggernaut] ${msg} · hash ${a.hash}`);
+    expect(a.holders, msg).toBeGreaterThanOrEqual(4);
+    expect(a.points[0]!, msg).toBeGreaterThanOrEqual(10);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.hash, msg).toBe(GOLDEN_JUGGERNAUT_HASH);
+  }, 240_000);
+});

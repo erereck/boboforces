@@ -253,6 +253,13 @@ export const STRINGS_EXTRA_PT_BR = {
   'mode.name.infection': 'Infection',
   'mode.desc.infection': 'Quem morre vira infectado. Aguente 3 min.',
   'hud.level': 'Nível',
+  // M6 (fase 3): o Juggernaut.
+  'mode.name.juggernaut': 'Juggernaut',
+  'mode.desc.juggernaut': 'Derrube o Jugg e vire ele. 150 pontos.',
+  'hud.jugg': 'Jugg',
+  'feed.juggIs': 'virou o',
+  'feed.jugg': 'Jugg',
+  'weapon.big-brrt': 'Big Brrt',
   // M5 (fase 7a): a linha da rede no F2 (online).
   'debug.netHost': 'Rede (host)',
   'debug.netClient': 'Rede (amigo)',

@@ -1,5 +1,5 @@
 import { DROP_KINDS } from '../view.ts';
-import { partyKill, partyLoadout } from './party.ts';
+import { partyActive, partyKill, partyLoadout } from './party.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -336,15 +336,17 @@ function kill(
         !zombie &&
         s.kind[k] === ENTITY_KIND.bobo &&
         ctx.domination === null &&
-        ctx.party.infectedSpeed <= 0
+        ctx.party.infectedSpeed <= 0 &&
+        ctx.party.jugg === null
       ) {
         const team = s.team[k]!;
         if (team < MAX_TEAMS) ctx.match.teamScore[team] = ctx.match.teamScore[team]! + 1;
       }
     }
   }
-  // M6 (fase 2): o Gun Game (o nível e a arma) e o Infection (quem morre vira infectado).
-  if (ctx.party.ladder !== null || ctx.party.infectedSpeed > 0) partyKill(ctx, t, killer, weapon);
+  // M6 (fase 2): o Gun Game (o nível e a arma) e o Infection (quem morre vira infectado). Fase 3: o Juggernaut (quem
+  // derruba o Jugg vira o Jugg).
+  if (partyActive(ctx.party)) partyKill(ctx, t, killer, weapon);
   // M3 (fase 3b): o Chonker explode em gosma ao morrer (machuca os bobos perto; no vazio, não).
   if (ctx.zombiesMode && zombie && s.zombieType[t] === ZOMBIE_TYPE.chonker && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, ZOMBIE_GOO, s.idOf(t), -1);
@@ -445,7 +447,7 @@ function endMatch(ctx: SimContext, team: number): void {
   const m = ctx.match;
   m.phase = 'ended';
   m.winnerTeam = team;
-  m.winnerEntity = ctx.ffa && team >= 0 ? leaderEntity : NULL_ENTITY;
+  m.winnerEntity = (ctx.ffa || ctx.party.jugg !== null) && team >= 0 ? leaderEntity : NULL_ENTITY;
   ctx.events.matchPhase(ctx.tick, 'ended');
 }
 
@@ -461,11 +463,12 @@ function leader(ctx: SimContext): number {
   let bestScore = -1;
   let tie = false;
   leaderEntity = NULL_ENTITY;
-  if (ctx.ffa) {
+  // M6 (fase 3): o Juggernaut também é de cada um (os pontos de Jugg), mesmo com os caçadores no mesmo time.
+  if (ctx.ffa || ctx.party.jugg !== null) {
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
       // M6 (fase 2): no Gun Game vence o nível mais alto (os pontos), não os abates.
-      const k = ctx.party.ladder !== null ? s.points[e]! : s.kills[e]!;
+      const k = ctx.party.ladder !== null || ctx.party.jugg !== null ? s.points[e]! : s.kills[e]!;
       if (k > bestScore) {
         bestScore = k;
         best = s.team[e]!;
@@ -539,7 +542,8 @@ export function pickSpawn(ctx: SimContext, e: number): number {
   const score = ctx.spawnScore;
   const mark = ctx.spawnMark;
   const zombie = s.kind[e] === ENTITY_KIND.zombie;
-  const anyTeam = ctx.ffa || zombie;
+  // M6 (fase 3): no Juggernaut os caçadores nascem em qualquer ponto (longe do Jugg), não numa base.
+  const anyTeam = ctx.ffa || zombie || ctx.party.jugg !== null;
   // M2 (fase 5d): no Bobo Training, os bots (fora do time do jogador) nascem só nos pontos sem time, longe de qualquer
   // bobo: os alvos se espalham pela arena em vez de ir para a base do outro time.
   const spread = ctx.training && s.team[e] !== 0;
@@ -767,7 +771,7 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.slot[e] = first < 0 ? 0 : first;
   s.weapon[e] = s.loadout[k + s.slot[e]!]!;
   // M6 (fase 2): a arma do nível (Gun Game) ou a faca do infectado.
-  if (ctx.party.ladder !== null || ctx.party.infectedSpeed > 0) partyLoadout(ctx, e);
+  if (partyActive(ctx.party)) partyLoadout(ctx, e);
   s.cookTicks[e] = -1;
   s.quickNade[e] = 0;
   s.adsAmount[e] = 0;

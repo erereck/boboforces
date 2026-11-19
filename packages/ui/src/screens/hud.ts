@@ -139,6 +139,12 @@ export interface HudModel {
   /** M6 (fase 2): `points` é o nível do Gun Game (o rótulo diz NÍVEL). */
   pointsIsLevel: boolean;
   /**
+   * M6 (fase 3): o marcador do Jugg (x, y em px da superfície; o `game` põe na borda da vista quando ele está fora: o
+   * Jugg aparece sempre), ligado por `juggMarkOn`.
+   */
+  readonly juggMark: Float32Array;
+  juggMarkOn: boolean;
+  /**
    * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
    * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
    */
@@ -276,6 +282,8 @@ export function createHudModel(): HudModel {
     pointMarkOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
     pointMarkCount: 0,
     pointsIsLevel: false,
+    juggMark: new Float32Array(2),
+    juggMarkOn: false,
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
@@ -414,6 +422,8 @@ interface HudTexts {
   readonly pointLetters: readonly string[];
   /** M6 (fase 2): o nível do Gun Game no lugar dos pontos. */
   readonly level: string;
+  /** M6 (fase 3): a plaquinha em cima do Jugg. */
+  readonly jugg: string;
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -451,6 +461,7 @@ function hudTexts(): HudTexts {
     perkLetters: [t('perk.chonky'), t('perk.speedy'), t('perk.buddy')].map((n) => n.slice(0, 1).toUpperCase()),
     pointLetters: [...t('hud.pointLetters')],
     level: t('hud.level').toUpperCase(),
+    jugg: t('hud.jugg').toUpperCase(),
   };
   return cachedTexts;
 }
@@ -576,6 +587,32 @@ function drawPointMark(
     pointColor(owner),
   );
   paintText(out, hud, letter, left + w / 2, top + pad, px, pointColor(owner), 0, 0.5);
+}
+
+/**
+ * M6 (fase 3): a plaquinha JUGG em cima do Jugg, na cor do time dele. Ao contrário das letras dos pontos, nunca some:
+ * fica presa dentro da vista (o `game` já põe na borda quando ele está fora).
+ */
+function drawJuggMark(
+  out: DrawList,
+  hud: MsdfFont | null,
+  label: string,
+  x: number,
+  y: number,
+  px: number,
+  scale: number,
+  view: HudViewport,
+): void {
+  if (hud === null || label === '') return;
+  const pad = hudPad(scale);
+  const h = Math.round(capHeightPx(hud, px) + pad * 2);
+  const w = Math.max(h, Math.round(textWidth(hud, label, px) + pad * 2));
+  const left = Math.round(Math.min(Math.max(x - w / 2, view.x), view.x + view.width - w));
+  const top = Math.round(Math.min(Math.max(y - h / 2, view.y), view.y + view.height - h));
+  plate(out, left, top, w, h, scale);
+  const bar = Math.max(2, Math.round(3 * scale));
+  pushRect(out, left, top + h - bar, w, bar, pointColor(1));
+  paintText(out, hud, label, left + w / 2, top + pad, px, pointColor(1), 0, 0.5);
 }
 
 function drawPing(out: DrawList, x: number, y: number, unit: number, view: HudViewport): void {
@@ -801,6 +838,9 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
         s,
         view,
       );
+    }
+    if (model.juggMarkOn) {
+      drawJuggMark(out, hud, hudTexts().jugg, model.juggMark[0]!, model.juggMark[1]!, labelPx, s, view);
     }
   }
 

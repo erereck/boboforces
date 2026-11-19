@@ -102,6 +102,7 @@ import {
   predictThrow,
   figurePostureOf,
   isFfaMode,
+  juggernautHp,
   makeEntityId,
   MATCH_DEFAULTS,
   METRICS,
@@ -122,6 +123,7 @@ import {
   heldReserve,
   MAX_CONTROLLERS,
   WEAPON_CODE,
+  WEAPON_BIG_BRRT,
   WEAPON_DESMONTADOR,
   WEAPON_GOO,
   WEAPON_SPIT,
@@ -271,7 +273,7 @@ import {
   type DeathState,
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
-import { projectToView, type ProjectCamera, type ProjectRect } from './markers.ts';
+import { projectToEdge, projectToView, type ProjectCamera, type ProjectRect } from './markers.ts';
 import {
   createMatchStats,
   localMatchRecord,
@@ -462,6 +464,8 @@ const MEMORY_LOG_EVERY_S = 60;
 const NET_LOG_EVERY_S = 30;
 /** M6 (fase 1): a letra do ponto do Domination fica a esta altura acima do anel (m). */
 const POINT_MARK_HEIGHT_M = 2.2;
+/** M6 (fase 3): a altura da plaquinha JUGG acima dos pés do Jugg (m). */
+const JUGG_MARK_HEIGHT_M = 2.4;
 /** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
 const PROGRAM_CHECK_FRAMES = 120;
 
@@ -735,6 +739,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const recipe = setup.recipe.recipe;
   const humans = setup.recipe.humans;
   const ffa = isFfaMode(recipe.mode);
+  /**
+   * M6 (fase 3): o Juggernaut. Os caçadores são um time (sem fogo amigo, os marcadores dos aliados), mas o placar e o
+   * vencedor são de cada um (os pontos de Jugg): `solo` vale para o resultado e o placar do alto.
+   */
+  const juggernaut = recipe.mode === 'juggernaut';
+  const solo = ffa || juggernaut;
   const warnings: string[] = [...request.benchWarnings, ...setup.warnings, ...setup.recipe.warnings];
   // Alarme do orçamento de skins (#56, PLANO §B15): conjunto além da reserva veste o padrão do próprio time.
   if (figures.plan.overflow.length > 0) {
@@ -854,10 +864,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
   // M3 (fase 4e): o Desmontador fica fora de `WEAPONS` (só da caixa), mas tem nome e categoria no HUD.
   weaponNames[WEAPON_DESMONTADOR] = t('weapon.desmontador');
+  // M6 (fase 3): a Big Brrt (só do Jugg) também.
+  weaponNames[WEAPON_BIG_BRRT] = t('weapon.big-brrt' as StringKey);
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
   weaponCategories[WEAPON_DESMONTADOR] = t('weapon.category.explosive');
+  weaponCategories[WEAPON_BIG_BRRT] = t('weapon.category.lmg');
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
   // M5 (fase 4c): online, cada humano com o nome que escolheu na sala (o filtro do atlas: veio de outro aparelho).
@@ -884,6 +897,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     localEntity: (p) => (p < seatCtrl.length ? sim.controllerEntity(seatCtrl[p]!) : NULL_ENTITY),
     hitmarker: showHitmarker,
     ffa,
+    soloWinner: juggernaut,
   });
   /** M2 (fecho da fase 3): as regras ativas de cada controlador (placar e tela de morte). */
   const ruleTexts = controllerRules(recipe, humans);
@@ -942,7 +956,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? (presetLevel(request.recipe) ?? 'normal')
         : (request.level ?? 'normal');
   /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
-  const challengeTeam = ffa ? -1 : 1;
+  const challengeTeam = solo ? -1 : 1;
   let unstuckPending = false;
   let matchStats = createMatchStats(1);
   let endedAt = -1;
@@ -970,14 +984,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
   const desmontadorModel = modelIndex.get('desmontador') ?? NO_MODEL;
   const boltModel = modelIndex.get('desmontador-bolt') ?? NO_MODEL;
+  const bigBrrtModel = modelIndex.get('big-brrt') ?? weaponModel[WEAPON_CODE.lmg]!;
   const modelOf = (code: number): number =>
     code === WEAPON_DESMONTADOR
       ? desmontadorModel
-      : code === WEAPON_SPIT
-        ? weaponModel[WEAPON_CODE.grenade]!
-        : code >= 0 && code < weaponModel.length
-          ? weaponModel[code]!
-          : NO_MODEL;
+      : code === WEAPON_BIG_BRRT
+        ? bigBrrtModel
+        : code === WEAPON_SPIT
+          ? weaponModel[WEAPON_CODE.grenade]!
+          : code >= 0 && code < weaponModel.length
+            ? weaponModel[code]!
+            : NO_MODEL;
   /** M3 (fase 4d): o modelo de cada drop (munição cheia, bomba, pontos em dobro, insta-kill, carpinteiro). */
   const dropModels = [
     ammoBoxModel,
@@ -999,6 +1016,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** Skin (1ª das `FIGURE_SKIN_LAYERS` camadas; 0xffff = ainda não resolvida) e gabarito do boneco de cada entidade. */
   let skinLayer = new Uint16Array(1);
   let figureOf = new Uint8Array(1);
+  /** M6 (fase 3): o time com que a figura foi resolvida (no Juggernaut a roupa troca quando o time muda). */
+  let figureTeam = new Uint8Array(1);
   /**
    * Velocidade de cada entidade no tick anterior e no atual (m/s): o render recebe a interpolada pelo `alpha`, sem o
    * degrau do tick (o rig do boneco filtra a aceleração; saltos viram tranco nas molas, pedido da F4).
@@ -1487,6 +1506,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * pelo controlador no time dele (sem time no FFA). Tabelas prontas do loading: sem alocação.
    */
   function resolveEntityFigure(v: SimView, i: number): void {
+    figureTeam[i] = v.team[i]!;
     // M6 (fase 2): o infectado tem a cara do bobo-zumbi.
     if (infection && v.kind[i] === ENTITY_KIND.bobo && v.team[i] === 1) {
       figureOf[i] = figures.zombieFigureOf(ZOMBIE_TYPE.walker);
@@ -1503,8 +1523,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const team = ffa || v.team[i] === NO_TEAM ? -1 : v.team[i]!;
     // M2 (fase 6c): o jogador 1 veste o Meu Bobo.
     if (humans > 0 && v.controller[i] === me) {
-      figureOf[i] = figures.playerFigure(team);
-      skinLayer[i] = figures.playerSkin(team);
+      // M6 (fase 3): o Meu Bobo só existe no time 0; o P1 que vira o Jugg continua com ele.
+      figureOf[i] = figures.playerFigure(juggernaut ? 0 : team);
+      skinLayer[i] = figures.playerSkin(juggernaut ? 0 : team);
       return;
     }
     const c = Math.max(0, v.controller[i]!);
@@ -1523,6 +1544,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     walkPhase = new Float32Array(capacity);
     skinLayer = new Uint16Array(capacity).fill(0xffff);
     figureOf = new Uint8Array(capacity).fill(NO_FIGURE);
+    figureTeam = new Uint8Array(capacity);
     velPrev = new Float32Array(capacity * 3);
     velCur = new Float32Array(capacity * 3);
   }
@@ -1797,6 +1819,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         default:
           break;
+      }
+    }
+    // M6 (fase 3): o Jugg trocou de mãos (ou foi sorteado): o kill feed avisa.
+    if (juggernaut) {
+      const j = juggIndex(v);
+      if (j !== lastJugg) {
+        lastJugg = j;
+        if (j >= 0) feedJugg(v, j);
       }
     }
   };
@@ -2882,7 +2912,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function showResult(record: boolean, previewRecord: 'kills' | 'streak' | 'both' | null = null): void {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
-    const sum = summarizeMatch(matchStats, v, human, ffa);
+    const sum = summarizeMatch(matchStats, v, human, solo, juggernaut);
     resultNemesis = sum.nemesis;
     // M2 (fase 4g): a partida vai para o `stats@1` (o bench não tem humano). Rodada 8 (D5): em tela dividida, todos os
     // jogadores locais somados (os humanos são os controladores 0..humans-1).
@@ -2894,7 +2924,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const locals: number[] = [];
       for (let p = 0; p < humans; p++) locals.push(entityIndex(sim.controllerEntity(p)));
       const zombies = zombiesMode ? { key: zombieKey, wave: v.match.zombieWave } : undefined;
-      breaks = host.stats.record(localMatchRecord(matchStats, v, locals, ffa, Math.round(timeS), zombies));
+      breaks = host.stats.record(localMatchRecord(matchStats, v, locals, solo, Math.round(timeS), zombies));
     }
     if (zombiesMode) {
       showZombiesResult(sum.outcome === 'win', previousWave, breaks !== null, breaks?.zombieWave === true);
@@ -2921,7 +2951,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? t('result.win')
         : sum.outcome === 'draw'
           ? t('result.draw')
-          : ffa && sum.winner >= 0
+          : solo && sum.winner >= 0
             ? t('result.ffaWinner', { name: nm(sum.winner) })
             : t('result.loss');
     const data: ResultScreenData = {
@@ -3091,8 +3121,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (firing[i]! > 0) pose |= ACTOR_POSE.firing;
       if (timeS - spawnT[i]! < SPAWN_S) pose |= ACTOR_POSE.spawning;
       actors.pose[n] = pose;
-      // M6 (fase 2): o 1º infectado muda de time vivo (sem o evento de spawn): a cara troca aqui.
-      if (skinLayer[i] === 0xffff || (infection && (v.team[i] === 1) !== (figureOf[i] === infectedFigure))) {
+      // M6 (fase 2): o 1º infectado muda de time vivo (sem o evento de spawn): a cara troca aqui. Fase 3: o Jugg também
+      // muda de time vivo (quem derruba o Jugg), e a roupa é a do time.
+      if (
+        skinLayer[i] === 0xffff ||
+        (infection && (v.team[i] === 1) !== (figureOf[i] === infectedFigure)) ||
+        (juggernaut && figureTeam[i] !== v.team[i])
+      ) {
         resolveEntityFigure(v, i);
       }
       actors.skin[n] = skinLayer[i]!;
@@ -3539,6 +3574,41 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     lost: t('feed.pointLost'),
     points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
   };
+  /** M6 (fase 3): o Jugg vivo agora (índice), ou -1. */
+  function juggIndex(v: SimView): number {
+    for (let i = 0; i < v.count; i++) {
+      if (
+        v.alive[i] === 1 &&
+        v.kind[i] === ENTITY_KIND.bobo &&
+        v.team[i] === 1 &&
+        (v.flags[i]! & ENTITY_FLAG.dead) === 0
+      )
+        return i;
+    }
+    return -1;
+  }
+  /** M6 (fase 3): quantos caçam o Jugg (a conta da vida dele, a mesma da sim). */
+  function huntersOf(v: SimView): number {
+    let n = 0;
+    for (let i = 0; i < v.count; i++) if (v.alive[i] === 1 && v.kind[i] === ENTITY_KIND.bobo && v.team[i] !== 1) n++;
+    return n;
+  }
+  /** O Jugg da última olhada (para o kill feed avisar quando ele muda). */
+  let lastJugg = -1;
+  const juggFeed = { is: t('feed.juggIs' as StringKey), jugg: t('feed.jugg' as StringKey) };
+  /** M6 (fase 3): "Fulano  virou o  Jugg". */
+  function feedJugg(v: SimView, j: number): void {
+    if (!showKillFeed) return;
+    pushKillFeed(
+      killFeed,
+      nameOf(v, j),
+      TEAM_COLORS[1] ?? COLORS.texto,
+      juggFeed.is,
+      juggFeed.jugg,
+      COLORS.acao,
+      false,
+    );
+  }
   /** M6 (fase 1): um ponto do Domination mudou de dono ("Laranja  capturou  Ponto B"). */
   function feedPoint(index: number, team: number, captured: boolean): void {
     if (!showKillFeed) return;
@@ -3562,7 +3632,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       let k = n++;
       while (k > 0) {
         const p = scoreOrder[k - 1]!;
-        const better = v.kills[i]! > v.kills[p]! || (v.kills[i] === v.kills[p] && v.deaths[i]! < v.deaths[p]!);
+        // M6 (fase 3): no Juggernaut a ordem é a dos pontos de Jugg (depois os abates).
+        const pi = juggernaut ? v.points[i]! - v.points[p]! : 0;
+        const better =
+          pi > 0 ||
+          (pi === 0 && (v.kills[i]! > v.kills[p]! || (v.kills[i] === v.kills[p] && v.deaths[i]! < v.deaths[p]!)));
         if (!better) break;
         scoreOrder[k] = p;
         k--;
@@ -3570,7 +3644,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       scoreOrder[k] = i;
     }
     scoreboard.rowCount = n;
-    scoreboard.teamCount = ffa ? 0 : recipe.teams.length;
+    scoreboard.teamCount = solo ? 0 : recipe.teams.length;
     for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
       scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;
     const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
@@ -3896,7 +3970,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
     // M3 (fase 2d): Bobo Zombies.
     // M6 (fase 2): no Gun Game, o nível (de 1 até o tamanho da escada).
-    m.points = zombiesMode ? v.points[e]! : gunGame ? v.points[e]! + 1 : -1;
+    // M6 (fase 3): no Juggernaut, os pontos de Jugg; a vida do Jugg é a dele (300 por caçador).
+    m.points = zombiesMode || juggernaut ? v.points[e]! : gunGame ? v.points[e]! + 1 : -1;
+    if (juggernaut && v.team[e] === 1) m.maxHealth = Math.max(juggernautHp(huntersOf(v)), m.health);
     m.pointsIsLevel = gunGame;
     // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
     m.perks = zombiesMode ? v.perks[e]! : 0;
@@ -4100,6 +4176,26 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.pointMarks[k * 2 + 1] = projected[1]!;
         m.pointMarkIndex[k] = i;
         m.pointMarkOwner[k] = cp.owner[i]!;
+      }
+    }
+    // M6 (fase 3): o Jugg aparece sempre para quem caça (na borda da vista quando está fora dela).
+    m.juggMarkOn = false;
+    if (juggernaut && v.team[e] !== 1) {
+      const j = juggIndex(v);
+      if (j >= 0) {
+        const rect = lay.rects[s]!;
+        projectToEdge(
+          desc.camera,
+          rect,
+          v.position[j * 3]!,
+          v.position[j * 3 + 1]! + JUGG_MARK_HEIGHT_M,
+          v.position[j * 3 + 2]!,
+          Math.max(16, rect.height * 0.06),
+          projected,
+        );
+        m.juggMark[0] = projected[0]!;
+        m.juggMark[1] = projected[1]!;
+        m.juggMarkOn = true;
       }
     }
     // M2 (fase 2d): marcadores dos aliados (TDM), projetados com a câmera desta vista.
@@ -5052,7 +5148,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           } else if (zombiesMode) {
             sharedHud.teamCount = 0;
             refreshZombieLine();
-          } else if (!ffa && request.kind === 'play') {
+          } else if (!ffa && !juggernaut && request.kind === 'play') {
             sharedHud.teamCount = 2;
             const score = sim.view().match.teamScore;
             sharedHud.teamScores[0] = score[0]!;

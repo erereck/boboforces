@@ -577,6 +577,58 @@ export function desmontador(): BuiltModel {
   return m.build();
 }
 
+/**
+ * M6 (fase 3): a Big Brrt, a minigun do Jugg (GDD §5.5): o feixe de 4 canos com as duas braçadeiras, a carcaça do
+ * rotor com a faixa laranja, o motor atrás, a alça de carregar em cima e a caixa de munição amarela do lado com a
+ * calha da fita. Segura como fuzil (o id não está em `WEAPONS`).
+ */
+export function bigBrrt(): BuiltModel {
+  const ORANGE = tone('laranja', 2);
+  const yellow = tone('amarelo', 1);
+  const m = new ModelBuilder('big-brrt', 'weapon', { flags: 0, debrisColor: GUNMETAL_DARK, blocksNav: false });
+  const L = m.layer('mdl_big_brrt', 'opaque', GUNMETAL_DARK);
+  const body = m.part('body');
+  const mag = m.part('mag', body.index, [-5, -1, -3]);
+  // Carcaça do rotor (a faixa laranja de lado) e o motor atrás.
+  body.box([-3, -1, -10], [6, 6, 13], L, combine(shaded(GUNMETAL), stripeRow(1, ORANGE)));
+  body.box([-2, 0, 3], [4, 4, 4], L, (face, p) => {
+    shaded(GUNMETAL_DARK)(face, p);
+    if (face === 'back') p.rect(1, 1, 2, 2, ORANGE);
+  });
+  // Empunhadura com sulcos e a guarda.
+  body.box([-1, -6, 1], [2, 5, 3], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  body.box([-1, -2, -2], [2, 1, 3], L, shaded(POLYMER_DARK));
+  // O feixe de canos (2 × 2) e as braçadeiras.
+  const barrel = body.box([-1.5, 0.5, -32], [1, 1, 22], L, shaded(GUNMETAL_DARK));
+  body.boxLike([0.5, 0.5, -32], barrel);
+  body.boxLike([-1.5, 2.5, -32], barrel);
+  body.boxLike([0.5, 2.5, -32], barrel);
+  body.box([-2.5, -0.5, -22], [5, 5, 1], L, shaded(GUNMETAL));
+  body.box(
+    [-2.5, -0.5, -32.5],
+    [5, 5, 1],
+    L,
+    shaded(GUNMETAL, (face, p) => face === 'front' && p.rect(1, 1, 3, 3, tone('neutro', 0))),
+  );
+  // Alça de carregar em cima (a barra e os dois pés).
+  body.box([-0.5, 6, -8], [1, 1, 9], L, shaded(POLYMER_DARK));
+  const post = body.box([-0.5, 5, -8], [1, 1, 1], L, shaded(GUNMETAL_DARK));
+  body.boxLike([-0.5, 5, 0], post);
+  // Calha da fita, da caixa até a carcaça.
+  body.box([-4, 2, -6], [1, 2, 4], L, shaded(yellow));
+  // Caixa de munição amarela, do lado esquerdo.
+  mag.box([-2, -4, -3.5], [4, 6, 7], L, (face, p) => {
+    shaded(yellow)(face, p);
+    if (SIDE(face)) p.rect(1, 1, p.w - 2, 1, tone('amarelo', 0));
+  });
+  m.socket('hand_r', body.index, [0, -2.5, 2.5], FORWARD);
+  m.socket('hand_l', body.index, [0, 6.5, -4], FORWARD);
+  m.socket('muzzle', body.index, [0, 2, -33], FORWARD);
+  m.socket('mag', body.index, [-5, -1, -3], DOWN);
+  m.socket('sight', body.index, [0, 7, -2], FORWARD);
+  return m.build();
+}
+
 export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   pistol,
   rifle,
@@ -589,4 +641,5 @@ export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   lmg,
   rocketShell,
   desmontador,
+  bigBrrt,
 ];

@@ -508,7 +508,9 @@ export function weaponDef(code: number): WeaponDef | null {
       ? ZOMBIE_SPIT
       : code === WEAPON_DESMONTADOR
         ? DESMONTADOR
-        : null;
+        : code === WEAPON_BIG_BRRT
+          ? BIG_BRRT
+          : null;
 }
 
 /**
@@ -603,3 +605,38 @@ export const DESMONTADOR: WeaponDef = {
   recoilKickDeg: 1,
   recoilMaxDeg: 2,
 };
+
+/**
+ * M6 (fase 3): a minigun do Jugg, a Big Brrt (GDD §5.5: 15 de dano, 1200/min, pente infinito, superaquece depois de 6 s
+ * de fogo contínuo). Fora de `WEAPONS`, como o Desmontador: só o Jugg tem (não entra nos menus, no loadout, na escada
+ * nem na caixa). O pente é o calor: os 120 tiros são os 6 s de fogo; parada, ela esfria (o pente volta,
+ * `BIG_BRRT_COOL`), e no zero superaquece e trava como uma recarga (`reloadS` é o tempo de esfriar). A reserva é
+ * infinita pela regra do Jugg. Dispersão e recuo meus (revisáveis).
+ */
+export const WEAPON_BIG_BRRT = 12;
+
+export const BIG_BRRT: WeaponDef = {
+  ...WEAPON_LMG,
+  id: 'big-brrt',
+  code: WEAPON_BIG_BRRT,
+  damage: 15,
+  minDamage: 10,
+  falloffStartM: 25,
+  falloffEndM: 50,
+  rpm: 1200,
+  clipSize: 120,
+  reserve: 120,
+  reloadS: 2.5,
+  hipSpreadDeg: 3,
+  adsSpreadMul: 0.6,
+  adsInS: 0.4,
+  adsZoom: 1.1,
+  recoilKickDeg: 0.12,
+  recoilMaxDeg: 2.5,
+  recoilPatternDeg: 0.2,
+  recoilYawNoiseDeg: 0.2,
+  killForce: 8,
+};
+
+/** A Big Brrt esfria depois de `delayS` sem atirar: o pente volta `perS` tiros por segundo (cheio em 2 s). */
+export const BIG_BRRT_COOL = { delayS: 0.3, perS: 60 } as const;

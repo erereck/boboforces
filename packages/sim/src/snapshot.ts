@@ -3,6 +3,7 @@ import { MAX_CONTROLLERS_WITH_ZOMBIES, MAX_TEAMS } from './constants.ts';
 import type { SimContext } from './context.ts';
 import type { StateArray } from './state.ts';
 import type { MatchPhase } from './view.ts';
+import { partyActive, syncJuggRules } from './systems/party.ts';
 
 /**
  * Snapshot simples (M0) e hash do estado. Os dois percorrem a MESMA lista (`SimState.fields`, na ordem fixa) até
@@ -19,7 +20,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 12;
+const SNAPSHOT_VERSION = 13;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -67,14 +68,15 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   // M6 (fase 1): os pontos do Domination (só nele: o hash dos outros modos não muda).
   const cp = ctx.domination;
   if (cp !== null) h.bytes(cp.owner).bytes(cp.progress).bytes(cp.scoreTicks);
-  // M6 (fase 2): o Gun Game e o Infection (só neles).
+  // M6 (fase 2): o Gun Game e o Infection (só neles). Fase 3: o Juggernaut, com o relógio do ponto do Jugg.
   const party = ctx.party;
-  if (party.ladder !== null || party.infectedSpeed > 0) {
+  if (partyActive(party)) {
     h.i32(party.started ? 1 : 0)
       .i32(party.winnerEntity | 0)
       .i32(party.winnerTeam);
     ctx.rngParty.saveState(rngScratch);
     h.bytes(rngScratch);
+    if (party.jugg !== null) h.i32(party.juggTicks);
   }
   return h.digest();
 }
@@ -164,12 +166,13 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, cp.scoreTicks, cp.scoreTicks.length);
     }
     const party = ctx.party;
-    if (party.ladder !== null || party.infectedSpeed > 0) {
+    if (partyActive(party)) {
       w.writeBits(party.started ? 1 : 0, 8);
       w.writeBits(party.winnerEntity >>> 0, 32);
       w.writeBits(party.winnerTeam >>> 0, 32);
       ctx.rngParty.saveState(rngScratch);
       writeArray(w, rngScratch, RNG_STATE_WORDS);
+      if (party.jugg !== null) w.writeBits(party.juggTicks >>> 0, 32);
     }
   }
 }
@@ -251,12 +254,17 @@ export function readState(ctx: SimContext, r: BitReader): void {
       readArray(r, cp.scoreTicks, cp.scoreTicks.length);
     }
     const party = ctx.party;
-    if (party.ladder !== null || party.infectedSpeed > 0) {
+    if (partyActive(party)) {
       party.started = r.readBits(8) === 1;
       party.winnerEntity = r.readBits(32) >>> 0;
       party.winnerTeam = r.readBits(32) | 0;
       readArray(r, rngScratch, RNG_STATE_WORDS);
       ctx.rngParty.loadState(rngScratch);
+      if (party.jugg !== null) {
+        party.juggTicks = r.readBits(32) | 0;
+        // As regras saem do time que acabou de chegar.
+        syncJuggRules(ctx);
+      }
     }
   }
 }

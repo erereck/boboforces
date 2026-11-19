@@ -12,6 +12,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   // M6 (fase 2): os presets de festa.
   { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
   { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
+  // M6 (fase 3).
+  { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -53,6 +55,18 @@ export function moreModePreset(id: string): MatchRecipe | null {
         seed: 0,
         match: { timeLimitS: 180, scoreLimit: 0 },
         infection: {},
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 7 }] }, { bots: [] }],
+      };
+    case 'juggernaut':
+      // A variante Rodízio (GDD §4.1.2): todos caçam (o time 0) e um sorteado começa Jugg (o time 1); 150 pontos (1 por
+      // segundo de Jugg) ou 10 min.
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Juggernaut',
+        mode: 'juggernaut',
+        map: 'construto',
+        seed: 0,
+        match: { timeLimitS: 600, scoreLimit: 150 },
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 7 }] }, { bots: [] }],
       };
     default:

@@ -53,8 +53,8 @@ export function isFfaMode(mode: string): boolean {
 
 /**
  * Família Bobo Warfare (regeneração, respawn padrão, caixinha de munição). M2 (fase 5d): o Bobo Training joga com as
- * mesmas regras (sem placar e sem fim: tempo e meta zerados).
+ * mesmas regras (sem placar e sem fim: tempo e meta zerados). M6 (fase 3): o Juggernaut também.
  */
 export function isWarfareMode(mode: string): boolean {
-  return mode.startsWith('warfare.') || mode === 'training';
+  return mode.startsWith('warfare.') || mode === 'training' || mode === 'juggernaut';
 }

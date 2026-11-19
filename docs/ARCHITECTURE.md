@@ -3608,3 +3608,54 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **O infectado pela rede:** a velocidade dele (1,2x) mora nas regras do bobo, que não viajam no snapshot; a predição do
   amigo infectado andava como sobrevivente e era puxada de volta a cada snapshot. Agora o `Sim.remote.commit` acerta a
   velocidade pelo time (que viaja). Teste: o amigo infectado desde o começo, 0,4% de predições erradas (21 em 5.308).
+
+### 17.4 Fase 3: Juggernaut (19/11/2026)
+
+- **A receita:** `mode: 'juggernaut'` (o id de conteúdo já existia), com os caçadores no time 0 e o time 1 vazio; o
+  card é a variante Rodízio (`moreModePreset('juggernaut')`: Construto, 8 bobos, 150 pontos ou 10 min). O modo joga
+  com as regras do Warfare (`isWarfareMode`: regeneração, respawn, caixinha de munição). A variante Fixo (rodadas de
+  3 min com rodízio) fica para quando houver rodadas (BoboStrike, M7).
+- **A sim** (`sim/src/systems/party.ts`, `PartyState.jugg`):
+  - O Jugg é o único bobo do time 1. Na largada (e sempre que falta um), um caçador vivo sorteado (`rngParty`) vira o
+    Jugg; quem dá o golpe final no Jugg vira o próximo na hora (o time, a vida cheia de Jugg, só a Big Brrt na mão), e o
+    caído volta a caçar (renasce com o loadout e a vida de sempre).
+  - **As regras do Jugg** (vida de `300 × caçadores`, mínimo 1000; 0,75x; `headshotImmune`; reserva infinita) vão nas
+    regras do bobo (`ctx.rules`, fora do estado). As de antes ficam guardadas em `PartyState.jugg` e voltam quando ele
+    cai. Como as regras saem do time (que o estado leva), o `syncJuggRules` as acerta a cada tick no host, ao ler um
+    snapshot e no `Sim.remote.commit` do amigo (a predição do amigo Jugg anda a 0,75x como no host).
+  - **Os pontos:** cada segundo vivo como Jugg vale 1 ponto (`SimState.points`; o relógio do segundo é
+    `PartyState.juggTicks`). A meta (`scoreLimit`) dá a vitória a ele (`winnerEntity`); no fim do tempo, o `leader`
+    olha os pontos de cada um, como no FFA (o Juggernaut é de cada um, mesmo com os caçadores no mesmo time). O placar
+    dos times não anda.
+  - **Os spawns:** todos começam espalhados (o sorteado não nasce no meio dos caçadores) e os caçadores renascem em
+    qualquer ponto (longe do Jugg), não numa base.
+  - O estado (o sorteio, o vencedor, `juggTicks`) entra no hash e no snapshot só no modo (`SNAPSHOT_VERSION` 13).
+- **A Big Brrt** (`WEAPON_BIG_BRRT` = 12, fora de `WEAPONS` como o Desmontador): 15 de dano, 1200/min. O pente é o
+  calor: 120 tiros são os 6 s de fogo contínuo; parada por 0,3 s, ela esfria 60 tiros por segundo; no zero, a recarga
+  (2,5 s) é o superaquecimento. O modelo (`model:big-brrt`, 15 caixas, 180 triângulos: o feixe de 4 canos, a caixa de
+  munição amarela, a alça) usa a 31ª das 32 camadas do `modelos64`; o tiro é o da SMG uma quarta abaixo, 20% mais
+  baixo.
+- **A IA:** no Juggernaut, o passeio do caçador é um nó a até 5 m do Jugg (o grupo cerca, em vez de fazer fila) e o do
+  Jugg é o caçador vivo mais perto (`pickJuggGoal`).
+- **O jogo:** o HUD mostra os PONTOS de Jugg e, para o Jugg, a vida dele (a mesma conta da sim); a plaquinha JUGG fica
+  sempre na tela de quem caça (`projectToEdge`: fora da vista ou atrás, vai para a borda na direção dele); o kill feed
+  avisa "Fulano virou o Jugg"; o placar do alto mostra só o relógio; o resultado é de cada um (o vencedor e os pontos).
+- **A rede:** nada novo no protocolo (o time, a vida e os pontos já viajam); a Big Brrt, o Jugg e os pontos do
+  Domination entraram no hash de conteúdo (quem está com o jogo velho vê "Atualize a página").
+- **Golden** (8 bots Normal no Construto, semente 42, 3 min): `f7c0ff3a`, com 4 Juggs e o melhor com 71 pontos. Os
+  outros goldens não mudaram.
+- **A revisão (Opus)** achou 7 coisas, corrigidas antes do commit:
+  - **(alta)** quem a sala ou o sofá punha no time 1 começava Jugg com 100 de vida (ou dois Juggs). Agora todos nascem
+    caçando (o `createSim` põe o time 0 no Juggernaut), o `juggernautSystem` rebaixa qualquer Jugg a mais, e a sala e
+    o sofá não oferecem a escolha de time no modo;
+  - a Big Brrt não recarrega no botão (o R do bot no passeio a travava 2,5 s): só o superaquecimento trava;
+  - o som do fim é o de cada um (`soloWinner`), como o resultado;
+  - a predição do amigo acerta as regras do Jugg pelo time mais novo (`SimPredict.load`), e a barra de vida do Jugg
+    não passa do cheio enquanto os times atrasados chegam;
+  - o Destravar que manda o Jugg para um spawn não o cura nem dá proteção;
+  - o placar do Tab é de cada um (pelos pontos de Jugg) e o Ajustar desafio mexe em todos os bots;
+  - o P1 que vira o Jugg continua com o Meu Bobo.
+- **O smoke da web** (`scripts/smoke-web.ts`): o mesmo build deu de 0,4 a 3,1 s de splash no runner do CI (a 1ª aba de
+  um navegador recém-aberto paga a partida do processo da GPU), e o CI do 72a34e5 caiu por isso. Acima do limite, o
+  splash é medido de novo em até 2 abas novas e vale a menor (`splashTriesMs` no relatório). Decisão minha, revisável.
+- **Online:** o amigo caçando numa sala de 90 s (a meta não chega): o Jugg troca de mãos igual nos dois lados, o mesmo fim e os mesmos pontos, 0,33% de predições erradas (9 em 2.694).

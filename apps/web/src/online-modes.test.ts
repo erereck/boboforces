@@ -193,6 +193,27 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M6 (fase 3): Juggernaut com o amigo caçando: o Jugg troca de mãos igual nos dois lados e o mesmo fim', () => {
+    const base = moreModePreset('juggernaut')!;
+    // 90 s em vez de 10 min (a meta de 150 não chega: vence quem tiver mais pontos de Jugg).
+    const r: MatchRecipe = { ...base, match: { ...base.match, timeLimitS: 90 } };
+    const run = playRoom(r, [0, 0], { snapshotHz: 30, zombies: 0, maxS: 120 });
+    expectSameResult(run);
+    const h = run.host.sim.view();
+    const v = run.clients[0]!.sim.view();
+    // Quem é o Jugg no fim (o time) e a vida dele chegam iguais.
+    for (let e = 0; e < h.count; e++) expect(v.team[e], `time da entidade ${e}`).toBe(h.team[e]);
+    let best = 0;
+    for (let e = 0; e < h.count; e++) best = Math.max(best, h.points[e]!);
+    expect(best).toBeGreaterThan(10);
+    const net = run.clients[0]!.net!;
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    console.log(
+      `[modos] Juggernaut: ${run.seconds.toFixed(1)} s, o melhor com ${best} pontos, vencedor ${h.match.winnerEntity}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 240_000);
+
   it('M6 (fase 2): Infection com o amigo infectado desde o começo: o mesmo fim, e a predição dele anda como no host', () => {
     const r = moreModePreset('infection')!;
     // O amigo escolhe o time 1: começa infectado (1,2x de velocidade), e a predição dele precisa saber disso.

@@ -70,7 +70,15 @@ function unstuck(ctx: SimContext, e: number): void {
   const bot = s.controller[e]! >= BOT_CONTROLLER_BASE;
   s.unstuckCount[e] = Math.min(255, s.unstuckCount[e]! + 1);
   if ((bot && s.unstuckCount[e]! >= MATCH_DEFAULTS.botUnstuckRespawnAt) || !findNode(ctx, bot)) {
+    // M6 (fase 3, revisão): o Jugg destravado no spawn continua com a vida que tinha e sem proteção.
+    const jugg = ctx.party.jugg !== null && s.team[e] === 1;
+    const health = s.health[e]!;
     respawn(ctx, e, pickSpawn(ctx, e));
+    if (jugg) {
+      s.health[e] = health;
+      s.spawnProtectTicks[e] = 0;
+      s.flags[e] = s.flags[e]! & ~ENTITY_FLAG.spawnProtected;
+    }
     ctx.events.unstuck(ctx.tick, s.idOf(e), from, 0, s.position[e3]!, s.position[e3 + 1]!, s.position[e3 + 2]!, true);
     return;
   }

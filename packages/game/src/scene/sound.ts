@@ -13,6 +13,7 @@ import {
   NULL_ENTITY,
   SIM_HZ,
   WEAPON_CODE,
+  WEAPON_BIG_BRRT,
   WEAPON_DESMONTADOR,
   ENTITY_KIND,
   PICKUP_KIND,
@@ -110,12 +111,13 @@ const IMPACT_SOUND: readonly SoundId[] = [
   'impacto-macio',
 ];
 
-/** Tiro de cada arma (código da sim) → [perto, longe]; a LMG usa o do fuzil. */
+/** Tiro de cada arma (código da sim) → [perto, longe]; a LMG usa o do fuzil e a Big Brrt o da SMG (mais grave). */
 function shotSounds(weapon: number): readonly [SoundId, SoundId] | null {
   switch (weapon) {
     case WEAPON_CODE.pistol:
       return ['tiro-pistola', 'tiro-pistola-longe'];
     case WEAPON_CODE.smg:
+    case WEAPON_BIG_BRRT:
       return ['tiro-smg', 'tiro-smg-longe'];
     case WEAPON_CODE.rifle:
     case WEAPON_CODE.lmg:
@@ -130,6 +132,10 @@ function shotSounds(weapon: number): readonly [SoundId, SoundId] | null {
 }
 
 const SOUND_INDEX: ReadonlyMap<SoundId, number> = new Map(SOUND_IDS.map((id, i) => [id, i]));
+
+/** M6 (fase 3): o tiro da Big Brrt (o da SMG, mais grave e um pouco mais baixo: são 20 por segundo). */
+const BIG_BRRT_PITCH = 0.75;
+const BIG_BRRT_GAIN = 0.8;
 
 /**
  * Síntese dos sons `synth` do banco, um por vez dentro do orçamento do frame do loading (no Switch o JS é
@@ -174,6 +180,8 @@ export interface MatchSoundDeps {
   readonly hitmarker: boolean;
   /** FFA: todo mundo que não é você é inimigo. */
   readonly ffa: boolean;
+  /** M6 (fase 3): o vencedor é um bobo, não um time (o Juggernaut), sem mudar o parentesco dos sons (`ffa`). */
+  readonly soloWinner?: boolean;
 }
 
 export interface MatchSound extends Disposable {
@@ -539,8 +547,12 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           const pair = shotSounds(ev.weapon);
           if (!pair) break;
           const rank = rankOf(v, ev.shooter);
-          if (rank === SOUND_RANK.own) playFlat(pair[0], nowS, ownGain(), SOUND_RANK.own);
-          else playAt(v, pair[0], pair[1], ev.originX, ev.originY, ev.originZ, nowS, rank, 1, 1, 1);
+          // M6 (fase 3): a Big Brrt é o tiro da SMG uma quarta abaixo (o "brrt" grave da minigun), um pouco mais baixo.
+          const brrt = ev.weapon === WEAPON_BIG_BRRT;
+          const pitch = brrt ? BIG_BRRT_PITCH : 1;
+          const gain = brrt ? BIG_BRRT_GAIN : 1;
+          if (rank === SOUND_RANK.own) playFlat(pair[0], nowS, ownGain() * gain, SOUND_RANK.own, pitch);
+          else playAt(v, pair[0], pair[1], ev.originX, ev.originY, ev.originZ, nowS, rank, gain, pitch, 1);
           break;
         }
         case 'impact':
@@ -804,7 +816,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           const i = entityIndex(me);
           let win = false;
           let tie = false;
-          if (deps.ffa) {
+          if (deps.ffa || deps.soloWinner === true) {
             win = v.match.winnerEntity === me && me !== NULL_ENTITY;
             tie = v.match.winnerEntity === NULL_ENTITY;
           } else {

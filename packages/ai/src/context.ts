@@ -32,6 +32,8 @@ export class AiContext {
   readonly ffa: boolean;
   /** M3 (fase 3a): Bobo Zombies (zumbis ignoram os caídos; os bots levantam os colegas). */
   zombiesMode = false;
+  /** M6 (fase 3): Juggernaut (o passeio é caçar o Jugg, ou, para o Jugg, avançar). */
+  juggernaut = false;
   readonly viewDistance: number;
   readonly paths: PathService;
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */

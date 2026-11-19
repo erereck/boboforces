@@ -65,7 +65,7 @@ import { SimState } from './state.ts';
 import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
-import { createPartyState, partySystem } from './systems/party.ts';
+import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -568,7 +568,9 @@ export function createSim(config: SimConfig): Sim {
   const perTeam = new Int32Array(MAX_TEAMS);
   let controllerCount = 0;
   slots.forEach((slot, i) => {
-    const id = s.allocate(ENTITY_KIND.bobo, slot.team, slot.controller);
+    // M6 (fase 3, revisão): no Juggernaut todo mundo começa caçando (o time 1 é só do Jugg, que o modo sorteia), mesmo
+    // que a sala ou o sofá tenha posto alguém do outro lado.
+    const id = s.allocate(ENTITY_KIND.bobo, ctx.party.jugg !== null ? 0 : slot.team, slot.controller);
     assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
     s.controllerEntity[slot.controller] = id;
     s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
@@ -578,10 +580,12 @@ export function createSim(config: SimConfig): Sim {
     applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
     const k = perTeam[slot.team]!;
     perTeam[slot.team] = k + 1;
+    // M6 (fase 3): no Juggernaut todo mundo começa espalhado (o Jugg sorteado não nasce no meio dos caçadores).
+    const spread = ctx.ffa || ctx.party.jugg !== null;
     respawn(
       ctx,
       id & 0xffff,
-      initialSpawn(map.spawns, slot.team, ctx.ffa, ctx.ffa ? i : k, ctx.training && slot.team !== 0),
+      initialSpawn(map.spawns, slot.team, spread, spread ? i : k, ctx.training && slot.team !== 0),
     );
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
@@ -799,6 +803,8 @@ export function createSim(config: SimConfig): Sim {
           if (s.kind[e] === ENTITY_KIND.bobo) ctx.rules.speed[e] = s.team[e] === 1 ? ctx.party.infectedSpeed : 1;
         }
       }
+      // M6 (fase 3): as regras do Jugg (a velocidade dele) também saem do time.
+      syncJuggRules(ctx);
       mapObjects?.sync();
       ctx.figures.invalidate();
       events.clear();
@@ -828,6 +834,9 @@ export function createSim(config: SimConfig): Sim {
       out[15] = s.sprintFireDelayTicks[e]!;
     },
     load(e, from): void {
+      // M6 (fase 3, revisão): o próprio time chega do snapshot mais novo (os outros, do atrasado): as regras do Jugg
+      // (a velocidade) saem dele antes de refazer as entradas.
+      syncJuggRules(ctx);
       const e3 = e * 3;
       s.position[e3] = from[0]!;
       s.position[e3 + 1] = from[1]!;

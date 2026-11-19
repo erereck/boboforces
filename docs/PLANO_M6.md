@@ -76,6 +76,8 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - variantes **Fixo** (rodadas de 3 min, rodízio, o "1 vs 3" do sofá) e **Rodízio** (quem dá o golpe final vira o
      Jugg; 150 pontos);
    - a IA caça o Jugg em grupo, e o Jugg avança.
+   - **feita em 19/11** (ARCHITECTURE §17.4): a variante Rodízio, no card da página Mais modos. A variante Fixo (rodadas
+     de 3 min com rodízio) espera as rodadas, que chegam com o BoboStrike (M7).
 4. **Os modificadores e o Bobo Chaos:**
    - a lista do GDD §4.5.3, cada um ligável em qualquer modo pela Partida personalizada;
    - o **Chaos**: 3 modificadores sorteados, e a Roleta troca 1 a cada 60 s, com aviso 5 s antes. O sorteio evita

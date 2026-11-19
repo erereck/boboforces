@@ -297,6 +297,11 @@ export const AI_SOLDIER = {
   /** M6 (fase 1): quem ataca escolhe outro ponto (não o mais perto) com esta chance, para o time se espalhar. */
   pointSpreadChance: 0.25,
   /**
+   * M6 (fase 3): no Juggernaut, os caçadores vão ao Jugg (sempre sabem onde ele está) num ponto a até tantos metros
+   * dele, para cercar em vez de fazer fila; o Jugg vai no caçador mais perto.
+   */
+  juggSpreadM: 5,
+  /**
    * Refaz a escolha da parte visível da cabeça ou do tronco do alvo (`visibleAimOffset`, ~26 raios: ~10 µs com JIT e
    * 0,23–0,26 ms jitless) a cada (s), além de na troca de alvo e de postura dele.
    */

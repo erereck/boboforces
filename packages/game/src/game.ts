@@ -1241,7 +1241,13 @@ export function startGame(deps: GameDeps): GameHandle {
   /** O preset escolhido tem dois lados (TDM): os jogadores 2 a 4 escolhem com ou contra o P1. */
   function couchTeams(): boolean {
     const r = couchPresets[couchPreset];
-    return r !== undefined && r.mode !== 'warfare.ffa' && r.mode !== 'training' && r.teams.length >= 2;
+    return (
+      r !== undefined &&
+      r.mode !== 'warfare.ffa' &&
+      r.mode !== 'training' &&
+      r.mode !== 'juggernaut' &&
+      r.teams.length >= 2
+    );
   }
 
   function couchSeats(): LocalSeat[] {

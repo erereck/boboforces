@@ -234,7 +234,17 @@ function outcomeOf(view: SimView, human: number, ffa: boolean): MatchOutcome {
 }
 
 /** Monta o resumo no fim da partida. `human` = índice da entidade do jogador (-1 sem humano). */
-export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa: boolean): MatchSummary {
+/**
+ * `ffa` = o vencedor é um bobo, não um time (o FFA, e no M6 o Juggernaut); `byPoints` = o placar de cada um são os
+ * pontos (os segundos de Jugg), não os abates.
+ */
+export function summarizeMatch(
+  st: MatchStats,
+  view: SimView,
+  human: number,
+  ffa: boolean,
+  byPoints = false,
+): MatchSummary {
   const m = view.match;
   let ownScore = 0;
   let otherScore = 0;
@@ -242,8 +252,9 @@ export function summarizeMatch(st: MatchStats, view: SimView, human: number, ffa
   let winner = -1;
   if (ffa) {
     winner = m.winnerEntity !== NULL_ENTITY ? entityIndex(m.winnerEntity) : -1;
-    ownScore = human >= 0 ? view.kills[human]! : 0;
-    otherScore = winner >= 0 ? view.kills[winner]! : 0;
+    const score = byPoints ? view.points : view.kills;
+    ownScore = human >= 0 ? score[human]! : 0;
+    otherScore = winner >= 0 ? score[winner]! : 0;
   } else {
     const team = human >= 0 ? view.team[human]! : 0;
     ownScore = m.teamScore[team] ?? 0;

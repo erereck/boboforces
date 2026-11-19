@@ -626,6 +626,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     const from = nav.nearestNode(x, y, z);
     // M6 (fase 1): no Domination o passeio é o objetivo (os pontos).
     if (view.controlPoints !== null && e >= 0 && pickPointGoal(c, b, e, team, x, y, z, from)) return;
+    // M6 (fase 3): no Juggernaut o passeio é o Jugg (ou, para o Jugg, o caçador mais perto).
+    if (c.juggernaut && e >= 0 && pickJuggGoal(c, b, e, x, y, z, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -743,6 +745,46 @@ function pickPointGoal(
   if (target < 0) target = b.rng.int(0, cp.count);
   const r = cp.radius[target]! * 0.6;
   const n = nav.nearestNode(cp.x[target]! + b.rng.range(-r, r), cp.y[target]!, cp.z[target]! + b.rng.range(-r, r));
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
+}
+
+/**
+ * M6 (fase 3): o objetivo no Juggernaut (GDD §4.1.2: o Jugg aparece sempre no radar). O caçador vai a um nó perto do
+ * Jugg (espalhado, para o grupo cercar); o Jugg vai no caçador vivo mais perto. `false` = ninguém alcançável.
+ */
+function pickJuggGoal(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  x: number,
+  y: number,
+  z: number,
+  from: number,
+): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  const jugg = view.team[e] === 1;
+  let target = -1;
+  let best = Infinity;
+  for (let i = 0; i < view.count; i++) {
+    if (i === e || view.kind[i] !== ENTITY_KIND.bobo || !c.living(i)) continue;
+    if (jugg === (view.team[i] === 1)) continue;
+    const d = Math.hypot(view.position[i * 3]! - x, view.position[i * 3 + 2]! - z);
+    if (d < best) {
+      best = d;
+      target = i;
+    }
+  }
+  if (target < 0) return false;
+  const r = jugg ? 0 : AI_SOLDIER.juggSpreadM;
+  const n = nav.nearestNode(
+    view.position[target * 3]! + b.rng.range(-r, r),
+    view.position[target * 3 + 1]!,
+    view.position[target * 3 + 2]! + b.rng.range(-r, r),
+  );
   if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
   nav.nodePosition(n, nodePos, 0);
   setWanderGoal(c, b, e);

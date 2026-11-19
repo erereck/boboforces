@@ -186,6 +186,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const paths = new PathService(api, followers, budget);
   const ctx = new AiContext(hz, isFfaMode(recipe.mode), viewDistance, paths, budget.raysPerTick);
   ctx.zombiesMode = recipe.mode === 'zombies';
+  ctx.juggernaut = recipe.mode === 'juggernaut';
   const createFlow = api.createFlowField;
   const flow = zombies > 0 && createFlow !== undefined ? new ZombieFlow(createFlow, hz, budget.pathNodesPerTick) : null;
   ctx.flow = flow;

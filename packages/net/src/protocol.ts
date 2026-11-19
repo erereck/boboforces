@@ -2,9 +2,13 @@ import { CONTENT_IDS, GAME_VERSION } from '@boboforces/format';
 import { StateHasher, type BitReader, type BitWriter } from '@boboforces/shared';
 import {
   BASE_HP,
+  BIG_BRRT,
+  BIG_BRRT_COOL,
   BOBO_NAV_METRICS,
   DESMONTADOR,
+  DOMINATION,
   HEADSHOT_MULTIPLIER,
+  JUGGERNAUT,
   MATCH_DEFAULTS,
   METRICS,
   MOVEMENT_BOBO,
@@ -103,6 +107,11 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   ZOMBIE_BOX,
   ZOMBIE_PERKS,
   ZOMBIE_DROPS,
+  // M6: os modos novos (fase 1: os pontos do Domination; fase 3: a Big Brrt e o Jugg).
+  DOMINATION,
+  BIG_BRRT,
+  BIG_BRRT_COOL,
+  JUGGERNAUT,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */
