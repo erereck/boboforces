@@ -134,6 +134,12 @@ export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[]
   ],
   // M5 (fase 5d): ping (kind 0) e emotes (1..4).
   signal: [['entity', 'u32'], ['kind', 'u8'], ...XYZ()] as EvField<'signal'>[],
+  // M6 (fase 1): o Domination: um ponto capturado ou neutralizado.
+  point: [
+    ['index', 'u8'],
+    ['team', 'u8'],
+    ['action', ['captured', 'neutralized']],
+  ],
 };
 
 /** Índice de cada tipo (a ordem do `EVENT_SCHEMA`). */

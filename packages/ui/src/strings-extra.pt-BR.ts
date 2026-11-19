@@ -300,6 +300,14 @@ export const STRINGS_EXTRA_PT_BR = {
   'emote.4': 'Ops!',
   // M5 (fase 5a): o host online foi para segundo plano (a faixa da dica, no cliente).
   'match.hostAway': 'O host saiu do jogo por um instante.',
+  // M6 (fase 1): as letras dos pontos do Domination (uma por ponto, na ordem do mapa).
+  'hud.pointLetters': 'ABCDE',
+  // O kill feed do Domination: "Laranja  capturou  Ponto B", "Azul  perdeu  Ponto A".
+  'feed.teamName.0': 'Laranja',
+  'feed.teamName.1': 'Azul',
+  'feed.pointCaptured': 'capturou',
+  'feed.pointLost': 'perdeu',
+  'feed.point': 'Ponto {letter}',
   'match.hostAwayEnds': 'O host saiu do jogo: acaba em {s} s.',
   // M4 (fase 4d): o teclado do jogo (no canvas, só com o D-pad).
   'keyboard.count': '{n}/{max}',

@@ -460,6 +460,30 @@ export function createNetLayout(view: SimView): NetLayout {
       );
     }
   }
+  // M6 (fase 1): os pontos do Domination (o dono e o progresso, em milésimos), só no modo dele.
+  const cp = view.controlPoints;
+  if (cp !== null) {
+    for (let i = 0; i < cp.count; i++) {
+      globals.push(
+        g(
+          `point${i}Owner`,
+          s(3),
+          (v) => v.controlPoints!.owner[i]!,
+          (v, _st, q) => {
+            v.controlPoints!.owner[i] = q;
+          },
+        ),
+        g(
+          `point${i}Progress`,
+          s(12, 6),
+          (v) => Math.round(v.controlPoints!.progress[i]! * 1000),
+          (v, _st, q) => {
+            v.controlPoints!.progress[i] = q / 1000;
+          },
+        ),
+      );
+    }
+  }
   // A tabela de codecs dos globais reaproveita o formato das outras (campo = um escalar).
   const asFields: NetField<SimView>[] = globals.map((gs) => ({
     name: gs.name,

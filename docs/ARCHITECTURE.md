@@ -3544,3 +3544,40 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   abas pelos relays de verdade: o amigo entrou em 5,0 s, e a sala acabou para ele quando o host saiu.
 - **O que fica para o Erick** (fases 8 e 9 do plano): o teste com amigos (`docs/ROTEIRO_M5.md`), o TURN (O3) e a revisão
   do aviso de privacidade (O5), que foi ao ar com o texto do Claude.
+
+## 17. M6: modos de festa (plano em `docs/PLANO_M6.md`)
+
+### 17.1 Fase 0: a página Mais modos (19/11/2026)
+
+- **O card:** nos Modos, o Bobo Training deu lugar a "Mais modos" (os 6 cards já ocupavam as 3 fileiras que cabem no
+  celular). A página (`screen: 'more'`) usa o desenho dos Modos (`modesScreen` com `titleKey`); os cards e as receitas
+  (`MORE_MODE_CARDS`, `moreModePreset`, em `game/src/more-modes.ts`) e os textos (a tabela extra) moram no pedaço dos
+  editores, fora do menu da web (349,7 de 350 KB). Cada card começa direto, como o Bobo Zombies dos Modos.
+- **Decisão menor revisável:** o Training foi para a página nova, como 1º card (fica a 2 cliques). A pergunta vai à
+  próxima rodada de prints.
+- **Achado:** a chamada `registerStrings(STRINGS_EXTRA_PT_BR)` solta no topo do `editors.ts` sumia do build da web (o
+  pacote é `sideEffects: false`): antes da 1ª partida, os textos da tabela extra (a frase de ajuda da Partida
+  personalizada e a página nova) ficavam crus. Agora o `editors.ts` exporta a tabela (`EXTRA_STRINGS`) e o `game` a
+  registra ao receber o módulo; no build, a tabela foi para um pedaço que os editores e a cena dividem.
+
+### 17.2 Fase 1: Domination (19/11/2026)
+
+- **A sim** (`sim/src/systems/domination.ts`, passo entre o dano e as regras): os pontos vêm do mapa
+  (`markers.domination` → `SimMap.controlPoints`), só com `mode: 'warfare.domination'`. O progresso vai de -1 (do time
+  1) a +1 (do time 0): o ponto do outro time primeiro volta a neutro. Captura em 5 s com 1, 3,75 s com 2 e 2,5 s com 3+;
+  com os dois times em cima, nada anda; vazio, volta devagar ao estado do dono. Cada ponto dominado soma 1 por segundo
+  ao time (`scoreTicks`); os abates não contam no placar do time. O estado entra no hash e no snapshot da sim só nesse
+  modo (`SNAPSHOT_VERSION` 11; os goldens do Warfare e do Zombies não mudaram). Evento novo: `point` (`captured` ou
+  `neutralized`).
+- **A IA** (`pickPointGoal` no `soldier.ts`): no Domination, o objetivo de passeio é um ponto. Um ponto do time sendo
+  tomado vem primeiro; quem ataca vai ao ponto que não é do time (o mais perto, às vezes outro); 1 em cada 3 defende.
+  Golden: 4 contra 4 bots Normal no Construto, `97f2f078` (capturas 2/3, o time 1 fecha 200 a 101).
+- **O HUD:** embaixo do placar, A, B e C na cor do dono, com a barra da captura na cor de quem ganha o ponto
+  (`HudSharedModel.points`); em cima de cada anel, a letra (`HudModel.pointMarks`); no kill feed, "Laranja capturou
+  Ponto B". O anel do chão do Construto ainda não muda de cor.
+- **A rede:** o dono e o progresso (em milésimos) de cada ponto entram nos globais do snapshot, só nesse modo, e o evento
+  `point` no fim do esquema: `PROTOCOL_VERSION` 3. Pela rede de mentira, com o Construto de verdade, o host, 1 amigo e
+  6 bots terminam com os mesmos pontos e o mesmo placar (5,2 KB/s do host para o amigo).
+- **Os menus:** o Domination entra no ciclo de modos da Partida personalizada (Times → Todos contra todos →
+  Domination → Zombies; com os times do TDM e a meta 200), e por ela na sala do Online; o Construto lista o modo no
+  `.bfmap`.

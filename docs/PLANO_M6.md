@@ -54,12 +54,16 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
      editores, que o jogo pede logo depois do menu, como a Partida personalizada;
    - nos Modos, um card **Festa** abre a página dos modos de festa. Na sala do Online, os mesmos cards;
    - a receita passa a aceitar os modos novos, e o validador e as migrações, os campos deles.
+   - **feita em 19/11** (ARCHITECTURE §17.1): o card do Bobo Training virou "Mais modos" (o Training é o 1º card de
+     lá).
 1. **Domination:**
    - 3 pontos: captura em 5 s com 1 jogador e até 2,5 s com 3+; cada ponto rende 1 ponto/s; 200 pontos ou 10 min;
    - a IA divide o time entre os pontos (atacar o que não é nosso, defender o que é), pelo quadro do time;
    - o HUD mostra A, B e C com a cor de quem tem e o progresso da captura; o anel no chão do Construto acende na cor do
      dono;
    - os pontos viajam no snapshot.
+   - **feita em 19/11** (ARCHITECTURE §17.2). O anel do chão ainda não muda de cor (o HUD e a letra em cima do anel
+     mostram o dono); a sala do Online chega ao Domination pela Personalizada.
 2. **Gun Game e Infection** (presets sobre o FFA e o TDM):
    - **Gun Game:** a escada de 7 armas, a última é a faca; morrer pela faca rebaixa 1 nível;
    - **Infection:** 1 infectado no começo; quem morre vira infectado (time zumbi, faca e 1,2x de velocidade, a cara de

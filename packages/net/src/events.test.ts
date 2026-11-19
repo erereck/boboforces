@@ -108,6 +108,9 @@ const SAMPLES: SimEvent[] = [
   // M5 (fase 5d): um ping e um emote.
   { type: 'signal', tick: 17, entity: 0x10002, kind: 0, x: 3.25, y: 1.5, z: -7 },
   { type: 'signal', tick: 17, entity: 0x10001, kind: 3, x: 1, y: 2.5, z: 2 },
+  // M6 (fase 1): o Domination.
+  { type: 'point', tick: 18, index: 2, team: 1, action: 'captured' },
+  { type: 'point', tick: 18, index: 0, team: 0, action: 'neutralized' },
   { type: 'purchase', tick: 18, index: 3, kind: 'perk', action: 'ok', item: 4, cost: 2500, by: 0x10001 },
   { type: 'box', tick: 18, index: 2, action: 'move', weapon: 11, by: 0 },
 ];

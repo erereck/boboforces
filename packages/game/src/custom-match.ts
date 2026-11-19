@@ -196,7 +196,9 @@ function fitMap(r: MatchRecipe, l: CustomLimits): MatchRecipe {
 }
 
 /** M3 (fase 6b): os modos da linha Modo, na ordem do ciclo. */
-const CUSTOM_MODES = ['warfare.tdm', 'warfare.ffa', 'zombies'] as const;
+const CUSTOM_MODES = ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies'] as const;
+/** M6 (fase 1): a meta e o tempo do Domination (GDD §4.1.2; os da sim, `DOMINATION`). */
+const DOMINATION_MATCH = { timeLimitS: 600, scoreLimit: 200 } as const;
 
 /** M3 (fase 6b): o mapa do Bobo Zombies quando se chega nele (a Base Abandonada; o Construto é mapa de teste). */
 const ZOMBIES_MAP = 'base';
@@ -208,7 +210,23 @@ function stepMode(r: MatchRecipe, delta: number, l: CustomLimits): MatchRecipe {
   const i = Math.max(0, (CUSTOM_MODES as readonly string[]).indexOf(r.mode));
   const next = CUSTOM_MODES[cycleIndex(CUSTOM_MODES.length, i, delta)]!;
   if (next === 'zombies') return syncEmbedded(toZombies(r, l), l);
-  const warfare = r.mode === 'zombies' ? fromZombies(r, l) : r;
+  let warfare = r.mode === 'zombies' ? fromZombies(r, l) : r;
+  // M6 (fase 1): o Domination usa os times do TDM (do FFA, divide antes), com a meta dos pontos.
+  if (next === 'warfare.domination') {
+    const teams = ffa(warfare) ? switchMode(warfare, l.maxBots) : warfare;
+    return fitMap(
+      {
+        ...teams,
+        mode: 'warfare.domination',
+        map: mapForMode(teams.map, 'warfare.domination'),
+        match: { ...teams.match, ...DOMINATION_MATCH },
+      },
+      l,
+    );
+  }
+  if (warfare.mode === 'warfare.domination') {
+    warfare = { ...warfare, mode: 'warfare.tdm', match: { ...warfare.match, timeLimitS: 600, scoreLimit: 75 } };
+  }
   if (warfare.mode === next) return fitMap(warfare, l);
   const switched = switchMode(warfare, l.maxBots);
   return fitMap({ ...switched, map: mapForMode(switched.map, switched.mode) }, l);
@@ -261,7 +279,7 @@ function switchMode(r: MatchRecipe, maxBots: number): MatchRecipe {
 }
 
 const TIMES = [180, 300, 600, 900, 1200, 1800, 0];
-const SCORES = [10, 15, 20, 25, 30, 50, 75, 100, 150, 0];
+const SCORES = [10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 0];
 const VIEWS = [50, 75, 100, 125, 140];
 const HPS = [25, 50, 75, 100, 150, 200, 300, 500, 1000];
 const RESPAWNS = [0, 1, 2, 3, 5, 8, 10, 15];

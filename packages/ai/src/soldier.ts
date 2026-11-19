@@ -624,6 +624,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   const team = e >= 0 ? view.team[e]! : 0;
   if (nav !== null && nav.nodeCount > 0) {
     const from = nav.nearestNode(x, y, z);
+    // M6 (fase 1): no Domination o passeio é o objetivo (os pontos).
+    if (view.controlPoints !== null && e >= 0 && pickPointGoal(c, b, e, team, x, y, z, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -689,6 +691,62 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   b.goalY = y;
   b.goalZ = b.rng.range(minZ + 2, Math.max(minZ + 2.5, maxZ - 2));
   b.hasGoal = true;
+}
+
+/**
+ * M6 (fase 1): o objetivo no Domination (GDD §4.1.4: os bots jogam o objetivo). Um ponto do time sendo tomado vem
+ * primeiro; depois, quem ataca vai ao ponto que não é do time (o mais perto, às vezes outro, para o time se espalhar) e
+ * um em cada 3 defende um ponto do time, quando há. O lugar é um nó da navegação dentro do anel. `false` = nenhum ponto
+ * alcançável (o passeio de sempre).
+ */
+function pickPointGoal(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  team: number,
+  x: number,
+  y: number,
+  z: number,
+  from: number,
+): boolean {
+  const view = c.view!;
+  const cp = view.controlPoints!;
+  const nav = view.nav!;
+  const defender = b.controller % AI_SOLDIER.pointDefenderEvery === 0;
+  let target = -1;
+  let best = Infinity;
+  let mineCount = 0;
+  for (let i = 0; i < cp.count; i++) {
+    const mine = cp.owner[i] === team;
+    if (mine) mineCount++;
+    const d = Math.hypot(cp.x[i]! - x, cp.z[i]! - z);
+    // Do time e sendo tomado (o progresso já saiu do cheio): todo mundo perto acode.
+    const losing = mine && Math.abs(cp.progress[i]!) < 1;
+    const cost = losing ? d * 0.5 : mine ? (defender ? d : Infinity) : defender ? d * 2 : d;
+    if (cost < best) {
+      best = cost;
+      target = i;
+    }
+  }
+  // Quem ataca às vezes escolhe outro ponto que não é do time (o time não vai todo para o mesmo).
+  if (!defender && mineCount < cp.count && b.rng.chance(AI_SOLDIER.pointSpreadChance)) {
+    const k = b.rng.int(0, cp.count - mineCount);
+    for (let i = 0, seen = 0; i < cp.count; i++) {
+      if (cp.owner[i] === team) continue;
+      if (seen++ === k) {
+        target = i;
+        break;
+      }
+    }
+  }
+  // Todos do time e ninguém tomando: fica num deles.
+  if (target < 0) target = b.rng.int(0, cp.count);
+  const r = cp.radius[target]! * 0.6;
+  const n = nav.nearestNode(cp.x[target]! + b.rng.range(-r, r), cp.y[target]!, cp.z[target]! + b.rng.range(-r, r));
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
 }
 
 /** Rascunho do centro da célula de calor (x, z). */

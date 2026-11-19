@@ -11,6 +11,14 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Plano** em `docs/PLANO_M6.md`: Domination, Gun Game e Infection, Juggernaut, os modificadores e o Bobo Chaos,
   Paintball e as variantes do Bobo Zombies (Armed Horde e Fortress), cada um sozinho com bots, no sofá, no online e no
   Switch. BoboStrike e Bobo Royale ficam para o M7. Perguntas U1–U6 no padrão.
+- **Mais modos (fase 0):** nos Modos, o card do Bobo Training virou "Mais modos", a página dos modos novos (o Training é
+  o primeiro card de lá). Ela mora fora do menu da web, que está no teto.
+- **Domination (fase 1):** 3 pontos no Construto; captura em 5 s sozinho e em 2,5 s com 3; cada ponto rende 1 ponto
+  por segundo; 200 pontos ou 10 min. Os bots jogam o objetivo: atacam os pontos do outro time, acodem o seu e um em
+  cada três defende. No alto, as letras A, B e C na cor do dono com a barra da captura; em cima de cada anel, a letra; no
+  kill feed, "Laranja capturou Ponto B". Também pela Partida personalizada e pela sala do Online (o protocolo subiu
+  para 3). De quebra: os textos da Partida personalizada e da página nova ficavam crus antes da primeira partida no
+  site (o empacotador descartava o registro da tabela), e agora não ficam.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

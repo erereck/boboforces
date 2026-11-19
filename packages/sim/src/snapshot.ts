@@ -19,7 +19,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 10;
+const SNAPSHOT_VERSION = 11;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -64,6 +64,9 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     h.bytes(mo.planks).bytes(mo.tearTicks).bytes(mo.repairTicks).bytes(mo.repairer).bytes(mo.doorOpen);
     if (mo.boxSpots > 0) h.bytes(mo.boxState).bytes(mo.boxUser);
   }
+  // M6 (fase 1): os pontos do Domination (só nele: o hash dos outros modos não muda).
+  const cp = ctx.domination;
+  if (cp !== null) h.bytes(cp.owner).bytes(cp.progress).bytes(cp.scoreTicks);
   return h.digest();
 }
 
@@ -144,6 +147,14 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, mo.boxUser, 1);
     }
   }
+  {
+    const cp = ctx.domination;
+    if (cp !== null) {
+      for (let i = 0; i < cp.count; i++) w.writeBits(cp.owner[i]! & 0xff, 8);
+      writeArray(w, cp.progress, cp.count);
+      writeArray(w, cp.scoreTicks, cp.scoreTicks.length);
+    }
+  }
 }
 
 /**
@@ -213,6 +224,14 @@ export function readState(ctx: SimContext, r: BitReader): void {
     if (mo.boxSpots > 0) {
       readArray(r, mo.boxState, mo.boxState.length);
       readArray(r, mo.boxUser, 1);
+    }
+  }
+  {
+    const cp = ctx.domination;
+    if (cp !== null) {
+      for (let i = 0; i < cp.count; i++) cp.owner[i] = (r.readBits(8) << 24) >> 24;
+      readArray(r, cp.progress, cp.count);
+      readArray(r, cp.scoreTicks, cp.scoreTicks.length);
     }
   }
 }

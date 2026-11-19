@@ -129,6 +129,14 @@ export interface HudModel {
   readonly bubbleText: string[];
   bubbleCount: number;
   /**
+   * M6 (fase 1): os pontos do Domination no mundo (2 valores por ponto: x, y em px da superfície, em cima do anel), a
+   * letra de cada um (o índice do ponto) e o dono (-1 = neutro).
+   */
+  readonly pointMarks: Float32Array;
+  readonly pointMarkIndex: Int8Array;
+  readonly pointMarkOwner: Int8Array;
+  pointMarkCount: number;
+  /**
    * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
    * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
    */
@@ -161,6 +169,8 @@ export interface HudModel {
 export const MAX_TEAM_PINGS = 8;
 /** M5 (fase 5d): balões de emote por vista. */
 export const MAX_EMOTE_BUBBLES = 8;
+/** M6 (fase 1): pontos do Domination no HUD (o mesmo teto da sim, `DOMINATION.maxPoints`). */
+export const MAX_CONTROL_POINTS = 5;
 /** Refino R2 (#79): pontos do arco da granada e avisos de granada perto por vista. */
 export const MAX_GRENADE_ARC = 48;
 export const MAX_GRENADE_WARNINGS = 4;
@@ -259,6 +269,10 @@ export function createHudModel(): HudModel {
     bubbles: new Float32Array(MAX_EMOTE_BUBBLES * 2),
     bubbleText: new Array<string>(MAX_EMOTE_BUBBLES).fill(''),
     bubbleCount: 0,
+    pointMarks: new Float32Array(MAX_CONTROL_POINTS * 2),
+    pointMarkIndex: new Int8Array(MAX_CONTROL_POINTS),
+    pointMarkOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
+    pointMarkCount: 0,
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
@@ -393,6 +407,8 @@ interface HudTexts {
   readonly boxTake: readonly string[];
   /** M3 (fase 4c): a inicial de cada vantagem (C, S, B). */
   readonly perkLetters: readonly string[];
+  /** M6 (fase 1): a letra de cada ponto do Domination. */
+  readonly pointLetters: readonly string[];
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -428,6 +444,7 @@ function hudTexts(): HudTexts {
     box: templateParts('hud.box', ['cost']).map((p) => p.toUpperCase()),
     boxTake: templateParts('hud.boxTake', ['weapon']).map((p) => p.toUpperCase()),
     perkLetters: [t('perk.chonky'), t('perk.speedy'), t('perk.buddy')].map((n) => n.slice(0, 1).toUpperCase()),
+    pointLetters: [...t('hud.pointLetters')],
   };
   return cachedTexts;
 }
@@ -514,6 +531,45 @@ function drawBubble(
   if (left < view.x || left + w > view.x + view.width || top < view.y || y > view.y + view.height) return;
   plate(out, left, top, w, h, scale);
   paintText(out, hud, text, left + pad, top + pad, px, COLORS.acao);
+}
+
+/** A cor do dono de um ponto (neutro: o texto apagado). */
+function pointColor(owner: number): number {
+  return owner >= 0 && owner < TEAM_COLORS.length ? TEAM_COLORS[owner]! : COLORS.textoBaixo;
+}
+
+/**
+ * M6 (fase 1): a letra de um ponto do Domination no mundo (em cima do anel), na cor do dono. Fora da vista, nada (o
+ * placar do alto mostra todos).
+ */
+function drawPointMark(
+  out: DrawList,
+  hud: MsdfFont | null,
+  letter: string,
+  owner: number,
+  x: number,
+  y: number,
+  px: number,
+  scale: number,
+  view: HudViewport,
+): void {
+  if (hud === null || letter === '') return;
+  const pad = hudPad(scale);
+  const h = Math.round(capHeightPx(hud, px) + pad * 2);
+  const w = Math.max(h, Math.round(textWidth(hud, letter, px) + pad * 2));
+  const left = Math.round(x - w / 2);
+  const top = Math.round(y - h / 2);
+  if (left < view.x || left + w > view.x + view.width || top < view.y || top + h > view.y + view.height) return;
+  plate(out, left, top, w, h, scale);
+  pushRect(
+    out,
+    left,
+    top + h - Math.max(2, Math.round(3 * scale)),
+    w,
+    Math.max(2, Math.round(3 * scale)),
+    pointColor(owner),
+  );
+  paintText(out, hud, letter, left + w / 2, top + pad, px, pointColor(owner), 0, 0.5);
 }
 
 function drawPing(out: DrawList, x: number, y: number, unit: number, view: HudViewport): void {
@@ -725,6 +781,20 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
     for (let i = 0; i < model.bubbleCount && i < MAX_EMOTE_BUBBLES; i++) {
       drawBubble(out, hud, model.bubbleText[i]!, model.bubbles[i * 2]!, model.bubbles[i * 2 + 1]!, labelPx, s, view);
+    }
+    const letters = hudTexts().pointLetters;
+    for (let i = 0; i < model.pointMarkCount && i < MAX_CONTROL_POINTS; i++) {
+      drawPointMark(
+        out,
+        hud,
+        letters[model.pointMarkIndex[i]!] ?? '',
+        model.pointMarkOwner[i]!,
+        model.pointMarks[i * 2]!,
+        model.pointMarks[i * 2 + 1]!,
+        labelPx,
+        s,
+        view,
+      );
     }
   }
 
@@ -1314,6 +1384,13 @@ export interface HudSharedModel {
   trainingLine: string;
   /** M3 (fase 7a): o minimapa ocupa o quadrante livre (o placar sobe para o alto, no tamanho normal). */
   spareMap: boolean;
+  /**
+   * M6 (fase 1): os pontos do Domination embaixo do placar (0 = sem pontos): o dono de cada um (-1 = neutro) e o
+   * progresso (-1, do time 1, a +1, do time 0).
+   */
+  points: number;
+  readonly pointOwner: Int8Array;
+  readonly pointProgress: Float32Array;
 }
 
 export function createHudSharedModel(): HudSharedModel {
@@ -1324,7 +1401,50 @@ export function createHudSharedModel(): HudSharedModel {
     suddenDeath: false,
     trainingLine: '',
     spareMap: false,
+    points: 0,
+    pointOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
+    pointProgress: new Float32Array(MAX_CONTROL_POINTS),
   };
+}
+
+/**
+ * M6 (fase 1): a fileira dos pontos do Domination, centrada em `cx` a partir de `y`: uma plaquinha por ponto com a
+ * letra na cor do dono e, embaixo, a barra da captura (a fração e a cor de quem está ganhando o ponto). Devolve a
+ * altura usada.
+ */
+function paintPointsRow(
+  out: DrawList,
+  font: MsdfFont | null,
+  model: Readonly<HudSharedModel>,
+  cx: number,
+  y: number,
+  s: number,
+  minTextPx: number,
+): number {
+  const n = Math.min(model.points, MAX_CONTROL_POINTS);
+  if (n <= 0) return 0;
+  const letters = hudTexts().pointLetters;
+  const px = hudLabelPx(s, minTextPx);
+  const pad = hudPad(s);
+  const cell = Math.round(capHeightPx(font, px) + pad * 2);
+  const gap = Math.max(3, Math.round(HUD_METRICS.gap * s));
+  const bar = Math.max(2, Math.round(3 * s));
+  const total = n * cell + (n - 1) * gap;
+  let x = Math.round(cx - total / 2);
+  for (let i = 0; i < n; i++) {
+    const owner = model.pointOwner[i]!;
+    const p = model.pointProgress[i]!;
+    plate(out, x, y, cell, cell + bar + 1, s);
+    paintText(out, font, letters[i] ?? '', x + cell / 2, y + pad, px, pointColor(owner), 0, 0.5);
+    // A barra: o tamanho da posse (|p|) na cor de quem tem a vantagem; cheia e do dono = a cor dele inteira.
+    const frac = p > 0 ? p : -p;
+    if (frac > 0.001) {
+      const team = p > 0 ? 0 : 1;
+      pushRect(out, x, y + cell, Math.max(1, Math.round(cell * frac)), bar, pointColor(team));
+    }
+    x += cell + gap;
+  }
+  return cell + bar + 1;
 }
 
 /**
@@ -1514,10 +1634,12 @@ export function drawHudShared(
       : Math.round(area.y + (area.height - h) / 2);
   plate(out, x, y, w, h, s);
   paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
+  // M6 (fase 1): os pontos do Domination embaixo do placar (a morte súbita vai embaixo deles).
+  const rowH = paintPointsRow(out, font, model, area.x + area.width / 2, Math.round(y + h + gap), s, area.minTextPx);
   if (model.suddenDeath) {
     const px = hudLabelPx(s, area.minTextPx);
     const sw = textWidth(font, tx.suddenDeath, px, HUD_METRICS.labelTracking);
-    const sy = Math.round(y + h + gap);
+    const sy = Math.round(y + h + gap + (rowH > 0 ? rowH + gap : 0));
     plate(out, area.x + (area.width - sw) / 2 - pad, sy, sw + pad * 2, capHeightPx(font, px) + pad * 2, s);
     paintText(
       out,

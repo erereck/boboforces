@@ -328,8 +328,9 @@ function kill(
     const k = killer & 0xffff;
     if (hostile(ctx, k, t)) {
       s.kills[k] = s.kills[k]! + 1;
-      // Placar dos times: só bobo matando bobo (o zumbi do estresse fica fora do TDM).
-      if (!ctx.ffa && !zombie && s.kind[k] === ENTITY_KIND.bobo) {
+      // Placar dos times: só bobo matando bobo (o zumbi do estresse fica fora do TDM). M6 (fase 1): no Domination o
+      // placar é dos pontos.
+      if (!ctx.ffa && !zombie && s.kind[k] === ENTITY_KIND.bobo && ctx.domination === null) {
         const team = s.team[k]!;
         if (team < MAX_TEAMS) ctx.match.teamScore[team] = ctx.match.teamScore[team]! + 1;
       }

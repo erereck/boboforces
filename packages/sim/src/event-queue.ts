@@ -20,6 +20,7 @@ import type {
   ProjectileEvent,
   ShotEvent,
   SignalEvent,
+  PointEvent,
   SimEvent,
   SpawnEvent,
   UnstuckEvent,
@@ -219,6 +220,12 @@ export class EventQueue {
     2,
   );
 
+  /** M6 (fase 1). */
+  private readonly points = new EventPool<Mutable<PointEvent>>(
+    () => ({ type: 'point', tick: 0, index: 0, team: 0, action: 'captured' }),
+    2,
+  );
+
   get size(): number {
     return this.length;
   }
@@ -245,6 +252,7 @@ export class EventQueue {
     this.pickups.reset();
     this.unstucks.reset();
     this.signals.reset();
+    this.points.reset();
   }
 
   /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
@@ -507,6 +515,16 @@ export class EventQueue {
     e.x = x;
     e.y = y;
     e.z = z;
+    this.push(e);
+  }
+
+  /** M6 (fase 1): um ponto do Domination capturado ou neutralizado. */
+  point(tick: number, index: number, team: number, action: 'captured' | 'neutralized'): void {
+    const e = this.points.acquire();
+    e.tick = tick;
+    e.index = index;
+    e.team = team;
+    e.action = action;
     this.push(e);
   }
 

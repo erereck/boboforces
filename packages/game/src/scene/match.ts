@@ -149,6 +149,7 @@ import {
   drawScoreboard,
   MAX_ALLY_MARKERS,
   MAX_TEAM_PINGS,
+  MAX_CONTROL_POINTS,
   MAX_EMOTE_BUBBLES,
   MAX_GRENADE_ARC,
   MAX_GRENADE_WARNINGS,
@@ -458,6 +459,8 @@ interface ViewmodelTweak {
 const MEMORY_LOG_EVERY_S = 60;
 /** M5 (fase 7a): de quanto em quanto tempo (s) a partida online grava a linha `[rede]` (vai no "Copiar relatório"). */
 const NET_LOG_EVERY_S = 30;
+/** M6 (fase 1): a letra do ponto do Domination fica a esta altura acima do anel (m). */
+const POINT_MARK_HEIGHT_M = 2.2;
 /** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
 const PROGRAM_CHECK_FRAMES = 120;
 
@@ -1655,6 +1658,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         case 'signal':
           onSignal(v, ev.entity, ev.kind, ev.x, ev.y, ev.z);
+          break;
+        case 'point':
+          feedPoint(ev.index, ev.team, ev.action === 'captured');
           break;
         case 'spawn': {
           const i = entityIndex(ev.entity);
@@ -3510,6 +3516,28 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     pushKillFeed(killFeed, nameOf(v, ki), colorOf(v, ki), label, nameOf(v, vi), colorOf(v, vi), headshot);
   }
 
+  /** M6 (fase 1): os textos do Domination no kill feed (resolvidos uma vez: o evento não cria string). */
+  const pointFeed = {
+    teams: [t('feed.teamName.0'), t('feed.teamName.1')],
+    captured: t('feed.pointCaptured'),
+    lost: t('feed.pointLost'),
+    points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
+  };
+  /** M6 (fase 1): um ponto do Domination mudou de dono ("Laranja  capturou  Ponto B"). */
+  function feedPoint(index: number, team: number, captured: boolean): void {
+    if (!showKillFeed) return;
+    const color = TEAM_COLORS[team] ?? COLORS.texto;
+    pushKillFeed(
+      killFeed,
+      pointFeed.teams[team] ?? '',
+      color,
+      captured ? pointFeed.captured : pointFeed.lost,
+      pointFeed.points[index] ?? '',
+      COLORS.acao,
+      false,
+    );
+  }
+
   /** M2 (fase 2d): preenche o placar do Tab (bobos por abates, depois menos mortes; ordenação sem alocar). */
   function fillScoreboard(v: SimView): void {
     let n = 0;
@@ -4040,6 +4068,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.bubbles[m.bubbleCount * 2 + 1] = projected[1]!;
       m.bubbleText[m.bubbleCount] = emoteTexts[emoteKind[b]! - 1] ?? '';
       m.bubbleCount++;
+    }
+    // M6 (fase 1): as letras dos pontos do Domination em cima de cada anel.
+    m.pointMarkCount = 0;
+    const cp = v.controlPoints;
+    if (cp !== null) {
+      for (let i = 0; i < cp.count && m.pointMarkCount < MAX_CONTROL_POINTS; i++) {
+        if (!projectToView(desc.camera, lay.rects[s]!, cp.x[i]!, cp.y[i]! + POINT_MARK_HEIGHT_M, cp.z[i]!, projected)) {
+          continue;
+        }
+        const k = m.pointMarkCount++;
+        m.pointMarks[k * 2] = projected[0]!;
+        m.pointMarks[k * 2 + 1] = projected[1]!;
+        m.pointMarkIndex[k] = i;
+        m.pointMarkOwner[k] = cp.owner[i]!;
+      }
     }
     // M2 (fase 2d): marcadores dos aliados (TDM), projetados com a câmera desta vista.
     m.markerCount = 0;
@@ -5002,6 +5045,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M2 (fase 2d): o relógio da partida (na morte súbita, os 60 s dela) e o aviso de morte súbita.
           sharedHud.timeLeftS = request.kind === 'play' && !training && mv.ticksLeft >= 0 ? mv.ticksLeft / sim.hz : -1;
           sharedHud.suddenDeath = mv.phase === 'suddenDeath';
+          // M6 (fase 1): os pontos do Domination embaixo do placar.
+          const cpv = sim.view().controlPoints;
+          sharedHud.points = cpv === null ? 0 : Math.min(cpv.count, MAX_CONTROL_POINTS);
+          for (let i = 0; i < sharedHud.points; i++) {
+            sharedHud.pointOwner[i] = cpv!.owner[i]!;
+            sharedHud.pointProgress[i] = cpv!.progress[i]!;
+          }
           sharedHud.spareMap = viewCount === 3 && sharedArea.mode === 'spare';
           if (viewCount === 3 || sharedHud.teamCount > 0 || sharedHud.timeLeftS >= 0 || training || zombiesMode) {
             drawHudShared(list, fonts, sharedHud, sharedArea);

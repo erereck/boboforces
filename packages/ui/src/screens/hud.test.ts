@@ -555,6 +555,31 @@ describe('placar e tempo compartilhados', () => {
     expect(drawnCommands(spare).map((c) => c.color)).toEqual([COLORS.bunker]);
   });
 
+  it('M6 (fase 1): os pontos do Domination embaixo do placar, a letra na cor do dono e a barra da captura', () => {
+    const screen = layoutHudScreen(1, 640, 360, { minTextPx: 12 });
+    const model = createHudSharedModel();
+    model.timeLeftS = 300;
+    model.teamCount = 2;
+    model.points = 3;
+    model.pointOwner.set([0, -1, 1]);
+    model.pointProgress.set([1, 0.4, -1]);
+    const list = createDrawList();
+    drawHudShared(list, fonts, model, screen.shared);
+    expect(syntheticGlyphText(list)).toContain('ABC');
+    const g = glyphs(list);
+    expect(g.find((x) => x.op === DRAW_OP.glyph && x.color === TEAM_COLORS[0])).toBeDefined();
+    expect(g.find((x) => x.color === COLORS.textoBaixo)).toBeDefined();
+    // Cabe na vista de 640×360: tudo dentro da tela.
+    for (const c of drawnCommands(list)) {
+      expect(c.x).toBeGreaterThanOrEqual(0);
+      expect(c.x + c.w).toBeLessThanOrEqual(640);
+      expect(c.y + c.h).toBeLessThanOrEqual(360);
+    }
+    // A barra do B: 40% na cor do time 0 (quem está ganhando o ponto).
+    const bars = drawnCommands(list).filter((c) => c.op !== DRAW_OP.glyph && c.color === TEAM_COLORS[0]);
+    expect(bars.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('vistas locais (ViewDesc.hud): origem 0,0 e mesmo tamanho', () => {
     const screen = layoutHudScreen(4, 1920, 1080, { minTextPx: 16, viewLocal: true });
     expect(screen.views[3]).toMatchObject({ x: 0, y: 0, width: 960, height: 540, scale: 1.5 });

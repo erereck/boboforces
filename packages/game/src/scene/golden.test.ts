@@ -301,3 +301,63 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
     ).toBe(GOLDEN_POSTO_HASH);
   }, 180_000);
 });
+
+/**
+ * M6 (fase 1): o golden do Domination: 4 contra 4 bots Normal no Construto (os 3 pontos do mapa), semente 42, até
+ * 3 min. Confere que os bots jogam o objetivo (os dois times capturam pontos e marcam), e o hash entre execuções.
+ * Gravado na fase 1 (19/11/2026): `97f2f078` (capturas 2/3, o time 1 fecha 200 a 101).
+ * MUDA com a sim, a IA, o mapa ou as regras dos pontos: atualize no mesmo commit e diga o motivo no CHANGELOG.
+ */
+const GOLDEN_DOMINATION_HASH = '97f2f078';
+const GOLDEN_DOMINATION_TICKS = 10_800;
+
+function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {
+  const { map } = loadWorld();
+  const captures = [0, 0];
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.domination',
+      map: 'construto',
+      seed: 42,
+      match: { timeLimitS: 0, scoreLimit: 200 },
+      teams: [
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+      ],
+    },
+    map,
+    humans: 0,
+    onEvents: (events) => {
+      for (const ev of events) if (ev.type === 'point' && ev.action === 'captured') captures[ev.team]!++;
+    },
+  });
+  for (let t = 0; t < GOLDEN_DOMINATION_TICKS && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const cp = v.controlPoints!;
+  const owned = [0, 0];
+  for (let i = 0; i < cp.count; i++) if (cp.owner[i]! >= 0) owned[cp.owner[i]!]!++;
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    captures,
+    score: [v.match.teamScore[0]!, v.match.teamScore[1]!],
+    owned,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semente 42, até 10.800 ticks', () => {
+  it('os bots jogam o objetivo: os dois times capturam e marcam; hash estável', () => {
+    const a = runDominationGolden();
+    const b = runDominationGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `capturas ${a.captures.join('/')}, placar ${a.score.join('×')}, pontos ${a.owned.join('/')}, fase ${a.phase}`;
+    console.log(`[domination] ${msg} · hash ${a.hash}`);
+    expect(a.captures[0], msg).toBeGreaterThan(0);
+    expect(a.captures[1], msg).toBeGreaterThan(0);
+    expect(a.score[0]! + a.score[1]!, msg).toBeGreaterThan(60);
+    expect(a.hash, msg).toBe(GOLDEN_DOMINATION_HASH);
+  }, 240_000);
+});

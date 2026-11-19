@@ -15,7 +15,10 @@ export interface SimMapSource {
   readonly markers: Pick<
     MapMarkers,
     'spawns' | 'playArea' | 'barricades' | 'paidDoors' | 'wallBuys' | 'boxSpots' | 'perkMachines'
-  >;
+  > & {
+    /** M6 (fase 1): os pontos do Domination (opcional: só o modo dele usa). */
+    readonly domination?: MapMarkers['domination'];
+  };
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
 }
@@ -51,6 +54,10 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     killPlaneY: area.killPlaneY,
     ...(source.colliders ? { colliders: source.colliders } : {}),
     ...(source.nav ? { nav: source.nav } : {}),
+    // M6 (fase 1): os pontos do Domination (a sim só usa no modo dele).
+    ...(source.markers.domination?.length
+      ? { controlPoints: source.markers.domination.map((d) => ({ x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
     // M3 (fase 3d): janelas com barricada e portas pagas (só nos mapas do Bobo Zombies).
     ...(source.markers.barricades?.length ? { barricades: source.markers.barricades } : {}),
     ...(source.markers.paidDoors?.length

@@ -1,4 +1,5 @@
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
+import type { ControlPointsView } from './systems/domination.ts';
 import type { NavGrid } from '@boboforces/nav';
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 import type { MatchMods } from './context.ts';
@@ -107,6 +108,8 @@ export interface SimView {
   readonly nav: NavGrid | null;
   /** M3 (fase 3d): janelas com barricada e portas pagas (estado ao vivo), ou `null` sem nenhuma no mapa. */
   readonly mapObjects: MapObjectsView | null;
+  /** M6 (fase 1): os pontos do Domination (`null` fora dele). */
+  readonly controlPoints: ControlPointsView | null;
   /**
    * M1 (integração): área jogável em metros (`SimMap.playArea`; paredes invisíveis em X/Z), ou `null` = a grade
    * inteira. A IA não escolhe destino fora dela.

@@ -18,7 +18,10 @@ export { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotNam
 export { customMatchScreen, labScreen, workshopScreen } from '@boboforces/ui';
 
 // Refino R3a (#79): a tabela de textos da cena também vale aqui (o Laboratório e a Oficina podem abrir antes dela).
+// M6 (fase 1): o jogo registra a tabela ao receber este módulo (`EXTRA_STRINGS`): o empacotador da web descarta a
+// chamada solta no topo do módulo (o pacote é `sideEffects: false`), e os textos ficavam crus antes da 1ª partida.
 registerStrings(STRINGS_EXTRA_PT_BR);
+export { STRINGS_EXTRA_PT_BR as EXTRA_STRINGS };
 // M4 (fase 2c): o importador da pasta `oficina/` (só o Switch usa; fora do menu da web).
 export { importWorkshopFiles } from './workshop-files.ts';
 export { createOnscreenKeyboard } from './onscreen-keyboard.ts';

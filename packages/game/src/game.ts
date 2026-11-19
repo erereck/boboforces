@@ -69,6 +69,7 @@ import {
   QUICK_ROWS,
   QUICK_SHORTCUT_PREFIX,
   quickMatchScreen,
+  registerStrings,
   MIN_TEXT,
   MIN_TOUCH_TARGET,
   resetDrawList,
@@ -905,6 +906,8 @@ export function startGame(deps: GameDeps): GameHandle {
     if (editorsPromise !== null || !deps.loadEditors) return;
     editorsPromise = deps.loadEditors().then(
       (m) => {
+        // M6 (fase 1): os textos do pedaço (a tabela extra), registrados aqui: a chamada no topo dele some no build.
+        registerStrings(m.EXTRA_STRINGS);
         editors = m;
         // M4 (fase 2c): bots e presets da pasta `oficina/` do cartão, uma vez (o importador mora no pedaço das telas
         // de edição, fora do menu da web; o Switch carrega esse pedaço logo no boot). O que não entra vai ao registro.

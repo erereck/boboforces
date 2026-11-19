@@ -30,6 +30,8 @@ export {
   type WallBuyDef,
 } from './map-objects.ts';
 export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './recipe.ts';
+// M6 (fase 1): o Domination.
+export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView } from './systems/domination.ts';
 export {
   aimPointLocal,
   aimPointWorld,

@@ -198,8 +198,15 @@ describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
     expect(tdm.zombies).toBeUndefined();
     expect(tdm.teams).toHaveLength(2);
     expect(presetBotCounts(tdm)[1]).toBe(4);
-    const ffa = stepCustom('match', z, 'mode', -1, PC);
-    expect(ffa.mode).toBe('warfare.ffa');
+    // M6 (fase 1): para trás, o Domination (os times do TDM e a meta dos pontos).
+    const dom = stepCustom('match', z, 'mode', -1, PC);
+    expect(dom.mode).toBe('warfare.domination');
+    expect(dom.map).toBe('construto');
+    expect(dom.match).toMatchObject({ timeLimitS: 600, scoreLimit: 200 });
+    expect(dom.teams).toHaveLength(2);
+    // E do Domination para trás, o Todos contra todos; para a frente, o Zombies.
+    expect(stepCustom('match', dom, 'mode', -1, PC).mode).toBe('warfare.ffa');
+    expect(stepCustom('match', dom, 'mode', 1, PC).mode).toBe('zombies');
     const checked = validateMatchRecipe(tdm, LIMITS);
     expect(checked.ok && checked.warnings).toEqual([]);
   });

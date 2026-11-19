@@ -199,6 +199,17 @@ export interface SignalEvent extends EventBase {
   readonly z: number;
 }
 
+/**
+ * M6 (fase 1): um ponto do Domination mudou de dono: `captured` (o time `team` dominou o ponto `index`) ou
+ * `neutralized` (o time `team` perdeu o ponto, que ficou neutro). Ver `systems/domination.ts`.
+ */
+export interface PointEvent extends EventBase {
+  readonly type: 'point';
+  readonly index: number;
+  readonly team: number;
+  readonly action: 'captured' | 'neutralized';
+}
+
 export interface MatchPhaseEvent extends EventBase {
   readonly type: 'matchPhase';
   readonly phase: MatchPhase;
@@ -290,6 +301,7 @@ export type SimEvent =
   | DoorEvent
   | PurchaseEvent
   | BoxEvent
-  | SignalEvent;
+  | SignalEvent
+  | PointEvent;
 
 export type SimEventType = SimEvent['type'];

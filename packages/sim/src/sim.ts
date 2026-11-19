@@ -64,6 +64,7 @@ import { REWIND_HISTORY, REWIND_MAX_S, RewindState } from './rewind.ts';
 import { SimState } from './state.ts';
 import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { createSignalState, signalSystem } from './systems/signals.ts';
+import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -116,6 +117,8 @@ export interface SimMap {
   readonly boxSpots?: readonly BoxSpotDef[];
   /** M3 (fase 4c): máquinas de vantagem do Bobo Zombies (ausente = nenhuma). */
   readonly perkMachines?: readonly PerkMachineDef[];
+  /** M6 (fase 1): os pontos do Domination (o centro do anel nos pés e o raio). */
+  readonly controlPoints?: readonly ControlPointDef[];
 }
 
 export interface SimConfig {
@@ -457,6 +460,11 @@ export function createSim(config: SimConfig): Sim {
           map.perkMachines ?? [],
         )
       : null;
+  // M6 (fase 1): os pontos do Domination (só no modo dele e num mapa que os tem).
+  const domination =
+    recipe.mode === 'warfare.domination' && (map.controlPoints?.length ?? 0) > 0
+      ? new ControlPoints(map.controlPoints!)
+      : null;
   const match: MatchState = {
     phase: countdownTicks > 0 ? 'warmup' : 'playing',
     ticksLeft: timeLimitS > 0 ? Math.max(1, secondsToTicks(timeLimitS, hz)) : -1,
@@ -475,6 +483,7 @@ export function createSim(config: SimConfig): Sim {
     colliders: mapObjects?.boboColliders ?? map.colliders ?? null,
     zombieColliders: mapObjects?.zombieColliders ?? map.colliders ?? null,
     mapObjects,
+    domination,
     spawns: map.spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
     profile: resolveMovementProfile(recipe.players),
@@ -672,6 +681,7 @@ export function createSim(config: SimConfig): Sim {
     colliders: ctx.colliders,
     nav: map.nav ?? null,
     mapObjects,
+    controlPoints: domination,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
   };
@@ -901,6 +911,8 @@ export function createSim(config: SimConfig): Sim {
       projectileSystem(ctx);
       pickupSystem(ctx);
       damageSystem(ctx);
+      // M6 (fase 1): os pontos do Domination (antes das regras, que olham o placar).
+      dominationSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);

@@ -8,7 +8,7 @@ export const MENU_MAPS = ['construto', 'ringue', 'posto', 'base'] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
 export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
-  construto: ['warfare.tdm', 'warfare.ffa', 'zombies'],
+  construto: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies'],
   ringue: ['warfare.tdm', 'training'],
   // M3 (fase 3d): o Posto Avançado é só do Bobo Zombies (janelas e porta paga).
   posto: ['zombies'],

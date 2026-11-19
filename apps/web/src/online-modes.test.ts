@@ -1,5 +1,6 @@
 import type { MatchRecipe } from '@boboforces/format';
 import { createSceneDriver, onlineRecipe, type OnlineSession, type SceneDriver } from '@boboforces/game';
+import { moreModePreset } from '@boboforces/game/editors';
 import { roomPreset, type RoomPresetMode } from '@boboforces/game/online';
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
 import * as net from '@boboforces/net';
@@ -114,6 +115,13 @@ function expectSameResult(run: RoomRun): void {
       expect([v.kills[e], v.deaths[e], v.points[e]], `entidade ${e}`).toEqual([h.kills[e], h.deaths[e], h.points[e]]);
     }
     if (h.mapObjects !== null) expect([...v.mapObjects!.doorOpen]).toEqual([...h.mapObjects.doorOpen]);
+    // M6 (fase 1): os pontos do Domination (o dono e o progresso, em milésimos).
+    if (h.controlPoints !== null) {
+      expect([...v.controlPoints!.owner]).toEqual([...h.controlPoints.owner]);
+      for (let i = 0; i < h.controlPoints.count; i++) {
+        expect(Math.abs(v.controlPoints!.progress[i]! - h.controlPoints.progress[i]!)).toBeLessThan(0.002);
+      }
+    }
   }
 }
 
@@ -165,6 +173,24 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     console.log(`[modos] Times: 30 Hz ${kb(at30)} KB/s, 20 Hz ${kb(at20)} KB/s por amigo`);
     dispose(at30);
     dispose(at20);
+  }, 240_000);
+
+  it('M6 (fase 1): Domination no Construto: o host, 1 amigo e 6 bots; os mesmos pontos e o mesmo placar', () => {
+    const r = moreModePreset('warfare.domination')!;
+    const run = playRoom({ ...r, match: { timeLimitS: 90, scoreLimit: 200 } }, [0, 1], {
+      snapshotHz: 30,
+      zombies: 0,
+      maxS: 240,
+    });
+    expectSameResult(run);
+    const h = run.host.sim.view();
+    expect(h.controlPoints!.count).toBe(3);
+    // Os bots jogaram o objetivo: alguém marcou pelos pontos.
+    expect(h.match.teamScore[0]! + h.match.teamScore[1]!).toBeGreaterThan(0);
+    console.log(
+      `[modos] Domination: ${run.seconds.toFixed(1)} s, placar ${h.match.teamScore[0]} × ${h.match.teamScore[1]}, pontos ${[...h.controlPoints!.owner].join(' ')}, host→amigo ${(run.hostBytesPerClient / 1024).toFixed(2)} KB/s`,
+    );
+    dispose(run);
   }, 240_000);
 
   it('Bobo Zombies na Base Abandonada: 2 humanos e 1 bot de apoio, 1 onda; a mesma onda, os mesmos pontos', () => {

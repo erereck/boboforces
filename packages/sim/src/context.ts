@@ -1,4 +1,5 @@
 import type { SignalState } from './systems/signals.ts';
+import type { ControlPoints } from './systems/domination.ts';
 import type { RewindState } from './rewind.ts';
 import type { FigurePart } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
@@ -197,6 +198,8 @@ export interface SimContext {
   readonly zombieColliders: StaticColliders | null;
   /** M3 (fase 3d): janelas com barricada e portas pagas do mapa (null = nenhuma). */
   readonly mapObjects: MapObjects | null;
+  /** M6 (fase 1): os pontos do Domination (`null` fora dele ou num mapa sem pontos). */
+  readonly domination: ControlPoints | null;
   readonly spawns: readonly SpawnPoint[];
   /** Perfil de movimento do bobo (da receita) e do zumbi. */
   readonly profile: MovementProfile;
