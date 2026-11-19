@@ -3743,3 +3743,8 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   Cabeção e entram os Invisíveis; 25 × 31). Os outros não mudaram.
 - **Ficam para depois:** Mini e Bots gigantes (a sim escala as hitboxes de um corpo com o `bodyScale`, mas a caixa de
   colisão, a câmera e a navegação não), Arcade e Ricochete.
+
+- **Espaço no menu (antes do Paintball):** os 166 textos da Partida personalizada, do Laboratório e da Oficina
+  (`custom.*`, `lab.*`, `labIntro.*` e `workshop.*`, menos os 3 que as Configurações usam) foram para a tabela extra,
+  que chega com os editores logo depois do 1º quadro do título (as telas deles já moravam lá). O menu caiu de 349,5
+  para 347,8 KB.

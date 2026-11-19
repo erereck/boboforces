@@ -113,7 +113,8 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
 
 - **O menu no teto:** cada texto novo no menu pesa. Por isso a fase 0 leva os cards e os textos dos modos novos para
   o pedaço dos editores. Na fase 4a o menu chegou a 349,5 de 350 KB (o validador da receita mora no menu e ganhou os
-  blocos `modifiers` e `chaos`): a próxima coisa que entrar no validador precisa abrir espaço antes.
+  blocos `modifiers` e `chaos`): a próxima coisa que entrar no validador precisa abrir espaço antes. Antes do
+  Paintball, os textos dos editores saíram do menu (347,8 KB).
 - **O protocolo:** o estado de cada modo entra no fim do esquema do snapshot e sobe o `PROTOCOL_VERSION`. Quem está com
   o jogo velho vê "Atualize a página", como já acontece.
 - **O Switch:** a IA de objetivo e as manchas pesam. Cada modo passa pelo bench; o que não couber fica marcado
