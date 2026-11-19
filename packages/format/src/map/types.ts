@@ -268,6 +268,8 @@ export interface MapMarkers {
   readonly boxSpots?: readonly MapBoxSpotMarker[];
   /** M3 (fase 4c): máquinas de vantagem (opcional). */
   readonly perkMachines?: readonly MapPerkMachineMarker[];
+  /** M7 (fase 1): os sites da bomba do BoboStrike (letra, centro dos pés e raio; opcional, como as janelas). */
+  readonly bombSites?: readonly MapPointMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

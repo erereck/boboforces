@@ -610,7 +610,8 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       recipe = {
         format: MATCH_RECIPE_FORMAT,
         mode: 'warfare.tdm',
-        map: 'construto',
+        // M7 (fase 1): o TDM na Base Bobo (`scene=airbase`).
+        map: bench.scene === 'airbase' ? 'airbase' : 'construto',
         seed: bench.seed >>> 0,
         match: { timeLimitS: 0, viewDistanceM: bench.viewDistanceM },
         teams: [{ bots: [{ ref, count: a }] }, { bots: b > 0 ? [{ ref, count: b }] : [] }],

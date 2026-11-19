@@ -16,6 +16,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   entrega a rodada aos caçadores e o que aguenta o tempo leva a dele; cada segundo de Jugg vale 1 ponto e, no fim, vence
   quem tem mais. No alto, "Rodada 2 de 4 · 2:31". A página Mais modos ficou mais junta para caber 4 linhas no celular
   (o Voltar vai para a última linha quando ela tem lugar).
+- **Base Bobo (fase 1):** o mapa do BoboStrike, de dia: o hangar (site A, com metade do teto e luminárias) no noroeste,
+  o pátio de carga (site B, a céu aberto, com contêineres) no nordeste, a pista no sul (onde os atacantes nascem) e o
+  pátio dos defensores no norte, atrás de um QG. Três rotas (oeste, meio com a torre de controle, leste) e corredores
+  curtos do meio para os sites; quebra-vistas em zigue-zague para nenhuma linha passar de 50 m. Já joga TDM (Partida
+  rápida e personalizada).
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

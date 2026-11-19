@@ -57,6 +57,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:posto',
   // M3 (fase 5a): a Base Abandonada, o mapa do Bobo Zombies (só acrescentado, regra 20)
   'map:base',
+  // M7 (fase 1): a Base Bobo, o mapa do BoboStrike (só acrescentado, regra 20)
+  'map:airbase',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

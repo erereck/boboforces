@@ -18,6 +18,8 @@ export interface SimMapSource {
   > & {
     /** M6 (fase 1): os pontos do Domination (opcional: só o modo dele usa). */
     readonly domination?: MapMarkers['domination'];
+    /** M7 (fase 1): os sites do BoboStrike (opcional). */
+    readonly bombSites?: MapMarkers['bombSites'];
   };
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;

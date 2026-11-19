@@ -277,9 +277,6 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     if (!['chonky', 'speedy', 'buddy'].includes(q.perk)) err(`máquina ${i}: vantagem desconhecida: ${q.perk}`);
     if (!Number.isInteger(q.cost) || q.cost < 0 || q.cost > 100_000) err(`máquina ${i} com preço inválido`);
   });
-  if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
-    err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
-  }
   const unique = (kind: string, names: readonly string[]): void => {
     const seen = new Set<string>();
     for (const n of names) {
@@ -288,6 +285,20 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
       seen.add(n);
     }
   };
+  // M7 (fase 1): o BoboStrike pede 2 sites (A e B), dentro da área.
+  const sites = mk.bombSites ?? [];
+  if (modes.has('strike') && sites.length !== 2) err(`BoboStrike: ${sites.length} sites (são 2)`);
+  unique(
+    'site do BoboStrike',
+    sites.map((d) => d.id),
+  );
+  sites.forEach((d) => {
+    if (!finite(d.x, d.y, d.z, d.radius) || d.radius <= 0) err(`site ${d.id} inválido`);
+    else if (!inArea(d.x, d.z)) err(`site ${d.id} fora da playArea`);
+  });
+  if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
+    err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);
+  }
   unique(
     'ponto de Domination',
     mk.domination.map((d) => d.id),

@@ -3918,3 +3918,25 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   - O 1º tick valendo, antes da rodada 1, não congelava (um tiro segurado na contagem saía do lugar antigo).
 - **O que fica para o BoboStrike:** os lados que trocam (`swapped` já existe, os spawns por lado não), a câmera de quem
   morre e o vencedor por eliminação (já no motor, sem modo que use ainda).
+
+### 18.2 Fase 1: a Base Bobo (19/11/2026)
+
+- **O mapa** (`assets-src/maps/airbase.ts`, `map:airbase`, "Base Bobo"): grade de 72 × 24 × 72 m, área jogável de 64 ×
+  64 m, de dia; modos `strike` e `warfare.tdm`. O hangar (site A) no noroeste, o pátio de carga (site B) no nordeste,
+  a pista (spawn dos atacantes, o time 0 na largada) no sul e o pátio dos defensores (o time 1) no norte, atrás de um QG
+  com as saídas pelos lados (da pista não se vê o pátio). Três rotas (oeste, meio, leste) separadas por barracões;
+  corredores curtos do meio aos dois sites; 6 spawns por time.
+  - O `mapc`: maior linha de visão medida 49 m (o teto é 50 m: quebra-vistas em zigue-zague nas rotas e na pista);
+    travessia TDM de ~8 s correndo (o GDD pede 12–18 s: aviso, o mapa é de 64 m); 2.683 nós jogáveis.
+- **O marcador `bombSites`** (`MapMarkers.bombSites`, opcional como as janelas: os mapas sem ele saem com os mesmos
+  bytes): letra, centro e raio. O validador pede 2 sites com `strike` nos modos, com nome único e dentro da área; o
+  `mapc` ganhou `bombSite` e desenha os sites na vista de cima; o `SimMap` aceita os sites (a sim usa na fase 2).
+- **O jogo:** a Base Bobo na lista de mapas (Partida rápida e personalizada, só TDM até o BoboStrike existir) e a cena
+  de bench `scene=airbase` (o TDM nela), que serve aos prints das câmeras `print:airbase`, `print:siteA`,
+  `print:siteB` e `print:meio` (`local/m7/capturar-mapa.ts`).
+- **Golden** (TDM 4 contra 4, semente 42, 2 min): `e3158452` (17 × 18).
+- **A revisão (Opus) achou 4 coisas, corrigidas antes do commit:** um beco sem saída de 3 m entre os barracões do
+  oeste (escondido pelo telhado: agora os blocos se encostam); a Base Bobo sem teto de bots no menu (20 contra 20 no PC
+  em 6 spawns por time: agora 9 bots, 5 contra 5 com o humano); as saídas do pátio dos defensores de 1,5 m (agora 2 m;
+  no TDM o pátio ainda é fácil de segurar, travessia de ~8 s: fica para a rodada de prints); e um caixote que entrava no
+  QG.

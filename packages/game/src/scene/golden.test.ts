@@ -787,3 +787,49 @@ describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
     expect(a.hash, msg).toBe(GOLDEN_JUGG_FIXED_HASH);
   }, 240_000);
 });
+
+/**
+ * M7 (fase 1): o TDM 4 contra 4 na Base Bobo (o mapa do BoboStrike), semente 42, 2 min. Confere que os bots andam pelas
+ * rotas e brigam no mapa novo (abates dos dois lados) e o hash entre execuções. Gravado na fase 1 (19/11/2026):
+ * `e3158452` (17 × 18). MUDA com a sim, a IA ou o mapa.
+ */
+const GOLDEN_AIRBASE_HASH = 'e3158452';
+
+function runAirbaseGolden(): { hash: string; score: [number, number] } {
+  const { map } = loadWorld('airbase');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'airbase',
+      seed: 42,
+      match: { timeLimitS: 120, scoreLimit: 0 },
+      teams: [
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+      ],
+    },
+    map,
+    humans: 0,
+  });
+  for (let t = 0; t < 120 * 60 + 5 && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    score: [v.match.teamScore[0]!, v.match.teamScore[1]!] as [number, number],
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do TDM na Base Bobo (M7, fase 1)', () => {
+  it('os bots brigam no mapa novo; hash estável', () => {
+    const a = runAirbaseGolden();
+    const b = runAirbaseGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `placar ${a.score.join('×')}`;
+    console.log(`[airbase] ${msg} · hash ${a.hash}`);
+    expect(Math.min(a.score[0], a.score[1]), msg).toBeGreaterThan(0);
+    expect(a.hash, msg).toBe(GOLDEN_AIRBASE_HASH);
+  }, 240_000);
+});

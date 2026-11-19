@@ -135,6 +135,7 @@ export function renderTopView(result: CompileResult): Uint8Array {
     rect(px(c.boxes[o]!), px(c.boxes[o + 2]!), px(c.boxes[o + 3]!) - 1, px(c.boxes[o + 5]!) - 1, 220, 60, 220);
   }
   for (const d of doc.markers.domination) disc(px(d.x), px(d.z), px(d.radius), 60, 230, 90, true);
+  for (const d of doc.markers.bombSites ?? []) disc(px(d.x), px(d.z), px(d.radius), 240, 70, 60, true);
   for (const s of doc.markers.spawns) {
     const col: [number, number, number] =
       s.team === 0 ? [255, 140, 0] : s.team === 1 ? [40, 120, 255] : [255, 255, 255];

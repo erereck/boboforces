@@ -479,3 +479,48 @@ describe('map@1: janelas e portas do Bobo Zombies (M3, fase 3d)', () => {
     expect(issues).toContain('porta 0 com preço inválido');
   });
 });
+
+describe('map@1: os sites do BoboStrike (M7, fase 1)', () => {
+  const withSites = (modes: readonly string[]): MapDocument => {
+    const doc = syntheticMap();
+    return {
+      ...doc,
+      meta: { ...doc.meta, modes },
+      markers: {
+        ...doc.markers,
+        bombSites: [
+          { id: 'A', x: 6, y: 0.5, z: 6, radius: 3 },
+          { id: 'B', x: 20, y: 0.5, z: 20, radius: 3 },
+        ],
+      },
+    };
+  };
+
+  it('ida e volta; sem site, os bytes do mapa sintético continuam os mesmos', () => {
+    const doc = withSites(syntheticMap().meta.modes);
+    expect(decodeMap(encodeMap(doc)).markers).toEqual(doc.markers);
+    expect(decodeMap(encodeMap(syntheticMap())).markers.bombSites).toBeUndefined();
+    expect(hashToHex(fnv1a32(encodeMap(syntheticMap())))).toBe('9912e4c5');
+  });
+
+  it('o BoboStrike pede 2 sites, com nome único e dentro da área', () => {
+    const doc = withSites(['strike']);
+    expect(validateMap(doc).filter((i) => i.includes('site'))).toEqual([]);
+    const one: MapDocument = { ...doc, markers: { ...doc.markers, bombSites: [doc.markers.bombSites![0]!] } };
+    expect(validateMap(one)).toContain('BoboStrike: 1 sites (são 2)');
+    const bad: MapDocument = {
+      ...doc,
+      markers: {
+        ...doc.markers,
+        bombSites: [
+          { id: 'A', x: 6, y: 0.5, z: 6, radius: 0 },
+          { id: 'A', x: 999, y: 0.5, z: 20, radius: 3 },
+        ],
+      },
+    };
+    const issues = validateMap(bad);
+    expect(issues).toContain('site do BoboStrike repetido: A');
+    expect(issues).toContain('site A inválido');
+    expect(issues).toContain('site A fora da playArea');
+  });
+});

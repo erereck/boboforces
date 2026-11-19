@@ -21,6 +21,7 @@ describe('mapas dos menus', () => {
     expect(mapsForMode('warfare.ffa')).toEqual(['construto']);
     expect(mapForMode('ringue', 'warfare.ffa')).toBe('construto');
     expect(mapBotCap('ringue', 40)).toBe(7);
+    expect(mapBotCap('airbase', 40)).toBe(9);
     expect(mapBotCap('construto', 12)).toBe(12);
   });
 

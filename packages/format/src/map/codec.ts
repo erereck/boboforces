@@ -109,6 +109,9 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
   return {
     spawns: m.spawns.map((s) => ({ x: s.x, y: s.y, z: s.z, yaw: s.yaw, team: s.team })),
     domination: m.domination.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, radius: d.radius })),
+    ...(m.bombSites && m.bombSites.length > 0
+      ? { bombSites: m.bombSites.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
     cameras: m.cameras.map((c) => ({
       name: c.name,
       x: c.x,
@@ -666,10 +669,26 @@ function parseMarkers(json: Json): MapMarkers {
             cost: int(q['cost'], p),
           };
         });
+  // M7 (fase 1): os sites do BoboStrike (opcional).
+  const bombSites =
+    m['bombSites'] === undefined
+      ? []
+      : arr(m['bombSites'], 'bombSites').map((v, i): MapPointMarker => {
+          const d = obj(v, `bombSites[${i}]`);
+          const p = `bombSites[${i}]`;
+          return {
+            id: str(d['id'], p),
+            x: num(d['x'], p),
+            y: num(d['y'], p),
+            z: num(d['z'], p),
+            radius: num(d['radius'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
     domination,
+    ...(bombSites.length > 0 ? { bombSites } : {}),
     cameras,
     routes,
     mannequins,

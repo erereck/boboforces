@@ -56,6 +56,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    - base militar cartunesca com hangar e pista; **2 sites** (A e B) e **3 rotas**; spawns de atacantes e defensores;
    - o marcador novo `bombSites` (o centro e o raio de cada site), os nós de IA, as câmeras e o teto de bots;
    - também joga TDM (vira opção na Partida rápida e na personalizada).
+   - **feita em 19/11** (ARCHITECTURE §18.2): a Base Bobo no TDM e na cena de bench `scene=airbase`.
 2. **BoboStrike na sim:**
    - a **Boom Box**: um atacante nasce com ela; largada ao morrer (com marcador para o time); plantar segurando o
      usar dentro do site; explode 40 s depois; desarmar em 7 s (5 s com kit);

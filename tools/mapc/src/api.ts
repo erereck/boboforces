@@ -107,6 +107,8 @@ export interface MapBuilder {
   prop(model: string, x: number, y: number, z: number, yaw: number, scale?: number, dose?: PropDose): void;
   spawn(marker: MapSpawnMarker): void;
   domination(point: MapPointMarker): void;
+  /** M7 (fase 1): site da bomba do BoboStrike (letra, centro dos pés e raio, em metros). */
+  bombSite(site: MapPointMarker): void;
   camera(camera: MapCamera): void;
   route(route: MapCameraRoute): void;
   mannequin(mannequin: MapMannequin): void;
