@@ -4295,3 +4295,32 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
 ## 19. M8: compartilhar, o Diretor e o Arcade
 
 Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
+
+### 19.1 Fase 0: o código comum (19/11/2026)
+
+- **Os códigos** (`format/src/share-code.ts`): `<prefixo>` + base64url(deflate nível 9 do JSON). O bot é `BF1-`, o
+  preset `BFP1-`, o esquadrão `BFS1-` e a semente do Surpreenda-me `BFR1-` (o número é a versão do código; o JSON
+  tem a dele). No máximo 4.000 caracteres (o prefixo incluso) e 64 KB descompactado: o inflate é em fatias e para no teto
+  (um código pequeno que abriria em 1 MB volta `tooBig`). O base64url é próprio (sem `btoa`). Colado com espaços,
+  quebras de linha, os invisíveis de alguns apps ou o prefixo em minúsculas, o código abre igual.
+- **Os links:** `#bot=` e `#p=` com o código sem o prefixo (`shareLinkHash`, `shareCodeFromHash`); a casca da web lê
+  o hash (fase 1) e o `format` só vê a string (regra 3).
+- **A importação** (`share-import.ts`, `importShareCode`): abre o código, valida pelo tipo (`validateBot`,
+  `validateMatchRecipe` com o teto do aparelho), recusa mais de 16 bots embutidos e id de bot com mais de 48
+  caracteres, normaliza o `look` e passa o filtro nos nomes (o do bot, o do preset, os dos times e os dos embutidos: o
+  barrado fica vazio, com o aviso `name.blocked`, e quem importa dá um nome do gerador). Os esquadrões e a semente
+  abrem nas fases 2 e 3.
+- **O filtro de nomes** (`name-filter.ts`, `isNameAllowed`): pt-BR e inglês, local. Sem `normalize`/`Intl` (o
+  Switch pode não ter os dados de Unicode): os acentos saem por tabela; os invisíveis somem; números e `@ $ !` viram
+  letra só na palavra que tem letra ("Bot 455" passa); as letras repetidas se juntam (3 ou mais viram 2, e também 1).
+  As raízes longas casam dentro de cada palavra; as palavras curtas só sozinhas, com a vizinha ("vi ado") ou com as
+  letras soltas ("p u t a"). Falsos positivos conhecidos (uma raiz dentro de um nome de verdade): Shitake, Scunthorpe,
+  Penistone.
+- **As armas das regras do bot** (`validateBot`): só os ids de arma conhecidos (a aposentada vira a substituta); o
+  resto cai com `content.missingWeapon`. Antes, um texto qualquer passava e aparecia cru no card e no placar.
+- **A revisão (Opus) achou:** o texto das armas acima; os falsos positivos de juntar as palavras ("Push It", "Bo
+  Stark", "Dona Zica", "Bot 455", "Dick Vigarista", "Bob kkk") e os furos das letras triplicadas, dos invisíveis, da
+  palavra partida e do 6 e 9; o teto dos embutidos também depois da validação; o `look` e o `id` sem teto; e a ordem
+  do prefixo antes do tamanho. Tudo corrigido antes do commit.
+- **O menu da web** não mudou (348,4 KB): nada do menu importa estes módulos (o `format` não tem efeito colateral);
+  a fase 1 os usa só no pedaço dos editores.

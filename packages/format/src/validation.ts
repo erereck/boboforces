@@ -65,6 +65,8 @@ export const ISSUE_CODES = [
   'save.invalidField',
   'save.valueClamped',
   'save.droppedEntry',
+  // M8 (fase 0): um nome barrado pelo filtro (o código e o link de outro aparelho)
+  'name.blocked',
 ] as const;
 
 export type IssueCode = (typeof ISSUE_CODES)[number];

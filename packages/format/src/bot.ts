@@ -1,3 +1,4 @@
+import { resolveContent } from './content-ids.ts';
 import type { FormatId } from './format-id.ts';
 // Só tipos da receita: o `match-recipe.ts` importa este arquivo (valida os `embeddedBots`), e um import de valor faria
 // ciclo na inicialização.
@@ -456,7 +457,13 @@ export function validateBot(doc: unknown): ValidationResult<BotDocument> {
   let weapons: string[] = [];
   if (r['weapons'] !== undefined) {
     if (Array.isArray(r['weapons']) && r['weapons'].every((w) => typeof w === 'string')) {
-      weapons = (r['weapons'] as string[]).slice(0, 16);
+      // M8 (fase 0, revisão): só armas conhecidas (a aposentada vira a substituta). O card e o placar mostram o id: um
+      // texto qualquer vindo de um código passaria por cima do filtro de nomes.
+      for (const w of (r['weapons'] as string[]).slice(0, 16)) {
+        const c = resolveContent('weapon', w);
+        if ((c.status === 'known' || c.status === 'retired') && !weapons.includes(c.local)) weapons.push(c.local);
+        else if (c.status !== 'known' && c.status !== 'retired') warn(ctx, 'rules.weapons', 'content.missingWeapon');
+      }
     } else warn(ctx, 'rules.weapons', 'bot.invalidField');
   }
   const rules: BotRules = {

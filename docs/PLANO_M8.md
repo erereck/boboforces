@@ -55,6 +55,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 0. **O código comum** (`packages/format`): base64url, o envelope `BF1-` / `BFP1-` (e os dos esquadrões e da semente)
    sobre o JSON com deflate, o inflate com teto (anti-bomba), o limite de 4.000 caracteres e o resumo do que caiu em
    fallback; o filtro de nomes também na importação.
+   - **feita em 19/11** (ARCHITECTURE §19.1): o formato, os links, a importação e o filtro de nomes (ainda sem tela).
 1. **A Oficina com códigos:** "Copiar código" no bot e no preset (a área de transferência da web), "Colar código" (o
    campo de texto escondido da web) com o resumo antes de salvar, e os links `#bot=` / `#p=` (lidos uma vez na casca,
    como o `#sala=`, e limpos da barra). No Switch, os arquivos do SD como hoje.

@@ -12,6 +12,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   esquadrões, o Surpreenda-me completo (com o cadeado e a semente), o Nêmesis com memória, o Diretor de Partida, as
   ordens aos bots aliados e o perfil Arcade. O Bobo Sandbox e os modificadores Mini, Bots gigantes e Ricochete ficam
   para o M9. Perguntas Z1–Z6 no padrão.
+- **O código comum (fase 0):** o formato dos códigos de compartilhar (o bot `BF1-`, o preset `BFP1-`, o esquadrão
+  `BFS1-` e a semente `BFR1-`, até 4.000 caracteres) e dos links `#bot=` e `#p=`, a importação que valida e corta no
+  teto do aparelho, e um filtro simples de nomes (pt-BR e inglês) para o que vem de outro aparelho. As armas das regras
+  de um bot agora só aceitam armas que existem. Ainda sem tela: os botões chegam na fase 1.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

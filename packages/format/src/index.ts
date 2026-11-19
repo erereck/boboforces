@@ -19,6 +19,10 @@ export * from './bobo.ts';
 // M5 (fase 4c): o perfil do online.
 export * from './online-profile.ts';
 export * from './backup.ts';
+// M8 (fase 0): os códigos de compartilhar e o filtro de nomes.
+export * from './share-code.ts';
+export * from './name-filter.ts';
+export * from './share-import.ts';
 export * from './presets.ts';
 export * from './png.ts';
 // M1: manifesto de camadas dos texture arrays, `map@1` (frente mapa-nav) e `model@1` + o boneco do FutBobo (#56;

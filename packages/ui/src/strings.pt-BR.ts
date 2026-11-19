@@ -753,6 +753,7 @@ export const STRINGS_PT_BR = {
   'issue.save.invalidField': 'Um dado salvo estava num formato estranho e voltou para o padrão.',
   'issue.save.valueClamped': 'Um dado salvo estava fora da faixa e foi ajustado.',
   'issue.save.droppedEntry': 'Um item salvo estava estragado e ficou de fora.',
+  'issue.name.blocked': 'Um nome barrado pelo filtro foi trocado.',
   'issue.bot.invalidField': 'Um campo do bot estava num formato estranho e foi ignorado.',
   'issue.bot.valueClamped': 'Um valor do bot passou do limite e foi ajustado.',
 } as const satisfies Readonly<Record<string, string>>;
