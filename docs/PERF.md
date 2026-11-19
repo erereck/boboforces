@@ -388,6 +388,22 @@ A aceleração é `driver.update(dt × velocidade)`, com o teto de 4 ticks por f
   2 ms por tick (8 ms por frame a 2×). Se o console não segurar, a aceleração fica no teto sem travar (o passo fixo
   descarta o tempo que sobra) e a câmera do Aquário como observador do LOD vira o próximo passo.
 
+## 1n. Os cards do M7 (fechamento; 19/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node 26.7 com JIT), cada card do M7 com a semente 42 e a receita do Aquário (o lugar do
+jogador vira um bot do mesmo time). 600 ticks de aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em
+`local/m7/medir-modos.ts`.
+
+| Modo | Mapa | Bots | Média (ms) | p50 | p99 | Máx | Vivos no fim |
+|---|---|---|---|---|---|---|---|
+| TDM (referência) | Construto | 8 | 0,040 | 0,029 | 0,219 | 0,92 | 7 |
+| Jugg Fixo | Construto | 4 | 0,015 | 0,011 | 0,087 | 0,73 | 4 |
+| BoboStrike | Base Bobo | 10 | 0,040 | 0,030 | 0,236 | 0,92 | 6 |
+| Bobo Royale (solo) | Ilha Tropical | 24 | 0,050 | 0,037 | 0,231 | 0,76 | 3 |
+
+- O Royale com 24 custa 1,25× o TDM com 8: o loot e a zona olham todos os itens, mas a luta acaba cedo (3 vivos aos
+  70 s). Sem JIT ele é mais caro (§1l), e é o que o bench no console precisa confirmar (pergunta Y5).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

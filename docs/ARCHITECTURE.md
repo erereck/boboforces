@@ -4267,3 +4267,27 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   visão e rota: gameplay.md §6.9), o "Entrar no time X" (um lugar novo), o Aquário pela sala online (a 1×) e a câmera
   do Aquário como observador do LOD da IA.
 
+### 18.11 Fechamento do M7 (19/11/2026)
+
+- **Os modos:** a página Mais modos tem 12 cards (os 9 do M6, o Jugg Fixo, o BoboStrike e o Bobo Royale) e o botão do
+  Aquário; a Partida personalizada joga o TDM na Base Bobo e tem o "Assistir". O BoboStrike (5 contra 5 na Base Bobo,
+  MR12) e o Royale (24 na Ilha Tropical; solo no card, duplas na sala online) rodam sozinhos com bots, no sofá, no
+  online e no Switch; o Aquário assiste qualquer modo e assume um bot no meio.
+- **Os mapas novos:** a Base Bobo (`airbase`, 144 × 48 × 144 células, de dia, 2 sites e 3 rotas) e a Ilha Tropical
+  (`island`, 400 × 64 × 400 células, ~150 m de terra, a vila, o loot e as largadas do Royale).
+- **As versões:** snapshot 18 e `PROTOCOL_VERSION` 8 (as rodadas, a bomba e o dinheiro, o Royale com a zona e o loot);
+  as tabelas `ROYALE`, `ROYALE_RARITY` e `ROYALE_WEAPONS` entram no hash de conteúdo da sala.
+- **Os goldens do M7** (`game/src/scene/golden.test.ts`): Jugg Fixo `9074d33b`, TDM na Base Bobo `e3158452`,
+  BoboStrike `9bf9f851` e Royale solo com 24 `38d57bd4`. Os 11 de antes não mudaram no M7 (TDM `b36eb8e1`, Zombies
+  `edc93590`, Posto `6c4eaf90` e os 8 do M6).
+- **O custo:** `PERF.md` §1k (a ilha), §1l (o Royale e o LOD C), §1m (o Aquário) e §1n (sim + IA de cada card do M7).
+  Nenhum modo do M7 pesa mais que o dobro do TDM no PC; no Eden, o Royale com 24 roda a 57–58 fps (§4).
+- **O menu da web** fechou o M7 em 348,4 KB (o teto é 350 KB): os modos novos moram no pedaço dos editores e da cena.
+- **Perguntas abertas** (no padrão até a resposta): Y5 e AB2 (24 no celular e no Switch com 2 ou mais, depois do
+  bench no console), Y7 e AB3 (o Royale só com bots acaba em 1 a 3 min), Y8 e AC1 (o Aquário fora do menu principal),
+  AB1 (a parede da zona), AB4 (o formato do card do Royale), AC2 (os bots com o mesmo nome) e AC3 (a velocidade só
+  pela pausa).
+- **Fica para depois do M7:** o Bobo Sandbox completo (Y6); a zona no minimapa, a arma nas costas e o seletor de duplas
+  e quartetos no card do Royale; o Aquário no sofá, a camada da IA no Aquário, o "Entrar no time X", o Aquário pela sala
+  online e a câmera do Aquário como observador do LOD da IA; e o bench do Royale no console (o Eden não mede o tempo
+  de quadro).

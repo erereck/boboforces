@@ -100,6 +100,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
      personalizada (fora do menu principal: o menu da web está no teto); 4 câmeras, a lista, a velocidade na pausa e
      "Assumir o bobo" / "Largar o bobo". Pergunta Y8.
 10. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
+    - **feita em 19/11** (ARCHITECTURE §18.11): o portão verde, a rodada de prints 27 (o Aquário) e o custo dos cards do
+      M7 (PERF §1n). **O M7 está fechado**; as perguntas Y5, Y7 e Y8 e as das rodadas 26 e 27 seguem no padrão.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

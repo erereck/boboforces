@@ -62,6 +62,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   cima; a roda troca o bobo, o Tab liga a lista grande. Na pausa, a velocidade (de 0,25× a 4× no PC; até 2× no celular e
   no Switch) e "Assumir o bobo": você entra no lugar dele, com a vida e a arma, e "Largar o bobo" devolve à IA. No fim,
   quem venceu, sem os seus números.
+- **Fechamento do M7 (fase 10):** o portão verde, a rodada de prints 27 e o custo de cada card medido: o Royale com 24
+  bots custa 0,05 ms por tick de sim + IA no PC (o TDM de referência, 0,04), o BoboStrike o mesmo que o TDM e o Jugg
+  Fixo menos; no Eden, o Royale com 24 roda a 57–58 fps. O menu da web continua dentro do teto (348,4 de 350 KB).
 
 ### M6: modos de festa (planejado em 19/11/2026)
 
