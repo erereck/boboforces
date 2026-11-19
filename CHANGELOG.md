@@ -6,7 +6,14 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M7: BoboStrike e Bobo Royale Mini (planejado em 19/11/2026)
+### M8: compartilhar, o Diretor e o Arcade (planejado em 19/11/2026)
+
+- **Plano** em `docs/PLANO_M8.md` (P-004, no padrão do #81): os códigos e os links da Oficina (bot e preset), os
+  esquadrões, o Surpreenda-me completo (com o cadeado e a semente), o Nêmesis com memória, o Diretor de Partida, as
+  ordens aos bots aliados e o perfil Arcade. O Bobo Sandbox e os modificadores Mini, Bots gigantes e Ricochete ficam
+  para o M9. Perguntas Z1–Z6 no padrão.
+
+### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 
 - **Plano** em `docs/PLANO_M7.md` (decisão #81): o motor de rodadas (com o Juggernaut Fixo), o BoboStrike na Base
   Bobo, o Bobo Royale Mini na Ilha Tropical (24 participantes, loot, zona e o LOD C da IA) e o Aquário. O Bobo Sandbox

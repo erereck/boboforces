@@ -4291,3 +4291,7 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   e quartetos no card do Royale; o Aquário no sofá, a camada da IA no Aquário, o "Entrar no time X", o Aquário pela sala
   online e a câmera do Aquário como observador do LOD da IA; e o bench do Royale no console (o Eden não mede o tempo
   de quadro).
+
+## 19. M8: compartilhar, o Diretor e o Arcade
+
+Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
