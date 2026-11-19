@@ -8,8 +8,8 @@ import type { MapBuilder, MapScript } from '../../tools/mapc/src/api.ts';
  * - O MORRO ao norte, com o FAROL no alto (só de enfeite: não se entra) e a casinha do faroleiro.
  * - A VILA ao sul do centro: uma praça e 10 casas de 3 m de pé-direito, com porta, janela e uma luminária no teto.
  * - O PÍER de tábua na praia do sul e 3 barracas na areia. Estradas de terra ligam a vila ao morro e às praias.
- * - Árvores, arbustos e mato na grama. Pontos de loot (marcador `lootSpots`) nas casas, nas barracas e no campo; 32
- *   pontos de largada sem time espalhados (o Royale sorteia).
+ * - Árvores, arbustos e mato na grama. Pontos de loot (marcador `lootSpots`) nas casas, nas barracas e no campo; os
+ *   pontos de largada sem time espalhados (o Royale escolhe os mais afastados entre si).
  *
  * Tudo em METROS aqui (múltiplos de 0,5); o builder recebe células.
  */
@@ -300,14 +300,19 @@ const island: MapScript = {
     for (const h of HOUSES) house(b, h, VILLAGE.h, loot);
     lighthouse(b, t, loot);
     beach(b, t, loot);
+    // As largadas (M7, fase 6): uma grade de 18 m sobre a terra, fora da vila, do farol, da estrada do meio e da água;
+    // com 24 participantes, o Royale escolhe as mais afastadas entre si (sem briga logo na largada).
     const spawns: [number, number][] = [];
-    for (let i = 0; i < 28; i++) {
-      const a = (i / 28) * Math.PI * 2;
-      const r = 48 + (i % 3) * 8;
-      spawns.push([
-        Math.round((CX + Math.sin(a) * r) * 2) / 2 + 0.25,
-        Math.round((CZ + Math.cos(a) * r) * 2) / 2 + 0.25,
-      ]);
+    for (let gx = 0; gx < 11; gx++) {
+      for (let gz = 0; gz < 11; gz++) {
+        // As linhas ímpares deslocadas meia casa (a grade vira um quincunce).
+        const x = 10.25 + gx * 18 + (gz % 2) * 9;
+        const z = 10.25 + gz * 18;
+        if (x > VILLAGE.x0 - 3 && x < VILLAGE.x1 + 3 && z > VILLAGE.z0 - 3 && z < VILLAGE.z1 + 3) continue;
+        if (Math.hypot(x - HILL.x, z - HILL.z) < 10 || Math.abs(x - 100) < 3) continue;
+        if (t.height(x, z) <= SEABED + 1 || x < MIN + 4 || x > MAX - 4 || z < MIN + 4 || z > MAX - 4) continue;
+        spawns.push([x, z]);
+      }
     }
     const trees: [number, number][] = [];
     nature(b, t, spawns, trees);
@@ -330,7 +335,7 @@ const island: MapScript = {
       box(b, x + 1, h, z, x + 2, h + 1, z + 1, 'crate');
       loot(x, h, z);
     }
-    // 32 pontos de largada sem time: um anel pela ilha e alguns na vila.
+    // Os pontos de largada sem time: a grade pela ilha e 4 na praça.
     for (const [x, z] of spawns) {
       const yaw = Math.atan2(-(CX - x), -(CZ - z));
       b.spawn({ x, y: t.height(x, z), z, yaw, team: -1 });

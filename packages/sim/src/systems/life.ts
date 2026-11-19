@@ -3,6 +3,7 @@ import { partyActive, partyKill, partyLoadout } from './party.ts';
 import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
 import { paintDamage, paintLoadout } from './paintball.ts';
 import { strikeArmor, strikeKill } from './strike.ts';
+import { ROYALE, ROYALE_UNDECIDED, royaleDrops, royaleLoadout, ZONE } from './royale.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -42,6 +43,7 @@ import {
   PART_TORSO,
   RULE_FLAG,
   WEAPON_BLEED_OUT,
+  WEAPON_ZONE,
   WEAPON_KILL_PLANE,
   WEAPON_NONE,
   type SimContext,
@@ -63,7 +65,26 @@ const R = RECENT_ATTACKERS;
 
 /** M7 (fase 2, revisão): o colete do BoboStrike segura tiro e explosão; a queda, o vazio e o sangrar passam inteiros. */
 function armored(weapon: number): boolean {
-  return weapon !== WEAPON_NONE && weapon !== WEAPON_KILL_PLANE && weapon !== WEAPON_BLEED_OUT;
+  return (
+    weapon !== WEAPON_NONE && weapon !== WEAPON_KILL_PLANE && weapon !== WEAPON_BLEED_OUT && weapon !== WEAPON_ZONE
+  );
+}
+
+/** M7 (fase 6): o colete do BoboStrike e o do Royale (o mesmo: metade do dano fora da cabeça). */
+function hasArmor(ctx: SimContext): boolean {
+  return ctx.strike !== null || ctx.royale !== null;
+}
+
+/** M7 (fase 6): no Royale em grupo, `t` cai (em vez de morrer) se alguém do esquadrão está de pé. */
+function royaleCanFall(ctx: SimContext, t: number): boolean {
+  const st = ctx.royale;
+  if (st === null || st.squad <= 1) return false;
+  const s = ctx.s;
+  for (let e = 0; e < s.count; e++) {
+    if (e === t || s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || s.team[e] !== s.team[t]) continue;
+    if ((s.flags[e]! & (F.dead | F.downed)) === 0) return true;
+  }
+  return false;
 }
 
 /** Passo 5: aplica a fila de dano na ordem em que foi gerada. */
@@ -75,7 +96,14 @@ export function damageSystem(ctx: SimContext): void {
     if (s.alive[t] === 0 || (s.flags[t]! & F.dead) !== 0) continue;
     // M3 (fase 2c): caído não toma dano; só sangrar até o fim e o plano de morte acabam com ele.
     const weaponOf = q.weapon[i]!;
-    if ((s.flags[t]! & F.downed) !== 0 && weaponOf !== WEAPON_BLEED_OUT && weaponOf !== WEAPON_KILL_PLANE) continue;
+    // M7 (fase 6): no Royale, o caído continua tomando dano (o tiro e a zona acabam com ele).
+    if (
+      (s.flags[t]! & F.downed) !== 0 &&
+      ctx.royale === null &&
+      weaponOf !== WEAPON_BLEED_OUT &&
+      weaponOf !== WEAPON_KILL_PLANE
+    )
+      continue;
     const source = q.attacker[i]!;
     let amount = q.amount[i]!;
     // M6 (fase 5): no Paintball, todo dano de tinta (a bola ou o respingo do balde) é um acerto inteiro; os
@@ -89,9 +117,9 @@ export function damageSystem(ctx: SimContext): void {
       // M2 (fase 4e): fogo amigo pela metade ou inteiro; um tiro mata (só dano de arma, nunca no aliado sem fogo amigo).
       if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
       // M7 (fase 2, revisão): o colete do BoboStrike antes do "um tiro mata".
-      if (ctx.strike !== null && armored(weaponOf)) amount = strikeArmor(ctx, t, amount, q.part[i] === PART_HEAD);
+      if (hasArmor(ctx) && armored(weaponOf)) amount = strikeArmor(ctx, t, amount, q.part[i] === PART_HEAD);
       if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
-    } else if (ctx.strike !== null && armored(weaponOf)) {
+    } else if (hasArmor(ctx) && armored(weaponOf)) {
       // Sem dono (a Boom Box): o colete também segura.
       amount = strikeArmor(ctx, t, amount, q.part[i] === PART_HEAD);
     }
@@ -152,8 +180,17 @@ export function damageSystem(ctx: SimContext): void {
         (s.flags[t]! & F.downed) === 0 &&
         weaponOf !== WEAPON_KILL_PLANE &&
         weaponOf !== WEAPON_BLEED_OUT;
+      // M7 (fase 6): no Royale em grupo, cai com alguém do esquadrão de pé (e o caído tem a vida dele).
+      const royaleFall =
+        (s.flags[t]! & F.downed) === 0 &&
+        weaponOf !== WEAPON_KILL_PLANE &&
+        weaponOf !== WEAPON_BLEED_OUT &&
+        royaleCanFall(ctx, t);
       if (canFall) knockDown(ctx, t, attacker);
-      else kill(ctx, t, attacker, weaponOf, part === PART_HEAD, bodyPart, i);
+      else if (royaleFall) {
+        knockDown(ctx, t, attacker);
+        s.health[t] = ROYALE.downHp;
+      } else kill(ctx, t, attacker, weaponOf, part === PART_HEAD, bodyPart, i);
     }
   }
   q.count = 0;
@@ -386,6 +423,7 @@ function kill(
         !zombie &&
         !ctx.zombiesMode &&
         ctx.rounds === null &&
+        ctx.royale === null &&
         s.kind[k] === ENTITY_KIND.bobo &&
         ctx.domination === null &&
         ctx.party.infectedSpeed <= 0 &&
@@ -421,6 +459,8 @@ function kill(
   }
   // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
   if (ctx.warfare && ctx.paintHits === 0 && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);
+  // M7 (fase 6): no Royale, a primária, o colete e os kits de quem morreu ficam no chão.
+  if (ctx.royale !== null && !zombie && weapon !== WEAPON_KILL_PLANE) royaleDrops(ctx, t);
   // M2 (fase 3b): "explode ao morrer" (regra do bot): a explosão do foguete no peito, de quem morreu.
   if ((ctx.rules.flags[t]! & RULE_FLAG.explodeOnDeath) !== 0 && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, WEAPON_ROCKET, s.idOf(t), -1);
@@ -477,6 +517,19 @@ export function rulesSystem(ctx: SimContext): void {
     endMatch(ctx, party.winnerTeam);
     return;
   }
+  // M7 (fase 6): o Royale acaba com o último esquadrão vivo (no solo, o vencedor também é o bobo).
+  const royale = ctx.royale;
+  if (royale !== null && royale.data[ZONE.winner] !== ROYALE_UNDECIDED) {
+    const team = royale.data[ZONE.winner]!;
+    endMatch(ctx, team);
+    if (royale.squad === 1 && team >= 0) {
+      const s = ctx.s;
+      for (let e = 0; e < s.count; e++) {
+        if (s.alive[e] === 1 && s.kind[e] === ENTITY_KIND.bobo && s.team[e] === team) m.winnerEntity = s.idOf(e);
+      }
+    }
+    return;
+  }
   if (m.phase === 'suddenDeath') {
     const lead = leader(ctx);
     if (lead >= 0) endMatch(ctx, lead);
@@ -515,7 +568,29 @@ export function rulesSystem(ctx: SimContext): void {
  */
 export function finishMatch(ctx: SimContext): void {
   if (ctx.match.phase === 'ended') return;
-  endMatch(ctx, leader(ctx));
+  endMatch(ctx, ctx.royale !== null ? royaleLeader(ctx) : leader(ctx));
+}
+
+/** M7 (fase 6, revisão): no Royale, o esquadrão com mais gente de pé (empate: -1). */
+function royaleLeader(ctx: SimContext): number {
+  const s = ctx.s;
+  const n = ctx.royale!.squads;
+  let best = -1;
+  let bestCount = 0;
+  let tie = false;
+  for (let t = 0; t < n; t++) {
+    let count = 0;
+    for (let e = 0; e < s.count; e++) {
+      if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo || s.team[e] !== t) continue;
+      if ((s.flags[e]! & (F.dead | F.downed)) === 0) count++;
+    }
+    if (count > bestCount) {
+      best = t;
+      bestCount = count;
+      tie = false;
+    } else if (count > 0 && count === bestCount) tie = true;
+  }
+  return tie ? -1 : best;
 }
 
 function endMatch(ctx: SimContext, team: number): void {
@@ -577,7 +652,8 @@ export function spawnSystem(ctx: SimContext): void {
     if ((fl & F.dead) !== 0) {
       // M3 (fase 2a): no Bobo Zombies quem volta é o diretor de ondas (bobos na onda seguinte, zumbis do pool). M7
       // (fase 0): nas rodadas sem respawn, quem morre espera a próxima.
-      if (ctx.zombiesMode || (ctx.rounds !== null && !ctx.rounds.rules.respawn)) continue;
+      // M7 (fase 6): no Royale, ninguém volta.
+      if (ctx.zombiesMode || ctx.royale !== null || (ctx.rounds !== null && !ctx.rounds.rules.respawn)) continue;
       if (s.respawnTicks[e]! > 0) s.respawnTicks[e]!--;
       if (s.respawnTicks[e] === 0 && ctx.match.phase !== 'ended') respawn(ctx, e, pickSpawn(ctx, e));
       continue;
@@ -855,6 +931,8 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   if (partyActive(ctx.party)) partyLoadout(ctx, e);
   // M6 (fase 5): as armas de tinta.
   if (ctx.paintHits > 0 && !partyActive(ctx.party)) paintLoadout(ctx, e);
+  // M7 (fase 6): o Royale começa só com a pistola.
+  if (ctx.royale !== null && !zombie) royaleLoadout(ctx, e);
   s.cookTicks[e] = -1;
   s.quickNade[e] = 0;
   s.adsAmount[e] = 0;

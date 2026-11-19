@@ -84,6 +84,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    - o **loot no chão**: armas em 3 raridades que melhoram recoil e pente, **sem mais dano**; coletes 50/100; kits de
      cura (sem regeneração);
    - a **zona** em 5 fases, com dano de 2 / 5 / 10 / 20 / 40 HP/s; vence o último time vivo.
+   - **feita em 19/11** (ARCHITECTURE §18.7): ainda sem card; a IA do FFA joga (a fase 7 ensina o loot e a zona).
 7. **A IA do Royale e o LOD C:** lootear, ir para a zona, se curar e entrar na luta alheia (3rd party); os bots a mais
    de 60 m de todo humano pensam a 1 Hz, andam por waypoints e resolvem a luta entre eles por probabilidade; o
    snapshot manda as entidades longe a 5–10 Hz.

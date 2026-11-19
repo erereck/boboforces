@@ -20,6 +20,8 @@ export interface SimMapSource {
     readonly domination?: MapMarkers['domination'];
     /** M7 (fase 1): os sites do BoboStrike (opcional). */
     readonly bombSites?: MapMarkers['bombSites'];
+    /** M7 (fase 6): os pontos de loot do Bobo Royale (opcional). */
+    readonly lootSpots?: MapMarkers['lootSpots'];
   };
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
@@ -59,6 +61,10 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     // M7 (fase 2): os sites do BoboStrike (a sim só usa no modo dele).
     ...(source.markers.bombSites?.length
       ? { bombSites: source.markers.bombSites.map((d) => ({ x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
+    // M7 (fase 6): os pontos de loot do Royale (a sim só usa no modo dele).
+    ...(source.markers.lootSpots?.length
+      ? { lootSpots: source.markers.lootSpots.map((d) => ({ x: d.x, y: d.y, z: d.z })) }
       : {}),
     // M6 (fase 1): os pontos do Domination (a sim só usa no modo dele).
     ...(source.markers.domination?.length

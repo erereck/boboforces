@@ -26,12 +26,12 @@ describe('mapas dos menus', () => {
     expect(mapBotCap('construto', 12)).toBe(12);
   });
 
-  it('a Ilha Tropical (M7, fase 5): 200 m, pontos de loot e 32 largadas sem time', () => {
+  it('a Ilha Tropical (M7, fases 5 e 6): 200 m, pontos de loot e as largadas sem time', () => {
     const map = decodeMap(new Uint8Array(readFileSync(join(ROOT, 'assets-src', 'maps', 'generated', 'island.bfmap'))));
     expect(map.grid.sizeX / 2).toBe(200);
     expect(map.grid.sizeZ / 2).toBe(200);
     expect(map.markers.lootSpots!.length).toBeGreaterThanOrEqual(24);
-    expect(map.markers.spawns.length).toBe(32);
+    expect(map.markers.spawns.length).toBeGreaterThanOrEqual(30);
     expect(map.markers.spawns.every((sp) => sp.team === -1)).toBe(true);
   });
 

@@ -21,7 +21,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 17;
+const SNAPSHOT_VERSION = 18;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -88,6 +88,15 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     ctx.rngStrike.saveState(rngScratch);
     h.bytes(rngScratch);
     for (const f of s.strikeFields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  }
+  // M7 (fase 6): o Bobo Royale (a zona, a colocação, o sorteio e os campos dos bobos, com os do caído).
+  const royale = ctx.royale;
+  if (royale !== null) {
+    h.bytes(royale.data).bytes(royale.circle).bytes(royale.place);
+    ctx.rngRoyale.saveState(rngScratch);
+    h.bytes(rngScratch);
+    for (const f of s.royaleFields) h.bytes(f.array.subarray(0, s.count * f.stride));
+    if (!ctx.zombiesMode) for (const f of s.zombieFields) h.bytes(f.array.subarray(0, s.count * f.stride));
   }
   // M6 (fase 4): os modificadores e a Roleta (só com eles).
   const chaos = ctx.chaos;
@@ -201,6 +210,16 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, rngScratch, RNG_STATE_WORDS);
       for (const f of s.strikeFields) writeArray(w, f.array, s.count * f.stride);
     }
+    const royale = ctx.royale;
+    if (royale !== null) {
+      writeArray(w, royale.data, royale.data.length);
+      writeArray(w, royale.circle, royale.circle.length);
+      writeArray(w, royale.place, royale.place.length);
+      ctx.rngRoyale.saveState(rngScratch);
+      writeArray(w, rngScratch, RNG_STATE_WORDS);
+      for (const f of s.royaleFields) writeArray(w, f.array, s.count * f.stride);
+      if (!ctx.zombiesMode) for (const f of s.zombieFields) writeArray(w, f.array, s.count * f.stride);
+    }
     const chaos = ctx.chaos;
     if (chaos !== null) {
       writeArray(w, chaos.masks, chaos.masks.length);
@@ -307,6 +326,16 @@ export function readState(ctx: SimContext, r: BitReader): void {
       readArray(r, rngScratch, RNG_STATE_WORDS);
       ctx.rngStrike.loadState(rngScratch);
       for (const f of s.strikeFields) readArray(r, f.array, s.count * f.stride);
+    }
+    const royale = ctx.royale;
+    if (royale !== null) {
+      readArray(r, royale.data, royale.data.length);
+      readArray(r, royale.circle, royale.circle.length);
+      readArray(r, royale.place, royale.place.length);
+      readArray(r, rngScratch, RNG_STATE_WORDS);
+      ctx.rngRoyale.loadState(rngScratch);
+      for (const f of s.royaleFields) readArray(r, f.array, s.count * f.stride);
+      if (!ctx.zombiesMode) for (const f of s.zombieFields) readArray(r, f.array, s.count * f.stride);
     }
     const chaos = ctx.chaos;
     if (chaos !== null) {

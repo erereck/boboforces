@@ -516,7 +516,9 @@ export function weaponDef(code: number): WeaponDef | null {
               ? PAINT_WEAPONS[code - WEAPON_PAINT_MARKER]!
               : code === WEAPON_BOOM_BOX
                 ? BOOM_BOX
-                : null;
+                : code >= WEAPON_ROYALE_FIRST && code < WEAPON_ROYALE_FIRST + ROYALE_WEAPONS.length
+                  ? ROYALE_WEAPONS[code - WEAPON_ROYALE_FIRST]!
+                  : null;
 }
 
 /**
@@ -779,3 +781,61 @@ export const BOOM_BOX: WeaponDef = {
   selfDamageMul: 0,
   killForce: 14,
 };
+
+/**
+ * M7 (fase 6): as raridades das armas do loot do Bobo Royale (GDD §4.6.4: melhoram o recuo e o pente, sem mais dano).
+ * A comum é a arma de sempre (o código base); a rara e a épica são códigos novos (19 a 26), com o pente (e a reserva)
+ * maior e o recuo menor. Os multiplicadores são meus (revisáveis).
+ */
+export const ROYALE_RARITY = [
+  { clip: 1, recoil: 1 },
+  { clip: 1.25, recoil: 0.8 },
+  { clip: 1.5, recoil: 0.6 },
+] as const;
+/** As armas que têm raridade, na ordem dos códigos novos (a rara e a épica de cada uma). */
+export const ROYALE_RARITY_BASES: readonly number[] = [
+  WEAPON_CODE.smg,
+  WEAPON_CODE.shotgun,
+  WEAPON_CODE.rifle,
+  WEAPON_CODE.sniper,
+];
+export const WEAPON_ROYALE_FIRST = 19;
+
+function rarityVariant(base: WeaponDef, rarity: 1 | 2, code: number): WeaponDef {
+  const r = ROYALE_RARITY[rarity];
+  return {
+    ...base,
+    id: base.id + (rarity === 1 ? '-rare' : '-epic'),
+    code,
+    clipSize: Math.round(base.clipSize * r.clip),
+    reserve: Math.round(base.reserve * r.clip),
+    recoilKickDeg: base.recoilKickDeg * r.recoil,
+    recoilMaxDeg: base.recoilMaxDeg * r.recoil,
+    recoilPatternDeg: base.recoilPatternDeg * r.recoil,
+    recoilYawNoiseDeg: base.recoilYawNoiseDeg * r.recoil,
+  };
+}
+
+export const ROYALE_WEAPONS: readonly WeaponDef[] = ROYALE_RARITY_BASES.flatMap((b, i) => [
+  rarityVariant(WEAPONS[b]!, 1, WEAPON_ROYALE_FIRST + i * 2),
+  rarityVariant(WEAPONS[b]!, 2, WEAPON_ROYALE_FIRST + i * 2 + 1),
+]);
+
+/** O código da arma `base` na raridade (0 = comum: o próprio `base`, como a arma sem raridade). */
+export function royaleWeaponCode(base: number, rarity: number): number {
+  const i = ROYALE_RARITY_BASES.indexOf(base);
+  if (rarity <= 0 || i < 0) return base;
+  return WEAPON_ROYALE_FIRST + i * 2 + (rarity >= 2 ? 1 : 0);
+}
+
+/** A raridade de um código (0 comum, 1 rara, 2 épica). */
+export function weaponRarity(code: number): number {
+  const k = code - WEAPON_ROYALE_FIRST;
+  return k >= 0 && k < ROYALE_WEAPONS.length ? 1 + (k % 2) : 0;
+}
+
+/** A arma base de um código (a comum da rara e da épica; as outras são elas mesmas). */
+export function weaponBase(code: number): number {
+  const k = code - WEAPON_ROYALE_FIRST;
+  return k >= 0 && k < ROYALE_WEAPONS.length ? ROYALE_RARITY_BASES[k >> 1]! : code;
+}

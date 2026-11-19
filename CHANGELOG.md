@@ -40,8 +40,14 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   vê a câmera de morte e, depois de 3 s, assiste um aliado vivo até a próxima rodada.
 - **Ilha Tropical (fase 5):** o mapa do Bobo Royale Mini (~200 × 200 m, de dia): o mar raso em volta, a praia de
   areia, o morro com o farol ao norte, a vila de 10 casas em volta da praça, o píer e as barracas na praia, estradas de
-  terra e 140 árvores; 54 pontos de loot e 32 largadas. Só joga o Royale (que chega na fase 6); por enquanto aparece no
+  terra e 140 árvores; 52 pontos de loot e 41 largadas. Só joga o Royale (que chega na fase 6); por enquanto aparece no
   bench. O download do mapa é de 28 KB.
+- **Bobo Royale na sim (fase 6, ainda sem card):** até 24 participantes em solo, duplas ou quartetos, sem respawn. Cada
+  esquadrão começa num canto diferente da ilha, só de pistola; no chão há armas em 3 raridades (a rara e a épica com
+  pente maior e menos recuo, o mesmo dano), coletes de 50 e 100, kits de cura e munição. Passar por cima pega; com a
+  primária ocupada, o usar troca. Segurar o usar 3 s usa um kit (+60). A zona fecha em 5 fases (~8 min) e fere quem
+  fica fora (2 a 40 HP/s). Em grupo, quem cai pode ser levantado pelo aliado. Vence o último esquadrão. Também pela
+  rede.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

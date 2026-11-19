@@ -255,6 +255,35 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M7 (fase 6): Bobo Royale em duplas na Ilha Tropical, o host e o amigo juntos e 22 bots: a zona, a colocação e o fim iguais', () => {
+    const normal = builtinBotRef('normal');
+    const r: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'royale.mini',
+      map: 'island',
+      seed: 0,
+      royale: { squad: 'duo' },
+      teams: [{ humans: 'all', bots: [{ ref: normal, count: 22 }] }],
+    };
+    const run = playRoom(r, [0, 0], { snapshotHz: 30, zombies: 0, maxS: 600 });
+    expectSameResult(run);
+    const h = run.host.sim.view();
+    const v = run.clients[0]!.sim.view();
+    // O host e o amigo na mesma dupla; o amigo vê a mesma zona e a mesma colocação de cada dupla.
+    expect(h.team[0]).toBe(h.team[1]);
+    expect([...v.royale!.data]).toEqual([...h.royale!.data]);
+    expect([...v.royale!.place]).toEqual([...h.royale!.place]);
+    for (let i = 0; i < h.royale!.circle.length; i++) {
+      expect(Math.abs(v.royale!.circle[i]! - h.royale!.circle[i]!)).toBeLessThan(0.01);
+    }
+    const net = run.clients[0]!.net!;
+    expect(net.mispredicts / Math.max(1, net.reconciles)).toBeLessThan(0.02);
+    console.log(
+      `[modos] Royale em duplas: ${run.seconds.toFixed(1)} s, zona ${h.royale!.data[0]}, vencedor ${h.match.winnerTeam}, predição errada ${net.mispredicts}/${net.reconciles}, ${(run.hostBytesPerClient / 1024).toFixed(1)} KB/s`,
+    );
+    dispose(run);
+  }, 600_000);
+
   it('M7 (fase 0): Juggernaut Fixo com o amigo: as rodadas chegam iguais, a compra congela a predição e o mesmo fim', () => {
     const base = moreModePreset('juggernautFixed')!;
     // Só os 2 (sem bot): 2 rodadas de até 3 min.

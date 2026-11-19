@@ -4069,5 +4069,62 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   só nasce onde o topo é grama); arbustos flutuando ou afundados (encaixados na célula antes de medir a altura, e
   cruzados como o mato). Também: os caixotes longe das largadas, a base do farol meio bloco abaixo, o `mapc` confere
   os pontos de loot como as largadas (fora de bloco, perto de um nó da navegação principal) e o validador exporta
-  `MIN_ROYALE_LOOT_SPOTS` (24) e o teto `MAX_LOOT_SPOTS` (96, o pool da sim).
+  `MIN_ROYALE_LOOT_SPOTS` (24) e o teto `MAX_LOOT_SPOTS` (96, o pool da sim; 64 depois da revisão da fase 6).
 - **Fica para a fase 6:** o `SimMap` com os pontos de loot (a sim do Royale).
+
+### 18.7 Fase 6: o Bobo Royale na sim (19/11/2026)
+
+- **A receita:** o bloco `royale` (`RoyaleRules`: `squad` = `solo` (padrão), `duo` ou `quad`; `royaleSquadSize`). O
+  Royale usa um time só na receita (como o FFA); a sim reparte os participantes em esquadrões na ordem (os humanos
+  primeiro: no sofá e na sala, os humanos caem no mesmo esquadrão) e o `team` de cada bobo é o esquadrão (até 24).
+  Sem tempo nem meta (quem acaba é o último esquadrão).
+- **O sistema** (`sim/src/systems/royale.ts`, `ROYALE` com as minhas escolhas marcadas):
+  - **A largada:** cada esquadrão num ponto sem time, o 1º sorteado e depois sempre o mais longe dos escolhidos; só a
+    pistola (com 2 pentes de reserva), a faca e a granada vazia; sem colete nem kit; sem regeneração nem respawn.
+  - **O loot** (`spawnRoyaleLoot`, no tick 0, pelo `rngRoyale`): um item por ponto de loot do mapa (35% com um 2º):
+    arma 45% (SMG, escopeta, fuzil ou sniper; comum 60%, rara 30%, épica 10%), colete 20% (o de 100 é um terço), kit
+    de cura 20% e caixinha de munição 15%. Os itens são pickups com tipos novos (`PICKUP_KIND.armor50`, `armor100`,
+    `heal` e `weaponBase` + código da arma) que não somem: o `pickTicks` deles guarda a munição da arma
+    (`ROYALE_AMMO_BASE` + pente + reserva × 1000), para a troca não encher o pente de graça.
+  - **As raridades** (`ROYALE_RARITY`, `ROYALE_WEAPONS`): a rara e a épica são códigos de arma novos (19 a 26) com o
+    pente e a reserva × 1,25 e × 1,5 e o recuo × 0,8 e × 0,6; o dano é o da comum (`royaleWeaponCode`,
+    `weaponRarity`, `weaponBase`).
+  - **Pegar:** passando por cima, o colete se for melhor, o kit até 3 e a arma com a primária vazia; com a primária
+    ocupada, apertar o usar perto da arma troca (a de agora cai no lugar, com a munição dela), como a troca do sistema
+    de armas (o tempo de troca; nunca com a granada cozinhando). **Curar:** segurar o usar longe de aliado caído, 3 s,
+    cura 60 (o tiro cancela; o aperto perto de uma arma é a troca).
+  - **A zona** (`royaleZoneSystem`, antes do dano): começa cobrindo a área; 5 fases de espera e encolher
+    (90+60, 70+50, 55+40, 40+35, 30+30 s: 8,3 min) até 80, 50, 28, 12 e 0 m (nunca maior que o círculo de agora); o
+    centro de cada fase é um ponto de loot sorteado que caiba dentro do círculo de agora. Fora dele, o dano da fase (2 /
+    5 / 10 / 20 / 40 HP/s), sem dono, que o colete não segura (`WEAPON_ZONE`), em pulsos de 0,5 s (um acerto por pulso:
+    um por tick eram 60 eventos por segundo por bobo na rede). O dano entra na fila antes do passo de dano do mesmo tick:
+    a fila não vai no snapshot, e o dano que sobrasse para o tick seguinte fazia a cópia divergir.
+  - **O caído** (duplas e quartetos): com alguém do esquadrão de pé, quem zera cai (o caído do Bobo Zombies, sem
+    "levanta sozinho") com 100 de vida de caído, que o tiro e a zona tiram; o aliado levanta segurando o usar 3 s. O
+    esquadrão que só tem caídos sai na hora e sangra inteiro no tick seguinte. O reviver e o sangrar rodam com a zona,
+    antes do dano (o golpe vale no mesmo tick, pelo mesmo motivo).
+  - **O fim** (`royaleSystem`, depois do dano): o esquadrão sem ninguém de pé ganha a colocação (`place`, empate entre
+    os que caem no mesmo tick); com um só, ele vence (no solo, o `winnerEntity` é o bobo); nenhum, empate. O fim
+    forçado (o host que volta do segundo plano) dá a vitória ao esquadrão com mais gente de pé. Quem morre deixa a
+    primária (com a munição), o colete e os kits no chão.
+- **O estado e a rede:** `RoyaleState` (`data` pelos índices de `ZONE`, `circle` pelos de `CIRCLE`, `place`), os
+  campos `heals` e `healTicks` (com o colete e os do caído no hash e no snapshot do Royale); `SNAPSHOT_VERSION` 18. Na
+  rede, o grupo `royale` das entidades, os globais da zona (o círculo em centímetros) e da colocação, o tipo do pickup
+  com 8 bits e o tempo dele com 32; `PROTOCOL_VERSION` 8 (`net.json`). Os campos cabem com até 68 participantes e
+  240 Hz (o card terá 24). A IA usa o calor e o perigo num quadro só no Royale (os esquadrões passam do teto de times
+  do quadro); os pings continuam por esquadrão.
+- **A Ilha Tropical:** as largadas viraram uma grade de 18 m sobre a terra (41 pontos; com 24 participantes no solo,
+  a largada fica a 18 m ou mais do vizinho; nas duplas, 32 m; nos quartetos, 51 m). O loot ficou com 52 pontos.
+- **Medidas** (`local/m7/medir-royale.ts`, 24 bots Normal com a IA do FFA, que ainda não looteia nem foge da zona):
+  solo, duplas e quartetos acabam em 1 a 4 min com um vencedor, a 0,03–0,07 ms por passo (p99 0,2–0,5 ms).
+- **Testes:** `sim/src/royale.test.ts` (a receita, as raridades, o solo inteiro com o snapshot no meio, as duplas com o
+  caído e o reviver, a zona até fechar e o empate, o determinismo) e o Royale em duplas pela rede de mentira
+  (`apps/web/src/online-modes.test.ts`). Os 14 goldens não mudaram.
+- **A revisão (Opus) achou 4 coisas, corrigidas antes do commit:** o caído que sangrava depois do dano deixava o golpe
+  na fila e a cópia do estado (snapshot) divergia; a zona soltava um acerto por tick por bobo (60 eventos por segundo
+  na rede: agora em pulsos de 0,5 s); pegar uma arma com a granada cozinhando travava a mão até morrer; e o quadro único
+  da IA juntava os pings de todos os esquadrões. Também: o teto de pontos de loot caiu para 64 (cabe no pool com as
+  quedas), os campos da rede alargados, o caído não pega munição e o fim forçado.
+- **Fica para a fase 8** (o jogo ainda não abre o Royale): o modelo e o nome das armas raras (`weaponModel` tem o
+  tamanho de `WEAPONS`), os modelos dos itens no chão (hoje o anúncio e o desenho são os dos drops do Zombies), a
+  morte pela zona no kill feed (hoje sai como queda) e o retorno de dano da zona.

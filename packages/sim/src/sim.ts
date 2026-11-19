@@ -6,6 +6,7 @@ import {
   PAINTBALL_DEFAULTS,
   resolveBot,
   ZOMBIES_DEFAULTS,
+  royaleSquadSize,
 } from '@boboforces/format';
 import { BUTTON, dequantizeAxis, type InputFrame } from '@boboforces/input';
 import {
@@ -73,6 +74,14 @@ import { createFortress } from './systems/fortress.ts';
 import { createRoundState, ROUND_PHASE, roundFrozen, roundsSystem } from './systems/rounds.ts';
 import { createStrikeState, STRIKE, STRIKE_BUY_BASE, STRIKE_SHOP, strikeSystem } from './systems/strike.ts';
 import { JUGG_FIXED } from './systems/party.ts';
+import {
+  createRoyaleState,
+  planZone,
+  ROYALE,
+  royaleSystem,
+  royaleZoneSystem,
+  spawnRoyaleLoot,
+} from './systems/royale.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -127,6 +136,8 @@ export interface SimMap {
   readonly perkMachines?: readonly PerkMachineDef[];
   /** M6 (fase 1): os pontos do Domination (o centro do anel nos pés e o raio). */
   readonly controlPoints?: readonly ControlPointDef[];
+  /** M7 (fase 6): os pontos de loot do Bobo Royale (o chão onde o item aparece). */
+  readonly lootSpots?: readonly { readonly x: number; readonly y: number; readonly z: number }[];
   /** M7 (fase 2): os sites do BoboStrike (o centro dos pés e o raio). */
   readonly bombSites?: readonly {
     readonly x: number;
@@ -440,6 +451,37 @@ function initialSpawn(spawns: readonly SpawnPoint[], team: number, ffa: boolean,
   return list[k % list.length]!;
 }
 
+/**
+ * M7 (fase 6): a ordem dos pontos de largada dos esquadrões do Royale, entre os sem time (ou todos): o 1º sorteado e,
+ * depois, sempre o mais longe dos já escolhidos (os esquadrões começam espalhados pela ilha).
+ */
+function royaleSpawnOrder(spawns: readonly SpawnPoint[], ctx: SimContext): number[] {
+  const any: number[] = [];
+  spawns.forEach((sp, i) => {
+    if (sp.team === -1) any.push(i);
+  });
+  const free = any.length > 0 ? any : spawns.map((_, i) => i);
+  const order = [free.splice(ctx.rngRoyale.int(0, free.length), 1)[0]!];
+  while (free.length > 0) {
+    let best = 0;
+    let bestD = -1;
+    free.forEach((i, k) => {
+      let d = Infinity;
+      for (const j of order) {
+        const dx = spawns[i]!.x - spawns[j]!.x;
+        const dz = spawns[i]!.z - spawns[j]!.z;
+        d = Math.min(d, dx * dx + dz * dz);
+      }
+      if (d > bestD) {
+        bestD = d;
+        best = k;
+      }
+    });
+    order.push(free.splice(best, 1)[0]!);
+  }
+  return order;
+}
+
 /** M3 (fase 2c): caído, só a pistola (o slot 1 do loadout) e só atirar, mirar e recarregar. */
 const DOWNED_SLOT = 1;
 const DOWNED_BUTTONS = BUTTON.fire | BUTTON.ads | BUTTON.reload;
@@ -471,7 +513,9 @@ export function createSim(config: SimConfig): Sim {
   // M7 (fase 2): o BoboStrike (as rodadas MR12, a Boom Box nos 2 sites do mapa).
   const strikeMode = recipe.mode === 'strike';
   const roundsMode = strikeMode || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
-  const timeLimitS = roundsMode ? 0 : (recipe.match?.timeLimitS ?? 0);
+  // M7 (fase 6): no Royale, quem acaba a partida é o último esquadrão (a zona fecha em ~8 min): sem tempo nem meta.
+  const royaleMode = recipe.mode === 'royale.mini';
+  const timeLimitS = roundsMode || royaleMode ? 0 : (recipe.match?.timeLimitS ?? 0);
   const countdownS = config.countdownS ?? 0;
   assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
   const countdownTicks = secondsToTicks(countdownS, hz);
@@ -534,6 +578,17 @@ export function createSim(config: SimConfig): Sim {
     // M7 (fase 0): as rodadas do Jugg Fixo (uma por participante, até o teto).
     strike: strikeMode ? createStrikeState(map.bombSites ?? []) : null,
     rngStrike: root.fork('strike'),
+    // M7 (fase 6): o Royale (os esquadrões, o loot dos pontos do mapa e a zona na área jogável).
+    royale: royaleMode
+      ? createRoyaleState(
+          royaleSquadSize(recipe.royale?.squad),
+          slots.length,
+          hz,
+          map.lootSpots ?? [],
+          map.playArea ?? { minX: 0, minZ: 0, maxX: map.grid.sizeX / 2, maxZ: map.grid.sizeZ / 2 },
+        )
+      : null,
+    rngRoyale: root.fork('royale'),
     rounds: strikeMode
       ? createRoundState({
           buyTicks: secondsToTicks(STRIKE.buyS, hz),
@@ -564,7 +619,7 @@ export function createSim(config: SimConfig): Sim {
     spawnProtectTicks: secondsToTicks(recipe.players?.spawnProtectionS ?? MATCH_DEFAULTS.spawnProtectionS, hz),
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
     regenPerTick: (MATCH_DEFAULTS.regenPerS * REGEN_FACTOR[recipe.players?.regen ?? 'default']) / hz,
-    scoreLimit: roundsMode ? 0 : (recipe.match?.scoreLimit ?? 0),
+    scoreLimit: roundsMode || royaleMode ? 0 : (recipe.match?.scoreLimit ?? 0),
     suddenDeathTicks: secondsToTicks(MATCH_DEFAULTS.suddenDeathS, hz),
     assistWindowTicks: secondsToTicks(MATCH_DEFAULTS.assistWindowS, hz),
     assistMinDamage: MATCH_DEFAULTS.assistMinDamage,
@@ -617,7 +672,8 @@ export function createSim(config: SimConfig): Sim {
       runChance: 0,
       left: 0,
       lastZombie: NULL_ENTITY,
-      selfRevivesLeft: recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives,
+      // M7 (fase 6): no Royale em grupo ninguém levanta sozinho.
+      selfRevivesLeft: royaleMode ? 0 : (recipe.zombies?.selfRevives ?? ZOMBIES_DEFAULTS.selfRevives),
       bossPending: 0,
       drops: 0,
       doubleTicks: 0,
@@ -637,12 +693,16 @@ export function createSim(config: SimConfig): Sim {
   applyChaos(ctx);
   const perTeam = new Int32Array(MAX_TEAMS);
   let controllerCount = 0;
+  // M7 (fase 6): no Royale, cada esquadrão nasce num ponto sorteado (sem repetir enquanto houver ponto).
+  const royaleSpots = ctx.royale !== null ? royaleSpawnOrder(map.spawns, ctx) : null;
   slots.forEach((slot, i) => {
     // M6 (fase 3, revisão): no Juggernaut todo mundo começa caçando (o time 1 é só do Jugg, que o modo sorteia), mesmo
     // que a sala ou o sofá tenha posto alguém do outro lado.
     // M6 (fase 6b): na Horda armada, humano é sempre do time 0 (o time 1 é só a horda de bots).
     const sideless = ctx.party.jugg !== null || (zombieArmed && slot.bot === null);
-    const id = s.allocate(ENTITY_KIND.bobo, sideless ? 0 : slot.team, slot.controller);
+    // M7 (fase 6): no Royale o time é o esquadrão (os humanos primeiro, na ordem da receita).
+    const squad = ctx.royale !== null ? Math.floor(i / ctx.royale.squad) : -1;
+    const id = s.allocate(ENTITY_KIND.bobo, squad >= 0 ? squad : sideless ? 0 : slot.team, slot.controller);
     assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
     s.controllerEntity[slot.controller] = id;
     s.primaryChoice[id & 0xffff] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
@@ -657,7 +717,9 @@ export function createSim(config: SimConfig): Sim {
     perTeam[team] = k + 1;
     // M6 (fase 3): no Juggernaut todo mundo começa espalhado (o Jugg sorteado não nasce no meio dos caçadores).
     const spread = ctx.ffa || ctx.party.jugg !== null;
-    if (horde) {
+    if (royaleSpots !== null) {
+      respawn(ctx, id & 0xffff, royaleSpots[squad % royaleSpots.length]!);
+    } else if (horde) {
       // M6 (fase 6b): o soldado da horda começa fora de jogo (morto e sem contagem), até o diretor de ondas soltar.
       s.flags[id & 0xffff] = ENTITY_FLAG.dead;
       s.respawnTicks[id & 0xffff] = 0;
@@ -685,6 +747,11 @@ export function createSim(config: SimConfig): Sim {
       } else respawn(ctx, id & 0xffff, order[i % order.length]!);
       controllerCount = controller + 1;
     }
+  }
+  // M7 (fase 6): o loot do Royale no chão e o 1º círculo da zona.
+  if (ctx.royale !== null) {
+    spawnRoyaleLoot(ctx);
+    planZone(ctx);
   }
   events.matchPhase(0, match.phase);
   bindFigureTable(figureTable);
@@ -714,7 +781,8 @@ export function createSim(config: SimConfig): Sim {
     velocity: s.projVelocity,
   };
   const pickView: Mutable<PickupView> = {
-    count: 0,
+    // M7 (fase 6): o loot do Royale já está no chão no tick 0.
+    count: s.pickCount,
     alive: s.pickAlive,
     kind: s.pickKind,
     position: s.pickPosition,
@@ -745,6 +813,8 @@ export function createSim(config: SimConfig): Sim {
     points: s.points,
     armor: s.armor,
     kit: s.kit,
+    heals: s.heals,
+    healTicks: s.healTicks,
     downTicks: s.downTicks,
     selfUp: s.selfUp,
     reviveTicks: s.reviveTicks,
@@ -775,6 +845,17 @@ export function createSim(config: SimConfig): Sim {
     chaos,
     fortress: ctx.fortress,
     strike: ctx.strike === null ? null : { data: ctx.strike.data, pos: ctx.strike.pos, sites: ctx.strike.sites },
+    royale:
+      ctx.royale === null
+        ? null
+        : {
+            squad: ctx.royale.squad,
+            squads: ctx.royale.squads,
+            data: ctx.royale.data,
+            circle: ctx.royale.circle,
+            place: ctx.royale.place,
+            zone: ROYALE.zone,
+          },
     rounds:
       ctx.rounds === null
         ? null
@@ -1069,6 +1150,8 @@ export function createSim(config: SimConfig): Sim {
       signalSystem(ctx);
       projectileSystem(ctx);
       pickupSystem(ctx);
+      // M7 (fase 6): a zona do Royale (o dano dela vale neste tick).
+      royaleZoneSystem(ctx);
       damageSystem(ctx);
       // M6 (fase 1): os pontos do Domination (antes das regras, que olham o placar).
       dominationSystem(ctx);
@@ -1077,6 +1160,8 @@ export function createSim(config: SimConfig): Sim {
       // M7 (fase 2): o BoboStrike (a compra e a Boom Box) e (fase 0) as rodadas.
       strikeSystem(ctx);
       roundsSystem(ctx);
+      // M7 (fase 6): o Bobo Royale (o usar, o caído e os esquadrões).
+      royaleSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);

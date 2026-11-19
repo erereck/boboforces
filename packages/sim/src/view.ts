@@ -51,6 +51,9 @@ export interface SimView {
   /** M7 (fase 2): o colete (0..100) e o kit de desarme (0/1) do BoboStrike. */
   readonly armor: Uint8Array;
   readonly kit: Uint8Array;
+  /** M7 (fase 6): os kits de cura do Bobo Royale (0..3) e a cura em curso, em ticks (0 = sem curar). */
+  readonly heals: Uint8Array;
+  readonly healTicks: Int32Array;
   /**
    * M3 (fase 2c): caído (`ENTITY_FLAG.downed`): ticks até sangrar ou levantar sozinho (`selfUp` 1) e o progresso do
    * reviver em ticks (0 = ninguém levantando).
@@ -131,6 +134,11 @@ export interface SimView {
    * site, os ticks; a rede escreve direto aqui), `pos` a bomba no chão e os sites.
    */
   readonly strike: StrikeView | null;
+  /**
+   * M7 (fase 6): o Bobo Royale Mini (`null` fora dele): a zona (`data` pelos índices de `ZONE` e `circle` pelos de
+   * `CIRCLE`; a rede escreve direto aqui), a colocação de cada esquadrão e as fases da zona.
+   */
+  readonly royale: RoyaleView | null;
   /** M6 (fase 4b): o tick do último tiro de cada entidade (os Invisíveis aparecem ao atirar; a IA olha daqui). */
   readonly lastShotTick: Int32Array;
   /**
@@ -163,7 +171,19 @@ export interface ProjectileView {
 }
 
 /** M2 (fase 2b): tipos de pickup (`PickupView.kind`). Valor novo entra no fim. */
-export const PICKUP_KIND = { ammoBox: 0, maxAmmo: 1, nuke: 2, doublePoints: 3, instaKill: 4, carpenter: 5 } as const;
+export const PICKUP_KIND = {
+  ammoBox: 0,
+  maxAmmo: 1,
+  nuke: 2,
+  doublePoints: 3,
+  instaKill: 4,
+  carpenter: 5,
+  /** M7 (fase 6): os itens do Bobo Royale: os coletes, o kit de cura e as armas (`weaponBase` + código da arma). */
+  armor50: 6,
+  armor100: 7,
+  heal: 8,
+  weaponBase: 32,
+} as const;
 /** M3 (fase 4d): quantos tipos de drop do Bobo Zombies (de `maxAmmo` a `carpenter`). */
 export const DROP_KINDS = 5;
 
@@ -287,6 +307,22 @@ export interface MapObjectsView {
 /** M6 (fase 4): o que a view mostra dos modificadores. */
 export interface ChaosView {
   readonly masks: Int32Array;
+}
+
+/** M7 (fase 6): o que a view mostra do Bobo Royale. */
+export interface RoyaleView {
+  /** Participantes por esquadrão (1, 2 ou 4; o `team` é o esquadrão) e quantos esquadrões. */
+  readonly squad: number;
+  readonly squads: number;
+  readonly data: Int32Array;
+  readonly circle: Float64Array;
+  readonly place: Uint8Array;
+  readonly zone: readonly {
+    readonly waitS: number;
+    readonly shrinkS: number;
+    readonly radiusM: number;
+    readonly dps: number;
+  }[];
 }
 
 /** M7 (fase 2): o que a view mostra do BoboStrike. */

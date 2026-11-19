@@ -216,7 +216,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       fortFlow?.update(ctx);
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
-      ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa);
+      // M7 (fase 6): no Royale os esquadrões passam do teto de times do quadro: o calor e o perigo num quadro só, como
+      // no FFA; os pings continuam por esquadrão.
+      ctx.board ??= new TeamBoard(view.world.sizeX, view.world.sizeZ, hz, ctx.ffa, ctx.ffa || view.royale !== null);
       if (ctx.strikeMode) strikeRoundTick(ctx);
       ctx.board.update(view, view.tick);
       // Ordem girando a cada tick: o orçamento de raios e a fila não favorecem sempre os mesmos.

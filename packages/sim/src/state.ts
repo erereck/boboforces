@@ -180,8 +180,13 @@ export class SimState {
   readonly buyRequest = new Uint8Array(MAX_ENTITIES);
   /** M7 (fase 2, revisão): o último `InputFrame.primary` (a compra é na borda: o valor persiste no quadro). */
   readonly lastPrimary = new Uint8Array(MAX_ENTITIES);
+  /** M7 (fase 6): os kits de cura do Bobo Royale e a cura em curso (ticks). */
+  readonly heals = new Uint8Array(MAX_ENTITIES);
+  readonly healTicks = new Int32Array(MAX_ENTITIES);
   /** M7 (fase 2): os campos que só existem no BoboStrike (o dinheiro é o `points`). */
   readonly strikeFields: readonly StateField[];
+  /** M7 (fase 6): os campos que só existem no Bobo Royale (o caído usa os do Bobo Zombies, que também entram). */
+  readonly royaleFields: readonly StateField[];
 
   constructor() {
     const f = (name: string, array: StateArray, stride = 1): StateField => ({ name, array, stride });
@@ -275,6 +280,7 @@ export class SimState {
       f('buyRequest', this.buyRequest),
       f('lastPrimary', this.lastPrimary),
     ];
+    this.royaleFields = [f('armor', this.armor), f('heals', this.heals), f('healTicks', this.healTicks)];
   }
 
   /** Projétil num slot livre (`projAlive` ligado); -1 = pool cheio. */

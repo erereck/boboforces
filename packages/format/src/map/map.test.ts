@@ -554,7 +554,7 @@ describe('map@1: os pontos de loot do Royale (M7, fase 5)', () => {
     expect(validateMap(withLoot(['royale.mini'], 24)).filter((i) => i.includes('loot'))).toEqual([]);
     expect(validateMap(withLoot(['royale.mini'], 23))).toContain('Royale: 23 pontos de loot (mínimo 24)');
     // O teto cabe no pool da sim (M7, fase 5, revisão).
-    expect(validateMap(withLoot(['royale.mini'], 97))).toContain('97 pontos de loot (máximo 96)');
+    expect(validateMap(withLoot(['royale.mini'], 65))).toContain('65 pontos de loot (máximo 64)');
     // Fora do Royale, o mapa pode ter (ou não) pontos de loot.
     expect(validateMap(withLoot(['warfare.tdm'], 2)).filter((i) => i.includes('loot'))).toEqual([]);
     const doc = withLoot(['warfare.tdm'], 2);

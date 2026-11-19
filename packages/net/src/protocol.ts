@@ -25,6 +25,9 @@ import {
   MOVEMENT_ZOMBIE_SLOW,
   MOVEMENT_ZOMBIE_SPRINTER,
   PART_DAMAGE_MULTIPLIER,
+  ROYALE,
+  ROYALE_RARITY,
+  ROYALE_WEAPONS,
   SPREAD_STATE_MULTIPLIER,
   STRIKE,
   STRIKE_SHOP,
@@ -49,7 +52,7 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -134,6 +137,10 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   STRIKE,
   STRIKE_SHOP,
   BOOM_BOX,
+  // Fase 6: o Bobo Royale (a zona, o loot e as armas raras e épicas).
+  ROYALE,
+  ROYALE_RARITY,
+  ROYALE_WEAPONS,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */

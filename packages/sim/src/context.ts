@@ -2,6 +2,7 @@ import type { ChaosState } from './systems/chaos.ts';
 import type { FortressState } from './systems/fortress.ts';
 import type { RoundState } from './systems/rounds.ts';
 import type { StrikeState } from './systems/strike.ts';
+import type { RoyaleState } from './systems/royale.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
@@ -109,6 +110,8 @@ export const WEAPON_KILL_PLANE = 254;
 export const WEAPON_BLEED_OUT = 253;
 /** M3 (fase 4d): o "golpe" da bomba (drop do Bobo Zombies): mata todos os zumbis em jogo, sem dono. */
 export const WEAPON_NUKE = 252;
+/** M7 (fase 6): o "golpe" da zona do Bobo Royale (sem dono; o colete não segura). */
+export const WEAPON_ZONE = 251;
 
 /**
  * M2 (fase 3b): regras de cada bobo (gameplay.md §6.5), uma por índice de entidade, montadas na criação a partir dos
@@ -221,6 +224,9 @@ export interface SimContext {
   /** M7 (fase 2): o BoboStrike (`null` fora dele). */
   readonly strike: StrikeState | null;
   readonly rngStrike: Rng;
+  /** M7 (fase 6): o Bobo Royale Mini (`null` fora dele) e o sorteio do loot e da zona. */
+  readonly royale: RoyaleState | null;
+  readonly rngRoyale: Rng;
   /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
   readonly training: boolean;
   readonly hz: number;

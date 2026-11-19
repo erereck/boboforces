@@ -40,9 +40,12 @@ export const MIN_DOMINATION_POINTS = 3;
  * 5): 200 m, a ilha do Royale Mini (~200 m de lado, decisão #35); a distância de visão da partida limita o que se vê.
  */
 export const MAX_DECLARED_SIGHT_LINE_M = 200;
-/** M7 (fase 5): o Royale pede pontos de loot (um item por ponto, às vezes dois); o teto cabe no pool da sim. */
+/**
+ * M7 (fase 5): o Royale pede pontos de loot (um item por ponto, às vezes dois). O teto cabe no pool da sim (256) com as
+ * quedas de quem morre (64 × 2 + 24 × 5 = 248; revisão da fase 6).
+ */
 export const MIN_ROYALE_LOOT_SPOTS = 24;
-export const MAX_LOOT_SPOTS = 96;
+export const MAX_LOOT_SPOTS = 64;
 /** Teto de um nome de câmera, rota ou manequim. */
 const MAX_MARKER_NAME = 64;
 /**

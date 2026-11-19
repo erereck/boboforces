@@ -188,6 +188,11 @@ export const ENTITY_GROUPS: readonly FieldGroup<SimView>[] = [
       int('reviveTicks', 1, s(16, 4), (v) => v.reviveTicks),
     ],
   },
+  // M7 (fase 6): os kits de cura e a cura em curso do Bobo Royale.
+  {
+    name: 'royale',
+    fields: [int('heals', 1, u(2), (v) => v.heals), int('healTicks', 1, u(10), (v) => v.healTicks)],
+  },
 ];
 
 /** Quantos grupos de entidade são "quentes" (um bit cada, sempre). */
@@ -205,9 +210,10 @@ export const PROJECTILE_FIELDS: readonly NetField<ProjectileView>[] = [
 /** Pickups no chão (um grupo só). */
 export const PICKUP_FIELDS: readonly NetField<PickupView>[] = [
   int('alive', 1, u(1), (v) => v.alive),
-  int('kind', 1, u(4), (v) => v.kind),
+  // M7 (fase 6): os itens do Royale (as armas a partir de 32) e a munição guardada no tempo deles (acima de 1 milhão).
+  int('kind', 1, u(8), (v) => v.kind),
   fixed('position', 3, s(20, 10), 100, (v) => v.position),
-  int('ticksLeft', 1, s(16, 6), (v) => v.ticksLeft),
+  int('ticksLeft', 1, s(32, 6), (v) => v.ticksLeft),
 ];
 
 /** O que o codificador precisa de cada componente (sem o tipo da view). */
@@ -542,6 +548,48 @@ export function createNetLayout(view: SimView): NetLayout {
           (v) => Math.round(v.strike!.pos[i]! * 100),
           (v, _st, q) => {
             v.strike!.pos[i] = q / 100;
+          },
+        ),
+      );
+    }
+  }
+  // M7 (fase 6): o Bobo Royale (a fase da zona, se encolhe, os ticks, os esquadrões vivos e o vencedor; o círculo em
+  // centímetros; a colocação de cada esquadrão), só nele.
+  const royale = view.royale;
+  if (royale !== null) {
+    const codecs = [u(3), u(1), u(16, 8), u(7), s(8)] as const;
+    codecs.forEach((codec, i) => {
+      globals.push(
+        g(
+          `royale${i}`,
+          codec,
+          (v) => v.royale!.data[i]!,
+          (v, _st, q) => {
+            v.royale!.data[i] = q;
+          },
+        ),
+      );
+    });
+    for (let i = 0; i < royale.circle.length; i++) {
+      globals.push(
+        g(
+          `zone${i}`,
+          s(20, 10),
+          (v) => Math.round(v.royale!.circle[i]! * 100),
+          (v, _st, q) => {
+            v.royale!.circle[i] = q / 100;
+          },
+        ),
+      );
+    }
+    for (let i = 0; i < royale.squads; i++) {
+      globals.push(
+        g(
+          `place${i}`,
+          u(7),
+          (v) => v.royale!.place[i]!,
+          (v, _st, q) => {
+            v.royale!.place[i] = q;
           },
         ),
       );

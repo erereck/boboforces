@@ -45,6 +45,17 @@ export {
   attackers as strikeAttackers,
   type StrikeItemId,
 } from './systems/strike.ts';
+// M7 (fase 6): o Bobo Royale Mini.
+export {
+  CIRCLE,
+  isRoyaleItem,
+  pickupWeapon,
+  ROYALE,
+  ROYALE_AMMO_BASE,
+  ROYALE_UNDECIDED,
+  ZONE,
+  zoneDps,
+} from './systems/royale.ts';
 export { CHAOS_MODS, MOD } from './systems/chaos.ts';
 export { FORTRESS } from './systems/fortress.ts';
 export {

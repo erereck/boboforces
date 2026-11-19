@@ -10,6 +10,7 @@ import { secondsToTicks } from '../constants.ts';
 import { NULL_ENTITY } from '../entity.ts';
 import { isHorde, PART_TORSO, WEAPON_NUKE } from '../context.ts';
 import { FIGURE_BONE } from '@boboforces/format';
+import { isRoyaleItem, royaleTake } from './royale.ts';
 
 /**
  * M2 (fase 2b): a caixinha de munição do Bobo Warfare (gameplay.md §4.1). Quem morre deixa uma nos pés; ela salta um
@@ -82,10 +83,13 @@ export function pickupSystem(ctx: SimContext): void {
     s.pickPrevPosition[i3] = s.pickPosition[i3]!;
     s.pickPrevPosition[i3 + 1] = s.pickPosition[i3 + 1]!;
     s.pickPrevPosition[i3 + 2] = s.pickPosition[i3 + 2]!;
-    s.pickTicks[i] = s.pickTicks[i]! - 1;
-    if (s.pickTicks[i]! <= 0) {
-      s.freePickup(i);
-      continue;
+    // M7 (fase 6): os itens do Royale não somem (o `pickTicks` deles guarda a munição da arma).
+    if (!isRoyaleItem(s.pickKind[i]!)) {
+      s.pickTicks[i] = s.pickTicks[i]! - 1;
+      if (s.pickTicks[i]! <= 0) {
+        s.freePickup(i);
+        continue;
+      }
     }
     const x = s.pickPosition[i3]!;
     const z = s.pickPosition[i3 + 2]!;
@@ -117,7 +121,13 @@ export function pickupSystem(ctx: SimContext): void {
       if (dy < -REACH_BELOW_M || dy > REACH_ABOVE_M) continue;
       const kind = s.pickKind[i]!;
       if (kind === PICKUP_KIND.ammoBox) {
+        // M7 (fase 6, revisão): no Royale, o caído não pega.
+        if (ctx.royale !== null && (s.flags[e]! & F.downed) !== 0) continue;
         if (!refill(ctx, e)) continue;
+      } else if (isRoyaleItem(kind)) {
+        // M7 (fase 6): o item do Royale: quem pega precisa estar de pé (e querer: o colete melhor, o kit até o teto, a
+        // arma com a primária vazia).
+        if ((s.flags[e]! & F.downed) !== 0 || !royaleTake(ctx, e, i, kind)) continue;
       } else {
         // M3 (fase 4d): o drop: quem pega precisa estar de pé.
         if ((s.flags[e]! & F.downed) !== 0) continue;

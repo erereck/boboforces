@@ -33,9 +33,12 @@ export class TeamBoard {
   private readonly sampleTicks: number;
   private readonly decay: number;
   private readonly ffa: boolean;
+  /** M7 (fase 6, revisão): o calor e o perigo num quadro só (o FFA e o Royale, que passa do teto de times). */
+  private readonly sharedHeat: boolean;
 
-  constructor(sizeXCells: number, sizeZCells: number, hz: number, ffa: boolean) {
+  constructor(sizeXCells: number, sizeZCells: number, hz: number, ffa: boolean, sharedHeat = ffa) {
     this.ffa = ffa;
+    this.sharedHeat = sharedHeat;
     this.cellsX = Math.max(1, Math.ceil(sizeXCells / CELLS_PER_METER / AI_TEAM.heatCellM));
     this.cellsZ = Math.max(1, Math.ceil(sizeZCells / CELLS_PER_METER / AI_TEAM.heatCellM));
     this.heat = new Float32Array(MAX_TEAMS * this.cellsX * this.cellsZ);
@@ -73,7 +76,7 @@ export class TeamBoard {
       if (d > this.lastDeaths[i]!) {
         const c = this.cell(view.position[i * 3]!, view.position[i * 3 + 2]!);
         if (c >= 0) {
-          const k2 = (this.ffa ? 0 : view.team[i]!) * n + c;
+          const k2 = (this.sharedHeat ? 0 : view.team[i]!) * n + c;
           this.danger[k2] = this.danger[k2]! + AI_TEAM.dangerWeight;
         }
       }
@@ -98,7 +101,7 @@ export class TeamBoard {
   private addEnemyHeat(view: SimView, i: number, w: number, n: number): void {
     const c = this.cell(view.position[i * 3]!, view.position[i * 3 + 2]!);
     if (c < 0) return;
-    if (this.ffa) {
+    if (this.sharedHeat) {
       this.heat[c] = this.heat[c]! + w;
       return;
     }
@@ -137,7 +140,7 @@ export class TeamBoard {
    */
   hottest(team: number, x: number, z: number, minM: number, maxM: number, minHeat: number): number {
     const n = this.cellsX * this.cellsZ;
-    const base = (this.ffa ? 0 : team) * n;
+    const base = (this.sharedHeat ? 0 : team) * n;
     let best = -1;
     let bestHeat = minHeat;
     for (let c = 0; c < n; c++) {
@@ -156,6 +159,6 @@ export class TeamBoard {
   /** Perigo (mortes do próprio time, decaindo) na célula de (x, z). */
   dangerAt(team: number, x: number, z: number): number {
     const c = this.cell(x, z);
-    return c < 0 ? 0 : this.danger[(this.ffa ? 0 : team) * this.cellsX * this.cellsZ + c]!;
+    return c < 0 ? 0 : this.danger[(this.sharedHeat ? 0 : team) * this.cellsX * this.cellsZ + c]!;
   }
 }

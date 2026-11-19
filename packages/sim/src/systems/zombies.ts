@@ -119,7 +119,7 @@ export function zombiesSystem(ctx: SimContext): void {
  * (até `reviveRangeM`) que segura o usar enche o reviver (trocar de quem levanta recomeça; enquanto alguém levanta, o
  * sangramento para); sem ninguém, sangra até o golpe final.
  */
-function updateDowned(ctx: SimContext): void {
+export function updateDowned(ctx: SimContext): void {
   const s = ctx.s;
   const r = ctx.zombieRules;
   const range2 = ZOMBIES_DOWN.reviveRangeM * ZOMBIES_DOWN.reviveRangeM;
