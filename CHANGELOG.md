@@ -6,6 +6,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M6: modos de festa (planejado em 19/11/2026)
+
+- **Plano** em `docs/PLANO_M6.md`: Domination, Gun Game e Infection, Juggernaut, os modificadores e o Bobo Chaos,
+  Paintball e as variantes do Bobo Zombies (Armed Horde e Fortress), cada um sozinho com bots, no sofá, no online e no
+  Switch. BoboStrike e Bobo Royale ficam para o M7. Perguntas U1–U6 no padrão.
+
 ### M5: online P2P (planejado em 16/11/2026)
 
 - **Plano** em `docs/PLANO_M5.md`: até 4 amigos na mesma partida pela web, cada um no seu aparelho, com os bots do
