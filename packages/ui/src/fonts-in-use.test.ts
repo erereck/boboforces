@@ -561,10 +561,18 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
           { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
           { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'mode.desc.zombies' },
-          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+          { id: 'more', nameKey: 'mode.name.more', descKey: 'mode.desc.more' },
           { id: 'surprise', nameKey: 'title.surprise', descKey: 'mode.desc.surprise' },
           { id: 'custom', nameKey: 'mode.name.custom', descKey: 'mode.desc.custom' },
         ],
+      }),
+      // M6 (fase 0): a página "Mais modos".
+      modesScreen.build({
+        modes: [
+          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+          { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+        ],
+        titleKey: 'modes.more.title',
       }),
       customMatchScreen.build({
         tabs: [
@@ -725,13 +733,20 @@ describe('estouro de texto com o atlas real', () => {
         { id: 'warfare.tdm', nameKey: 'mode.name.warfare.tdm', descKey: 'mode.desc.warfare.tdm' },
         { id: 'warfare.ffa', nameKey: 'mode.name.warfare.ffa', descKey: 'mode.desc.warfare.ffa' },
         { id: 'zombies', nameKey: 'mode.name.zombies', descKey: 'mode.desc.zombies' },
-        { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+        { id: 'more', nameKey: 'mode.name.more', descKey: 'mode.desc.more' },
         { id: 'surprise', nameKey: 'title.surprise', descKey: 'mode.desc.surprise' },
         { id: 'custom', nameKey: 'mode.name.custom', descKey: 'mode.desc.custom' },
       ],
     });
     for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS]) {
-      for (const tree of [modes, onlineMatchScreen.build(null)]) expectCardsFit(layoutFor(tree, t), t);
+      const more = modesScreen.build({
+        modes: [
+          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+          { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+        ],
+        titleKey: 'modes.more.title',
+      });
+      for (const tree of [modes, more, onlineMatchScreen.build(null)]) expectCardsFit(layoutFor(tree, t), t);
     }
   });
 

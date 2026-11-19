@@ -1712,13 +1712,40 @@ describe('Ringue (M2, fase 5c)', () => {
 });
 
 describe('Bobo Training (M2, fase 5d)', () => {
+  it('M6 (fase 0): Modos → Mais modos: Voltar volta ao card dele; o Domination abre no Construto', async () => {
+    const { platform, game } = await bootToTitle();
+    titleTo(platform, 'modes');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('more');
+    platform.tap('Escape');
+    expect(game.screen).toBe('modes');
+    // O foco voltou no Mais modos: Enter abre de novo; à direita do Training, o Domination.
+    platform.tap('Enter');
+    expect(game.screen).toBe('more');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] construto (play)'))).toBe(true);
+    expect(game.save.presets.recent[0]!.mode).toBe('warfare.domination');
+    game.dispose();
+  }, 60_000);
+
   it('Modos → Bobo Training: Ringue sem placar, alvos espalhados que não atacam e a linha dos números', async () => {
     const { platform, game } = await bootToTitle();
-    // Refino R3b: Título → Modos → Bobo Training (o 4º card: 2ª linha, à direita).
+    // Refino R3b: Título → Modos; M6 (fase 0): o 4º card (2ª linha, à direita) é o Mais modos, e o Bobo Training é o
+    // 1º card dele.
     titleTo(platform, 'modes');
     expect(game.screen).toBe('modes');
     platform.tap('ArrowDown');
     platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('more');
     platform.tap('Enter');
     await untilRunning(platform, game);
     expect(platform.logLines.some((l) => l.includes('[cena] ringue (play)'))).toBe(true);

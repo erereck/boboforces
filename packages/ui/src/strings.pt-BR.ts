@@ -573,6 +573,9 @@ export const STRINGS_PT_BR = {
   'training.line': 'Precisão {accuracy} · TTK médio {ttk} · Na cabeça {head} · Abates {kills}',
   'mode.name.training': 'Bobo Training',
   'mode.desc.training': 'Alvos parados e andando, sem placar.',
+  // M6 (fase 0): o card que abre a página dos modos novos (o Bobo Training foi para lá).
+  'mode.name.more': 'Mais modos',
+  'mode.desc.more': 'Training, Domination e os de festa.',
   // M2 (fase 5b): o Laboratório (editor de um bot por vez, gameplay.md §6).
   'lab.tab.skill': 'Habilidade',
   'lab.tab.mind': 'Inteligência',
@@ -824,6 +827,8 @@ export const STRINGS_PT_BR = {
   'mode.warfare.ffa': 'Bobo Warfare: Todos contra todos',
   'mode.short.warfare.tdm': 'Times',
   'mode.short.warfare.ffa': 'Todos contra todos',
+  'mode.warfare.domination': 'Bobo Warfare: Domination',
+  'mode.short.warfare.domination': 'Domination',
   'map.construto': 'Construto',
   'map.ringue': 'Ringue',
   // M3 (fase 3d): o mapa pequeno do Bobo Zombies (nome provisório).

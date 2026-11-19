@@ -244,6 +244,10 @@ export const STRINGS_EXTRA_PT_BR = {
   'debug.on': 'ligado',
   'debug.off': 'desligado',
   'debug.unknown': '—',
+  // M6 (fase 0): a página "Mais modos" (no pedaço dos editores).
+  'modes.more.title': 'Mais modos',
+  'mode.name.domination': 'Domination',
+  'mode.desc.domination': 'Três pontos: o time que segurar mais ganha.',
   // M5 (fase 7a): a linha da rede no F2 (online).
   'debug.netHost': 'Rede (host)',
   'debug.netClient': 'Rede (amigo)',

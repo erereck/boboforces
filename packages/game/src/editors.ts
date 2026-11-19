@@ -22,3 +22,5 @@ registerStrings(STRINGS_EXTRA_PT_BR);
 // M4 (fase 2c): o importador da pasta `oficina/` (só o Switch usa; fora do menu da web).
 export { importWorkshopFiles } from './workshop-files.ts';
 export { createOnscreenKeyboard } from './onscreen-keyboard.ts';
+// M6 (fase 0): a página "Mais modos" (os cards e as receitas dos modos novos).
+export { MORE_MODE_CARDS, moreModePreset } from './more-modes.ts';

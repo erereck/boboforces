@@ -259,6 +259,7 @@ export type GameScreen =
   | 'labIntro'
   | 'quick'
   | 'modes'
+  | 'more'
   | 'tests'
   | 'custom'
   | 'surprise'
@@ -725,6 +726,7 @@ export function startGame(deps: GameDeps): GameHandle {
   // M2 (fase 4d): Partida Rápida e Modos.
   const quickMenu = createMenuController();
   const modesMenu = createMenuController();
+  const moreMenu = createMenuController();
   modesMenu.setRoot(
     modesScreen.build({
       modes: [
@@ -735,8 +737,8 @@ export function startGame(deps: GameDeps): GameHandle {
         })),
         // M3 (fase 2d): o Bobo Zombies começa direto (fase 5a: na Base Abandonada).
         { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
-        // M2 (fase 5d): o Bobo Training começa direto (no Ringue, com os alvos).
-        { id: 'training', nameKey: 'mode.name.training' as const, descKey: 'mode.desc.training' as const },
+        // M6 (fase 0): o Bobo Training foi para a página "Mais modos", com os modos novos (fora do menu).
+        { id: 'more', nameKey: 'mode.name.more' as const, descKey: 'mode.desc.more' as const },
         // Refino R3b (#79): o Surpreenda-me e a Partida personalizada (com a última partida) moram aqui agora.
         { id: 'surprise', nameKey: 'title.surprise' as const, descKey: 'mode.desc.surprise' as const },
         { id: 'custom', nameKey: 'mode.name.custom' as const, descKey: 'mode.desc.custom' as const },
@@ -1883,8 +1885,12 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
-          else if (id === 'training') playTraining(trainingPreset());
-          else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
+          else if (id === 'more') {
+            withEditors(() => {
+              moreMenu.setRoot(modesScreen.build({ modes: editors!.MORE_MODE_CARDS, titleKey: 'modes.more.title' }));
+              screen = 'more';
+            });
+          } else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
           else if (id === 'surprise') {
             rollNewSurprise();
             screen = 'surprise';
@@ -1892,6 +1898,26 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
+      case 'more': {
+        // M6 (fase 0): os modos novos (e o Bobo Training): cada card começa direto.
+        const nav = moreMenu.update(menuInput, raw, u);
+        const a = nav.activated;
+        if (nav.back || a === MODES_ACTION.back) {
+          screen = 'modes';
+          modesMenu.focus(MODES_PREFIX + 'more');
+        } else if (a !== null && a.startsWith(MODES_PREFIX)) {
+          const id = a.slice(MODES_PREFIX.length);
+          const preset = editors!.moreModePreset(id);
+          if (id === 'training') playTraining(trainingPreset());
+          else if (preset !== null) playPreset(preset);
+        }
+        if (screen === 'more') {
+          moreMenu.draw(list, u);
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }
