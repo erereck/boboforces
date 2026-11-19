@@ -48,6 +48,8 @@ export interface PauseState {
   readonly players?: boolean;
   /** M4 (fase 3): a linha da bateria ("Bateria 64%"); ausente ou vazia = sem a linha (web, ou sem leitura). */
   readonly battery?: string;
+  /** M8 (fase 5): a linha do Diretor de Partida ("Diretor de Partida (Equilibrado): bots –½"); ausente = desligado. */
+  readonly director?: string;
   /** M7 (fase 9): os itens do P1 já montados (os do Aquário); ausente = os de sempre. */
   readonly items?: readonly UiNode[];
 }
@@ -146,6 +148,16 @@ function couchLines(state: PauseState | null): UiNode[] {
       kind: 'text',
       id: 'battery',
       text: { literal: state.battery },
+      style: 'caption',
+      color: COLORS.textoBaixo,
+      textAlign: 'center',
+    });
+  }
+  if (state?.director) {
+    out.push({
+      kind: 'text',
+      id: 'director',
+      text: { literal: state.director },
       style: 'caption',
       color: COLORS.textoBaixo,
       textAlign: 'center',

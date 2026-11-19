@@ -408,3 +408,27 @@ export const AI_ZOMBIE = {
   replanSA: 1,
   replanSB: 2,
 } as const;
+
+/**
+ * M8 (fase 5): o Diretor de Partida (gameplay.md §6.8; GDD §4.4.4). Mede o K/D dos humanos (somados: no sofá, o do
+ * grupo) numa janela móvel de 3 min amostrada a cada 10 s e, a cada 30 s, mexe só na mira dos bots: 1/4 de nível por
+ * vez, dentro de ±1 nível do escolhido. Tudo nos ticks da sim (determinístico; no online, só o host tem bots).
+ */
+export const AI_DIRECTOR = {
+  /** A cada quantos segundos de partida o Diretor lê o placar dos humanos. */
+  sampleS: 10,
+  /** A janela móvel, em amostras (18 × 10 s = 3 min). */
+  windowSamples: 18,
+  /** Um ajuste a cada quantas amostras (3 × 10 s = 30 s). */
+  adjustSamples: 3,
+  /** Abates + mortes dos humanos na janela para a medida valer (com menos, o Diretor espera). */
+  minEvents: 4,
+  /** A faixa do ajuste em quartos de nível (4 = ±1 nível). */
+  maxQuarters: 4,
+  /** A faixa de K/D dos humanos de cada objetivo: acima, os bots melhoram 1/4; abaixo, pioram 1/4. */
+  targets: {
+    relax: { min: 2, max: 3 },
+    balanced: { min: 1, max: 1.5 },
+    challenge: { min: 0.7, max: 1 },
+  },
+} as const;

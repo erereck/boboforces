@@ -301,8 +301,9 @@ function toZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   const support = Math.min(ZOMBIES_SUPPORT_MAX, l.maxBots, ffa(r) ? 0 : botsOf(r, 0));
   const map = mapsForMode('zombies').includes(r.map as MenuMap) && r.map !== 'construto' ? r.map : ZOMBIES_MAP;
   const { viewDistanceM } = r.match ?? {};
-  // M6 (fase 4): o Bobo Zombies não tem a aba Modificadores: os modificadores e a Roleta não vão junto.
-  const { modifiers: _mods, chaos: _chaos, ...rest } = r;
+  // M6 (fase 4): o Bobo Zombies não tem a aba Modificadores: os modificadores e a Roleta não vão junto; nem o Diretor
+  // de Partida (M8, fase 5: não vale no Zombies).
+  const { modifiers: _mods, chaos: _chaos, director: _director, ...rest } = r;
   return {
     ...rest,
     mode: 'zombies',
@@ -687,8 +688,24 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
       return syncEmbedded(setTotal(rr, team, n), l);
     },
   });
-  return ffa(r) ? [choose(0), count(0)] : [choose(0), count(0), choose(1), count(1)];
+  return ffa(r) ? [choose(0), count(0), DIRECTOR_ROW] : [choose(0), count(0), choose(1), count(1), DIRECTOR_ROW];
 }
+
+/** M8 (fase 5): o Diretor de Partida na aba Bots: desligado (sem o bloco), Relax, Equilibrado ou Desafio. */
+const DIRECTOR_CHOICES = [null, 'relax', 'balanced', 'challenge'] as const;
+
+const DIRECTOR_ROW: RowDef = {
+  id: 'director',
+  labelKey: 'custom.row.director',
+  value: (r) =>
+    r.director === undefined ? t('director.off') : t(`director.goal.${r.director.goal ?? 'balanced'}` as StringKey),
+  step: (r, d) => {
+    const cur = r.director === undefined ? null : (r.director.goal ?? 'balanced');
+    const pick = DIRECTOR_CHOICES[cycleIndex(DIRECTOR_CHOICES.length, DIRECTOR_CHOICES.indexOf(cur), d)]!;
+    const { director: _drop, ...rest } = r;
+    return pick === null ? rest : { ...rest, director: { goal: pick } };
+  },
+};
 
 /** M6 (fase 4): liga ou desliga um modificador fixo (na ordem da lista; ligar tira o que conflita com ele). */
 function withModifier(r: MatchRecipe, id: ModifierId, on: boolean): MatchRecipe {

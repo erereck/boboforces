@@ -10,6 +10,7 @@ import {
   drawKillFeed,
   drawMatchCountdown,
   drawScoreboard,
+  directorShiftText,
   KILL_FEED_MAX,
   KILL_FEED_SHOW_S,
   pushKillFeed,
@@ -124,6 +125,48 @@ describe('placar do Tab', () => {
       const plain = createDrawList();
       drawScoreboard(plain, fonts, sample(2), w, h, min);
       expect(syntheticGlyphText(plain)).not.toContain('500devida');
+    }
+  });
+
+  it('M8 (fase 5): a linha do Diretor embaixo do título, em âmbar, sem empurrar nada para fora da tela', () => {
+    expect([0, 1, 2, 3, 4, -1, -2, -3, -4].map(directorShiftText)).toEqual([
+      '±0',
+      '+¼',
+      '+½',
+      '+¾',
+      '+1',
+      '–¼',
+      '–½',
+      '–¾',
+      '–1',
+    ]);
+    for (const [w, h, min] of [
+      [1280, 720, MIN_TEXT.tv],
+      [640, 360, MIN_TEXT.switchSplit],
+    ] as const) {
+      const m = sample(2);
+      m.note = 'Diretor: bots –½';
+      const list = createDrawList();
+      drawScoreboard(list, fonts, m, w, h, min);
+      within(list, w, h);
+      const text = syntheticGlyphText(list);
+      // A fonte sintética não tem o – nem o ½ (a do HUD tem: Latin-1 e a pontuação extra).
+      expect(text).toContain('Diretor:bots');
+      // Embaixo do título (no 640×360 com o placar cheio, na ponta da linha dele) e antes da 1ª tabela.
+      expect(text.indexOf('Diretor')).toBeGreaterThan(text.indexOf('Times'));
+      expect(text.indexOf('Diretor')).toBeLessThan(text.indexOf('ABATES'));
+      const glyphs = drawnCommands(list).filter((c) => c.op === DRAW_OP.glyph);
+      // O cabeçalho das tabelas (texto baixo) marca onde acaba a parte de cima.
+      const top = Math.min(...glyphs.filter((c) => c.color === COLORS.textoBaixo).map((c) => c.y));
+      const title = glyphs.filter((c) => c.color === COLORS.texto && c.y < top);
+      const note = glyphs.filter((c) => c.color === COLORS.acao && c.y < top);
+      expect(note.length).toBeGreaterThan(0);
+      // O aviso não encosta no título.
+      const titleRight = Math.max(...title.map((c) => c.x + c.w));
+      const noteLeft = Math.min(...note.map((c) => c.x));
+      const noteTop = Math.min(...note.map((c) => c.y));
+      const titleBottom = Math.max(...title.map((c) => c.y + c.h));
+      expect(noteLeft > titleRight || noteTop >= titleBottom, `${w}: ${noteLeft} ${titleRight}`).toBe(true);
     }
   });
 

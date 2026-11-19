@@ -944,6 +944,27 @@ describe('estouro de texto com o atlas real', () => {
       }
     }
   });
+
+  it('M8 (fase 5, revisão): a frase de ajuda mais longa da Partida personalizada cabe na largura das linhas', () => {
+    const longest = (Object.keys(STRINGS_EXTRA_PT_BR) as StringKey[])
+      .filter((k) => k.startsWith('custom.help.'))
+      .map((k) => t(k))
+      .reduce((a, b) => (b.length > a.length ? b : a));
+    const tree = customMatchScreen.build({
+      tabs: ['custom.tab.match', 'custom.tab.players', 'custom.tab.weapons', 'custom.tab.bots'],
+      tab: 3,
+      rows: [{ id: 'director', labelKey: 'custom.row.director', value: 'Equilibrado' }],
+      summary: 'Times · De boa · 4 contra 4 · Construto · Diretor ligado',
+      note: '',
+      help: longest,
+    });
+    for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+      const layout = layoutFor(tree, target);
+      expectNoOverflow(layout, target);
+      const help = layout.byId.get('help')!;
+      expect(layout.texts.get(help)!.width, `${target.name}: ${longest}`).toBeLessThanOrEqual(800 * layout.scale + 0.5);
+    }
+  });
 });
 
 function list(w: number, h: number): DrawList {

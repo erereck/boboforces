@@ -4427,3 +4427,49 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   na 1ª partida ("· 1 partidas": agora com 2 ou mais, e com o nome do rival); o id longo demais (não volta igual do
   save) fica de fora e o nome é cortado por letra; e o aviso usa o nome de agora (o bot da Oficina renomeado). Na Horda
   Armada, os soldados da horda são bots do time 1: eles também viram rival.
+
+### 19.6 Fase 5: o Diretor de Partida (19/11/2026)
+
+- **A receita** ganha o bloco opcional `director` (`{ goal?: 'relax' | 'balanced' | 'challenge' }`; sem o bloco,
+  desligado; sem o objetivo, Equilibrado). O validador do `preset@1` lê o objetivo da lista (fora dela, aviso); a
+  versão não muda (campo novo opcional). Vai junto nos presets salvos e nos códigos `BFP1-`.
+- **A medida** (`ai/match-director.ts`, `MatchDirector`; números em `AI_DIRECTOR` no `ai/config.ts`): a cada 10 s de
+  sim, soma os abates e as mortes das entidades de quem é humano agora (no sofá, o grupo) e guarda num anel de 19
+  amostras; a cada 3 amostras (30 s) compara o K/D da janela de 3 min (no começo, desde a linha de base) com a faixa
+  do objetivo (Relax 2–3, Equilibrado 1–1,5, Desafio 0,7–1). Acima, os bots melhoram 1/4 de nível; abaixo, pioram;
+  dentro, nada. Precisa de 4 eventos na janela; o ajuste fica em ±1 nível (±4 quartos) e dentro da folga dos bots.
+  Só lê a `SimView` nos ticks da sim: determinístico (o replay e o golden reproduzem).
+- **Quem é humano agora:** os controladores `0..humans-1` no começo; o `setHumanControlled` (o jogador do sofá que
+  assume um bot, o que sai e volta a ser o cérebro de reserva, o amigo online que cai) marca e desmarca. Quando muda,
+  o conjunto de bots que mudam é refeito e a janela recomeça dos totais de agora (o placar de quem chegou não vira um
+  salto no K/D).
+- **O ajuste** (`ai/skill.ts`, `skillShift`): multiplica a reação, o erro de mira, a aquisição e o giro do bot. Cada
+  campo anda na tabela dos 5 níveis a partir de onde o valor do bot está nela (o inverso da interpolação; fora da
+  tabela, a ponta, na proporção): num bot de nível, a mira fica exatamente entre os dois níveis; num da Oficina, com a
+  mira de um nível e o cérebro de outro, vale a mira. Inteligência, personalidade, regras, recuo e cabeça não mudam.
+  Sem ajuste os multiplicadores são 1 exato: os goldens não mudam. O "Ajustar desafio" da pausa troca o nível; o
+  ajuste continua valendo sobre o nível novo, dentro da folga nova.
+- **A folga** (`skillRoom`): quanto a mira dos bots que mudam ainda pode melhorar e piorar na tabela (em quartos; o
+  campo com mais folga, até ±1 nível). O ajuste não passa dela: com inimigos Tryhard o placar não mostra "+1" sem
+  mudar nada, e a volta não espera ajustes vazios.
+- **Quem muda:** só os bots da receita (os cérebros de reserva do sofá são dos humanos), fora os que um jogador pilota,
+  dos times de agora sem humano (o `team` da `SimView`: no Royale, o esquadrão, então os colegas do humano ficam de
+  fora); no FFA e na Infection (quem é infectado muda), todos; com humano em todo time (o sofá dividido), todos.
+  Desligado no Bobo Zombies (a Partida personalizada tira o bloco ao passar para lá), no Aquário (sem humanos) e sem
+  bots.
+- **Na tela:** no placar do Tab, "Diretor: bots –½" em âmbar embaixo do título (`ScoreboardModel.note`; sem espaço, o
+  placar cheio em 640×360, na ponta direita da linha do título); na pausa, "Diretor de Partida (Equilibrado): bots –½";
+  na Partida personalizada, a linha "Diretor de Partida" na aba Bots (Desligado → Relax → Equilibrado → Desafio); no
+  resumo da partida, "Diretor ligado". O sinal de menos é o travessão – e as frações ¼ ½ ¾ do Latin-1 (estão na fonte
+  do HUD; o − matemático não está).
+- **Online (pergunta Z4):** os bots rodam só no host, então só ele ajusta e só o placar dele mostra o ajuste; o resumo
+  que o host publica no lobby leva o "Diretor ligado" para os clientes. Sem mudar o protocolo nem o snapshot.
+- **A revisão (Opus) achou, corrigido antes do commit:** a frase de ajuda da aba Bots com 196 letras saía da tela
+  (agora tem 74, e um teste com o atlas real mede a mais longa da Partida personalizada); o ajuste subia no placar nas
+  pontas da tabela sem fazer nada (a folga); o bot da Oficina andava pela inteligência e não pela mira (de 6° para 15°
+  com −1 nível); quem conta como humano e quais bots mudam eram fixos desde a criação (o sofá que entra no meio e o
+  cérebro de reserva de quem saiu); e, no Royale em dupla ou quarteto, os colegas de esquadrão do humano também
+  mudavam. O custo no pedaço do menu: ~114 B gzip (o validador e a pausa também estão nele); o menu ficou em 349,2 KB.
+- **Fica para depois** (gameplay.md §6.8): o modo Personalizado do Diretor (sliders), a agressividade, o número de
+  bots ativos e o ritmo e a distância de spawn, e o Zombies (ritmo da horda, especiais e drops); trocar o objetivo na
+  pausa (a pausa só mostra).

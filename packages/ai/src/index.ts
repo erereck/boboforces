@@ -8,3 +8,4 @@ export * from './paths.ts';
 export * from './director.ts';
 export * from './headless.ts';
 export * from './weapons.ts';
+export * from './match-director.ts';

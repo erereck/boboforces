@@ -27,6 +27,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   não mexe nela. "Copiar código" dá um `BFR1-…` que, colado, joga a mesma partida.
 - **O Nêmesis com memória (fase 4):** o bot que mais te pegou vira o seu rival entre partidas. Quando ele volta, a
   contagem do começo avisa ("Seu Nêmesis voltou: Jorge · te pegou 7, você 3"); no resultado, a rivalidade inteira.
+- **O Diretor de Partida (fase 5):** na aba Bots da Partida personalizada, Relax, Equilibrado ou Desafio. A cada 30 s ele
+  olha como você está indo nos últimos 3 min e mexe só na mira dos bots, 1/4 de nível por vez e até 1 nível; o placar
+  mostra o ajuste ("Diretor: bots –½"). Desligado por padrão.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

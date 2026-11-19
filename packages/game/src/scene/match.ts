@@ -176,6 +176,7 @@ import {
   drawKillFeed,
   drawMatchCountdown,
   drawScoreboard,
+  directorShiftText,
   MAX_ALLY_MARKERS,
   MAX_TEAM_PINGS,
   MAX_CONTROL_POINTS,
@@ -3215,6 +3216,31 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     host.log(`[partida] bateria em ${n}% sem carregar: aviso`);
   }
 
+  // --- M8 (fase 5): o Diretor de Partida (o ajuste vem do diretor dos bots; o cliente online não tem: sem linha) ---
+  let directorShown = Number.NaN;
+  /** O ajuste de agora (quartos de nível) ou `null` com o Diretor desligado. */
+  function directorShift(): number | null {
+    return driver.director?.directorShift() ?? null;
+  }
+  /** A linha da pausa, ou `''` com o Diretor desligado. */
+  function directorPauseLine(): string {
+    const shift = directorShift();
+    if (shift === null) return '';
+    const goal = t(`director.goal.${recipe.director?.goal ?? 'balanced'}` as StringKey);
+    return t('director.pause', { goal, shift: directorShiftText(shift) });
+  }
+  /** A linha do placar: refeita só quando o ajuste muda (a cada 30 s no máximo). */
+  function refreshDirectorNote(): void {
+    const shift = directorShift();
+    if (shift === null) {
+      scoreboard.note = '';
+      return;
+    }
+    if (shift === directorShown) return;
+    directorShown = shift;
+    scoreboard.note = t('director.badge', { shift: directorShiftText(shift) });
+  }
+
   /** Refino R4: o foco com que a pausa foi montada (a frase de ajuda é dele). */
   let pauseMainFocus: string | null = null;
   function pauseMain(): void {
@@ -3228,6 +3254,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // O item Jogadores é da LOCAL EDITION (na web, a página abre sozinha quando um controle cai).
       players: couch && host.localEdition === true,
       battery: batteryLine(),
+      director: directorPauseLine(),
       // M7 (fase 9): os itens do Aquário (a velocidade, assumir e voltar a assistir).
       ...(aquarium
         ? {
@@ -4525,6 +4552,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       scoreOrder[k] = i;
     }
     scoreboard.rowCount = n;
+    refreshDirectorNote();
     scoreboard.teamCount = solo ? 0 : hordeArmed ? 1 : recipe.teams.length;
     for (let tIdx = 0; tIdx < scoreboard.teamScores.length; tIdx++)
       scoreboard.teamScores[tIdx] = v.match.teamScore[tIdx] ?? 0;

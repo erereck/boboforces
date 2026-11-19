@@ -138,6 +138,8 @@ export const SCOREBOARD_MAX_ROWS = 40;
 export interface ScoreboardModel {
   /** Nome do modo ("Bobo Warfare: Times"), por referência. */
   title: string;
+  /** M8 (fase 5): a linha embaixo do título ("Diretor: bots –½"); `''` = sem a linha. */
+  note: string;
   /** 0 = FFA (uma lista só); 2 = TDM. */
   teamCount: number;
   readonly teamScores: number[];
@@ -166,6 +168,7 @@ export function createScoreboardModel(): ScoreboardModel {
   const n = SCOREBOARD_MAX_ROWS;
   return {
     title: '',
+    note: '',
     teamCount: 0,
     teamScores: [0, 0, 0, 0],
     rowCount: 0,
@@ -250,7 +253,12 @@ export function drawScoreboard(
   const footer = (n: number): number => (n > 0 ? gap + plateH(n) : 0);
   const titleCap = capHeightPx(font, titlePx);
   const totalW = sideBySide ? tableW * tables + gap * 2 * (tables - 1) : tableW;
-  const baseH = titleCap + gap * 2 + (sideBySide ? tableH : tableH * tables + gap * (tables - 1));
+  const tablesH = titleCap + gap * 2 + (sideBySide ? tableH : tableH * tables + gap * (tables - 1));
+  // M8 (fase 5): a linha do Diretor de Partida embaixo do título; sem espaço (o placar cheio numa tela pequena), na
+  // ponta direita da linha do título.
+  const noteLine = m.note !== '' ? Math.round(ruleCap + gap) : 0;
+  const noteH = tablesH + noteLine <= height - pad * 2 ? noteLine : 0;
+  const baseH = tablesH + noteH;
   // Quantas linhas de legenda cabem por tabela no que sobra da tela (numa tela pequena com o placar cheio, as de baixo
   // ficam de fora; a tela de morte ainda mostra as regras de quem matou).
   const spare = height - pad * 2 - baseH;
@@ -266,8 +274,19 @@ export function drawScoreboard(
   const x0 = Math.round((width - totalW) / 2);
   let y0 = Math.round(Math.max(pad, (height - totalH) / 2));
   pushRect(out, 0, 0, width, height, withAlpha(COLORS.bunker, 0.45));
-  paintText(out, font, m.title, width / 2, y0, titlePx, COLORS.texto, 0.04, 0.5);
+  if (m.note !== '' && noteH === 0) {
+    // Na mesma linha: o título à esquerda e o aviso à direita, na largura das tabelas (ou na que os dois pedem).
+    const want = textWidth(font, m.title, titlePx, 0.04) + gap * 2 + textWidth(font, m.note, rulePx, 0.04);
+    const span = Math.min(width - pad * 2, Math.max(totalW, want));
+    const left = Math.round((width - span) / 2);
+    paintText(out, font, m.title, left, y0, titlePx, COLORS.texto, 0.04);
+    paintText(out, font, m.note, left + span, y0 + titleCap - ruleCap, rulePx, COLORS.acao, 0.04, 1);
+  } else paintText(out, font, m.title, width / 2, y0, titlePx, COLORS.texto, 0.04, 0.5);
   y0 += Math.round(titleCap + gap * 2);
+  if (noteH > 0) {
+    paintText(out, font, m.note, width / 2, y0, rulePx, COLORS.acao, 0.04, 0.5);
+    y0 += noteH;
+  }
   let stackY = y0;
   for (let tIdx = 0; tIdx < tables; tIdx++) {
     const tx0 = sideBySide ? x0 + tIdx * (tableW + gap * 2) : x0;
@@ -307,6 +326,18 @@ export function drawScoreboard(
       fy += ruleH;
     }
   }
+}
+
+/**
+ * M8 (fase 5): o ajuste do Diretor em quartos de nível como o placar mostra: "+¼", "–½", "+1", "±0" (o travessão – e
+ * as frações ¼ ½ ¾ estão na fonte do HUD).
+ */
+export function directorShiftText(quarters: number): string {
+  if (quarters === 0) return '±0';
+  const a = Math.abs(quarters);
+  const whole = Math.floor(a / 4);
+  const frac = ['', '¼', '½', '¾'][a % 4]!;
+  return (quarters > 0 ? '+' : '–') + (whole > 0 ? String(whole) : '') + frac;
 }
 
 /** Quantas linhas de regra vão embaixo da tabela `tIdx` (com uma tabela só, todas). */

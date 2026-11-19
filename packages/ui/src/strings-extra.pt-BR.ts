@@ -573,6 +573,15 @@ export const STRINGS_EXTRA_PT_BR = {
   // M8 (fase 4): o Nêmesis com memória.
   'nemesis.back': 'Seu Nêmesis voltou: {name} · te pegou {them}, você {you}',
   'result.rivalry': 'Rivalidade com {name}: te pegou {them}, você {you} · {n} partidas',
+  // M8 (fase 5): o Diretor de Partida (gameplay.md §6.8): no placar, na pausa e na Partida personalizada.
+  'director.badge': 'Diretor: bots {shift}',
+  'director.pause': 'Diretor de Partida ({goal}): bots {shift}',
+  'director.off': 'Desligado',
+  'director.goal.relax': 'Relax',
+  'director.goal.balanced': 'Equilibrado',
+  'director.goal.challenge': 'Desafio',
+  'custom.row.director': 'Diretor de Partida',
+  'custom.help.director': 'Ajusta só a mira dos bots, aos poucos, para você ficar no ritmo escolhido.',
   'share.error.surpriseNewer': 'Esse Surpreenda-me é de uma versão mais nova do jogo: atualize.',
   'surprise.sizeTeams': '{n} contra {n} · {min} min',
   'surprise.sizeFfa': '{n} bots · {min} min',

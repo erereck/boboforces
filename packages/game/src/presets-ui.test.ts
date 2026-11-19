@@ -25,6 +25,10 @@ describe('preset em texto', () => {
       teams: [{ humans: 'all', bots: [{ ref: 'builtin:knife-ninja', count: 7 }] }],
     };
     expect(presetSummary(ffa)).toBe('Todos contra todos · 8 bobos · Construto');
+    // M8 (fase 5): o Diretor ligado aparece no resumo (e no lobby online).
+    expect(presetSummary({ ...ffa, director: { goal: 'relax' } })).toBe(
+      'Todos contra todos · 8 bobos · Construto · Diretor ligado',
+    );
     expect(presetLines(ffa).at(-1)).toBe('10 min');
   });
 });

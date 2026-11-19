@@ -72,6 +72,8 @@ export function presetSummary(recipe: MatchRecipe): string {
     levelName(recipe),
     sides(recipe),
     t(`map.${recipe.map}` as StringKey),
+    // M8 (fase 5): o Diretor de Partida ligado (também no lobby online, pergunta Z4).
+    recipe.director !== undefined ? t('summary.director') : '',
   ].filter((p) => p !== '');
   return parts.join(t('summary.separator'));
 }

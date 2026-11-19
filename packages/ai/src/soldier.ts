@@ -80,7 +80,15 @@ import {
 } from './persona.ts';
 import { COVER_PHASE, onDamaged, seekCover, updateCover } from './tactics.ts';
 import { GRENADE_PHASE, holdAngle, maybeStartGrenade, onTargetLost, retreatBelow, stepGrenade } from './tactics2.ts';
-import { aimSkillForLevel, aimSkillFromBot, type AimSkill } from './skill.ts';
+import {
+  aimSkillForLevel,
+  aimSkillFromBot,
+  skillRoom,
+  skillShift,
+  type AimSkill,
+  type SkillRoom,
+  type SkillShift,
+} from './skill.ts';
 
 /**
  * Soldado N0 do M1 (gameplay.md §6.3 "Zumbi": vai pela rota e atira quando vê; ignora cobertura). Três camadas
@@ -257,6 +265,11 @@ export class SoldierBrain {
   acquireTicks: number;
   turnStep: number;
   errorRad: number;
+  /** M8 (fase 5): o ajuste do Diretor de Partida (quartos de nível; `setShift`). */
+  shiftQuarters = 0;
+  /** M8 (fase 5, revisão): a folga da mira do nível ou do bot na tabela (quartos de nível; o Diretor não passa dela). */
+  roomUp = 0;
+  roomDown = 0;
   readonly follower: PathFollower;
 
   wasDead = true;
@@ -449,6 +462,16 @@ export class SoldierBrain {
   }
 
   /**
+   * M8 (fase 5): o ajuste do Diretor de Partida em quartos de nível (+ = melhor; 0 = a mira do nível ou do bot). Vale
+   * também depois do "Ajustar desafio" (o ajuste é sobre o nível novo).
+   */
+  setShift(quarters: number, timing: SoldierTiming): void {
+    if (quarters === this.shiftQuarters) return;
+    this.shiftQuarters = quarters;
+    this.applySkill(timing);
+  }
+
+  /**
    * Troca o nível (habilidade e inteligência do nível; reação, giro e erro de mira); personalidade e regras ficam.
    */
   setLevel(level: BotLevel, timing: SoldierTiming): void {
@@ -460,10 +483,14 @@ export class SoldierBrain {
   }
 
   private applySkill(timing: SoldierTiming): void {
-    this.reactionTicks = secondsToTicks(this.skill.reactionS, timing.hz);
-    this.acquireTicks = secondsToTicks(this.skill.acquireS, timing.hz);
-    this.turnStep = (this.skill.turnDegPerS * DEG_TO_RAD) / timing.hz;
-    this.errorRad = this.skill.aimErrorDeg * DEG_TO_RAD;
+    const m = skillShift(this.skill, this.shiftQuarters, shiftScratch);
+    const room = skillRoom(this.skill, roomScratch);
+    this.roomUp = room.up;
+    this.roomDown = room.down;
+    this.reactionTicks = secondsToTicks(this.skill.reactionS * m.reaction, timing.hz);
+    this.acquireTicks = secondsToTicks(this.skill.acquireS * m.acquire, timing.hz);
+    this.turnStep = (this.skill.turnDegPerS * m.turn * DEG_TO_RAD) / timing.hz;
+    this.errorRad = this.skill.aimErrorDeg * m.aimError * DEG_TO_RAD;
   }
 }
 
@@ -476,6 +503,10 @@ export function moveToward(current: number, goal: number, step: number): number 
   const d = goal - current;
   return current + (d > step ? step : d < -step ? -step : d);
 }
+
+/** M8 (fase 5): o rascunho dos multiplicadores do Diretor. */
+const shiftScratch: SkillShift = { reaction: 1, aimError: 1, acquire: 1, turn: 1 };
+const roomScratch: SkillRoom = { up: 0, down: 0 };
 
 /** Rascunhos do módulo (o `think` não aloca). */
 const local = { x: 0, y: 0 };

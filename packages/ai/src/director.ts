@@ -21,7 +21,8 @@ import {
 import { AiContext } from './context.ts';
 import { strikeRoundTick } from './strike.ts';
 import { RoyaleClaims } from './royale.ts';
-import { AI_BUDGET, type AiBudget } from './config.ts';
+import { AI_BUDGET, AI_DIRECTOR, type AiBudget } from './config.ts';
+import { MatchDirector } from './match-director.ts';
 import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
 import { SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
@@ -52,6 +53,11 @@ export interface BotDirector extends Disposable {
    * reserva (`BotDirectorConfig.standby`), que começam pilotados. Controlador sem cérebro: nada.
    */
   setHumanControlled(controller: number, human: boolean): void;
+  /**
+   * M8 (fase 5): o ajuste do Diretor de Partida em quartos de nível (+ = bots melhores), ou `null` com ele desligado
+   * (sem o bloco `director`, no Bobo Zombies ou sem humanos). O `game` mostra no placar ("Diretor: bots −½").
+   */
+  directorShift(): number | null;
 }
 
 export interface BotDirectorConfig {
@@ -207,6 +213,79 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       : null;
   ctx.fortFlow = fortFlow;
   const total = soldiers.length + zombieBrains.length;
+  // M8 (fase 5): o Diretor de Partida. Quem é humano agora (controlador): os do sofá e os amigos online, menos quem
+  // saiu e voltou a ser o cérebro de reserva, mais o bot que um jogador assumiu (`setHumanControlled`).
+  const isHuman = new Uint8Array(Math.max(maxController, config.humans - 1) + 1).fill(1, 0, config.humans);
+  const matchDirector =
+    recipe.director !== undefined && recipe.mode !== 'zombies' && config.humans > 0 && recipeBots > 0
+      ? new MatchDirector(recipe.director.goal ?? 'balanced', hz, isHuman)
+      : null;
+  /** 1 = o Diretor mexe na mira deste bot da receita (os cérebros de reserva do sofá são dos humanos). */
+  const shifted = new Uint8Array(recipeBots);
+  /** O soldado de cada controlador (-1 = nenhum) e o time de agora de cada um (o da `SimView`: no Royale, o esquadrão). */
+  const soldierOf = new Int16Array(maxController + 1).fill(-1);
+  for (let i = 0; i < recipeBots; i++) soldierOf[soldiers[i]!.controller] = i;
+  const teamNow = new Int16Array(recipeBots);
+  const humanTeam = new Uint8Array(256);
+  /** Refazer quem muda (os humanos mudaram ou é o 1º tick) e a folga (o "Ajustar desafio" trocou o nível). */
+  let directorRebuild = true;
+  let directorRange = true;
+  /**
+   * Os bots que mudam: os dos times de agora sem humano; no FFA e na Infection (quem é infectado muda), todos; com
+   * humano em todo time (o sofá dividido), todos. Um bot que um jogador pilota não muda até voltar.
+   */
+  function rebuildShifted(view: SimView): void {
+    humanTeam.fill(0);
+    teamNow.fill(-1);
+    for (let e = 0; e < view.count; e++) {
+      const c = view.controller[e]!;
+      if (c < 0 || c >= isHuman.length) continue;
+      if (isHuman[c] === 1) humanTeam[view.team[e]!] = 1;
+      const i = c < soldierOf.length ? soldierOf[c]! : -1;
+      if (i >= 0) teamNow[i] = view.team[e]!;
+    }
+    const everyone = ctx.ffa || recipe.infection !== undefined;
+    let any = false;
+    for (let i = 0; i < recipeBots; i++) {
+      const t = teamNow[i]!;
+      const on = isHuman[soldiers[i]!.controller] !== 1 && (everyone || t < 0 || humanTeam[t] === 0);
+      shifted[i] = on ? 1 : 0;
+      any ||= on;
+    }
+    if (!any) for (let i = 0; i < recipeBots; i++) shifted[i] = isHuman[soldiers[i]!.controller] === 1 ? 0 : 1;
+  }
+  /** A folga do Diretor: a maior entre os bots que mudam (até ±1 nível). */
+  function refreshRange(): void {
+    let up = 0;
+    let down = 0;
+    for (let i = 0; i < recipeBots; i++) {
+      if (shifted[i] !== 1) continue;
+      up = Math.max(up, soldiers[i]!.roomUp);
+      down = Math.max(down, soldiers[i]!.roomDown);
+    }
+    matchDirector?.setRange(Math.min(AI_DIRECTOR.maxQuarters, up), Math.min(AI_DIRECTOR.maxQuarters, down));
+  }
+  function applyDirectorShift(shift: number): void {
+    for (let i = 0; i < recipeBots; i++) soldiers[i]!.setShift(shifted[i] === 1 ? shift : 0, soldierTiming);
+  }
+  function directorTick(md: MatchDirector, view: SimView): void {
+    let changed = false;
+    if (directorRebuild) {
+      rebuildShifted(view);
+      // Quem conta mudou: a janela recomeça dos totais de agora (sem um salto no K/D).
+      md.rebase(view);
+      directorRebuild = false;
+      directorRange = true;
+      changed = true;
+    }
+    if (directorRange) {
+      refreshRange();
+      directorRange = false;
+      changed = true;
+    }
+    if (md.update(view)) changed = true;
+    if (changed) applyDirectorShift(md.shift);
+  }
 
   let disposed = false;
   return {
@@ -218,6 +297,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       paths.service();
       flow?.update(ctx);
       fortFlow?.update(ctx);
+      if (matchDirector !== null) directorTick(matchDirector, view);
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
       // M7 (fase 6): no Royale os esquadrões passam do teto de times do quadro: o calor e o perigo num quadro só, como
@@ -255,6 +335,10 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     },
     setHumanControlled(controller, human): void {
       for (let i = 0; i < soldiers.length; i++) if (soldiers[i]!.controller === controller) piloted[i] = human ? 1 : 0;
+      if (controller >= 0 && controller < isHuman.length && isHuman[controller] !== (human ? 1 : 0)) {
+        isHuman[controller] = human ? 1 : 0;
+        directorRebuild = true;
+      }
     },
     setLevel(level, team): number {
       let n = 0;
@@ -262,8 +346,13 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
         if (team >= 0 && soldierTeams[i] !== team) continue;
         soldiers[i]!.setLevel(level, soldierTiming);
         n++;
+        // M8 (fase 5, revisão): o nível novo muda a folga do Diretor.
+        directorRange = true;
       }
       return n;
+    },
+    directorShift(): number | null {
+      return matchDirector?.shift ?? null;
     },
     stats(): BotDirectorStats {
       return {

@@ -79,6 +79,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    numa janela de 3 min (a cada 10 s, nos ticks da sim) e ajusta só os bots, no máximo 1/4 de nível a cada 30 s e
    dentro de ±1 nível (a mira dos bots entre dois níveis); o ícone no placar ("Diretor: bots −½"); na Partida
    personalizada e na pausa. No online, só o host (pergunta Z4).
+   - **feita em 19/11** (ARCHITECTURE §19.6): a medida e o ajuste na IA (`MatchDirector`, `skillShift`), o aviso no
+     placar e na pausa, a linha na aba Bots e o "Diretor ligado" no resumo (o lobby online).
 6. **As ordens aos bots aliados:** a roda (Vem comigo, Segura aqui, Ataca ali, Me cobre / Me revive) num botão; o N0 e o
    N1 ignoram, do N2 para cima obedecem pela **lealdade** (um campo novo da personalidade, com o padrão de cada preset);
    o ping dos humanos também passa a valer para os bots. A ordem viaja na rede (`PROTOCOL_VERSION`).

@@ -318,6 +318,8 @@ export const STRINGS_PT_BR = {
   'surprise.reroll': 'Rolar de novo',
   // Resumo de um preset (título, sorteio, Partida Rápida).
   'summary.separator': ' · ',
+  /** M8 (fase 5): no resumo (e no lobby online, pergunta Z4), o Diretor de Partida ligado. */
+  'summary.director': 'Diretor ligado',
   'summary.teams': '{a} contra {b}',
   'summary.teamsShort': '{a}×{b}',
   'summary.ffa': '{n} bobos',

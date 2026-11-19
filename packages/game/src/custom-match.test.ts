@@ -122,7 +122,27 @@ describe('Partida personalizada', () => {
     expect([ffa.mode, presetBotCounts(ffa)]).toEqual(['warfare.ffa', [7]]);
     // M3 (fase 6b): o modo é um ciclo de 3 (Times → Todos contra todos → Zombies); para trás, o FFA volta aos Times.
     expect(presetBotCounts(stepCustom('match', ffa, 'mode', -1, PHONE))).toEqual([3, 4]);
-    expect(customRows('bots', ffa).map((x) => x.id)).toEqual(['bot0', 'count0']);
+    expect(customRows('bots', ffa).map((x) => x.id)).toEqual(['bot0', 'count0', 'director']);
+  });
+
+  it('M8 (fase 5): o Diretor de Partida na aba Bots: desligado → Relax → Equilibrado → Desafio → desligado', () => {
+    const seen: string[] = [];
+    let r: MatchRecipe = DEBUT_PRESET;
+    for (let i = 0; i < 4; i++) {
+      seen.push(value('bots', r, 'director'));
+      r = stepCustom('bots', r, 'director', 1, PC);
+    }
+    seen.push(value('bots', r, 'director'));
+    expect(seen).toEqual(['Desligado', 'Relax', 'Equilibrado', 'Desafio', 'Desligado']);
+    expect(r.director).toBeUndefined();
+    const on = stepCustom('bots', DEBUT_PRESET, 'director', -1, PC);
+    expect(on.director).toEqual({ goal: 'challenge' });
+    expect(validateMatchRecipe(on, { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 }).ok).toBe(true);
+    // No Bobo Zombies o Diretor não vale: sai junto com os modificadores.
+    let z = on;
+    for (let i = 0; i < 3 && z.mode !== 'zombies'; i++) z = stepCustom('match', z, 'mode', 1, PC);
+    expect(z.mode).toBe('zombies');
+    expect(z.director).toBeUndefined();
   });
 
   it('alcance de visão para no teto do aparelho', () => {

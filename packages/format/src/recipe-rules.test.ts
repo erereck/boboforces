@@ -82,4 +82,17 @@ describe('regras da receita (fase 4e)', () => {
     expect(bad.ok && bad.value.players).toEqual({});
     expect(bad.ok && bad.warnings.map((w) => w.code)).toContain('recipe.invalidField');
   });
+  it('M8 (fase 5): o Diretor de Partida: o objetivo da lista passa; fora dela sai com aviso; não-objeto cai', () => {
+    const ok = validateMatchRecipe(recipe({ director: { goal: 'challenge' } }), LIMITS);
+    expect(ok.ok && ok.value.director).toEqual({ goal: 'challenge' });
+    expect(ok.ok && ok.warnings).toEqual([]);
+    const empty = validateMatchRecipe(recipe({ director: {} }), LIMITS);
+    expect(empty.ok && empty.value.director).toEqual({});
+    const bad = validateMatchRecipe(recipe({ director: { goal: 'easy' } }), LIMITS);
+    expect(bad.ok && bad.value.director).toEqual({});
+    expect(bad.ok && bad.warnings.map((w) => w.path)).toContain('director.goal');
+    const junk = validateMatchRecipe(recipe({ director: 3 }), LIMITS);
+    expect(junk.ok && junk.value.director).toBeUndefined();
+    expect(junk.ok && junk.warnings.map((w) => w.code)).toContain('recipe.invalidField');
+  });
 });

@@ -212,6 +212,17 @@ export interface RoyaleRules {
   readonly squad?: RoyaleSquad;
 }
 
+/**
+ * M8 (fase 5): o Diretor de Partida (gameplay.md §6.8; GDD §4.4.4): ajusta só a mira dos bots para os humanos ficarem
+ * na faixa de K/D do objetivo (Relax 2–3, Equilibrado 1–1,5, Desafio 0,7–1). Desligado por padrão: o bloco ausente.
+ */
+export const DIRECTOR_GOALS = ['relax', 'balanced', 'challenge'] as const;
+export type DirectorGoal = (typeof DIRECTOR_GOALS)[number];
+export interface DirectorRules {
+  /** Ausente = Equilibrado. */
+  readonly goal?: DirectorGoal;
+}
+
 /** Participantes por esquadrão de cada formato do Royale. */
 export function royaleSquadSize(squad: RoyaleSquad | undefined): number {
   return squad === 'quad' ? 4 : squad === 'duo' ? 2 : 1;
@@ -299,6 +310,8 @@ export interface MatchRecipe {
   readonly juggernaut?: JuggernautRules;
   /** M7 (fase 6): o Bobo Royale Mini (só com `mode: 'royale.mini'`). */
   readonly royale?: RoyaleRules;
+  /** M8 (fase 5): o Diretor de Partida (ausente = desligado; no Bobo Zombies não vale). */
+  readonly director?: DirectorRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -361,6 +374,7 @@ const TOP_KEYS = [
   'paintball',
   'juggernaut',
   'royale',
+  'director',
   'teams',
   'embeddedBots',
 ] as const;
@@ -686,6 +700,18 @@ function readJuggernaut(ctx: Ctx, value: unknown): Record<string, unknown> | und
   const out: Record<string, unknown> = {};
   readChoice(ctx, value, 'variant', 'juggernaut', JUGGERNAUT_VARIANTS, out);
   return Object.assign(out, unknownFields(value, ['variant']));
+}
+
+/** M8 (fase 5): o Diretor de Partida (o objetivo). */
+function readDirector(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'director', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readChoice(ctx, value, 'goal', 'director', DIRECTOR_GOALS, out);
+  return Object.assign(out, unknownFields(value, ['goal']));
 }
 
 /** M7 (fase 6): o Bobo Royale (o formato dos esquadrões). */
@@ -1021,6 +1047,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (juggernaut !== undefined) out['juggernaut'] = juggernaut;
   const royale = readRoyale(ctx, doc['royale']);
   if (royale !== undefined) out['royale'] = royale;
+  const director = readDirector(ctx, doc['director']);
+  if (director !== undefined) out['director'] = director;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {
