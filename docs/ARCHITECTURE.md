@@ -4350,3 +4350,29 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
 - **Limites conhecidos:** sem a área de transferência (o navegador recusou), o código não aparece em texto para copiar
   à mão; e um link aberto numa aba onde o jogo já está aberto não faz nada (o hash é lido só na carga, como o
   `#sala=`).
+
+### 19.3 Fase 2: os esquadrões (19/11/2026)
+
+- **O formato** `squad@1` (`format/src/squad.ts`): o nome (até 24), até 8 entradas (o bot e quantos, de 1 a 16) e, só no
+  código, os bots da Oficina embutidos. No save, as entradas apontam para os bots de fábrica (`builtin:`) e para os da
+  Oficina (`embedded:<id>`, resolvidos na hora de usar: o bot que sumiu vira o Normal Bob, como no preset). Até 100
+  esquadrões na web e 30 no Switch; a chave `squads` do save; o `backup@1` leva os esquadrões (o backup antigo sem
+  eles: nenhum). A leitura das listas do save (os bots e os esquadrões) virou uma função só (`readDocList`).
+- **A Oficina** saiu do `game.ts` (o menu da web) para o pedaço dos editores (`game/src/workshop.ts`): a lista ganhou o
+  grupo Esquadrões (com o "+ Novo esquadrão"), o card do esquadrão (as entradas e o total; sem o Favoritar), as ações
+  (Editar, Duplicar, Apagar, Compartilhar) e o editor (o nome pelo teclado do sistema ou o do jogo, cada bot com
+  quantos, "+ Adicionar bot"; o "–" no 1 tira o bot; Voltar com mudança pede confirmação). O compartilhar abre por cima
+  da Oficina. O `game.ts` só abre, volta e leva ao Laboratório: o menu caiu de 349,4 para 349,0 KB com os esquadrões.
+- **O código** `BFS1-` (sem link: o GDD só dá link ao bot e ao preset) leva os bots da Oficina do esquadrão. Quem
+  recebe ganha os bots na Oficina (ids novos, nomes pelo filtro) e o esquadrão com as entradas apontando para eles; sem
+  lugar para todos, nada entra.
+- **Na Partida personalizada:** os esquadrões entram no fim das escolhas do bot de cada time (não no apoio do Zombies);
+  o time recebe as entradas do esquadrão e a linha mostra o primeiro bot e quantos tipos a mais ("Jorge the Immortal
+  +1"). Com várias entradas, a quantidade mexe na última (que sai a 0), e o corte do mapa respeita as entradas.
+- **A revisão (Opus) achou 8 coisas, corrigidas antes do commit:** fechar o compartilhar aberto pela Oficina repetia o
+  aperto na Oficina (o B voltava ao título; o A reabria o compartilhar): agora espera soltar e põe o foco no que chegou;
+  o esquadrão de um bot só e a cópia de um esquadrão travavam a escolha na Partida personalizada (agora ficam de fora, e
+  a linha mostra o nome do esquadrão); o bot que não existe (o de fábrica desconhecido, o da Oficina que sumiu) virava
+  uma chave crua (agora o Normal Bob, com aviso); um código feito à mão podia deixar bots soltos na Oficina; o teste de
+  id do esquadrão não pegava colisão; cancelar a digitação marcava mudança; o editor perdia o foco da lista; e um frame
+  em branco ao abrir o compartilhar.

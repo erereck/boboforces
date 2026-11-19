@@ -29,4 +29,6 @@ export { createOnscreenKeyboard } from './onscreen-keyboard.ts';
 export { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } from './more-modes.ts';
 // M8 (fase 1): compartilhar por código e por link.
 export { createShareFlow, shareAvailable } from './share.ts';
+// M8 (fase 2): a Oficina inteira (os bots e os esquadrões).
+export { createWorkshopFlow } from './workshop.ts';
 export { shareCodeFromHash } from '@boboforces/format';

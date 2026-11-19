@@ -1,8 +1,9 @@
 import { validateBot, type BotDocument } from './bot.ts';
-import { validateMatchRecipe, type MatchRecipe, type TeamRecipe } from './match-recipe.ts';
+import { FALLBACK_BOT_REF, validateMatchRecipe, type MatchRecipe, type TeamRecipe } from './match-recipe.ts';
 import { normalizeFigureLook, type FigureLook } from './model/figure-look.ts';
 import { cleanSharedName, isNameAllowed } from './name-filter.ts';
 import { decodeShareCode, type ShareDecodeError, type ShareKind } from './share-code.ts';
+import { validateSquad, type SquadDocument } from './squad.ts';
 import { issue, type RecipeLimits, type ValidationIssue } from './validation.ts';
 
 /** GDD §4.8: até 16 bots embutidos por preset. */
@@ -25,6 +26,13 @@ export type ShareImport =
       readonly ok: true;
       readonly kind: 'preset';
       readonly preset: MatchRecipe;
+      readonly warnings: readonly ValidationIssue[];
+    }
+  | {
+      readonly ok: true;
+      readonly kind: 'squad';
+      /** M8 (fase 2): o esquadrão com os bots da Oficina dele embutidos (quem recebe salva os dois). */
+      readonly squad: SquadDocument;
       readonly warnings: readonly ValidationIssue[];
     }
   | {
@@ -56,7 +64,7 @@ function filterBot(bot: BotDocument, path: string, warnings: ValidationIssue[]):
   return { ...bot, name: '', look };
 }
 
-/** M8 (fase 0): abre um código de bot ou de preset (os esquadrões e a semente têm o deles). */
+/** M8 (fase 0): abre um código de bot, de preset ou (fase 2) de esquadrão (a semente tem o dela). */
 export function importShareCode(text: string, limits: RecipeLimits): ShareImport {
   const decoded = decodeShareCode(text);
   if (!decoded.ok) return { ok: false, error: decoded.error, issues: [] };
@@ -111,6 +119,34 @@ export function importShareDoc(kind: ShareKind, doc: unknown, limits: RecipeLimi
     const bots = preset.embeddedBots?.map((b, i) => filterBot(b, `embeddedBots[${i}].name`, warnings));
     preset = { ...preset, teams, ...(bots !== undefined ? { embeddedBots: bots } : {}) };
     return { ok: true, kind: 'preset', preset, warnings };
+  }
+  if (kind === 'squad') {
+    const r = validateSquad(doc);
+    if (!r.ok) return { ok: false, error: 'invalid', issues: r.errors };
+    const embedded = r.value.embeddedBots ?? [];
+    const longId = embedded.findIndex((b) => !botIdOk(b));
+    if (longId >= 0)
+      return { ok: false, error: 'invalid', issues: [issue(`embeddedBots[${longId}].id`, 'bot.invalidField')] };
+    const warnings = [...r.warnings];
+    let name = cleanSharedName(r.value.name, r.value.name.length);
+    if (name !== '' && !isNameAllowed(name)) {
+      warnings.push(issue('name', 'name.blocked'));
+      name = '';
+    }
+    const bots = embedded.map((b, i) => filterBot(b, `embeddedBots[${i}].name`, warnings));
+    const ids = new Set(bots.map((b) => b.id));
+    const entries = r.value.bots.map((e, i) => {
+      if (!e.ref.startsWith('embedded:') || ids.has(e.ref.slice('embedded:'.length))) return e;
+      warnings.push(issue(`bots[${i}].ref`, 'content.missingBot', e.ref));
+      return { ...e, ref: FALLBACK_BOT_REF };
+    });
+    const squad: SquadDocument = {
+      ...r.value,
+      name,
+      bots: entries,
+      ...(bots.length > 0 ? { embeddedBots: bots } : {}),
+    };
+    return { ok: true, kind: 'squad', squad, warnings };
   }
   return { ok: false, error: 'kind', issues: [] };
 }

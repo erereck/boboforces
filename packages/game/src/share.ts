@@ -9,6 +9,7 @@ import {
   type MatchRecipe,
   type RecipeLimits,
   type ShareKind,
+  type SquadDocument,
   type ValidationIssue,
 } from '@boboforces/format';
 import type { MenuInput, RawInputState } from '@boboforces/input';
@@ -16,6 +17,7 @@ import type { Platform, TextInputSession } from '@boboforces/platform-api';
 import type { Rng } from '@boboforces/shared';
 import { SHARE_ACTION, shareScreen, t, type DrawList, type ShareMode, type StringKey } from '@boboforces/ui';
 import { botCardLines, botDisplayName, copyName, newBotId } from './bot-card.ts';
+import { newSquadId } from './workshop.ts';
 import { presetName } from './custom-match.ts';
 import { rollBotName } from './lab.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
@@ -45,8 +47,8 @@ export type ShareOutcome =
   { readonly open: true } | { readonly open: false; readonly savedBot: string | null; readonly note: string };
 
 export interface ShareFlow {
-  /** Mostra o código do bot ou do preset escolhido (Copiar código, Copiar link, Colar um código). */
-  openExport(kind: 'bot' | 'preset', doc: BotDocument | MatchRecipe, name: string): void;
+  /** Mostra o código do bot, do esquadrão ou do preset escolhido (Copiar código, Copiar link, Colar um código). */
+  openExport(kind: 'bot' | 'squad' | 'preset', doc: BotDocument | SquadDocument | MatchRecipe, name: string): void;
   /** Espera um código colado. */
   openPaste(): void;
   /** Abre um código que já chegou (o link). */
@@ -103,10 +105,11 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
   /** O código do que se mostra (`null` = grande demais). */
   let exportCode: string | null = null;
   let exportName = '';
-  let exportKind: 'bot' | 'preset' = 'bot';
+  let exportKind: 'bot' | 'squad' | 'preset' = 'bot';
   let fromExport = false;
   let receivedBot: BotDocument | null = null;
   let receivedPreset: MatchRecipe | null = null;
+  let receivedSquad: SquadDocument | null = null;
   /** A partida recebida já foi salva (o botão Salvar some: cada aperto faria outra cópia). */
   let presetSaved = false;
   let typing: TextInputSession | null = null;
@@ -121,7 +124,8 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
         lines,
         note,
         canCopy: can.copy && (mode !== 'export' || exportCode !== null),
-        canLink: deps.linkFor !== null,
+        // O esquadrão não tem link (GDD §4.8: só o bot e o preset); o código basta.
+        canLink: deps.linkFor !== null && !(mode === 'export' && exportKind === 'squad'),
         canPaste: can.paste,
         ...(presetSaved ? { saved: true } : {}),
       }),
@@ -136,13 +140,22 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
 
   function showExport(): void {
     mode = 'export';
-    title = t(exportKind === 'bot' ? 'share.exportBot' : 'share.exportPreset', { name: exportName });
+    title = t(
+      exportKind === 'bot' ? 'share.exportBot' : exportKind === 'squad' ? 'share.exportSquad' : 'share.exportPreset',
+      { name: exportName },
+    );
     lines =
       exportCode === null
         ? [t('share.tooLong')]
         : [
             t('share.exportSize', { n: exportCode.length }),
-            t(exportKind === 'bot' ? 'share.exportHintBot' : 'share.exportHintPreset'),
+            t(
+              exportKind === 'bot'
+                ? 'share.exportHintBot'
+                : exportKind === 'squad'
+                  ? 'share.exportHintSquad'
+                  : 'share.exportHintPreset',
+            ),
           ];
     rebuild();
   }
@@ -209,6 +222,7 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
   function openCode(text: string): void {
     receivedBot = null;
     receivedPreset = null;
+    receivedSquad = null;
     presetSaved = false;
     note = '';
     // Colaram o link inteiro (o "Copiar link" desta tela): o código está no hash.
@@ -224,6 +238,22 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
       mode = 'bot';
       title = t('share.receivedBot', { name: r.bot.name || t('share.unnamed') });
       lines = [...botCardLines(r.bot), ...issueLines(r.warnings)];
+    } else if (r.kind === 'squad') {
+      receivedSquad = r.squad;
+      mode = 'squad';
+      title = t('share.receivedSquad', { name: r.squad.name || t('share.unnamed') });
+      const names = new Map(
+        (r.squad.embeddedBots ?? []).map((b) => [`embedded:${b.id}`, b.name || t('share.unnamed')]),
+      );
+      lines = [
+        ...r.squad.bots.map((e) =>
+          t('squad.line', {
+            n: e.count,
+            name: names.get(e.ref) ?? t(`bot.name.${e.ref.slice(e.ref.indexOf(':') + 1)}` as StringKey),
+          }),
+        ),
+        ...issueLines(r.warnings),
+      ];
     } else {
       receivedPreset = r.preset;
       mode = 'preset';
@@ -233,19 +263,63 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
     rebuild();
   }
 
-  /** O bot recebido vira um bot seu: id novo; sem nome (barrado), um do gerador; nome repetido, "Jorge 2". */
-  function saveReceivedBot(bot: BotDocument): void {
+  /** O bot recebido como um bot seu: id novo; sem nome (barrado), um do gerador; nome repetido, "Jorge 2". */
+  function asOwnBot(bot: BotDocument): BotDocument {
     const ids = new Set([...save.bots.map((b) => b.id), ...deps.factoryBots.map((b) => b.id)]);
     const names = new Set([...save.bots, ...deps.factoryBots].map(botDisplayName));
     const base = bot.name !== '' ? bot.name : rollBotName(deps.rng, names);
-    const doc: BotDocument = {
-      ...bot,
-      id: newBotId(deps.rng, ids),
-      name: names.has(base) ? copyName(base, names) : base,
-    };
+    return { ...bot, id: newBotId(deps.rng, ids), name: names.has(base) ? copyName(base, names) : base };
+  }
+
+  function saveReceivedBot(bot: BotDocument): void {
+    const doc = asOwnBot(bot);
     if (save.saveBot(doc)) close(doc.id, t('share.savedBot', { name: doc.name }));
     else {
       note = t('workshop.full', { n: save.bots.length });
+      rebuild();
+    }
+  }
+
+  /**
+   * M8 (fase 2): o esquadrão recebido: os bots dele entram na Oficina (ids novos, as entradas apontam para eles) e ele
+   * vira um esquadrão seu. Sem lugar para todos, nada entra.
+   */
+  function saveReceivedSquad(squad: SquadDocument): void {
+    // Só os bots que alguma entrada usa, uma vez cada (um código feito à mão pode repetir ou sobrar).
+    const used = new Set(squad.bots.map((e) => e.ref));
+    const embedded = (squad.embeddedBots ?? []).filter(
+      (b, i, all) => used.has(`embedded:${b.id}`) && all.findIndex((x) => x.id === b.id) === i,
+    );
+    const map = new Map<string, string>();
+    const saved: string[] = [];
+    /** Sem lugar (a Oficina ou os esquadrões cheios): os bots que já entraram saem de novo. */
+    const undo = (): void => {
+      for (const id of saved) save.deleteBot(id);
+    };
+    for (const b of embedded) {
+      const own = asOwnBot(b);
+      if (save.saveBot(own)) saved.push(own.id);
+      else {
+        undo();
+        note = t('workshop.full', { n: save.bots.length });
+        rebuild();
+        return;
+      }
+      map.set(`embedded:${b.id}`, `embedded:${own.id}`);
+    }
+    const taken = new Set(save.squads.map((q) => q.name));
+    const base = squad.name !== '' ? squad.name : t('squad.defaultName', { n: save.squads.length + 1 });
+    const { embeddedBots: _gone, ...rest } = squad;
+    const own: SquadDocument = {
+      ...rest,
+      id: newSquadId(deps.rng, save.squads),
+      name: taken.has(base) ? copyName(base, taken) : base,
+      bots: squad.bots.map((e) => ({ ...e, ref: (map.get(e.ref) ?? e.ref) as SquadDocument['bots'][number]['ref'] })),
+    };
+    if (save.saveSquad(own)) close(own.id, t('squad.saved', { name: own.name }));
+    else {
+      undo();
+      note = t('squad.full', { n: save.squads.length });
       rebuild();
     }
   }
@@ -282,6 +356,7 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
       if (hash !== null) copy(deps.linkFor(hash), 'share.linkCopied');
     } else if (a === SHARE_ACTION.paste) openPaste();
     else if (a === SHARE_ACTION.save && receivedBot !== null) saveReceivedBot(receivedBot);
+    else if (a === SHARE_ACTION.save && receivedSquad !== null) saveReceivedSquad(receivedSquad);
     else if (a === SHARE_ACTION.save && receivedPreset !== null && !presetSaved) saveReceivedPreset(receivedPreset);
     else if (a === SHARE_ACTION.play && receivedPreset !== null) {
       const preset = receivedPreset;

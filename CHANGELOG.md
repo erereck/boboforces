@@ -19,6 +19,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A Oficina com códigos (fase 1, só na web):** o botão Compartilhar no card da Oficina e na Partida personalizada
   copia o código (`BF1-…` para o bot, `BFP1-…` para a partida) ou o link; "Colar um código" e o link aberto mostram o
   que veio (e o que mudou para caber no aparelho) antes de salvar o bot na Oficina ou jogar e salvar a partida.
+- **Esquadrões (fase 2):** na Oficina, o grupo Esquadrões e o "+ Novo esquadrão": um nome e até 8 bots com quantos de
+  cada ("The Jorges": 6 Jorges). Na Partida personalizada, um esquadrão vira o bot de um time. Compartilhar um esquadrão
+  dá um código `BFS1-…` que leva os bots dele junto. Os esquadrões entram no backup.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

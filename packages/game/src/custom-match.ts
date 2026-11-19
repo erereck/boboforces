@@ -9,6 +9,7 @@ import {
   ZOMBIES_DEFAULTS,
   ZOMBIES_WAVE_CHOICES,
   type BotDocument,
+  type SquadDocument,
   type BotRef,
   type MatchRecipe,
   type ModifierId,
@@ -55,12 +56,15 @@ export interface CustomLimits {
   readonly maxViewM: number;
   /** M2 (fase 5b): os bots da Oficina, que entram na escolha do bot de cada time (embutidos no preset). */
   readonly savedBots?: readonly BotDocument[];
+  /** M8 (fase 2): os esquadrões, que também entram na escolha (o time recebe as entradas dele). */
+  readonly squads?: readonly SquadDocument[];
 }
 
 interface RowDef {
   readonly id: string;
   readonly labelKey: StringKey;
-  value(r: MatchRecipe): string;
+  /** M8 (fase 2): com os tetos (os esquadrões), a linha do bot mostra o nome do esquadrão do time. */
+  value(r: MatchRecipe, limits?: CustomLimits): string;
   step(r: MatchRecipe, delta: number, limits: CustomLimits): MatchRecipe;
 }
 
@@ -156,12 +160,69 @@ function botName(ref: BotRef, r: MatchRecipe): string {
   return t(`bot.name.${ref.slice('builtin:'.length)}` as StringKey);
 }
 
-/** As escolhas de bot: os de fábrica, os da Oficina e o embutido que já está no preset (mesmo se saiu da Oficina). */
-function botChoices(r: MatchRecipe, team: number, l: CustomLimits): BotRef[] {
-  const refs: BotRef[] = [...CUSTOM_BOTS, ...(l.savedBots ?? []).map((b): BotRef => `embedded:${b.id}`)];
-  const current = refOf(r, team);
+const SQUAD = 'squad:';
+/** M8 (fase 2): o time com mais de um bot que não é um esquadrão salvo ("Normal Bob +2"). */
+const MIXED = 'mixed';
+
+const sameEntries = (a: SquadDocument, b: SquadDocument): boolean => JSON.stringify(a.bots) === JSON.stringify(b.bots);
+
+/** M8 (fase 2): o esquadrão que tem exatamente as entradas do time (`null` = nenhum). */
+function squadOfTeam(r: MatchRecipe, team: number, l: CustomLimits): SquadDocument | null {
+  const bots = r.teams[team]?.bots ?? [];
+  if (bots.length < 2) return null;
+  const key = JSON.stringify(bots);
+  return l.squads?.find((q) => JSON.stringify(q.bots) === key) ?? null;
+}
+
+/** A escolha de agora: a ref do bot (1 linha), o esquadrão (`squad:<id>`) ou a mistura. */
+function currentChoice(r: MatchRecipe, team: number, l: CustomLimits): string {
+  if ((r.teams[team]?.bots.length ?? 0) < 2) return refOf(r, team);
+  const q = squadOfTeam(r, team, l);
+  return q !== null ? SQUAD + q.id : MIXED;
+}
+
+/**
+ * As escolhas do bot do time: os de fábrica, os da Oficina, os esquadrões (M8, fase 2) e a escolha de agora (o embutido
+ * que saiu da Oficina, ou a mistura de um preset antigo).
+ */
+function botChoices(r: MatchRecipe, team: number, l: CustomLimits): string[] {
+  const refs: string[] = [
+    ...CUSTOM_BOTS,
+    ...(l.savedBots ?? []).map((b): BotRef => `embedded:${b.id}`),
+    // Com 2 ou mais bots diferentes (o de um bot só já é a escolha do bot) e sem repetir o mesmo conteúdo (a cópia).
+    ...(l.squads ?? [])
+      .filter((q, i, all) => q.bots.length > 1 && all.findIndex((x) => sameEntries(x, q)) === i)
+      .map((q) => SQUAD + q.id),
+  ];
+  const current = currentChoice(r, team, l);
   if (!refs.includes(current)) refs.push(current);
   return refs;
+}
+
+/** Quantos bots o time tem. */
+function teamTotal(r: MatchRecipe, team: number): number {
+  return botsOf(r, team);
+}
+
+/**
+ * M8 (fase 2): muda o total do time. Com um bot só, é o de sempre; com várias entradas (um esquadrão), a última cresce
+ * ou encolhe (e sai a 0), sem passar do teto.
+ */
+function setTotal(r: MatchRecipe, team: number, n: number): MatchRecipe {
+  const bots = r.teams[team]?.bots ?? [];
+  if (bots.length < 2) return setTeam(r, team, refOf(r, team), n);
+  const next = bots.map((b) => ({ ...b }));
+  let total = next.reduce((s, b) => s + b.count, 0);
+  while (total > n && next.length > 0) {
+    const last = next[next.length - 1]!;
+    const cut = Math.min(last.count, total - n);
+    last.count -= cut;
+    total -= cut;
+    if (last.count === 0) next.pop();
+  }
+  if (total < n && next.length > 0) next[next.length - 1]!.count += n - total;
+  const teams = r.teams.map((tm, i) => (i === team ? { ...tm, bots: next } : tm));
+  return { ...r, teams };
 }
 
 /** Põe o bot da Oficina no preset (`embeddedBots`) e tira os embutidos que nenhum time usa mais. */
@@ -191,11 +252,11 @@ function setTeam(r: MatchRecipe, team: number, ref: BotRef, count: number): Matc
 function fitMap(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   if (r.mode === 'zombies') return r;
   const cap = mapBotCap(r.map, l.maxBots);
-  if (ffa(r)) return botsOf(r, 0) > cap ? setTeam(r, 0, refOf(r, 0), cap) : r;
+  if (ffa(r)) return botsOf(r, 0) > cap ? setTotal(r, 0, cap) : r;
   const enemies = Math.min(botsOf(r, 1), Math.ceil(cap / 2));
   const allies = Math.min(botsOf(r, 0), cap - enemies);
   if (enemies === botsOf(r, 1) && allies === botsOf(r, 0)) return r;
-  return setTeam(setTeam(r, 1, refOf(r, 1), enemies), 0, refOf(r, 0), allies);
+  return setTotal(setTotal(r, 1, enemies), 0, allies);
 }
 
 /** M3 (fase 6b): os modos da linha Modo, na ordem do ciclo. */
@@ -455,7 +516,10 @@ const SUPPORT_ROWS: readonly RowDef[] = [
     labelKey: 'custom.row.supportBot',
     value: (r) => botName(refOf(r, 0), r),
     step: (r, d, l) => {
-      const choices = botChoices(r, 0, l);
+      // Os bots de apoio do Zombies são de um tipo só (sem os esquadrões).
+      const choices = botChoices(r, 0, l).filter(
+        (c): c is BotRef => c.startsWith('builtin:') || c.startsWith(EMBEDDED),
+      );
       const i = cycleIndex(choices.length, Math.max(0, choices.indexOf(refOf(r, 0))), d);
       return syncEmbedded(setTeam(r, 0, choices[i]!, botsOf(r, 0)), l);
     },
@@ -589,11 +653,26 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
   const choose = (team: number): RowDef => ({
     id: `bot${team}`,
     labelKey: ffa(r) ? 'custom.row.bot' : team === 0 ? 'custom.row.allyBot' : 'custom.row.enemyBot',
-    value: (rr) => botName(refOf(rr, team), rr),
+    value: (rr, l) => {
+      const bots = rr.teams[team]?.bots ?? [];
+      if (bots.length < 2) return botName(refOf(rr, team), rr);
+      const q = l !== undefined ? squadOfTeam(rr, team, l) : null;
+      if (q !== null) return t('custom.squad', { name: q.name });
+      // Sem um esquadrão igual (um preset antigo, ou o esquadrão mudou): o primeiro bot e quantos tipos a mais.
+      return t('custom.mixed', { name: botName(refOf(rr, team), rr), n: bots.length - 1 });
+    },
     step: (rr, d, l) => {
       const choices = botChoices(rr, team, l);
-      const i = cycleIndex(choices.length, Math.max(0, choices.indexOf(refOf(rr, team))), d);
-      const next = setTeam(rr, team, choices[i]!, Math.max(team === 0 && !ffa(rr) ? 0 : 1, botsOf(rr, team)));
+      const i = cycleIndex(choices.length, Math.max(0, choices.indexOf(currentChoice(rr, team, l))), d);
+      const pick = choices[i]!;
+      if (pick === MIXED) return rr;
+      if (pick.startsWith(SQUAD)) {
+        const q = l.squads?.find((s) => SQUAD + s.id === pick);
+        if (!q) return rr;
+        const teams = rr.teams.map((tm, k) => (k === team ? { ...tm, bots: q.bots.map((b) => ({ ...b })) } : tm));
+        return syncEmbedded(fitMap({ ...rr, teams }, l), l);
+      }
+      const next = setTeam(rr, team, pick as BotRef, Math.max(team === 0 && !ffa(rr) ? 0 : 1, botsOf(rr, team)));
       return syncEmbedded(next, l);
     },
   });
@@ -604,8 +683,8 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
     step: (rr, d, l) => {
       const other = ffa(rr) ? 0 : botsOf(rr, 1 - team);
       const min = team === 0 && !ffa(rr) ? 0 : 1;
-      const n = Math.max(min, Math.min(mapBotCap(rr.map, l.maxBots) - other, botsOf(rr, team) + d));
-      return setTeam(rr, team, refOf(rr, team), n);
+      const n = Math.max(min, Math.min(mapBotCap(rr.map, l.maxBots) - other, teamTotal(rr, team) + d));
+      return syncEmbedded(setTotal(rr, team, n), l);
     },
   });
   return ffa(r) ? [choose(0), count(0)] : [choose(0), count(0), choose(1), count(1)];

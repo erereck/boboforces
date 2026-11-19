@@ -72,7 +72,19 @@ describe('M8 (fase 0): importar um código', () => {
       ok: false,
       error: 'invalid',
     });
-    expect(importShareCode(code('squad', { a: 1 }), limits)).toEqual({ ok: false, error: 'kind', issues: [] });
+    expect(
+      importShareCode(
+        encodeShareCode('surprise', { a: 1 }).ok
+          ? (encodeShareCode('surprise', { a: 1 }) as { code: string }).code
+          : '',
+        limits,
+      ),
+    ).toEqual({
+      ok: false,
+      error: 'kind',
+      issues: [],
+    });
+    expect(importShareCode(code('squad', { a: 1 }), limits)).toMatchObject({ ok: false, error: 'invalid' });
     expect(importShareCode('BF1-!!!', limits)).toEqual({ ok: false, error: 'base64', issues: [] });
   });
 });

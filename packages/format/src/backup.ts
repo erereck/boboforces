@@ -6,7 +6,8 @@ import { migrateDocument } from './migrations.ts';
 import { DEFAULT_SETTINGS, validateSettings, type SettingsDocument } from './settings.ts';
 import { EMPTY_STATS, validateStats, type StatsDocument } from './stats.ts';
 import { DEFAULT_BOBO, validateBobo, type BoboDocument } from './bobo.ts';
-import { isPlainObject, type RecipeLimits, type ValidationResult } from './validation.ts';
+import { SQUAD_LIMITS, validateSquad, type SquadDocument } from './squad.ts';
+import { isPlainObject, type RecipeLimits, type ValidationIssue, type ValidationResult } from './validation.ts';
 
 /**
  * M2 (fase 4b): a biblioteca de presets e o `backup@1` (tecnico.md §14.2 e §14.4; arte-ux.md §6.4 e §6.12).
@@ -50,15 +51,57 @@ export interface BackupDocument {
   readonly presets: PresetLibrary;
   /** Bots salvos da Oficina (fase 5). */
   readonly bots: readonly BotDocument[];
+  /** M8 (fase 2): os esquadrões (backup antigo sem eles: nenhum). */
+  readonly squads: readonly SquadDocument[];
 }
 
 /** Tetos de uma plataforma para a biblioteca (os salvos e os bots). */
 export interface LibraryCaps {
   readonly saved: number;
   readonly bots: number;
+  /** M8 (fase 2). */
+  readonly squads: number;
 }
 
-export const WEB_LIBRARY_CAPS: LibraryCaps = { saved: LIBRARY_LIMITS.saved, bots: LIBRARY_LIMITS.bots };
+export const WEB_LIBRARY_CAPS: LibraryCaps = {
+  saved: LIBRARY_LIMITS.saved,
+  bots: LIBRARY_LIMITS.bots,
+  squads: SQUAD_LIMITS.saved,
+};
+
+/**
+ * Uma lista de documentos do jogador (os bots, os esquadrões): cada um validado sozinho; o que não passa sai com o
+ * aviso `save.droppedEntry`, e o que passa do teto também.
+ */
+export function readDocList<T>(
+  raw: unknown,
+  path: string,
+  max: number,
+  validate: (doc: unknown) => ValidationResult<T>,
+  warnings: ValidationIssue[],
+): T[] {
+  const out: T[] = [];
+  if (raw === undefined) return out;
+  if (!Array.isArray(raw)) {
+    warnings.push({ path, code: 'save.invalidField' });
+    return out;
+  }
+  for (let i = 0; i < raw.length; i++) {
+    if (out.length === max) {
+      warnings.push({ path, code: 'save.valueClamped', detail: `${raw.length} → ${max}` });
+      break;
+    }
+    const r = validate(raw[i]);
+    if (r.ok) out.push(r.value);
+    else
+      warnings.push({
+        path: `${path}[${i}]`,
+        code: 'save.droppedEntry',
+        detail: r.errors.map((e) => e.code).join(', '),
+      });
+  }
+  return out;
+}
 
 function readPresets(
   r: DocReader,
@@ -127,6 +170,7 @@ export function createBackup(
     bobo: BoboDocument;
     presets: PresetLibrary;
     bots: readonly BotDocument[];
+    squads: readonly SquadDocument[];
   },
   createdAt: string,
   gameVersion: string,
@@ -174,20 +218,8 @@ export function validateBackup(
   }
   const lib = validatePresetLibrary(doc['presets'], limits, caps);
   if (lib.ok) r.warnings.push(...lib.warnings);
-  const bots: BotDocument[] = [];
-  const rawBots = doc['bots'];
-  if (rawBots !== undefined && !Array.isArray(rawBots)) r.warn('bots', 'save.invalidField');
-  else if (Array.isArray(rawBots)) {
-    for (let i = 0; i < rawBots.length; i++) {
-      if (bots.length === caps.bots) {
-        r.warn('bots', 'save.valueClamped', `${rawBots.length} → ${caps.bots} bots`);
-        break;
-      }
-      const b = validateBot(rawBots[i]);
-      if (b.ok) bots.push(b.value);
-      else r.warn(`bots[${i}]`, 'save.droppedEntry', b.errors.map((e) => e.code).join(', '));
-    }
-  }
+  const bots = readDocList(doc['bots'], 'bots', caps.bots, validateBot, r.warnings);
+  const squads = readDocList(doc['squads'], 'squads', caps.squads, validateSquad, r.warnings);
   return {
     ok: true,
     value: {
@@ -199,6 +231,7 @@ export function validateBackup(
       bobo,
       presets: lib.ok ? lib.value : EMPTY_PRESET_LIBRARY,
       bots,
+      squads,
     },
     warnings: r.warnings,
   };

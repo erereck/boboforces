@@ -22,6 +22,8 @@ export const FORMAT_KINDS = [
   'loop',
   // M5 (fase 4c): o perfil do online (o nome na sala e o aviso de privacidade já lido; online-profile.ts).
   'online',
+  // M8 (fase 2): o esquadrão (squad.ts).
+  'squad',
 ] as const;
 
 export type FormatKind = (typeof FORMAT_KINDS)[number];
@@ -50,6 +52,7 @@ export const CURRENT_FORMAT_VERSION: Readonly<Record<FormatKind, number>> = {
   layers: 1,
   loop: 1,
   online: 1,
+  squad: 1,
 };
 
 export function formatId(kind: FormatKind, version: number = CURRENT_FORMAT_VERSION[kind]): FormatId {

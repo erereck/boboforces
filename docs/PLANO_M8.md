@@ -64,6 +64,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 2. **Os esquadrões:** o formato `squad@1` (nome e bots, até 16 entradas), a lista e o editor na Oficina, o uso nos
    times da Partida personalizada (o preset leva os bots expandidos, para quem recebe não precisar do esquadrão), o
    backup e o código.
+   - **feita em 19/11** (ARCHITECTURE §19.3): o formato, a Oficina com os esquadrões (que saiu do menu da web para o
+     pedaço dos editores), o uso nos times e o código `BFS1-`.
 3. **O Surpreenda-me completo:** o sorteio de todos os modos com card (a regra de cada um), os mapas de cada modo, as
    armas, 0 a 3 modificadores e 0 a 2 bots "estrela"; o **cadeado** por linha (navegável no D-pad e no toque) e a
    **semente** como código (com a versão da tabela do sorteio). A tela sai do pedaço do menu.

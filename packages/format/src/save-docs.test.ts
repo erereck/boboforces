@@ -14,6 +14,7 @@ import { EMPTY_STATS, STATS_FORMAT, validateStats, zombieRecordKey } from './sta
 import { BOBO_FORMAT, DEFAULT_BOBO, validateBobo } from './bobo.ts';
 import { DEFAULT_ONLINE_PROFILE, ONLINE_PROFILE_FORMAT, validateOnlineProfile } from './online-profile.ts';
 import { FIGURE_PRESETS } from './model/figure-presets.ts';
+import { SQUAD_FORMAT, squadSize, validateSquad } from './squad.ts';
 import { cloneJson, ISSUE_CODES, type RecipeLimits } from './validation.ts';
 
 /** M2, fase 4b: os documentos do jogador (settings@1, stats@1, a biblioteca de presets e o backup@1). */
@@ -237,6 +238,15 @@ describe('backup@1', () => {
         bobo: { format: BOBO_FORMAT, look: FIGURE_PRESETS.pilot, preset: 'pilot' },
         presets: { recent: [preset('última')], saved: [preset('Sexta')], favorites: ['Sexta'], botFavorites: [] },
         bots: [builtinBot('jorge-the-immortal')!],
+        // M8 (fase 2): os esquadrões também vão e voltam.
+        squads: [
+          {
+            format: SQUAD_FORMAT,
+            id: 'jorges',
+            name: 'The Jorges',
+            bots: [{ ref: 'builtin:jorge-the-immortal', count: 6 }],
+          },
+        ],
       },
       '2026-11-09T05:00:00Z',
       '0.0.1',
@@ -299,5 +309,44 @@ describe('online@1 (M5 fase 4c)', () => {
     if (bad.ok) codesKnown(bad.warnings);
     const other = validateOnlineProfile({ format: BOBO_FORMAT });
     expect(!other.ok && other.errors[0]!.code).toBe('format.wrongKind');
+  });
+});
+
+describe('M8 (fase 2): squad@1', () => {
+  it('as entradas válidas ficam; a quebrada sai com aviso; o teto de 8 entradas e de 16 de cada', () => {
+    const r = validateSquad({
+      format: SQUAD_FORMAT,
+      id: 'jorges',
+      name: '  The Jorges  ',
+      bots: [
+        { ref: 'builtin:jorge-the-immortal', count: 6 },
+        { ref: 'embedded:abc123', count: 40 },
+        { ref: 'http://x', count: 1 },
+        { ref: 'builtin:normal-bob', count: 0 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.name).toBe('The Jorges');
+    expect(r.value.bots).toEqual([
+      { ref: 'builtin:jorge-the-immortal', count: 6 },
+      { ref: 'embedded:abc123', count: 16 },
+    ]);
+    expect(squadSize(r.value)).toBe(22);
+    expect(r.warnings.map((w) => w.code)).toEqual(['save.valueClamped', 'save.droppedEntry', 'save.droppedEntry']);
+    const many = validateSquad({
+      format: SQUAD_FORMAT,
+      id: 'x',
+      name: 'Muitos',
+      bots: Array.from({ length: 12 }, () => ({ ref: 'builtin:normal-bob', count: 1 })),
+    });
+    expect(many.ok && many.value.bots).toHaveLength(8);
+  });
+
+  it('recusa outro formato e versão mais nova; o id estranho vira "squad"', () => {
+    expect(validateSquad({ format: 'boboforces/bot@1' }).ok).toBe(false);
+    expect(validateSquad({ format: 'boboforces/squad@9' }).ok).toBe(false);
+    const r = validateSquad({ format: SQUAD_FORMAT, id: '../../x', name: 'A', bots: [] });
+    expect(r.ok && r.value.id).toBe('squad');
   });
 });

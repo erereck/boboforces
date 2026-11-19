@@ -34,6 +34,8 @@ export interface WorkshopState {
   readonly confirmDelete: boolean;
   /** M8 (fase 1): o botão Compartilhar (código e link; só na web). */
   readonly share?: boolean;
+  /** M8 (fase 2): o escolhido é um esquadrão (sem o Favoritar). */
+  readonly squad?: boolean;
 }
 
 /** Medidas (px de referência): a lista e o card. */
@@ -115,13 +117,17 @@ export const workshopScreen: Screen<WorkshopState> = {
       button('duplicate', 'workshop.duplicate', WORKSHOP_ACTION.duplicate, false, !state.canEdit),
     ];
     const bottom: UiNode[] = [
-      button(
-        'favorite',
-        state.favorite ? 'workshop.unfavorite' : 'workshop.favorite',
-        WORKSHOP_ACTION.favorite,
-        false,
-        true,
-      ),
+      ...(state.squad === true
+        ? []
+        : [
+            button(
+              'favorite',
+              state.favorite ? 'workshop.unfavorite' : 'workshop.favorite',
+              WORKSHOP_ACTION.favorite,
+              false,
+              true,
+            ),
+          ]),
       ...(state.canDelete
         ? [
             button(

@@ -23,6 +23,8 @@ export * from './backup.ts';
 export * from './share-code.ts';
 export * from './name-filter.ts';
 export * from './share-import.ts';
+// M8 (fase 2): os esquadrões.
+export * from './squad.ts';
 export * from './presets.ts';
 export * from './png.ts';
 // M1: manifesto de camadas dos texture arrays, `map@1` (frente mapa-nav) e `model@1` + o boneco do FutBobo (#56;

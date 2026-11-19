@@ -59,8 +59,6 @@ import {
   LAB_INTRO_ACTION,
   labIntroScreen,
   MODES_ACTION,
-  WORKSHOP_ACTION,
-  WORKSHOP_BOT_PREFIX,
   NEWS_ACTION,
   NEWS_ITEMS,
   newsScreen,
@@ -114,6 +112,7 @@ import {
 } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import type { ShareFlow } from './share.ts';
+import type { WorkshopFlow } from './workshop.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import type * as EditorsModule from './editors.ts';
 import type * as OnlineModule from './online-screens.ts';
@@ -473,12 +472,11 @@ export function startGame(deps: GameDeps): GameHandle {
   refreshTitle();
   // M2 (fase 6c): o Meu Bobo entre o Laboratório e os Ajustes (GDD §2.2).
 
-  // M2 (fase 5a): a Oficina (a entrada do Laboratório): a biblioteca dos bots e o card do escolhido.
-  const workshopMenu = createMenuController();
+  // M2 (fase 5a): a Oficina (a entrada do Laboratório). M8 (fase 2): a tela inteira mora no pedaço dos editores
+  // (`workshop.ts`, com os esquadrões); aqui só abre, volta e leva ao Laboratório.
   const botRng = createRng((Math.floor(platform.now()) ^ 0x5bd1e995) >>> 0);
   const factoryBots = Object.values(BUILTIN_BOTS);
-  let workshopSelected = factoryBots[0]!.id;
-  let workshopNote = '';
+  let workshopFlow: WorkshopFlow | null = null;
   /** M8 (fase 1): a tela de compartilhar (do pedaço dos editores) e a tela para onde ela volta. */
   let shareFlow: ShareFlow | null = null;
   let shareReturn: GameScreen = 'title';
@@ -488,49 +486,39 @@ export function startGame(deps: GameDeps): GameHandle {
     withEditors(() => {
       // O pedaço chegou depois: só abre se o jogador ainda está onde pediu.
       if (screen !== from) return;
-      shareFlow ??= editors!.createShareFlow({
-        platform,
-        save,
-        limits: recipeLimitsFor(selectPlatformProfile(platform.features.profileHint, 1)),
-        linkFor: deps.shareLinkFor ?? null,
-        rng: botRng,
-        factoryBots,
-        play: (preset) => (preset.mode === 'training' ? playTraining(preset) : playPreset(preset)),
-      });
       shareReturn = from;
-      open(shareFlow);
+      open(getShareFlow());
       screen = 'share';
     });
   }
-  /** O bot que está esperando o "Confirmar" do Apagar. */
-  let workshopConfirm: string | null = null;
-  function findBot(id: string): BotDocument | null {
-    return save.bots.find((b) => b.id === id) ?? factoryBots.find((b) => b.id === id) ?? null;
+  function getShareFlow(): ShareFlow {
+    shareFlow ??= editors!.createShareFlow({
+      platform,
+      save,
+      limits: recipeLimitsFor(selectPlatformProfile(platform.features.profileHint, 1)),
+      linkFor: deps.shareLinkFor ?? null,
+      rng: botRng,
+      factoryBots,
+      play: (preset) => (preset.mode === 'training' ? playTraining(preset) : playPreset(preset)),
+    });
+    return shareFlow;
   }
-  function rebuildWorkshop(): void {
-    const item = (b: BotDocument) => ({ id: b.id, label: botDisplayName(b) });
-    const favorites = save.presets.botFavorites.map(findBot).filter((b): b is BotDocument => b !== null);
-    const bot = findBot(workshopSelected) ?? factoryBots[0]!;
-    workshopSelected = bot.id;
-    workshopMenu.setRoot(
-      editors!.workshopScreen.build({
-        groups: [
-          { id: 'fav', titleKey: 'workshop.favorites', items: favorites.map(item), empty: '' },
-          { id: 'mine', titleKey: 'workshop.mine', items: save.bots.map(item), empty: t('workshop.empty') },
-          { id: 'factory', titleKey: 'workshop.factory', items: factoryBots.map(item), empty: '' },
-        ],
-        selected: bot.id,
-        name: botDisplayName(bot),
-        lines: botCardLines(bot),
-        note: workshopNote,
-        canEdit: true,
-        canDelete: !isBuiltinBot(bot),
-        favorite: save.presets.botFavorites.includes(bot.id),
-        confirmDelete: workshopConfirm === bot.id,
-        share: editors!.shareAvailable(platform).copy,
-      }),
-    );
+  /** Abre a Oficina (no bot ou esquadrão `select`, com o aviso `note`). */
+  function openWorkshop(select: string | null = null, note = ''): void {
+    withEditors(() => {
+      workshopFlow ??= editors!.createWorkshopFlow({
+        platform,
+        save,
+        rng: botRng,
+        factoryBots,
+        share: getShareFlow,
+        usesGamepad: () => menuInput.lastDevice === 'gamepad',
+      });
+      workshopFlow.open(select, note);
+      screen = 'workshop';
+    });
   }
+
   // M2 (fase 5b): o Laboratório, o editor de um bot por vez.
   const labMenu = createMenuController();
   let labDoc: BotDocument = factoryBots[0]!;
@@ -578,10 +566,9 @@ export function startGame(deps: GameDeps): GameHandle {
     rebuildLab();
     screen = 'lab';
   }
-  function closeLab(): void {
+  function closeLab(select: string | null = null, note = ''): void {
     endTyping();
-    screen = 'workshop';
-    rebuildWorkshop();
+    openWorkshop(select, note);
   }
   function endTyping(): void {
     labTyping?.close();
@@ -658,11 +645,7 @@ export function startGame(deps: GameDeps): GameHandle {
       return;
     } else if (a === LAB_ACTION.save) {
       if (save.saveBot(labDoc)) {
-        workshopSelected = labDoc.id;
-        workshopNote = t('lab.saved', { name: labDoc.name });
-        workshopConfirm = null;
-        workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${labDoc.id}`);
-        closeLab();
+        closeLab(labDoc.id, t('lab.saved', { name: labDoc.name }));
         return;
       }
       labNote = t('workshop.full', { n: save.bots.length });
@@ -687,55 +670,6 @@ export function startGame(deps: GameDeps): GameHandle {
       }
     }
     rebuildLab();
-  }
-
-  function openWorkshop(): void {
-    withEditors(() => {
-      workshopNote = '';
-      workshopConfirm = null;
-      rebuildWorkshop();
-      screen = 'workshop';
-    });
-  }
-  function workshopAction(a: string): void {
-    const bot = findBot(workshopSelected);
-    if (a.startsWith(WORKSHOP_BOT_PREFIX)) {
-      // `bot:<grupo>:<id>`
-      workshopSelected = a.slice(a.indexOf(':', WORKSHOP_BOT_PREFIX.length) + 1);
-      workshopNote = '';
-      workshopConfirm = null;
-    } else if (bot === null) return;
-    else if (a === WORKSHOP_ACTION.duplicate) {
-      const ids = new Set([...save.bots.map((b) => b.id), ...factoryBots.map((b) => b.id)]);
-      const names = new Set([...save.bots, ...factoryBots].map(botDisplayName));
-      const copy: BotDocument = { ...bot, id: newBotId(botRng, ids), name: copyName(botDisplayName(bot), names) };
-      if (save.saveBot(copy)) {
-        workshopSelected = copy.id;
-        workshopNote = t('workshop.duplicated', { name: copy.name });
-        workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${copy.id}`);
-      } else workshopNote = t('workshop.full', { n: save.bots.length });
-      workshopConfirm = null;
-    } else if (a === WORKSHOP_ACTION.edit) {
-      openLab(bot);
-      return;
-    } else if (a === WORKSHOP_ACTION.share) {
-      openShare('workshop', (f) => f.openExport('bot', bot, botDisplayName(bot)));
-      return;
-    } else if (a === WORKSHOP_ACTION.favorite) {
-      const on = !save.presets.botFavorites.includes(bot.id);
-      workshopNote = save.setBotFavorite(bot.id, on) ? '' : t('workshop.favoritesFull');
-    } else if (a === WORKSHOP_ACTION.delete && !isBuiltinBot(bot)) {
-      if (workshopConfirm === bot.id) {
-        save.deleteBot(bot.id);
-        workshopNote = t('workshop.deleted', { name: bot.name });
-        workshopConfirm = null;
-        workshopSelected = save.bots[0]?.id ?? factoryBots[0]!.id;
-      } else {
-        workshopConfirm = bot.id;
-        workshopNote = t('workshop.deleteAsk', { name: bot.name });
-      }
-    }
-    rebuildWorkshop();
   }
 
   // M2 (fase 4h): o aviso "Gire o celular" (celular em retrato).
@@ -833,6 +767,9 @@ export function startGame(deps: GameDeps): GameHandle {
     get savedBots(): readonly BotDocument[] {
       return save.bots;
     },
+    get squads() {
+      return save.squads;
+    },
   };
   /** Refino R4c: o foco com que a Partida personalizada foi montada (a frase de ajuda é dele). */
   let customHelpFocus: string | null = null;
@@ -850,7 +787,7 @@ export function startGame(deps: GameDeps): GameHandle {
         rows: ed.customRows(tab, customRecipe).map((r) => ({
           id: r.id,
           labelKey: r.labelKey,
-          value: r.value(customRecipe),
+          value: r.value(customRecipe, customLimits),
         })),
         summary: presetSummary(customRecipe),
         note: customNote,
@@ -1856,13 +1793,10 @@ export function startGame(deps: GameDeps): GameHandle {
         // M8 (fase 1): compartilhar e receber; ao fechar, volta de onde veio (o bot salvo aparece na Oficina).
         const r = shareFlow!.frame(menuInput, raw, u, list);
         if (!r.open) {
-          if (screen === 'share') screen = shareReturn === 'title' && r.savedBot !== null ? 'workshop' : shareReturn;
-          if (screen === 'workshop') {
-            if (r.savedBot !== null) workshopSelected = r.savedBot;
-            workshopNote = r.note;
-            rebuildWorkshop();
-            if (r.savedBot !== null) workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${r.savedBot}`);
-          } else if (screen === 'custom') {
+          if (screen === 'share') screen = shareReturn;
+          // Do link da carga, o bot (ou esquadrão) salvo aparece na Oficina.
+          if (screen === 'title' && r.savedBot !== null) openWorkshop(r.savedBot, r.note);
+          else if (screen === 'custom') {
             customNote = r.note;
             rebuildCustom();
           }
@@ -1873,11 +1807,11 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
       }
       case 'workshop': {
-        const nav = workshopMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === WORKSHOP_ACTION.back) screen = 'title';
-        else {
-          if (nav.activated !== null) workshopAction(nav.activated);
-          workshopMenu.draw(list, u);
+        const r = workshopFlow!.frame(menuInput, raw, u, list);
+        if (r.kind === 'back') screen = 'title';
+        else if (r.kind === 'lab') openLab(r.bot);
+        else if (screen === 'workshop') {
+          // (Jogar uma partida recebida troca a tela no meio do frame: aí não desenha o menu.)
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

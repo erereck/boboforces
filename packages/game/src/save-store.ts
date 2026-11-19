@@ -8,11 +8,14 @@ import {
   issue,
   LIBRARY_LIMITS,
   PLATFORM_PROFILES,
+  readDocList,
+  SQUAD_LIMITS,
   validateBackup,
   validateBobo,
   validateBot,
   validatePresetLibrary,
   validateSettings,
+  validateSquad,
   validateStats,
   WEB_LIBRARY_CAPS,
   type BackupDocument,
@@ -23,6 +26,7 @@ import {
   type PresetLibrary,
   type RecipeLimits,
   type SettingsDocument,
+  type SquadDocument,
   type StatsDocument,
   type ValidationIssue,
   type ValidationResult,
@@ -42,6 +46,8 @@ export const SAVE_KEYS = {
   bots: 'bots',
   // M2 (fase 6c): o Meu Bobo.
   bobo: 'bobo',
+  // M8 (fase 2): os esquadrões.
+  squads: 'squads',
 } as const;
 
 /** Tetos de receita para guardar presets: os do motor (o corte ao aparelho é na hora de jogar). */
@@ -54,7 +60,7 @@ export const STORAGE_RECIPE_LIMITS: RecipeLimits = {
 /** Tetos da biblioteca por plataforma (gameplay.md §10.4 e §6.7: 200 presets e 500 bots na web; 50 e 100 no Switch). */
 export function libraryCapsFor(platform: PlatformId): LibraryCaps {
   return platform === 'switch'
-    ? { saved: LIBRARY_LIMITS.savedSwitch, bots: LIBRARY_LIMITS.botsSwitch }
+    ? { saved: LIBRARY_LIMITS.savedSwitch, bots: LIBRARY_LIMITS.botsSwitch, squads: SQUAD_LIMITS.savedSwitch }
     : WEB_LIBRARY_CAPS;
 }
 
@@ -67,6 +73,8 @@ export interface SaveStore {
   readonly bobo: BoboDocument;
   readonly presets: PresetLibrary;
   readonly bots: readonly BotDocument[];
+  /** M8 (fase 2): os esquadrões. */
+  readonly squads: readonly SquadDocument[];
   /** Avisos da leitura (migrou, corrigiu, descartou), para o relatório e a Novidades. */
   readonly loadWarnings: readonly ValidationIssue[];
   setSettings(next: SettingsDocument): void;
@@ -83,6 +91,9 @@ export interface SaveStore {
   saveBot(bot: BotDocument): boolean;
   /** Apaga um bot salvo (e o favorito dele). */
   deleteBot(id: string): void;
+  /** M8 (fase 2): salva um esquadrão pelo id (o mesmo id substitui); `false` se a lista está cheia. */
+  saveSquad(squad: SquadDocument): boolean;
+  deleteSquad(id: string): void;
   /** Favorito de um bot (de fábrica ou salvo); `false` se já há 6. */
   setBotFavorite(id: string, on: boolean): boolean;
   /** O backup em texto (JSON), para baixar. `createdAt` vem de quem tem relógio (a casca). */
@@ -155,17 +166,20 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       prefixed(SAVE_KEYS.presets, r.warnings);
     }
   }
-  let bots: readonly BotDocument[] = [];
-  const rawBots = parse(storage, SAVE_KEYS.bots, warnings);
-  if (Array.isArray(rawBots)) {
-    const list: BotDocument[] = [];
-    for (let i = 0; i < rawBots.length && list.length < caps.bots; i++) {
-      const r = validateBot(rawBots[i]);
-      if (r.ok) list.push(r.value);
-      else warnings.push(issue(`${SAVE_KEYS.bots}[${i}]`, 'save.droppedEntry', r.errors.map((e) => e.code).join(', ')));
-    }
-    bots = list;
-  } else if (rawBots !== undefined) warnings.push(issue(SAVE_KEYS.bots, 'save.invalidField'));
+  let bots: readonly BotDocument[] = readDocList(
+    parse(storage, SAVE_KEYS.bots, warnings),
+    SAVE_KEYS.bots,
+    caps.bots,
+    validateBot,
+    warnings,
+  );
+  let squads: readonly SquadDocument[] = readDocList(
+    parse(storage, SAVE_KEYS.squads, warnings),
+    SAVE_KEYS.squads,
+    caps.squads,
+    validateSquad,
+    warnings,
+  );
 
   const write = (key: string, value: unknown): void => storage.set(key, JSON.stringify(value));
   const writePresets = (): void => write(SAVE_KEYS.presets, presets);
@@ -185,6 +199,9 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
     },
     get bots() {
       return bots;
+    },
+    get squads() {
+      return squads;
     },
     loadWarnings: warnings,
     setSettings(next) {
@@ -252,6 +269,20 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
         writePresets();
       }
     },
+    saveSquad(squad) {
+      const i = squads.findIndex((q) => q.id === squad.id);
+      if (i < 0 && squads.length >= caps.squads) return false;
+      const next = squads.slice();
+      if (i >= 0) next[i] = squad;
+      else next.push(squad);
+      squads = next;
+      write(SAVE_KEYS.squads, squads);
+      return true;
+    },
+    deleteSquad(id) {
+      squads = squads.filter((q) => q.id !== id);
+      write(SAVE_KEYS.squads, squads);
+    },
     setBotFavorite(id, on) {
       const has = presets.botFavorites.includes(id);
       if (on === has) return true;
@@ -264,7 +295,11 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       return true;
     },
     exportBackup(createdAt, gameVersion) {
-      return JSON.stringify(createBackup({ settings, stats, bobo, presets, bots }, createdAt, gameVersion), null, 2);
+      return JSON.stringify(
+        createBackup({ settings, stats, bobo, presets, bots, squads }, createdAt, gameVersion),
+        null,
+        2,
+      );
     },
     readBackup(text) {
       let doc: unknown;
@@ -282,6 +317,7 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
         bobo = backup.bobo;
         presets = backup.presets;
         bots = backup.bots.slice(0, caps.bots);
+        squads = backup.squads.slice(0, caps.squads);
       } else {
         // Juntar: a validação da biblioteca dá nome único aos repetidos e corta no teto.
         const merged = validatePresetLibrary(
@@ -297,12 +333,15 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
         if (merged.ok) presets = merged.value;
         const ids = new Set(bots.map((b) => b.id));
         bots = [...bots, ...backup.bots.filter((b) => !ids.has(b.id))].slice(0, caps.bots);
+        const squadIds = new Set(squads.map((q) => q.id));
+        squads = [...squads, ...backup.squads.filter((q) => !squadIds.has(q.id))].slice(0, caps.squads);
       }
       write(SAVE_KEYS.settings, settings);
       write(SAVE_KEYS.stats, stats);
       write(SAVE_KEYS.bobo, bobo);
       writePresets();
       write(SAVE_KEYS.bots, bots);
+      write(SAVE_KEYS.squads, squads);
     },
     flush() {
       return storage.flush();

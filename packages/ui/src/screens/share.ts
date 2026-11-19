@@ -19,7 +19,7 @@ export const SHARE_ACTION = {
   back: 'share.back',
 } as const;
 
-export type ShareMode = 'export' | 'paste' | 'bot' | 'preset' | 'error';
+export type ShareMode = 'export' | 'paste' | 'bot' | 'squad' | 'preset' | 'error';
 
 export interface ShareState {
   readonly mode: ShareMode;
@@ -62,6 +62,8 @@ function buttons(state: ShareState): UiNode[] {
       return [back];
     case 'bot':
       return [button('save', 'share.saveBot', SHARE_ACTION.save, true), back];
+    case 'squad':
+      return [button('save', 'share.saveSquad', SHARE_ACTION.save, true), back];
     case 'preset':
       return [
         button('play', 'share.play', SHARE_ACTION.play, true),
