@@ -246,6 +246,13 @@ export class FigureHitCache {
   private readonly local = new Float64Array(LOCAL_ROW);
   /** Último slot: sem cache (corpo sem controlador, ou a função livre). */
   readonly spare: number;
+  /**
+   * M6 (fase 4b): o Cabeção: a caixa da cabeça multiplicada por isto, crescendo do pescoço para cima (o centro sobe meia
+   * altura a mais, pelo eixo de cima da caixa). 1 = normal. A fase larga ganha as folgas `headTop` e `headSide` (m).
+   */
+  headScale = 1;
+  private headTop = 0;
+  private headSide = 0;
 
   /** `slots` = slots com cache (controladores); mais 1 sem cache. */
   constructor(table: FigureGameTable | null, slots: number) {
@@ -262,6 +269,17 @@ export class FigureHitCache {
       this.table = table;
       this.ray[R_BOTTOM] = tableBottom(table);
     }
+    this.invalidate();
+  }
+
+  /** M6 (fase 4b): troca a escala da cabeça (o Cabeção); mudando, esvazia o cache. */
+  setHeadScale(k: number): void {
+    if (k === this.headScale) return;
+    this.headScale = k;
+    // A caixa da cabeça tem 0,44 m de altura e 0,25 m de largura: em dobro, o topo sobe 0,44 m (0,48 com a cabeça
+    // inclinada) e o canto sai até 0,1 m do raio da fase larga (medido na revisão da 4b). Com folga.
+    this.headTop = k > 1 ? 0.55 * (k - 1) : 0;
+    this.headSide = k > 1 ? 0.2 * (k - 1) : 0;
     this.invalidate();
   }
 
@@ -353,7 +371,7 @@ export class FigureHitCache {
     // quente:
     const r = this.ray;
     // Fase larga: caixa alinhada aos eixos do mundo com o raio e o topo da postura (todo pitch, com a folga).
-    const radius = table.broad[posture * 2]!;
+    const radius = table.broad[posture * 2]! + this.headSide;
     const px = pos[p3]!;
     const py = pos[p3 + 1]!;
     const pz = pos[p3 + 2]!;
@@ -369,7 +387,7 @@ export class FigureHitCache {
         o = r[R_OY]! - py;
         d = r[R_DY]!;
         lo = r[R_BOTTOM]!;
-        hi = table.broad[posture * 2 + 1]!;
+        hi = table.broad[posture * 2 + 1]! + this.headTop;
       } else if (k === 2) {
         o = r[R_OZ]! - pz;
         d = r[R_DZ]!;
@@ -472,6 +490,18 @@ export class FigureHitCache {
       dst[q + 12] = src[h + HF.hx]!;
       dst[q + 13] = src[h + HF.hy]!;
       dst[q + 14] = src[h + HF.hz]!;
+    }
+    // M6 (fase 4b): o Cabeção cresce a caixa da cabeça a partir do pescoço (a base dela fica).
+    const k = this.headScale;
+    if (k !== 1) {
+      const q = w + FIGURE_BONE.head * W_STRIDE;
+      const up = dst[q + 13]! * (k - 1);
+      dst[q] = dst[q]! + dst[q + 6]! * up;
+      dst[q + 1] = dst[q + 1]! + dst[q + 7]! * up;
+      dst[q + 2] = dst[q + 2]! + dst[q + 8]! * up;
+      dst[q + 12] = dst[q + 12]! * k;
+      dst[q + 13] = dst[q + 13]! * k;
+      dst[q + 14] = dst[q + 14]! * k;
     }
     // fim-quente
   }

@@ -85,9 +85,10 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - **4a feita em 19/11** (ARCHITECTURE §17.5): a Roleta e o card do Bobo Chaos, com 9 modificadores (Lua, gravidade
      pesada, Pressa, só na cabeça, um tiro mata, munição infinita, Vampiro, Tudo explode e troca de arma por abate),
      ligáveis em qualquer modo pela aba Modificadores da Personalizada.
-   - **4b:** Cabeção, Invisíveis (menos quando atiram) e Festa (confete). Mini, Bots gigantes, Arcade (bhop, wall jump,
-     pulo duplo) e Ricochete pedem colisão, navegação ou movimento novos: entram se couberem, senão ficam para o
-     fechamento.
+   - **4b feita em 19/11** (ARCHITECTURE §17.6): Cabeção, Invisíveis (menos quando atiram) e Festa (confete), na
+     Roleta e na Personalizada (12 modificadores). Ficam para depois: Mini e Bots gigantes (a sim já escala as hitboxes
+     de um corpo, `bodyScale`, mas a caixa de colisão, a câmera e a navegação não), Arcade (bhop, wall jump e pulo
+     duplo: movimento novo) e Ricochete (o tiro que quica).
 5. **Paintball:**
    - 1 tiro mata (configurável 1–3), respawn de 1 s, 50 abates ou 5 min;
    - os marcadores com o projétil visível;

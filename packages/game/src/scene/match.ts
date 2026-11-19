@@ -102,8 +102,10 @@ import {
   GRENADE_THROW,
   predictThrow,
   figurePostureOf,
+  CHAOS_MODS,
   isFfaMode,
   juggernautHp,
+  MOD,
   makeEntityId,
   MATCH_DEFAULTS,
   METRICS,
@@ -466,6 +468,8 @@ const MEMORY_LOG_EVERY_S = 60;
 const NET_LOG_EVERY_S = 30;
 /** M6 (fase 1): a letra do ponto do Domination fica a esta altura acima do anel (m). */
 const POINT_MARK_HEIGHT_M = 2.2;
+/** M6 (fase 4b): pedidos de confete da Festa por quadro (cada um, 2 punhados de 4 cubinhos). */
+const CONFETTI_PER_FRAME = 4;
 /** M6 (fase 3): a altura da plaquinha JUGG acima dos pés do Jugg (m). */
 const JUGG_MARK_HEIGHT_M = 2.4;
 /** M4 (fase 5b): depois de quantos frames conferir se algum programa de shader nasceu fora do aquecimento. */
@@ -1011,6 +1015,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let flash = new Float32Array(1);
   let recoil = new Float32Array(1);
   let firing = new Float32Array(1);
+  /** M6 (fase 4b): quando cada entidade atirou por último (s) e quem está invisível agora (1), para a mira assistida. */
+  let shotAt = new Float32Array(1);
+  let hiddenNow = new Uint8Array(1);
   let spawnT = new Float32Array(1);
   let reloadStart = new Float32Array(1);
   let reloadDur = new Float32Array(1);
@@ -1547,6 +1554,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     walkPhase = new Float32Array(capacity);
     skinLayer = new Uint16Array(capacity).fill(0xffff);
     figureOf = new Uint8Array(capacity).fill(NO_FIGURE);
+    shotAt = new Float32Array(capacity).fill(-1e9);
+    hiddenNow = new Uint8Array(capacity);
     figureTeam = new Uint8Array(capacity);
     velPrev = new Float32Array(capacity * 3);
     velCur = new Float32Array(capacity * 3);
@@ -1609,6 +1618,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (i < recoil.length) {
             recoil[i] = 1;
             firing[i] = FIRING_S;
+            shotAt[i] = timeS;
           }
           // Boca do cano aproximada (o render usa a do viewmodel para o dono em 1ª pessoa).
           const yaw = Math.atan2(-ev.dirX, -ev.dirZ);
@@ -1628,6 +1638,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         }
         case 'impact': {
+          if (chaosOn(MOD.confetti)) confetti(ev.x, ev.y, ev.z);
           if (ev.prop >= 0) {
             const owner = loaded.world.colliders.owner[ev.prop] ?? -1;
             const prop = owner >= 0 ? (loaded.propRenderIndex[owner] ?? -1) : -1;
@@ -1642,6 +1653,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (i < flash.length) flash[i] = 1;
           // `bodyPart` é a `FigurePart` (0..11, o osso da hitbox atingida): o cubinho sai da caixa desse osso.
           pushActorImpact(fx, ev.target, ev.x, ev.y, ev.z, ev.dirX, ev.dirY, ev.dirZ, ev.bodyPart, CUBES_ACTOR);
+          // M6 (fase 4b): a Festa solta confete em cada acerto.
+          if (chaosOn(MOD.confetti)) confetti(ev.x, ev.y, ev.z);
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
             if (slot.controller < 0) continue;
@@ -1686,7 +1699,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           ensureCapacity(v.capacity);
           if (skinLayer[i] === 0xffff) resolveEntityFigure(v, i);
           d.skin = skinLayer[i]!;
-          d.figure = figureOf[i]!;
+          // M6 (fase 4b): o invisível que morre não tem pose recente para desmontar: só o "poof", no lugar certo.
+          d.figure = hiddenNow[i] === 1 ? NO_FIGURE : figureOf[i]!;
           d.scale = 1;
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           pushDeath(fx, d);
@@ -1750,7 +1764,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         case 'melee': {
           const i = entityIndex(ev.attacker);
-          if (i < firing.length) firing[i] = FIRING_S * 3;
+          if (i < firing.length) {
+            firing[i] = FIRING_S * 3;
+            shotAt[i] = timeS;
+          }
           break;
         }
         case 'explosion': {
@@ -1786,6 +1803,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         }
         case 'projectile': {
+          // M6 (fase 4b): o foguete e a granada também mostram o invisível (como o último tiro da sim).
+          if (ev.action === 'launch') {
+            const j = entityIndex(ev.owner);
+            if (j < shotAt.length) shotAt[j] = timeS;
+          }
           if (ev.action !== 'launch' || ev.weapon !== WEAPON_CODE.rocket) break;
           const i = entityIndex(ev.owner);
           if (i < recoil.length) {
@@ -2196,7 +2218,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
     const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(v.flags[e]!);
     const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
-    findAimAssist(v, e, ffa, ex, ey, ez, m.yaw, m.pitch, level, a, far, st);
+    findAimAssist(v, e, ffa, ex, ey, ez, m.yaw, m.pitch, level, a, far, st, hiddenNow);
     return st.scale;
   }
 
@@ -3098,13 +3120,22 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const v = sim.view();
     ensureCapacity(v.capacity);
     const grid = loaded.lightGrid;
+    // M6 (fase 4b): o Cabeção (a cabeça de todos em dobro) e os Invisíveis (ninguém aparece, só logo depois de atirar).
+    actors.headScale = chaosOn(MOD.bigHead) ? CHAOS_MODS.bigHead : 1;
+    confettiLeft = CONFETTI_PER_FRAME;
+    const invisible = chaosOn(MOD.invisible);
     let n = 0;
     for (let i = 0; i < v.count && n < actors.capacity; i++) {
+      hiddenNow[i] = 0;
       if (v.alive[i] !== 1) continue;
       const kind = v.kind[i]!;
       if (kind !== ENTITY_KIND.bobo && kind !== ENTITY_KIND.zombie) continue;
       const flags = v.flags[i]!;
       if (flags & ENTITY_FLAG.dead) continue;
+      if (invisible && kind === ENTITY_KIND.bobo && timeS - shotAt[i]! > CHAOS_MODS.invisibleShowS && !localBody(i)) {
+        hiddenNow[i] = 1;
+        continue;
+      }
       const o = i * 3;
       const k = n * 3;
       const x = lerp(v.prevPosition[o]!, v.position[o]!, alpha);
@@ -3577,6 +3608,32 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     lost: t('feed.pointLost'),
     points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
   };
+  /** M6 (fase 4b): o modificador está ligado agora (pela máscara que a view mostra)? */
+  function chaosOn(bit: number): boolean {
+    const c = sim.view().chaos;
+    return c !== null && (c.masks[0]! & bit) !== 0;
+  }
+  /** M6 (fase 4b): as cores do confete da Festa (as do "poof" da morte) e a próxima a sair. */
+  const CONFETTI_COLORS = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff, 0xffd23f, 0xff6fb5, 0xffffff] as const;
+  let confettiNext = 0;
+  /** Pedidos de confete que ainda cabem neste quadro (a Big Brrt são 20 tiros por segundo). */
+  let confettiLeft = CONFETTI_PER_FRAME;
+  /** O próprio corpo de um jogador local (em 3ª pessoa e no sofá ele não some para ninguém da tela). */
+  function localBody(i: number): boolean {
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const c = slots[sIdx]!.controller;
+      if (c >= 0 && entityIndex(sim.controllerEntity(c)) === i) return true;
+    }
+    return false;
+  }
+  function confetti(x: number, y: number, z: number): void {
+    if (confettiLeft <= 0) return;
+    confettiLeft--;
+    for (let k = 0; k < 2; k++) {
+      const color = CONFETTI_COLORS[confettiNext++ % CONFETTI_COLORS.length]!;
+      pushDebris(fx, x, y, z, 0, 2.5, 0, color, 4, 2.2);
+    }
+  }
   /** M6 (fase 4): os nomes dos modificadores (pelo bit) e a chave da última linha montada. */
   const modNames = MODIFIERS.map((id) => t(`mod.${id}` as StringKey).toUpperCase());
   let modsKey = -1;
@@ -4175,6 +4232,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (emoteUntil[b]! <= timeS) continue;
       const i = entityIndex(emoteBy[b]!);
       if (i >= v.count || v.alive[i] !== 1 || (v.flags[i]! & ENTITY_FLAG.dead) !== 0) continue;
+      // M6 (fase 4b): o balão não entrega o invisível.
+      if (hiddenNow[i] === 1) continue;
       const o = i * 3;
       if (
         !projectToView(

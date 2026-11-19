@@ -3,6 +3,7 @@
 // osso, copia o osso para as caixas extras (mãos, cabelo), recorta o cabelo no teto, escreve a 4ª linha (luz, expressão
 // e clarão) de toda caixa e guarda a matriz da arma do ator. O passe dos atores só sobe os buffers e desenha.
 import {
+  FIGURE_BONE,
   FIGURE_BONES,
   FIGURE_BOX_FIELD,
   FIGURE_BOX_FLAG,
@@ -27,6 +28,10 @@ const BLOCK = FIGURE_MAX_BOXES * FIGURE_BOX_STRIDE;
  * existe na sim (o mesmo espaço do `actorKey` da entidade 0).
  */
 const MANNEQUIN_KEY = 0xfffe0000;
+/** M6 (fase 4b): o teto do cabelo bem alto (o Cabeção não recorta). */
+const NO_CEILING = 1e9;
+/** M6 (fase 4b): as 9 entradas da parte linear de uma MAT4 (colunas 0, 1 e 2), as que o Cabeção escala. */
+const HEAD_COLUMNS = [0, 1, 2, 4, 5, 6, 8, 9, 10] as const;
 
 /**
  * Faixa vertical de cada caixa de cabelo no espaço do osso da cabeça (px), calculada uma vez por gabarito: o centro
@@ -131,6 +136,8 @@ export interface FigureFrame {
 export function createFigureFrame(rig: FigureRig, instances: FigureInstances = createFigureInstances()): FigureFrame {
   let templates: FigureTemplateSet | null = null;
   let spans: FigureHairSpans | null = null;
+  /** M6 (fase 4b): a escala da cabeça do quadro anterior (mudou: todo boneco recalcula a pose). */
+  let lastHeadScale = 1;
   const stats = { figures: 0, boxes: 0, hidden: 0 };
 
   function finish(a: ActorBuffer, i: number, r: number, expression: number, ceiling: number): void {
@@ -232,6 +239,11 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
       instances.end();
       rig.begin(frame, a, frameIndex);
       const m = instances.matrices;
+      // M6 (fase 4b): o Cabeção escala o osso da cabeça (o pescoço é a origem dele: cresce para cima). Só nas poses
+      // recalculadas (a "shifted" soma o deslocamento ao quadro de antes, que já está escalado); mudou, todas recalculam.
+      const headScale = a.headScale > 0 ? a.headScale : 1;
+      const rescale = headScale !== lastHeadScale;
+      lastHeadScale = headScale;
       for (let i = 0; i < a.count; i++) {
         const r = instances.actorRecord[i]!;
         if (r < 0) continue;
@@ -239,8 +251,8 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
         stats.boxes += instances.recBoxes[r]!;
         const fresh = instances.actorFresh[i] === 1;
         // Manequim: só posa quando o prefixo muda (o resto do tempo as matrizes dele ficam paradas, sem upload).
-        if (instances.actorMannequin[i] === 1 && !fresh) continue;
-        const force = fresh || instances.recForce[r] === 1;
+        if (instances.actorMannequin[i] === 1 && !fresh && !rescale) continue;
+        const force = fresh || rescale || instances.recForce[r] === 1;
         const result = rig.pose(a, i, m, instances.recStart[r]! * MAT4, force);
         if (result === FIGURE_POSE_RESULT.hidden) {
           hide(r);
@@ -248,7 +260,15 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
           continue;
         }
         instances.recForce[r] = 0;
-        finish(a, i, r, rig.expression, rig.hairCeilingY);
+        if (headScale !== 1 && result === FIGURE_POSE_RESULT.computed) {
+          const h = (instances.recStart[r]! + FIGURE_BONE.head) * MAT4;
+          for (let c = 0; c < 9; c++) {
+            const k = h + HEAD_COLUMNS[c]!;
+            m[k] = m[k]! * headScale;
+          }
+        }
+        // Com a cabeça grande, o cabelo e o chapéu vão junto (o teto do recorte é para a cabeça normal).
+        finish(a, i, r, rig.expression, headScale > 1 ? NO_CEILING : rig.hairCeilingY);
         instances.recArmed[r] = a.weapon[i] !== NO_MODEL && rig.weapon(instances.recWeapon, r * MAT4) ? 1 : 0;
       }
       rig.end(frameIndex);

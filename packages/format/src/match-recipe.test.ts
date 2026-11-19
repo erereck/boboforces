@@ -340,4 +340,20 @@ describe('Bobo Zombies (M3, fase 2a)', () => {
     expect(bad.value.zombies).toEqual({});
     expect(bad.codes).toEqual(['recipe.invalidField', 'recipe.invalidField']);
   });
+
+  it('M6 (fase 4): os modificadores: conhecidos, sem repetir e sem conflito (também com o "um tiro mata" da regra)', () => {
+    const r = validateMatchRecipe(
+      {
+        ...base(),
+        modifiers: ['lowGravity', 'heavyGravity', 'vampire', 'vampire', 'inexistente', 'invisible'],
+        weapons: { oneShot: true },
+        chaos: { count: 9, everyS: 5 },
+      },
+      PC,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.modifiers).toEqual(['lowGravity', 'vampire']);
+    expect(r.value.chaos).toEqual({ count: 4, everyS: 20 });
+  });
 });

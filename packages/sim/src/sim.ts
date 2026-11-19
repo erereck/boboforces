@@ -704,6 +704,7 @@ export function createSim(config: SimConfig): Sim {
     mapObjects,
     controlPoints: domination,
     chaos,
+    lastShotTick: s.lastShotTick,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
   };

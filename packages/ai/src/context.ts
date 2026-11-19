@@ -1,10 +1,12 @@
 import {
+  type AimPoint,
   aimPointWorld,
+  CHAOS_MODS,
   ENTITY_FLAG,
   ENTITY_KIND,
   MAX_CONTROLLERS_WITH_ZOMBIES,
   MAX_HUMANS,
-  type AimPoint,
+  MOD,
   type SimView,
 } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
@@ -106,6 +108,20 @@ export class AiContext {
     return this.ffa || v.team[a] !== v.team[b];
   }
 
+  /**
+   * M6 (fase 4b): com os Invisíveis ligados, o bobo `t` que não atirou no último segundo não é visto (a menos de 2 m,
+   * sim: a IA esbarra).
+   */
+  unseen(ex: number, ez: number, t: number): boolean {
+    const v = this.view!;
+    const c = v.chaos;
+    if (c === null || (c.masks[0]! & MOD.invisible) === 0 || v.kind[t] !== ENTITY_KIND.bobo) return false;
+    if (this.tick - v.lastShotTick[t]! <= CHAOS_MODS.invisibleShowS * this.hz) return false;
+    const dx = v.position[t * 3]! - ex;
+    const dz = v.position[t * 3 + 2]! - ez;
+    return dx * dx + dz * dz > CHAOS_MODS.invisibleNearM * CHAOS_MODS.invisibleNearM;
+  }
+
   /** Corpo vivo (não morto) na entidade `i`. */
   living(i: number): boolean {
     const v = this.view!;
@@ -131,6 +147,7 @@ export class AiContext {
    */
   canSee(ex: number, ey: number, ez: number, t: number): boolean {
     const v = this.view!;
+    if (this.unseen(ex, ez, t)) return false;
     const aim = this.aim;
     for (let k = 0; k < 2; k++) {
       if (this.raysLeft <= 0) return false;

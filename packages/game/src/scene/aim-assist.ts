@@ -79,6 +79,7 @@ export function findAimAssist(
   alpha: number,
   maxM: number,
   out: AimAssistState,
+  hidden: Uint8Array | null = null,
 ): void {
   out.scale = 1;
   out.target = -1;
@@ -90,6 +91,8 @@ export function findAimAssist(
     if (kind !== ENTITY_KIND.bobo && kind !== ENTITY_KIND.zombie) continue;
     const fl = view.flags[j]!;
     if ((fl & ENTITY_FLAG.dead) !== 0 || !hostile(view, self, j, ffa)) continue;
+    // M6 (fase 4b): o invisível (que não atirou há pouco) não puxa a mira.
+    if (hidden !== null && hidden[j] === 1) continue;
     const o = j * 3;
     const tx = view.prevPosition[o]! + (view.position[o]! - view.prevPosition[o]!) * alpha;
     const ty =

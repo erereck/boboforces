@@ -39,6 +39,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   3 m) e **troca de arma por abate**. A aba Modificadores da Partida personalizada liga cada um em qualquer modo, e a
   Roleta também. Online, a Roleta chega igual para todos (protocolo 4: quem está com o jogo velho vê "Atualize a
   página").
+- **Mais 3 modificadores (fase 4b):** **Cabeção** (a cabeça de todo mundo, e o acerto nela, em dobro), **Invisíveis**
+  (ninguém aparece, só por 1 s depois de atirar; os bots também não veem quem não atirou, a não ser de pertinho) e
+  **Festa** (cada acerto solta confete). Entram na Roleta do Bobo Chaos e na aba Modificadores da Personalizada.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

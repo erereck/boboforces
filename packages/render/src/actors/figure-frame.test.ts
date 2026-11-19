@@ -4,6 +4,7 @@
 import {
   createFigureGameTable,
   createFigureTemplateSet,
+  FIGURE_BONE,
   FIGURE_BOX_FIELD,
   FIGURE_BOX_FLAG,
   FIGURE_BOX_STRIDE,
@@ -151,5 +152,31 @@ describe('quadro dos bonecos (rig de repouso)', () => {
     b.entity[0] = 0x00020001;
     frame.update(frameCtx(), b, 2);
     expect(inst.recArmed[inst.actorRecord[0]!]).toBe(0);
+  });
+
+  it('M6 (fase 4b): o Cabeção escala o osso da cabeça em dobro (do pescoço) e volta ao normal quando desliga', () => {
+    const templates = createFigureTemplateSet([FIGURE_LOOK_DEFAULT]);
+    const frame = createFigureFrame(createRestFigureRig());
+    frame.setFigures(templates, gameTable());
+    const a = oneActor(0);
+    const head = (): number[] => {
+      const inst = frame.instances;
+      const s = inst.recStart[inst.actorRecord[0]!]!;
+      return Array.from(inst.matrices.slice((s + FIGURE_BONE.head) * MAT4, (s + FIGURE_BONE.head) * MAT4 + 16));
+    };
+    frame.update(frameCtx(), a, 1);
+    const normal = head();
+    a.headScale = 2;
+    frame.update(frameCtx(), a, 2);
+    const big = head();
+    for (const k of [0, 1, 2, 4, 5, 6, 8, 9, 10]) expect(big[k]).toBeCloseTo(normal[k]! * 2, 5);
+    // O pescoço (a origem do osso) fica onde estava.
+    for (const k of [12, 13, 14]) expect(big[k]).toBeCloseTo(normal[k]!, 5);
+    // Quadros seguidos não escalam de novo; desligado, volta.
+    frame.update(frameCtx(), a, 3);
+    expect(head()[5]).toBeCloseTo(big[5]!, 5);
+    a.headScale = 1;
+    frame.update(frameCtx(), a, 4);
+    expect(head()[5]).toBeCloseTo(normal[5]!, 5);
   });
 });

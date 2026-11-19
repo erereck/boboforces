@@ -247,6 +247,50 @@ describe('modificadores (M6 fase 4)', () => {
     two.dispose();
   });
 
+  it('Cabeção: a sniper 25 e 50 cm acima do centro da cabeça erra normalmente e acerta a cabeça com ele', () => {
+    const shotAt = (big: boolean, above: number): string => {
+      const r = recipe({ weapons: { allowed: ['sniper'] }, ...(big ? { modifiers: ['bigHead' as const] } : {}) });
+      const sim = createSim({ recipe: r, map: flatMap(), humans: 2 });
+      const f = createInputFrames();
+      const p: AimPoint = { x: 0, y: 0, z: 0 };
+      // Mira com o ADS inteiro antes do tiro (a sniper fica sem dispersão).
+      for (let i = 0; i < SIM_HZ; i++) {
+        aimPointWorld(sim.view(), entity(sim, 1), true, p);
+        aimAt(sim, f[0]!, 0, { x: p.x, y: p.y + above, z: p.z });
+        f[0]!.buttons = BUTTON.ads;
+        sim.step(f);
+      }
+      f[0]!.buttons = BUTTON.ads | BUTTON.fire;
+      const events: SimEvent[] = [];
+      for (let i = 0; i < 3; i++) {
+        sim.step(f);
+        f[0]!.buttons = BUTTON.ads;
+        sim.drainEvents(events);
+      }
+      const hit = events.find((ev) => ev.type === 'hit');
+      sim.dispose();
+      return hit !== undefined && hit.type === 'hit' ? hit.part : 'nada';
+    };
+    // Revisão da 4b: 50 cm acima passava da fase larga (o topo da cabeça grande não entrava).
+    for (const above of [0.25, 0.5])
+      expect([shotAt(false, above), shotAt(true, above)], `${above} m`).toEqual(['nada', 'head']);
+  });
+
+  it('revisão: com o "um tiro mata" da regra de arma, a Roleta nunca põe os Invisíveis nem o tudo explode', () => {
+    const r = recipe({ chaos: { count: 4, everyS: 20 }, weapons: { oneShot: true } });
+    const sim = createSim({ recipe: r, map: flatMap(), humans: 2 });
+    const f = createInputFrames();
+    const masks = sim.view().chaos!.masks;
+    let seen = 0;
+    for (let i = 0; i < 300 * SIM_HZ; i++) {
+      sim.step(f);
+      seen |= masks[0]! | masks[1]!;
+    }
+    expect(seen & (MOD.invisible | MOD.explosive | MOD.oneShot)).toBe(0);
+    expect(popcount(seen)).toBeGreaterThan(5);
+    sim.dispose();
+  });
+
   it('sem modificador, nada de Roleta na view (e o hash dos outros modos não muda)', () => {
     const sim = createSim({ recipe: recipe(), map: flatMap(), humans: 2 });
     expect(sim.view().chaos).toBeNull();

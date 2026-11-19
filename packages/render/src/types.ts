@@ -127,6 +127,8 @@ export interface RenderMap {
 export interface ActorBuffer {
   readonly capacity: number;
   count: number;
+  /** M6 (fase 4b): a escala da cabeça de todos os bonecos (o Cabeção), a partir do pescoço; 1 = normal. */
+  headScale: number;
   /** 3 por ator: pés, em metros. */
   readonly position: Float32Array;
   readonly yaw: Float32Array;
@@ -196,6 +198,7 @@ export function createActorBuffer(capacity: number): ActorBuffer {
   return {
     capacity,
     count: 0,
+    headScale: 1,
     position: new Float32Array(capacity * 3),
     yaw: new Float32Array(capacity),
     pitch: new Float32Array(capacity),

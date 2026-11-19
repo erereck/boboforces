@@ -3707,3 +3707,39 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   - a Personalizada mostra e desliga os 9 (Lua e gravidade pesada ganharam linha; "só na cabeça", "um tiro mata" e a
     munição mostram e desligam também o modificador).
 - **O menu:** 349,5 de 350 KB (o validador mora no menu). Ver os riscos do PLANO_M6.
+
+### 17.6 Fase 4b: Cabeção, Invisíveis e Festa (19/11/2026)
+
+- **Os ids** `bigHead`, `invisible` e `confetti` entram no fim de `MODIFIERS` (bits 9 a 11: os presets da 4a não
+  mudam). Novo conflito: Invisíveis com um tiro mata (o exemplo do GDD §4.5.3).
+- **Cabeção:**
+  - Na sim, o `FigureHitCache` (`setHeadScale`, chamado pelo `applyChaos`) cresce a caixa da cabeça 2x a partir do
+    pescoço: as meias medidas dobram e o centro sobe meia altura pelo eixo de cima da caixa. A fase larga ganha 0,55 m
+    no topo e 0,2 m no raio (a caixa da cabeça tem 0,44 m de altura: em dobro, o topo sobe 0,48 m com a cabeça
+    inclinada).
+  - No render, o `ActorBuffer.headScale` escala o osso da cabeça (a origem é o pescoço), e o cabelo e o chapéu, que
+    copiam o osso, vão junto (sem o recorte no teto, que é para a cabeça normal). Só as poses recalculadas são
+    escaladas (a "shifted" soma o deslocamento ao quadro anterior, já escalado); quando a escala muda, todo boneco
+    recalcula, inclusive os manequins. A esfera do LOD da animação cresce junto.
+  - Teste: tiros de sniper 25 e 50 cm acima do centro da cabeça erram normalmente e acertam a cabeça com o Cabeção.
+  - A IA ainda mira e enxerga pelo centro da cabeça normal (que fica dentro da grande: os tiros dela acertam), e a lag
+    compensation usa a escala do tick atual (na troca da Roleta, por até 350 ms o tiro do amigo vê o outro tamanho).
+- **Invisíveis:**
+  - Na cena, os bobos que não atiraram (nem golpearam, nem lançaram foguete ou granada) no último segundo não entram
+    nos atores (o corpo, o cabelo e a sombra somem), não puxam a mira assistida (`hiddenNow`) e não mostram o balão
+    de emote. O próprio corpo dos jogadores da tela fica (em 3ª pessoa e no sofá). Quem morre invisível solta só o
+    "poof", no lugar certo (sem pose recente para desmontar).
+  - Na IA, o `canSee` não vê quem não atirou no último segundo (`SimView.lastShotTick`, o tick do último tiro da sim),
+    a não ser a menos de 2 m.
+- **Festa:** a cena solta 2 punhados de 4 cubinhos de confete (as cores do "poof" da morte) em cada acerto e em cada
+  impacto, no máximo 4 pedidos por quadro (a Big Brrt são 20 tiros por segundo).
+- **Os conflitos e a regra de arma:** o "um tiro mata" da regra de arma (`weapons.oneShot`) conta como o modificador:
+  o validador tira os modificadores que conflitam com ele, a Roleta não os sorteia (`ChaosState.baseBits`) e a
+  Personalizada desliga um quando liga o outro. Passar para o Bobo Zombies na Personalizada tira os modificadores e a
+  Roleta (o modo não tem a aba).
+- **A revisão (Opus)** achou 15 coisas (1 alta: a fase larga cortava o topo da cabeça grande; 6 médias), corrigidas
+  antes do commit, menos duas baixas que ficam anotadas acima (a mira da IA e a lag compensation na troca).
+- **Golden** do Bobo Chaos com os 12 modificadores: `c1b4cd36` (Lua, Pressa e Cabeção; sai a Lua e entra a Festa; sai o
+  Cabeção e entram os Invisíveis; 25 × 31). Os outros não mudaram.
+- **Ficam para depois:** Mini e Bots gigantes (a sim escala as hitboxes de um corpo com o `bodyScale`, mas a caixa de
+  colisão, a câmera e a navegação não), Arcade e Ricochete.

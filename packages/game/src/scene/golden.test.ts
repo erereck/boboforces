@@ -512,10 +512,10 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
 /**
  * M6 (fase 4): o Bobo Chaos (Times 4 contra 4 com a Roleta) com 8 bots Normal no Construto, semente 42, 3 min. Confere
  * que a Roleta troca 1 modificador por minuto, que os bots jogam com eles (abates) e o hash entre execuções. Gravado na
- * fase 4 (19/11/2026): `9c9aabae` (pesada, pressa e tudo explode; sai a pesada e entra a troca por abate; sai a
- * troca e entra a Lua; 24 × 21). MUDA com a sim, a IA, o mapa ou os modificadores.
+ * fase 4b (19/11/2026), com os 12 modificadores: `c1b4cd36` (Lua, Pressa e Cabeção; sai a Lua e entra a Festa; sai o
+ * Cabeção e entram os Invisíveis; 25 × 31). MUDA com a sim, a IA, o mapa ou os modificadores.
  */
-const GOLDEN_CHAOS_HASH = '9c9aabae';
+const GOLDEN_CHAOS_HASH = 'c1b4cd36';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();

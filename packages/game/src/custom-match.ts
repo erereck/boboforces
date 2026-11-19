@@ -240,8 +240,10 @@ function toZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   const support = Math.min(ZOMBIES_SUPPORT_MAX, l.maxBots, ffa(r) ? 0 : botsOf(r, 0));
   const map = mapsForMode('zombies').includes(r.map as MenuMap) && r.map !== 'construto' ? r.map : ZOMBIES_MAP;
   const { viewDistanceM } = r.match ?? {};
+  // M6 (fase 4): o Bobo Zombies não tem a aba Modificadores: os modificadores e a Roleta não vão junto.
+  const { modifiers: _mods, chaos: _chaos, ...rest } = r;
   return {
-    ...r,
+    ...rest,
     mode: 'zombies',
     map,
     match: { timeLimitS: 0, scoreLimit: 0, ...(viewDistanceM !== undefined ? { viewDistanceM } : {}) },
@@ -611,6 +613,8 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
 
 /** M6 (fase 4): liga ou desliga um modificador fixo (na ordem da lista; ligar tira o que conflita com ele). */
 function withModifier(r: MatchRecipe, id: ModifierId, on: boolean): MatchRecipe {
+  // O "um tiro mata" da regra de arma conflita como o modificador: ligar um que conflita com ele o desliga.
+  if (on && modifiersConflict('oneShot', id) && weapons(r).oneShot === true) r = withWeapons(r, { oneShot: false });
   const now = r.modifiers ?? [];
   const list = MODIFIERS.filter((m) => (m === id ? on : now.includes(m) && !(on && modifiersConflict(m, id))));
   const { modifiers: _drop, ...rest } = r;
@@ -618,6 +622,14 @@ function withModifier(r: MatchRecipe, id: ModifierId, on: boolean): MatchRecipe 
 }
 
 const hasModifier = (r: MatchRecipe, id: ModifierId): boolean => (r.modifiers ?? []).includes(id);
+
+/** Ligando `id` pela regra de arma, sai o modificador que conflita com ele (Invisíveis e tudo explode com um tiro mata). */
+function withoutConflicts(r: MatchRecipe, id: ModifierId, on: boolean): MatchRecipe {
+  if (!on) return r;
+  let out = r;
+  for (const m of r.modifiers ?? []) if (modifiersConflict(id, m)) out = withModifier(out, m, false);
+  return out;
+}
 
 /** A munição como a linha mostra: o modificador "munição infinita" vale como o pente infinito. */
 const ammoOf = (r: MatchRecipe): (typeof AMMO_MODES)[number] =>
@@ -650,7 +662,7 @@ const MOD_ROWS: readonly RowDef[] = [
     'oneShot',
     'custom.row.oneShot',
     (r) => (weapons(r).oneShot ?? false) || hasModifier(r, 'oneShot'),
-    (r, v) => withWeapons(withModifier(r, 'oneShot', false), { oneShot: v }),
+    (r, v) => withWeapons(withModifier(withoutConflicts(r, 'oneShot', v), 'oneShot', false), { oneShot: v }),
   ),
   flag(
     'sniperBody',
@@ -701,6 +713,9 @@ const MOD_ROWS: readonly RowDef[] = [
   modifierFlag('vampire', 'vampire', 'custom.row.vampire'),
   modifierFlag('explosive', 'explosive', 'custom.row.explosive'),
   modifierFlag('swapOnKill', 'swapOnKill', 'custom.row.swapOnKill'),
+  modifierFlag('bigHead', 'bigHead', 'custom.row.bigHead'),
+  modifierFlag('invisible', 'invisible', 'custom.row.invisible'),
+  modifierFlag('confetti', 'confetti', 'custom.row.confetti'),
   flag(
     'chaos',
     'custom.row.chaos',

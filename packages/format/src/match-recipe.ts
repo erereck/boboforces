@@ -156,6 +156,10 @@ export const MODIFIERS = [
   'vampire',
   'explosive',
   'swapOnKill',
+  // M6 (fase 4b).
+  'bigHead',
+  'invisible',
+  'confetti',
 ] as const;
 export type ModifierId = (typeof MODIFIERS)[number];
 
@@ -164,6 +168,8 @@ export const MODIFIER_CONFLICTS: readonly (readonly [ModifierId, ModifierId])[] 
   ['lowGravity', 'heavyGravity'],
   // Toda explosão mataria todo mundo a 3 m, em corrente.
   ['oneShot', 'explosive'],
+  // Morrer de um tiro que não se vê de onde veio (GDD §4.5.3).
+  ['invisible', 'oneShot'],
 ];
 
 /** Os dois modificadores conflitam? */
@@ -902,7 +908,17 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   const infection = readInfection(ctx, doc['infection']);
   if (infection !== undefined) out['infection'] = infection;
   const modifiers = readModifiers(ctx, doc['modifiers']);
-  if (modifiers !== undefined) out['modifiers'] = modifiers;
+  if (modifiers !== undefined) {
+    // O "um tiro mata" da regra de arma conta como o modificador nos conflitos.
+    const oneShot = (out['weapons'] as { oneShot?: boolean } | undefined)?.oneShot === true;
+    out['modifiers'] = oneShot
+      ? modifiers.filter((m) => {
+          const ok = !modifiersConflict('oneShot', m);
+          if (!ok) warn(ctx, 'modifiers', 'recipe.invalidField', m);
+          return ok;
+        })
+      : modifiers;
+  }
   const chaos = readChaos(ctx, doc['chaos']);
   if (chaos !== undefined) out['chaos'] = chaos;
 

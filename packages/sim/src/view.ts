@@ -116,6 +116,8 @@ export interface SimView {
    * largada). A rede escreve direto aqui no amigo.
    */
   readonly chaos: ChaosView | null;
+  /** M6 (fase 4b): o tick do último tiro de cada entidade (os Invisíveis aparecem ao atirar; a IA olha daqui). */
+  readonly lastShotTick: Int32Array;
   /**
    * M1 (integração): área jogável em metros (`SimMap.playArea`; paredes invisíveis em X/Z), ou `null` = a grade
    * inteira. A IA não escolhe destino fora dela.

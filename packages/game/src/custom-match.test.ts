@@ -76,6 +76,19 @@ describe('Partida personalizada', () => {
     expect(p.weapons).toEqual({ headshotOnly: false, oneShot: false, ammo: 'normal' });
     r = stepCustom('mods', r, 'chaos', 0, PC);
     expect(r.chaos).toBeUndefined();
+    // Revisão da 4b: Invisíveis com o "um tiro mata" da regra: um desliga o outro, nos dois sentidos.
+    let q = stepCustom('mods', DEBUT_PRESET, 'oneShot', 0, PC);
+    q = stepCustom('mods', q, 'invisible', 0, PC);
+    expect(q.modifiers).toEqual(['invisible']);
+    expect(q.weapons?.oneShot).toBe(false);
+    q = stepCustom('mods', q, 'oneShot', 0, PC);
+    expect(q.modifiers).toBeUndefined();
+    expect(q.weapons?.oneShot).toBe(true);
+    // O Bobo Zombies não leva os modificadores (não tem a aba).
+    const z = stepCustom('match', { ...DEBUT_PRESET, modifiers: ['invisible'], chaos: {} }, 'mode', 3, PC);
+    expect(z.mode).toBe('zombies');
+    expect(z.modifiers).toBeUndefined();
+    expect(z.chaos).toBeUndefined();
   });
 
   it('M2 (fase 6a): o perfil de movimento; velocidade e pulo só aparecem no Personalizado', () => {

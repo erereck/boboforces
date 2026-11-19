@@ -30,6 +30,11 @@ export const CHAOS_MODS = {
   /** Tudo explode: a explosão de quem morre (dano no centro e raio). */
   blastDamage: 60,
   blastRadiusM: 3,
+  /** Cabeção: a cabeça (e a hitbox dela) em dobro, crescendo do pescoço para cima. */
+  bigHead: 2,
+  /** Invisíveis: aparecem por este tempo depois de atirar (s), e a menos disto (m) a IA nota mesmo assim. */
+  invisibleShowS: 1,
+  invisibleNearM: 2,
 } as const;
 
 type MutableMods = { -readonly [K in keyof MatchMods]: MatchMods[K] };
@@ -52,6 +57,8 @@ export class ChaosState {
   predictMask = -1;
   /** Perfis por gravidade (normal, lunar, pesada) × velocidade (normal, 1,5x): índice `g * 2 + v`. */
   readonly profiles: readonly MovementProfile[];
+  /** Os bits que a regra de arma da receita já liga (só na cabeça, um tiro mata): a Roleta não sorteia o que conflita. */
+  readonly baseBits: number;
   /** As regras de arma da partida (sem modificador) e a cópia que a máscara liga (`ctx.mods` aponta para ela). */
   readonly baseMods: MatchMods;
   readonly mods: MutableMods;
@@ -73,6 +80,7 @@ export class ChaosState {
     this.profiles = profiles;
     this.baseMods = mods;
     this.mods = { ...mods };
+    this.baseBits = (mods.headshotOnly ? MOD.headshotOnly : 0) | (mods.oneShot ? MOD.oneShot : 0);
   }
 }
 
@@ -119,6 +127,7 @@ export function applyChaos(ctx: SimContext): void {
   const g = (mask & MOD.lowGravity) !== 0 ? 1 : (mask & MOD.heavyGravity) !== 0 ? 2 : 0;
   const v = (mask & MOD.speed) !== 0 ? 1 : 0;
   ctx.profile = c.profiles[g * 2 + v]!;
+  ctx.figures.setHeadScale((mask & MOD.bigHead) !== 0 ? CHAOS_MODS.bigHead : 1);
   c.mods.headshotOnly = c.baseMods.headshotOnly || (mask & MOD.headshotOnly) !== 0;
   c.mods.oneShot = c.baseMods.oneShot || (mask & MOD.oneShot) !== 0;
 }
@@ -161,7 +170,7 @@ export function chaosSystem(ctx: SimContext): void {
     if (m[2]! < 0) {
       // A largada: os primeiros sorteados.
       let mask = c.fixed;
-      for (let i = 0; i < c.count; i++) mask |= pickBit(ctx, poolFor(mask));
+      for (let i = 0; i < c.count; i++) mask |= pickBit(ctx, poolFor(mask | c.baseBits) & ~c.baseBits);
       m[0] = mask;
       m[1] = mask;
       m[2] = c.everyTicks;
@@ -171,7 +180,7 @@ export function chaosSystem(ctx: SimContext): void {
       if (m[2] === c.warnTicks) {
         const out = pickBit(ctx, m[0]! & ~c.fixed);
         const keep = m[0]! & ~out;
-        const add = pickBit(ctx, poolFor(keep) & ~out);
+        const add = pickBit(ctx, poolFor(keep | c.baseBits) & ~out & ~c.baseBits);
         m[1] = add !== 0 ? keep | add : m[0]!;
       }
       if (m[2]! <= 0) {

@@ -1386,7 +1386,8 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
         const cx = position[i * 3]!;
         const cy = position[i * 3 + 1]! + lift * scale;
         const cz = position[i * 3 + 2]!;
-        const r = -radius * scale;
+        // M6 (fase 4b): com o Cabeção, a esfera cresce para cobrir a cabeça grande (até 2,3 m em pé).
+        const r = -(radius + (actors.headScale > 1 ? 0.3 * (actors.headScale - 1) : 0)) * scale;
         const slot = slots[i]!;
         let best = Infinity;
         for (let v = 0; v < vc; v++) {
