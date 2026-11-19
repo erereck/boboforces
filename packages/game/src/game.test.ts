@@ -65,6 +65,7 @@ import {
   MIN_TEXT,
   MIN_TOUCH_TARGET,
   moveFocus,
+  OPTION,
   parseFontPack,
   shareScreen,
   STRINGS_EXTRA_PT_BR,
@@ -1088,6 +1089,26 @@ describe('textos do game com o atlas real (#54)', () => {
     }
   });
 
+  /** M8 (fase 3): a tela do Surpreenda-me com o sorteio mais comprido (o modo, as estrelas e 3 modificadores). */
+  function surpriseRoot(): UiNode {
+    return EDITORS.surpriseTree(
+      {
+        // O mais comprido: os Times com 3 modificadores e 2 estrelas, travados.
+        mode: 'warfare.tdm',
+        map: 'construto',
+        weapon: 'shotgun',
+        mods: ['heavyGravity', 'headshotOnly', 'infiniteAmmo'],
+        level: 'vibe',
+        stars: ['jorge-the-immortal', 'hunter-hank'],
+        size: 6,
+        long: true,
+      },
+      new Set(['mode', 'mods', 'enemies']),
+      t_('surprise.copied'),
+      true,
+    );
+  }
+
   it('M7 (fase 9) e M8 (fase 1): o Aquário e o compartilhar cabem (a pausa, o Mais modos, o Assistir e as telas de código)', () => {
     const help = t_('pause.help.speed');
     const custom: MatchRecipe = {
@@ -1118,6 +1139,8 @@ describe('textos do game com o atlas real (#54)', () => {
         ['resume', 'watch', 'challenge', 'settings', 'unstuck', 'quit'],
       ],
       ['Mais modos', EDITORS.moreModesRoot(true), []],
+      // M8 (fase 3): o Surpreenda-me com as linhas mais compridas e os 4 botões.
+      ['Surpreenda-me', surpriseRoot(), []],
       // M8 (fase 1): a tela de compartilhar (o jeito com mais botões e a partida recebida com o resumo).
       [
         'Compartilhar',
@@ -1182,8 +1205,22 @@ describe('textos do game com o atlas real (#54)', () => {
             !name.startsWith('pausa') &&
             !name.startsWith('Compart') &&
             !name.startsWith('Partida rec') &&
-            !['back', 'save', 'watch', 'start'].includes(node.id ?? '')
+            !['back', 'save', 'watch', 'start', 'surprise.reroll', 'surprise.play'].includes(node.id ?? '')
           ) {
+            continue;
+          }
+          // As linhas do Surpreenda-me ficam na coluna com rolagem (no celular, o Copiar código vem rolando).
+          if (name.startsWith('Surpreenda') && (node.id ?? '').startsWith('row:')) {
+            // Mas o texto da linha cabe na largura (só a altura rola).
+            expect(r.x + r.w, `${t.name} ${name}: ${node.id}`).toBeLessThanOrEqual(c.x + c.w + 0.5);
+            // E o valor cabe entre as setas (a área do valor menos as duas setas).
+            const value = layout.values.get(node);
+            if (value) {
+              const room = (OPTION.valueWidth - 2 * OPTION.arrow) * layout.scale;
+              expect(value.width, `${t.name} ${name}: "${value.text}" em ${room.toFixed(1)} px`).toBeLessThanOrEqual(
+                room,
+              );
+            }
             continue;
           }
           const room = r.w - 2 * BUTTON.padX * layout.scale;
@@ -1462,11 +1499,11 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect(game.screen).toBe('surprise');
-    // Rolar de novo (à direita de Jogar) fica na tela; Jogar começa a partida.
-    platform.tap('ArrowRight');
+    // M8 (fase 3): Rolar de novo (à esquerda de Jogar) fica na tela; Jogar começa a partida.
+    platform.tap('ArrowLeft');
     platform.tap('Enter');
     expect(game.screen).toBe('surprise');
-    platform.tap('ArrowLeft');
+    platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(game.screen).toBe('scene');
     await untilRunning(platform, game);

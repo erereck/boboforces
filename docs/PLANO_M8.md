@@ -69,6 +69,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 3. **O Surpreenda-me completo:** o sorteio de todos os modos com card (a regra de cada um), os mapas de cada modo, as
    armas, 0 a 3 modificadores e 0 a 2 bots "estrela"; o **cadeado** por linha (navegável no D-pad e no toque) e a
    **semente** como código (com a versão da tabela do sorteio). A tela sai do pedaço do menu.
+   - **feita em 19/11** (ARCHITECTURE §19.4): o código guarda o sorteio em si (não a semente), para valer entre
+     versões.
 4. **O Nêmesis com memória:** o bot que mais te matou fica guardado (quem é, quantas vezes te pegou, quantas você o
    pegou de volta); quando ele volta numa partida, a contagem do começo avisa ("Seu Nêmesis voltou") e o resultado
    mostra o placar da rivalidade. Sem mudar a IA (pergunta Z3).

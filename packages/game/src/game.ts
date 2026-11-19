@@ -77,8 +77,6 @@ import {
   SETTINGS_ACTION,
   SETTINGS_ROW_PREFIX,
   SETTINGS_TAB_PREFIX,
-  SURPRISE_ACTION,
-  surpriseScreen,
   TITLE_ACTION,
   TITLE_ACTION_TEST_PREFIX,
   t,
@@ -110,9 +108,10 @@ import {
   settingsRows,
   stepSettings,
 } from './settings-menu.ts';
-import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
+import { presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import type { ShareFlow } from './share.ts';
 import type { WorkshopFlow } from './workshop.ts';
+import type { SurpriseFlow } from './surprise.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import type * as EditorsModule from './editors.ts';
 import type * as OnlineModule from './online-screens.ts';
@@ -440,7 +439,6 @@ export function startGame(deps: GameDeps): GameHandle {
       : []),
     ...testItems.map((item) => ({ id: item.id, labelKey: item.labelKey })),
   ];
-  const surpriseMenu = createMenuController();
   // Refino R3b (#79): a tela dos itens de teste (antes, à direita do título).
   const testsMenu = createMenuController();
   testsMenu.setRoot(testListScreen.build({ items: extraItems }));
@@ -454,8 +452,8 @@ export function startGame(deps: GameDeps): GameHandle {
   /** M7 (fase 9): a última partida pedida foi um Aquário (o "De novo" repete assim) e o liga/desliga do Mais modos. */
   let lastSpectate = false;
   let moreWatch = false;
-  /** O sorteio na tela do Surpreenda-me. */
-  let surprise: MatchRecipe = DEBUT_PRESET;
+  /** M8 (fase 3): o Surpreenda-me completo (a tela mora no pedaço dos editores). O sorteio simples fica para a sala. */
+  let surpriseFlow: SurpriseFlow | null = null;
   const surpriseRng = createRng(Math.floor(platform.now()) >>> 0);
   function refreshTitle(): void {
     titleMenu.setRoot(
@@ -1080,9 +1078,14 @@ export function startGame(deps: GameDeps): GameHandle {
       }
     }
   }
-  function rollNewSurprise(): void {
-    surprise = rollSurprise(surpriseRng);
-    surpriseMenu.setRoot(surpriseScreen.build({ lines: presetLines(surprise) }));
+  function openSurprise(): void {
+    const from = screen;
+    withEditors(() => {
+      if (screen !== from) return;
+      surpriseFlow ??= editors!.createSurpriseFlow({ platform, rng: surpriseRng });
+      surpriseFlow.open();
+      screen = 'surprise';
+    });
   }
 
   let screen: GameScreen = 'loading';
@@ -1389,10 +1392,8 @@ export function startGame(deps: GameDeps): GameHandle {
         quitArmed = true;
         couchSig = -1;
       } else if (a === COUCH_ACTION.modes) screen = 'modes';
-      else if (a === COUCH_ACTION.surprise) {
-        rollNewSurprise();
-        screen = 'surprise';
-      } else if (a === COUCH_ACTION.settings) openSettings();
+      else if (a === COUCH_ACTION.surprise) openSurprise();
+      else if (a === COUCH_ACTION.settings) openSettings();
       else if (a === COUCH_ACTION.lab) openWorkshop();
       else if (a === COUCH_ACTION.tests) screen = 'tests';
       else if (a === COUCH_ACTION.bobo) {
@@ -1909,10 +1910,8 @@ export function startGame(deps: GameDeps): GameHandle {
               screen = 'more';
             });
           } else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
-          else if (id === 'surprise') {
-            rollNewSurprise();
-            screen = 'surprise';
-          } else if (id === 'custom') openCustom(currentPreset(), 'modes');
+          else if (id === 'surprise') openSurprise();
+          else if (id === 'custom') openCustom(currentPreset(), 'modes');
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);
@@ -1946,12 +1945,10 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
       }
       case 'surprise': {
-        const nav = surpriseMenu.update(menuInput, raw, u);
-        if (nav.back || nav.activated === SURPRISE_ACTION.back) screen = 'modes';
-        else if (nav.activated === SURPRISE_ACTION.reroll) rollNewSurprise();
-        else if (nav.activated === SURPRISE_ACTION.play) playPreset(surprise);
-        if (screen === 'surprise') {
-          surpriseMenu.draw(list, u);
+        const r = surpriseFlow!.frame(menuInput, raw, u, list);
+        if (r.kind === 'back') screen = 'modes';
+        else if (r.kind === 'play') playPreset(r.recipe);
+        else {
           renderer.renderViews(NO_VIEWS);
           renderer.drawUi(list);
         }

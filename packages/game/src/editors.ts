@@ -31,4 +31,6 @@ export { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } fro
 export { createShareFlow, shareAvailable } from './share.ts';
 // M8 (fase 2): a Oficina inteira (os bots e os esquadrões).
 export { createWorkshopFlow } from './workshop.ts';
+// M8 (fase 3): o Surpreenda-me completo.
+export { createSurpriseFlow, surpriseTree } from './surprise.ts';
 export { shareCodeFromHash } from '@boboforces/format';

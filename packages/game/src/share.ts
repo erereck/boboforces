@@ -3,7 +3,9 @@ import {
   encodeShareCode,
   importShareCode,
   RECIPE_RANGES,
+  validateMatchRecipe,
   shareCodeFromHash,
+  shareKindOf,
   shareLinkHash,
   type BotDocument,
   type MatchRecipe,
@@ -18,6 +20,14 @@ import type { Rng } from '@boboforces/shared';
 import { SHARE_ACTION, shareScreen, t, type DrawList, type ShareMode, type StringKey } from '@boboforces/ui';
 import { botCardLines, botDisplayName, copyName, newBotId } from './bot-card.ts';
 import { newSquadId } from './workshop.ts';
+import {
+  SURPRISE_LINES,
+  surpriseCodeIsNewer,
+  surpriseDetails,
+  surpriseFromCode,
+  surpriseLineText,
+  surpriseRecipe,
+} from './surprise.ts';
 import { presetName } from './custom-match.ts';
 import { rollBotName } from './lab.ts';
 import { createMenuController, type UiFrame } from './menu.ts';
@@ -228,6 +238,31 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
     // Colaram o link inteiro (o "Copiar link" desta tela): o código está no hash.
     const at = text.indexOf('#');
     const code = at >= 0 ? (shareCodeFromHash(text.slice(at).trim()) ?? text) : text;
+    // M8 (fase 3): o código do Surpreenda-me é o sorteio em si (quem lê a tabela dele é o `surprise.ts`).
+    if (shareKindOf(code) === 'surprise') {
+      const decoded = decodeShareCode(code);
+      const roll = decoded.ok ? surpriseFromCode(decoded.doc) : null;
+      const checked = roll !== null ? validateMatchRecipe(surpriseRecipe(roll), deps.limits) : null;
+      if (roll === null || checked === null || !checked.ok) {
+        const key = !decoded.ok
+          ? (`share.error.${decoded.error}` as StringKey)
+          : surpriseCodeIsNewer(decoded.doc)
+            ? 'share.error.surpriseNewer'
+            : 'share.error.invalid';
+        showError([t(key)]);
+        return;
+      }
+      receivedPreset = checked.value;
+      mode = 'preset';
+      title = t('share.receivedSurprise');
+      lines = [
+        ...SURPRISE_LINES.map((line) => `${t(`surprise.line.${line}` as StringKey)}: ${surpriseLineText(roll, line)}`),
+        ...(surpriseDetails(roll) !== '' ? [surpriseDetails(roll)] : []),
+        ...issueLines(checked.warnings),
+      ];
+      rebuild();
+      return;
+    }
     const r = importShareCode(code, deps.limits);
     if (!r.ok) {
       showError([t(`share.error.${r.error}` as StringKey), ...issueLines(r.issues)]);

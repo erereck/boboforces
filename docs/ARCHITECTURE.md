@@ -4376,3 +4376,32 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   uma chave crua (agora o Normal Bob, com aviso); um código feito à mão podia deixar bots soltos na Oficina; o teste de
   id do esquadrão não pegava colisão; cancelar a digitação marcava mudança; o editor perdia o foco da lista; e um frame
   em branco ao abrir o compartilhar.
+
+### 19.4 Fase 3: o Surpreenda-me completo (19/11/2026)
+
+- **O sorteio** (`game/src/surprise.ts`, no pedaço dos editores): um dos 14 modos com card (com peso: os Times 6, o FFA
+  3, os de festa 1 ou 2), o mapa (só os Times, o FFA e o Zombies clássico sorteiam: os outros dependem do mapa deles), a
+  arma (35% das vezes uma arma só da escada do Gun Game) e de 0 a 3 modificadores sem conflito (só nos modos de regra
+  livre: Times, FFA e Domination; o Confete fica de fora), o nível dos bots e de 0 a 2 bots estrela (Jorge the Immortal,
+  Camper Carl, Knife Ninja, Scaredy Sam, Hunter Hank, Goofy Gus) no lugar de bots do time adversário (o time não
+  cresce). A receita leva o nome "Surpreenda-me". A mesma semente dá o mesmo sorteio.
+- **O cadeado:** cada linha (Modo, Mapa, Armas, Modificadores, Inimigos) trava com um aperto ("· travado"); o Rolar de
+  novo muda só as outras. O mapa travado que não vale para o modo novo é sorteado de novo; tudo travado, o Rolar de novo
+  solta tudo.
+- **O código** `BFR1-` guarda o sorteio em si (com a versão da tabela, `v: 1`), não a semente: quem colar joga a mesma
+  partida mesmo com o conteúdo mudando. O "Colar um código" da Oficina abre o sorteio (Jogar ou Salvar preset); o que
+  não existe mais é recusado e o campo estragado cai no padrão. O Copiar código é uma linha no fim (4 botões embaixo
+  não cabem no celular).
+- **O menu da web:** o Surpreenda-me saiu dele (a tela antiga, o `rollSurprise` dela e o estado no `game.ts`); o menu
+  caiu para 348,9 KB. O sorteio simples (Times ou FFA) continua só para a partida da sala do Online.
+- **O card:** cada linha mostra o valor curto (o 1º modificador e quantos a mais; o nível e quantas estrelas): a área do
+  valor tem ~23 letras. Embaixo do título, o que não cabe (o tamanho e o tempo dos Times e do FFA, os modificadores e as
+  estrelas pelo nome); o cadeado vai no rótulo ("INIMIGOS · TRAVADO"); direita trava, esquerda solta, o confirmar
+  alterna (segurar não pisca). O teste de textos confere o valor entre as setas nas 6 telas.
+- **A revisão (Opus) achou, corrigido antes do commit:** o tamanho dos Times passava do teto do mapa (o Ringue com 6
+  contra 6; agora o teto da Partida Rápida); a Infection mostrava estrelas que não entravam (o time dela é o dos
+  infectados: sem estrela) e o Zombies, um nível que não vale; o nome "Surpreenda-me" apagava o do card (o Gun Game, a
+  Fortaleza: agora o nome do modo fica); o mapa travado que não coube no modo novo ficava travado num mapa que o jogador
+  não escolheu (agora o cadeado sai); o código colado não cortava no teto do aparelho (agora valida e avisa, com o
+  "versão mais nova"); o "troca por abate" e a munição infinita da faca com uma arma só; e a tela abria mesmo com o
+  jogador já em outra (o pedaço dos editores chega depois).
