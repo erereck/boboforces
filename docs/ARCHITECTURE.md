@@ -4324,3 +4324,29 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   do prefixo antes do tamanho. Tudo corrigido antes do commit.
 - **O menu da web** não mudou (348,4 KB): nada do menu importa estes módulos (o `format` não tem efeito colateral);
   a fase 1 os usa só no pedaço dos editores.
+
+### 19.2 Fase 1: a Oficina com códigos (19/11/2026)
+
+- **Compartilhar** (`game/src/share.ts`, `ui/src/screens/share.ts`, no pedaço dos editores): o botão Compartilhar no
+  card da Oficina (o bot) e a linha "Compartilhar (código e link)" no fim da aba Partida da Partida personalizada (o
+  preset; fora da sala do Online). A tela mostra o tamanho do código e tem Copiar código, Copiar link e Colar um código.
+- **Receber:** o código colado (o campo escondido da web; colado inteiro, abre sem o Enter) ou o link `#bot=` / `#p=`
+  (a casca lê o hash uma vez, como o `#sala=`, e limpa a barra; quem abre é o pedaço dos editores) mostra o que veio
+  e o resumo do que mudou (os avisos do validador e os nomes barrados). O bot vira um bot seu (id novo; o nome barrado
+  ganha um do gerador; o repetido, "Jorge 2"); a partida joga ou vira um preset salvo.
+- **Só na web:** no Switch os botões não aparecem (sem colar texto nem rede; os arquivos do SD continuam, pergunta Z2).
+- **O deflate dos códigos** (`format/src/deflate-lite.ts`): um bloco com o Huffman fixo e o LZ77 guloso (janela de 32
+  KB). O `deflateSync` do `fflate` punha o compressor inteiro no menu da web (o `fflate` é um módulo só, e o menu já
+  leva o inflate dele para o atlas das fontes): +2,8 KB em gzip, acima do teto. O deflate pequeno mora só nos editores e
+  a volta usa o inflate de sempre. Um bot vira ~750 caracteres (o `fflate` no nível 9 faria ~580) e um preset com 16
+  bots embutidos ~1.900. O UTF-8 também é próprio (o `strToU8` do `fflate` traria o `TextEncoder` dele).
+- **O menu da web** ficou em 348,9 KB (+0,4: a cola no `game.ts` e na casca).
+- **A revisão (Opus) achou, corrigido antes do commit:** a tela de colar não saía sem teclado (agora o Voltar anda pelo
+  mouse, pelo toque e pelo B do controle com o campo aberto); o link da carga podia tirar o jogador de uma partida (o
+  pedaço dos editores chegava depois do JOGAR) ou se perder (agora espera o jogador no título); os nomes de fora agora
+  só com o que a fonte desenha (sem controle, quebra de linha nem marca de direção); o link colado no lugar do código
+  abre; a partida recebida salva uma vez só e o nome com o sufixo cabe no teto; o aviso do bot salvo na volta à Partida
+  personalizada; o Bobo Training recebido não vira o último preset; e a linha Compartilhar só na aba Partida.
+- **Limites conhecidos:** sem a área de transferência (o navegador recusou), o código não aparece em texto para copiar
+  à mão; e um link aberto numa aba onde o jogo já está aberto não faz nada (o hash é lido só na carga, como o
+  `#sala=`).

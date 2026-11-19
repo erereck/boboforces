@@ -50,6 +50,7 @@ import {
   drawTestScreen,
   CUSTOM_ACTION,
   CUSTOM_ROW_PREFIX,
+  CUSTOM_SHARE_ROW,
   CUSTOM_TAB_PREFIX,
   COUCH_ACTION,
   couchScreen,
@@ -112,6 +113,7 @@ import {
   stepSettings,
 } from './settings-menu.ts';
 import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
+import type { ShareFlow } from './share.ts';
 import { botCardLines, botDisplayName, copyName, isBuiltinBot, newBotId } from './bot-card.ts';
 import type * as EditorsModule from './editors.ts';
 import type * as OnlineModule from './online-screens.ts';
@@ -229,6 +231,10 @@ export interface GameDeps {
    * do título, o Online abre direto no Entrar com o código. Quem lê e valida o código é o pedaço do Online.
    */
   readonly onlineLink?: string;
+  /** M8 (fase 1): o hash do link de um código (`#bot=…` ou `#p=…`), lido uma vez na casca; abre a tela de receber. */
+  readonly shareLink?: string;
+  /** M8 (fase 1): monta o link inteiro de um hash (a casca da web); ausente = sem "Copiar link". */
+  readonly shareLinkFor?: (hash: string) => string;
 }
 
 /** M3: o módulo das telas de edição (`editors.ts`). */
@@ -264,6 +270,7 @@ export type GameScreen =
   | 'tests'
   | 'custom'
   | 'surprise'
+  | 'share'
   | 'couch'
   | 'settings'
   | 'online'
@@ -472,6 +479,29 @@ export function startGame(deps: GameDeps): GameHandle {
   const factoryBots = Object.values(BUILTIN_BOTS);
   let workshopSelected = factoryBots[0]!.id;
   let workshopNote = '';
+  /** M8 (fase 1): a tela de compartilhar (do pedaço dos editores) e a tela para onde ela volta. */
+  let shareFlow: ShareFlow | null = null;
+  let shareReturn: GameScreen = 'title';
+  /** M8 (fase 1, revisão): o link da carga, esperando o jogador estar no título (aberto, vira `undefined`). */
+  let pendingShareLink = deps.shareLink;
+  function openShare(from: GameScreen, open: (flow: ShareFlow) => void): void {
+    withEditors(() => {
+      // O pedaço chegou depois: só abre se o jogador ainda está onde pediu.
+      if (screen !== from) return;
+      shareFlow ??= editors!.createShareFlow({
+        platform,
+        save,
+        limits: recipeLimitsFor(selectPlatformProfile(platform.features.profileHint, 1)),
+        linkFor: deps.shareLinkFor ?? null,
+        rng: botRng,
+        factoryBots,
+        play: (preset) => (preset.mode === 'training' ? playTraining(preset) : playPreset(preset)),
+      });
+      shareReturn = from;
+      open(shareFlow);
+      screen = 'share';
+    });
+  }
   /** O bot que está esperando o "Confirmar" do Apagar. */
   let workshopConfirm: string | null = null;
   function findBot(id: string): BotDocument | null {
@@ -497,6 +527,7 @@ export function startGame(deps: GameDeps): GameHandle {
         canDelete: !isBuiltinBot(bot),
         favorite: save.presets.botFavorites.includes(bot.id),
         confirmDelete: workshopConfirm === bot.id,
+        share: editors!.shareAvailable(platform).copy,
       }),
     );
   }
@@ -687,6 +718,9 @@ export function startGame(deps: GameDeps): GameHandle {
     } else if (a === WORKSHOP_ACTION.edit) {
       openLab(bot);
       return;
+    } else if (a === WORKSHOP_ACTION.share) {
+      openShare('workshop', (f) => f.openExport('bot', bot, botDisplayName(bot)));
+      return;
     } else if (a === WORKSHOP_ACTION.favorite) {
       const on = !save.presets.botFavorites.includes(bot.id);
       workshopNote = save.setBotFavorite(bot.id, on) ? '' : t('workshop.favoritesFull');
@@ -821,7 +855,7 @@ export function startGame(deps: GameDeps): GameHandle {
         summary: presetSummary(customRecipe),
         note: customNote,
         help: ed.customHelp(tabs, customHelpFocus),
-        ...(customDone !== null ? { forRoom: true } : {}),
+        ...(customDone !== null ? { forRoom: true } : { share: customTab === 0 && ed.shareAvailable(platform).copy }),
       }),
     );
   }
@@ -1722,6 +1756,14 @@ export function startGame(deps: GameDeps): GameHandle {
         // Nada para desenhar: na web o splash (ou a página de erro) cobre a canvas.
         break;
       case 'title': {
+        // M8 (fase 1): aberto por um link de código (`#bot=`, `#p=`): a tela de receber, com o jogador no título.
+        if (pendingShareLink !== undefined) {
+          const link = pendingShareLink;
+          openShare('title', (f) => {
+            pendingShareLink = undefined;
+            f.openCode(editors!.shareCodeFromHash(link) ?? '');
+          });
+        }
         const nav = titleMenu.update(menuInput, raw, u);
         const action = nav.activated;
         if (action === TITLE_ACTION.play) play();
@@ -1810,6 +1852,26 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         break;
       }
+      case 'share': {
+        // M8 (fase 1): compartilhar e receber; ao fechar, volta de onde veio (o bot salvo aparece na Oficina).
+        const r = shareFlow!.frame(menuInput, raw, u, list);
+        if (!r.open) {
+          if (screen === 'share') screen = shareReturn === 'title' && r.savedBot !== null ? 'workshop' : shareReturn;
+          if (screen === 'workshop') {
+            if (r.savedBot !== null) workshopSelected = r.savedBot;
+            workshopNote = r.note;
+            rebuildWorkshop();
+            if (r.savedBot !== null) workshopMenu.focus(`${WORKSHOP_BOT_PREFIX}mine:${r.savedBot}`);
+          } else if (screen === 'custom') {
+            customNote = r.note;
+            rebuildCustom();
+          }
+        } else {
+          renderer.renderViews(NO_VIEWS);
+          renderer.drawUi(list);
+        }
+        break;
+      }
       case 'workshop': {
         const nav = workshopMenu.update(menuInput, raw, u);
         if (nav.back || nav.activated === WORKSHOP_ACTION.back) screen = 'title';
@@ -1870,7 +1932,9 @@ export function startGame(deps: GameDeps): GameHandle {
           done?.(a === CUSTOM_ACTION.start ? customRecipe : null);
         } else if (a === CUSTOM_ACTION.start) playPreset(customRecipe);
         else if (a === CUSTOM_ACTION.watch) playPreset(customRecipe, true);
-        else if (a === CUSTOM_ACTION.save) {
+        else if (a === CUSTOM_ROW_PREFIX + CUSTOM_SHARE_ROW) {
+          openShare('custom', (f) => f.openExport('preset', customRecipe, presetSummary(customRecipe)));
+        } else if (a === CUSTOM_ACTION.save) {
           customNote = saveCustomPreset(customRecipe);
           rebuildCustom();
         } else if (a !== null && a.startsWith(CUSTOM_TAB_PREFIX)) {
@@ -2094,6 +2158,7 @@ export function startGame(deps: GameDeps): GameHandle {
     loadEditors();
     // M5 (fase 4d): aberto por um link de sala: direto no Entrar.
     if (deps.onlineLink !== undefined && deps.loadOnline) openOnline(deps.onlineLink);
+
     // O bench abre a cena só depois de UM frame do título: assim o `loading_ms` mede o mesmo que JOGAR no menu.
     // Antes, a cena começava no boot e o loading pagava o primeiro desenho da UI (programa, atlas e, no Eden, a
     // compilação dos shaders do emulador): ~0,75 s a mais na mesma build.

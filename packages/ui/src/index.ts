@@ -24,6 +24,8 @@ export * from './screens/custom-match.ts';
 export * from './screens/news.ts';
 export * from './screens/rotate.ts';
 export * from './screens/workshop.ts';
+// M8 (fase 1): compartilhar por código e por link.
+export * from './screens/share.ts';
 export * from './screens/lab.ts';
 export * from './screens/lab-intro.ts';
 export * from './screens/couch.ts';

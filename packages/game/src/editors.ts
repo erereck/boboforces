@@ -27,3 +27,6 @@ export { importWorkshopFiles } from './workshop-files.ts';
 export { createOnscreenKeyboard } from './onscreen-keyboard.ts';
 // M6 (fase 0): a página "Mais modos" (os cards e as receitas dos modos novos).
 export { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } from './more-modes.ts';
+// M8 (fase 1): compartilhar por código e por link.
+export { createShareFlow, shareAvailable } from './share.ts';
+export { shareCodeFromHash } from '@boboforces/format';

@@ -95,3 +95,27 @@ describe('M8 (fase 0, revisão): o que vem de fora', () => {
     });
   });
 });
+
+describe('M8 (fase 1): o tamanho dos códigos', () => {
+  it('um preset com 16 bots embutidos cabe bem nos 4.000 caracteres (o LZ77 junta o que se repete)', () => {
+    const bots = Array.from({ length: SHARE_MAX_EMBEDDED_BOTS }, (_, i) => ({
+      ...builtinBot(i % 2 === 0 ? 'jorge-the-immortal' : 'normal-bob')!,
+      id: `meu-bot-${i}`,
+      name: `Bot do Fulano ${i}`,
+    }));
+    const c = code('preset', preset(bots));
+    expect(c.length).toBeLessThan(3000);
+    expect(importShareCode(c, limits)).toMatchObject({ ok: true, kind: 'preset' });
+  });
+});
+
+describe('M8 (fase 1, revisão): os nomes de fora só com o que a fonte desenha', () => {
+  it('tira controles, quebras de linha e marcas de direção; o que sobra vazio vira o nome do gerador', () => {
+    const r = importShareCode(code('bot', { ...jorge, name: 'Jorge\n‮Bob\u0007 ☃' }), limits);
+    expect(r.ok && r.kind === 'bot' && r.bot.name).toBe('Jorge Bob');
+    const empty = importShareCode(code('bot', { ...jorge, name: '‮\u0007☃' }), limits);
+    expect(empty.ok && empty.kind === 'bot' && empty.bot.name).toBe('');
+    const p = importShareCode(code('preset', { ...preset([jorge], 'Festa\u0000 do Bob') }), limits);
+    expect(p.ok && p.kind === 'preset' && p.preset.name).toBe('Festa do Bob');
+  });
+});

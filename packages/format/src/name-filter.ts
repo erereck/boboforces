@@ -9,6 +9,22 @@
  * casam sozinhas, para não barrar "Computador", "Disputa", "Desviado", "Knight", "Fagundes", "Pica-Pau" ou "Cockpit".
  */
 
+/**
+ * Fora do atlas do HUD (o `cleanHudText` do jogo): o que não é Latin-1 imprimível nem a pontuação extra do `fontbake`.
+ * Tira também os controles, as quebras de linha e as marcas de direção que um nome de fora pode trazer.
+ */
+const OUTSIDE_HUD = new RegExp(
+  '[^\u0020-\u007e\u00a0-\u00ff\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u2026\u20ac]',
+  'gu',
+);
+
+/** M8 (fase 1, revisão): o nome que veio de outro aparelho, só com o que a fonte desenha e sem espaço repetido. */
+export function cleanSharedName(name: string, maxLength: number): string {
+  // A quebra de linha vira espaço antes de os caracteres de fora saírem ("Jorge\nBob" fica "Jorge Bob").
+  const text = name.replace(/\s+/gu, ' ').replace(OUTSIDE_HUD, '').replace(/ +/gu, ' ').trim();
+  return Array.from(text).slice(0, maxLength).join('').trimEnd();
+}
+
 /** Casam em qualquer parte do nome (já sem acento e sem letra repetida). */
 const ROOTS: readonly string[] = [
   // pt-BR

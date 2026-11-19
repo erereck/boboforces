@@ -32,6 +32,8 @@ export interface WorkshopState {
   readonly favorite: boolean;
   /** Apagar pede confirmação: o botão vira "Confirmar". */
   readonly confirmDelete: boolean;
+  /** M8 (fase 1): o botão Compartilhar (código e link; só na web). */
+  readonly share?: boolean;
 }
 
 /** Medidas (px de referência): a lista e o card. */
@@ -202,6 +204,16 @@ export const workshopScreen: Screen<WorkshopState> = {
               children: [
                 { kind: 'row', id: 'actionsTop', gap: 12, children: top },
                 { kind: 'row', id: 'actionsBottom', gap: 12, children: bottom },
+                ...(state.share === true
+                  ? [
+                      {
+                        kind: 'row',
+                        id: 'actionsShare',
+                        gap: 12,
+                        children: [button('share', 'workshop.share', WORKSHOP_ACTION.share, false, true)],
+                      } as UiNode,
+                    ]
+                  : []),
               ],
             },
           ],

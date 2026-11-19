@@ -66,6 +66,7 @@ import {
   MIN_TOUCH_TARGET,
   moveFocus,
   parseFontPack,
+  shareScreen,
   STRINGS_EXTRA_PT_BR,
   STRINGS_PT_BR,
   t as t_,
@@ -1087,7 +1088,7 @@ describe('textos do game com o atlas real (#54)', () => {
     }
   });
 
-  it('M7 (fase 9): o Aquário cabe: a pausa (assistindo e com o bot), o botão do Mais modos e o Assistir', () => {
+  it('M7 (fase 9) e M8 (fase 1): o Aquário e o compartilhar cabem (a pausa, o Mais modos, o Assistir e as telas de código)', () => {
     const help = t_('pause.help.speed');
     const custom: MatchRecipe = {
       format: MATCH_RECIPE_FORMAT,
@@ -1117,6 +1118,37 @@ describe('textos do game com o atlas real (#54)', () => {
         ['resume', 'watch', 'challenge', 'settings', 'unstuck', 'quit'],
       ],
       ['Mais modos', EDITORS.moreModesRoot(true), []],
+      // M8 (fase 1): a tela de compartilhar (o jeito com mais botões e a partida recebida com o resumo).
+      [
+        'Compartilhar',
+        shareScreen.build({
+          mode: 'export',
+          title: 'Compartilhar o bot Jorge the Immortal da Silva',
+          lines: [t_('share.exportSize', { n: 3999 }), t_('share.exportHintPreset')],
+          note: t_('share.tooLong'),
+          canCopy: true,
+          canLink: true,
+          canPaste: true,
+        }),
+        ['copyCode', 'paste'],
+      ],
+      [
+        'Partida recebida',
+        shareScreen.build({
+          mode: 'preset',
+          title: 'Partida recebida: Times De boa 4×4',
+          lines: [
+            'Times · De boa · 4 contra 4 · Construto',
+            t_('issue.name.blocked'),
+            t_('issue.recipe.botsOverPlatformCap'),
+          ],
+          note: '',
+          canCopy: true,
+          canLink: true,
+          canPaste: true,
+        }),
+        ['play', 'back'],
+      ],
       [
         'Partida personalizada',
         EDITORS.customMatchScreen.build({
@@ -1146,7 +1178,14 @@ describe('textos do game com o atlas real (#54)', () => {
           const text = layout.texts.get(node);
           if (!text || node.kind !== 'button') continue;
           // As abas da Partida personalizada e os cards são de antes (só os botões de baixo e o do título aqui).
-          if (!name.startsWith('pausa') && !['back', 'save', 'watch', 'start'].includes(node.id ?? '')) continue;
+          if (
+            !name.startsWith('pausa') &&
+            !name.startsWith('Compart') &&
+            !name.startsWith('Partida rec') &&
+            !['back', 'save', 'watch', 'start'].includes(node.id ?? '')
+          ) {
+            continue;
+          }
           const room = r.w - 2 * BUTTON.padX * layout.scale;
           expect(text.width, `${t.name} ${name}: "${text.text}" em ${room.toFixed(1)} px`).toBeLessThanOrEqual(room);
           expect(r.h, `${t.name} ${name}`).toBeGreaterThanOrEqual(t.minTarget);

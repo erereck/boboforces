@@ -59,6 +59,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 1. **A Oficina com códigos:** "Copiar código" no bot e no preset (a área de transferência da web), "Colar código" (o
    campo de texto escondido da web) com o resumo antes de salvar, e os links `#bot=` / `#p=` (lidos uma vez na casca,
    como o `#sala=`, e limpos da barra). No Switch, os arquivos do SD como hoje.
+   - **feita em 19/11** (ARCHITECTURE §19.2): Compartilhar na Oficina e na Partida personalizada, colar e o link; os
+     códigos com um deflate pequeno próprio (o do `fflate` estourava o menu da web).
 2. **Os esquadrões:** o formato `squad@1` (nome e bots, até 16 entradas), a lista e o editor na Oficina, o uso nos
    times da Partida personalizada (o preset leva os bots expandidos, para quem recebe não precisar do esquadrão), o
    backup e o código.

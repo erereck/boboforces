@@ -16,6 +16,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   `BFS1-` e a semente `BFR1-`, até 4.000 caracteres) e dos links `#bot=` e `#p=`, a importação que valida e corta no
   teto do aparelho, e um filtro simples de nomes (pt-BR e inglês) para o que vem de outro aparelho. As armas das regras
   de um bot agora só aceitam armas que existem. Ainda sem tela: os botões chegam na fase 1.
+- **A Oficina com códigos (fase 1, só na web):** o botão Compartilhar no card da Oficina e na Partida personalizada
+  copia o código (`BF1-…` para o bot, `BFP1-…` para a partida) ou o link; "Colar um código" e o link aberto mostram o
+  que veio (e o que mudou para caber no aparelho) antes de salvar o bot na Oficina ou jogar e salvar a partida.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

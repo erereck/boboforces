@@ -1,7 +1,7 @@
 import { validateBot, type BotDocument } from './bot.ts';
 import { validateMatchRecipe, type MatchRecipe, type TeamRecipe } from './match-recipe.ts';
 import { normalizeFigureLook, type FigureLook } from './model/figure-look.ts';
-import { isNameAllowed } from './name-filter.ts';
+import { cleanSharedName, isNameAllowed } from './name-filter.ts';
 import { decodeShareCode, type ShareDecodeError, type ShareKind } from './share-code.ts';
 import { issue, type RecipeLimits, type ValidationIssue } from './validation.ts';
 
@@ -50,7 +50,8 @@ function filterBot(bot: BotDocument, path: string, warnings: ValidationIssue[]):
     typeof bot.look === 'object' && bot.look !== null && !Array.isArray(bot.look)
       ? normalizeFigureLook(bot.look as Partial<FigureLook>)
       : null;
-  if (isNameAllowed(bot.name)) return { ...bot, look };
+  const name = cleanSharedName(bot.name, bot.name.length);
+  if (isNameAllowed(name)) return { ...bot, name, look };
   warnings.push(issue(path, 'name.blocked'));
   return { ...bot, name: '', look };
 }
@@ -90,15 +91,21 @@ export function importShareDoc(kind: ShareKind, doc: unknown, limits: RecipeLimi
       return { ok: false, error: 'invalid', issues: [issue(`embeddedBots[${longId}].id`, 'bot.invalidField')] };
     const warnings = [...r.warnings];
     let preset: MatchRecipe = r.value;
-    if (preset.name !== undefined && !isNameAllowed(preset.name)) {
-      warnings.push(issue('name', 'name.blocked'));
+    if (preset.name !== undefined) {
+      const name = cleanSharedName(preset.name, preset.name.length);
       const { name: _name, ...rest } = preset;
-      preset = rest;
+      if (name !== '' && isNameAllowed(name)) preset = { ...rest, name };
+      else {
+        if (name !== '') warnings.push(issue('name', 'name.blocked'));
+        preset = rest;
+      }
     }
     const teams = preset.teams.map((t, i): TeamRecipe => {
-      if (t.name === undefined || isNameAllowed(t.name)) return t;
-      warnings.push(issue(`teams[${i}].name`, 'name.blocked'));
+      if (t.name === undefined) return t;
+      const name = cleanSharedName(t.name, t.name.length);
       const { name: _name, ...rest } = t;
+      if (name !== '' && isNameAllowed(name)) return { ...rest, name };
+      if (name !== '') warnings.push(issue(`teams[${i}].name`, 'name.blocked'));
       return rest;
     });
     const bots = preset.embeddedBots?.map((b, i) => filterBot(b, `embeddedBots[${i}].name`, warnings));

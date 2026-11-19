@@ -96,7 +96,12 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
   // quem recarrega (ou o jogo, ao aplicar uma versão nova no título) não cai de novo na mesma sala.
   const hash = window.location.hash;
   const onlineLink = !bench && !switchTitle && /(^#|&)sala=/i.test(hash) ? hash : undefined;
-  if (onlineLink !== undefined) history.replaceState(null, '', window.location.pathname + window.location.search);
+  // M8 (fase 1): o link de um código (`#bot=…`, `#p=…`): o mesmo jeito (quem abre é o pedaço dos editores).
+  const shareLink =
+    !bench && !switchTitle && onlineLink === undefined && /(^#|&)(bot|p)=/.test(hash) ? hash : undefined;
+  if (onlineLink !== undefined || shareLink !== undefined) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
   const online = onlineVisible(new URLSearchParams(window.location.search), onlineLink !== undefined);
   const game = startGame({
     platform: switchTitle ? asSwitchTitlePlatform(platform) : platform,
@@ -112,6 +117,8 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
     // M5 (fase 4c): o Online (as telas, a sala e o núcleo do `net`) vem com o chunk da cena e a rede de verdade (o
     // Trystero, `@boboforces/net/rtc`) num chunk só dela, pedidos juntos ao abrir o botão do título. Fora do bench e da prévia do título do Switch. `?sinal=local`: as abas do mesmo navegador se acham sem relay (o teste).
     ...(onlineLink !== undefined ? { onlineLink } : {}),
+    ...(shareLink !== undefined ? { shareLink } : {}),
+    shareLinkFor: (h: string) => window.location.origin + window.location.pathname + h,
     ...(bench || switchTitle || !online
       ? {}
       : {

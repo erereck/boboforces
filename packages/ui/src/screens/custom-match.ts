@@ -2,8 +2,8 @@ import type { StringKey } from '../strings.pt-BR.ts';
 import type { Screen } from '../tree.ts';
 import { buildTabbed, TABBED_LAYOUT } from './tabbed.ts';
 // M6 (fase 2): as ações moram em `editor-actions.ts` (o menu da web não leva a tela por causa delas).
-import { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_TAB_PREFIX } from './editor-actions.ts';
-export { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_TAB_PREFIX };
+import { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_SHARE_ROW, CUSTOM_TAB_PREFIX } from './editor-actions.ts';
+export { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_SHARE_ROW, CUSTOM_TAB_PREFIX };
 
 /**
  * M2 (fase 4e): Partida personalizada (gameplay.md §10.1 e §10.3; arte-ux.md §6.3), no esqueleto de abas com linhas
@@ -30,6 +30,8 @@ export interface CustomMatchState {
   readonly help?: string;
   /** M5 (fase 4c): aberta pela sala do Online: o Começar vira "Usar na sala" (a partida volta para a sala). */
   readonly forRoom?: boolean;
+  /** M8 (fase 1): a linha Compartilhar no fim da aba (código e link do preset; só na web). */
+  readonly share?: boolean;
 }
 
 /** Medidas (px de referência): a coluna das linhas e a altura da janela dela. */
@@ -42,7 +44,12 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       titleKey: 'custom.title',
       tabs: state.tabs,
       tab: state.tab,
-      rows: state.rows.map((r) => ({ kind: 'option', id: r.id, labelKey: r.labelKey, value: r.value })),
+      rows: [
+        ...state.rows.map((r) => ({ kind: 'option' as const, id: r.id, labelKey: r.labelKey, value: r.value })),
+        ...(state.share === true
+          ? [{ kind: 'action' as const, id: CUSTOM_SHARE_ROW, label: { key: 'custom.share' as const } }]
+          : []),
+      ],
       summary: state.summary,
       note: state.note,
       ...(state.help !== undefined ? { help: state.help } : {}),

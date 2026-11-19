@@ -9,6 +9,8 @@ export const CUSTOM_ACTION = { start: 'start', save: 'save', back: 'back', watch
 /** Ação de uma aba (`tab:<índice>`) e de uma linha (`row:<id>`). */
 export const CUSTOM_TAB_PREFIX = TABBED_TAB_PREFIX;
 export const CUSTOM_ROW_PREFIX = TABBED_ROW_PREFIX;
+/** M8 (fase 1): o id da linha Compartilhar da Partida personalizada (a ação é `row:share`). */
+export const CUSTOM_SHARE_ROW = 'share';
 
 export const LAB_ACTION = { back: 'back', test: 'test', save: 'save' } as const;
 
@@ -18,6 +20,7 @@ export const WORKSHOP_ACTION = {
   favorite: 'favorite',
   delete: 'delete',
   back: 'back',
+  share: 'share',
 } as const;
 
 /** Ação de um bot da lista: `bot:<grupo>:<id>` (o mesmo bot pode estar nos favoritos e no grupo dele). */

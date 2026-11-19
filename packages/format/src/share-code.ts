@@ -1,4 +1,5 @@
-import { deflateSync, Inflate, strFromU8, strToU8 } from 'fflate';
+import { Inflate, strFromU8 } from 'fflate';
+import { deflateLite, encodeUtf8Lite } from './deflate-lite.ts';
 
 /**
  * M8 (fase 0): os códigos de compartilhar (GDD §4.8, tecnico.md §14.3): `<prefixo>` + base64url(deflate(JSON)). O bot
@@ -71,9 +72,12 @@ export type ShareEncodeResult =
   | { readonly ok: true; readonly code: string }
   | { readonly ok: false; readonly error: 'tooLong'; readonly chars: number };
 
-/** O código de um documento (o JSON compacto, deflate no nível 9). Passou de 4.000 caracteres: `tooLong`. */
+/**
+ * O código de um documento (o JSON compacto no deflate pequeno: o do `fflate` levaria o compressor para o menu da web).
+ * Passou de 4.000 caracteres: `tooLong`.
+ */
 export function encodeShareCode(kind: ShareKind, doc: unknown): ShareEncodeResult {
-  const bytes = deflateSync(strToU8(JSON.stringify(doc)), { level: 9 });
+  const bytes = deflateLite(encodeUtf8Lite(JSON.stringify(doc)));
   const code = SHARE_CODE_PREFIX[kind] + encodeBase64Url(bytes);
   return code.length > SHARE_CODE_MAX_CHARS ? { ok: false, error: 'tooLong', chars: code.length } : { ok: true, code };
 }
