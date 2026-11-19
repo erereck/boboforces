@@ -561,3 +561,52 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
     expect(a.hash, msg).toBe(GOLDEN_CHAOS_HASH);
   }, 240_000);
 });
+
+/**
+ * M6 (fase 5): o Bobo Paintball (4 contra 4, 1 acerto derruba, renasce em 1 s) com 8 bots Normal no Construto, semente
+ * 42, até 50 abates ou 3 min. Confere que os bots acertam a bola de tinta (adiantando o voo e a queda), que o placar
+ * anda e o hash entre execuções. Gravado na fase 5 (19/11/2026): `855196e7` (43 × 35 em 3 min, com o balde). MUDA com a sim, a IA, o
+ * mapa ou as armas de tinta.
+ */
+const GOLDEN_PAINTBALL_HASH = '855196e7';
+
+function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
+  const { map } = loadWorld();
+  const normal = builtinBotRef('normal');
+  const recipe: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'paintball',
+    map: 'construto',
+    seed: 42,
+    match: { timeLimitS: 180, scoreLimit: 50 },
+    players: { respawnS: 1 },
+    weapons: { ammo: 'infiniteReserve' },
+    paintball: {},
+    teams: [{ bots: [{ ref: normal, count: 4 }] }, { bots: [{ ref: normal, count: 4 }] }],
+  };
+  const match = createHeadlessMatch({ recipe, map, humans: 0 });
+  let t = 0;
+  for (; t < 10_900 && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    score: [v.match.teamScore[0]!, v.match.teamScore[1]!],
+    ticks: t,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Paintball (M6, fase 5) com bots no Construto', () => {
+  it('os bots acertam a tinta e o placar anda; hash estável', () => {
+    const a = runPaintballGolden();
+    const b = runPaintballGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `placar ${a.score.join('×')}, fase ${a.phase} em ${a.ticks} ticks`;
+    console.log(`[paintball] ${msg} · hash ${a.hash}`);
+    expect(a.score[0]! + a.score[1]!, msg).toBeGreaterThan(20);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.hash, msg).toBe(GOLDEN_PAINTBALL_HASH);
+  }, 240_000);
+});

@@ -10,6 +10,8 @@ export type ParticleKind = (typeof PARTICLE_KIND)[keyof typeof PARTICLE_KIND];
 
 export interface ParticleRing {
   readonly capacity: number;
+  /** M6 (fase 5): até onde o anel dá a volta (≤ `capacity`; o das manchas de tinta usa o teto da plataforma). */
+  limit: number;
   readonly data: Float32Array;
   /** Próxima posição a escrever. */
   next: number;
@@ -25,6 +27,7 @@ export interface ParticleRing {
 export function createParticleRing(capacity: number): ParticleRing {
   return {
     capacity,
+    limit: capacity,
     data: new Float32Array(capacity * PARTICLE_FLOATS),
     next: 0,
     written: 0,
@@ -103,8 +106,8 @@ export function resetParticleSpec(s: ParticleSpec): void {
 /** Escreve a partícula nascendo agora (`time`, relógio do passe). Devolve a posição no anel. */
 export function emitParticle(ring: ParticleRing, s: Readonly<ParticleSpec>, time: number): number {
   const slot = ring.next;
-  ring.next = (slot + 1) % ring.capacity;
-  if (ring.written < ring.capacity) ring.written++;
+  ring.next = (slot + 1) % ring.limit;
+  if (ring.written < ring.limit) ring.written++;
   if (ring.dirtyMin < 0) {
     ring.dirtyMin = slot;
     ring.dirtyMax = slot;

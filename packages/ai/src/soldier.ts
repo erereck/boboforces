@@ -881,6 +881,15 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     dz = view.position[t3 + 2]! + view.velocity[t3 + 2]! * flight - ez;
     horiz = Math.sqrt(dx * dx + dz * dz);
     dist = Math.sqrt(horiz * horiz + dy * dy);
+  } else if (held !== null && held.fire === WEAPON_FIRE.projectile && held.projectileSpeed > 0) {
+    // M6 (fase 5): a bola de tinta: no ponto de sempre, adiantado pelo voo, e mais alto pela queda (½·g·t²).
+    const t3 = tg * 3;
+    const flight = dist / held.projectileSpeed;
+    dx += view.velocity[t3]! * flight;
+    dy += 0.5 * held.projectileGravity * flight * flight;
+    dz += view.velocity[t3 + 2]! * flight;
+    horiz = Math.sqrt(dx * dx + dz * dz);
+    dist = Math.sqrt(horiz * horiz + dy * dy);
   }
   let goalYaw = Math.atan2(-dx, -dz);
   let goalPitch = Math.atan2(dy, horiz);
@@ -1527,6 +1536,7 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
       buttons |= BUTTON.crouch;
     } else if (
       b.intelligence.retreat &&
+      !c.noRegen &&
       b.coverPhase === COVER_PHASE.none &&
       tick >= b.coverCooldownUntil &&
       view.health[e]! < retreatBelow(b) * b.maxHp

@@ -90,6 +90,11 @@ export const FX_RING_SIZES = { additive: 384, alpha: 384, decal: 256 } as const;
 export const FX_QUEUE_CAPACITY = 256;
 /** Teto de cubinhos por pedido (a fila pode pedir mais; o pool é o limite real). */
 const MAX_CUBES_PER_EVENT = 16;
+/** M6 (fase 5): o anel das manchas de tinta (o teto do PC, U6) e quanto cada uma fica (até a mais velha sair). */
+export const PAINT_RING_SIZE = 96;
+export const PAINT_LIFE_S = 600;
+/** O anel das bolas de tinta em voo (cada uma vive um quadro e pouco). */
+const PAINT_BALL_RING_SIZE = 192;
 /** Vida da marca de tiro (GDD §5.5). */
 export const DECAL_LIFE_S = 20;
 /** Centro do corpo de pé (m acima dos pés, × escala): metade da altura do boneco (#56). */
@@ -151,11 +156,17 @@ export function createFxPass(ctx: PassContext): FxPass {
     additive: createParticleRing(FX_RING_SIZES.additive),
     alpha: createParticleRing(FX_RING_SIZES.alpha),
     decal: createParticleRing(FX_RING_SIZES.decal),
+    // M6 (fase 5): as manchas de tinta, num anel delas (o teto é o da plataforma, que vem em cada pedido), e as bolas
+    // em voo, num anel delas também (uma partícula por bola por quadro não empurra a fumaça do anel alfa).
+    paint: createParticleRing(PAINT_RING_SIZE),
+    balls: createParticleRing(PAINT_BALL_RING_SIZE),
   };
   const ringMeshes: [ParticleRing, ParticleMesh][] = [
     [rings.additive, createParticleMesh(quad, rings.additive.data, additive, 'fx-aditivo')],
     [rings.alpha, createParticleMesh(quad, rings.alpha.data, alpha, 'fx-alfa')],
     [rings.decal, createParticleMesh(quad, rings.decal.data, decal, 'fx-marcas')],
+    [rings.paint, createParticleMesh(quad, rings.paint.data, decal, 'fx-tinta')],
+    [rings.balls, createParticleMesh(quad, rings.balls.data, alpha, 'fx-bolas')],
   ];
   for (const [, pm] of ringMeshes) root.add(pm.mesh);
 
@@ -762,6 +773,52 @@ export function createFxPass(ctx: PassContext): FxPass {
   }
 
   /** M2: rastro do foguete (uma fumacinha clara que cresce e sobe, e a chama colada na traseira). */
+  /** M6 (fase 5): a bola de tinta em voo: um ponto da cor do time que dura um quadro e pouco. */
+  function paintBall(o: number): void {
+    const d = pending.data;
+    resetParticleSpec(spec);
+    spec.kind = PARTICLE_KIND.round;
+    spec.x = d[o]!;
+    spec.y = d[o + 1]!;
+    spec.z = d[o + 2]!;
+    spec.size = 0.11;
+    spec.life = 0.045;
+    setColor(d[o + 6]!, 1);
+    emitParticle(rings.balls, spec, clock);
+  }
+
+  /** M6 (fase 5): a mancha de tinta (decal) na superfície; o anel dá a volta no teto da plataforma. */
+  function paint(o: number, frame: FrameContext): void {
+    const d = pending.data;
+    const cap = d[o + 8]!;
+    const limit = Math.max(1, Math.min(PAINT_RING_SIZE, Math.round(cap)));
+    if (rings.paint.limit !== limit) {
+      clearParticleRing(rings.paint);
+      rings.paint.limit = limit;
+    }
+    // A luz do lugar da mancha (um pouco para fora da superfície).
+    sample(
+      frame.world?.lightGrid ?? null,
+      d[o]! + d[o + 3]! * 0.1,
+      d[o + 1]! + d[o + 4]! * 0.1,
+      d[o + 2]! + d[o + 5]! * 0.1,
+    );
+    resetParticleSpec(spec);
+    lit();
+    spec.kind = PARTICLE_KIND.paint;
+    spec.x = d[o]!;
+    spec.y = d[o + 1]!;
+    spec.z = d[o + 2]!;
+    spec.x1 = d[o + 3]!;
+    spec.y1 = d[o + 4]!;
+    spec.z1 = d[o + 5]!;
+    spec.size = d[o + 7]!;
+    spec.life = PAINT_LIFE_S;
+    spec.rotation = rng.range(0, Math.PI * 2);
+    setColor(d[o + 6]!, 1);
+    emitParticle(rings.paint, spec, clock);
+  }
+
   function trail(o: number, frame: FrameContext): void {
     const d = pending.data;
     const bx = d[o]! - d[o + 3]! * 0.3;
@@ -824,6 +881,12 @@ export function createFxPass(ctx: PassContext): FxPass {
           break;
         case FX_KIND.trail:
           trail(o, frame);
+          break;
+        case FX_KIND.paintBall:
+          paintBall(o);
+          break;
+        case FX_KIND.paint:
+          paint(o, frame);
           break;
         default:
           break;

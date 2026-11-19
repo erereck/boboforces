@@ -24,6 +24,10 @@ export const FX_KIND = {
   explosion: 8,
   /** M2: rastro do foguete em voo (fumacinha + chama), um por projétil por frame. */
   trail: 9,
+  /** M6 (fase 5): a bola de tinta em voo (um ponto na cor do time, um por bola por frame). */
+  paintBall: 10,
+  /** M6 (fase 5): a mancha de tinta (decal na cor do time), no anel das manchas com o teto da plataforma. */
+  paint: 11,
 } as const;
 export type FxKind = (typeof FX_KIND)[keyof typeof FX_KIND];
 
@@ -43,6 +47,8 @@ export const FX_STRIDE = 16;
  *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum); `entity` = vítima
  * - explosion (M2): 0–2 centro (m), 3 raio (m)
  * - trail (M2): 0–2 posição (m), 3–5 direção de voo (unitária; a fumaça sai para trás)
+ * - paintBall (M6): 0–2 posição (m), 6 cor 0xRRGGBB
+ * - paint (M6): 0–2 ponto (m), 3–5 normal da superfície, 6 cor 0xRRGGBB, 7 tamanho (m), 8 teto de manchas
  */
 export interface FxQueue {
   readonly capacity: number;
@@ -266,5 +272,40 @@ export function pushTrail(
   if (o < 0) return false;
   put3(q.data, o, x, y, z);
   put3(q.data, o + 3, dirX, dirY, dirZ);
+  return true;
+}
+
+/** M6 (fase 5): a bola de tinta em voo em (x, y, z), na cor `color`. */
+export function pushPaintBall(q: FxQueue, x: number, y: number, z: number, color: number): boolean {
+  const o = slot(q, FX_KIND.paintBall, 0);
+  if (o < 0) return false;
+  put3(q.data, o, x, y, z);
+  q.data[o + 6] = color;
+  return true;
+}
+
+/**
+ * M6 (fase 5): a mancha de tinta no ponto (na superfície de normal (nx, ny, nz)), na cor `color`, com `size` m; `cap` é
+ * o teto de manchas da plataforma (a mais velha some).
+ */
+export function pushPaint(
+  q: FxQueue,
+  x: number,
+  y: number,
+  z: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  color: number,
+  size: number,
+  cap: number,
+): boolean {
+  const o = slot(q, FX_KIND.paint, 0);
+  if (o < 0) return false;
+  put3(q.data, o, x, y, z);
+  put3(q.data, o + 3, nx, ny, nz);
+  q.data[o + 6] = color;
+  q.data[o + 7] = size;
+  q.data[o + 8] = cap;
   return true;
 }

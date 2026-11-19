@@ -209,6 +209,8 @@ export interface SimContext {
   readonly zombieProfile: MovementProfile;
   readonly ffa: boolean;
   readonly warfare: boolean;
+  /** M6 (fase 5): o Bobo Paintball: os acertos de tinta que derrubam (0 = fora dele). */
+  readonly paintHits: number;
   /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
   readonly training: boolean;
   readonly hz: number;

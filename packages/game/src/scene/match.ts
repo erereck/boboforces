@@ -67,12 +67,15 @@ import {
 import {
   ACTOR_KIND,
   ACTOR_POSE,
+  type ActorBuffer,
   createActorBuffer,
   createEnvironment,
   createFxQueue,
   createProjectileBuffer,
   createRenderDebug,
   createViewDesc,
+  type FxDeath,
+  type MipFilterMode,
   NO_FIGURE,
   NO_MODEL,
   pushActorImpact,
@@ -81,70 +84,74 @@ import {
   pushDebris,
   pushExplosion,
   pushMuzzleFlash,
+  pushPaint,
+  pushPaintBall,
   pushPropImpact,
   pushTracer,
   pushTrail,
   resetFxQueue,
-  viewmodelAimOffset,
-  VIEWMODEL_POSE,
-  type ActorBuffer,
-  type FxDeath,
-  type MipFilterMode,
   type ViewDesc,
+  VIEWMODEL_POSE,
+  viewmodelAimOffset,
 } from '@boboforces/render/data';
 import { clamp, createLogger, HALF_PI, lerp, lerpAngle, pitchToI16, wrapAngle, yawToU16 } from '@boboforces/shared';
 import {
+  BOX,
+  BOX_PHASE,
+  CHAOS_MODS,
   ENTITY_FLAG,
   ENTITY_KIND,
   entityIndex,
   expandRecipe,
   eyeHeightFor,
-  GRENADE_THROW,
-  predictThrow,
   figurePostureOf,
-  CHAOS_MODS,
+  GRENADE_THROW,
+  heldClip,
+  heldReserve,
   isFfaMode,
+  isPaintWeapon,
   juggernautHp,
-  MOD,
   makeEntityId,
   MATCH_DEFAULTS,
-  METRICS,
-  NO_TEAM,
+  MAX_CONTROLLERS,
   MAX_ZOMBIES,
+  METRICS,
+  MOD,
+  NO_TEAM,
   NULL_ENTITY,
-  BOX,
-  BOX_PHASE,
+  PERK,
+  PERK_IDS,
+  PICKUP_KIND,
+  predictThrow,
+  resolveMovementProfile,
+  type Sim,
+  type SimEvent,
+  type SimView,
+  SPREAD_STATE_MULTIPLIER,
+  SPREAD_WALKING_SPEED,
+  WEAPON_BIG_BRRT,
+  WEAPON_CHAOS_BLAST,
+  WEAPON_CODE,
+  WEAPON_DESMONTADOR,
+  WEAPON_FIRE,
+  WEAPON_GOO,
+  WEAPON_KILL_PLANE,
+  WEAPON_NONE,
+  WEAPON_PAINT_BUCKET,
+  WEAPON_PAINT_MARKER,
+  WEAPON_PAINT_PUMP,
+  WEAPON_PAINT_SNIPER,
+  WEAPON_SLOT,
+  WEAPON_SPIT,
+  weaponDef,
+  weaponGrip,
+  WEAPONS,
   ZOMBIE_BARRICADES,
   ZOMBIE_BOX,
   ZOMBIE_PERKS,
   ZOMBIE_SHOP,
-  PERK,
-  PERK_IDS,
-  PICKUP_KIND,
-  ZOMBIES_DOWN,
-  heldClip,
-  heldReserve,
-  MAX_CONTROLLERS,
-  WEAPON_CODE,
-  WEAPON_BIG_BRRT,
-  WEAPON_CHAOS_BLAST,
-  WEAPON_DESMONTADOR,
-  WEAPON_GOO,
-  WEAPON_SPIT,
-  WEAPON_FIRE,
-  WEAPON_KILL_PLANE,
   ZOMBIE_TYPE,
-  WEAPON_NONE,
-  WEAPON_SLOT,
-  weaponDef,
-  WEAPONS,
-  weaponGrip,
-  type Sim,
-  type SimEvent,
-  type SimView,
-  resolveMovementProfile,
-  SPREAD_STATE_MULTIPLIER,
-  SPREAD_WALKING_SPEED,
+  ZOMBIES_DOWN,
 } from '@boboforces/sim';
 import {
   ageKillFeed,
@@ -204,7 +211,7 @@ import {
   type StringKey,
   type UiFonts,
 } from '@boboforces/ui';
-import { sampleLightGrid } from '@boboforces/world';
+import { CELLS_PER_METER, isCellSolid, sampleLightGrid } from '@boboforces/world';
 import { seatRecipe, type LocalSeat } from './seats.ts';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
@@ -468,6 +475,15 @@ const MEMORY_LOG_EVERY_S = 60;
 const NET_LOG_EVERY_S = 30;
 /** M6 (fase 1): a letra do ponto do Domination fica a esta altura acima do anel (m). */
 const POINT_MARK_HEIGHT_M = 2.2;
+/** M6 (fase 5): as cores da tinta por time (as do placar, em 0xRRGGBB) e o tamanho das manchas (m). */
+const PAINT_COLORS = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff] as const;
+const PAINT_BALL_SPLAT_M = 0.45;
+const PAINT_BUCKET_SPLAT_M = 1.8;
+/** Onde procurar o bloco da superfície (o chão primeiro) e a quantos metros do ponto da tinta. */
+const PAINT_PROBES = [0, -1, 0, 1, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 0] as const;
+const PAINT_PROBE_M = 0.12;
+/** Acima disto (m) entre o snapshot anterior e o atual, a bola é outra no mesmo lugar do pool (sem interpolar). */
+const PAINT_JUMP_M = 12;
 /** M6 (fase 4b): pedidos de confete da Festa por quadro (cada um, 2 punhados de 4 cubinhos). */
 const CONFETTI_PER_FRAME = 4;
 /** M6 (fase 3): a altura da plaquinha JUGG acima dos pés do Jugg (m). */
@@ -873,11 +889,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M6 (fase 3): a Big Brrt (só do Jugg) também. Fase 4: a explosão do "tudo explode" no kill feed.
   weaponNames[WEAPON_BIG_BRRT] = t('weapon.big-brrt' as StringKey);
   weaponNames[WEAPON_CHAOS_BLAST] = t('weapon.chaos-blast' as StringKey);
+  // M6 (fase 5): as armas de tinta do Paintball.
+  for (const code of [WEAPON_PAINT_MARKER, WEAPON_PAINT_PUMP, WEAPON_PAINT_SNIPER, WEAPON_PAINT_BUCKET]) {
+    weaponNames[code] = t(`weapon.${weaponDef(code)!.id}` as StringKey);
+  }
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
   weaponCategories[WEAPON_DESMONTADOR] = t('weapon.category.explosive');
   weaponCategories[WEAPON_BIG_BRRT] = t('weapon.category.lmg');
+  for (const code of [WEAPON_PAINT_MARKER, WEAPON_PAINT_PUMP, WEAPON_PAINT_SNIPER, WEAPON_PAINT_BUCKET]) {
+    weaponCategories[code] = t('weapon.category.paint' as StringKey);
+  }
   // M2 (fase 2c): tela de morte. Nomes por controlador, textos da faixa e as opções do radial (resolvidos uma vez).
   const names = controllerNames(recipe, humans);
   // M5 (fase 4c): online, cada humano com o nome que escolheu na sala (o filtro do atlas: veio de outro aparelho).
@@ -992,16 +1015,29 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const desmontadorModel = modelIndex.get('desmontador') ?? NO_MODEL;
   const boltModel = modelIndex.get('desmontador-bolt') ?? NO_MODEL;
   const bigBrrtModel = modelIndex.get('big-brrt') ?? weaponModel[WEAPON_CODE.lmg]!;
+  /** M6 (fase 5): as armas de tinta usam os modelos do arsenal (SMG, escopeta, sniper e granada) até a arte delas. */
+  const paintModel = (code: number): number =>
+    weaponModel[
+      code === WEAPON_PAINT_MARKER
+        ? WEAPON_CODE.smg
+        : code === WEAPON_PAINT_PUMP
+          ? WEAPON_CODE.shotgun
+          : code === WEAPON_PAINT_SNIPER
+            ? WEAPON_CODE.sniper
+            : WEAPON_CODE.grenade
+    ]!;
   const modelOf = (code: number): number =>
     code === WEAPON_DESMONTADOR
       ? desmontadorModel
-      : code === WEAPON_BIG_BRRT
-        ? bigBrrtModel
-        : code === WEAPON_SPIT
-          ? weaponModel[WEAPON_CODE.grenade]!
-          : code >= 0 && code < weaponModel.length
-            ? weaponModel[code]!
-            : NO_MODEL;
+      : isPaintWeapon(code)
+        ? paintModel(code)
+        : code === WEAPON_BIG_BRRT
+          ? bigBrrtModel
+          : code === WEAPON_SPIT
+            ? weaponModel[WEAPON_CODE.grenade]!
+            : code >= 0 && code < weaponModel.length
+              ? weaponModel[code]!
+              : NO_MODEL;
   /** M3 (fase 4d): o modelo de cada drop (munição cheia, bomba, pontos em dobro, insta-kill, carpinteiro). */
   const dropModels = [
     ammoBoxModel,
@@ -1771,6 +1807,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         }
         case 'explosion': {
+          // M6 (fase 5): a tinta: a mancha na superfície (sem fogo, sem tremer a tela) e um respingo da cor do time.
+          if (isPaintWeapon(ev.weapon)) {
+            paintSplat(v, ev.x, ev.y, ev.z, entityIndex(ev.owner), ev.radius);
+            break;
+          }
           // M3 (fase 5c): a gosma do Chonker é uma chuva de cubinhos verdes (sem fogo); o raio do Desmontador solta
           // faíscas verdes além da explosão.
           if (ev.weapon === WEAPON_GOO || ev.weapon === WEAPON_DESMONTADOR) {
@@ -1807,6 +1848,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (ev.action === 'launch') {
             const j = entityIndex(ev.owner);
             if (j < shotAt.length) shotAt[j] = timeS;
+          }
+          // M6 (fase 5): o marcador de tinta recua e põe o boneco atirando, sem o clarão do foguete.
+          if (ev.action === 'launch' && isPaintWeapon(ev.weapon) && ev.weapon !== WEAPON_PAINT_BUCKET) {
+            const j = entityIndex(ev.owner);
+            if (j < recoil.length) {
+              recoil[j] = 1;
+              firing[j] = FIRING_S;
+            }
+            break;
           }
           if (ev.action !== 'launch' || ev.weapon !== WEAPON_CODE.rocket) break;
           const i = entityIndex(ev.owner);
@@ -3313,6 +3363,28 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (let p = 0; p < pv.count && n < projectiles.capacity; p++) {
       if (pv.alive[p] !== 1) continue;
       const code = pv.weapon[p]!;
+      // M6 (fase 5): a bola de tinta é um ponto na cor do time de quem atirou (o balde voa com o modelo).
+      if (isPaintWeapon(code) && code !== WEAPON_PAINT_BUCKET) {
+        const o3 = p * 3;
+        // Um salto grande do anterior para o atual é outra bola no mesmo lugar do pool (no amigo online): sem lerp.
+        const jx = pv.position[o3]! - pv.prevPosition[o3]!;
+        const jy = pv.position[o3 + 1]! - pv.prevPosition[o3 + 1]!;
+        const jz = pv.position[o3 + 2]! - pv.prevPosition[o3 + 2]!;
+        const a = jx * jx + jy * jy + jz * jz > PAINT_JUMP_M * PAINT_JUMP_M ? 1 : alpha;
+        const bx = lerp(pv.prevPosition[o3]!, pv.position[o3]!, a);
+        const by = lerp(pv.prevPosition[o3 + 1]!, pv.position[o3 + 1]!, a);
+        const bz = lerp(pv.prevPosition[o3 + 2]!, pv.position[o3 + 2]!, a);
+        // A bola recém-saída do olho de quem atirou fica escondida até 1,5 m (senão tapa a mira dele), como o foguete.
+        const shooter = entityIndex(pv.owner[p]!);
+        if (shooter < v.count && v.alive[shooter] === 1) {
+          const ox = v.position[shooter * 3]! - bx;
+          const oy = v.position[shooter * 3 + 1]! + eyeHeightFor(v.flags[shooter]!) - by;
+          const oz = v.position[shooter * 3 + 2]! - bz;
+          if (ox * ox + oy * oy + oz * oz < PROJECTILE_HIDE_NEAR_EYE_M * PROJECTILE_HIDE_NEAR_EYE_M) continue;
+        }
+        pushPaintBall(fx, bx, by, bz, paintColorOf(v, shooter));
+        continue;
+      }
       const model =
         code === WEAPON_CODE.rocket ? rocketShellModel : code === WEAPON_DESMONTADOR ? boltModel : modelOf(code);
       if (model === NO_MODEL) continue;
@@ -3608,6 +3680,55 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     lost: t('feed.pointLost'),
     points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
   };
+  /** M6 (fase 5): a cor da tinta de quem atirou (a do time; sem time, a do Laranja). */
+  function paintColorOf(v: SimView, owner: number): number {
+    const team = owner >= 0 && owner < v.count ? v.team[owner]! : 0;
+    return PAINT_COLORS[team] ?? PAINT_COLORS[0]!;
+  }
+  /** O teto de manchas da plataforma (U6: 96 no PC, 48 no celular, 32 no Switch). */
+  const paintCap = profile.family === 'switch' ? 32 : profile.family === 'mobile' ? 48 : 96;
+  const paintNormal = new Float32Array(3);
+  /**
+   * A normal da superfície onde a tinta bateu: a explosão da bola fica 5 cm para fora dela, então o bloco vizinho
+   * sólido mais perto diz a face (o chão primeiro). Sem bloco por perto (no ar, num bobo ou numa prop), `false`.
+   */
+  function surfaceNormal(v: SimView, x: number, y: number, z: number): boolean {
+    for (let k = 0; k < PAINT_PROBES.length; k += 3) {
+      const dx = PAINT_PROBES[k]!;
+      const dy = PAINT_PROBES[k + 1]!;
+      const dz = PAINT_PROBES[k + 2]!;
+      const cx = Math.floor((x + dx * PAINT_PROBE_M) * CELLS_PER_METER);
+      const cy = Math.floor((y + dy * PAINT_PROBE_M) * CELLS_PER_METER);
+      const cz = Math.floor((z + dz * PAINT_PROBE_M) * CELLS_PER_METER);
+      if (cx < 0 || cz < 0 || cx >= v.world.sizeX || cz >= v.world.sizeZ) return false;
+      if (isCellSolid(v.world, v.blocks, cx, cy, cz)) {
+        paintNormal[0] = -dx;
+        paintNormal[1] = -dy;
+        paintNormal[2] = -dz;
+        return true;
+      }
+    }
+    return false;
+  }
+  /** A tinta que estourou: a mancha (bola pequena, balde grande) e o respingo. */
+  function paintSplat(v: SimView, x: number, y: number, z: number, owner: number, radius: number): void {
+    const color = paintColorOf(v, owner);
+    if (surfaceNormal(v, x, y, z)) {
+      pushPaint(
+        fx,
+        x - paintNormal[0]! * 0.04,
+        y - paintNormal[1]! * 0.04,
+        z - paintNormal[2]! * 0.04,
+        paintNormal[0]!,
+        paintNormal[1]!,
+        paintNormal[2]!,
+        color,
+        radius > 0 ? PAINT_BUCKET_SPLAT_M : PAINT_BALL_SPLAT_M,
+        paintCap,
+      );
+    }
+    pushDebris(fx, x, y, z, 0, 1.5, 0, color, radius > 0 ? 14 : 5, radius > 0 ? 3 : 1.6);
+  }
   /** M6 (fase 4b): o modificador está ligado agora (pela máscara que a view mostra)? */
   function chaosOn(bit: number): boolean {
     const c = sim.view().chaos;
@@ -3941,7 +4062,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const phase = walkPhase[e] ?? 0;
     const kick = recoil[e] ?? 0;
     // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
-    const tweak = VIEWMODEL_TWEAK[v.weapon[e]!] ?? null;
+    // M6 (fase 5): a sniper de tinta usa o modelo (e o ajuste) da sniper.
+    const vmCode = v.weapon[e] === WEAPON_PAINT_SNIPER ? WEAPON_CODE.sniper : v.weapon[e]!;
+    const tweak = VIEWMODEL_TWEAK[vmCode] ?? null;
     const away = 1 - ads;
     // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
     // 0,6 em 3–4P deixavam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P). M3 (fase 1d): a vista
@@ -4018,7 +4141,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const ey = v.position[e * 3 + 1]! + 1;
     const ez = v.position[e * 3 + 2]!;
     for (let i = 0; i < p.count && m.nadeCount < MAX_GRENADE_WARNINGS; i++) {
-      if (p.alive[i] !== 1 || p.weapon[i] !== WEAPON_CODE.grenade || p.owner[i] === me) continue;
+      if (p.alive[i] !== 1 || p.owner[i] === me) continue;
+      if (p.weapon[i] !== WEAPON_CODE.grenade && p.weapon[i] !== WEAPON_PAINT_BUCKET) continue;
       const dx = p.position[i * 3]! - ex;
       const dy = p.position[i * 3 + 1]! - ey;
       const dz = p.position[i * 3 + 2]! - ez;
@@ -4337,7 +4461,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.grenades =
       held && held.fire === WEAPON_FIRE.thrown
         ? -1
-        : v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable] === WEAPON_CODE.grenade
+        : weaponDef(v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!)?.fire === WEAPON_FIRE.thrown
           ? v.slotClip[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!
           : -1;
     m.crosshair =

@@ -195,6 +195,21 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M6 (fase 5): Bobo Paintball: as bolas de tinta e os abates chegam iguais ao amigo', () => {
+    const base = moreModePreset('paintball')!;
+    const r: MatchRecipe = { ...base, match: { ...base.match, timeLimitS: 90 } };
+    const run = playRoom(r, [0, 1], { snapshotHz: 30, zombies: 0, maxS: 120 });
+    expectSameResult(run);
+    const h = run.host.sim.view().match.teamScore;
+    expect(h[0]! + h[1]!).toBeGreaterThan(5);
+    const net = run.clients[0]!.net!;
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    console.log(
+      `[modos] Bobo Paintball: ${run.seconds.toFixed(1)} s, placar ${h[0]}×${h[1]}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 240_000);
+
   it('M6 (fase 4): Bobo Chaos com a Roleta a cada 20 s: os modificadores chegam iguais e a predição anda com eles', () => {
     const base = moreModePreset('chaos')!;
     // 90 s com a troca a cada 20 s: a largada e 4 trocas; o amigo no time 0.

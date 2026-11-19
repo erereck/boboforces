@@ -1,10 +1,11 @@
 import {
   createFigureGameTable,
   DEFAULT_BOT_RULES,
-  ZOMBIES_DEFAULTS,
-  resolveBot,
   type FigureGameTable,
   type MatchRecipe,
+  PAINTBALL_DEFAULTS,
+  resolveBot,
+  ZOMBIES_DEFAULTS,
 } from '@boboforces/format';
 import { BUTTON, dequantizeAxis, type InputFrame } from '@boboforces/input';
 import {
@@ -501,6 +502,7 @@ export function createSim(config: SimConfig): Sim {
     zombieProfile: zombieSpeed(MOVEMENT_ZOMBIE, recipe),
     ffa: isFfaMode(recipe.mode),
     warfare: isWarfareMode(recipe.mode),
+    paintHits: recipe.mode === 'paintball' ? (recipe.paintball?.hits ?? PAINTBALL_DEFAULTS.hits) : 0,
     training: recipe.mode === 'training',
     hz,
     dt: 1 / hz,

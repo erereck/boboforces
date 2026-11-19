@@ -1,6 +1,7 @@
 import { DROP_KINDS } from '../view.ts';
 import { partyActive, partyKill, partyLoadout } from './party.ts';
 import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
+import { paintDamage, paintLoadout } from './paintball.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -11,6 +12,7 @@ import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
   CHAOS_BLAST,
   DEFAULT_LOADOUT_REST,
+  isPaintWeapon,
   DEFAULT_PRIMARY,
   isPrimaryWeapon,
   WEAPON_CODE,
@@ -61,10 +63,14 @@ export function damageSystem(ctx: SimContext): void {
     if ((s.flags[t]! & F.downed) !== 0 && weaponOf !== WEAPON_BLEED_OUT && weaponOf !== WEAPON_KILL_PLANE) continue;
     const source = q.attacker[i]!;
     let amount = q.amount[i]!;
+    // M6 (fase 5): no Paintball, todo dano de tinta (a bola ou o respingo do balde) é um acerto inteiro; os
+    // multiplicadores de dano não mudam o acerto, mas o fogo amigo e o "um tiro mata" abaixo continuam valendo.
+    const paint = ctx.paintHits > 0 && isPaintWeapon(weaponOf);
+    if (paint && amount > 0) amount = paintDamage(ctx, maxHpOf(ctx, t));
     // M2 (fase 3b): multiplicador de dano de quem atacou (regra do bot).
     if (source !== NULL_ENTITY && s.isCurrent(source)) {
       const a = source & 0xffff;
-      amount *= ctx.rules.damageMult[a]! * ctx.mods.damageMul;
+      if (!paint) amount *= ctx.rules.damageMult[a]! * ctx.mods.damageMul;
       // M2 (fase 4e): fogo amigo pela metade ou inteiro; um tiro mata (só dano de arma, nunca no aliado sem fogo amigo).
       if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
       if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
@@ -381,7 +387,7 @@ function kill(
     dropZombieDrop(ctx, t, 1 + ctx.rngZombies.int(0, DROP_KINDS));
   }
   // Caixinha de munição (Bobo Warfare): quem caiu no vazio não deixa (ela sumiria lá embaixo).
-  if (ctx.warfare && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);
+  if (ctx.warfare && ctx.paintHits === 0 && !zombie && weapon !== WEAPON_KILL_PLANE) dropAmmoBox(ctx, t);
   // M2 (fase 3b): "explode ao morrer" (regra do bot): a explosão do foguete no peito, de quem morreu.
   if ((ctx.rules.flags[t]! & RULE_FLAG.explodeOnDeath) !== 0 && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, WEAPON_ROCKET, s.idOf(t), -1);
@@ -400,6 +406,7 @@ function kill(
     modOn(ctx, MOD.swapOnKill) &&
     !partyActive(ctx.party) &&
     !ctx.zombiesMode &&
+    ctx.paintHits === 0 &&
     killer !== NULL_ENTITY &&
     s.isCurrent(killer)
   ) {
@@ -540,6 +547,7 @@ export function spawnSystem(ctx: SimContext): void {
     if (s.spawnProtectTicks[e]! > 0 && --s.spawnProtectTicks[e]! === 0) s.flags[e] = fl & ~F.spawnProtected;
     if (
       (ctx.warfare || ctx.zombiesMode) &&
+      ctx.paintHits === 0 &&
       s.kind[e] === ENTITY_KIND.bobo &&
       s.health[e]! < maxHpOf(ctx, e) &&
       ctx.tick - s.lastDamageTick[e]! >= ctx.regenDelayTicks
@@ -807,6 +815,8 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.weapon[e] = s.loadout[k + s.slot[e]!]!;
   // M6 (fase 2): a arma do nível (Gun Game) ou a faca do infectado.
   if (partyActive(ctx.party)) partyLoadout(ctx, e);
+  // M6 (fase 5): as armas de tinta.
+  if (ctx.paintHits > 0 && !partyActive(ctx.party)) paintLoadout(ctx, e);
   s.cookTicks[e] = -1;
   s.quickNade[e] = 0;
   s.adsAmount[e] = 0;

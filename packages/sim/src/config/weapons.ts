@@ -512,7 +512,9 @@ export function weaponDef(code: number): WeaponDef | null {
           ? BIG_BRRT
           : code === WEAPON_CHAOS_BLAST
             ? CHAOS_BLAST
-            : null;
+            : code >= WEAPON_PAINT_MARKER && code <= WEAPON_PAINT_BUCKET
+              ? PAINT_WEAPONS[code - WEAPON_PAINT_MARKER]!
+              : null;
 }
 
 /**
@@ -552,6 +554,8 @@ export const DEFAULT_PRIMARY: WeaponCode = WEAPON_CODE.rifle;
 
 /** O código serve de primária (slot 0)? */
 export function isPrimaryWeapon(code: number): boolean {
+  // M6 (fase 5): só o arsenal (`WEAPONS`): as armas de modo (Desmontador, Big Brrt, tinta) não são escolha do jogador.
+  if (code < 0 || code >= WEAPONS.length) return false;
   const def = weaponDef(code);
   return def !== null && def.slot === WEAPON_SLOT.primary;
 }
@@ -659,3 +663,99 @@ export const CHAOS_BLAST: WeaponDef = {
   selfDamageMul: 0,
   killForce: 6,
 };
+
+/**
+ * M6 (fase 5): as armas do Bobo Paintball (GDD §5.5: marcador automático, pump, sniper e balde), fora de `WEAPONS` como
+ * a Big Brrt: só o modo as dá (a primária escolhida vira a de tinta dela). A bola de tinta é um projétil de contato com
+ * queda (o ramo do foguete, sem área); o balde é uma granada que espirra em 3 m. O dano "100" vira o acerto de tinta: o
+ * modo troca pelo que derruba em `hits` acertos. Números meus (revisáveis).
+ */
+export const WEAPON_PAINT_MARKER = 14;
+export const WEAPON_PAINT_PUMP = 15;
+export const WEAPON_PAINT_SNIPER = 16;
+export const WEAPON_PAINT_BUCKET = 17;
+
+const PAINT_BALL = {
+  fire: WEAPON_FIRE.projectile,
+  damage: 100,
+  minDamage: 100,
+  falloffStartM: NO_FALLOFF,
+  falloffEndM: NO_FALLOFF,
+  fuseS: 0,
+  blastDamage: 0,
+  blastRadiusM: 0,
+  selfDamageMul: 0,
+  pellets: 1,
+  pelletSpreadDeg: 0,
+  killForce: 2,
+} as const;
+
+export const PAINT_MARKER: WeaponDef = {
+  ...WEAPON_SMG,
+  ...PAINT_BALL,
+  id: 'paint-marker',
+  code: WEAPON_PAINT_MARKER,
+  rpm: 600,
+  clipSize: 40,
+  reserve: 160,
+  reloadS: 2,
+  rangeM: 70,
+  projectileSpeed: 45,
+  projectileGravity: 6,
+  hipSpreadDeg: 2.2,
+};
+
+export const PAINT_PUMP: WeaponDef = {
+  ...WEAPON_RIFLE,
+  ...PAINT_BALL,
+  id: 'paint-pump',
+  code: WEAPON_PAINT_PUMP,
+  automatic: false,
+  rpm: 90,
+  clipSize: 8,
+  reserve: 40,
+  reloadS: 2.4,
+  rangeM: 90,
+  projectileSpeed: 65,
+  projectileGravity: 5,
+  hipSpreadDeg: 1.2,
+  grip: FIGURE_GRIP.rifle,
+};
+
+export const PAINT_SNIPER: WeaponDef = {
+  ...WEAPON_SNIPER,
+  ...PAINT_BALL,
+  id: 'paint-sniper',
+  code: WEAPON_PAINT_SNIPER,
+  rangeM: 160,
+  projectileSpeed: 110,
+  projectileGravity: 3,
+};
+
+export const PAINT_BUCKET: WeaponDef = {
+  ...WEAPON_GRENADE,
+  id: 'paint-bucket',
+  code: WEAPON_PAINT_BUCKET,
+  clipSize: 1,
+  reserve: 0,
+  blastDamage: 100,
+  blastRadiusM: 3,
+  selfDamageMul: 0,
+  killForce: 3,
+};
+
+const PAINT_WEAPONS: readonly WeaponDef[] = [PAINT_MARKER, PAINT_PUMP, PAINT_SNIPER, PAINT_BUCKET];
+
+/** A arma é de tinta (o acerto conta como acerto de tinta no Paintball)? */
+export function isPaintWeapon(code: number): boolean {
+  return code >= WEAPON_PAINT_MARKER && code <= WEAPON_PAINT_BUCKET;
+}
+
+/** A primária de tinta de quem escolheu `primary` (sniper → a de tinta; escopeta → o pump; o resto → o marcador). */
+export function paintPrimaryFor(primary: number): number {
+  return primary === WEAPON_CODE.sniper
+    ? WEAPON_PAINT_SNIPER
+    : primary === WEAPON_CODE.shotgun
+      ? WEAPON_PAINT_PUMP
+      : WEAPON_PAINT_MARKER;
+}

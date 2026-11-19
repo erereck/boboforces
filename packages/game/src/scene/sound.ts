@@ -7,22 +7,26 @@ import { GAME_SYNTH_SOUNDS, MAX_DISTANCE_M, SYNTH_SAMPLE_RATE, type AudioBus, ty
 import type { Disposable } from '@boboforces/shared';
 import {
   ENTITY_FLAG,
+  ENTITY_KIND,
   entityIndex,
   isLivePhase,
+  isPaintWeapon,
+  type MatchPhase,
   NO_TEAM,
   NULL_ENTITY,
-  SIM_HZ,
-  WEAPON_CODE,
-  WEAPON_BIG_BRRT,
-  WEAPON_DESMONTADOR,
-  ENTITY_KIND,
   PICKUP_KIND,
-  WEAPON_GOO,
-  WEAPON_SPIT,
-  ZOMBIE_TYPE,
-  type MatchPhase,
+  SIM_HZ,
   type SimEvent,
   type SimView,
+  WEAPON_BIG_BRRT,
+  WEAPON_CODE,
+  WEAPON_DESMONTADOR,
+  WEAPON_GOO,
+  WEAPON_PAINT_BUCKET,
+  WEAPON_PAINT_PUMP,
+  WEAPON_PAINT_SNIPER,
+  WEAPON_SPIT,
+  ZOMBIE_TYPE,
 } from '@boboforces/sim';
 import { BLOCK_FLAG, cellBlock, CELLS_PER_METER, createRayHit, raycastGrid } from '@boboforces/world';
 import { SOUND_IDS, SOUND_RANK, SOUNDS, type SoundId } from '../sound-bank.ts';
@@ -133,6 +137,9 @@ function shotSounds(weapon: number): readonly [SoundId, SoundId] | null {
 
 const SOUND_INDEX: ReadonlyMap<SoundId, number> = new Map(SOUND_IDS.map((id, i) => [id, i]));
 
+/** M6 (fase 5): o tiro do marcador de tinta (o da arma parecida, bem mais agudo e baixo). */
+const PAINT_PITCH = 1.7;
+const PAINT_GAIN = 0.55;
 /** M6 (fase 3): o tiro da Big Brrt (o da SMG, mais grave e um pouco mais baixo: são 20 por segundo). */
 const BIG_BRRT_PITCH = 0.75;
 const BIG_BRRT_GAIN = 0.8;
@@ -622,6 +629,16 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           if (ev.action === 'bounce') {
             const speed = Math.hypot(ev.vx, ev.vy, ev.vz);
             playAt(v, 'granada-quica', null, ev.x, ev.y, ev.z, nowS, rank, Math.min(1, 0.3 + speed / 12));
+          } else if (isPaintWeapon(ev.weapon) && ev.weapon !== WEAPON_PAINT_BUCKET) {
+            // M6 (fase 5): o marcador de tinta: o tiro da arma parecida, bem mais agudo e baixo (um "pop").
+            const id: SoundId =
+              ev.weapon === WEAPON_PAINT_SNIPER
+                ? 'tiro-sniper'
+                : ev.weapon === WEAPON_PAINT_PUMP
+                  ? 'tiro-escopeta'
+                  : 'tiro-smg';
+            if (rank === SOUND_RANK.own) playFlat(id, nowS, ownGain() * PAINT_GAIN, rank, PAINT_PITCH);
+            else playAt(v, id, null, ev.x, ev.y, ev.z, nowS, rank, PAINT_GAIN, PAINT_PITCH, 1);
           } else if (ev.weapon === WEAPON_CODE.rocket) {
             if (rank === SOUND_RANK.own) playFlat('foguete', nowS, ownGain(), rank);
             else playAt(v, 'foguete', null, ev.x, ev.y, ev.z, nowS, rank);
@@ -632,7 +649,7 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           } else if (ev.weapon === WEAPON_SPIT) {
             // M3 (fase 6d): o cuspe do Spitter.
             playAt(v, 'cuspe', null, ev.x, ev.y, ev.z, nowS, rank);
-          } else if (ev.weapon === WEAPON_CODE.grenade) {
+          } else if (ev.weapon === WEAPON_CODE.grenade || ev.weapon === WEAPON_PAINT_BUCKET) {
             // Arremesso: o mesmo sopro da faca, mais grave.
             if (rank === SOUND_RANK.own) playFlat('faca-golpe', nowS, 0.8, rank, 0.75);
             else playAt(v, 'faca-golpe', null, ev.x, ev.y, ev.z, nowS, rank, 0.8, 0.75);
@@ -640,6 +657,24 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           break;
         }
         case 'explosion':
+          // M6 (fase 5): a tinta estoura com a gosma (a bola baixinho e aguda; o balde inteiro), sem abaixar a música.
+          if (isPaintWeapon(ev.weapon)) {
+            const bucket = ev.radius > 0;
+            playAt(
+              v,
+              'gosma',
+              null,
+              ev.x,
+              ev.y,
+              ev.z,
+              nowS,
+              SOUND_RANK.world,
+              bucket ? 1 : 0.35,
+              bucket ? 1.2 : 1.8,
+              0,
+            );
+            break;
+          }
           // A música abaixa 6 dB nas explosões (arte-ux §10.4), se estiver tocando na partida.
           if (listenerDistance(ev.x, ev.y, ev.z) < MAX_DISTANCE_M)
             mixer.duckMusic(MATCH_SOUND.duckDb, MATCH_SOUND.duckS);

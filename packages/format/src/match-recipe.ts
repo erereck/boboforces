@@ -186,6 +186,15 @@ export interface ChaosRules {
   readonly everyS?: number;
 }
 
+/**
+ * M6 (fase 5): o Bobo Paintball (`mode: 'paintball'`, GDD §4.1.2): `hits` acertos de tinta derrubam (1 a 3).
+ */
+export interface PaintballRules {
+  readonly hits?: number;
+}
+
+export const PAINTBALL_DEFAULTS = { hits: 1 } as const;
+
 /** M6 (fase 4): os padrões da Roleta. */
 export const CHAOS_DEFAULTS = { count: 3, everyS: 60, warnS: 5 } as const;
 
@@ -256,6 +265,8 @@ export interface MatchRecipe {
   readonly modifiers?: readonly ModifierId[];
   /** M6 (fase 4): a Roleta do Bobo Chaos. */
   readonly chaos?: ChaosRules;
+  /** M6 (fase 5): o Bobo Paintball (só com `mode: 'paintball'`). */
+  readonly paintball?: PaintballRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -291,6 +302,7 @@ export const RECIPE_RANGES = {
   // M6 (fase 4): a Roleta.
   chaosCount: { min: 1, max: 4 },
   chaosEveryS: { min: 20, max: 300 },
+  paintHits: { min: 1, max: 3 },
   zombieHpMul: { min: 0.25, max: 5 },
   zombieSpeed: { min: 0.5, max: 2 },
   zombieEconomy: { min: 0.5, max: 3 },
@@ -314,6 +326,7 @@ const TOP_KEYS = [
   'infection',
   'modifiers',
   'chaos',
+  'paintball',
   'teams',
   'embeddedBots',
 ] as const;
@@ -604,6 +617,18 @@ function readModifiers(ctx: Ctx, value: unknown): ModifierId[] | undefined {
     out.push(m);
   }
   return out;
+}
+
+/** M6 (fase 5): o Paintball. */
+function readPaintball(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'paintball', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readRange(ctx, value, 'hits', 'paintball', RECIPE_RANGES.paintHits, out);
+  return Object.assign(out, unknownFields(value, ['hits']));
 }
 
 /** M6 (fase 4): a Roleta do Bobo Chaos. */
@@ -921,6 +946,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   }
   const chaos = readChaos(ctx, doc['chaos']);
   if (chaos !== undefined) out['chaos'] = chaos;
+  const paintball = readPaintball(ctx, doc['paintball']);
+  if (paintball !== undefined) out['paintball'] = paintball;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

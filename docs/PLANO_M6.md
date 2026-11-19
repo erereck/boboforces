@@ -93,6 +93,8 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - 1 tiro mata (configurável 1–3), respawn de 1 s, 50 abates ou 5 min;
    - os marcadores com o projétil visível;
    - as manchas de tinta em decal, com teto por plataforma (U6); o cenário não muda.
+   - **feita em 19/11** (ARCHITECTURE §17.7). As 4 armas de tinta usam os modelos do arsenal (SMG, escopeta, sniper e
+     granada) até a arte delas: o pacote de modelos está com 31 das 32 camadas.
 6. **Bobo Zombies: Armed Horde e Fortress:**
    - **Armed Horde:** as ondas são de bots soldados, com a IA do Warfare;
    - **Fortress:** um gerador com HP (entidade, não cenário) que os zumbis atacam e os humanos defendem.

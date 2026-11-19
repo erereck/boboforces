@@ -36,6 +36,8 @@ export class AiContext {
   zombiesMode = false;
   /** M6 (fase 3): Juggernaut (o passeio é caçar o Jugg, ou, para o Jugg, avançar). */
   juggernaut = false;
+  /** M6 (fase 5): a vida não volta (Paintball): recuar para regenerar não adianta. */
+  noRegen = false;
   readonly viewDistance: number;
   readonly paths: PathService;
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */

@@ -3748,3 +3748,48 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
   (`custom.*`, `lab.*`, `labIntro.*` e `workshop.*`, menos os 3 que as Configurações usam) foram para a tabela extra,
   que chega com os editores logo depois do 1º quadro do título (as telas deles já moravam lá). O menu caiu de 349,5
   para 347,8 KB.
+
+### 17.7 Fase 5: Bobo Paintball (19/11/2026)
+
+- **A receita:** `mode: 'paintball'` com o bloco `paintball` (`hits`, 1 a 3, padrão 1). O card (`moreModePreset`):
+  Times 4 contra 4 no Construto, 50 abates ou 5 min, `respawnS` 1 e a reserva infinita. O modo joga com as regras do
+  Warfare (`isWarfareMode`), menos a regeneração e a caixinha de munição.
+- **As armas de tinta** (`WEAPON_PAINT_*`, códigos 14 a 17, fora de `WEAPONS` como a Big Brrt):
+  - O Marcador (automático, 45 m/s), o Pump (65 m/s) e a Sniper de tinta (110 m/s) atiram uma bola: um projétil de
+    contato com queda (o ramo do foguete, com `projectileGravity` e raio 0: só o acerto direto).
+  - O Balde é uma granada que espirra em 3 m.
+  - Números meus, revisáveis.
+- **A sim** (`sim/src/systems/paintball.ts`, `ctx.paintHits`): todo dano de tinta (a bola ou o respingo) vira um acerto
+  inteiro (`ceil(vida máxima ÷ hits)`). O `paintLoadout` (no `respawn`) troca a primária escolhida pela de tinta
+  dela (sniper → a de tinta, escopeta → o pump, o resto → o marcador), põe o balde no slot de arremesso e tira a
+  pistola e a faca.
+- **A IA:** os projéteis que não são de área (a bola) são mirados no ponto de sempre, adiantados pelo tempo de voo e
+  mais altos pela queda (½·g·t²).
+- **A cena e o render:**
+  - A bola em voo é um ponto de FX na cor do time (`FX_KIND.paintBall`), não um modelo. O balde voa com o modelo da
+    granada; as armas de tinta usam os modelos do arsenal (o pacote de modelos está com 31 das 32 camadas).
+  - O estouro vira a mancha (`FX_KIND.paint`, a partícula `paint` do mesmo programa de shader: o respingo irregular na
+    cor) e um respingo de cubinhos. A normal da superfície sai da grade (o bloco sólido vizinho mais perto do ponto,
+    o chão primeiro), sem mudar o protocolo; sem bloco por perto (num bobo ou numa prop), só o respingo.
+  - O anel das manchas dá a volta no teto da plataforma (`ParticleRing.limit`, que vem em cada pedido): 96 no PC, 48 no
+    celular e 32 no Switch (U6).
+  - O som: o tiro da arma parecida mais agudo (um "pop") e o estouro da gosma.
+- **Golden** (8 bots Normal no Construto, semente 42): `855196e7` (43 × 35 em 3 min). **Online:** uma sala de 90 s com
+  um amigo em cada time, o mesmo fim (18 × 17) e 0,64% de predições erradas (17 em 2.671).
+- **A revisão (Opus)** achou 18 coisas (6 médias, 12 baixas; nenhuma de determinismo), corrigidas antes do commit, menos
+  as que ficam anotadas abaixo:
+  - a própria bola tapava a mira (agora fica escondida até 1,5 m do olho, como o foguete); a luz da mancha era a do
+    efeito anterior (agora a do lugar dela); no amigo, a bola que trocava de lugar no pool riscava o mapa (agora um
+    salto de mais de 12 m não é interpolado); as bolas ganharam um anel delas (empurravam a fumaça do anel alfa);
+  - os bots não jogavam o balde (agora qualquer arma de arremesso serve) e, no Paintball, não recuam para regenerar
+    (a vida não volta: `AiContext.noRegen`);
+  - o acerto de tinta vem antes do fogo amigo e do "um tiro mata" (o fogo amigo pela metade dá meio acerto; os
+    multiplicadores de dano não mudam o acerto);
+  - só o arsenal (`WEAPONS`) serve de primária escolhida (`isPrimaryWeapon`): um amigo online não pede arma de modo;
+  - o loadout de tinta respeita a lista de armas do bot (o só de faca fica sem primária e sem balde) e não passa por
+    cima dos modos de festa; a troca por abate não roda no Paintball;
+  - fora da grade não há mancha; o balde conta no HUD e no aviso como a granada; a sniper de tinta usa o ajuste do
+    viewmodel da sniper; o tiro de tinta marca o indicador de som e o estouro não.
+  - **Ficam anotados:** a bola acerta sempre o tronco (o "só na cabeça" não vale para ela, como para o foguete); a
+    normal da mancha é a do bloco inteiro (numa rampa ela deita); a mancha nova fica por baixo das velhas depois que o
+    anel dá a volta; a tela de morte ainda oferece as 6 primárias (fuzil, SMG, LMG e foguete viram o Marcador).

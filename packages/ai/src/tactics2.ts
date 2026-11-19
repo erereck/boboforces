@@ -1,6 +1,15 @@
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, wrapAngle } from '@boboforces/shared';
-import { eyeHeightFor, GRENADE_THROW, WEAPON_CODE, WEAPON_GRENADE, WEAPON_SLOT, type SimView } from '@boboforces/sim';
+import {
+  eyeHeightFor,
+  GRENADE_THROW,
+  WEAPON_CODE,
+  WEAPON_FIRE,
+  WEAPON_GRENADE,
+  WEAPON_SLOT,
+  weaponDef,
+  type SimView,
+} from '@boboforces/sim';
 import { AI_FLANK, AI_GRENADE, AI_HOLD, AI_PERSONA, AI_RETREAT, AI_TEAM } from './config.ts';
 import type { AiContext } from './context.ts';
 import type { SoldierBrain, SoldierTiming } from './soldier.ts';
@@ -123,7 +132,8 @@ const hotPos = new Float64Array(2);
 
 function hasGrenade(view: SimView, e: number): boolean {
   const k = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable;
-  return view.loadout[k] === WEAPON_CODE.grenade && view.slotClip[k]! > 0;
+  // M6 (fase 5): qualquer arma de arremesso (a granada ou o balde de tinta).
+  return weaponDef(view.loadout[k]!)?.fire === WEAPON_FIRE.thrown && view.slotClip[k]! > 0;
 }
 
 function startGrenade(b: SoldierBrain, tick: number, x: number, y: number, z: number): void {

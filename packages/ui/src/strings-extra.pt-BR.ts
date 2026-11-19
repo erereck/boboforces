@@ -261,6 +261,13 @@ export const STRINGS_EXTRA_PT_BR = {
   'feed.jugg': 'Jugg',
   'weapon.big-brrt': 'Big Brrt',
   // M6 (fase 4): os modificadores e o Bobo Chaos.
+  'mode.name.paintball': 'Bobo Paintball',
+  'mode.desc.paintball': '1 acerto de tinta derruba. 50 abates ou 5 min.',
+  'weapon.paint-marker': 'Marcador',
+  'weapon.paint-pump': 'Pump',
+  'weapon.paint-sniper': 'Sniper de tinta',
+  'weapon.paint-bucket': 'Balde de tinta',
+  'weapon.category.paint': 'Tinta',
   'mode.name.chaos': 'Bobo Chaos',
   'mode.desc.chaos': '3 modificadores; a Roleta troca 1 por minuto.',
   'mod.lowGravity': 'Lua',

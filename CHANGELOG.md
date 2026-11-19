@@ -42,6 +42,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Mais 3 modificadores (fase 4b):** **Cabeção** (a cabeça de todo mundo, e o acerto nela, em dobro), **Invisíveis**
   (ninguém aparece, só por 1 s depois de atirar; os bots também não veem quem não atirou, a não ser de pertinho) e
   **Festa** (cada acerto solta confete). Entram na Roleta do Bobo Chaos e na aba Modificadores da Personalizada.
+- **Bobo Paintball (fase 5):** o card na página Mais modos (4 contra 4 no Construto). Um acerto de tinta derruba
+  (de 1 a 3 pela receita, no bloco `paintball`), renasce em 1 s, 50 abates ou 5 min. A primária escolhida vira a de tinta: o
+  **Marcador** (automático), o **Pump** (no lugar da escopeta) e a **Sniper de tinta**, com a bola visível em voo e
+  caindo com a distância; no lugar da granada, o **Balde de tinta**, que espirra em 3 m. Cada estouro deixa uma mancha
+  na cor do time no chão ou na parede (até 96 no PC, 48 no celular e 32 no Switch; a mais velha some). Os bots
+  adiantam a mira pela bola e pela queda.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

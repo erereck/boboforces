@@ -20,6 +20,8 @@ export const PARTICLE_KIND = {
   blob: 5,
   /** Clarão do cano: estrela de 4 pontas (2 quadros pelo giro). */
   star: 6,
+  /** M6 (fase 5): mancha de tinta: como a marca de tiro (na superfície, normal em `pC`), com o respingo na cor. */
+  paint: 7,
 } as const;
 
 export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive'] as const;
@@ -32,6 +34,7 @@ const int BF_P_SPARK = 3;
 const int BF_P_DECAL = 4;
 const int BF_P_BLOB = 5;
 const int BF_P_STAR = 6;
+const int BF_P_PAINT = 7;
 `;
 
 export const PARTICLE_VERTEX = /* glsl */ `
@@ -99,7 +102,7 @@ void main() {
     vec3 p = pos - dir * (0.5 - (c.y + 0.5)) * size * 6.0;
     vec3 side = normalize(cross(dir, cameraPosition - p) + vec3(1e-5, 0.0, 0.0));
     world = p + side * c.x * size;
-  } else if (kind == BF_P_DECAL || kind == BF_P_BLOB) {
+  } else if (kind == BF_P_DECAL || kind == BF_P_BLOB || kind == BF_P_PAINT) {
     vec3 n = kind == BF_P_BLOB ? vec3(0.0, 1.0, 0.0) : normalize(pC.xyz + vec3(0.0, 1e-5, 0.0));
     vec3 t1 = normalize(cross(n, abs(n.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
     vec3 t2 = cross(n, t1);
@@ -161,6 +164,13 @@ void main() {
       shape = 0.0;
     }
     fadeStart = 0.9;
+  } else if (vKind == BF_P_PAINT) {
+    // Mancha de tinta: miolo cheio e a borda em gotas (5 lobos e um ruído fino), com a beirada um tom abaixo.
+    float ang = atan(pq.y, pq.x);
+    float edge = 0.66 + 0.2 * sin(ang * 5.0) + 0.08 * sin(ang * 13.0 + 1.7);
+    shape = r < edge ? 1.0 : (r < edge + 0.16 && sin(ang * 9.0) > 0.55 ? 1.0 : 0.0);
+    color *= r > edge - 0.18 ? 0.82 : 1.0;
+    fadeStart = 0.95;
   } else if (vKind == BF_P_BLOB) {
     // A sombra-blob vive "para sempre" (vT ~ 0): o fade só começa no fim. A borda 0 do smoothstep TEM de ficar abaixo
     // de 1,0 (com 2,0 o resultado é indefinido e, na prática, dava 1 → alfa 0 → discard: a sombra nunca aparecia).

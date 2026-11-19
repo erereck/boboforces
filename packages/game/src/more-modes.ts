@@ -16,6 +16,8 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
   { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
   // M6 (fase 4).
   { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
+  // M6 (fase 5).
+  { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
 ];
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -82,6 +84,20 @@ export function moreModePreset(id: string): MatchRecipe | null {
         seed: 0,
         match: { timeLimitS: 600, scoreLimit: 50 },
         chaos: {},
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
+      };
+    case 'paintball':
+      // GDD §4.1.2: 1 acerto derruba (configurável 1–3 no bloco), renasce em 1 s, 50 abates ou 5 min; 4 contra 4.
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Bobo Paintball',
+        mode: 'paintball',
+        map: 'construto',
+        seed: 0,
+        match: { timeLimitS: 300, scoreLimit: 50 },
+        players: { respawnS: 1 },
+        weapons: { ammo: 'infiniteReserve' },
+        paintball: {},
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
       };
     default:
