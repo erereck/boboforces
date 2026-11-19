@@ -63,6 +63,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   30 s de partida, uma linha `[rede]` com as médias vai para o "Copiar relatório" (é por ela que os números do teste
   com amigos chegam). E o `npm run bench:rede` mede o host com 8 e com 40 bots e o Bobo Zombies: no PC, a rede do host
   fica abaixo de 0,5 ms por quadro.
+- **O roteiro do teste com amigos (fase 7b):** `docs/ROTEIRO_M5.md`, com o host no PC e no celular, cada modo, as
+  quedas e o que mandar no fim. Para testar sem abrir o Online a todo mundo, o botão fica escondido no site: aparece
+  com `?online` no endereço (o aparelho lembra) e para quem abre o link de uma sala.
 - **A prova (fase 4e):** duas abas do Edge, pelo teclado como um jogador, vão do título à sala, jogam pela rede e
   voltam à sala; pelos relays de verdade, o amigo entra em ~4 s.
 

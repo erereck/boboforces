@@ -3487,3 +3487,20 @@ Um revisor (Opus) leu as 3 partes. Nada grave; 2 problemas e 6 menores, todos co
   `afterTicks` do link; o trabalho dos amigos de mentira fica à parte. Números no PERF §1i.
 - **`online:web`:** `--partida N` deixa o X1 rodar N segundos (com 40, sai uma linha `[rede]` de cada lado, que o
   relatório guarda em `steps.rede`); com `--prints`, o F2 do host e do amigo.
+
+### 16.20 Fase 7b: o roteiro e o Online escondido (19/11/2026)
+
+- **O roteiro** (`docs/ROTEIRO_M5.md`): o teste com amigos da fase 8, com os critérios 2 e 3 do plano. O host no PC
+  com 3 amigos (cada modo, ping e emote, as quedas, o AFK, o host ausente, Tirar e sair) e o host no celular (8 bots, o
+  Bobo Zombies, trocar de app). O que mandar no fim: o relatório de cada aparelho, com as linhas `[rede]`.
+- **Decisão menor revisável: o Online escondido no site** (`ONLINE_OPEN` em `apps/web/src/main.ts`). Para o teste
+  com amigos precisar só do "pode publicar" (e não de abrir o Online ao público, O6), o título só oferece o Online:
+  - no `npm run dev`;
+  - com `?online` no endereço (o aparelho lembra, na chave `boboforces:online-teste`);
+  - para quem abre o link de uma sala (`#sala=`);
+  - no teste das abas (`?sinal=local`).
+
+  Sem isso, o `loadOnline` não vai ao `startGame` e o título fica como antes do M5. Abrir ao público é
+  `ONLINE_OPEN = true`. O `online:web -- --relays` abre o host com `?online`. O menu continuou em 349,5 KB.
+- **No celular não há F2:** os números do host no celular (o critério 3) vêm das linhas `[rede]` do "Copiar relatório",
+  que trazem o fps, a sim, a IA e a rede (fase 7a).

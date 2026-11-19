@@ -163,7 +163,7 @@ async function main(): Promise<number> {
   const failures: string[] = [];
   const steps: Record<string, unknown> = {};
   if (printsDir !== null) mkdirSync(printsDir, { recursive: true });
-  const query = relays ? '' : '?sinal=local';
+  const query = relays ? '?online' : '?sinal=local';
   try {
     // Um contexto só: o BroadcastChannel da sinalização local não atravessa contextos (e o aviso já lido vale nos dois).
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });

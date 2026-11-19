@@ -62,6 +62,27 @@ async function loadBenchShell(platform: WebPlatform): Promise<BenchShell | null>
   return shell;
 }
 
+/**
+ * M5 (fase 7b): o Online fica escondido no site até o Erick abrir ao público (PLANO_M5, O6). Ele aparece no
+ * `npm run dev`, com `?online` na URL (o aparelho lembra), para quem abre o link de uma sala e no teste das abas
+ * (`?sinal=local`). Abrir para todos = `ONLINE_OPEN = true`.
+ */
+const ONLINE_OPEN = false;
+const ONLINE_TEST_KEY = 'boboforces:online-teste';
+
+function onlineVisible(search: URLSearchParams, roomLink: boolean): boolean {
+  if (ONLINE_OPEN || import.meta.env.DEV || roomLink || search.get('sinal') === 'local') return true;
+  try {
+    if (search.has('online')) {
+      localStorage.setItem(ONLINE_TEST_KEY, '1');
+      return true;
+    }
+    return localStorage.getItem(ONLINE_TEST_KEY) === '1';
+  } catch {
+    return search.has('online');
+  }
+}
+
 function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): void {
   const webInput = platform.webInput;
   const options = rendererOptionsFor(platform.graphics, bench?.config ?? null);
@@ -73,6 +94,7 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
   const hash = window.location.hash;
   const onlineLink = !bench && !switchTitle && /(^#|&)sala=/i.test(hash) ? hash : undefined;
   if (onlineLink !== undefined) history.replaceState(null, '', window.location.pathname + window.location.search);
+  const online = onlineVisible(new URLSearchParams(window.location.search), onlineLink !== undefined);
   const game = startGame({
     platform: switchTitle ? asSwitchTitlePlatform(platform) : platform,
     // O menu desenha com o renderer só de UI; o completo (mundo, atores, VFX) chega com a cena (`loadScene`), por
@@ -87,7 +109,7 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
     // M5 (fase 4c): o Online (as telas, a sala e o núcleo do `net`) vem com o chunk da cena e a rede de verdade (o
     // Trystero, `@boboforces/net/rtc`) num chunk só dela, pedidos juntos ao abrir o botão do título. Fora do bench e da prévia do título do Switch. `?sinal=local`: as abas do mesmo navegador se acham sem relay (o teste).
     ...(onlineLink !== undefined ? { onlineLink } : {}),
-    ...(bench || switchTitle
+    ...(bench || switchTitle || !online
       ? {}
       : {
           loadOnline: () =>

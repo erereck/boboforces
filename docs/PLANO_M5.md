@@ -196,6 +196,8 @@ O que dá para medir sem gente de verdade, e o que fica pronto para medir com el
   - **feita em 18/11** (ARCHITECTURE §16.19).
 - **7b, o roteiro:** o `docs/ROTEIRO_M5.md`, o passo a passo do teste real com amigos (fase 8). O host no PC e no
   celular, 4G e wi-fi, cada modo, as quedas, o "Copiar relatório" de cada um. Diz também o que anotar.
+  **Feita em 19/11** (ARCHITECTURE §16.20), com o Online escondido no site até ser aberto ao público: ele aparece com
+  `?online` ou para quem abre o link de uma sala.
 - **7c, a rodada de prints:** as telas da fase 5 e da fase 6 que ainda não foram à página (os cards da sala, o aviso
   do host no celular, a faixa do host ausente, o "voltando à sala", o Atualizar). Ela vai à página das rodadas com as
   perguntas novas e as que seguem abertas.
