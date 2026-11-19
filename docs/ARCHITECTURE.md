@@ -3581,3 +3581,24 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **Os menus:** o Domination entra no ciclo de modos da Partida personalizada (Times → Todos contra todos →
   Domination → Zombies; com os times do TDM e a meta 200), e por ela na sala do Online; o Construto lista o modo no
   `.bfmap`.
+
+### 17.3 Fase 2: Gun Game e Infection (19/11/2026)
+
+- **A receita:** os dois são regra sobre o Warfare, sem modo novo (e sem nome novo no menu, que está no teto). O Gun
+  Game é `weapons.ladder` (ids de arma, 2 a 12, na ordem) sobre o FFA; o Infection é o bloco `infection` (`speed`, a
+  velocidade dos infectados, padrão 1,2) sobre os Times. O validador conhece os dois.
+- **A sim** (`sim/src/systems/party.ts`, `ctx.party`):
+  - **Gun Game:** o nível mora nos pontos (`SimState.points`, que o snapshot e a rede já levam; o protocolo não muda). O
+    loadout do spawn vira só a arma do nível (`partyLoadout`); o abate sobe um nível e troca a arma na hora
+    (`partyKill`); morrer pela faca desce um; quem abate com a última arma vence (`winnerEntity`); no fim do tempo,
+    vence o nível mais alto (o `leader` do FFA olha os pontos).
+  - **Infection:** time 0 sobrevivente, time 1 infectado. Na largada, sem infectado, um sobrevivente sorteado
+    (`rngParty`) vira infectado na hora; quem morre vira infectado ao renascer (a faca e a velocidade pelas regras do
+    bobo, `rules.speed`). O `partySystem` põe no placar quantos há de cada lado e decide: ninguém sobrou, os
+    infectados; o último tick do tempo, os sobreviventes. O `rulesSystem` encerra com o que o modo decidiu.
+  - O estado (o sorteio, quem venceu) entra no hash e no snapshot da sim só nesses modos (`SNAPSHOT_VERSION` 12).
+- **Goldens** (8 bots Normal no Construto, semente 42): Gun Game `6595bdd9` (um bot fecha a escada em 3.707 ticks);
+  Infection `ffb3e5cb` (os 8 infectados em 7.648 ticks). Os do Warfare, do Zombies e do Domination não mudaram.
+- **O jogo:** os cards Gun Game e Infection na página Mais modos (`moreModePreset`). No Gun Game, o HUD mostra "NÍVEL n"
+  no lugar dos abates (`HudModel.pointsIsLevel`); nos dois, a tela de morte não oferece a escolha da arma. O infectado
+  tem a cara do bobo-zumbi comum (a figura troca quando o time muda, inclusive o 1º infectado, que muda vivo).

@@ -571,6 +571,8 @@ describe('estouro de texto com o atlas real', () => {
         modes: [
           { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
           { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+          { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
+          { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
         ],
         titleKey: 'modes.more.title',
       }),
@@ -743,6 +745,8 @@ describe('estouro de texto com o atlas real', () => {
         modes: [
           { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
           { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+          { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
+          { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
         ],
         titleKey: 'modes.more.title',
       });

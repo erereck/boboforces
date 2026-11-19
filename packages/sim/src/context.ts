@@ -1,4 +1,5 @@
 import type { SignalState } from './systems/signals.ts';
+import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
 import type { RewindState } from './rewind.ts';
 import type { FigurePart } from '@boboforces/format';
@@ -265,6 +266,10 @@ export interface SimContext {
   /** O estado do diretor de ondas (no snapshot e no hash só no Bobo Zombies). */
   readonly waves: WaveState;
   readonly rngZombies: Rng;
+  /** M6 (fase 2): o sorteio dos modos de festa (o 1º infectado). */
+  readonly rngParty: Rng;
+  /** M6 (fase 2): o Gun Game e o Infection (inativos fora deles). */
+  readonly party: PartyState;
   readonly downedProfile: MovementProfile;
   /** M3 (fase 3b): o Sprinter e o devagar (Chonker e chefão). */
   readonly sprinterProfile: MovementProfile;

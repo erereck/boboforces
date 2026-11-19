@@ -19,6 +19,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   kill feed, "Laranja capturou Ponto B". Também pela Partida personalizada e pela sala do Online (o protocolo subiu
   para 3). De quebra: os textos da Partida personalizada e da página nova ficavam crus antes da primeira partida no
   site (o empacotador descartava o registro da tabela), e agora não ficam.
+- **Gun Game e Infection (fase 2):** nos cards da página Mais modos. No **Gun Game**, cada um só tem a arma do nível
+  (fuzil, SMG, escopeta, metralhadora, sniper, pistola e faca); cada abate sobe um nível e troca a arma na hora, morrer
+  pela faca desce um, e quem abate com a faca vence; o HUD mostra o NÍVEL. No **Infection**, um sorteado começa
+  infectado (faca, mais rápido, a cara de bobo-zumbi), quem morre vira infectado, e o placar mostra quantos há de cada
+  lado: os infectados vencem se não sobrar ninguém, os sobreviventes se aguentarem 3 min. Os bots jogam os dois.
 
 ### M5: online P2P (planejado em 16/11/2026)
 

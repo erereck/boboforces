@@ -65,6 +65,7 @@ import { SimState } from './state.ts';
 import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './systems/life.ts';
 import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
+import { createPartyState, partySystem } from './systems/party.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -557,6 +558,8 @@ export function createSim(config: SimConfig): Sim {
       instaTicks: 0,
     },
     rngZombies: root.fork('zombies'),
+    rngParty: root.fork('party'),
+    party: createPartyState(recipe),
     downedProfile: MOVEMENT_DOWNED,
     sprinterProfile: zombieSpeed(MOVEMENT_ZOMBIE_SPRINTER, recipe),
     slowProfile: zombieSpeed(MOVEMENT_ZOMBIE_SLOW, recipe),
@@ -913,6 +916,8 @@ export function createSim(config: SimConfig): Sim {
       damageSystem(ctx);
       // M6 (fase 1): os pontos do Domination (antes das regras, que olham o placar).
       dominationSystem(ctx);
+      // M6 (fase 2): o Infection (a largada, o placar e quem venceu).
+      partySystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);

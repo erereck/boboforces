@@ -68,6 +68,7 @@ objetivo, o HUD, o card, o online e a conferência no Switch (o orçamento pelo 
    - **Gun Game:** a escada de 7 armas, a última é a faca; morrer pela faca rebaixa 1 nível;
    - **Infection:** 1 infectado no começo; quem morre vira infectado (time zumbi, faca e 1,2x de velocidade, a cara de
      bobo-zumbi); os sobreviventes vencem se aguentarem 3 min.
+   - **feita em 19/11** (ARCHITECTURE §17.3): os dois nos cards da página Mais modos.
 3. **Juggernaut:**
    - o Jugg tem HP de 300 × oponentes (mínimo 1000), headshot sem multiplicador, velocidade 0,75x e aparece sempre no
      radar;

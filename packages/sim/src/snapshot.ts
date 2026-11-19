@@ -19,7 +19,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 11;
+const SNAPSHOT_VERSION = 12;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -67,6 +67,15 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   // M6 (fase 1): os pontos do Domination (só nele: o hash dos outros modos não muda).
   const cp = ctx.domination;
   if (cp !== null) h.bytes(cp.owner).bytes(cp.progress).bytes(cp.scoreTicks);
+  // M6 (fase 2): o Gun Game e o Infection (só neles).
+  const party = ctx.party;
+  if (party.ladder !== null || party.infectedSpeed > 0) {
+    h.i32(party.started ? 1 : 0)
+      .i32(party.winnerEntity | 0)
+      .i32(party.winnerTeam);
+    ctx.rngParty.saveState(rngScratch);
+    h.bytes(rngScratch);
+  }
   return h.digest();
 }
 
@@ -154,6 +163,14 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       writeArray(w, cp.progress, cp.count);
       writeArray(w, cp.scoreTicks, cp.scoreTicks.length);
     }
+    const party = ctx.party;
+    if (party.ladder !== null || party.infectedSpeed > 0) {
+      w.writeBits(party.started ? 1 : 0, 8);
+      w.writeBits(party.winnerEntity >>> 0, 32);
+      w.writeBits(party.winnerTeam >>> 0, 32);
+      ctx.rngParty.saveState(rngScratch);
+      writeArray(w, rngScratch, RNG_STATE_WORDS);
+    }
   }
 }
 
@@ -232,6 +249,14 @@ export function readState(ctx: SimContext, r: BitReader): void {
       for (let i = 0; i < cp.count; i++) cp.owner[i] = (r.readBits(8) << 24) >> 24;
       readArray(r, cp.progress, cp.count);
       readArray(r, cp.scoreTicks, cp.scoreTicks.length);
+    }
+    const party = ctx.party;
+    if (party.ladder !== null || party.infectedSpeed > 0) {
+      party.started = r.readBits(8) === 1;
+      party.winnerEntity = r.readBits(32) >>> 0;
+      party.winnerTeam = r.readBits(32) | 0;
+      readArray(r, rngScratch, RNG_STATE_WORDS);
+      ctx.rngParty.loadState(rngScratch);
     }
   }
 }

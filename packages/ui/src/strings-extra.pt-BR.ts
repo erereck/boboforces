@@ -248,6 +248,11 @@ export const STRINGS_EXTRA_PT_BR = {
   'modes.more.title': 'Mais modos',
   'mode.name.domination': 'Domination',
   'mode.desc.domination': 'Três pontos: o time que segurar mais ganha.',
+  'mode.name.gunGame': 'Gun Game',
+  'mode.desc.gunGame': 'Cada abate troca a arma; a faca fecha.',
+  'mode.name.infection': 'Infection',
+  'mode.desc.infection': 'Quem morre vira infectado. Aguente 3 min.',
+  'hud.level': 'Nível',
   // M5 (fase 7a): a linha da rede no F2 (online).
   'debug.netHost': 'Rede (host)',
   'debug.netClient': 'Rede (amigo)',

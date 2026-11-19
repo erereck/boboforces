@@ -127,6 +127,7 @@ import {
   WEAPON_SPIT,
   WEAPON_FIRE,
   WEAPON_KILL_PLANE,
+  ZOMBIE_TYPE,
   WEAPON_NONE,
   WEAPON_SLOT,
   weaponDef,
@@ -1040,6 +1041,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
   const zombiesMode = recipe.mode === 'zombies';
+  /** M6 (fase 2): o Gun Game (a escada) e o Infection; nos dois, a arma é do modo (sem o radial da morte). */
+  const gunGame = (recipe.weapons?.ladder?.length ?? 0) > 0;
+  const infection = recipe.infection !== undefined;
+  const fixedLoadout = gunGame || infection;
+  /** A figura do infectado (a do bobo-zumbi comum). */
+  const infectedFigure = figures.zombieFigureOf(ZOMBIE_TYPE.walker);
   // Refino R1 (#79): quanto o perfil da partida abre a mira andando e no ar (a retícula da HUD segue).
   const moveSpreadMul = resolveMovementProfile(recipe.players).moveSpreadMul ?? 1;
   // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
@@ -1480,6 +1487,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * pelo controlador no time dele (sem time no FFA). Tabelas prontas do loading: sem alocação.
    */
   function resolveEntityFigure(v: SimView, i: number): void {
+    // M6 (fase 2): o infectado tem a cara do bobo-zumbi.
+    if (infection && v.kind[i] === ENTITY_KIND.bobo && v.team[i] === 1) {
+      figureOf[i] = figures.zombieFigureOf(ZOMBIE_TYPE.walker);
+      skinLayer[i] = figures.zombieSkinOf(ZOMBIE_TYPE.walker);
+      return;
+    }
     if (v.kind[i] === ENTITY_KIND.zombie) {
       // M3 (fase 5b): a skin do tipo (o zumbi do pool troca de tipo a cada vez que entra; o `spawn` resolve de novo).
       const type = v.zombieType[i]!;
@@ -3078,7 +3091,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (firing[i]! > 0) pose |= ACTOR_POSE.firing;
       if (timeS - spawnT[i]! < SPAWN_S) pose |= ACTOR_POSE.spawning;
       actors.pose[n] = pose;
-      if (skinLayer[i] === 0xffff) resolveEntityFigure(v, i);
+      // M6 (fase 2): o 1º infectado muda de time vivo (sem o evento de spawn): a cara troca aqui.
+      if (skinLayer[i] === 0xffff || (infection && (v.team[i] === 1) !== (figureOf[i] === infectedFigure))) {
+        resolveEntityFigure(v, i);
+      }
       actors.skin[n] = skinLayer[i]!;
       actors.figure[n] = figureOf[i]!;
       // A mesma função e a mesma empunhadura (`WeaponDef.grip`) da hitbox da sim (E.12).
@@ -3879,7 +3895,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.dead = (flags & ENTITY_FLAG.dead) !== 0;
     m.respawnS = m.dead ? v.respawnTicks[e]! / sim.hz : 0;
     // M3 (fase 2d): Bobo Zombies.
-    m.points = zombiesMode ? v.points[e]! : -1;
+    // M6 (fase 2): no Gun Game, o nível (de 1 até o tamanho da escada).
+    m.points = zombiesMode ? v.points[e]! : gunGame ? v.points[e]! + 1 : -1;
+    m.pointsIsLevel = gunGame;
     // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
     m.perks = zombiesMode ? v.perks[e]! : 0;
     if ((m.perks & PERK.chonky) !== 0) m.maxHealth = Math.round(m.maxHealth * ZOMBIE_PERKS.chonkyHpMul);
@@ -4115,8 +4133,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       fillDeathBanner(m, st, v, names, weaponNames, deathTx, ruleTexts);
       const seat = humans > 0 ? seatOf(slot.controller) : -1;
       const human = seat >= 0;
-      m.primaryNames = human ? primaryNames : NO_PRIMARIES;
-      m.primaryCategories = human ? primaryCategories : NO_PRIMARIES;
+      // M6 (fase 2): no Gun Game e no Infection a arma é do modo: sem o radial.
+      m.primaryNames = human && !fixedLoadout ? primaryNames : NO_PRIMARIES;
+      m.primaryCategories = human && !fixedLoadout ? primaryCategories : NO_PRIMARIES;
       m.primarySelected = human ? seatPrimary[seatNum[seat]!]! : 0;
       m.hardTimeHint = st.hint;
     } else {

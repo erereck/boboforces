@@ -120,7 +120,26 @@ export interface WeaponRules {
   readonly allowed?: readonly string[];
   /** Assistência de mira permitida (padrão: sim). */
   readonly aimAssist?: boolean;
+  /**
+   * M6 (fase 2): o Gun Game (GDD §4.1.2): a escada de armas, na ordem (ids: `rifle`, `knife`…). Cada bobo só tem a arma
+   * do nível dele; cada abate sobe um nível; morrer pela faca desce um; quem abate com a última vence. Ausente = sem
+   * escada.
+   */
+  readonly ladder?: readonly string[];
 }
+
+/**
+ * M6 (fase 2): o Infection (GDD §4.1.2), sobre os Times: o time 0 são os sobreviventes e o time 1 os infectados. Um
+ * sobrevivente sorteado começa infectado; quem morre vira infectado (faca e mais rápido); os sobreviventes vencem se
+ * aguentarem até o fim do tempo, e os infectados, se não sobrar ninguém.
+ */
+export interface InfectionRules {
+  /** Velocidade dos infectados (multiplicador). */
+  readonly speed?: number;
+}
+
+/** M6 (fase 2): os padrões do Infection. */
+export const INFECTION_DEFAULTS = { speed: 1.2 } as const;
 
 /** M2 (fase 4e): o que a HUD mostra (gameplay.md §10.3, "Tela da partida"). Ausente = tudo ligado. */
 export interface HudRules {
@@ -183,6 +202,8 @@ export interface MatchRecipe {
   readonly hud?: HudRules;
   /** M3 (fase 2a): as regras do Bobo Zombies (só com `mode: 'zombies'`). */
   readonly zombies?: ZombiesRules;
+  /** M6 (fase 2): o Infection (sobre os Times). */
+  readonly infection?: InfectionRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -212,6 +233,9 @@ export const RECIPE_RANGES = {
   maxBotEntriesPerTeam: 16,
   // M3 (fase 2a): Bobo Zombies.
   zombieQuantity: { min: 0.5, max: 3 },
+  // M6 (fase 2): o Gun Game e o Infection.
+  ladderLength: { min: 2, max: 12 },
+  infectedSpeed: { min: 0.5, max: 2 },
   zombieHpMul: { min: 0.25, max: 5 },
   zombieSpeed: { min: 0.5, max: 2 },
   zombieEconomy: { min: 0.5, max: 3 },
@@ -232,6 +256,7 @@ const TOP_KEYS = [
   'weapons',
   'hud',
   'zombies',
+  'infection',
   'teams',
   'embeddedBots',
 ] as const;
@@ -261,6 +286,7 @@ const WEAPON_KEYS = [
   'sniperBodyKill',
   'allowed',
   'aimAssist',
+  'ladder',
 ] as const;
 const HUD_KEYS = ['killFeed', 'hitmarker', 'allyMarkers'] as const;
 const TEAM_KEYS = ['name', 'humans', 'bots'] as const;
@@ -496,6 +522,20 @@ function readZombies(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   return Object.assign(out, unknownFields(value, ZOMBIES_KEYS));
 }
 
+const INFECTION_KEYS = ['speed'] as const;
+
+/** M6 (fase 2): o bloco do Infection. */
+function readInfection(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) {
+    warn(ctx, 'infection', 'recipe.invalidField', describe(value));
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  readRange(ctx, value, 'speed', 'infection', RECIPE_RANGES.infectedSpeed, out);
+  return Object.assign(out, unknownFields(value, INFECTION_KEYS));
+}
+
 /** M2 (fase 4e): os modificadores de arma (gameplay.md §4.5). */
 function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
   if (value === undefined) return undefined;
@@ -535,6 +575,22 @@ function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
       }
       out['allowed'] = ids;
     }
+  }
+  // M6 (fase 2): a escada do Gun Game (armas conhecidas, na ordem; repetidas valem: a escada é dela).
+  const ladder = value['ladder'];
+  if (ladder !== undefined) {
+    const ids: string[] = [];
+    if (Array.isArray(ladder)) {
+      for (const id of ladder) {
+        const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
+        if (r !== null && r.status === 'known') ids.push(r.local);
+        else warn(ctx, 'weapons.ladder', 'content.missingWeapon', describe(id));
+      }
+    }
+    const { min, max } = RECIPE_RANGES.ladderLength;
+    if (ids.length >= min) out['ladder'] = ids.slice(0, max);
+    else warn(ctx, 'weapons.ladder', 'recipe.invalidField', describe(ladder));
+    if (ids.length > max) warn(ctx, 'weapons.ladder', 'recipe.valueClamped', `${ids.length} → ${max}`);
   }
   return Object.assign(out, unknownFields(value, WEAPON_KEYS));
 }
@@ -754,6 +810,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (hud !== undefined) out['hud'] = hud;
   const zombies = readZombies(ctx, doc['zombies']);
   if (zombies !== undefined) out['zombies'] = zombies;
+  const infection = readInfection(ctx, doc['infection']);
+  if (infection !== undefined) out['infection'] = infection;
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {

@@ -136,6 +136,8 @@ export interface HudModel {
   readonly pointMarkIndex: Int8Array;
   readonly pointMarkOwner: Int8Array;
   pointMarkCount: number;
+  /** M6 (fase 2): `points` é o nível do Gun Game (o rótulo diz NÍVEL). */
+  pointsIsLevel: boolean;
   /**
    * M2 (fase 4h): dica de 1 linha das primeiras partidas (gameplay.md §2.5): a tecla ou o botão do dispositivo ativo
    * (desenhado como uma tecla, em âmbar) e o resto do texto ("corre"), já resolvidos pelo `game`; `tipAlpha` 0 = nada.
@@ -273,6 +275,7 @@ export function createHudModel(): HudModel {
     pointMarkIndex: new Int8Array(MAX_CONTROL_POINTS),
     pointMarkOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
     pointMarkCount: 0,
+    pointsIsLevel: false,
     tipKey: '',
     tipText: '',
     tipAlpha: 0,
@@ -409,6 +412,8 @@ interface HudTexts {
   readonly perkLetters: readonly string[];
   /** M6 (fase 1): a letra de cada ponto do Domination. */
   readonly pointLetters: readonly string[];
+  /** M6 (fase 2): o nível do Gun Game no lugar dos pontos. */
+  readonly level: string;
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -445,6 +450,7 @@ function hudTexts(): HudTexts {
     boxTake: templateParts('hud.boxTake', ['weapon']).map((p) => p.toUpperCase()),
     perkLetters: [t('perk.chonky'), t('perk.speedy'), t('perk.buddy')].map((n) => n.slice(0, 1).toUpperCase()),
     pointLetters: [...t('hud.pointLetters')],
+    level: t('hud.level').toUpperCase(),
   };
   return cachedTexts;
 }
@@ -805,7 +811,7 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     let w = pad;
     if (multi) w += icon + gap / 2 + textWidth(hud, tx.players[slot] as string, labelPx) + gap * 1.5;
     const zm = model.points >= 0;
-    const firstLabel = zm ? tx.points : tx.kills;
+    const firstLabel = zm ? (model.pointsIsLevel ? tx.level : tx.points) : tx.kills;
     const firstValue = zm ? model.points : model.kills;
     const secondLabel = zm ? tx.kills : tx.deaths;
     const secondValue = zm ? model.kills : model.deaths;

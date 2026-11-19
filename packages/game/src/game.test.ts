@@ -1734,6 +1734,29 @@ describe('Bobo Training (M2, fase 5d)', () => {
     game.dispose();
   }, 60_000);
 
+  it('M6 (fase 2): Mais modos → Gun Game: a escada na receita e só a 1ª arma na mão', async () => {
+    const { platform, game } = await bootToTitle();
+    titleTo(platform, 'modes');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('more');
+    // O Gun Game: embaixo do Training.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(game.save.presets.recent[0]!.weapons?.ladder?.[0]).toBe('rifle');
+    const sim = game.match!.sim;
+    const v = sim.view();
+    const me = entityIndex(sim.controllerEntity(0));
+    // Só o fuzil: os outros slots vazios.
+    const slots = [...v.loadout.subarray(me * 4, me * 4 + 4)];
+    expect(slots.filter((c) => c !== 255)).toHaveLength(1);
+    game.dispose();
+  }, 60_000);
+
   it('Modos → Bobo Training: Ringue sem placar, alvos espalhados que não atacam e a linha dos números', async () => {
     const { platform, game } = await bootToTitle();
     // Refino R3b: Título → Modos; M6 (fase 0): o 4º card (2ª linha, à direita) é o Mais modos, e o Bobo Training é o

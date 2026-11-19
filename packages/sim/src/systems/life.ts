@@ -1,4 +1,5 @@
 import { DROP_KINDS } from '../view.ts';
+import { partyKill, partyLoadout } from './party.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -330,12 +331,20 @@ function kill(
       s.kills[k] = s.kills[k]! + 1;
       // Placar dos times: só bobo matando bobo (o zumbi do estresse fica fora do TDM). M6 (fase 1): no Domination o
       // placar é dos pontos.
-      if (!ctx.ffa && !zombie && s.kind[k] === ENTITY_KIND.bobo && ctx.domination === null) {
+      if (
+        !ctx.ffa &&
+        !zombie &&
+        s.kind[k] === ENTITY_KIND.bobo &&
+        ctx.domination === null &&
+        ctx.party.infectedSpeed <= 0
+      ) {
         const team = s.team[k]!;
         if (team < MAX_TEAMS) ctx.match.teamScore[team] = ctx.match.teamScore[team]! + 1;
       }
     }
   }
+  // M6 (fase 2): o Gun Game (o nível e a arma) e o Infection (quem morre vira infectado).
+  if (ctx.party.ladder !== null || ctx.party.infectedSpeed > 0) partyKill(ctx, t, killer, weapon);
   // M3 (fase 3b): o Chonker explode em gosma ao morrer (machuca os bobos perto; no vazio, não).
   if (ctx.zombiesMode && zombie && s.zombieType[t] === ZOMBIE_TYPE.chonker && weapon !== WEAPON_KILL_PLANE) {
     explode(ctx, s.position[t * 3]!, s.position[t * 3 + 1]! + 1, s.position[t * 3 + 2]!, ZOMBIE_GOO, s.idOf(t), -1);
@@ -378,6 +387,17 @@ export function rulesSystem(ctx: SimContext): void {
       m.phase = 'playing';
       ctx.events.matchPhase(ctx.tick, 'playing');
     }
+    return;
+  }
+  // M6 (fase 2): o modo de festa já decidiu (a escada fechada, os sobreviventes no fim ou ninguém sobrando).
+  const party = ctx.party;
+  if (party.winnerEntity !== NULL_ENTITY && ctx.s.isCurrent(party.winnerEntity)) {
+    leaderEntity = party.winnerEntity;
+    endMatch(ctx, ctx.s.team[party.winnerEntity & 0xffff]!);
+    return;
+  }
+  if (party.winnerTeam !== -2) {
+    endMatch(ctx, party.winnerTeam);
     return;
   }
   if (m.phase === 'suddenDeath') {
@@ -444,7 +464,8 @@ function leader(ctx: SimContext): number {
   if (ctx.ffa) {
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
-      const k = s.kills[e]!;
+      // M6 (fase 2): no Gun Game vence o nível mais alto (os pontos), não os abates.
+      const k = ctx.party.ladder !== null ? s.points[e]! : s.kills[e]!;
       if (k > bestScore) {
         bestScore = k;
         best = s.team[e]!;
@@ -745,6 +766,8 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   }
   s.slot[e] = first < 0 ? 0 : first;
   s.weapon[e] = s.loadout[k + s.slot[e]!]!;
+  // M6 (fase 2): a arma do nível (Gun Game) ou a faca do infectado.
+  if (ctx.party.ladder !== null || ctx.party.infectedSpeed > 0) partyLoadout(ctx, e);
   s.cookTicks[e] = -1;
   s.quickNade[e] = 0;
   s.adsAmount[e] = 0;

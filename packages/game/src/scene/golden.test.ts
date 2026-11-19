@@ -361,3 +361,91 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
     expect(a.hash, msg).toBe(GOLDEN_DOMINATION_HASH);
   }, 240_000);
 });
+
+/**
+ * M6 (fase 2): o Gun Game e o Infection com bots no Construto, semente 42. O Gun Game: 8 bots Normal na escada de 7
+ * armas (a faca por último), até alguém fechar ou 4 min. O Infection: 8 bots sobreviventes, 3 min. Conferem que os bots
+ * jogam (sobem a escada; os infectados pegam gente) e o hash entre execuções. Gravados na fase 2 (19/11/2026): Gun Game
+ * `6595bdd9` (um bot fecha a escada em 3.707 ticks), Infection `ffb3e5cb` (os 8 infectados em 7.648 ticks).
+ * MUDAM com a sim, a IA, o mapa ou as regras dos modos: atualize no mesmo commit e diga o motivo no CHANGELOG.
+ */
+const GOLDEN_GUNGAME_HASH = '6595bdd9';
+const GOLDEN_INFECTION_HASH = 'ffb3e5cb';
+const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
+
+function runPartyGolden(kind: 'gunGame' | 'infection'): {
+  hash: string;
+  levels: number[];
+  teams: number[];
+  phase: string;
+  winnerTeam: number;
+  ticks: number;
+} {
+  const { map } = loadWorld();
+  const normal = builtinBotRef('normal');
+  const recipe: MatchRecipe =
+    kind === 'gunGame'
+      ? {
+          format: MATCH_RECIPE_FORMAT,
+          mode: 'warfare.ffa',
+          map: 'construto',
+          seed: 42,
+          match: { timeLimitS: 0, scoreLimit: 0 },
+          weapons: { ladder: GUN_GAME_LADDER, ammo: 'infiniteReserve' },
+          teams: [{ bots: [{ ref: normal, count: 8 }] }],
+        }
+      : {
+          format: MATCH_RECIPE_FORMAT,
+          mode: 'warfare.tdm',
+          map: 'construto',
+          seed: 42,
+          match: { timeLimitS: 180, scoreLimit: 0 },
+          infection: {},
+          teams: [{ bots: [{ ref: normal, count: 8 }] }, { bots: [] }],
+        };
+  const match = createHeadlessMatch({ recipe, map, humans: 0 });
+  const limit = kind === 'gunGame' ? 14_400 : 10_900;
+  let t = 0;
+  for (; t < limit && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const levels: number[] = [];
+  const teams = [0, 0];
+  for (let e = 0; e < v.count; e++) {
+    if (v.alive[e] !== 1) continue;
+    levels.push(v.points[e]!);
+    if (v.team[e]! < 2) teams[v.team[e]!]!++;
+  }
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    levels: levels.sort((a, b) => b - a),
+    teams,
+    phase: v.match.phase,
+    winnerTeam: v.match.winnerTeam,
+    ticks: t,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots no Construto', () => {
+  it('Gun Game: os bots sobem a escada e alguém fecha; hash estável', () => {
+    const a = runPartyGolden('gunGame');
+    const b = runPartyGolden('gunGame');
+    expect(b.hash).toBe(a.hash);
+    const msg = `níveis ${a.levels.join(',')}, fase ${a.phase} em ${a.ticks} ticks`;
+    console.log(`[gungame] ${msg} · hash ${a.hash}`);
+    expect(a.levels[0]!, msg).toBeGreaterThanOrEqual(3);
+    expect(a.hash, msg).toBe(GOLDEN_GUNGAME_HASH);
+  }, 240_000);
+
+  it('Infection: os infectados pegam gente; a partida acaba (ninguém sobrou ou o tempo); hash estável', () => {
+    const a = runPartyGolden('infection');
+    const b = runPartyGolden('infection');
+    expect(b.hash).toBe(a.hash);
+    const msg = `sobreviventes ${a.teams[0]}, infectados ${a.teams[1]}, fase ${a.phase} (vencedor ${a.winnerTeam}) em ${a.ticks} ticks`;
+    console.log(`[infection] ${msg} · hash ${a.hash}`);
+    expect(a.teams[1]!, msg).toBeGreaterThanOrEqual(2);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.hash, msg).toBe(GOLDEN_INFECTION_HASH);
+  }, 240_000);
+});
