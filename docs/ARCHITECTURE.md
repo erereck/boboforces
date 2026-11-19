@@ -3605,3 +3605,6 @@ Um revisor (Opus) leu as 3 partes e achou 5 problemas e 3 menores, todos corrigi
 - **Espaço no menu:** as ações das telas de edição (Partida personalizada, Laboratório e Oficina) foram para um módulo só
   delas (`ui/src/screens/editor-actions.ts`). Com as ações no mesmo arquivo da tela, o `game.ts` (o menu) puxava a tela
   inteira para o pedaço do menu; agora as telas vão com os editores, e o menu caiu de 349,8 para 349,1 KB.
+- **O infectado pela rede:** a velocidade dele (1,2x) mora nas regras do bobo, que não viajam no snapshot; a predição do
+  amigo infectado andava como sobrevivente e era puxada de volta a cada snapshot. Agora o `Sim.remote.commit` acerta a
+  velocidade pelo time (que viaja). Teste: o amigo infectado desde o começo, 0,4% de predições erradas (21 em 5.308).

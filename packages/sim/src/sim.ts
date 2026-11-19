@@ -792,6 +792,13 @@ export function createSim(config: SimConfig): Sim {
         const c = s.controller[e]!;
         if (s.alive[e] === 1 && c >= 0 && c < MAX_CONTROLLERS_WITH_ZOMBIES) s.controllerEntity[c] = s.idOf(e);
       }
+      // M6 (fase 2): a velocidade do modo sai do time (que o snapshot traz): a predição do próprio boneco anda como no
+      // host (o infectado é mais rápido).
+      if (ctx.party.infectedSpeed > 0) {
+        for (let e = 0; e < s.count; e++) {
+          if (s.kind[e] === ENTITY_KIND.bobo) ctx.rules.speed[e] = s.team[e] === 1 ? ctx.party.infectedSpeed : 1;
+        }
+      }
       mapObjects?.sync();
       ctx.figures.invalidate();
       events.clear();

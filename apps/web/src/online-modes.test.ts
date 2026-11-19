@@ -193,6 +193,21 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     dispose(run);
   }, 240_000);
 
+  it('M6 (fase 2): Infection com o amigo infectado desde o começo: o mesmo fim, e a predição dele anda como no host', () => {
+    const r = moreModePreset('infection')!;
+    // O amigo escolhe o time 1: começa infectado (1,2x de velocidade), e a predição dele precisa saber disso.
+    const run = playRoom(r, [0, 1], { snapshotHz: 30, zombies: 0, maxS: 200 });
+    expectSameResult(run);
+    const net = run.clients[0]!.net!;
+    expect(net.reconciles).toBeGreaterThan(1000);
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    const h = run.host.sim.view();
+    console.log(
+      `[modos] Infection: ${run.seconds.toFixed(1)} s, sobreviventes ${h.match.teamScore[0]} × infectados ${h.match.teamScore[1]}, vencedor ${h.match.winnerTeam}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 240_000);
+
   it('Bobo Zombies na Base Abandonada: 2 humanos e 1 bot de apoio, 1 onda; a mesma onda, os mesmos pontos', () => {
     const r = roomPreset('zombies');
     const run = playRoom({ ...r, zombies: { waves: 1 } }, [-1, -1], { snapshotHz: 30, zombies: 16, maxS: 240 });
