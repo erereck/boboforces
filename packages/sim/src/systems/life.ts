@@ -2,6 +2,7 @@ import { DROP_KINDS, PICKUP_KIND } from '../view.ts';
 import { partyActive, partyKill, partyLoadout } from './party.ts';
 import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
 import { paintDamage, paintLoadout } from './paintball.ts';
+import { strikeArmor, strikeKill } from './strike.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -60,6 +61,11 @@ import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.
 const F = ENTITY_FLAG;
 const R = RECENT_ATTACKERS;
 
+/** M7 (fase 2, revisão): o colete do BoboStrike segura tiro e explosão; a queda, o vazio e o sangrar passam inteiros. */
+function armored(weapon: number): boolean {
+  return weapon !== WEAPON_NONE && weapon !== WEAPON_KILL_PLANE && weapon !== WEAPON_BLEED_OUT;
+}
+
 /** Passo 5: aplica a fila de dano na ordem em que foi gerada. */
 export function damageSystem(ctx: SimContext): void {
   const s = ctx.s;
@@ -82,7 +88,12 @@ export function damageSystem(ctx: SimContext): void {
       if (!paint) amount *= ctx.rules.damageMult[a]! * ctx.mods.damageMul;
       // M2 (fase 4e): fogo amigo pela metade ou inteiro; um tiro mata (só dano de arma, nunca no aliado sem fogo amigo).
       if (a !== t && !hostile(ctx, a, t)) amount *= ctx.mods.friendlyFire;
+      // M7 (fase 2, revisão): o colete do BoboStrike antes do "um tiro mata".
+      if (ctx.strike !== null && armored(weaponOf)) amount = strikeArmor(ctx, t, amount, q.part[i] === PART_HEAD);
       if (ctx.mods.oneShot && amount > 0) amount = Math.max(amount, s.health[t]!);
+    } else if (ctx.strike !== null && armored(weaponOf)) {
+      // Sem dono (a Boom Box): o colete também segura.
+      amount = strikeArmor(ctx, t, amount, q.part[i] === PART_HEAD);
     }
     // M3 (fase 4d): insta-kill: qualquer dano de bobo mata o zumbi (menos o chefão). M6 (fase 6b): e o soldado da
     // horda (pelo dano de quem não é da horda).
@@ -366,12 +377,15 @@ function kill(
     const k = killer & 0xffff;
     if (hostile(ctx, k, t)) {
       s.kills[k] = s.kills[k]! + 1;
+      // M7 (fase 2): o dinheiro do abate no BoboStrike.
+      if (ctx.strike !== null && s.kind[k] === ENTITY_KIND.bobo) strikeKill(ctx, k, t);
       // Placar dos times: só bobo matando bobo (o zumbi do estresse fica fora do TDM). M6 (fase 1): no Domination o
       // placar é dos pontos.
       if (
         !ctx.ffa &&
         !zombie &&
         !ctx.zombiesMode &&
+        ctx.rounds === null &&
         s.kind[k] === ENTITY_KIND.bobo &&
         ctx.domination === null &&
         ctx.party.infectedSpeed <= 0 &&

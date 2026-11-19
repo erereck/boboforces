@@ -71,6 +71,7 @@ import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts
 import { applyChaos, ChaosState, chaosOf, chaosSystem } from './systems/chaos.ts';
 import { createFortress } from './systems/fortress.ts';
 import { createRoundState, ROUND_PHASE, roundFrozen, roundsSystem } from './systems/rounds.ts';
+import { createStrikeState, STRIKE, STRIKE_BUY_BASE, STRIKE_SHOP, strikeSystem } from './systems/strike.ts';
 import { JUGG_FIXED } from './systems/party.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
@@ -126,6 +127,13 @@ export interface SimMap {
   readonly perkMachines?: readonly PerkMachineDef[];
   /** M6 (fase 1): os pontos do Domination (o centro do anel nos pés e o raio). */
   readonly controlPoints?: readonly ControlPointDef[];
+  /** M7 (fase 2): os sites do BoboStrike (o centro dos pés e o raio). */
+  readonly bombSites?: readonly {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly radius: number;
+  }[];
 }
 
 export interface SimConfig {
@@ -460,7 +468,9 @@ export function createSim(config: SimConfig): Sim {
   // Tabela de jogo do boneco: a da partida, ou montada aqui (na criação; nunca no 1º raio).
   const figureTable = config.figureTable ?? createFigureGameTable();
   // M7 (fase 0, revisão): nas rodadas, o tempo e a meta da receita não valem (quem acaba a partida são as rodadas).
-  const roundsMode = recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed';
+  // M7 (fase 2): o BoboStrike (as rodadas MR12, a Boom Box nos 2 sites do mapa).
+  const strikeMode = recipe.mode === 'strike';
+  const roundsMode = strikeMode || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
   const timeLimitS = roundsMode ? 0 : (recipe.match?.timeLimitS ?? 0);
   const countdownS = config.countdownS ?? 0;
   assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
@@ -522,17 +532,29 @@ export function createSim(config: SimConfig): Sim {
     fortress:
       zombiesMode && recipe.zombies?.variant === 'fortress' ? createFortress(map.spawns, map.grid, map.blocks) : null,
     // M7 (fase 0): as rodadas do Jugg Fixo (uma por participante, até o teto).
-    rounds: roundsMode
+    strike: strikeMode ? createStrikeState(map.bombSites ?? []) : null,
+    rngStrike: root.fork('strike'),
+    rounds: strikeMode
       ? createRoundState({
-          buyTicks: secondsToTicks(JUGG_FIXED.startS, hz),
-          liveTicks: secondsToTicks(JUGG_FIXED.roundS, hz),
-          overTicks: secondsToTicks(JUGG_FIXED.overS, hz),
-          winRounds: 0,
-          totalRounds: Math.min(slots.length, JUGG_FIXED.maxRounds),
-          swapAfter: 0,
-          respawn: true,
+          buyTicks: secondsToTicks(STRIKE.buyS, hz),
+          liveTicks: secondsToTicks(STRIKE.roundS, hz),
+          overTicks: secondsToTicks(STRIKE.overS, hz),
+          winRounds: STRIKE.winRounds,
+          totalRounds: STRIKE.totalRounds,
+          swapAfter: STRIKE.swapAfter,
+          respawn: false,
         })
-      : null,
+      : roundsMode
+        ? createRoundState({
+            buyTicks: secondsToTicks(JUGG_FIXED.startS, hz),
+            liveTicks: secondsToTicks(JUGG_FIXED.roundS, hz),
+            overTicks: secondsToTicks(JUGG_FIXED.overS, hz),
+            winRounds: 0,
+            totalRounds: Math.min(slots.length, JUGG_FIXED.maxRounds),
+            swapAfter: 0,
+            respawn: true,
+          })
+        : null,
     training: recipe.mode === 'training',
     hz,
     dt: 1 / hz,
@@ -721,6 +743,8 @@ export function createSim(config: SimConfig): Sim {
     bodyScale: s.bodyScale,
     perks: s.perks,
     points: s.points,
+    armor: s.armor,
+    kit: s.kit,
     downTicks: s.downTicks,
     selfUp: s.selfUp,
     reviveTicks: s.reviveTicks,
@@ -750,6 +774,7 @@ export function createSim(config: SimConfig): Sim {
     controlPoints: domination,
     chaos,
     fortress: ctx.fortress,
+    strike: ctx.strike === null ? null : { data: ctx.strike.data, pos: ctx.strike.pos, sites: ctx.strike.sites },
     rounds:
       ctx.rounds === null
         ? null
@@ -817,6 +842,14 @@ export function createSim(config: SimConfig): Sim {
     if ((s.flags[e]! & ENTITY_FLAG.downed) !== 0) {
       s.inWeapon[e] = DOWNED_SLOT;
       s.inButtons[e] = (s.inButtons[e]! & DOWNED_BUTTONS) | BUTTON.crouch;
+    }
+    // M7 (fase 2): no BoboStrike, o `primary` a partir de `STRIKE_BUY_BASE` é um pedido de compra (a sim consome).
+    // A compra é na borda (o `primary` persiste no quadro e a rede repete o último): só quando o valor muda.
+    if (ctx.strike !== null) {
+      const code = f.primary & 0xff;
+      const req = code - STRIKE_BUY_BASE;
+      if (code !== s.lastPrimary[e] && req >= 0 && req < STRIKE_SHOP.length) s.buyRequest[e] = req + 1;
+      s.lastPrimary[e] = code;
     }
     // Primária do próximo spawn: código + 1 (0 = manter); código que não é primária é ignorado.
     const p = (f.primary & 0xff) - 1;
@@ -1041,7 +1074,8 @@ export function createSim(config: SimConfig): Sim {
       dominationSystem(ctx);
       // M6 (fase 2): o Infection (a largada, o placar e quem venceu).
       partySystem(ctx);
-      // M7 (fase 0): as rodadas (a largada, o vencedor da rodada e o fim da partida).
+      // M7 (fase 2): o BoboStrike (a compra e a Boom Box) e (fase 0) as rodadas.
+      strikeSystem(ctx);
       roundsSystem(ctx);
       rulesSystem(ctx);
       spawnSystem(ctx);

@@ -174,6 +174,14 @@ export class SimState {
    * outros modos não muda).
    */
   readonly zombieFields: readonly StateField[];
+  /** M7 (fase 2): o colete (0..100), o kit de desarme (0/1) e o pedido de compra (índice da loja + 1) do BoboStrike. */
+  readonly armor = new Uint8Array(MAX_ENTITIES);
+  readonly kit = new Uint8Array(MAX_ENTITIES);
+  readonly buyRequest = new Uint8Array(MAX_ENTITIES);
+  /** M7 (fase 2, revisão): o último `InputFrame.primary` (a compra é na borda: o valor persiste no quadro). */
+  readonly lastPrimary = new Uint8Array(MAX_ENTITIES);
+  /** M7 (fase 2): os campos que só existem no BoboStrike (o dinheiro é o `points`). */
+  readonly strikeFields: readonly StateField[];
 
   constructor() {
     const f = (name: string, array: StateArray, stride = 1): StateField => ({ name, array, stride });
@@ -259,6 +267,13 @@ export class SimState {
       f('reviver', this.reviver),
       f('repairPoints', this.repairPoints),
       f('perks', this.perks),
+    ];
+    this.strikeFields = [
+      f('points', this.points),
+      f('armor', this.armor),
+      f('kit', this.kit),
+      f('buyRequest', this.buyRequest),
+      f('lastPrimary', this.lastPrimary),
     ];
   }
 

@@ -35,6 +35,16 @@ export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView
 export { JUGG_FIXED, JUGGERNAUT, juggernautHp } from './systems/party.ts';
 // M7 (fase 0): as rodadas.
 export { ROUND, ROUND_PHASE, ROUND_UNDECIDED } from './systems/rounds.ts';
+// M7 (fase 2): o BoboStrike.
+export {
+  BOMB,
+  STRIKE,
+  STRIKE_BUY_BASE,
+  STRIKE_DATA,
+  STRIKE_SHOP,
+  attackers as strikeAttackers,
+  type StrikeItemId,
+} from './systems/strike.ts';
 export { CHAOS_MODS, MOD } from './systems/chaos.ts';
 export { FORTRESS } from './systems/fortress.ts';
 export {

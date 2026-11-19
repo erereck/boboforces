@@ -3940,3 +3940,46 @@ Plano em `docs/PLANO_M7.md` (decisão #81).
   em 6 spawns por time: agora 9 bots, 5 contra 5 com o humano); as saídas do pátio dos defensores de 1,5 m (agora 2 m;
   no TDM o pátio ainda é fácil de segurar, travessia de ~8 s: fica para a rodada de prints); e um caixote que entrava no
   QG.
+
+### 18.3 Fase 2: o BoboStrike na sim (19/11/2026)
+
+- **O modo** (`mode: 'strike'`, `sim/src/systems/strike.ts`, `ctx.strike`): as rodadas do motor da fase 0 com as regras
+  `STRIKE` (15 s de compra, 1:45 de rodada, 5 s de pausa, MR12: troca na 6ª, vence quem fizer 7; sem respawn; o tempo e
+  a meta da receita não valem). Sem regeneração, sem caixinha de munição e sem proteção de spawn.
+  - **Os lados:** o time 0 ataca no 1º tempo; depois da troca, o 1. Os pontos de spawn são do lado (os do time 0 do mapa
+    são os de ataque): trocados, cada time nasce nos do outro (`roundSpawn` pelo lado). Na volta do intervalo o
+    dinheiro volta a 800, as derrotas seguidas zeram e todo mundo volta só de pistola.
+  - **A Boom Box** (`StrikeState.data` pelos índices de `STRIKE_DATA`, a posição em `pos`): na largada, um atacante
+    sorteado (`rngStrike`) leva. O portador que cai larga a bomba onde estava; um atacante vivo a 1,2 m pega. Plantar:
+    o portador dentro do site (o raio do marcador), no chão, segurando o usar por 3 s; soltar ou sair recomeça. Plantada,
+    o relógio da rodada vira o da bomba (40 s; a rodada não acaba mais no tempo). Desarmar: o defensor vivo mais perto, a
+    até 1,5 m, no chão, segurando o usar por 7 s (5 s com o kit); trocar de quem desarma recomeça. A explosão
+    (`BOOM_BOX`, código 18, sem dono) faz 500 no centro, caindo até 0 em 20 m (mata a até 10 m mesmo de colete).
+  - **Quem vence a rodada:** a explosão (atacantes), o desarme (defensores), os defensores eliminados (atacantes, mesmo
+    com a bomba plantada), os atacantes eliminados sem a bomba plantada ou o tempo sem a bomba plantada (defensores).
+  - **A economia** (`points` é o dinheiro, até 16.000): 800 na largada; vitória 3.000; derrota 1.900 mais 500 por
+    derrota seguida do time (até 3.400); abate 300; plantar 300.
+  - **A compra** (`STRIKE_SHOP`, só na compra): o `InputFrame.primary` de `STRIKE_BUY_BASE` (200) + o item vira um
+    pedido (`buyRequest`), que a sim consome. Comprar o que já tem não faz nada (a entrada repetida da rede não compra
+    duas vezes). A arma comprada vai para a mão.
+  - **Quem sobrevive** guarda o loadout (as armas, os pentes e a reserva), o colete e o kit; quem morreu volta com a
+    pistola e a faca.
+  - **O colete** (`armor`, 0..100): absorve metade do dano fora da cabeça, até o que sobra dele.
+- **Estado, snapshot e rede:** `strike.data`, `strike.pos`, o RNG e os campos dos bobos (`strikeFields`: o dinheiro, o
+  colete, o kit e o pedido) só no modo (snapshot v17); na rede, 10 globais da bomba, a posição dela e o grupo `strike`
+  (o colete e o kit) por bobo. `PROTOCOL_VERSION` 7.
+- **A revisão (Opus) achou 10 coisas, corrigidas antes do commit (as regras novas são escolhas minhas, revisáveis):**
+  - Nas rodadas, os abates não somam no placar dos times (uma granada na pausa da última rodada desempatava a partida).
+  - A compra é na borda do `primary` (`lastPrimary`, no estado): o valor persiste no quadro, e a compra negada numa
+    rodada saía sozinha na seguinte.
+  - A bomba largada cai até o chão embaixo do portador; no vazio, passa a um atacante vivo sorteado.
+  - O colete entra antes do "um tiro mata" e não segura a queda, o vazio nem o sangrar.
+  - Quem já está desarmando continua (outro defensor chegando mais perto zerava o progresso).
+  - A arma comprada e a da largada ficam na mão (o `inWeapon` acompanha).
+  - O kit é só de quem defende.
+  - Os dois lados zerados no mesmo tick, sem a bomba plantada: a defesa leva.
+  - Ficam como estão: a explosão respeita parede (um caixote salva), e o dano dela entra no tick seguinte.
+  - Para a IA (fase 3): o bot portador planta; não há como largar a bomba de propósito.
+- **Testes:** a sim (`strike.test.ts`: comprar, plantar, desarmar, explodir, o dinheiro, o colete guardado, a troca de
+  lado e o fim em 7) e a rede (o BoboStrike na Base Bobo por 3 min: a rodada, a bomba e o dinheiro iguais no amigo; 35
+  predições erradas em 5.247). Ainda sem a IA do modo: os bots brigam como no Times.

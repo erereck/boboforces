@@ -5,6 +5,7 @@ import {
   BIG_BRRT,
   BIG_BRRT_COOL,
   BOBO_NAV_METRICS,
+  BOOM_BOX,
   CHAOS_BLAST,
   CHAOS_MODS,
   DESMONTADOR,
@@ -25,6 +26,8 @@ import {
   MOVEMENT_ZOMBIE_SPRINTER,
   PART_DAMAGE_MULTIPLIER,
   SPREAD_STATE_MULTIPLIER,
+  STRIKE,
+  STRIKE_SHOP,
   WEAPON_FIRE,
   WEAPONS,
   ZOMBIE_BARRICADES,
@@ -46,7 +49,7 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -126,8 +129,11 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   // Fase 6: o gerador do Fortress e a Horda armada.
   FORTRESS,
   HORDE,
-  // M7 (fase 0): o Jugg Fixo (as rodadas).
+  // M7 (fase 0): o Jugg Fixo (as rodadas). Fase 2: o BoboStrike (a loja, a economia e a Boom Box).
   JUGG_FIXED,
+  STRIKE,
+  STRIKE_SHOP,
+  BOOM_BOX,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */

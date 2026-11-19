@@ -48,6 +48,9 @@ export interface SimView {
   readonly perks: Uint8Array;
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */
   readonly points: Int32Array;
+  /** M7 (fase 2): o colete (0..100) e o kit de desarme (0/1) do BoboStrike. */
+  readonly armor: Uint8Array;
+  readonly kit: Uint8Array;
   /**
    * M3 (fase 2c): caído (`ENTITY_FLAG.downed`): ticks até sangrar ou levantar sozinho (`selfUp` 1) e o progresso do
    * reviver em ticks (0 = ninguém levantando).
@@ -123,6 +126,11 @@ export interface SimView {
    * ticks na fase, as vitórias, os lados trocados e o vencedor; a rede escreve direto aqui no amigo) e as regras.
    */
   readonly rounds: RoundsView | null;
+  /**
+   * M7 (fase 2): o BoboStrike (`null` fora dele): `data` pelos índices de `STRIKE_DATA` (a Boom Box, quem carrega, o
+   * site, os ticks; a rede escreve direto aqui), `pos` a bomba no chão e os sites.
+   */
+  readonly strike: StrikeView | null;
   /** M6 (fase 4b): o tick do último tiro de cada entidade (os Invisíveis aparecem ao atirar; a IA olha daqui). */
   readonly lastShotTick: Int32Array;
   /**
@@ -279,6 +287,13 @@ export interface MapObjectsView {
 /** M6 (fase 4): o que a view mostra dos modificadores. */
 export interface ChaosView {
   readonly masks: Int32Array;
+}
+
+/** M7 (fase 2): o que a view mostra do BoboStrike. */
+export interface StrikeView {
+  readonly data: Int32Array;
+  readonly pos: Float32Array;
+  readonly sites: readonly { readonly x: number; readonly y: number; readonly z: number; readonly radius: number }[];
 }
 
 /** M7 (fase 0): o que a view mostra das rodadas. */

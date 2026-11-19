@@ -172,6 +172,11 @@ export const ENTITY_GROUPS: readonly FieldGroup<SimView>[] = [
     ],
   },
   { name: 'attacker', fields: [int('lastAttacker', 1, u(32), (v) => v.lastAttacker)] },
+  // M7 (fase 2): o colete e o kit do BoboStrike (o dinheiro é o `points`).
+  {
+    name: 'strike',
+    fields: [int('armor', 1, u(7), (v) => v.armor), int('kit', 1, u(1), (v) => v.kit)],
+  },
   {
     name: 'zombie',
     fields: [
@@ -513,6 +518,34 @@ export function createNetLayout(view: SimView): NetLayout {
         ),
       );
     });
+  }
+  // M7 (fase 2): o BoboStrike (a Boom Box, quem carrega, o site, os ticks e as derrotas seguidas; a posição dela).
+  if (view.strike !== null) {
+    const codecs = [u(3), u(32), s(3), u(16, 8), u(16, 8), u(32), u(16, 8), u(32), u(4), u(4)] as const;
+    codecs.forEach((codec, i) => {
+      globals.push(
+        g(
+          `strike${i}`,
+          codec,
+          (v) => v.strike!.data[i]!,
+          (v, _st, q) => {
+            v.strike!.data[i] = q;
+          },
+        ),
+      );
+    });
+    for (let i = 0; i < 3; i++) {
+      globals.push(
+        g(
+          `bombPos${i}`,
+          s(20, 10),
+          (v) => Math.round(v.strike!.pos[i]! * 100),
+          (v, _st, q) => {
+            v.strike!.pos[i] = q / 100;
+          },
+        ),
+      );
+    }
   }
   // M6 (fase 4): os modificadores (a máscara ligada, a da próxima troca e os ticks até ela), só com eles.
   if (view.chaos !== null) {

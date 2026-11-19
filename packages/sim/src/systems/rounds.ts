@@ -2,6 +2,7 @@ import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
 import { finishMatch, respawn } from './life.ts';
 import { juggRoundReset, juggRoundStart, juggRoundWinner } from './party.ts';
+import { strikeRoundEnd, strikeRoundReset, strikeRoundStart, strikeRoundWinner, strikeTimeWinner } from './strike.ts';
 
 /**
  * M7 (fase 0): o motor de rodadas (o BoboStrike e o Juggernaut Fixo). Cada rodada começa com todo mundo de volta ao
@@ -92,17 +93,20 @@ export function roundsSystem(ctx: SimContext): void {
     finishMatch(ctx);
     return;
   }
-  if (rules.swapAfter > 0 && round === rules.swapAfter) d[ROUND.swapped] = d[ROUND.swapped]! ^ 1;
-  startRound(ctx);
+  const swap = rules.swapAfter > 0 && round === rules.swapAfter;
+  if (swap) d[ROUND.swapped] = d[ROUND.swapped]! ^ 1;
+  startRound(ctx, swap);
 }
 
 /** A próxima rodada: todo mundo de volta ao spawn (com a vida cheia) e o modo arruma os papéis. */
-function startRound(ctx: SimContext): void {
+function startRound(ctx: SimContext, swapped = false): void {
   const st = ctx.rounds!;
   const d = st.data;
   d[ROUND.round] = d[ROUND.round]! + 1;
   d[ROUND.winner] = ROUND_UNDECIDED;
   if (ctx.party.jugg !== null) juggRoundReset(ctx);
+  // M7 (fase 2): o BoboStrike guarda o que os sobreviventes carregam (na volta do intervalo, zera o dinheiro).
+  if (ctx.strike !== null) strikeRoundReset(ctx, swapped);
   // Cada um num ponto diferente (todos nascem juntos: a nota do spawn não serve). No Jugg, qualquer ponto, girando
   // a cada rodada; nos times, os pontos do time.
   const s = ctx.s;
@@ -116,9 +120,12 @@ function startRound(ctx: SimContext): void {
     const team = s.team[e]!;
     const k = anyPoint ? n + round : team === 1 ? n1++ : n0++;
     n++;
-    respawn(ctx, e, roundSpawn(ctx, team, k, anyPoint));
+    // M7 (fase 2): os pontos de spawn são do lado (atacantes nos do time 0 do mapa); trocados, cada time no do outro.
+    const side = team <= 1 ? team ^ d[ROUND.swapped]! : team;
+    respawn(ctx, e, roundSpawn(ctx, side, k, anyPoint));
   }
   if (ctx.party.jugg !== null) juggRoundStart(ctx, d[ROUND.round]!);
+  if (ctx.strike !== null) strikeRoundStart(ctx);
   const buy = st.rules.buyTicks;
   d[ROUND.phase] = buy > 0 ? ROUND_PHASE.buy : ROUND_PHASE.live;
   d[ROUND.ticks] = buy > 0 ? buy : st.rules.liveTicks;
@@ -150,6 +157,7 @@ function roundSpawn(ctx: SimContext, team: number, k: number, anyPoint: boolean)
 /** Quem venceu a rodada agora (`ROUND_UNDECIDED` = ninguém ainda): o modo, ou o time que sobrou (sem respawn). */
 function roundWinner(ctx: SimContext): number {
   if (ctx.party.jugg !== null) return juggRoundWinner(ctx);
+  if (ctx.strike !== null) return strikeRoundWinner(ctx);
   if (ctx.rounds!.rules.respawn) return ROUND_UNDECIDED;
   const s = ctx.s;
   let alive0 = 0;
@@ -166,6 +174,7 @@ function roundWinner(ctx: SimContext): number {
 /** O vencedor quando o tempo da rodada acaba: o Jugg que aguentou (o time 1); sem regra do modo, empate. */
 function timeWinner(ctx: SimContext): number {
   if (ctx.party.jugg !== null) return 1;
+  if (ctx.strike !== null) return strikeTimeWinner(ctx);
   return -1;
 }
 
@@ -174,6 +183,7 @@ function endRound(ctx: SimContext, winner: number): void {
   d[ROUND.winner] = winner;
   if (winner === 0) d[ROUND.wins0] = d[ROUND.wins0]! + 1;
   else if (winner === 1) d[ROUND.wins1] = d[ROUND.wins1]! + 1;
+  if (ctx.strike !== null) strikeRoundEnd(ctx, winner);
   ctx.match.teamScore[0] = d[ROUND.wins0]!;
   ctx.match.teamScore[1] = d[ROUND.wins1]!;
   d[ROUND.phase] = ROUND_PHASE.over;

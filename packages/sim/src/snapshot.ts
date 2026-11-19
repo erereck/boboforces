@@ -21,7 +21,7 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 16;
+const SNAPSHOT_VERSION = 17;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -81,8 +81,14 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
   }
   // M6 (fase 6a): a vida do gerador do Fortress (só nele).
   if (ctx.fortress !== null) h.bytes(ctx.fortress.hp);
-  // M7 (fase 0): as rodadas (só nos modos de rodada).
+  // M7 (fase 0): as rodadas (só nos modos de rodada). Fase 2: o BoboStrike (a bomba e os campos dos bobos).
   if (ctx.rounds !== null) h.bytes(ctx.rounds.data);
+  if (ctx.strike !== null) {
+    h.bytes(ctx.strike.data).bytes(ctx.strike.pos);
+    ctx.rngStrike.saveState(rngScratch);
+    h.bytes(rngScratch);
+    for (const f of s.strikeFields) h.bytes(f.array.subarray(0, s.count * f.stride));
+  }
   // M6 (fase 4): os modificadores e a Roleta (só com eles).
   const chaos = ctx.chaos;
   if (chaos !== null) {
@@ -188,6 +194,13 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
     }
     if (ctx.fortress !== null) writeArray(w, ctx.fortress.hp, 1);
     if (ctx.rounds !== null) writeArray(w, ctx.rounds.data, ctx.rounds.data.length);
+    if (ctx.strike !== null) {
+      writeArray(w, ctx.strike.data, ctx.strike.data.length);
+      writeArray(w, ctx.strike.pos, 3);
+      ctx.rngStrike.saveState(rngScratch);
+      writeArray(w, rngScratch, RNG_STATE_WORDS);
+      for (const f of s.strikeFields) writeArray(w, f.array, s.count * f.stride);
+    }
     const chaos = ctx.chaos;
     if (chaos !== null) {
       writeArray(w, chaos.masks, chaos.masks.length);
@@ -288,6 +301,13 @@ export function readState(ctx: SimContext, r: BitReader): void {
     }
     if (ctx.fortress !== null) readArray(r, ctx.fortress.hp, 1);
     if (ctx.rounds !== null) readArray(r, ctx.rounds.data, ctx.rounds.data.length);
+    if (ctx.strike !== null) {
+      readArray(r, ctx.strike.data, ctx.strike.data.length);
+      readArray(r, ctx.strike.pos, 3);
+      readArray(r, rngScratch, RNG_STATE_WORDS);
+      ctx.rngStrike.loadState(rngScratch);
+      for (const f of s.strikeFields) readArray(r, f.array, s.count * f.stride);
+    }
     const chaos = ctx.chaos;
     if (chaos !== null) {
       readArray(r, chaos.masks, chaos.masks.length);

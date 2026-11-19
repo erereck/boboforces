@@ -66,6 +66,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
      300) e a **compra** nos 15 s do começo da rodada (pistola grátis; SMG e escopeta 1200; fuzil 2700; sniper 4500;
      colete 650 ou 1000; granada 300; kit 400);
    - o **colete** (50 ou 100, absorve 50% do dano no tronco e nos membros), sem regeneração.
+   - **feita em 19/11** (ARCHITECTURE §18.3): o modo na sim e na rede (ainda sem card: a IA e o HUD vêm nas fases 3 e 4).
 3. **A IA do BoboStrike:**
    - atacantes: escolher o site, o portador planta, os outros escoltam e seguram o site;
    - defensores: se dividir nos sites, rotacionar ao ouvir a bomba e retomar; desarmar;

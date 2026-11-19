@@ -21,6 +21,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   pátio dos defensores no norte, atrás de um QG. Três rotas (oeste, meio com a torre de controle, leste) e corredores
   curtos do meio para os sites; quebra-vistas em zigue-zague para nenhuma linha passar de 50 m. Já joga TDM (Partida
   rápida e personalizada).
+- **BoboStrike na sim (fase 2, ainda sem card):** as rodadas MR12 (troca de lado na 6ª, vence quem fizer 7), a Boom Box
+  (um atacante sorteado leva; largada ao morrer; plantar no site segurando o usar por 3 s; explode em 40 s; desarmar em
+  7 s, ou 5 s com o kit), a compra nos 15 s da largada (pistola grátis; SMG e escopeta 1.200; fuzil 2.700; sniper
+  4.500; colete 650 ou 1.000; granada 300; kit 400), a economia em faixas (vitória 3.000; derrota 1.900 mais 500 por
+  derrota seguida, até 3.400; abate e plantar 300) e o colete (absorve metade do dano fora da cabeça). Quem sobrevive
+  guarda o que tem; quem morreu volta só de pistola. Também pela rede.
 
 ### M6: modos de festa (planejado em 19/11/2026)
 

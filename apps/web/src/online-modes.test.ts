@@ -1,4 +1,4 @@
-import type { MatchRecipe } from '@boboforces/format';
+import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { createSceneDriver, onlineRecipe, type OnlineSession, type SceneDriver } from '@boboforces/game';
 import { moreModePreset } from '@boboforces/game/editors';
 import { roomPreset, type RoomPresetMode } from '@boboforces/game/online';
@@ -225,6 +225,32 @@ describe('as partidas da sala pela rede de mentira (M5 fase 6a)', () => {
     expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
     console.log(
       `[modos] Bobo Chaos: ${run.seconds.toFixed(1)} s, máscara final ${h[0]!.toString(2)}, placar ${run.host.sim.view().match.teamScore[0]}×${run.host.sim.view().match.teamScore[1]}, predição errada ${net.mispredicts}/${net.reconciles}`,
+    );
+    dispose(run);
+  }, 240_000);
+
+  it('M7 (fase 2): BoboStrike na Base Bobo, um de cada lado e 2 bots por time: a rodada, a bomba e o dinheiro iguais', () => {
+    const normal = builtinBotRef('normal');
+    const r: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'strike',
+      map: 'airbase',
+      seed: 0,
+      teams: [{ humans: 'all', bots: [{ ref: normal, count: 2 }] }, { bots: [{ ref: normal, count: 3 }] }],
+    };
+    // 3 min: a compra, a 1ª rodada (os bots brigam como no Times até a IA do modo) e o começo da 2ª.
+    const run = playRoom(r, [0, 1], { snapshotHz: 30, zombies: 0, maxS: 180 });
+    const h = run.host.sim.view();
+    const v = run.clients[0]!.sim.view();
+    expect(h.rounds!.data[0]).toBeGreaterThanOrEqual(2);
+    // O amigo vê a mesma rodada e a mesma bomba (no último snapshot que chegou, ~1 tick atrás no máximo).
+    expect(v.rounds!.data[0]).toBe(h.rounds!.data[0]);
+    expect(v.rounds!.data[3]! + v.rounds!.data[4]!).toBe(h.rounds!.data[3]! + h.rounds!.data[4]!);
+    for (let e = 0; e < h.count; e++) expect(v.points[e], `dinheiro da entidade ${e}`).toBe(h.points[e]);
+    const net = run.clients[0]!.net!;
+    expect(net.mispredicts / net.reconciles).toBeLessThan(0.02);
+    console.log(
+      `[modos] BoboStrike: ${run.seconds.toFixed(1)} s, rodada ${h.rounds!.data[0]}, ${h.rounds!.data[3]}×${h.rounds!.data[4]}, predição errada ${net.mispredicts}/${net.reconciles}`,
     );
     dispose(run);
   }, 240_000);

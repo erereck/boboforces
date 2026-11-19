@@ -56,6 +56,10 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     killPlaneY: area.killPlaneY,
     ...(source.colliders ? { colliders: source.colliders } : {}),
     ...(source.nav ? { nav: source.nav } : {}),
+    // M7 (fase 2): os sites do BoboStrike (a sim só usa no modo dele).
+    ...(source.markers.bombSites?.length
+      ? { bombSites: source.markers.bombSites.map((d) => ({ x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
     // M6 (fase 1): os pontos do Domination (a sim só usa no modo dele).
     ...(source.markers.domination?.length
       ? { controlPoints: source.markers.domination.map((d) => ({ x: d.x, y: d.y, z: d.z, radius: d.radius })) }

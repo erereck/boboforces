@@ -514,7 +514,9 @@ export function weaponDef(code: number): WeaponDef | null {
             ? CHAOS_BLAST
             : code >= WEAPON_PAINT_MARKER && code <= WEAPON_PAINT_BUCKET
               ? PAINT_WEAPONS[code - WEAPON_PAINT_MARKER]!
-              : null;
+              : code === WEAPON_BOOM_BOX
+                ? BOOM_BOX
+                : null;
 }
 
 /**
@@ -759,3 +761,21 @@ export function paintPrimaryFor(primary: number): number {
       ? WEAPON_PAINT_PUMP
       : WEAPON_PAINT_MARKER;
 }
+
+/**
+ * M7 (fase 2): a explosão da Boom Box do BoboStrike (gameplay.md: a bomba de brinquedo). Sem dono (ninguém leva o abate)
+ * e fere todo mundo: 500 no centro, caindo até 0 em 20 m (mata a até 10 m mesmo com colete cheio). Escolha minha
+ * (revisável, pergunta Y4).
+ */
+export const WEAPON_BOOM_BOX = 18;
+
+export const BOOM_BOX: WeaponDef = {
+  ...WEAPON_ROCKET,
+  id: 'boom-box',
+  code: WEAPON_BOOM_BOX,
+  damage: 0,
+  blastDamage: 500,
+  blastRadiusM: 20,
+  selfDamageMul: 0,
+  killForce: 14,
+};
