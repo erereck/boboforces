@@ -26,6 +26,8 @@ export interface ResultScreenData {
   /** `''` = ninguém. */
   readonly nemesis: string;
   readonly nemesisKills: number;
+  /** M8 (fase 4): a rivalidade com o Nêmesis guardado ("Na rivalidade: te pegou 12, você 4 · 3 partidas"). */
+  readonly rivalry?: string;
   readonly victim: string;
   readonly victimKills: number;
   readonly kills: number;
@@ -107,6 +109,18 @@ export const resultScreen: Screen<ResultScreenData> = {
                 ),
               ],
             } as UiNode,
+            ...(d.rivalry !== undefined
+              ? [
+                  {
+                    kind: 'text',
+                    id: 'rivalry',
+                    text: { literal: d.rivalry },
+                    style: 'caption',
+                    color: COLORS.acao,
+                    textAlign: 'center',
+                  } as UiNode,
+                ]
+              : []),
           ]
         : [line('nemesis', 'result.noNemesis', {}, COLORS.textoBaixo)];
     return {

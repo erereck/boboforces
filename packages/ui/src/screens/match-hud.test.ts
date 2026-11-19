@@ -147,6 +147,14 @@ describe('contagem inicial e morte súbita', () => {
     expect(text).toContain('Hoje:6');
   });
 
+  it('M8 (fase 4): a 2ª linha do Nêmesis, comprida, encolhe para caber em 640×360', () => {
+    const list = createDrawList();
+    const extra = 'Seu Nêmesis voltou: Jorge the Immortal da Silva · te pegou 120, você 45';
+    drawMatchCountdown(list, fonts, 2.3, 'Hoje: 6 × Normal Bob e 2 × Camper Carl', 640, 360, MIN_TEXT.phone, extra);
+    within(list, 640, 360);
+    expect(syntheticGlyphText(list)).toContain('SeuNêmesisvoltou');
+  });
+
   it('o placar compartilhado ganha "MORTE SÚBITA" embaixo, com o relógio', () => {
     const lay = layoutHudScreen(1, W, H, { minTextPx: MIN_TEXT.tv });
     const m = createHudSharedModel();

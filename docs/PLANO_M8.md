@@ -74,6 +74,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 4. **O Nêmesis com memória:** o bot que mais te matou fica guardado (quem é, quantas vezes te pegou, quantas você o
    pegou de volta); quando ele volta numa partida, a contagem do começo avisa ("Seu Nêmesis voltou") e o resultado
    mostra o placar da rivalidade. Sem mudar a IA (pergunta Z3).
+   - **feita em 19/11** (ARCHITECTURE §19.5): a memória no `stats@1`, o aviso na contagem e a rivalidade no resultado.
 5. **O Diretor de Partida:** o bloco `director` da receita (desligado, Relax, Equilibrado, Desafio); mede os humanos
    numa janela de 3 min (a cada 10 s, nos ticks da sim) e ajusta só os bots, no máximo 1/4 de nível a cada 30 s e
    dentro de ±1 nível (a mira dos bots entre dois níveis); o ícone no placar ("Diretor: bots −½"); na Partida

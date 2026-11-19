@@ -313,6 +313,7 @@ import {
 import { bareLookId, botLookIndices, FIGURE_ZOMBIE_LOOK, figureLookById, type SceneFigures } from './figures.ts';
 import type { LoadedConstruto, LoadingTimes } from './load.ts';
 import { createCameraPose, poseFromCamera, sampleRoute, type CameraPose } from './route.ts';
+import { showsRivalry, updateNemesis, type MatchBotTally } from './nemesis.ts';
 import {
   AQUARIUM,
   AQUARIUM_ACTION,
@@ -1085,6 +1086,28 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   const scoreOrder = new Int16Array(SCOREBOARD_MAX_ROWS);
   const todayLine = countdownLine(recipe, humans, names);
+  /** M8 (fase 4, revisão): os controladores que um jogador já assumiu (o sofá, o Aquário): não contam como bot. */
+  const everHuman = new Set<number>();
+  /**
+   * M8 (fase 4): o Nêmesis voltou? Na contagem, a 2ª linha ("Seu Nêmesis voltou: Jorge · te pegou 7, você 3"). Só na
+   * partida de verdade com jogador (o Aquário e o bench não têm rival).
+   */
+  const nemesisLine = ((): string => {
+    const mem = host.stats.current.nemesis;
+    if (mem === undefined || request.kind !== 'play' || humans === 0) return '';
+    const slots = expandRecipe(recipe, humans);
+    // Do lado de lá (o rival aliado, como o bot de apoio do Zombies, não conta); no FFA, na Infection (quem é infectado
+    // muda) e no Royale (os esquadrões saem da largada), todos.
+    const everyone = solo || recipe.infection !== undefined || royaleMode;
+    const myTeam = slots.find((sl) => sl.controller === me)?.team ?? 0;
+    for (const slot of slots) {
+      if (slot.bot !== null && (everyone || slot.team !== myTeam) && resolveBot(recipe, slot.bot).id === mem.id) {
+        const name = names[slot.controller] ?? mem.name;
+        return t('nemesis.back', { name, them: mem.killedYou, you: mem.youKilled });
+      }
+    }
+    return '';
+  })();
   const projected = new Float64Array(3);
   /** M2 (fase 3e): avisos do time (x, y, z) lidos do diretor. */
   const pingScratch = new Float64Array(MAX_TEAM_PINGS * 3);
@@ -2359,6 +2382,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     endDeath(slot.death);
     slot.shoulder.arm = -1;
     driver.setHumanControlled(c, true);
+    everHuman.add(c);
     aqList = false;
     aqDeadS = 0;
     host.log(`[partida] aquário: assumiu ${nameOf(v, i)}`);
@@ -2823,6 +2847,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     viewCount = slots.length;
     layout = null;
     driver.setHumanControlled(pick, true);
+    everHuman.add(pick);
     const name = names[pick] ?? '?';
     const label = d.kind === 'gamepad' ? `controle ${d.index + 1}` : 'teclado';
     host.log(`[partida] sofá: P${num + 1} entrou no meio (${label}) no lugar de ${name}`);
@@ -3476,6 +3501,36 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return 'none';
   }
 
+  /**
+   * M8 (fase 4): a memória do Nêmesis depois da partida (`scene/nemesis.ts`): cada bot com quantas vezes te pegou e
+   * você a ele, pelo id do documento. Devolve a linha da rivalidade quando o Nêmesis da partida é o rival guardado.
+   */
+  function recordNemesis(v: SimView, human: number): string {
+    const tallies: MatchBotTally[] = [];
+    for (const slot of expandRecipe(recipe, humans)) {
+      // O lugar que um jogador do sofá assumiu (mesmo que tenha saído depois) não é bot: os abates dele não contam.
+      if (slot.bot === null || everHuman.has(slot.controller)) continue;
+      const e = entityIndex(sim.controllerEntity(slot.controller));
+      if (e >= v.count || e >= matchStats.capacity) continue;
+      // Só os do lado de lá: no FFA e na Infection (quem é infectado muda), todos; no Royale, o esquadrão é o time.
+      if (!solo && !infection && v.team[e] === v.team[human]) continue;
+      const id = resolveBot(recipe, slot.bot).id;
+      // O id longo demais não volta igual do save (o teto é 64): fica de fora.
+      if (id.length > 48) continue;
+      tallies.push({
+        id,
+        name: Array.from(nameOf(v, e)).slice(0, 24).join(''),
+        killedYou: matchStats.killedHuman[e]!,
+        youKilled: matchStats.killedByHuman[e]!,
+      });
+    }
+    const prev = host.stats.current.nemesis ?? null;
+    const mem = updateNemesis(prev, tallies);
+    if (mem !== prev) host.stats.setNemesis(mem);
+    if (mem === null || !showsRivalry(mem, tallies)) return '';
+    return t('result.rivalry', { name: mem.name, them: mem.killedYou, you: mem.youKilled, n: mem.matches });
+  }
+
   /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
   /** M2 (fase 4e): o que o resultado mostra (para refazer a tela ao salvar o preset). */
   let resultData: ResultScreenData | null = null;
@@ -3487,6 +3542,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M2 (fase 4g): a partida vai para o `stats@1` (o bench não tem humano). Rodada 8 (D5): em tela dividida, todos os
     // jogadores locais somados (os humanos são os controladores 0..humans-1).
     let breaks: RecordBreaks | null = null;
+    /** M8 (fase 4): a rivalidade com o Nêmesis guardado (`''` = nenhuma). */
+    let rivalry = '';
     // M3 (fase 6a): a onda máxima desta configuração antes da partida (o recorde é por mapa, regras e jogadores).
     const zombieKey = zombiesMode ? zombieRecordKey(recipe, humans) : '';
     const previousWave = zombiesMode ? zombieRecord(host.stats.current, zombieKey) : 0;
@@ -3495,6 +3552,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       for (let p = 0; p < humans; p++) locals.push(entityIndex(sim.controllerEntity(p)));
       const zombies = zombiesMode ? { key: zombieKey, wave: v.match.zombieWave } : undefined;
       breaks = host.stats.record(localMatchRecord(matchStats, v, locals, solo, Math.round(timeS), zombies));
+      rivalry = recordNemesis(v, human);
     }
     if (zombiesMode) {
       showZombiesResult(sum.outcome === 'win', previousWave, breaks !== null, breaks?.zombieWave === true);
@@ -3552,6 +3610,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       nemesis: nm(sum.nemesis),
       ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
       nemesisKills: sum.nemesisKills,
+      ...(rivalry !== '' ? { rivalry } : {}),
       victim: nm(sum.victim),
       victimKills: sum.victimKills,
       kills: sum.kills,
@@ -6465,7 +6524,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             minText,
           );
           if (mv.phase === 'warmup' && mv.countdownTicks > 0) {
-            drawMatchCountdown(list, fonts, mv.countdownTicks / sim.hz, todayLine, ui.width, ui.height, minText);
+            drawMatchCountdown(
+              list,
+              fonts,
+              mv.countdownTicks / sim.hz,
+              todayLine,
+              ui.width,
+              ui.height,
+              minText,
+              nemesisLine,
+            );
           }
           let wantsScoreboard = (humans > 0 && player.isDown('scoreboard')) || (aquarium && pilot < 0 && aqList);
           for (let k = 0; k < extras.length; k++) if (extras[k]!.isDown('scoreboard')) wantsScoreboard = true;

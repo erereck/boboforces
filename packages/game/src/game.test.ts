@@ -773,6 +773,7 @@ describe('startGame (NullRenderer)', () => {
         current: EMPTY_STATS,
         record: () => ({ mostKills: false, bestStreak: false, zombieWave: false }),
         tipSeen: () => {},
+        setNemesis: () => {},
       },
       bobo: { current: DEFAULT_BOBO, save: () => {} },
       audio: { mixer: createMixer(null), files: Promise.resolve() },

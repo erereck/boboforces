@@ -350,3 +350,17 @@ describe('M8 (fase 2): squad@1', () => {
     expect(r.ok && r.value.id).toBe('squad');
   });
 });
+
+describe('M8 (fase 4): o Nêmesis no stats@1', () => {
+  it('vai e volta; estragado, sai com aviso sem derrubar o resto', () => {
+    const nemesis = { id: 'jorge-the-immortal', name: 'Jorge the Immortal', killedYou: 7, youKilled: 3, matches: 2 };
+    const ok = validateStats({ ...EMPTY_STATS, nemesis });
+    expect(ok.ok && ok.value.nemesis).toEqual(nemesis);
+    const bad = validateStats({ ...EMPTY_STATS, nemesis: 'x' });
+    expect(bad.ok && bad.value.nemesis).toBeUndefined();
+    expect(bad.ok && bad.warnings.map((w) => w.path)).toContain('nemesis');
+    expect(validateStats(EMPTY_STATS).ok && 'nemesis' in (validateStats(EMPTY_STATS) as { value: object }).value).toBe(
+      false,
+    );
+  });
+});

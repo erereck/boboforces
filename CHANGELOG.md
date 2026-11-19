@@ -25,6 +25,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **O Surpreenda-me completo (fase 3):** sorteia entre os 14 modos, o mapa, as armas (às vezes uma só), até 3
   modificadores, o nível e até 2 bots estrela no time adversário. Cada linha tem cadeado: travada, o "Rolar de novo"
   não mexe nela. "Copiar código" dá um `BFR1-…` que, colado, joga a mesma partida.
+- **O Nêmesis com memória (fase 4):** o bot que mais te pegou vira o seu rival entre partidas. Quando ele volta, a
+  contagem do começo avisa ("Seu Nêmesis voltou: Jorge · te pegou 7, você 3"); no resultado, a rivalidade inteira.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

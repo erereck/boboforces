@@ -4405,3 +4405,25 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   não escolheu (agora o cadeado sai); o código colado não cortava no teto do aparelho (agora valida e avisa, com o
   "versão mais nova"); o "troca por abate" e a munição infinita da faca com uma arma só; e a tela abria mesmo com o
   jogador já em outra (o pedaço dos editores chega depois).
+
+### 19.5 Fase 4: o Nêmesis com memória (19/11/2026)
+
+- **A memória** (`stats@1`, o campo opcional `nemesis`, sem mudar a versão): o rival é guardado pelo id do documento
+  do bot (o de fábrica, como `normal-bob`, ou o da Oficina: vários bots com o mesmo id contam juntos), com o nome,
+  quantas vezes te pegou, quantas você o pegou e em quantas partidas. A cena grava pelo núcleo (`SceneStats.setNemesis`).
+- **A regra** (`scene/nemesis.ts`, `updateNemesis`): numa partida em que o rival está do lado de lá (no FFA, qualquer
+  um; o rival aliado, como o bot de apoio do Zombies, não conta), ele soma os abates dos dois lados e mais uma partida;
+  o Nêmesis da partida (o que mais te pegou) vira o rival novo se te pegou mais que o de antes nesta partida. Sem abate
+  no jogador, não há Nêmesis. Só nas partidas que gravam estatística (fora do Aquário e do bench).
+- **O aviso:** na contagem do começo, uma 2ª linha em âmbar ("Seu Nêmesis voltou: Jorge the Immortal · te pegou 7,
+  você 3") quando ele está do lado de lá; a linha mais comprida encolhe para caber em 640×360.
+- **No resultado:** embaixo do Nêmesis, "Na rivalidade: te pegou 12, você 4 · 3 partidas" quando o Nêmesis da partida
+  é o rival guardado.
+- **A IA não muda** (pergunta Z3): um Nêmesis que "te persegue" mudaria a partida e os goldens.
+- **A revisão (Opus) achou, corrigido antes do commit:** o jogador do sofá que entrou no meio contava como o bot que
+  ele assumiu (agora o controlador que um jogador já assumiu fica de fora); o "lado de lá" errava na Infection (quem é
+  infectado muda: agora todos contam) e no aviso do Royale (os esquadrões saem da largada: todos); o candidato vinha da
+  entidade, e não da soma do id (5 Normal Bobs com 1 abate cada perdiam para um Jorge com 2); a rivalidade aparecia já
+  na 1ª partida ("· 1 partidas": agora com 2 ou mais, e com o nome do rival); o id longo demais (não volta igual do
+  save) fica de fora e o nome é cortado por letra; e o aviso usa o nome de agora (o bot da Oficina renomeado). Na Horda
+  Armada, os soldados da horda são bots do time 1: eles também viram rival.

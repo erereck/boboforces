@@ -50,11 +50,26 @@ export interface StatsOnboarding {
   readonly seenNews: string;
 }
 
+/**
+ * M8 (fase 4): o Nêmesis com memória entre partidas (GDD §4.4.3, gameplay.md "só para o Nêmesis"): o bot que mais te
+ * pegou numa partida vira o rival; cada partida em que ele está soma quantas vezes ele te pegou e quantas você o pegou.
+ * `id` é o do documento do bot (o de fábrica, como `normal-bob`, ou o da Oficina).
+ */
+export interface NemesisMemory {
+  readonly id: string;
+  readonly name: string;
+  readonly killedYou: number;
+  readonly youKilled: number;
+  readonly matches: number;
+}
+
 export interface StatsDocument {
   readonly format: FormatId;
   readonly totals: StatsTotals;
   readonly records: StatsRecords;
   readonly onboarding: StatsOnboarding;
+  /** M8 (fase 4): o rival de agora (ausente = nenhum ainda). */
+  readonly nemesis?: NemesisMemory;
 }
 
 export const STATS_RANGES = {
@@ -140,6 +155,22 @@ export function validateStats(input: unknown): ValidationResult<StatsDocument> {
   const rec = r.obj(doc, 'records', 'records');
   const o = r.obj(doc, 'onboarding', 'onboarding');
   const S = STATS_RANGES;
+  // M8 (fase 4): o Nêmesis (estragado, sai sem derrubar o resto).
+  const n = doc['nemesis'];
+  let nemesis: NemesisMemory | undefined;
+  if (typeof n === 'object' && n !== null && !Array.isArray(n)) {
+    const src = n as Record<string, unknown>;
+    const id = r.str(src, 'id', 'nemesis.id', '', S.versionLength * 2);
+    if (id !== '') {
+      nemesis = {
+        id,
+        name: r.str(src, 'name', 'nemesis.name', '', S.tipLength),
+        killedYou: r.count(src, 'killedYou', 'nemesis.killedYou'),
+        youKilled: r.count(src, 'youKilled', 'nemesis.youKilled'),
+        matches: r.count(src, 'matches', 'nemesis.matches'),
+      };
+    }
+  } else if (n !== undefined) r.warn('nemesis', 'save.invalidField');
   return {
     ok: true,
     value: {
@@ -154,6 +185,7 @@ export function validateStats(input: unknown): ValidationResult<StatsDocument> {
         tipsSeen: r.strings(o, 'tipsSeen', 'onboarding.tipsSeen', S.tips, S.tipLength),
         seenNews: r.str(o, 'seenNews', 'onboarding.seenNews', '', S.versionLength),
       },
+      ...(nemesis !== undefined ? { nemesis } : {}),
     },
     warnings: r.warnings,
   };

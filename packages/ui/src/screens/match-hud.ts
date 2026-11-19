@@ -330,23 +330,34 @@ export function drawMatchCountdown(
   width: number,
   height: number,
   minTextPx: number,
+  /** M8 (fase 4): uma 2ª linha em âmbar (o "Seu Nêmesis voltou"); `''` = nenhuma. */
+  extra = '',
 ): void {
   const s = Math.min(width / 640, height / 360);
   const display: MsdfFont | null = fonts?.display ?? null;
   const hud: MsdfFont | null = fonts?.hud ?? null;
   const bigPx = Math.max(hudNumberPx(s, minTextPx) * 3, minTextPx);
-  const px = hudLabelPx(s, minTextPx) * 1.2;
   const pad = Math.max(3, Math.round(HUD_METRICS.pad * s));
   const gap = Math.max(3, Math.round(HUD_METRICS.gap * s));
+  // M8 (fase 4): a linha mais comprida cabe na tela (encolhe até o piso de texto).
+  const px0 = hudLabelPx(s, minTextPx) * 1.2;
+  const widest = Math.max(line !== '' ? textWidth(hud, line, px0) : 0, extra !== '' ? textWidth(hud, extra, px0) : 0);
+  const px = widest > width - pad * 8 ? Math.max(minTextPx, (px0 * (width - pad * 8)) / widest) : px0;
   const capBig = capHeightPx(display, bigPx);
   const cap = capHeightPx(hud, px);
   const n = Math.max(1, Math.ceil(seconds));
   const lineW = line !== '' ? textWidth(hud, line, px) : 0;
-  const w = Math.max(numberWidth(display, n, 0, bigPx), lineW) + pad * 4;
-  const h = capBig + (lineW > 0 ? gap * 2 + cap : 0) + pad * 4;
+  const extraW = extra !== '' ? textWidth(hud, extra, px) : 0;
+  const w = Math.max(numberWidth(display, n, 0, bigPx), lineW, extraW) + pad * 4;
+  const h = capBig + (lineW > 0 ? gap * 2 + cap : 0) + (extraW > 0 ? gap * 2 + cap : 0) + pad * 4;
   const x = Math.round((width - w) / 2);
   const y = Math.round(height * 0.32 - h / 2);
   pushShape(out, x, y, Math.round(w), Math.round(h), COLORS.hudFundo, Math.round(6 * s));
   paintNumber(out, display, n, 0, width / 2, y + pad * 2, bigPx, COLORS.acao, 0.5);
-  if (lineW > 0) paintText(out, hud, line, width / 2, y + pad * 2 + capBig + gap * 2, px, COLORS.texto, 0, 0.5);
+  let ty = y + pad * 2 + capBig + gap * 2;
+  if (lineW > 0) {
+    paintText(out, hud, line, width / 2, ty, px, COLORS.texto, 0, 0.5);
+    ty += cap + gap * 2;
+  }
+  if (extraW > 0) paintText(out, hud, extra, width / 2, ty, px, COLORS.acao, 0, 0.5);
 }

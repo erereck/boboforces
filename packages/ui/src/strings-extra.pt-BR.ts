@@ -570,6 +570,9 @@ export const STRINGS_EXTRA_PT_BR = {
   'surprise.copyCode': 'Copiar código',
   'surprise.copied': 'Código copiado: quem colar (Oficina, Compartilhar, Colar um código) joga a mesma partida.',
   'share.receivedSurprise': 'Surpreenda-me recebido',
+  // M8 (fase 4): o Nêmesis com memória.
+  'nemesis.back': 'Seu Nêmesis voltou: {name} · te pegou {them}, você {you}',
+  'result.rivalry': 'Rivalidade com {name}: te pegou {them}, você {you} · {n} partidas',
   'share.error.surpriseNewer': 'Esse Surpreenda-me é de uma versão mais nova do jogo: atualize.',
   'surprise.sizeTeams': '{n} contra {n} · {min} min',
   'surprise.sizeFfa': '{n} bots · {min} min',

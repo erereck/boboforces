@@ -112,3 +112,22 @@ describe('M7 (fase 9): o resultado do Aquário só assistido', () => {
     for (const id of ['score', 'nemesisRow', 'victim', 'numbers']) expect(played).toContain(id);
   });
 });
+
+describe('M8 (fase 4): a rivalidade no resultado', () => {
+  it('embaixo do Nêmesis, quando ele é o rival guardado', () => {
+    const find = (node: UiNode, id: string): UiNode | null => {
+      if (node.id === id) return node;
+      const kids = 'children' in node && node.children ? node.children : [];
+      for (const k of kids) {
+        const hit = find(k, id);
+        if (hit) return hit;
+      }
+      return null;
+    };
+    const tree = resultScreen.build({ ...base, rivalry: 'Na rivalidade: te pegou 12, você 4 · 3 partidas' });
+    expect(find(tree, 'rivalry')).toMatchObject({
+      text: { literal: 'Na rivalidade: te pegou 12, você 4 · 3 partidas' },
+    });
+    expect(find(resultScreen.build(base), 'rivalry')).toBeNull();
+  });
+});

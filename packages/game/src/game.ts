@@ -1491,6 +1491,11 @@ export function startGame(deps: GameDeps): GameHandle {
             return save.stats;
           },
           tipSeen: (id) => save.setStats(markTipSeen(save.stats, id)),
+          // M8 (fase 4): o rival depois da partida.
+          setNemesis: (memory) => {
+            const { nemesis: _old, ...rest } = save.stats;
+            save.setStats(memory === null ? rest : { ...rest, nemesis: memory });
+          },
           record: (m) => {
             const r = addMatch(save.stats, m);
             save.setStats(r.doc);

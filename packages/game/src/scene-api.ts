@@ -4,6 +4,7 @@ import type {
   BotLevel,
   MatchRecipe,
   SettingsDocument,
+  NemesisMemory,
   StatsDocument,
 } from '@boboforces/format';
 // Costura entre o núcleo do jogo (menus, fluxo; `@boboforces/game`) e a CENA (Construto: loading, partida local,
@@ -136,6 +137,8 @@ export interface SceneStats {
   record(match: MatchRecord): RecordBreaks;
   /** M2 (fase 4h): a dica `id` apareceu (não volta mais). */
   tipSeen(id: string): void;
+  /** M8 (fase 4): o rival depois da partida (`null` = sem rival). */
+  setNemesis(memory: NemesisMemory | null): void;
 }
 
 /** M4 (fase 3): a leitura da bateria (Switch: `navigator.getBattery` do nx.js, guardada pela casca). */
