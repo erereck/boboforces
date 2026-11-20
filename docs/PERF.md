@@ -404,6 +404,24 @@ jogador vira um bot do mesmo time). 600 ticks de aquecimento e 3.600 medidos (60
 - O Royale com 24 custa 1,25× o TDM com 8: o loot e a zona olham todos os itens, mas a luta acaba cedo (3 vivos aos
   70 s). Sem JIT ele é mais caro (§1l), e é o que o bench no console precisa confirmar (pergunta Y5).
 
+## 1o. O que o M8 pôs na partida (fechamento; 20/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node 26.7 com JIT), no Construto com 8 participantes (4 contra 4), semente 42, sem limite
+de tempo. 600 ticks de aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em `local/m8/medir-m8.ts`. O humano das duas
+últimas linhas fica parado (o Diretor mede o K/D dele).
+
+| Caso | Média (ms) | p50 | p99 | Máx |
+|---|---|---|---|---|
+| TDM (referência) | 0,042 | 0,031 | 0,224 | 0,85 |
+| TDM com o Arcade (modificador) | 0,035 | 0,026 | 0,191 | 0,98 |
+| TDM com 1 humano | 0,024 | 0,018 | 0,182 | 0,44 |
+| TDM com 1 humano e o Diretor (Equilibrado) | 0,023 | 0,018 | 0,172 | 0,46 |
+
+- O Arcade e o Diretor não aparecem no custo (as diferenças são ruído da luta, que muda com o movimento). O Diretor lê
+  o placar a cada 10 s; o Arcade só faz as sondas de parede e de chão no tick em que o pulo é apertado no ar.
+- O menu da web: 349,6 KB de 350 (size-check). As ordens e a roda ficaram no pedaço da cena; o que entrou no menu foi
+  pouco (os textos curtos, o validador do `director`, a lealdade e as ordens no `input`).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

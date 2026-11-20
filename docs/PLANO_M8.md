@@ -93,6 +93,7 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    - **feita em 20/11** (ARCHITECTURE §19.8): o perfil e o modificador, o movimento, o estado no hash e no snapshot
      só com o Arcade, a predição e o protocolo 10.
 8. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
+   - **feita em 20/11** (ARCHITECTURE §19.9, PERF §1o): a rodada de prints 31 (as ordens e o Arcade) fecha as do M8.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

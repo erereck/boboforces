@@ -4564,3 +4564,23 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   pouso; o estado do Arcade ficava no caído; o bunny hop ignorava a regra de velocidade (o Jugg); a janela do bunny
   hop dependia do Hz; e a chave da parede saía da ponta da sonda. Os testes agora cobrem a mesma parede de verdade,
   o corredor, o meio-fio, o bot, o analógico, os 30 Hz e a predição.
+
+### 19.9 Fechamento do M8 (20/11/2026)
+
+- **O que entrou:** os códigos e os links de compartilhar (o bot, o preset, o esquadrão e o Surpreenda-me), os
+  esquadrões na Oficina e nos times, o Surpreenda-me completo (14 modos, o cadeado e o código), o Nêmesis com memória,
+  o Diretor de Partida, as ordens aos bots aliados (com a lealdade) e o perfil Arcade (perfil e modificador). O Bobo
+  Sandbox e os modificadores Mini, Bots gigantes e Ricochete ficam para o M9 (pergunta Z1).
+- **As versões:** `PROTOCOL_VERSION` 10 (a ordem nos bits 12 a 14 do quadro, a marca de jogador no 15 e o estado do
+  Arcade no privado do snapshot) e o `net.json` junto; snapshot da sim 19 (os campos do Arcade, só com ele); formatos
+  novos `squad@1`; os campos opcionais `director` (receita) e `loyalty` (bot) sem mudar versão.
+- **Os goldens:** os 15 de antes do M8 não mudaram (TDM `b36eb8e1`, Zombies `edc93590`, Posto `6c4eaf90`, os 8 do
+  M6 e os 4 do M7): o Diretor só mede com humanos, as ordens só sorteiam no fluxo delas e o estado do Arcade só entra
+  no hash com ele.
+- **O custo:** `PERF.md` §1o (sim + IA por tick com o Arcade e com o Diretor: iguais à referência, no ruído). O menu
+  da web ficou em 349,6 KB de 350: o que o M8 pôs nele (os textos curtos, o validador do `director`, a lealdade, as
+  ordens no `input`) está no limite, e a próxima coisa do menu precisa tirar algo antes (pendência para o M9).
+- **As revisões:** uma do Opus por fase, todas com achados corrigidos antes do commit (as listas nas §19.1 a §19.8).
+- **Fica para depois:** a resposta das ordens para o cliente online, o Diretor no Zombies e nos spawns, o Personalizado
+  do Diretor, trocar o objetivo do Diretor na pausa e o filtro do Me cobre pelos atacantes de quem mandou.
+

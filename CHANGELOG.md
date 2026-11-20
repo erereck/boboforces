@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M8: compartilhar, o Diretor e o Arcade (planejado em 19/11/2026)
+### M8: compartilhar, o Diretor e o Arcade (fechado em 20/11/2026)
 
 - **Plano** em `docs/PLANO_M8.md` (P-004, no padrão do #81): os códigos e os links da Oficina (bot e preset), os
   esquadrões, o Surpreenda-me completo (com o cadeado e a semente), o Nêmesis com memória, o Diretor de Partida, as
@@ -37,6 +37,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **O perfil Arcade (fase 7):** mais rápido, pulo de 1,3 m com pulo duplo, bunny hop (+5% por pulo até 12 m/s),
   wall jump uma vez por parede, deslize que mantém o momento, atirar correndo e sem dano de queda. Na Partida
   personalizada, como perfil de movimento ou como modificador; os bots não fazem bunny hop nem wall jump.
+- **Fechamento (fase 8):** os goldens de antes não mudaram no M8 (nem o Diretor, nem as ordens, nem o Arcade mexem na
+  partida sem estar ligados); o protocolo do online foi a 10 e o snapshot da sim a 19; o menu da web ficou em
+  349,6 KB (o teto é 350). As rodadas de prints 29 a 31 mostram tudo, com as perguntas AE1–AG4.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 
