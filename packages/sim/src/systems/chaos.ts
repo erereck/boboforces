@@ -173,8 +173,9 @@ export function chaosSystem(ctx: SimContext): void {
   if (c.count > 0 && (phase === 'playing' || phase === 'suddenDeath')) {
     const m = c.masks;
     if (m[2]! < 0) {
-      // A largada: os primeiros sorteados.
-      let mask = c.fixed;
+      // A largada: os primeiros sorteados. M9 (fase 4, revisão): em cima da máscara ativa (sem o dono, ela é a dos
+      // fixos; com ele, o que o dono ligou ou desligou antes da largada fica).
+      let mask = m[0]!;
       for (let i = 0; i < c.count; i++) mask |= pickBit(ctx, poolFor(mask | c.baseBits) & ~c.baseBits);
       m[0] = mask;
       m[1] = mask;

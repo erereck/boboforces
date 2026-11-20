@@ -12,10 +12,13 @@ import {
   createInputFrames,
   createSim,
   createSimLoop,
+  OwnerLog,
+  type OwnerCommand,
   type Sim,
   type SimEvent,
   type SimLoop,
   type SimMap,
+  type SimOwnerConfig,
 } from '@boboforces/sim';
 
 /**
@@ -58,6 +61,11 @@ export interface LocalDriverConfig {
   readonly countdownS?: number;
   /** M3 (fase 1c): humanos do sofá com cérebro de reserva (`BotDirectorConfig.standby`): um bot assume quem sai. */
   readonly standby?: readonly number[];
+  /**
+   * M9 (fase 4): as Ferramentas do Dono (`SimConfig.owner` e o mesmo no diretor). O cliente online que cria a sim
+   * por `createMatchSim` precisa da mesma opção (a reserva muda o conjunto de entidades).
+   */
+  readonly owner?: SimOwnerConfig;
 }
 
 export interface LocalDriver extends MatchDriver {
@@ -73,6 +81,13 @@ export interface LocalDriver extends MatchDriver {
    * cérebro de reserva assume). Enquanto pilotado, a IA não pensa por ele.
    */
   setHumanControlled(controller: number, on: boolean): void;
+  /**
+   * M9 (fase 4): um comando do dono (`Sim.command`: vale no próximo tick). Os aceitos vão para `ownerLog` com o tick
+   * em que valem (o roteiro do replay). Sem as Ferramentas do Dono, com a fila da sim cheia ou com o log cheio
+   * (`OWNER_LOG_MAX` comandos na partida), -1.
+   */
+  command(cmd: OwnerCommand): number;
+  readonly ownerLog: OwnerLog;
 }
 
 /**
@@ -95,8 +110,9 @@ export function createMatchSim(config: LocalDriverConfig): Sim {
     ...(config.hz !== undefined ? { hz: config.hz } : {}),
     ...(config.figureTable ? { figureTable: config.figureTable } : {}),
     // M2: bots com a primária sorteada pela semente (`botPrimaries` da IA); o bench fixa a dele.
-    primaries: config.primaries ?? botPrimaries(recipe, humans),
+    primaries: config.primaries ?? botPrimaries(recipe, humans, config.owner?.reserve ?? 0),
     ...(config.countdownS !== undefined ? { countdownS: config.countdownS } : {}),
+    ...(config.owner !== undefined ? { owner: config.owner } : {}),
   });
 }
 
@@ -112,9 +128,11 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
       zombies,
       ...(config.budget ? { budget: config.budget } : {}),
       ...(config.standby ? { standby: config.standby } : {}),
+      ...(config.owner !== undefined ? { owner: config.owner } : {}),
     },
     NAV_PATH_API,
   );
+  const ownerLog = new OwnerLog();
   const frames = createInputFrames();
   const now = config.now ?? null;
   /** M3 (fase 1c): controladores de bot que um jogador local assumiu. */
@@ -153,6 +171,14 @@ export function createLocalDriver(config: LocalDriverConfig): LocalDriver {
     },
     get lastSimMs(): number {
       return lastSimMs;
+    },
+    ownerLog,
+    command(cmd): number {
+      // Com o log cheio, recusa: o replay nunca perde um comando que valeu.
+      if (disposed || ownerLog.full) return -1;
+      const seq = sim.command(cmd);
+      if (seq > 0) ownerLog.record(sim.tick, cmd);
+      return seq;
     },
     setHumanControlled(controller, on) {
       director.setHumanControlled(controller, on);

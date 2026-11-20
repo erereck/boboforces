@@ -93,3 +93,20 @@ export {
 export { WEAPON_KILL_PLANE, WEAPON_NONE, WEAPON_NUKE, WEAPON_ZONE } from './context.ts';
 // Refino R2 (#79): o arco da granada para a HUD.
 export { predictThrow } from './systems/projectiles.ts';
+// M9 (fase 4): as Ferramentas do Dono e o roteiro dos comandos.
+export {
+  isOwnerDormant,
+  OWNER,
+  OWNER_COMMANDS,
+  OWNER_FAILS,
+  ownerAllowed,
+  ownerReserveBase,
+  ownerReserveCount,
+  ownerReserveSlots,
+  type OwnerCommand,
+  type OwnerCommandKind,
+  type OwnerFail,
+  type OwnerView,
+  type SimOwnerConfig,
+} from './systems/owner.ts';
+export * from './owner-script.ts';

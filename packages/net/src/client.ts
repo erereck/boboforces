@@ -1,5 +1,5 @@
 import { copyInputFrame, createInputFrame, type InputFrame } from '@boboforces/input';
-import { BitReader, BitWriter } from '@boboforces/shared';
+import { assert, BitReader, BitWriter } from '@boboforces/shared';
 import type { Sim, SimEvent } from '@boboforces/sim';
 import { EventQueue } from './events.ts';
 import { applyFrame, createRemoteState, type NetFrame } from './frame.ts';
@@ -119,6 +119,9 @@ const REPLAY = 64;
  */
 export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   const { sim, endpoint, host, writeLocalFrame } = config;
+  // M9 (fase 4, revisão): a sim do cliente precisa do layout do host, e o protocolo ainda não leva a opção do dono: uma
+  // sim com as Ferramentas do Dono não entra no online até a fase 5 (ver `createNetHost`).
+  assert(sim.view().owner === null, 'net: a partida com as Ferramentas do Dono ainda não vai para o online');
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
   /** M6 (fase 4): o global da máscara dos modificadores (-1 = partida sem eles). */

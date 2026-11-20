@@ -626,6 +626,8 @@ function leader(ctx: SimContext): number {
   if (ctx.ffa || ctx.party.jugg !== null) {
     for (let e = 0; e < s.count; e++) {
       if (s.alive[e] === 0 || s.kind[e] !== ENTITY_KIND.bobo) continue;
+      // M9 (fase 4, revisão): o bot que o dono tirou de jogo (morto sem contagem, `respawnTicks` -1) não lidera.
+      if (s.respawnTicks[e]! < 0 && (s.flags[e]! & F.dead) !== 0) continue;
       // M6 (fase 2): no Gun Game vence o nível mais alto (os pontos), não os abates.
       let k = ctx.party.ladder !== null || ctx.party.jugg !== null ? s.points[e]! : s.kills[e]!;
       // M7 (fase 0, revisão): no Jugg Fixo, quem aguenta as rodadas empata nos pontos: desempata pelos abates e depois

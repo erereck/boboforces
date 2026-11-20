@@ -15,10 +15,12 @@ import {
   isFfaMode,
   MATCH_DEFAULTS,
   MAX_ZOMBIES,
+  ownerReserveSlots,
   ROUND,
   ROUND_PHASE,
   SIM_HZ,
   ZOMBIE_CONTROLLER_BASE,
+  type SimOwnerConfig,
   type SimView,
 } from '@boboforces/sim';
 import { AiContext } from './context.ts';
@@ -101,6 +103,12 @@ export interface BotDirectorConfig {
    * (`fork('standby', c)`): os bots da receita não mudam. Não conta em `botCount`.
    */
   readonly standby?: readonly number[];
+  /**
+   * M9 (fase 4): as Ferramentas do Dono, a MESMA opção de `SimConfig.owner`: a reserva ganha cérebros desde o começo
+   * (`ownerReserveSlots`, depois dos bots da receita), que ficam parados enquanto o bot dorme. Os cérebros dos
+   * congelados seguem pensando (a sim ignora a entrada deles).
+   */
+  readonly owner?: SimOwnerConfig;
 }
 
 /** Estatísticas acumuladas do diretor (bench headless e painel F2). */
@@ -150,7 +158,11 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   const soldierTeams: number[] = [];
   const zombieBrains: ZombieBrain[] = [];
   let maxController = -1;
-  for (const slot of expandRecipe(recipe, config.humans)) {
+  const owner = config.owner ?? null;
+  const recipeSlots = expandRecipe(recipe, config.humans);
+  const botSlots =
+    owner !== null ? [...recipeSlots, ...ownerReserveSlots(recipe, config.humans, owner.reserve)] : recipeSlots;
+  for (const slot of botSlots) {
     if (slot.bot === null) continue;
     // Bot embutido (`embedded:`) ainda não existe no M1: vira Normal.
     // M2 (fase 3a): o bot da ref (de fábrica ou embutido; sem ele, o Normal Bob). O nível rápido é o da ref ou, nos
@@ -181,7 +193,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     maxController = Math.max(maxController, slot.controller);
   }
   const recipeBots = soldiers.length;
-  for (const slot of expandRecipe(recipe, config.humans)) {
+  for (const slot of recipeSlots) {
     if (slot.bot !== null || !(config.standby ?? []).includes(slot.controller)) continue;
     const follower = new PathFollower(followers.length);
     followers.push(follower);
@@ -383,8 +395,31 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       answer.obeyed++;
     }
   }
+  /**
+   * M9 (fase 4): o time de agora do soldado `i` (o dono troca o time de um bot; a Infection também): o da view, ou o
+   * da receita antes do 1º tick e para quem não tem corpo.
+   */
+  function teamOf(i: number): number {
+    const view = ctx.view;
+    const e = view !== null ? ctx.ctrlToEntity[soldiers[i]!.controller]! : -1;
+    return e >= 0 ? view!.team[e]! : soldierTeams[i]!;
+  }
+  /** M9 (fase 4): o time que o Diretor de Partida viu de cada bot (o dono trocou um: refaz quem muda). */
+  const ownerTeams = new Int16Array(owner !== null ? recipeBots : 0).fill(-1);
+  function ownerTeamsChanged(): boolean {
+    let changed = false;
+    for (let i = 0; i < ownerTeams.length; i++) {
+      const t = teamOf(i);
+      if (t !== ownerTeams[i]) {
+        ownerTeams[i] = t;
+        changed = true;
+      }
+    }
+    return changed;
+  }
   function directorTick(md: MatchDirector, view: SimView): void {
     let changed = false;
+    if (owner !== null && ownerTeamsChanged()) directorRebuild = true;
     if (directorRebuild) {
       rebuildShifted(view);
       // Quem conta mudou: a janela recomeça dos totais de agora (sem um salto no K/D).
@@ -461,7 +496,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     setLevel(level, team): number {
       let n = 0;
       for (let i = 0; i < soldiers.length; i++) {
-        if (team >= 0 && soldierTeams[i] !== team) continue;
+        // M9 (fase 4): com o dono, pelo time de agora (ele troca o time de um bot); sem ele, o da receita, como antes
+        // (na Infection, o "Ajustar desafio" do time 1 segue sendo o dos bots que começaram nele).
+        if (team >= 0 && (owner !== null ? teamOf(i) : soldierTeams[i]) !== team) continue;
         soldiers[i]!.setLevel(level, soldierTiming);
         n++;
         // M8 (fase 5, revisão): o nível novo muda a folga do Diretor.

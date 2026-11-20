@@ -23,6 +23,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
   só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:
   ela chega na fase 3.
+- **As Ferramentas do Dono na sim (fase 4):** criar um bot num ponto, tirar um bot da partida, congelar a IA dele,
+  trocar o time, dar uma arma e ligar ou desligar um modificador no meio da partida, como comandos que valem no começo
+  do próximo passo (gravados, para o replay). Ainda sem tela: o menu do dono chega na fase 5.
 
 ### M8: compartilhar, o Diretor e o Arcade (fechado em 20/11/2026)
 

@@ -82,6 +82,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 4. **As Ferramentas do Dono na sim:** a fila de comandos do dono (com o tick em que valem, aplicada num ponto fixo do
    passo, gravável para replay), a reserva de bots dormentes do Sandbox (criar bot num ponto), congelar a IA, trocar o
    time, dar arma e ligar ou desligar um modificador ao vivo; o teste headless por um roteiro de comandos.
+   - **feita em 20/11** (ARCHITECTURE §20.4): snapshot 20 só com as ferramentas; offline só até a fase 5.
 5. **As Ferramentas do Dono no jogo:** o menu do dono (uma página da pausa e uma roda para mirar e aplicar), a câmera
    lenta (só offline), o online (só o host manda; os amigos veem pelo snapshot), o sofá (só o jogador 1) e o Switch.
 6. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.

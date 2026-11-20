@@ -7,6 +7,7 @@ import type { SandboxState } from './systems/sandbox.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
+import type { OwnerState } from './systems/owner.ts';
 import type { RewindState } from './rewind.ts';
 import type { FigurePart } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
@@ -117,7 +118,8 @@ export const WEAPON_ZONE = 251;
 /**
  * M2 (fase 3b): regras de cada bobo (gameplay.md §6.5), uma por índice de entidade, montadas na criação a partir dos
  * bots da receita (`resolveBot`): ficam fora do estado (saem da receita), então não vão no snapshot nem no hash. Os
- * humanos e os bots sem regra ficam no padrão (vida da partida, ×1, sem restrição).
+ * humanos e os bots sem regra ficam no padrão (vida da partida, ×1, sem restrição). M9 (fase 4): com as Ferramentas
+ * do Dono, `weaponMask` muda no meio (o `giveWeapon` alarga) e entra no hash e no snapshot (`OwnerState.fields`).
  */
 export interface EntityRules {
   readonly maxHp: Float32Array;
@@ -305,6 +307,8 @@ export interface SimContext {
   /** M3 (fase 3b): o Sprinter e o devagar (Chonker e chefão). */
   readonly sprinterProfile: MovementProfile;
   readonly slowProfile: MovementProfile;
+  /** M9 (fase 4): as Ferramentas do Dono (`null` sem `SimConfig.owner`). */
+  readonly owner: OwnerState | null;
 }
 
 /** M3 (fase 2a): as regras do Bobo Zombies resolvidas para a sim. */

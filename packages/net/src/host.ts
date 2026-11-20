@@ -1,5 +1,5 @@
 import type { InputFrame } from '@boboforces/input';
-import { BitReader, BitWriter } from '@boboforces/shared';
+import { assert, BitReader, BitWriter } from '@boboforces/shared';
 import { NULL_ENTITY, PREDICT_STATE_SIZE, type Sim, type SimEvent } from '@boboforces/sim';
 import { EventWriter } from './events.ts';
 import { captureFrame } from './frame.ts';
@@ -105,6 +105,9 @@ export interface NetHost {
 
 export function createNetHost(config: NetHostConfig): NetHost {
   const { sim, endpoint } = config;
+  // M9 (fase 4, revisão): a sim com as Ferramentas do Dono muda o conjunto de entidades e o layout (o estado dos
+  // modificadores sempre), e o protocolo ainda não leva a opção ao cliente: só offline até a fase 5.
+  assert(sim.view().owner === null, 'net: a partida com as Ferramentas do Dono ainda não vai para o online');
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
   const compensate = config.lagCompensation ?? true;

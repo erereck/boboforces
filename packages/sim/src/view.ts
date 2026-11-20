@@ -1,5 +1,6 @@
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import type { ControlPointsView } from './systems/domination.ts';
+import type { OwnerView } from './systems/owner.ts';
 import type { NavGrid } from '@boboforces/nav';
 import type { BlockRegistry, StaticColliders, WorldGrid } from '@boboforces/world';
 import type { MatchMods } from './context.ts';
@@ -153,6 +154,8 @@ export interface SimView {
   } | null;
   /** M2 (fase 4e): os modificadores da partida (a IA lê o ADS e o fogo amigo). */
   readonly mods: MatchMods;
+  /** M9 (fase 4): as Ferramentas do Dono (a reserva e quem está congelado), ou `null` sem elas. */
+  readonly owner: OwnerView | null;
 }
 
 /**

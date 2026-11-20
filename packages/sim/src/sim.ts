@@ -1,4 +1,5 @@
 import {
+  type BotRef,
   createFigureGameTable,
   DEFAULT_BOT_RULES,
   type FigureGameTable,
@@ -85,6 +86,18 @@ import {
 } from './systems/royale.ts';
 import { sandboxSpawns } from './systems/sandbox.ts';
 import { zombiesSystem } from './systems/zombies.ts';
+import {
+  enqueueOwner,
+  ownerAllowed,
+  ownerHoldsInput,
+  ownerInputsDone,
+  ownerReserveBase,
+  ownerReserveSlots,
+  ownerSystem,
+  OwnerState,
+  type OwnerCommand,
+  type SimOwnerConfig,
+} from './systems/owner.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
 import { movementSystem, moveOne } from './systems/movement.ts';
@@ -187,6 +200,13 @@ export interface SimConfig {
   readonly countdownS?: number;
   /** M3 (fase 4d): chance de drop por zumbi abatido no Bobo Zombies (padrão `ZOMBIE_DROPS.chance`; testes e robô). */
   readonly dropChance?: number;
+  /**
+   * M9 (fase 4): as Ferramentas do Dono (`systems/owner.ts`): a reserva de bots dormentes e os comandos
+   * (`Sim.command`). Ausente = sem elas (nada muda). Só nos modos de respawn livre (`ownerAllowed`; a sim recusa os
+   * outros). SÓ OFFLINE por enquanto: com elas a sim muda o conjunto de entidades e o layout da rede (o estado dos
+   * modificadores sempre), e o protocolo ainda não leva a opção ao cliente; o host e o cliente online recusam (fase 5).
+   */
+  readonly owner?: SimOwnerConfig;
 }
 
 /** Referência a um snapshot já confirmado (delta do online, M5). */
@@ -298,6 +318,12 @@ export interface Sim extends Disposable {
    * host online, quando volta de mais de 10 s em segundo plano num PvP.
    */
   finish(): void;
+  /**
+   * M9 (fase 4): enfileira um comando do dono; vale no começo do próximo `step` (na ordem de chegada) e responde com
+   * um evento `owner` (o mesmo número). Devolve o número do comando, ou -1 (sem as Ferramentas do Dono ou com a fila
+   * cheia). A fila não vai no snapshot (é entrada, como os InputFrames); o replay grava `{ tick, cmd }`.
+   */
+  command(cmd: OwnerCommand): number;
 }
 
 /**
@@ -569,7 +595,15 @@ export function createSim(config: SimConfig): Sim {
   // M6 (fase 4): os modificadores (o perfil e as regras de arma da partida são a base deles).
   const baseProfile = resolveMovementProfile(recipe.players, recipe.modifiers ?? []);
   const baseMods = matchModsOf(recipe);
-  const chaos = chaosOf(recipe) ? new ChaosState(recipe, baseProfile, baseMods, hz) : null;
+  // M9 (fase 4): com as Ferramentas do Dono, o estado dos modificadores existe desde o tick 0 (o dono liga um ao vivo).
+  const chaos =
+    chaosOf(recipe) || config.owner !== undefined ? new ChaosState(recipe, baseProfile, baseMods, hz) : null;
+  const rules = createEntityRules(recipe.players?.hp ?? BASE_HP);
+  const reserveSlots = config.owner !== undefined ? ownerReserveSlots(recipe, humans, config.owner.reserve) : [];
+  const owner =
+    config.owner !== undefined
+      ? new OwnerState(reserveSlots.length, ownerReserveBase(recipe, humans), recipe.teams.length, rules.weaponMask)
+      : null;
   const match: MatchState = {
     phase: countdownTicks > 0 ? 'warmup' : 'playing',
     ticksLeft: timeLimitS > 0 ? Math.max(1, secondsToTicks(timeLimitS, hz)) : -1,
@@ -659,7 +693,7 @@ export function createSim(config: SimConfig): Sim {
     nav: map.nav ?? null,
     navMainComponent: navMain,
     ammoBoxTicks: secondsToTicks(MATCH_DEFAULTS.ammoBoxLifeS, hz),
-    rules: createEntityRules(recipe.players?.hp ?? BASE_HP),
+    rules,
     mods: chaos?.mods ?? baseMods,
     killPlaneY: map.killPlaneY ?? lowestBlockY(map.grid) - METRICS.killPlaneBelow,
     playArea: map.playArea ?? null,
@@ -718,8 +752,24 @@ export function createSim(config: SimConfig): Sim {
     downedProfile: MOVEMENT_DOWNED,
     sprinterProfile: zombieSpeed(MOVEMENT_ZOMBIE_SPRINTER, recipe),
     slowProfile: zombieSpeed(MOVEMENT_ZOMBIE_SLOW, recipe),
+    owner,
   };
+  assert(owner === null || ownerAllowed(recipe), 'sim: as Ferramentas do Dono só valem nos modos de respawn livre');
 
+  /**
+   * As regras de `e` (o bot `bot`, ou humano com `null`) no time `team`. M9 (fase 2): no Sandbox, a vida e as armas
+   * do time (humanos e bots; a regra do próprio bot ganha). M9 (fase 4, revisão): o dono refaz as de um bot no
+   * `spawnBot` e no `setTeam` (o time de destino).
+   */
+  const slotRules = (e: number, bot: BotRef | null, team: number): void => {
+    const teamRules = ctx.sandbox !== null ? recipe.teams[team] : undefined;
+    const hp = teamRules?.hp ?? ctx.maxHp;
+    if (bot !== null) applyBotRules(ctx.rules, e, resolveBot(recipe, bot).rules, hp);
+    else ctx.rules.maxHp[e] = hp;
+    if (teamRules?.weapons !== undefined && ctx.rules.weaponMask[e] === 0)
+      ctx.rules.weaponMask[e] = weaponMaskOf(teamRules.weapons);
+    applyMatchWeaponRules(ctx.rules, e, recipe);
+  };
   // Os modificadores fixos valem desde o tick 0.
   applyChaos(ctx);
   const perTeam = new Int32Array(MAX_TEAMS);
@@ -741,13 +791,7 @@ export function createSim(config: SimConfig): Sim {
     const horde = zombieArmed && slot.bot !== null && slot.team === 1;
     if (zombiesMode && !horde) s.points[id & 0xffff] = ZOMBIE_POINTS.start;
     // M9 (fase 2): no Sandbox, a vida e as armas do time (humanos e bots; a regra do próprio bot ganha).
-    const teamRules = ctx.sandbox !== null ? recipe.teams[slot.team] : undefined;
-    const hp = teamRules?.hp ?? ctx.maxHp;
-    if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, hp);
-    else ctx.rules.maxHp[id & 0xffff] = hp;
-    if (teamRules?.weapons !== undefined && ctx.rules.weaponMask[id & 0xffff] === 0)
-      ctx.rules.weaponMask[id & 0xffff] = weaponMaskOf(teamRules.weapons);
-    applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
+    slotRules(id & 0xffff, slot.bot, slot.team);
     // M6 (fase 6b): o humano que a receita pôs no time 1 da Horda armada nasce com o time 0.
     const team = zombieArmed && slot.bot === null ? 0 : slot.team;
     const k = perTeam[team]!;
@@ -765,6 +809,29 @@ export function createSim(config: SimConfig): Sim {
     }
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
+  // M9 (fase 4): a reserva do dono, depois dos bots da receita: o Normal Bob, fora de jogo (morto e sem contagem) até
+  // um `spawnBot`.
+  for (const slot of reserveSlots) {
+    const id = s.allocate(ENTITY_KIND.bobo, slot.team, slot.controller);
+    assert(id !== NULL_ENTITY, 'sim: sem slot de entidade');
+    const e = id & 0xffff;
+    s.controllerEntity[slot.controller] = id;
+    s.primaryChoice[e] = config.primaries?.[slot.controller] ?? DEFAULT_PRIMARY;
+    slotRules(e, slot.bot, slot.team);
+    const sp = map.spawns[0]!;
+    s.position[e * 3] = sp.x;
+    s.position[e * 3 + 1] = sp.y;
+    s.position[e * 3 + 2] = sp.z;
+    s.flags[e] = ENTITY_FLAG.dead;
+    s.respawnTicks[e] = -1;
+    controllerCount = Math.max(controllerCount, slot.controller + 1);
+  }
+  // M9 (fase 4, revisão): no Sandbox, o dono põe o bot nas regras do time de destino (a ref de cada controlador de bot).
+  if (owner !== null && ctx.sandbox !== null) {
+    const refs: (BotRef | null)[] = [];
+    for (const slot of [...slots, ...reserveSlots]) refs[slot.controller] = slot.bot;
+    owner.teamRules = (e, team) => slotRules(e, refs[s.controller[e]!] ?? null, team);
+  }
   if (zombies > 0) {
     const order = zombieSpawnOrder(spawns, s);
     for (let i = 0; i < zombies; i++) {
@@ -905,6 +972,7 @@ export function createSim(config: SimConfig): Sim {
     lastShotTick: s.lastShotTick,
     playArea: map.playArea ?? null,
     mods: ctx.mods,
+    owner,
   };
   const syncView = (): void => {
     view.tick = ctx.tick;
@@ -981,8 +1049,12 @@ export function createSim(config: SimConfig): Sim {
     for (let c = 0; c < controllerCount; c++) {
       const id = s.controllerEntity[c]!;
       if (id === NULL_ENTITY) continue;
-      applyInput(id & 0xffff, c < inputs.length ? (inputs[c] ?? null) : null);
+      // M9 (fase 4): o bot congelado pelo dono fica sem entrada (parado, sem botões, a mira onde estava); o que acabou
+      // de entrar pelo `spawnBot` também, neste passo (o rumo pedido vale).
+      const e = id & 0xffff;
+      applyInput(e, c < inputs.length && (owner === null || !ownerHoldsInput(owner, e)) ? (inputs[c] ?? null) : null);
     }
+    if (owner !== null) ownerInputsDone(owner);
   };
 
   const remote: SimRemote = {
@@ -1171,6 +1243,10 @@ export function createSim(config: SimConfig): Sim {
       finishMatch(ctx);
       keepEvents = true;
     },
+    command(cmd): number {
+      assert(!disposed, 'sim: command depois do dispose');
+      return owner === null ? -1 : enqueueOwner(owner, cmd);
+    },
     step(inputs): void {
       assert(!disposed, 'sim: step depois do dispose');
       if (!keepEvents) events.clear();
@@ -1186,6 +1262,8 @@ export function createSim(config: SimConfig): Sim {
       }
       for (let p = 0; p < s.projCount * 3; p++) s.projPrevPosition[p] = s.projPosition[p]!;
       // Ordem fixa (tecnico.md §4.1). (0) IA roda fora, antes do step; (8) o diretor de ondas do Bobo Zombies.
+      // M9 (fase 4): (0b) os comandos do dono, antes das entradas (o congelar já vale neste tick).
+      ownerSystem(ctx);
       applyInputs(inputs);
       // M6 (fase 4): a Roleta (antes do movimento: a gravidade nova vale neste tick).
       chaosSystem(ctx);

@@ -4698,3 +4698,49 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   tiros e 9 abates, como sem teto); o cache de mira visível usava o corte do braço do tamanho 1; e o humano que assume
   um bot vira gigante (documentado acima). Corrigido antes do commit.
 
+### 20.4 Fase 4: as Ferramentas do Dono na sim (20/11/2026)
+
+- **A opção** (`SimConfig.owner?: { reserve }`, não um campo da receita): liga as ferramentas e separa a **reserva**,
+  até 16 bots dormentes (e até 64 menos os bots da receita), Normal Bob, no time 0, nos controladores logo depois dos
+  bots da receita (`ownerReserveSlots`, a mesma conta na sim e na IA). Dormente = morto com `respawnTicks = -1` (o
+  renascer normal nunca traz de volta); `isOwnerDormant(view, e)` diz quem está fora (para as listas da fase 5). A
+  mesma opção vai ao `BotDirectorConfig`, ao `HeadlessMatchConfig` (com `ownerScript`) e ao `LocalDriverConfig`.
+  `ownerAllowed(recipe)` diz se o modo aceita: TDM, FFA, Domination, Paintball, Treino e Sandbox (os modos que
+  trazem de volta ou contam cada jogador pelas regras deles, Zombies, BoboStrike, Royale e os de festa, recusam; o
+  `createSim` usa a mesma conta).
+- **Os comandos** (`sim/systems/owner.ts`, `OwnerCommand`, os tipos em `OWNER_COMMANDS`): `spawnBot { team, x, y,
+  z, yaw }`, `remove { entity }`, `freeze { entity, on }`, `setTeam { entity, team }`, `giveWeapon { entity,
+  weapon }` e `setModifier { modifier, on }`. O `sim.command(cmd)` põe na fila (32; devolve o número do comando, ou
+  -1 sem as ferramentas ou com a fila cheia) e todos valem num ponto só, no começo do próximo `step()`, antes das
+  entradas, na ordem de chegada. O evento `owner` (número, comando, entidade, ok e o motivo da recusa: `ended`,
+  `entity`, `human`, `dormant`, `team`, `weapon`, `reserve`, `place`, `modifier`, `conflict`) fica no host
+  (fora da tabela de eventos da rede).
+- **As escolhas** (decisões menores): só bots são alvo (humano é recusado, também no time e na arma); o `spawnBot`
+  usa a reserva primeiro e depois os bots da receita tirados da partida, no nó livre de navegação mais perto (até 8 m,
+  os 16 mais perto, dentro da área de jogo; sem navegação, o spawn mais perto), virado para onde pediu (a entrada velha
+  da IA não vale naquele tick); o `remove` tira sem morte, sem placar e sem crédito (os projéteis dele no ar somem,
+  quem ele acertou esquece, e o `leader()` pula os dormentes); o `freeze` zera a entrada do bot na sim (a IA dele
+  continua pensando, a sim ignora), passa pela morte e solta a granada que ele segurava sem jogar; o `giveWeapon` põe
+  na mão, vira a escolha do próximo renascer e alarga a lista de armas do bot (no Paintball, a versão de tinta); o
+  `setModifier` desliga o par que conflita, recusa o que conflita com uma regra fixa da receita (inclusive desligar
+  o "só na cabeça" ou o "um tiro mata" que vêm das regras de arma) e não mexe no Arcade; com a Roleta, o primeiro
+  sorteio parte da máscara de agora (o que o dono ligou antes fica).
+- **No Sandbox:** o bot criado ou trocado de time pega o HP e as armas do time novo (as regras do próprio bot ainda
+  ganham; `slotRules`, a mesma da criação). No `setTeam` de um bot vivo, o HP máximo novo vale na hora sem curar (a
+  vida acima do teto é cortada), só as armas que o time novo não deixa são trocadas (a primária vira a primeira
+  permitida, cheia), e o resto chega no próximo renascer.
+- **O estado:** só com as ferramentas, as marcas de congelado e a lista de armas de cada bot entram no hash e no
+  snapshot, e o estado dos modificadores existe desde o tick 0 (`SNAPSHOT_VERSION` 20; sem as ferramentas, o layout
+  é o de antes). **Offline só, por enquanto:** o amigo online não sabe que a opção está ligada (o layout da rede ganha 3
+  globais), então o `createNetHost` e o `createClientDriver` recusam uma sim com dono até a fase 5 mandar a opção no
+  começo da partida.
+- **A IA:** os cérebros da reserva existem desde o começo; o "Ajustar desafio" filtra pelo time de agora só com as
+  ferramentas (sem elas, pelo time da receita, como antes); o Diretor de Partida recalcula quando um bot troca de time.
+- **O replay:** `createOwnerScript([{ tick, cmd }]).feed(sim)` e o `OwnerLog` do `LocalDriver` (até 4.096
+  comandos; cheio, o `command()` recusa, para o replay nunca perder um comando que valeu) dão o mesmo hash.
+- **A revisão (Opus) achou:** o bot criado virava para onde mirava antes (a entrada velha); o "dar arma" no Paintball
+  entregava arma de verdade; o modificador ligado pelo dono sumia no primeiro sorteio da Roleta; o "Ajustar desafio"
+  mudava no Infection sem as ferramentas; desligar a regra de arma da receita dizia "ok" sem fazer nada; o bot tirado
+  ainda podia pontuar; o ponto fora da área de jogo; o online desalinhado (acima); e as regras do time do Sandbox no
+  bot criado ou trocado. Tudo corrigido antes do commit; nenhum golden mudou.
+

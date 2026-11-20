@@ -217,4 +217,19 @@ describe('eventos pela rede (M5 fase 2a)', () => {
       expect(types, t).toContain(t);
     }
   }, 30_000);
+
+  it('M9 (fase 4): a resposta dos comandos do dono fica no host (não viaja)', () => {
+    const owner: SimEvent = {
+      type: 'owner',
+      tick: 10,
+      seq: 1,
+      command: 'spawnBot',
+      entity: 0x10007,
+      ok: true,
+      reason: 'none',
+    };
+    expect(EVENT_TYPES as readonly string[]).not.toContain('owner');
+    const { got } = roundtrip([SAMPLES[0]!, owner, SAMPLES[1]!]);
+    expect(got).toEqual([SAMPLES[0]!, SAMPLES[1]!].map(asF32));
+  });
 });

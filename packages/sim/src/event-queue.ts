@@ -16,6 +16,7 @@ import type {
   BoxEvent,
   DownEvent,
   MoveEvent,
+  OwnerEvent,
   PickupEvent,
   ProjectileEvent,
   ShotEvent,
@@ -27,6 +28,7 @@ import type {
   UnstuckEvent,
   WeaponEvent,
 } from './events.ts';
+import type { OwnerCommandKind, OwnerFail } from './systems/owner.ts';
 import type { MatchPhase } from './view.ts';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -245,6 +247,12 @@ export class EventQueue {
     16,
   );
 
+  /** M9 (fase 4). */
+  private readonly owners = new EventPool<Mutable<OwnerEvent>>(
+    () => ({ type: 'owner', tick: 0, seq: 0, command: 'spawnBot', entity: 0, ok: true, reason: 'none' }),
+    2,
+  );
+
   get size(): number {
     return this.length;
   }
@@ -273,6 +281,7 @@ export class EventQueue {
     this.signals.reset();
     this.points.reset();
     this.ricochets.reset();
+    this.owners.reset();
   }
 
   /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
@@ -572,6 +581,18 @@ export class EventQueue {
     e.index = index;
     e.team = team;
     e.action = action;
+    this.push(e);
+  }
+
+  /** M9 (fase 4): a resposta de um comando do dono. */
+  owner(tick: number, seq: number, command: OwnerCommandKind, entity: EntityId, ok: boolean, reason: OwnerFail): void {
+    const e = this.owners.acquire();
+    e.tick = tick;
+    e.seq = seq;
+    e.command = command;
+    e.entity = entity;
+    e.ok = ok;
+    e.reason = reason;
     this.push(e);
   }
 

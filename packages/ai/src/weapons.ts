@@ -1,6 +1,13 @@
 import type { MatchRecipe } from '@boboforces/format';
 import { hashCombine } from '@boboforces/shared';
-import { DEFAULT_PRIMARY, expandRecipe, MAX_CONTROLLERS, WEAPON_CODE, type WeaponCode } from '@boboforces/sim';
+import {
+  DEFAULT_PRIMARY,
+  expandRecipe,
+  MAX_CONTROLLERS,
+  ownerReserveSlots,
+  WEAPON_CODE,
+  type WeaponCode,
+} from '@boboforces/sim';
 
 /**
  * Primária de cada bot (M2, fase 1d; gameplay.md §4.3: "nenhuma arma entra sem o bot saber quando usá-la"). Sorteio
@@ -33,12 +40,15 @@ export function botPrimary(seed: number, controller: number): WeaponCode {
 /**
  * Primária de cada controlador da receita (índice = controlador, `MAX_CONTROLLERS` posições) para o
  * `SimConfig.primaries`: bots pelo sorteio, humanos com a padrão (o menu radial da fase 2 escolhe a deles pelo
- * `InputFrame.primary`).
+ * `InputFrame.primary`). M9 (fase 4): com a reserva do dono (`ownerReserve` bots), ela sorteia também.
  */
-export function botPrimaries(recipe: MatchRecipe, humans: number): number[] {
+export function botPrimaries(recipe: MatchRecipe, humans: number, ownerReserve = 0): number[] {
   const out: number[] = new Array<number>(MAX_CONTROLLERS).fill(DEFAULT_PRIMARY);
   for (const slot of expandRecipe(recipe, humans)) {
     if (slot.bot !== null) out[slot.controller] = botPrimary(recipe.seed, slot.controller);
+  }
+  for (const slot of ownerReserveSlots(recipe, humans, ownerReserve)) {
+    out[slot.controller] = botPrimary(recipe.seed, slot.controller);
   }
   return out;
 }

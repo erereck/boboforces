@@ -12,6 +12,11 @@ import { copyBits } from './snapshot.ts';
  */
 
 type EvKind = 'u8' | 'u16' | 'i16' | 'i32' | 'u32' | 'f32' | 'bool' | readonly string[];
+/**
+ * M9 (fase 4): os tipos que viajam. A resposta dos comandos do dono (`owner`) fica só no host, que é quem usa as
+ * ferramentas: o `EventWriter` pula o que não está no schema (os amigos veem o efeito pelo snapshot e pelo `spawn`).
+ */
+type NetEventType = Exclude<SimEventType, 'owner'>;
 type EventOf<T extends SimEventType> = Extract<SimEvent, { type: T }>;
 type EvField<T extends SimEventType> = readonly [Exclude<keyof EventOf<T>, 'type' | 'tick'> & string, EvKind];
 
@@ -25,7 +30,7 @@ const XYZ = (p = ''): readonly [string, EvKind][] => [
  * Os campos de cada tipo, na ordem em que viajam. Tipo novo entra no FIM (o índice do tipo viaja) e campo novo no fim
  * do tipo; os dois sobem o `PROTOCOL_VERSION`. O teste confere que todo campo de todo tipo volta igual.
  */
-export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[] } = {
+export const EVENT_SCHEMA: { readonly [T in NetEventType]: readonly EvField<T>[] } = {
   shot: [
     ['shooter', 'u32'],
     ['weapon', 'u8'],
@@ -151,7 +156,7 @@ export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[]
 };
 
 /** Índice de cada tipo (a ordem do `EVENT_SCHEMA`). */
-export const EVENT_TYPES = Object.keys(EVENT_SCHEMA) as SimEventType[];
+export const EVENT_TYPES = Object.keys(EVENT_SCHEMA) as NetEventType[];
 const TYPE_BITS = bitsFor(EVENT_TYPES.length);
 const TYPE_INDEX = new Map<string, number>(EVENT_TYPES.map((t, i) => [t, i]));
 type AnyField = readonly [string, EvKind];

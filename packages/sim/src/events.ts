@@ -2,6 +2,7 @@ import type { FigurePart } from '@boboforces/format';
 import type { BlockId } from '@boboforces/world';
 import type { HitPart } from './config/metrics.ts';
 import type { EntityId } from './entity.ts';
+import type { OwnerCommandKind, OwnerFail } from './systems/owner.ts';
 import type { MatchPhase } from './view.ts';
 
 /**
@@ -299,6 +300,21 @@ export interface BoxEvent extends EventBase {
   readonly by: EntityId;
 }
 
+/**
+ * M9 (fase 4): a resposta de um comando do dono (`Sim.command`), no passo em que ele valeu. `seq` é o número que o
+ * `command` devolveu; `entity` é o bot (no `spawnBot`, o que entrou; `NULL_ENTITY` no `setModifier` e no `spawnBot`
+ * recusado); `reason` é o motivo da recusa (`none` quando `ok`). Só local: não vai pela rede (quem usa as ferramentas
+ * é o host; os amigos veem o efeito pelo snapshot).
+ */
+export interface OwnerEvent extends EventBase {
+  readonly type: 'owner';
+  readonly seq: number;
+  readonly command: OwnerCommandKind;
+  readonly entity: EntityId;
+  readonly ok: boolean;
+  readonly reason: OwnerFail;
+}
+
 export type SimEvent =
   | ShotEvent
   | HitEvent
@@ -321,6 +337,7 @@ export type SimEvent =
   | BoxEvent
   | SignalEvent
   | PointEvent
-  | RicochetEvent;
+  | RicochetEvent
+  | OwnerEvent;
 
 export type SimEventType = SimEvent['type'];
