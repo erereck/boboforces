@@ -943,6 +943,13 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   s.jumpBufferTicks[e] = 0;
   s.slideTicks[e] = 0;
   s.slideCooldownTicks[e] = 0;
+  // M8 (fase 7): o Arcade.
+  s.airJumps[e] = 0;
+  s.groundTicks[e] = 0;
+  s.landSpeed[e] = 0;
+  s.slideSpeed[e] = 0;
+  s.wallKeys[e * 2] = 0;
+  s.wallKeys[e * 2 + 1] = 0;
   s.airPeakY[e] = sp.y;
   s.fireCooldownS[e] = 0;
   s.reloadTicks[e] = 0;

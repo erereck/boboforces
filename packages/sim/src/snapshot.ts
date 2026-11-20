@@ -21,7 +21,8 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 6 (M2): contagem, vencedor do FFA, assistências e agressores recentes (fase 2a).
 // 7 (M2): caixinhas de munição e a contagem do Destravar (fase 2b).
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
-const SNAPSHOT_VERSION = 18;
+// 19 (M8, fase 7): os campos do Arcade (só com ele).
+const SNAPSHOT_VERSION = 19;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 
@@ -105,6 +106,8 @@ export function hashState(ctx: SimContext, h: StateHasher): number {
     ctx.rngChaos.saveState(rngScratch);
     h.bytes(rngScratch);
   }
+  // M8 (fase 7): o Arcade (só com ele: o hash dos outros perfis não muda).
+  if (ctx.arcade) for (const f of s.arcadeFields) h.bytes(f.array.subarray(0, s.count * f.stride));
   return h.digest();
 }
 
@@ -226,6 +229,7 @@ export function writeState(ctx: SimContext, w: BitWriter): void {
       ctx.rngChaos.saveState(rngScratch);
       writeArray(w, rngScratch, RNG_STATE_WORDS);
     }
+    if (ctx.arcade) for (const f of s.arcadeFields) writeArray(w, f.array, s.count * f.stride);
   }
 }
 
@@ -344,5 +348,6 @@ export function readState(ctx: SimContext, r: BitReader): void {
       ctx.rngChaos.loadState(rngScratch);
       applyChaos(ctx);
     }
+    if (ctx.arcade) for (const f of s.arcadeFields) readArray(r, f.array, s.count * f.stride);
   }
 }

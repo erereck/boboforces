@@ -25,8 +25,15 @@ export const BUTTON = {
    * pausa; a IA, depois de 8 s sem progresso na rota.
    */
   unstuck: 1 << 11,
-  // Os bits 12 a 14 são da ordem aos bots (`ORDER_SHIFT`); o próximo botão entra no 15.
+  // Os bits 12 a 14 são da ordem aos bots (`ORDER_SHIFT`) e o 15 é a marca de humano (`FRAME_HUMAN`).
 } as const;
+
+/**
+ * M8 (fase 7, revisão): o quadro escrito por um jogador (o mapeador liga em todo quadro; a IA nunca). A sim decide
+ * por ele o que é só de quem joga (o bunny hop e o wall jump do Arcade): quem pilota um bot faz, e o cérebro de
+ * reserva no lugar de quem saiu do sofá ou caiu do online, não.
+ */
+export const FRAME_HUMAN = 1 << 15;
 
 /**
  * M8 (fase 6): a ordem aos bots aliados (gameplay.md §6.10) viaja nos bits 12 a 14 do campo de botões, fora da

@@ -353,8 +353,8 @@ const RESPAWNS = [0, 1, 2, 3, 5, 8, 10, 15];
 const PROTECTIONS = [0, 0.5, 1, 1.5, 2, 3, 5];
 const DAMAGES = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5];
 const GRAVITIES = [0.25, 0.5, 0.75, 1, 1.5, 2];
-/** M2 (fase 6a): os perfis do M2 (o Arcade é do M6+) e os passos do Personalizado. */
-const MOVEMENTS = ['bobo', 'tactical', 'custom'] as const;
+/** M2 (fase 6a): os perfis e os passos do Personalizado. M8 (fase 7): o Arcade. */
+const MOVEMENTS = ['bobo', 'tactical', 'arcade', 'custom'] as const;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const JUMPS = [0.5, 0.75, 1, 1.5, 2, 3];
 
@@ -534,7 +534,9 @@ const MOVEMENT_ROW: RowDef = {
   value: (r) => t(`movement.${movementOf(r)}` as StringKey),
   step: (r, d) => {
     const i = cycleIndex(MOVEMENTS.length, MOVEMENTS.indexOf(movementOf(r)), d);
-    return withPlayers(r, { movement: MOVEMENTS[i]! });
+    // Mexer no perfil tira o modificador Arcade (senão a linha mostraria um perfil que a sim não joga).
+    const base = (r.modifiers ?? []).includes('arcade') ? withModifier(r, 'arcade', false) : r;
+    return withPlayers(base, { movement: MOVEMENTS[i]! });
   },
 };
 
@@ -553,10 +555,11 @@ const CUSTOM_MOVEMENT_ROWS: readonly RowDef[] = [
   },
 ];
 
-/** O perfil do M2 da receita (o Arcade, que só chega no M6+, aparece como Bobo, que é como a sim joga). */
+/** O perfil da receita (sem ele, o Bobo); o modificador Arcade manda nele (é como a sim joga). */
 function movementOf(r: MatchRecipe): (typeof MOVEMENTS)[number] {
+  if ((r.modifiers ?? []).includes('arcade')) return 'arcade';
   const m = players(r).movement;
-  return m === 'tactical' || m === 'custom' ? m : 'bobo';
+  return m === 'tactical' || m === 'custom' || m === 'arcade' ? m : 'bobo';
 }
 
 const PLAYER_ROWS: readonly RowDef[] = [
@@ -590,7 +593,8 @@ const PLAYER_ROWS: readonly RowDef[] = [
   flag(
     'fall',
     'custom.row.fall',
-    (r) => players(r).fallDamage ?? true,
+    // M8 (fase 7): o Arcade não tem dano de queda (o padrão do perfil).
+    (r) => players(r).fallDamage ?? movementOf(r) !== 'arcade',
     (r, v) => withPlayers(r, { fallDamage: v }),
   ),
   // M2 (fase 6b): a câmera permitida (livre ou só a 1ª pessoa).
@@ -812,6 +816,8 @@ const MOD_ROWS: readonly RowDef[] = [
   modifierFlag('bigHead', 'bigHead', 'custom.row.bigHead'),
   modifierFlag('invisible', 'invisible', 'custom.row.invisible'),
   modifierFlag('confetti', 'confetti', 'custom.row.confetti'),
+  // M8 (fase 7): o Arcade como modificador (o perfil inteiro, a partida toda).
+  modifierFlag('arcade', 'arcade', 'custom.row.arcade'),
   flag(
     'chaos',
     'custom.row.chaos',

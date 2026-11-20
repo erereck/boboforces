@@ -1,4 +1,4 @@
-import type { MovementProfileId, PlayerRules } from '@boboforces/format';
+import type { ModifierId, MovementProfileId, PlayerRules } from '@boboforces/format';
 import { METRICS } from './metrics.ts';
 
 /**
@@ -46,6 +46,10 @@ export interface MovementProfile {
   readonly bhop?: boolean;
   readonly wallJump?: boolean;
   readonly doubleJump?: boolean;
+  /** M8 (fase 7): atira correndo (com a dispersão de "no ar"); correr não espera o tiro. */
+  readonly fireWhileSprinting?: boolean;
+  /** M8 (fase 7): o deslize começa na velocidade que já tinha (se for maior) e termina numa fração dela. */
+  readonly slideKeepsMomentum?: boolean;
 }
 
 /**
@@ -115,6 +119,53 @@ export const MOVEMENT_TACTICAL: MovementProfile = {
 };
 
 /**
+ * M8 (fase 7): perfil Arcade (GDD §4.2.2, gameplay.md §3.3): andar 5,5 e correr 8,0 m/s, pulo de 1,3 m com pulo
+ * duplo, bunny hop de +5% por pulo até 12 m/s, wall jump uma vez por parede, deslize que mantém o momento, escalar até
+ * 2,0 m, sem dano de queda e atirando correndo com a dispersão de "no ar". Os números sem tabela são escolhas minhas
+ * (revisáveis, `ARCHITECTURE.md` §19.8): os de `ARCADE_TUNING`, o controle no ar 0,45 e o deslize de 0,9 s.
+ */
+export const MOVEMENT_ARCADE: MovementProfile = {
+  id: 'arcade',
+  walk: 5.5,
+  sprint: 8.0,
+  crouch: 2.8,
+  accel: 70,
+  airControl: 0.45,
+  friction: 18.5,
+  jump: 1.3,
+  gravity: 20,
+  mantleHeight: 2.0,
+  coyoteS: 0.1,
+  jumpBufferS: 0.12,
+  sprintFireDelayS: 0,
+  adsMoveMul: 0.75,
+  moveSpreadMul: 0.7,
+  fallDamage: false,
+  slide: { durationS: 0.9, startSpeed: 9, cooldownS: 0.6 },
+  bhop: true,
+  wallJump: true,
+  doubleJump: true,
+  fireWhileSprinting: true,
+  slideKeepsMomentum: true,
+};
+
+/** M8 (fase 7): os números do Arcade sem tabela no GDD (as escolhas da fase; o tick converte os segundos). */
+export const ARCADE_TUNING = {
+  /** Bunny hop: cada pulo logo depois de pousar (dentro da janela) ganha +5% sobre a velocidade do pouso, até 12 m/s. */
+  bhopGain: 1.05,
+  bhopMaxSpeed: 12,
+  bhopWindowS: 0.1,
+  /** O pulo duplo sobe com esta fração da velocidade do pulo e vira para onde o jogador aponta. */
+  doubleJumpMul: 0.9,
+  /** Wall jump: a parede encostada a até `wallProbeM`; o empurrão para longe dela (m/s); a mesma parede só de novo a mais de `sameWallM` dela. */
+  wallProbeM: 0.15,
+  wallPushSpeed: 5.5,
+  sameWallM: 1.5,
+  /** O deslize termina nesta fração da velocidade com que começou. */
+  slideEndKeep: 0.75,
+} as const;
+
+/**
  * Pulo mínimo (m) depois da gravidade e do multiplicador: com a borda de até 0,5 m no ar, alcança 1,0 m (mais 5 cm de
  * folga, porque o ápice quase nunca cai num tick), e todo mapa continua atravessável (gameplay.md §3.6) mesmo com
  * gravidade 2× no Tático ou pulo 0,5× com gravidade alta.
@@ -127,9 +178,13 @@ export const MIN_JUMP_HEIGHT = 0.55;
  * A gravidade (fase 4e) mantém a velocidade do pulo: a gravidade menor faz subir mais, por isso a altura divide por
  * ela. Sem nada mudado, devolve o próprio perfil base (o golden não muda).
  */
-export function resolveMovementProfile(players: PlayerRules | undefined): MovementProfile {
-  const id = players?.movement ?? 'bobo';
-  const base = id === 'tactical' ? MOVEMENT_TACTICAL : MOVEMENT_BOBO;
+export function resolveMovementProfile(
+  players: PlayerRules | undefined,
+  modifiers: readonly ModifierId[] = [],
+): MovementProfile {
+  // M8 (fase 7): o Arcade pelo perfil ou pelo modificador (fixo na receita).
+  const id = modifiers.includes('arcade') ? 'arcade' : (players?.movement ?? 'bobo');
+  const base = id === 'tactical' ? MOVEMENT_TACTICAL : id === 'arcade' ? MOVEMENT_ARCADE : MOVEMENT_BOBO;
   const custom = id === 'custom';
   const g = players?.gravity ?? 1;
   const speed = custom ? (players?.speed ?? 1) : 1;

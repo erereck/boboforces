@@ -137,7 +137,8 @@ function poolFor(mask: number): number {
   let pool = 0;
   for (let i = 0; i < MODIFIERS.length; i++) {
     const bit = 1 << i;
-    if ((mask & bit) !== 0) continue;
+    // M8 (fase 7): o Arcade só fixo na receita.
+    if ((mask & bit) !== 0 || MODIFIERS[i] === 'arcade') continue;
     let ok = true;
     for (let j = 0; j < MODIFIERS.length && ok; j++) {
       if ((mask & (1 << j)) !== 0 && modifiersConflict(MODIFIERS[i]!, MODIFIERS[j]!)) ok = false;

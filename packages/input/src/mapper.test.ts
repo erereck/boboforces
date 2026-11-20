@@ -1,6 +1,6 @@
 import { BitWriter, i16ToPitch, u16ToYaw } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
-import { BUTTON } from './actions.ts';
+import { BUTTON, FRAME_HUMAN } from './actions.ts';
 import { createInputFrame, INPUT_FRAME_BITS, writeInputFrame, type InputFrame } from './frame.ts';
 import { keyIndex, type KeyCode } from './keys.ts';
 import { createInputMapper, MAX_PITCH, MENU_REPEAT_DELAY_S, MENU_REPEAT_INTERVAL_S } from './mapper.ts';
@@ -59,7 +59,10 @@ describe('teclado e mouse', () => {
     press(raw, 'ShiftLeft', 'KeyC', 'Space', 'KeyR');
     m.update(raw, DT);
     const f = frameOf(m);
-    expect(f.buttons).toBe(BUTTON.fire | BUTTON.ads | BUTTON.sprint | BUTTON.crouch | BUTTON.jump | BUTTON.reload);
+    // M8 (fase 7): mais a marca de quadro de jogador.
+    expect(f.buttons).toBe(
+      BUTTON.fire | BUTTON.ads | BUTTON.sprint | BUTTON.crouch | BUTTON.jump | BUTTON.reload | FRAME_HUMAN,
+    );
     expect(m.isDown('crouch')).toBe(true);
     expect(m.wasPressed('jump')).toBe(true);
     m.update(raw, DT);
@@ -72,7 +75,8 @@ describe('teclado e mouse', () => {
     const m = kbm();
     press(raw, 'ControlLeft', 'ControlRight');
     m.update(raw, DT);
-    expect(frameOf(m).buttons).toBe(0);
+    // Só a marca de quadro de jogador (M8, fase 7).
+    expect(frameOf(m).buttons).toBe(FRAME_HUMAN);
     expect(m.isDown('crouch')).toBe(false);
   });
 

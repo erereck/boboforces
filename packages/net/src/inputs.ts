@@ -1,6 +1,7 @@
 import {
   copyInputFrame,
   createInputFrame,
+  FRAME_HUMAN,
   frameOrder,
   ORDER_MASK,
   readInputFrame,
@@ -121,7 +122,9 @@ export class RemoteInputBuffer {
       const view16 = r.readBits(16);
       const view = hasView === 1 ? view16 : -1;
       const seq = f.seq;
-      if (f.buttons !== 0 || f.moveX !== 0 || f.moveY !== 0 || f.yaw !== this.recvYaw || f.pitch !== this.recvPitch) {
+      // A marca de quadro de jogador (M8, fase 7) não é atividade.
+      const active = (f.buttons & ~FRAME_HUMAN) !== 0;
+      if (active || f.moveX !== 0 || f.moveY !== 0 || f.yaw !== this.recvYaw || f.pitch !== this.recvPitch) {
         this.activeReceived++;
       }
       this.recvYaw = f.yaw;

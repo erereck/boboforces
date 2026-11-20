@@ -231,7 +231,8 @@ export interface SimRemote {
  * flags, botões, coiote, pulo guardado, deslize, recarga do deslize, direção do deslize (2), pico do ar e o atraso do
  * tiro depois de correr.
  */
-export const PREDICT_STATE_SIZE = 16;
+/** M8 (fase 7): mais os 6 do Arcade (pulos no ar, chão desde o pouso, velocidade do pouso e do deslize, as 2 paredes). */
+export const PREDICT_STATE_SIZE = 22;
 
 /**
  * M5 (fase 2b, só o cliente online): o cliente prediz o próprio movimento com o mesmo código do `step`. O host manda,
@@ -544,7 +545,7 @@ export function createSim(config: SimConfig): Sim {
       ? new ControlPoints(map.controlPoints!)
       : null;
   // M6 (fase 4): os modificadores (o perfil e as regras de arma da partida são a base deles).
-  const baseProfile = resolveMovementProfile(recipe.players);
+  const baseProfile = resolveMovementProfile(recipe.players, recipe.modifiers ?? []);
   const baseMods = matchModsOf(recipe);
   const chaos = chaosOf(recipe) ? new ChaosState(recipe, baseProfile, baseMods, hz) : null;
   const match: MatchState = {
@@ -642,6 +643,7 @@ export function createSim(config: SimConfig): Sim {
     rewind: null,
     signals: createSignalState(MAX_ENTITIES),
     zombiesMode,
+    arcade: baseProfile.id === 'arcade',
     zombieArmed,
     zombieRunProfile: zombieSpeed(MOVEMENT_ZOMBIE_RUNNER, recipe),
     zombieRules: {
@@ -1030,6 +1032,12 @@ export function createSim(config: SimConfig): Sim {
       out[13] = s.slideDir[e * 2 + 1]!;
       out[14] = s.airPeakY[e]!;
       out[15] = s.sprintFireDelayTicks[e]!;
+      out[16] = s.airJumps[e]!;
+      out[17] = s.groundTicks[e]!;
+      out[18] = s.landSpeed[e]!;
+      out[19] = s.slideSpeed[e]!;
+      out[20] = s.wallKeys[e * 2]!;
+      out[21] = s.wallKeys[e * 2 + 1]!;
     },
     load(e, from): void {
       // M6 (fase 3, revisão): o próprio time chega do snapshot mais novo (os outros, do atrasado): as regras do Jugg
@@ -1053,6 +1061,12 @@ export function createSim(config: SimConfig): Sim {
       s.slideDir[e * 2 + 1] = from[13]!;
       s.airPeakY[e] = from[14]!;
       s.sprintFireDelayTicks[e] = from[15]!;
+      s.airJumps[e] = from[16]!;
+      s.groundTicks[e] = from[17]!;
+      s.landSpeed[e] = from[18]!;
+      s.slideSpeed[e] = from[19]!;
+      s.wallKeys[e * 2] = from[20]!;
+      s.wallKeys[e * 2 + 1] = from[21]!;
     },
     round(phase, ticks): void {
       if (ctx.rounds === null) return;

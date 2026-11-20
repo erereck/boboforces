@@ -1,5 +1,5 @@
 import { FIGURE_BONE } from '@boboforces/format';
-import { BUTTON } from '@boboforces/input';
+import { BUTTON, FRAME_HUMAN } from '@boboforces/input';
 import {
   cellBlock,
   cellFlipped,
@@ -13,7 +13,7 @@ import {
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { ZOMBIE_TYPE } from '../config/zombie.ts';
 import { METRICS } from '../config/metrics.ts';
-import type { MovementProfile } from '../config/movement.ts';
+import { ARCADE_TUNING, type MovementProfile } from '../config/movement.ts';
 import { isBody, PART_TORSO, WEAPON_KILL_PLANE, WEAPON_NONE, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
@@ -41,6 +41,11 @@ const sweep = createSweepResult();
 const drop = createSweepResult();
 const standProbe: Aabb = createAabb();
 const standSweep = createSweepResult();
+// M8 (fase 7): a sonda da parede do wall jump e a do chão logo abaixo (o pulo guardado antes do pouso).
+const wallProbe: Aabb = createAabb();
+const wallSweep = createSweepResult();
+const groundProbe: Aabb = createAabb();
+const groundSweep = createSweepResult();
 
 const F = ENTITY_FLAG;
 const MOVE_FLAGS = F.onGround | F.crouching | F.sprinting | F.sliding | F.ads;
@@ -69,6 +74,8 @@ class ProfileTicks {
   slideTotal = 0;
   slideCooldown = 0;
   airStep = 0;
+  /** M8 (fase 7): a janela do bunny hop, em ticks no chão desde o pouso. */
+  bhopWindow = 0;
 
   update(p: MovementProfile, hz: number): void {
     if (this.profile === p && this.hz === hz) return;
@@ -81,6 +88,7 @@ class ProfileTicks {
     this.slideTotal = p.slide ? Math.max(1, secondsToTicks(p.slide.durationS, hz)) : 0;
     this.slideCooldown = p.slide ? secondsToTicks(p.slide.cooldownS, hz) : 0;
     this.airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump) + MANTLE_SLACK);
+    this.bhopWindow = secondsToTicks(ARCADE_TUNING.bhopWindowS, hz);
   }
 }
 
@@ -116,6 +124,60 @@ function onSlope(ctx: SimContext, x: number, y: number, z: number): boolean {
     if (shape >= SHAPE_ID.ramp && shape <= SHAPE_ID.rampCornerOut) return true;
   }
   return false;
+}
+
+/**
+ * M8 (fase 7): a parede encostada (a até `wallProbeM` em ±X ou ±Z, nessa ordem, pulando as já usadas neste voo) e a
+ * chave dela: o lado (1 a 4, no bit 16) e o plano da face no contato (a 1/16 m: a mesma face dá sempre a mesma chave,
+ * na grade ou numa prop); 0 = nenhuma. A sonda começa um degrau acima dos pés (meio-fio, degrau e caixote baixo não
+ * são parede).
+ */
+function touchingWall(
+  ctx: SimContext,
+  x: number,
+  y: number,
+  z: number,
+  height: number,
+  colliders: SimContext['colliders'],
+  used0: number,
+  used1: number,
+): number {
+  const d = ARCADE_TUNING.wallProbeM;
+  const lift = METRICS.stepHeight;
+  if (height <= lift) return 0;
+  for (let k = 0; k < 4; k++) {
+    const dx = k === 0 ? d : k === 1 ? -d : 0;
+    const dz = k === 2 ? d : k === 3 ? -d : 0;
+    setBox(wallProbe, x, y + lift, z, height - lift);
+    sweepAabb(ctx.grid, ctx.blocks, wallProbe, dx, 0, dz, 0, wallSweep, colliders);
+    if (dx !== 0 ? !wallSweep.hitX : !wallSweep.hitZ) continue;
+    const face = dx > 0 ? wallProbe.maxX : dx < 0 ? wallProbe.minX : dz > 0 ? wallProbe.maxZ : wallProbe.minZ;
+    const key = ((k + 1) << 16) | (Math.round(face * 16) & 0xffff);
+    if (key !== used0 && key !== used1) return key;
+  }
+  return 0;
+}
+
+/**
+ * M8 (fase 7, revisão): caindo com o chão ao alcance do pulo guardado (`jumpBufferS`): o toque é o pulo do pouso (o
+ * bunny hop), não o duplo.
+ */
+function groundBelow(
+  ctx: SimContext,
+  x: number,
+  y: number,
+  z: number,
+  vy: number,
+  height: number,
+  p: MovementProfile,
+  colliders: SimContext['colliders'],
+): boolean {
+  if (vy >= 0) return false;
+  const t = p.jumpBufferS;
+  const reach = -vy * t + 0.5 * p.gravity * t * t;
+  setBox(groundProbe, x, y, z, height);
+  sweepAabb(ctx.grid, ctx.blocks, groundProbe, 0, -reach, 0, 0, groundSweep, colliders);
+  return groundSweep.onGround;
 }
 
 /** M3 (fase 3b): o perfil de cada tipo de zumbi. */
@@ -165,7 +227,23 @@ function moveBody(ctx: SimContext, e: number): void {
   const p = pt.profile!;
   const g = p.gravity;
   const slide = p.slide;
+  // M8 (fase 7): o Arcade (o bobo de pé; o caído e o zumbi seguem os perfis deles). O bunny hop e o wall jump só de
+  // quem joga (gameplay.md §3.6: os bots não fazem).
+  const arcade = ctx.arcade && pt === boboTicks;
   const btn = s.inButtons[e]!;
+  // Revisão: quem joga pela marca do quadro (quem pilota um bot faz; o cérebro de reserva no lugar de alguém, não).
+  const human = (btn & FRAME_HUMAN) !== 0;
+  // Caído, o estado do Arcade zera (levantar não lança com o pouso de antes).
+  if (ctx.arcade && pt === downedTicks) {
+    s.airJumps[e] = 0;
+    s.groundTicks[e] = 0;
+    s.landSpeed[e] = 0;
+    s.slideSpeed[e] = 0;
+    s.wallKeys[e * 2] = 0;
+    s.wallKeys[e * 2 + 1] = 0;
+  }
+  // O teto do Arcade (12 m/s) com a regra de velocidade do bobo (o Jugg mais lento também no bunny hop).
+  const arcadeCap = ARCADE_TUNING.bhopMaxSpeed * ctx.rules.speed[e]!;
   const pressed = btn & ~s.prevButtons[e]!;
   const i3 = e * 3;
   let x = s.position[i3]!;
@@ -215,7 +293,11 @@ function moveBody(ctx: SimContext, e: number): void {
     s.slideTicks[e] = pt.slideTotal;
     s.slideDir[e * 2] = vx / hSpeed;
     s.slideDir[e * 2 + 1] = vz / hSpeed;
-    ctx.events.move(ctx.tick, s.idOf(e), 'slide', slide.startSpeed);
+    // M8 (fase 7): no Arcade o deslize começa na velocidade que já tinha (se for maior).
+    if (arcade && p.slideKeepsMomentum === true) {
+      s.slideSpeed[e] = Math.min(Math.max(arcadeCap, slide.startSpeed), Math.max(slide.startSpeed, hSpeed));
+    }
+    ctx.events.move(ctx.tick, s.idOf(e), 'slide', arcade ? s.slideSpeed[e]! : slide.startSpeed);
   }
 
   // --- Agachar (levanta só se couber em pé: caixa agachada varrida para cima, com formas e props) ---
@@ -234,7 +316,8 @@ function moveBody(ctx: SimContext, e: number): void {
   const adsHeld = (btn & BUTTON.ads) !== 0;
   const sprinting =
     (btn & BUTTON.sprint) !== 0 &&
-    (btn & (BUTTON.fire | BUTTON.grenade)) === 0 &&
+    // M8 (fase 7): no Arcade o tiro não corta a corrida (atira correndo, com a dispersão de "no ar").
+    (p.fireWhileSprinting === true || (btn & (BUTTON.fire | BUTTON.grenade)) === 0) &&
     my > SPRINT_MIN_FORWARD &&
     !crouching &&
     !adsHeld &&
@@ -246,7 +329,10 @@ function moveBody(ctx: SimContext, e: number): void {
   if (sliding && slide) {
     const left = --s.slideTicks[e]!;
     const t = 1 - left / pt.slideTotal;
-    const speed = slide.startSpeed + (p.crouch - slide.startSpeed) * t;
+    // M8 (fase 7): no Arcade, da velocidade do começo até uma fração dela (mantém o momento).
+    const from = arcade && p.slideKeepsMomentum === true ? s.slideSpeed[e]! : slide.startSpeed;
+    const to = arcade && p.slideKeepsMomentum === true ? from * ARCADE_TUNING.slideEndKeep : p.crouch;
+    const speed = from + (to - from) * t;
     vx = s.slideDir[e * 2]! * speed;
     vz = s.slideDir[e * 2 + 1]! * speed;
     if (left <= 0 || (btn & BUTTON.crouch) === 0) {
@@ -303,6 +389,10 @@ function moveBody(ctx: SimContext, e: number): void {
       if (ns > cap && ns > 0) {
         vx *= cap / ns;
         vz *= cap / ns;
+      } else if (arcade && hSpeed > target && ns < hSpeed && ns > 0) {
+        // M8 (fase 7): no Arcade o controle no ar vira sem frear (o momento do bunny hop fica até o pouso).
+        vx *= hSpeed / ns;
+        vz *= hSpeed / ns;
       }
     }
   }
@@ -321,7 +411,57 @@ function moveBody(ctx: SimContext, e: number): void {
       sliding = false;
       s.slideCooldownTicks[e] = pt.slideCooldown;
     }
+    // M8 (fase 7): o bunny hop: pulando logo depois de pousar, a velocidade do pouso (ou a de agora, se maior) +5%,
+    // até o teto, na direção de agora.
+    // A janela em ticks no chão (`<`: 0,1 s igual a 30 e a 60 Hz).
+    if (arcade && p.bhop === true && human && wasOnGround && s.groundTicks[e]! < pt.bhopWindow) {
+      const cur = Math.sqrt(vx * vx + vz * vz);
+      if (cur > STOP_SPEED) {
+        const sp = Math.min(arcadeCap, Math.max(s.landSpeed[e]!, cur) * ARCADE_TUNING.bhopGain);
+        vx = (vx / cur) * sp;
+        vz = (vz / cur) * sp;
+      }
+    }
     ctx.events.move(ctx.tick, s.idOf(e), 'jump', pt.jumpSpeed);
+  } else if (arcade && (pressed & BUTTON.jump) !== 0 && !wasOnGround) {
+    // M8 (fase 7): no ar, o wall jump (de quem joga, numa parede nova encostada) ou o pulo duplo (um por pulo).
+    const height = crouching ? METRICS.aabbCrouchHeight : METRICS.aabbHeight;
+    const used0 = s.wallKeys[e * 2]!;
+    const used1 = s.wallKeys[e * 2 + 1]!;
+    // Revisão: uma vez por parede e no máximo duas por voo (num corredor, A-B-A-B não vira escada).
+    const wall =
+      p.wallJump === true && human && used1 === 0 ? touchingWall(ctx, x, y, z, height, colliders, used0, used1) : 0;
+    if (wall !== 0) {
+      s.wallKeys[e * 2 + (used0 === 0 ? 0 : 1)] = wall;
+      vy = pt.jumpSpeed;
+      const side = wall >> 16;
+      const push = ARCADE_TUNING.wallPushSpeed;
+      if (side === 1) vx = -push;
+      else if (side === 2) vx = push;
+      else if (side === 3) vz = -push;
+      else vz = push;
+      // O empurrão não passa do teto.
+      const ws = Math.sqrt(vx * vx + vz * vz);
+      if (ws > arcadeCap && ws > 0) {
+        vx *= arcadeCap / ws;
+        vz *= arcadeCap / ws;
+      }
+      jumpBuffer = 0;
+      jumped = true;
+      ctx.events.move(ctx.tick, s.idOf(e), 'jump', pt.jumpSpeed);
+    } else if (p.doubleJump === true && s.airJumps[e]! < 1 && !groundBelow(ctx, x, y, z, vy, height, p, colliders)) {
+      s.airJumps[e] = s.airJumps[e]! + 1;
+      vy = pt.jumpSpeed * ARCADE_TUNING.doubleJumpMul;
+      // Vira para onde o jogador aponta, sem perder a velocidade que tinha (o analógico pela metade também).
+      if (wishLen > 0) {
+        const sp = Math.min(arcadeCap, Math.max(Math.sqrt(vx * vx + vz * vz), p.walk * ctx.rules.speed[e]!));
+        vx = (wx / wishLen) * sp;
+        vz = (wz / wishLen) * sp;
+      }
+      jumpBuffer = 0;
+      jumped = true;
+      ctx.events.move(ctx.tick, s.idOf(e), 'jump', vy);
+    }
   }
   if (jumpBuffer > 0) jumpBuffer--;
 
@@ -420,6 +560,18 @@ function moveBody(ctx: SimContext, e: number): void {
   s.velocity[i3 + 2] = vz;
   s.jumpBufferTicks[e] = jumpBuffer;
   s.coyoteTicks[e] = coyote;
+  // M8 (fase 7): no chão, os pulos no ar e a parede voltam; o pouso guarda a velocidade (a do bunny hop).
+  if (arcade) {
+    if (onGround) {
+      if (!wasOnGround) {
+        s.landSpeed[e] = Math.sqrt(vx * vx + vz * vz);
+        s.groundTicks[e] = 0;
+      } else if (s.groundTicks[e]! < 255) s.groundTicks[e] = s.groundTicks[e]! + 1;
+      s.airJumps[e] = 0;
+      s.wallKeys[e * 2] = 0;
+      s.wallKeys[e * 2 + 1] = 0;
+    } else s.groundTicks[e] = 0;
+  }
   fl &= ~MOVE_FLAGS;
   if (onGround) fl |= F.onGround;
   if (crouching) fl |= F.crouching;

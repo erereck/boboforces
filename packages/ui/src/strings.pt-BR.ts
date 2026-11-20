@@ -366,6 +366,7 @@ export const STRINGS_PT_BR = {
   /** M2 (fase 6b): a regra "Câmera permitida". */
   'movement.bobo': 'Bobo',
   'movement.tactical': 'Tático',
+  'movement.arcade': 'Arcade',
   'movement.custom': 'Personalizado',
   'menu.back': 'Voltar',
   'menu.confirm': 'Confirmar',

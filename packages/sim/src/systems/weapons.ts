@@ -256,7 +256,8 @@ export function weaponSystem(ctx: SimContext): void {
       s.reloadTicks[e] === 0 &&
       s.switchTicks[e] === 0 &&
       s.fireCooldownS[e]! <= FIRE_READY_EPS &&
-      (fl & F.sprinting) === 0 &&
+      // M8 (fase 7): no Arcade atira correndo.
+      ((fl & F.sprinting) === 0 || ctx.profile.fireWhileSprinting === true) &&
       s.sprintFireDelayTicks[e] === 0;
 
     // Granada: cozinha segurando, joga ao soltar, explode na mão se o pavio acabar.
@@ -436,8 +437,10 @@ function aimSpread(ctx: SimContext, e: number, def: WeaponDef, fl: number): numb
   let mul: number;
   // M2 (fase 6a): o perfil pesa a dispersão andando e no ar (o Tático erra mais em movimento).
   const moving = ctx.profile.moveSpreadMul ?? 1;
-  if ((fl & F.onGround) === 0) mul = SPREAD_STATE_MULTIPLIER.air * moving;
-  else if ((fl & F.crouching) !== 0) mul = SPREAD_STATE_MULTIPLIER.crouching;
+  // M8 (fase 7): correndo no Arcade, a dispersão de "no ar".
+  if ((fl & F.onGround) === 0 || ((fl & F.sprinting) !== 0 && ctx.profile.fireWhileSprinting === true)) {
+    mul = SPREAD_STATE_MULTIPLIER.air * moving;
+  } else if ((fl & F.crouching) !== 0) mul = SPREAD_STATE_MULTIPLIER.crouching;
   else if (vx * vx + vz * vz > SPREAD_WALKING_SPEED * SPREAD_WALKING_SPEED)
     mul = SPREAD_STATE_MULTIPLIER.walking * moving;
   else mul = SPREAD_STATE_MULTIPLIER.still;

@@ -90,6 +90,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
    +5% por pulo até 12 m/s, wall jump uma vez por parede, slide que mantém o momento, mantle até 2 m, sem dano de
    queda, atira correndo com o espalhamento "no ar"); o modificador Arcade; os bots não fazem bunny hop nem wall jump
    (gameplay.md §3.6). O estado novo entra no snapshot e na predição do cliente.
+   - **feita em 20/11** (ARCHITECTURE §19.8): o perfil e o modificador, o movimento, o estado no hash e no snapshot
+     só com o Arcade, a predição e o protocolo 10.
 8. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

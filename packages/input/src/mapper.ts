@@ -11,6 +11,7 @@ import {
   WEAPON_SLOT_COUNT,
   type GameAction,
   type MenuAction,
+  FRAME_HUMAN,
 } from './actions.ts';
 import { TOUCH_CONTROLS, type BindingSource, type DeviceBinding, type TouchControlId } from './bindings.ts';
 import { quantizeAxis, type InputFrame } from './frame.ts';
@@ -334,7 +335,8 @@ class Mapper implements InputMapper {
 
   writeFrame(out: InputFrame, seq: number): void {
     out.seq = seq & 0xffff;
-    out.buttons = (this.latchBits | this.downBits) & 0xffff;
+    // M8 (fase 7, revisão): a marca de quadro de jogador (`FRAME_HUMAN`).
+    out.buttons = ((this.latchBits | this.downBits) & 0xffff) | FRAME_HUMAN;
     out.moveX = quantizeAxis(this.moveX);
     out.moveY = quantizeAxis(this.moveY);
     out.yaw = yawToU16(this.yaw);

@@ -4524,3 +4524,43 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   tira todas); e a rede somava ordens dos quadros pulados.
 - **Fica para depois:** a resposta para o cliente online (uma mensagem curta do host) e o filtro do Me cobre pelos
   inimigos que atacam quem mandou (hoje ele só cola e levanta).
+
+### 19.8 Fase 7: o perfil Arcade (20/11/2026)
+
+- **O perfil** (`sim/config/movement.ts`, `MOVEMENT_ARCADE`): os números do GDD §4.2.2 (andar 5,5 e correr 8,0 m/s,
+  pulo de 1,3 m, escalar até 2,0 m, sem dano de queda) e as escolhas da fase, revisáveis (`ARCADE_TUNING` e o
+  perfil): aceleração 70 m/s², controle no ar 0,45, deslize de 0,9 s que começa em 9 m/s ou na velocidade que já
+  tinha e termina em 3/4 dela, o pulo duplo com 0,9 da velocidade do pulo (e virando para onde o jogador aponta), a
+  janela do bunny hop de 0,1 s no chão e o empurrão do wall jump de 5,5 m/s. Liga pela regra `players.movement:
+  'arcade'` ou pelo modificador novo `arcade` (fixo na receita; fora da Roleta do Chaos, que troca no meio da
+  partida); a Partida personalizada mostra os dois (a linha Movimento e a aba Modificadores), e o Surpreenda-me pode
+  sortear o modificador.
+- **O movimento** (`systems/movement.ts`): o pulo duplo (um por pulo); o bunny hop (pulando logo depois de pousar, a
+  velocidade do pouso ou a de agora, a maior, +5%, até 12 m/s; no ar, o controle do Arcade vira sem frear, para o
+  momento chegar ao pouso); o wall jump (no ar, encostado a até 0,15 m de uma parede em ±X ou ±Z, um degrau acima
+  dos pés: sobe e é empurrado para longe dela; cada parede, pelo lado e pelo plano da face no contato, uma vez por
+  voo, e no máximo duas por voo; senão o toque vira o pulo duplo); o deslize que mantém o momento; correr não corta o
+  tiro e a dispersão correndo é a de "no ar" (`weapons.ts`, e a mira da HUD acompanha). O teto de 12 m/s (com a
+  regra de velocidade do bobo) vale também no wall jump e no deslize. O bunny hop e o wall jump são só de quem joga,
+  pela marca de quadro de jogador (`FRAME_HUMAN`, o bit 15 dos botões, que o mapeador liga e a IA nunca): quem
+  pilota um bot faz, e o cérebro de reserva no lugar de quem saiu, não; os bots não fazem (gameplay.md §3.6), mas
+  pulam duplo. Caindo com o chão ao alcance do pulo guardado, o toque é o pulo do pouso (o bunny hop), não o duplo. A escalada no ar continua no
+  teto do degrau de 0,5 m (1,8 m com o pulo de 1,3 m); com o pulo duplo, os 2,0 m sobram.
+- **O estado** (`state.ts`, `arcadeFields`: pulos no ar, ticks no chão desde o pouso, as velocidades do pouso e do
+  deslize e as chaves das duas paredes do voo): zera no nascer e ao cair, e só entra no hash e no snapshot com o
+  Arcade (`ctx.arcade`), como os campos do Zombies e do Royale: os goldens dos outros perfis não mudam. O snapshot da
+  sim sobe para 19.
+- **A predição do cliente online** leva os 6 campos (`PREDICT_STATE_SIZE` 16 → 22), e o estado privado do snapshot da
+  rede também (os contadores em 16 bits; as velocidades e as chaves das paredes em f32: as chaves são inteiros abaixo
+  de 2^24, exatas). `MOVEMENT_ARCADE` e `ARCADE_TUNING` entram no hash de conteúdo do handshake. O protocolo sobe
+  para 10 (e o `net.json`); a marca de quadro de jogador não conta como atividade na rede.
+- **Na tela:** com o modificador ligado, a linha Movimento mostra Arcade (mexer nela tira o modificador) e a linha
+  Dano de queda mostra o padrão do perfil (desligado no Arcade).
+- **A revisão (Opus) achou, corrigido antes do commit:** o wall jump guardava só a última parede (num corredor, A-B-A-B
+  subia 40 m: agora duas paredes por voo, uma vez cada); o pulo duplo com o analógico pela metade freava (de 8 para
+  2,4 m/s); quem é humano pelo índice do controlador errava nos dois sentidos (agora a marca do quadro); a sonda da
+  parede pegava o meio-fio; o wall jump e o deslize passavam de 12 m/s; as tabelas do Arcade fora do hash de
+  conteúdo; a tela mostrava dano de queda e o perfil errado com o modificador; o pulo duplo comia o pulo guardado do
+  pouso; o estado do Arcade ficava no caído; o bunny hop ignorava a regra de velocidade (o Jugg); a janela do bunny
+  hop dependia do Hz; e a chave da parede saía da ponta da sonda. Os testes agora cobrem a mesma parede de verdade,
+  o corredor, o meio-fio, o bot, o analógico, os 30 Hz e a predição.

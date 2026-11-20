@@ -34,6 +34,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   botão Ordens) e escolha na roda: Vem comigo, Segura aqui, Ataca ali ou Me cobre (Me revive no Zombies). Os bots
   N2 ou mais espertos obedecem conforme a lealdade, que o Laboratório agora mostra; a tela diz quantos obedeceram. O
   seu aviso também chama os bots espertos do time.
+- **O perfil Arcade (fase 7):** mais rápido, pulo de 1,3 m com pulo duplo, bunny hop (+5% por pulo até 12 m/s),
+  wall jump uma vez por parede, deslize que mantém o momento, atirar correndo e sem dano de queda. Na Partida
+  personalizada, como perfil de movimento ou como modificador; os bots não fazem bunny hop nem wall jump.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

@@ -160,6 +160,8 @@ export const MODIFIERS = [
   'bigHead',
   'invisible',
   'confetti',
+  // M8 (fase 7): o perfil Arcade a partida toda (fixo na receita; fora da Roleta do Chaos, que troca no meio).
+  'arcade',
 ] as const;
 export type ModifierId = (typeof MODIFIERS)[number];
 

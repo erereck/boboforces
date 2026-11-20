@@ -276,6 +276,8 @@ export interface SimContext {
   readonly signals: SignalState;
   /** M3 (fase 2a): Bobo Zombies (`mode: 'zombies'`): o diretor de ondas, os renascimentos e o pool de zumbis. */
   readonly zombiesMode: boolean;
+  /** M8 (fase 7): o perfil é o Arcade (o pulo duplo, o bunny hop, o wall jump; os campos dele no hash e no snapshot). */
+  readonly arcade: boolean;
   /** M6 (fase 6b): a Horda armada (as ondas são os bots do time 1; janelas abertas, sem tábua). */
   readonly zombieArmed: boolean;
   readonly zombieRunProfile: MovementProfile;

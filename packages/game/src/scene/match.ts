@@ -1307,7 +1307,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** A figura do infectado (a do bobo-zumbi comum). */
   const infectedFigure = figures.zombieFigureOf(ZOMBIE_TYPE.walker);
   // Refino R1 (#79): quanto o perfil da partida abre a mira andando e no ar (a retícula da HUD segue).
-  const moveSpreadMul = resolveMovementProfile(recipe.players).moveSpreadMul ?? 1;
+  const moveProfile = resolveMovementProfile(recipe.players, recipe.modifiers ?? []);
+  const moveSpreadMul = moveProfile.moveSpreadMul ?? 1;
+  // M8 (fase 7): no Arcade, correndo a mira abre como no ar (atira correndo).
+  const sprintSpread = moveProfile.fireWhileSprinting === true;
   // M3 (fase 6e): a música do Bobo Zombies em 2 camadas (a cena manda nela; o núcleo volta no resultado).
   const zombieMusic = zombiesMode ? createZombieMusic(host.audio.mixer, host.platform.assets, host.log) : null;
   const musicLocals: number[] = [];
@@ -5782,7 +5785,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const speed = Math.hypot(v.velocity[e * 3]!, v.velocity[e * 3 + 2]!);
     const fl = v.flags[e]!;
     const moveOpen =
-      (fl & ENTITY_FLAG.onGround) === 0
+      (fl & ENTITY_FLAG.onGround) === 0 || (sprintSpread && (fl & ENTITY_FLAG.sprinting) !== 0)
         ? SPREAD_STATE_MULTIPLIER.air * moveSpreadMul - 1
         : speed > SPREAD_WALKING_SPEED && (fl & ENTITY_FLAG.crouching) === 0
           ? SPREAD_STATE_MULTIPLIER.walking * moveSpreadMul - 1

@@ -97,6 +97,10 @@ describe('Partida personalizada', () => {
     expect(ids(DEBUT_PRESET).slice(0, 2)).toEqual(['movement', 'hp']);
     let r = stepCustom('players', DEBUT_PRESET, 'movement', 1, PC);
     expect(value('players', r, 'movement')).toBe('Tático');
+    // M8 (fase 7): o Arcade entre o Tático e o Personalizado.
+    r = stepCustom('players', r, 'movement', 1, PC);
+    expect(value('players', r, 'movement')).toBe('Arcade');
+    expect(ids(r).slice(0, 2)).toEqual(['movement', 'hp']);
     r = stepCustom('players', r, 'movement', 1, PC);
     expect(ids(r).slice(0, 4)).toEqual(['movement', 'speed', 'jump', 'hp']);
     r = stepCustom('players', r, 'speed', 1, PC);

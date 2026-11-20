@@ -77,6 +77,17 @@ export class SimState {
   readonly jumpBufferTicks = new Int16Array(MAX_ENTITIES);
   readonly slideTicks = new Int16Array(MAX_ENTITIES);
   readonly slideCooldownTicks = new Int16Array(MAX_ENTITIES);
+  /**
+   * M8 (fase 7): o Arcade: os pulos no ar já usados (o duplo), os ticks no chão desde o pouso (a janela do bunny hop),
+   * a velocidade no plano no pouso, a do começo do deslize e as paredes dos wall jumps deste voo (`wallKeys`, duas
+   * por bobo: o lado e o plano da face, 0 = nenhuma; uma vez por parede e no máximo duas por voo). Só no hash e no
+   * snapshot com o Arcade (`arcadeFields`).
+   */
+  readonly airJumps = new Uint8Array(MAX_ENTITIES);
+  readonly groundTicks = new Uint8Array(MAX_ENTITIES);
+  readonly landSpeed = new Float64Array(MAX_ENTITIES);
+  readonly slideSpeed = new Float64Array(MAX_ENTITIES);
+  readonly wallKeys = new Int32Array(MAX_ENTITIES * 2);
   /** Direção do deslize no plano (x, z). */
   readonly slideDir = new Float64Array(MAX_ENTITIES * 2);
   readonly airPeakY = new Float64Array(MAX_ENTITIES);
@@ -187,6 +198,8 @@ export class SimState {
   readonly strikeFields: readonly StateField[];
   /** M7 (fase 6): os campos que só existem no Bobo Royale (o caído usa os do Bobo Zombies, que também entram). */
   readonly royaleFields: readonly StateField[];
+  /** M8 (fase 7): os campos do Arcade (só no hash e no snapshot com ele). */
+  readonly arcadeFields: readonly StateField[];
 
   constructor() {
     const f = (name: string, array: StateArray, stride = 1): StateField => ({ name, array, stride });
@@ -281,6 +294,13 @@ export class SimState {
       f('lastPrimary', this.lastPrimary),
     ];
     this.royaleFields = [f('armor', this.armor), f('heals', this.heals), f('healTicks', this.healTicks)];
+    this.arcadeFields = [
+      f('airJumps', this.airJumps),
+      f('groundTicks', this.groundTicks),
+      f('landSpeed', this.landSpeed),
+      f('slideSpeed', this.slideSpeed),
+      f('wallKeys', this.wallKeys, 2),
+    ];
   }
 
   /** Projétil num slot livre (`projAlive` ligado); -1 = pool cheio. */

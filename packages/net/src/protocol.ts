@@ -1,6 +1,7 @@
 import { CHAOS_DEFAULTS, CONTENT_IDS, GAME_VERSION, MODIFIER_CONFLICTS, MODIFIERS } from '@boboforces/format';
 import { StateHasher, type BitReader, type BitWriter } from '@boboforces/shared';
 import {
+  ARCADE_TUNING,
   BASE_HP,
   BIG_BRRT,
   BIG_BRRT_COOL,
@@ -46,13 +47,14 @@ import {
   ZOMBIE_SPIT,
   ZOMBIES_DOWN,
   ZOMBIES_MODE,
+  MOVEMENT_ARCADE,
 } from '@boboforces/sim';
 
 /**
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza).
  */
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -94,6 +96,9 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   BASE_HP,
   MOVEMENT_BOBO,
   MOVEMENT_TACTICAL,
+  // M8 (fase 7): o Arcade.
+  MOVEMENT_ARCADE,
+  ARCADE_TUNING,
   MATCH_DEFAULTS,
   WEAPON_FIRE,
   WEAPONS,
