@@ -30,6 +30,24 @@ export interface ShotEvent extends EventBase {
 }
 
 /**
+ * M9 (fase 1): o Ricochete: a bala (ou o chumbo) do `shot` quicou no cenário em (x, y, z) e seguiu na direção
+ * unitária `dir*` por `distance` m (até o que a parou, ou o resto do alcance). O render puxa o rastro dali; o
+ * `impact` da parede e o `hit` do alvo saem à parte, como no tiro.
+ */
+export interface RicochetEvent extends EventBase {
+  readonly type: 'ricochet';
+  readonly shooter: EntityId;
+  readonly weapon: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly dirX: number;
+  readonly dirY: number;
+  readonly dirZ: number;
+  readonly distance: number;
+}
+
+/**
  * Acerto em bobo (ou zumbi). `bodyPart` diz QUAL dos 12 ossos do boneco foi atingido (`FIGURE_BONE` do format, #56:
  * cabeça, tronco, braço e antebraço D/E, coxa, canela e pé D/E; u8) e `dir*` é a direção do tiro (unitária): o render
  * acha o texel da skin no ponto (cor dos cubinhos) e joga os cubinhos nessa direção. `part` continua sendo a categoria
@@ -302,6 +320,7 @@ export type SimEvent =
   | PurchaseEvent
   | BoxEvent
   | SignalEvent
-  | PointEvent;
+  | PointEvent
+  | RicochetEvent;
 
 export type SimEventType = SimEvent['type'];

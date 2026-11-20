@@ -357,7 +357,7 @@ export function explode(
     if ((fj & F.dead) !== 0) continue;
     const self = j === o;
     if (!self && o >= 0 && !canHurt(ctx, o, j)) continue;
-    // Ponto mais perto da AABB do corpo.
+    // Ponto mais perto da AABB do corpo (M9: a caixa de colisão, que o Mini e o gigante não mudam; `CHAOS_SCALE`).
     const j3 = j * 3;
     const half = METRICS.aabbWidth / 2;
     const h = (fj & F.crouching) !== 0 ? METRICS.aabbCrouchHeight : METRICS.aabbHeight;

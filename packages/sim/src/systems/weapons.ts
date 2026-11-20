@@ -30,7 +30,7 @@ import {
 } from '../context.ts';
 import { BOT_CONTROLLER_BASE, secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
-import { aimPointWorldWith, eyeHeightFor, figurePostureOf, weaponGrip, type AimPoint } from '../hitbox.ts';
+import { aimPointWorldWith, figurePostureOf, simEyeHeight, weaponGrip, type AimPoint } from '../hitbox.ts';
 import { isLivePhase } from '../view.ts';
 import { explode, launchProjectile, rocketFuseTicks } from './projectiles.ts';
 import { MOD, modOn } from './chaos.ts';
@@ -163,7 +163,7 @@ export function weaponSystem(ctx: SimContext): void {
           explode(
             ctx,
             s.position[e3]!,
-            s.position[e3 + 1]! + eyeHeightFor(fl),
+            s.position[e3 + 1]! + simEyeHeight(ctx, e, fl),
             s.position[e3 + 2]!,
             nade,
             s.idOf(e),
@@ -272,7 +272,7 @@ export function weaponSystem(ctx: SimContext): void {
           explode(
             ctx,
             s.position[e3]!,
-            s.position[e3 + 1]! + eyeHeightFor(fl),
+            s.position[e3 + 1]! + simEyeHeight(ctx, e, fl),
             s.position[e3 + 2]!,
             def,
             s.idOf(e),
@@ -472,7 +472,7 @@ function castRay(ctx: SimContext, e: number, ox: number, oy: number, oz: number,
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
     // M5 (fase 2d): voltando no tempo, cada alvo é testado onde estava (postura daquele tick; o cache das caixas
-    // usa o tick antigo como chave).
+    // usa o tick antigo como chave). M9: com o tamanho da máscara de agora (o Mini e o gigante; `CHAOS_SCALE`).
     const rw = ctx.rewind;
     if (rw !== null && rw.active > 0) {
       if (!rw.has(j)) continue;
@@ -515,6 +515,87 @@ function emitImpact(ctx: SimContext): void {
   );
 }
 
+/** M9 (fase 1): o Ricochete: a bala recomeça a isto (m) da face, pela normal (o raio novo não nasce dentro dela). */
+const RICOCHET_LIFT_M = 0.05;
+/**
+ * Saídas do `castShot`: a distância do 1º trecho (o `distance` do `shot`), a distância total até o alvo (o dano cai
+ * com ela) e o ponto e a direção do acerto.
+ */
+let shotFirstT = 0;
+let shotTotalT = 0;
+const shotPoint = new Float64Array(3);
+const shotDir = new Float64Array(3);
+
+/**
+ * Um raio de bala ou de chumbo em `dir` a partir de (ox, oy, oz) até `range` (`castRay`; o `impact` do cenário sai
+ * aqui). M9 (fase 1): com o Ricochete, uma volta no cenário: bateu numa face (normal não nula; o raio que começa
+ * dentro do bloco não quica), a direção reflete (r = d − 2(d·n)n), o raio recomeça `RICOCHET_LIFT_M` fora da face com
+ * o resto do alcance (as hitboxes valem, a volta no tempo também, e quem atirou continua fora) e sai o `ricochet`.
+ * Devolve o alvo (ou -1), com o osso em `castBone`. Sem sorteio: o RNG das armas não muda.
+ */
+function castShot(
+  ctx: SimContext,
+  e: number,
+  shooter: number,
+  code: number,
+  ox: number,
+  oy: number,
+  oz: number,
+  range: number,
+): number {
+  const dx = dir[0]!;
+  const dy = dir[1]!;
+  const dz = dir[2]!;
+  const target = castRay(ctx, e, ox, oy, oz, range);
+  const t = castT;
+  shotFirstT = t;
+  shotTotalT = t;
+  if (target >= 0) {
+    shotPoint[0] = ox + dx * t;
+    shotPoint[1] = oy + dy * t;
+    shotPoint[2] = oz + dz * t;
+    shotDir[0] = dx;
+    shotDir[1] = dy;
+    shotDir[2] = dz;
+    return target;
+  }
+  if (!rayHit.hit) return -1;
+  emitImpact(ctx);
+  const nx = rayHit.normalX;
+  const ny = rayHit.normalY;
+  const nz = rayHit.normalZ;
+  if (!modOn(ctx, MOD.ricochet) || (nx === 0 && ny === 0 && nz === 0)) return -1;
+  const dn = 2 * (dx * nx + dy * ny + dz * nz);
+  const rx = dx - dn * nx;
+  const ry = dy - dn * ny;
+  const rz = dz - dn * nz;
+  const bx = rayHit.x + nx * RICOCHET_LIFT_M;
+  const by = rayHit.y + ny * RICOCHET_LIFT_M;
+  const bz = rayHit.z + nz * RICOCHET_LIFT_M;
+  dir[0] = rx;
+  dir[1] = ry;
+  dir[2] = rz;
+  const bounced = castRay(ctx, e, bx, by, bz, Math.max(0, range - t));
+  dir[0] = dx;
+  dir[1] = dy;
+  dir[2] = dz;
+  const t2 = castT;
+  shotTotalT = t + t2;
+  ctx.events.ricochet(ctx.tick, shooter, code, bx, by, bz, rx, ry, rz, t2);
+  if (bounced >= 0) {
+    shotPoint[0] = bx + rx * t2;
+    shotPoint[1] = by + ry * t2;
+    shotPoint[2] = bz + rz * t2;
+    shotDir[0] = rx;
+    shotDir[1] = ry;
+    shotDir[2] = rz;
+    return bounced;
+  }
+  // A 2ª parede (a que começa dentro de um canto não marca nada).
+  if (rayHit.hit && rayHit.distance > 0) emitImpact(ctx);
+  return -1;
+}
+
 /**
  * Dano de 1 raio (ou chumbo) da arma `def` a `t` m no osso `bone` de `target`. Quem é imune a tiro de cabeça (regra
  * do bot, M2 fase 3b) leva na cabeça o dano do tronco.
@@ -541,7 +622,7 @@ function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: 
 
   const i3 = e * 3;
   const ox = s.position[i3]!;
-  const oy = s.position[i3 + 1]! + eyeHeightFor(fl);
+  const oy = s.position[i3 + 1]! + simEyeHeight(ctx, e, fl);
   const oz = s.position[i3 + 2]!;
 
   // Centro do tiro: a mira com a dispersão do estado (amostrada uniforme no disco).
@@ -558,23 +639,22 @@ function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: 
   const code = s.weapon[e]!;
 
   if (def.fire === WEAPON_FIRE.bullet) {
-    const target = castRay(ctx, e, ox, oy, oz, def.rangeM);
-    const t = castT;
+    const target = castShot(ctx, e, shooter, code, ox, oy, oz, def.rangeM);
     if (target >= 0) {
       const i = ctx.damage.push(
         target,
         shooter,
-        rayDamage(ctx, def, t, castBone, target),
+        rayDamage(ctx, def, shotTotalT, castBone, target),
         FIGURE_PART_CATEGORY[castBone]!,
         castBone,
         code,
-        ox + cx * t,
-        oy + cy * t,
-        oz + cz * t,
+        shotPoint[0]!,
+        shotPoint[1]!,
+        shotPoint[2]!,
       );
-      ctx.damage.setDirection(i, cx, cy, cz, def.killForce);
-    } else if (rayHit.hit) emitImpact(ctx);
-    ctx.events.shot(ctx.tick, shooter, code, ox, oy, oz, cx, cy, cz, t);
+      ctx.damage.setDirection(i, shotDir[0]!, shotDir[1]!, shotDir[2]!, def.killForce);
+    }
+    ctx.events.shot(ctx.tick, shooter, code, ox, oy, oz, cx, cy, cz, shotFirstT);
     return;
   }
 
@@ -589,10 +669,9 @@ function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: 
     const px = dir[0]!;
     const py = dir[1]!;
     const pz = dir[2]!;
-    const target = castRay(ctx, e, ox, oy, oz, def.rangeM);
-    const t = castT;
+    const target = castShot(ctx, e, shooter, code, ox, oy, oz, def.rangeM);
     if (target >= 0) {
-      const amount = rayDamage(ctx, def, t, castBone, target);
+      const amount = rayDamage(ctx, def, shotTotalT, castBone, target);
       let slot = -1;
       for (let q = 0; q < targets; q++) if (pelletTarget[q] === target) slot = q;
       if (slot < 0 && targets < MAX_PELLET_TARGETS) {
@@ -601,16 +680,16 @@ function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: 
         pelletDamage[slot] = 0;
         pelletPart[slot] = FIGURE_PART_CATEGORY[castBone]!;
         pelletBodyPart[slot] = castBone;
-        pelletPoint[slot * 3] = ox + px * t;
-        pelletPoint[slot * 3 + 1] = oy + py * t;
-        pelletPoint[slot * 3 + 2] = oz + pz * t;
-        pelletDir[slot * 3] = px;
-        pelletDir[slot * 3 + 1] = py;
-        pelletDir[slot * 3 + 2] = pz;
+        pelletPoint[slot * 3] = shotPoint[0]!;
+        pelletPoint[slot * 3 + 1] = shotPoint[1]!;
+        pelletPoint[slot * 3 + 2] = shotPoint[2]!;
+        pelletDir[slot * 3] = shotDir[0]!;
+        pelletDir[slot * 3 + 1] = shotDir[1]!;
+        pelletDir[slot * 3 + 2] = shotDir[2]!;
       }
       if (slot >= 0) pelletDamage[slot] = pelletDamage[slot]! + amount;
-    } else if (rayHit.hit) emitImpact(ctx);
-    ctx.events.shot(ctx.tick, shooter, code, ox, oy, oz, px, py, pz, t);
+    }
+    ctx.events.shot(ctx.tick, shooter, code, ox, oy, oz, px, py, pz, shotFirstT);
   }
   for (let q = 0; q < targets; q++) {
     // Chumbos a 0 de dano (longe demais) não viram acerto.
@@ -681,7 +760,7 @@ function swingKnife(ctx: SimContext, e: number, def: WeaponDef): void {
   const back = tfx * dx + tfz * dz > BACKSTAB_COS;
   const table = ctx.figures.table;
   if (table === null) throw new Error('sim: tabela de jogo solta (dispose)');
-  aimPointWorldWith(table, s, best, false, knifePoint);
+  aimPointWorldWith(table, s, best, false, knifePoint, ctx.figures.chaosScaleOf(s, best));
   ctx.events.melee(ctx.tick, attacker, s.idOf(best));
   const i = ctx.damage.push(
     best,
@@ -728,7 +807,7 @@ function fireRocket(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: n
     s.idOf(e),
     def,
     s.position[e3]!,
-    s.position[e3 + 1]! + eyeHeightFor(fl),
+    s.position[e3 + 1]! + simEyeHeight(ctx, e, fl),
     s.position[e3 + 2]!,
     dir[0]! * v,
     dir[1]! * v,
@@ -751,7 +830,7 @@ function throwGrenade(ctx: SimContext, e: number, k: number, def: WeaponDef, fl:
     s.idOf(e),
     def,
     s.position[e3]!,
-    s.position[e3 + 1]! + eyeHeightFor(fl),
+    s.position[e3 + 1]! + simEyeHeight(ctx, e, fl),
     s.position[e3 + 2]!,
     -Math.sin(yaw) * cp * v + s.velocity[e3]! * THROW_INHERIT,
     Math.sin(pitch) * v + s.velocity[e3 + 1]! * THROW_INHERIT,

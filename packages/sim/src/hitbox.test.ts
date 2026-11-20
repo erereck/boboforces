@@ -22,6 +22,7 @@ import {
   figureHitBoxes,
   figurePosture,
   figureRoot,
+  MODIFIERS,
   type FigureAimOut,
 } from '@boboforces/format';
 import { createRng } from '@boboforces/shared';
@@ -37,6 +38,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
 import { weaponDamageAt, WEAPON_RIFLE } from './config/weapons.ts';
+import { BOT_CONTROLLER_BASE, ZOMBIE_CONTROLLER_BASE } from './constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM } from './entity.ts';
 import { SimState } from './state.ts';
 import {
@@ -46,12 +48,17 @@ import {
   bindFigureTable,
   bodyPartAtHeight,
   boundFigureTable,
+  CHAOS_SCALE,
+  chaosScale,
+  chaosScaleOf,
   createBoboHit,
   eyeHeightFor,
   FigureHitCache,
   figurePostureOf,
+  GIANT_EYE_CEILING_GAP_M,
   HITBOX_COUNT,
   rayVsBobo,
+  scaledEyeHeight,
   unbindFigureTable,
   visibleAimLocal,
   visibleAimOffset,
@@ -1033,3 +1040,168 @@ describe('corpo em escala (M3, fase 3b)', () => {
     cache.release();
   });
 });
+
+describe('Mini e Bots gigantes (M9, fase 1)', () => {
+  const MINI = 1 << MODIFIERS.indexOf('mini');
+  const GIANTS = 1 << MODIFIERS.indexOf('giantBots');
+  /** Um humano (controlador 0) no x = 0 e um bot (o 1º controlador de bot) no x = 4, os dois em pé olhando −Z. */
+  function bodies(): { s: SimState; human: number; bot: number } {
+    const s = new SimState();
+    const human = s.allocate(ENTITY_KIND.bobo, 0, 0) & 0xffff;
+    const bot = s.allocate(ENTITY_KIND.bobo, 1, BOT_CONTROLLER_BASE) & 0xffff;
+    s.position[bot * 3] = 4;
+    return { s, human, bot };
+  }
+  let tick = 1;
+  /** Raio horizontal de z = −10 para +Z na altura `h` (m) e no x do corpo: o osso acertado ou −1. */
+  function shoot(cache: FigureHitCache, s: SimState, e: number, h: number): number {
+    cache.beginRay(s.position[e * 3]!, h, -10, 0, 0, 1, 100);
+    return cache.testEntity(s, e, STAND, tick++);
+  }
+
+  it('a escala: o Mini vale para todo corpo; o gigante, só para os bobos dos bots', () => {
+    expect(chaosScale(0, BOT_CONTROLLER_BASE, ENTITY_KIND.bobo)).toBe(1);
+    expect(chaosScale(MINI, 0, ENTITY_KIND.bobo)).toBe(CHAOS_SCALE.mini);
+    expect(chaosScale(MINI, ZOMBIE_CONTROLLER_BASE, ENTITY_KIND.zombie)).toBe(CHAOS_SCALE.mini);
+    expect(chaosScale(GIANTS, 0, ENTITY_KIND.bobo)).toBe(1);
+    expect(chaosScale(GIANTS, BOT_CONTROLLER_BASE, ENTITY_KIND.bobo)).toBe(CHAOS_SCALE.giantBots);
+    expect(chaosScale(GIANTS, ZOMBIE_CONTROLLER_BASE, ENTITY_KIND.zombie)).toBe(1);
+    expect(chaosScale(GIANTS, BOT_CONTROLLER_BASE, ENTITY_KIND.projectile)).toBe(1);
+    const view = { chaos: { masks: Int32Array.of(GIANTS, GIANTS, -1) }, ...bodies().s };
+    expect(chaosScaleOf(view, 1)).toBe(3);
+    expect(chaosScaleOf({ ...view, chaos: null }, 1)).toBe(1);
+  });
+
+  it('a hitbox: o tiro a 2,6 m pega o bot gigante e passa por cima do humano; o Mini erra a 0,95 m', () => {
+    const { s, human, bot } = bodies();
+    const cache = new FigureHitCache(table, 8);
+    expect([shoot(cache, s, human, 2.6), shoot(cache, s, bot, 2.6)]).toEqual([-1, -1]);
+    cache.setChaosMask(GIANTS);
+    expect(shoot(cache, s, human, 2.6)).toBe(-1);
+    // 2,6 m é a cintura do gigante (5,25 m); a 5 m, a cabeça dele.
+    expect(shoot(cache, s, bot, 2.6)).toBeGreaterThanOrEqual(0);
+    expect(shoot(cache, s, bot, 5)).toBe(FIGURE_BONE.head);
+    // O Mini (0,875 m de altura): 0,95 m passa por cima dos dois; 0,8 m é a cabeça e 0,5 m o tronco.
+    cache.setChaosMask(MINI);
+    expect(shoot(cache, s, human, 1.2)).toBe(-1);
+    expect(shoot(cache, s, bot, 0.95)).toBe(-1);
+    expect(shoot(cache, s, human, 0.8)).toBe(FIGURE_BONE.head);
+    expect(shoot(cache, s, human, 0.5)).toBe(FIGURE_BONE.torso);
+    // Sem bits de tamanho, como antes.
+    cache.setChaosMask(MOD_BIT_NONE);
+    expect(shoot(cache, s, human, 1.2)).toBeGreaterThanOrEqual(0);
+    cache.release();
+  });
+
+  it('o corte dos braços do gigante continua a 0,75 m do eixo no mundo (o braço triplo não passa do muro)', () => {
+    const { s, bot } = bodies();
+    // Fuzil no ADS: os braços vão para a frente, até ~2 m do eixo no gigante.
+    const ads = figurePosture(FIGURE_STANCE.stand, FIGURE_GRIP.rifle, FIGURE_MODE.ads, false);
+    const cache = new FigureHitCache(table, 8);
+    cache.setChaosMask(GIANTS);
+    const rng = createRng('m9-braco');
+    const px = s.position[bot * 3]!;
+    const pz = s.position[bot * 3 + 2]!;
+    let arms = 0;
+    let far = 0;
+    for (let i = 0; i < 20000; i++) {
+      // Raios de todos os lados para um ponto qualquer do volume do gigante (até 2,5 m do eixo e 5,5 m de altura).
+      const a = rng.range(0, Math.PI * 2);
+      const tx = px + rng.range(-2.5, 2.5);
+      const ty = rng.range(0, 5.5);
+      const tz = pz + rng.range(-2.5, 2.5);
+      const d = dirOf(a, rng.range(-0.5, 0.5));
+      cache.beginRay(tx - d[0]! * 10, ty - d[1]! * 10, tz - d[2]! * 10, d[0]!, d[1]!, d[2]!, 100);
+      const bone = cache.testEntity(s, bot, ads, tick++);
+      if (bone < 0 || FIGURE_PART_CATEGORY[bone] !== 2) continue;
+      arms++;
+      const t = cache.bestT();
+      const ex = tx - d[0]! * 10 + d[0]! * t - px;
+      const ez = tz - d[2]! * 10 + d[2]! * t - pz;
+      far = Math.max(far, Math.abs(ex), Math.abs(ez));
+    }
+    expect(arms).toBeGreaterThan(50);
+    expect(far).toBeLessThanOrEqual(ARM_HIT_CUT_M + 1e-9);
+    // O raio volta como estava: o corpo normal seguinte continua com o corte de sempre.
+    cache.setChaosMask(MOD_BIT_NONE);
+    cache.release();
+  });
+
+  it('o olho: o Mini na metade; o gigante no triplo a céu aberto e 10 cm abaixo do teto baixo', () => {
+    const blocks = createTestBlocks();
+    const concrete = makeCell(blocks.byKey('concrete')!.id);
+    const grid = createWorldGrid(20, 20, 20);
+    fillBox(grid, 0, 0, 0, 19, 0, 19, concrete);
+    // Teto de 3,0 a 3,5 m (célula y = 6) sobre a metade x < 5 m.
+    fillBox(grid, 0, 6, 0, 9, 6, 19, concrete);
+    const eye = (x: number, flags: number, k: number): number =>
+      scaledEyeHeight(grid, blocks, null, x, 0.5, 5, flags, k);
+    expect(eye(2, 0, 1)).toBe(eyeHeightFor(0));
+    expect(eye(2, F.crouching, 1)).toBe(eyeHeightFor(F.crouching));
+    expect(eye(2, 0, 0.5)).toBeCloseTo(METRICS.eyeHeight / 2, 9);
+    expect(eye(7, 0, 3)).toBeCloseTo(METRICS.eyeHeight * 3, 9);
+    // Embaixo do teto: o olho para em 3,0 − 0,1 m (os pés a 0,5 m).
+    expect(eye(2, 0, 3)).toBeCloseTo(3 - GIANT_EYE_CEILING_GAP_M - 0.5, 9);
+    expect(eye(2, F.crouching, 3)).toBeCloseTo(3 - GIANT_EYE_CEILING_GAP_M - 0.5, 9);
+  });
+
+  it('revisão: a mira visível do gigante usa o corte dos braços da sim (÷ escala): o antebraço longe não tapa', () => {
+    // Fuzil em ADS, de frente a 10 m (no frame de tamanho 1): no bobo normal o antebraço de apoio tapa o queixo e a
+    // mira sobe; no gigante o antebraço fica além dos 0,75 m do eixo no mundo, a sim não o conta, e a mira fica no meio.
+    const ads = figurePosture(FIGURE_STANCE.stand, FIGURE_GRIP.rifle, FIGURE_MODE.ads, false);
+    const eye: AimPoint = { x: 0, y: METRICS.eyeHeight, z: 10 };
+    const normal: AimPoint = { x: 0, y: 0, z: 0 };
+    const giant: AimPoint = { x: 0, y: 0, z: 0 };
+    visibleAimLocal(ads, 0, true, eye, normal);
+    visibleAimLocal(ads, 0, true, eye, giant, CHAOS_SCALE.giantBots);
+    expect(normal.y).toBeGreaterThan(0.02);
+    expect(Math.abs(giant.y)).toBeLessThan(normal.y / 2);
+    // A sim concorda: do mesmo olho, o raio ao queixo (a parte de baixo da caixa da cabeça) acerta o antebraço do
+    // normal e a cabeça do gigante.
+    const { s, bot } = bodies();
+    s.position[bot * 3] = 0;
+    const chin = hitPoint(boxesAt(ads, 0), FIGURE_BONE.head, 0, -0.8, 0);
+    const cache = new FigureHitCache(table, 8);
+    const toHead = (k: number): number => {
+      // Frame do alvo com yaw 0: a frente (+z) é o −Z do mundo.
+      const o = [0, eye.y * k, -eye.z * k];
+      const p = [chin[0]! * k, chin[1]! * k, -chin[2]! * k];
+      const d = [p[0]! - o[0]!, p[1]! - o[1]!, p[2]! - o[2]!];
+      const n = Math.hypot(d[0]!, d[1]!, d[2]!);
+      cache.beginRay(o[0]!, o[1]!, o[2]!, d[0]! / n, d[1]! / n, d[2]! / n, 100);
+      return cache.testEntity(s, bot, ads, tick++);
+    };
+    expect(FIGURE_PART_CATEGORY[toHead(1)]).toBe(2);
+    cache.setChaosMask(GIANTS);
+    expect(toHead(CHAOS_SCALE.giantBots)).toBe(FIGURE_BONE.head);
+    cache.release();
+  });
+
+  it('a mira da IA cresce com o corpo (o Mini): o ponto e o desvio da parte vista', () => {
+    const body = {
+      flags: new Uint32Array(1),
+      weapon: new Uint8Array(1).fill(255),
+      kind: Uint8Array.of(ENTITY_KIND.bobo),
+      position: new Float64Array(3),
+      yaw: new Float64Array(1),
+      pitch: new Float64Array(1),
+    };
+    const one: AimPoint = { x: 0, y: 0, z: 0 };
+    const half: AimPoint = { x: 0, y: 0, z: 0 };
+    for (const head of [true, false]) {
+      aimPointWorld(body, 0, head, one);
+      aimPointWorld(body, 0, head, half, 0.5);
+      expect(half.y).toBeCloseTo(one.y / 2, 12);
+      expect(half.z).toBeCloseTo(one.z / 2, 12);
+      // O olho a 5 m na frente, na altura do peito: no Mini, o mesmo olho visto do frame de tamanho 1 está 2x longe.
+      visibleAimOffset(body, 0, head, { x: 0, y: 0.6, z: -5 }, half, 0.5);
+      visibleAimOffset(body, 0, head, { x: 0, y: 1.2, z: -10 }, one);
+      expect(half.x).toBeCloseTo(one.x / 2, 12);
+      expect(half.y).toBeCloseTo(one.y / 2, 12);
+      expect(half.z).toBeCloseTo(one.z / 2, 12);
+    }
+  });
+});
+
+/** Máscara sem modificador de tamanho. */
+const MOD_BIT_NONE = 0;

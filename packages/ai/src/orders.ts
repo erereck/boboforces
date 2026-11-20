@@ -1,7 +1,7 @@
 import type { BotPersonality } from '@boboforces/format';
 import { ORDER } from '@boboforces/input';
 import type { Rng } from '@boboforces/shared';
-import { ENTITY_FLAG, eyeHeightFor, secondsToTicks, type SimView } from '@boboforces/sim';
+import { ENTITY_FLAG, secondsToTicks, viewEyeHeight, type SimView } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { AI_ORDERS } from './config.ts';
 import type { SoldierBrain } from './soldier.ts';
@@ -82,7 +82,7 @@ export function orderPoint(
     out.z = z;
     return true;
   }
-  const ey = y + eyeHeightFor(view.flags[e]!);
+  const ey = y + viewEyeHeight(view, e, view.flags[e]!);
   const dx = -Math.sin(yaw) * Math.cos(pitch);
   const dy = Math.sin(pitch);
   const dz = -Math.cos(yaw) * Math.cos(pitch);

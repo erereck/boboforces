@@ -818,6 +818,7 @@ function nearestEnemy2(ctx: SimContext, e: number, x: number, z: number): number
  */
 function enemiesSeeing(ctx: SimContext, e: number, x: number, y: number, z: number, max: number): number {
   const s = ctx.s;
+  // M9: o olho normal de todos, mesmo com o Mini e os Bots gigantes (`CHAOS_SCALE`).
   const eye = METRICS.eyeHeight;
   const range = MATCH_DEFAULTS.viewDistanceM;
   let n = 0;

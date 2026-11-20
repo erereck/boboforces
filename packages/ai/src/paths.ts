@@ -78,6 +78,8 @@ export class PathFollower {
   stuckX = 0;
   stuckZ = 0;
   stuckCount = 0;
+  /** M9 (fase 1): o bot gigante: o A* dos pedidos dele foge do teto baixo (`AI_PATH.giantHeadroomM`). */
+  giant = false;
 
   constructor(id: number) {
     this.id = id;
@@ -208,6 +210,9 @@ export class PathService {
       const slice = Math.min(this.slice, budget);
       budget -= slice;
       this.calls++;
+      // M9 (fase 1): o teto baixo custa mais só na busca do gigante (o resto busca como sempre).
+      search.headroomM = f.giant ? AI_PATH.giantHeadroomM : 0;
+      search.headroomCost = f.giant ? AI_PATH.giantHeadroomCost : 0;
       const status = this.api.findPath(nav, f.reqFrom, f.reqTo, search, slice);
       if (status === 'pending') continue;
       this.pop(f);

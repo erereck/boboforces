@@ -96,6 +96,13 @@ export const AI_PATH = {
   separationWeight: 0.8,
   /** Capacidade de cada caminho (nós). */
   pathCapacity: 256,
+  /**
+   * M9 (fase 1): o bot gigante (Bots gigantes) prefere o céu aberto: cada nó com menos que `giantHeadroomM` (a altura
+   * dele, 3 × 1,75 m) do piso ao teto custa `giantHeadroomCost` m a mais no A*. Só preferência: a caixa dele é a
+   * normal e ele passa por baixo de tudo que um bobo passa.
+   */
+  giantHeadroomM: 5.25,
+  giantHeadroomCost: 2,
 } as const;
 
 /**

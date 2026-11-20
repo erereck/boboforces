@@ -82,7 +82,7 @@ function swing(ctx: SimContext, e: number, damage: number, range2: number): void
   const b3 = best * 3;
   const table = ctx.figures.table;
   if (table === null) throw new Error('sim: tabela de jogo solta (dispose)');
-  aimPointWorldWith(table, s, best, false, point);
+  aimPointWorldWith(table, s, best, false, point, ctx.figures.chaosScaleOf(s, best));
   let dx = s.position[b3]! - ex;
   let dz = s.position[b3 + 2]! - ez;
   const d = Math.sqrt(dx * dx + dz * dz);

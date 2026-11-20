@@ -140,6 +140,14 @@ export const EVENT_SCHEMA: { readonly [T in SimEventType]: readonly EvField<T>[]
     ['team', 'u8'],
     ['action', ['captured', 'neutralized']],
   ],
+  // M9 (fase 1): o Ricochete: de onde a bala quicou, para onde e até onde.
+  ricochet: [
+    ['shooter', 'u32'],
+    ['weapon', 'u8'],
+    ...XYZ(),
+    ...XYZ('dir'),
+    ['distance', 'f32'],
+  ] as EvField<'ricochet'>[],
 };
 
 /** Índice de cada tipo (a ordem do `EVENT_SCHEMA`). */

@@ -11,13 +11,24 @@ import {
   figureBodyPartAtHeight,
   figureHitBoxes,
   figurePosture,
+  MODIFIERS,
   type FigureAimOut,
   type FigureGameTable,
   type FigureGrip,
   type FigurePart,
 } from '@boboforces/format';
+import {
+  BLOCK_FLAG,
+  createRayHit,
+  raycastGrid,
+  type BlockRegistry,
+  type StaticColliders,
+  type WorldGrid,
+} from '@boboforces/world';
 import { METRICS } from './config/metrics.ts';
 import { weaponDef } from './config/weapons.ts';
+import { BOT_CONTROLLER_BASE, ZOMBIE_CONTROLLER_BASE } from './constants.ts';
+import type { SimContext } from './context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from './entity.ts';
 import type { SimState } from './state.ts';
 
@@ -53,6 +64,56 @@ export const HITBOX_COUNT = FIGURE_BONES;
  */
 export const ARM_HIT_CUT_M = METRICS.aabbWidth / 2 + 0.45;
 
+/**
+ * M9 (fase 1): o tamanho do corpo pelos modificadores Mini (todos com metade) e Bots gigantes (os bots com o triplo).
+ * Sem estado novo: sai da máscara de modificadores (que já entra no hash, no snapshot e na rede), do controlador e do
+ * tipo. Multiplica o `bodyScale` (Chonker, chefão) nas hitboxes e no desenho; a caixa de colisão e a navegação não
+ * mudam (como no Chonker). De propósito não escreve no `bodyScale`: ele só entra no hash do Zombies e do Royale, e os
+ * zumbis nascem escrevendo nele.
+ *
+ * Limites aceitos (revisão da fase 1), sem estado novo na rede:
+ * - **Quem assume um lugar fica com o corpo do lugar**: o "gigante" é o controlador de bot, não quem joga. O humano
+ *   que entra no meio da partida pelo sofá, ou que assume um bot no Aquário, vira gigante (o lugar é de bot); o bot que
+ *   ocupa o lugar de um humano que saiu continua normal (o lugar é de humano).
+ * - **A volta no tempo** (o tiro do amigo online) testa as posições antigas com o tamanho da máscara de AGORA: só
+ *   difere nos < 200 ms em volta da troca da Roleta que liga ou desliga um tamanho.
+ * - **As explosões** medem a distância até a caixa de colisão, que não muda: o Mini leva o estilhaço de um bobo inteiro
+ *   e o gigante, o de um normal.
+ * - **O spawn seguro** (`life.ts`, quem enxerga o ponto) usa o olho normal de todos.
+ */
+export const CHAOS_SCALE = { mini: 0.5, giantBots: 3 } as const;
+const MINI_BIT = 1 << MODIFIERS.indexOf('mini');
+const GIANT_BIT = 1 << MODIFIERS.indexOf('giantBots');
+/** Os bits da máscara que mudam o tamanho dos corpos. */
+export const CHAOS_SCALE_BITS = MINI_BIT | GIANT_BIT;
+
+/**
+ * Escala do corpo pela máscara `mask` (bits de `MODIFIERS`): o Mini vale para todo corpo (bobo e zumbi); os Bots
+ * gigantes só para os bobos de controlador de bot (humanos são 0..3 e zumbis vêm depois dos bots). 1 = normal. Decide
+ * pelo controlador (o lugar), não por quem joga nele: ver os limites em `CHAOS_SCALE`.
+ */
+export function chaosScale(mask: number, controller: number, kind: number): number {
+  if ((mask & CHAOS_SCALE_BITS) === 0) return 1;
+  if ((mask & MINI_BIT) !== 0) {
+    return kind === ENTITY_KIND.bobo || kind === ENTITY_KIND.zombie ? CHAOS_SCALE.mini : 1;
+  }
+  return kind === ENTITY_KIND.bobo && controller >= BOT_CONTROLLER_BASE && controller < ZOMBIE_CONTROLLER_BASE
+    ? CHAOS_SCALE.giantBots
+    : 1;
+}
+
+/** O que `chaosScaleOf` lê (a `SimView` serve). */
+export interface ChaosBodies {
+  readonly chaos: { readonly masks: Int32Array } | null;
+  readonly controller: Int16Array;
+  readonly kind: Uint8Array;
+}
+
+/** `chaosScale` do corpo `e` pela máscara ligada na view (1 sem modificadores). */
+export function chaosScaleOf(v: ChaosBodies, e: number): number {
+  return v.chaos === null ? 1 : chaosScale(v.chaos.masks[0]!, v.controller[e]!, v.kind[e]!);
+}
+
 const HF = FIGURE_HIT_FIELD;
 const F = ENTITY_FLAG;
 /** Categoria de dano do braço em `FIGURE_PART_CATEGORY` (as caixas que levam o corte). */
@@ -76,7 +137,12 @@ const R_BEST = 6;
 const R_BOTTOM = 7;
 const R_AXIS_X = 8;
 const R_AXIS_Z = 9;
-const RAY_SIZE = 10;
+/**
+ * M9 (fase 1): o corte dos braços no frame do raio. `ARM_HIT_CUT_M` sempre, menos no corpo do Mini e do gigante, que
+ * vai testado no frame de tamanho 1 (`testEntity`): lá ele é `ARM_HIT_CUT_M` ÷ a escala, e no mundo o corte não muda.
+ */
+const R_CUT = 10;
+const RAY_SIZE = 11;
 /** `stampKey` = entidade × KEY_POSTURES + postura (postura < 22). */
 const KEY_POSTURES = 32;
 
@@ -253,6 +319,11 @@ export class FigureHitCache {
   headScale = 1;
   private headTop = 0;
   private headSide = 0;
+  /**
+   * M9 (fase 1): os bits de tamanho (Mini, Bots gigantes) da máscara aplicada (`chaosScale`); 0 = todos no tamanho do
+   * `bodyScale`. As caixas do cache ficam no frame de tamanho 1, então trocar não esvazia nada.
+   */
+  chaosMask = 0;
 
   /** `slots` = slots com cache (controladores); mais 1 sem cache. */
   constructor(table: FigureGameTable | null, slots: number) {
@@ -260,7 +331,18 @@ export class FigureHitCache {
     this.boxes = new Float64Array((slots + 1) * W_ROW);
     this.stampTick = new Int32Array(slots + 1).fill(-1);
     this.stampKey = new Int32Array(slots + 1).fill(-1);
+    this.ray[R_CUT] = ARM_HIT_CUT_M;
     if (table !== null) this.setTable(table);
+  }
+
+  /** M9 (fase 1): a máscara de modificadores aplicada (só os bits de tamanho ficam). */
+  setChaosMask(mask: number): void {
+    this.chaosMask = mask & CHAOS_SCALE_BITS;
+  }
+
+  /** M9 (fase 1): a escala dos modificadores do corpo `e` (1 sem Mini nem Bots gigantes). */
+  chaosScaleOf(s: SimState, e: number): number {
+    return this.chaosMask === 0 ? 1 : chaosScale(this.chaosMask, s.controller[e]!, s.kind[e]!);
   }
 
   /** Troca a tabela (o chão da fase larga é recalculado só quando ela muda) e esvazia o cache. */
@@ -318,12 +400,16 @@ export class FigureHitCache {
   testEntity(s: SimState, e: number, posture: number, tick: number): number {
     const c = s.controller[e]!;
     const slot = c >= 0 && c < this.spare ? c : this.spare;
-    const sc = s.bodyScale[e]!;
+    // M9 (fase 1): o Mini e os Bots gigantes multiplicam a escala do corpo.
+    const k = this.chaosMask === 0 ? 1 : chaosScale(this.chaosMask, c, s.kind[e]!);
+    const sc = k === 1 ? s.bodyScale[e]! : s.bodyScale[e]! * k;
     if (sc === 1)
       return this.test(posture, s.position, e * 3, s.yaw, s.pitch, e, slot, e * KEY_POSTURES + posture, tick);
     // M3 (fase 3b): corpo em escala (Chonker, chefão): o raio vai para o espaço do corpo em tamanho 1, em volta dos pés
     // (origem e direção ÷ escala); o `t` do acerto continua o do raio do mundo.
     const r = this.ray;
+    // M9: no corpo dos modificadores o corte dos braços continua o do mundo (o do Chonker cresce com ele, como antes).
+    if (k !== 1) r[R_CUT] = ARM_HIT_CUT_M / k;
     const e3 = e * 3;
     const px = s.position[e3]!;
     const py = s.position[e3 + 1]!;
@@ -348,6 +434,7 @@ export class FigureHitCache {
     r[R_DX] = dx;
     r[R_DY] = dy;
     r[R_DZ] = dz;
+    r[R_CUT] = ARM_HIT_CUT_M;
     return hit;
   }
 
@@ -508,7 +595,7 @@ export class FigureHitCache {
 
   /**
    * Fase estreita: o raio contra as 12 caixas do slot; a de menor entrada (a 1ª no empate) se < R_BEST. As caixas de
-   * braço só valem dentro do corte (`ARM_HIT_CUT_M` em x e z do mundo em volta do eixo R_AXIS_X/Z): se a entrada numa
+   * braço só valem dentro do corte (R_CUT, o `ARM_HIT_CUT_M`, em x e z em volta do eixo R_AXIS_X/Z): se a entrada numa
    * delas cai fora do corte, o trecho do raio na caixa é cortado pela faixa do raio dentro do prisma do corte (slab
    * test em x e z, feito só nesse caso e uma vez por chamada; o caso comum só confere o ponto de entrada).
    */
@@ -523,6 +610,7 @@ export class FigureHitCache {
     const dy = r[R_DY]!;
     const dz = r[R_DZ]!;
     let best = r[R_BEST]!;
+    const cut = r[R_CUT]!;
     // Faixa do raio dentro do corte dos braços (vazia: cutLo > cutHi), calculada na 1ª vez que precisa.
     let cutLo = 0;
     let cutHi = -1;
@@ -564,7 +652,7 @@ export class FigureHitCache {
       if (FIGURE_PART_CATEGORY[b] === ARM_CATEGORY) {
         const ex = ox + dx * tmin - r[R_AXIS_X]!;
         const ez = oz + dz * tmin - r[R_AXIS_Z]!;
-        if (ex < -ARM_HIT_CUT_M || ex > ARM_HIT_CUT_M || ez < -ARM_HIT_CUT_M || ez > ARM_HIT_CUT_M) {
+        if (ex < -cut || ex > cut || ez < -cut || ez > cut) {
           if (!cutReady) {
             cutReady = true;
             cutHi = Infinity;
@@ -572,11 +660,11 @@ export class FigureHitCache {
               const e = k === 0 ? ox - r[R_AXIS_X]! : oz - r[R_AXIS_Z]!;
               const f = k === 0 ? dx : dz;
               if (f > -1e-12 && f < 1e-12) {
-                if (e < -ARM_HIT_CUT_M || e > ARM_HIT_CUT_M) cutHi = -1;
+                if (e < -cut || e > cut) cutHi = -1;
               } else {
                 const inv = 1 / f;
-                let t1 = (-ARM_HIT_CUT_M - e) * inv;
-                let t2 = (ARM_HIT_CUT_M - e) * inv;
+                let t1 = (-cut - e) * inv;
+                let t2 = (cut - e) * inv;
                 if (t1 > t2) {
                   const tmp = t1;
                   t1 = t2;
@@ -697,10 +785,12 @@ const AIM_LOCAL: FigureAimOut = { y: 0, z: 0 };
 
 /**
  * Ponto de mira no MUNDO do corpo `i` (cabeça ou tronco): postura pelos bits e pela arma dele, `aimPointLocal` no pitch
- * dele, levado ao mundo pela posição e pelo yaw dele. Sem alocação (só índices e arrays na chamada).
+ * dele, levado ao mundo pela posição e pelo yaw dele. Sem alocação (só índices e arrays na chamada). M9 (fase 1):
+ * `scale` é a escala dos modificadores do corpo (`chaosScaleOf`; o ponto cresce a partir dos pés). O `bodyScale` do
+ * Chonker fica de fora (a mira dos zumbis grandes é a de sempre).
  */
-export function aimPointWorld(body: BodyArrays, i: number, head: boolean, out: AimPoint): void {
-  aimPointWorldWith(boundFigureTable(), body, i, head, out);
+export function aimPointWorld(body: BodyArrays, i: number, head: boolean, out: AimPoint, scale = 1): void {
+  aimPointWorldWith(boundFigureTable(), body, i, head, out, scale);
 }
 
 /** `aimPointWorld` com a tabela dada (a sim usa a dela). */
@@ -710,10 +800,15 @@ export function aimPointWorldWith(
   i: number,
   head: boolean,
   out: AimPoint,
+  scale = 1,
 ): void {
   // quente:
   const posture = figurePostureOf(body.flags[i]!, weaponGrip(body.weapon[i]!), body.kind[i]!);
   figureAimPoint(table, posture, body.pitch[i]!, head, AIM_LOCAL);
+  if (scale !== 1) {
+    AIM_LOCAL.y *= scale;
+    AIM_LOCAL.z *= scale;
+  }
   const yaw = body.yaw[i]!;
   const i3 = i * 3;
   out.x = body.position[i3]! - Math.sin(yaw) * AIM_LOCAL.z;
@@ -784,12 +879,22 @@ function aimSees(posture: number, bone: number): boolean {
  * candidatos vistos; se o centróide estiver tapado, o candidato visto mais perto dele. Nenhum visível: desvio 0.
  * Monta as caixas uma vez e testa até 27 raios (~10 µs com JIT, 0,23–0,26 ms jitless): para a IA de tempos em tempos e
  * na troca de postura do alvo, com teto por tick (`AI_SOLDIER.visibleAimPerTick`), nunca a cada tick por bot.
+ * M9 (revisão da fase 1): `scale` é a escala dos modificadores do alvo (o frame aqui é o de tamanho 1, como o
+ * `testEntity` faz): o corte dos braços vai ÷ escala, o mesmo da sim, e no mundo continua a 0,75 m.
  */
-export function visibleAimLocal(posture: number, pitch: number, head: boolean, eye: AimPoint, out: AimPoint): void {
+export function visibleAimLocal(
+  posture: number,
+  pitch: number,
+  head: boolean,
+  eye: AimPoint,
+  out: AimPoint,
+  scale = 1,
+): void {
   const table = boundFigureTable();
   const cache = AIM_CACHE;
   if (cache.table !== table) cache.setTable(table);
   aimCalls = (aimCalls + 1) & 0x3fffffff;
+  cache.ray[R_CUT] = scale === 1 ? ARM_HIT_CUT_M : ARM_HIT_CUT_M / scale;
   // quente:
   AIM_PITCH[0] = pitch;
   const local = AIM_BOXES;
@@ -857,9 +962,17 @@ export function visibleAimLocal(posture: number, pitch: number, head: boolean, e
 
 /**
  * `visibleAimLocal` para o corpo `i` (postura pelos bits e pela arma dele, pitch dele) com o olho `eye` no MUNDO; o
- * desvio sai no frame do alvo (leve ao mundo pelo yaw dele, junto com o `aimPointWorld`).
+ * desvio sai no frame do alvo (leve ao mundo pelo yaw dele, junto com o `aimPointWorld`). M9 (fase 1): no corpo em
+ * escala (`scale`, a do `aimPointWorld`), o olho vai para o frame de tamanho 1 e o desvio volta multiplicado.
  */
-export function visibleAimOffset(body: BodyArrays, i: number, head: boolean, eye: AimPoint, out: AimPoint): void {
+export function visibleAimOffset(
+  body: BodyArrays,
+  i: number,
+  head: boolean,
+  eye: AimPoint,
+  out: AimPoint,
+  scale = 1,
+): void {
   // quente:
   const posture = figurePostureOf(body.flags[i]!, weaponGrip(body.weapon[i]!), body.kind[i]!);
   const yaw = body.yaw[i]!;
@@ -871,7 +984,17 @@ export function visibleAimOffset(body: BodyArrays, i: number, head: boolean, eye
   AIM_EYE.x = c * rx - s * rz;
   AIM_EYE.y = eye.y - body.position[i3 + 1]!;
   AIM_EYE.z = -s * rx - c * rz;
-  visibleAimLocal(posture, body.pitch[i]!, head, AIM_EYE, out);
+  if (scale !== 1) {
+    AIM_EYE.x /= scale;
+    AIM_EYE.y /= scale;
+    AIM_EYE.z /= scale;
+  }
+  visibleAimLocal(posture, body.pitch[i]!, head, AIM_EYE, out, scale);
+  if (scale !== 1) {
+    out.x *= scale;
+    out.y *= scale;
+    out.z *= scale;
+  }
   // fim-quente
 }
 
@@ -886,4 +1009,101 @@ export function bodyPartAtHeight(posture: number, pitch: number, h: number): Fig
 /** Altura do olho (a partir dos pés, no eixo da entidade) conforme o agachamento. */
 export function eyeHeightFor(flags: number): number {
   return (flags & ENTITY_FLAG.crouching) !== 0 ? METRICS.crouchEyeHeight : METRICS.eyeHeight;
+}
+
+/** M9 (fase 1): folga (m) do olho do gigante abaixo do primeiro bloco acima dele. */
+export const GIANT_EYE_CEILING_GAP_M = 0.1;
+/** O que barra o olho do gigante: bloco que para bala ou visão. */
+const EYE_CEILING_MASK = BLOCK_FLAG.blocksBullets | BLOCK_FLAG.blocksSight;
+const eyeHit = createRayHit();
+
+/**
+ * M9 (fase 1): altura do olho (a partir dos pés) do corpo na escala `scale` dos modificadores (`chaosScale`), com os
+ * pés em (x, y, z). Escala 1: `eyeHeightFor`. Menor (o Mini): o olho em escala, sempre dentro da caixa de colisão, que
+ * não muda. Maior (o gigante, de caixa normal): o olho em escala, mas nunca além do primeiro bloco (que para bala ou
+ * visão) logo acima do olho normal, menos `GIANT_EYE_CEILING_GAP_M`: um raio da grade para cima. Sem isto o gigante
+ * embaixo de um teto veria e atiraria do andar de cima.
+ */
+export function scaledEyeHeight(
+  grid: WorldGrid,
+  blocks: BlockRegistry,
+  colliders: StaticColliders | null,
+  x: number,
+  y: number,
+  z: number,
+  flags: number,
+  scale: number,
+): number {
+  const eye = eyeHeightFor(flags);
+  if (scale === 1) return eye;
+  const want = eye * scale;
+  if (scale < 1) return want;
+  if (!raycastGrid(grid, blocks, x, y + eye, z, 0, 1, 0, want - eye, EYE_CEILING_MASK, eyeHit, colliders)) return want;
+  return Math.min(want, eye + Math.max(0, eyeHit.distance - GIANT_EYE_CEILING_GAP_M));
+}
+
+/** O que `viewEyeHeight` lê (a `SimView` serve). */
+export interface EyeBodies extends ChaosBodies {
+  readonly position: Float64Array;
+  readonly world: WorldGrid;
+  readonly blocks: BlockRegistry;
+  readonly colliders: StaticColliders | null;
+}
+
+/** M9 (fase 1): o olho do corpo `e` com os bits `flags` pela view (a IA, a câmera e a mira do jogo). */
+export function viewEyeHeight(v: EyeBodies, e: number, flags: number): number {
+  const k = chaosScaleOf(v, e);
+  if (k === 1) return eyeHeightFor(flags);
+  const e3 = e * 3;
+  return scaledEyeHeight(
+    v.world,
+    v.blocks,
+    v.colliders,
+    v.position[e3]!,
+    v.position[e3 + 1]!,
+    v.position[e3 + 2]!,
+    flags,
+    k,
+  );
+}
+
+/**
+ * M9 (revisão da fase 1): o teto do ponto de mira do corpo `i` (y no mundo), ou `Infinity`. Só o gigante embaixo de um
+ * teto tem: lá a cabeça e o peito em escala ficam dentro ou acima do telhado, e todo raio de visão até eles bateria
+ * nele (os gigantes dentro de casa não se viam nem eram vistos). O teto é o olho dele já limitado (10 cm abaixo do
+ * bloco), um ponto que ainda cai no corpo (o tronco; num corredor de 2 m, o quadril). A céu aberto, nada muda.
+ */
+export function viewAimCeiling(v: EyeBodies, i: number, flags: number): number {
+  const k = chaosScaleOf(v, i);
+  if (k <= 1) return Infinity;
+  const i3 = i * 3;
+  const y = v.position[i3 + 1]!;
+  const eye = scaledEyeHeight(v.world, v.blocks, v.colliders, v.position[i3]!, y, v.position[i3 + 2]!, flags, k);
+  return eye < eyeHeightFor(flags) * k ? y + eye : Infinity;
+}
+
+/**
+ * M9 (revisão da fase 1): `aimPointWorld` do corpo `i` na escala dos modificadores dele (`chaosScaleOf`) e nunca acima
+ * do `viewAimCeiling`. Devolve `true` quando o teto cortou (o desvio da parte vista, `visibleAimOffset`, não vale).
+ * É o ponto que a IA olha e mira (e a assistência de mira do jogo usa o mesmo teto).
+ */
+export function viewAimPoint(v: EyeBodies & BodyArrays, i: number, head: boolean, out: AimPoint): boolean {
+  aimPointWorld(v, i, head, out, chaosScaleOf(v, i));
+  const top = viewAimCeiling(v, i, v.flags[i]!);
+  if (out.y <= top) return false;
+  out.y = top;
+  return true;
+}
+
+/** M9 (fase 1): o olho do corpo `e` com os bits `flags` na sim (a máscara aplicada pelo `applyChaos`). */
+export function simEyeHeight(
+  ctx: Pick<SimContext, 's' | 'grid' | 'blocks' | 'colliders' | 'figures'>,
+  e: number,
+  flags: number,
+): number {
+  const k = ctx.figures.chaosScaleOf(ctx.s, e);
+  if (k === 1) return eyeHeightFor(flags);
+  const p = ctx.s.position;
+  const e3 = e * 3;
+  return scaledEyeHeight(ctx.grid, ctx.blocks, ctx.colliders, p[e3]!, p[e3 + 1]!, p[e3 + 2]!, flags, k);
 }

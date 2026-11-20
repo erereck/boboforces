@@ -818,6 +818,10 @@ const MOD_ROWS: readonly RowDef[] = [
   modifierFlag('confetti', 'confetti', 'custom.row.confetti'),
   // M8 (fase 7): o Arcade como modificador (o perfil inteiro, a partida toda).
   modifierFlag('arcade', 'arcade', 'custom.row.arcade'),
+  // M9 (fase 1).
+  modifierFlag('mini', 'mini', 'custom.row.mini'),
+  modifierFlag('giantBots', 'giantBots', 'custom.row.giantBots'),
+  modifierFlag('ricochet', 'ricochet', 'custom.row.ricochet'),
   flag(
     'chaos',
     'custom.row.chaos',

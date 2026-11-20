@@ -2,7 +2,7 @@ import { BUTTON, frameOrder, ORDER } from '@boboforces/input';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import type { SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
-import { eyeHeightFor } from '../hitbox.ts';
+import { simEyeHeight } from '../hitbox.ts';
 
 /**
  * M5 (fase 5d): os avisos sem texto (GDD §3.7, tecnico.md §13.5: "pings e emotes, sem chat"). O botão de aviso marca
@@ -49,7 +49,7 @@ export function signalSystem(ctx: SimContext): void {
     st.nextTick[e] = ctx.tick + cooldown;
     const e3 = e * 3;
     const x = s.position[e3]!;
-    const y = s.position[e3 + 1]! + eyeHeightFor(s.flags[e]!);
+    const y = s.position[e3 + 1]! + simEyeHeight(ctx, e, s.flags[e]!);
     const z = s.position[e3 + 2]!;
     if ((pressed & BUTTON.ping) !== 0) {
       pingAhead(ctx, e, x, y, z);
@@ -84,7 +84,7 @@ function orderSignal(ctx: SimContext, e: number, order: number): void {
   st.orderTick[e] = ctx.tick + Math.max(1, Math.round(SIGNAL_COOLDOWN_S * ctx.hz));
   const e3 = e * 3;
   const x = s.position[e3]!;
-  const y = s.position[e3 + 1]! + eyeHeightFor(s.flags[e]!);
+  const y = s.position[e3 + 1]! + simEyeHeight(ctx, e, s.flags[e]!);
   const z = s.position[e3 + 2]!;
   if (order === ORDER.attack) pingAhead(ctx, e, x, y, z);
   ctx.events.signal(ctx.tick, s.idOf(e), SIGNAL_KIND.firstOrder + order - 1, x, y + EMOTE_ABOVE_M, z);

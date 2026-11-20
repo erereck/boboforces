@@ -168,8 +168,15 @@ export const MODIFIERS = [
   'confetti',
   // M8 (fase 7): o perfil Arcade a partida toda (fixo na receita; fora da Roleta do Chaos, que troca no meio).
   'arcade',
+  // M9 (fase 1): todos com metade do tamanho, os bots com o triplo e as balas quicando uma vez no cenário.
+  'mini',
+  'giantBots',
+  'ricochet',
 ] as const;
 export type ModifierId = (typeof MODIFIERS)[number];
+
+/** A máscara dos modificadores viaja em 16 bits (snapshot e rede): a lista nunca passa disto. */
+export const MAX_MODIFIERS = 16;
 
 /** Pares que não andam juntos: o validador fica com o primeiro, e a Roleta nunca põe os dois. */
 export const MODIFIER_CONFLICTS: readonly (readonly [ModifierId, ModifierId])[] = [
@@ -178,6 +185,11 @@ export const MODIFIER_CONFLICTS: readonly (readonly [ModifierId, ModifierId])[] 
   ['oneShot', 'explosive'],
   // Morrer de um tiro que não se vê de onde veio (GDD §4.5.3).
   ['invisible', 'oneShot'],
+  // M9 (fase 1): o tamanho é um só (metade ou o triplo); a cabeça em dobro no bot triplo passaria de 1,3 m (alvo fácil
+  // demais e sempre do outro lado do teto); e o tiro que mata quicando na parede é morte sem chance de reação.
+  ['mini', 'giantBots'],
+  ['giantBots', 'bigHead'],
+  ['ricochet', 'oneShot'],
 ];
 
 /** Os dois modificadores conflitam? */

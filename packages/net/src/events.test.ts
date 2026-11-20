@@ -113,6 +113,20 @@ const SAMPLES: SimEvent[] = [
   { type: 'point', tick: 18, index: 0, team: 0, action: 'neutralized' },
   { type: 'purchase', tick: 18, index: 3, kind: 'perk', action: 'ok', item: 4, cost: 2500, by: 0x10001 },
   { type: 'box', tick: 18, index: 2, action: 'move', weapon: 11, by: 0 },
+  // M9 (fase 1): o Ricochete.
+  {
+    type: 'ricochet',
+    tick: 18,
+    shooter: 0x20003,
+    weapon: 3,
+    x: 6.05,
+    y: 1.62,
+    z: -2.5,
+    dirX: -0.6,
+    dirY: 0,
+    dirZ: -0.8,
+    distance: 12.375,
+  },
 ];
 
 /** O evento como o cliente deve ver: reais em f32. */

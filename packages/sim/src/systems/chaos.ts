@@ -18,7 +18,9 @@ import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
  *   chega: a gravidade e a velocidade da predição dele são as do host).
  * - **Aplicar** a máscara troca o perfil de movimento da partida (`ctx.profile`: um dos 6 feitos na criação, sem
  *   alocar) e liga os modificadores de arma (`ctx.mods`, a cópia da partida). Os outros efeitos olham a máscara na
- *   hora (`modOn`): munição infinita (armas), vampiro (dano), tudo explode e troca de arma por abate (morte).
+ *   hora (`modOn`): munição infinita (armas), vampiro (dano), tudo explode e troca de arma por abate (morte) e, no M9,
+ *   o Ricochete (armas). O Mini e os Bots gigantes vão para as hitboxes (`setChaosMask`); o olho, a IA e o desenho
+ *   tiram o tamanho da máscara (`chaosScale`).
  */
 export const MOD = Object.fromEntries(MODIFIERS.map((id, i) => [id, 1 << i])) as Readonly<Record<ModifierId, number>>;
 
@@ -128,6 +130,8 @@ export function applyChaos(ctx: SimContext): void {
   const v = (mask & MOD.speed) !== 0 ? 1 : 0;
   ctx.profile = c.profiles[g * 2 + v]!;
   ctx.figures.setHeadScale((mask & MOD.bigHead) !== 0 ? CHAOS_MODS.bigHead : 1);
+  // M9 (fase 1): o Mini e os Bots gigantes (o tamanho sai da máscara na hora: `chaosScale`).
+  ctx.figures.setChaosMask(mask);
   c.mods.headshotOnly = c.baseMods.headshotOnly || (mask & MOD.headshotOnly) !== 0;
   c.mods.oneShot = c.baseMods.oneShot || (mask & MOD.oneShot) !== 0;
 }

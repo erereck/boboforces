@@ -47,6 +47,9 @@ export interface NavPathImpl extends NavPath {
   from: NavNode;
   to: NavNode;
   slot: number;
+  /** M9 (fase 1): o `headroomM` e o `headroomCost` da busca em andamento ou do último resultado. */
+  searchRoom: number;
+  searchRoomCost: number;
 }
 
 function createSlot(nodeCount: number): SearchSlot {
@@ -84,6 +87,8 @@ export function createNavPathImpl(nav: NavGridImpl, capacity = 256): NavPathImpl
     pointCount: 0,
     pointLinks: new Uint8Array(capacity),
     slot: -1,
+    searchRoom: 0,
+    searchRoomCost: 0,
   };
 }
 
@@ -229,12 +234,21 @@ export function findPathImpl(
 ): PathStatus {
   const pool = nav.search;
   pool.calls++;
-  const same = out.from === from && out.to === to && out.status !== 'idle';
+  const room = out.headroomM ?? 0;
+  const roomCost = room > 0 ? (out.headroomCost ?? 0) : 0;
+  const same =
+    out.from === from &&
+    out.to === to &&
+    out.status !== 'idle' &&
+    out.searchRoom === room &&
+    out.searchRoomCost === roomCost;
   if (same && (out.status === 'found' || out.status === 'unreachable')) return out.status;
   if (!same) {
     release(nav, out);
     out.from = from;
     out.to = to;
+    out.searchRoom = room;
+    out.searchRoomCost = roomCost;
     out.length = 0;
     out.pointCount = 0;
     out.status = 'pending';
@@ -268,6 +282,8 @@ export function findPathImpl(
   const linkCost = nav.linkCost;
   const linkGate = nav.linkGate;
   const gateBlock = nav.gateBlock;
+  const topY = nav.topY;
+  const ceilY = nav.ceilY;
   for (let work = 0; work < budget; work++) {
     if (slot.heapSize === 0) return finish(nav, out, 'unreachable');
     const cur = heapPop(slot);
@@ -283,7 +299,9 @@ export function findPathImpl(
       const gate = linkGate[l]!;
       if (gate >= 0 && (gateBlock[gate]! & NAV_GATE_BLOCK.bobo) !== 0) continue;
       const nb = linkTarget[l]!;
-      const cost = gCur + linkCost[l]!;
+      let cost = gCur + linkCost[l]!;
+      // M9 (fase 1): o teto baixo custa mais para o gigante (só preferência: a ligação continua valendo).
+      if (roomCost > 0 && ceilY[nb]! - topY[nb]! < room) cost += roomCost;
       if (slot.stamp[nb] !== gen) {
         slot.stamp[nb] = gen;
         slot.g[nb] = cost;

@@ -106,7 +106,7 @@ import {
   ENTITY_KIND,
   entityIndex,
   expandRecipe,
-  eyeHeightFor,
+  chaosScaleOf,
   figurePostureOf,
   GRENADE_THROW,
   heldClip,
@@ -132,6 +132,7 @@ import {
   type SimView,
   SPREAD_STATE_MULTIPLIER,
   SPREAD_WALKING_SPEED,
+  viewEyeHeight,
   WEAPON_BIG_BRRT,
   WEAPON_CHAOS_BLAST,
   WEAPON_CODE,
@@ -1933,21 +1934,31 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             firing[i] = FIRING_S;
             shotAt[i] = timeS;
           }
-          // Boca do cano aproximada (o render usa a do viewmodel para o dono em 1ª pessoa).
+          // Boca do cano aproximada (o render usa a do viewmodel para o dono em 1ª pessoa). M9 (fase 1): no Mini e no
+          // gigante, a arma fica na escala do corpo.
+          const size = i < v.count ? chaosScaleOf(v, i) : 1;
           const yaw = Math.atan2(-ev.dirX, -ev.dirZ);
-          const rx = Math.cos(yaw);
-          const rz = -Math.sin(yaw);
-          const mx = ev.originX + ev.dirX * 0.7 + rx * 0.16;
-          const my = ev.originY + ev.dirY * 0.7 - 0.14;
-          const mz = ev.originZ + ev.dirZ * 0.7 + rz * 0.16;
+          const rx = Math.cos(yaw) * size;
+          const rz = -Math.sin(yaw) * size;
+          const mx = ev.originX + ev.dirX * 0.7 * size + rx * 0.16;
+          const my = ev.originY + ev.dirY * 0.7 * size - 0.14 * size;
+          const mz = ev.originZ + ev.dirZ * 0.7 * size + rz * 0.16;
           const owner = viewOfEntity(ev.shooter);
           const weapon = modelOf(ev.weapon);
           pushMuzzleFlash(fx, ev.shooter, mx, my, mz, ev.dirX, ev.dirY, ev.dirZ, owner, weapon);
-          if (ev.distance > 1.5) {
+          if (ev.distance > 1.5 * size) {
             const d = ev.distance;
             pushTracer(fx, mx, my, mz, ev.originX + ev.dirX * d, ev.originY + ev.dirY * d, ev.originZ + ev.dirZ * d);
           }
           flashViews(mx, my, mz, owner);
+          break;
+        }
+        case 'ricochet': {
+          // M9 (fase 1): o Ricochete: o rastro sai do ponto do quique.
+          if (ev.distance > 0.5) {
+            const d = ev.distance;
+            pushTracer(fx, ev.x, ev.y, ev.z, ev.x + ev.dirX * d, ev.y + ev.dirY * d, ev.z + ev.dirZ * d);
+          }
           break;
         }
         case 'impact': {
@@ -2014,7 +2025,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           d.skin = skinLayer[i]!;
           // M6 (fase 4b): o invisível que morre não tem pose recente para desmontar: só o "poof", no lugar certo.
           d.figure = hiddenNow[i] === 1 ? NO_FIGURE : figureOf[i]!;
-          d.scale = 1;
+          // M9 (fase 1): o tamanho de quem caiu (o Mini e o gigante desmontam do tamanho que tinham).
+          d.scale = v.bodyScale[i]! * chaosScaleOf(v, i);
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           pushDeath(fx, d);
           onDeath(s, ev.victim, ev.killer, ev.weapon);
@@ -2791,7 +2803,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const a = driver.alpha;
     const o = e * 3;
     const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
-    const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(v.flags[e]!);
+    const ey =
+      v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + viewEyeHeight(v, e, v.flags[e]!);
     const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
     findAimAssist(v, e, ffa, ex, ey, ez, m.yaw, m.pitch, level, a, far, st, hiddenNow);
     return st.scale;
@@ -3167,7 +3180,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         const a = driver.alpha;
         const o = e * 3;
         const ex = v.prevPosition[o]! + (v.position[o]! - v.prevPosition[o]!) * a;
-        const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + eyeHeightFor(fl);
+        const ey = v.prevPosition[o + 1]! + (v.position[o + 1]! - v.prevPosition[o + 1]!) * a + viewEyeHeight(v, e, fl);
         const ez = v.prevPosition[o + 2]! + (v.position[o + 2]! - v.prevPosition[o + 2]!) * a;
         findAimAssist(v, e, ffa, ex, ey, ez, player.yaw, player.pitch, 1, a, far, tipAssist);
         const j = tipAssist.target;
@@ -3418,7 +3431,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const fl = v.flags[e]!;
     if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
     const ex = v.position[e * 3]!;
-    const ey = v.position[e * 3 + 1]! + eyeHeightFor(fl);
+    const ey = v.position[e * 3 + 1]! + viewEyeHeight(v, e, fl);
     const ez = v.position[e * 3 + 2]!;
     let third: ViewSlot | null = null;
     for (let i = 0; i < slots.length; i++) if (slots[i]!.controller === me && slots[i]!.third) third = slots[i]!;
@@ -3439,7 +3452,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const fl = v.flags[e]!;
     if (v.alive[e] !== 1 || (fl & ENTITY_FLAG.dead) !== 0) return false;
     const ex = v.position[e * 3]!;
-    const ey = v.position[e * 3 + 1]! + eyeHeightFor(fl);
+    const ey = v.position[e * 3 + 1]! + viewEyeHeight(v, e, fl);
     const ez = v.position[e * 3 + 2]!;
     aimFromCamera(
       v,
@@ -3876,15 +3889,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.localSlot[n] = local >= 0 ? local : 255;
       actors.entity[n] = id;
       actors.kind[n] = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
-      // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto).
-      actors.scale[n] = v.bodyScale[i]!;
+      // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto). M9 (fase 1): o Mini e os Bots gigantes.
+      const chaosK = chaosScaleOf(v, i);
+      actors.scale[n] = v.bodyScale[i]! * chaosK;
       let expression: number = FACE_EXPRESSION.neutral;
       if (flash[i]! > 0.3) expression = FACE_EXPRESSION.pain;
       else if (zombie) expression = FACE_EXPRESSION.angry;
       else if (flags & ENTITY_FLAG.ads) expression = FACE_EXPRESSION.aiming;
       else if (firing[i]! > 0) expression = FACE_EXPRESSION.angry;
       actors.expression[n] = expression;
-      sampleLightGrid(grid, x, y + ACTOR_LIGHT_Y, z, actors.light, k);
+      // A luz do meio do corpo; no gigante, a do tamanho normal (dentro de casa, o meio dele fica no teto).
+      sampleLightGrid(grid, x, y + ACTOR_LIGHT_Y * Math.min(1, chaosK), z, actors.light, k);
       const vx = lerp(velPrev[o]!, velCur[o]!, alpha);
       const vz = lerp(velPrev[o + 2]!, velCur[o + 2]!, alpha);
       actors.velocity[k] = vx;
@@ -4027,7 +4042,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         const shooter = entityIndex(pv.owner[p]!);
         if (shooter < v.count && v.alive[shooter] === 1) {
           const ox = v.position[shooter * 3]! - bx;
-          const oy = v.position[shooter * 3 + 1]! + eyeHeightFor(v.flags[shooter]!) - by;
+          const oy = v.position[shooter * 3 + 1]! + viewEyeHeight(v, shooter, v.flags[shooter]!) - by;
           const oz = v.position[shooter * 3 + 2]! - bz;
           if (ox * ox + oy * oy + oz * oz < PROJECTILE_HIDE_NEAR_EYE_M * PROJECTILE_HIDE_NEAR_EYE_M) continue;
         }
@@ -4045,7 +4060,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const owner = entityIndex(pv.owner[p]!);
       if (owner < v.count && v.alive[owner] === 1) {
         const ox = v.position[owner * 3]! - x;
-        const oy = v.position[owner * 3 + 1]! + eyeHeightFor(v.flags[owner]!) - y;
+        const oy = v.position[owner * 3 + 1]! + viewEyeHeight(v, owner, v.flags[owner]!) - y;
         const oz = v.position[owner * 3 + 2]! - z;
         if (ox * ox + oy * oy + oz * oz < PROJECTILE_HIDE_NEAR_EYE_M * PROJECTILE_HIDE_NEAR_EYE_M) continue;
       }
@@ -5135,7 +5150,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const o = e * 3;
     const flags = v.flags[e]!;
     const dead = (flags & ENTITY_FLAG.dead) !== 0;
-    const targetEye = dead ? eyeHeightFor(0) : eyeHeightFor(flags);
+    const targetEye = viewEyeHeight(v, e, dead ? 0 : flags);
     slot.eye = slot.eye < 0 ? targetEye : slot.eye + (targetEye - slot.eye) * Math.min(1, dt * EYE_FOLLOW);
     c.x = lerp(v.prevPosition[o]!, v.position[o]!, alpha);
     c.y = lerp(v.prevPosition[o + 1]!, v.position[o + 1]!, alpha) + slot.eye;
@@ -5183,7 +5198,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (mate >= 0) {
       const q = mate * 3;
       const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
-      const my = lerp(v.prevPosition[q + 1]!, v.position[q + 1]!, alpha) + eyeHeightFor(v.flags[mate]!);
+      const my = lerp(v.prevPosition[q + 1]!, v.position[q + 1]!, alpha) + viewEyeHeight(v, mate, v.flags[mate]!);
       const mz = lerp(v.prevPosition[q + 2]!, v.position[q + 2]!, alpha);
       const myaw = lerpAngle(v.prevYaw[mate]!, v.yaw[mate]!, alpha);
       const mpitch = lerp(v.prevPitch[mate]!, v.pitch[mate]!, alpha) * 0.5;
@@ -5333,7 +5348,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       v.colliders,
       def,
       v.position[o]!,
-      v.position[o + 1]! + eyeHeightFor(v.flags[e]!),
+      v.position[o + 1]! + viewEyeHeight(v, e, v.flags[e]!),
       v.position[o + 2]!,
       -Math.sin(yaw) * cp * spd + v.velocity[o]! * GRENADE_THROW.inherit,
       Math.sin(pitch) * spd + v.velocity[o + 1]! * GRENADE_THROW.inherit,
@@ -5592,7 +5607,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           desc.camera,
           lay.rects[s]!,
           v.position[o]!,
-          v.position[o + 1]! + EMOTE_HEIGHT_M,
+          v.position[o + 1]! + EMOTE_HEIGHT_M * chaosScaleOf(v, i),
           v.position[o + 2]!,
           projected,
         )
@@ -5697,7 +5712,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           desc.camera,
           rect,
           v.position[j * 3]!,
-          v.position[j * 3 + 1]! + JUGG_MARK_HEIGHT_M,
+          v.position[j * 3 + 1]! + JUGG_MARK_HEIGHT_M * chaosScaleOf(v, j),
           v.position[j * 3 + 2]!,
           Math.max(16, rect.height * 0.06),
           projected,
@@ -5723,7 +5738,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (entityIndex(sim.controllerEntity(seatCtrl[k]!)) === j) seat = seatNum[k]!;
         }
         const o = j * 3;
-        const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M;
+        const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M * chaosScaleOf(v, j);
         if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
         if (seat < 0 && projected[2]! > ALLY_MARKER_MAX_M) continue;
         m.markers[m.markerCount * 2] = projected[0]!;

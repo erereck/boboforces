@@ -1,5 +1,5 @@
 import { angleDelta, clamp, DEG_TO_RAD, wrapAngle } from '@boboforces/shared';
-import { ENTITY_FLAG, ENTITY_KIND, type SimView } from '@boboforces/sim';
+import { chaosScaleOf, ENTITY_FLAG, ENTITY_KIND, type SimView, viewAimCeiling } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 
 /**
@@ -94,11 +94,13 @@ export function findAimAssist(
     // M6 (fase 4b): o invisível (que não atirou há pouco) não puxa a mira.
     if (hidden !== null && hidden[j] === 1) continue;
     const o = j * 3;
+    // M9 (fase 1): o peito e o cone crescem com o corpo (o Mini e o bot gigante); o peito do gigante embaixo de um
+    // teto fica abaixo dele (`viewAimCeiling`, o mesmo teto da mira da IA).
+    const size = chaosScaleOf(view, j);
+    let chest = ((fl & ENTITY_FLAG.crouching) !== 0 ? AIM_ASSIST.crouchChestM : AIM_ASSIST.chestM) * size;
+    if (size > 1) chest = Math.min(chest, viewAimCeiling(view, j, fl) - view.position[o + 1]!);
     const tx = view.prevPosition[o]! + (view.position[o]! - view.prevPosition[o]!) * alpha;
-    const ty =
-      view.prevPosition[o + 1]! +
-      (view.position[o + 1]! - view.prevPosition[o + 1]!) * alpha +
-      ((fl & ENTITY_FLAG.crouching) !== 0 ? AIM_ASSIST.crouchChestM : AIM_ASSIST.chestM);
+    const ty = view.prevPosition[o + 1]! + (view.position[o + 1]! - view.prevPosition[o + 1]!) * alpha + chest;
     const tz = view.prevPosition[o + 2]! + (view.position[o + 2]! - view.prevPosition[o + 2]!) * alpha;
     const dx = tx - ex;
     const dy = ty - ey;
@@ -111,7 +113,7 @@ export function findAimAssist(
     const eYaw = angleDelta(yaw, tYaw);
     const ePitch = tPitch - pitch;
     const cone = clamp(
-      Math.atan(AIM_ASSIST.radiusM / dist),
+      Math.atan((AIM_ASSIST.radiusM * size) / dist),
       AIM_ASSIST.minDeg * DEG_TO_RAD,
       AIM_ASSIST.maxDeg * DEG_TO_RAD,
     );

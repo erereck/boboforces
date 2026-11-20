@@ -107,6 +107,13 @@ export interface NavPath {
   pointCount: number;
   /** Tipo da ligação que CHEGA a cada ponto (`NAV_LINK`), para a IA pular ou agachar. */
   readonly pointLinks: Uint8Array;
+  /**
+   * M9 (fase 1): custo extra (m) de cada ligação que chega a um nó com menos de `headroomM` do piso ao teto (ausente ou
+   * 0 = nenhum). O bot gigante (caixa normal, corpo 3x) prefere o céu aberto sem deixar de passar por baixo. Mudar
+   * conta como outro pedido (a busca recomeça).
+   */
+  headroomM?: number;
+  headroomCost?: number;
 }
 
 /**

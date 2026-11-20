@@ -14,6 +14,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A dieta do menu da web (fase 0):** o menu que abre o jogo ficou 18 KB menor (de 349,6 para 332,3 KB): os textos
   que só a partida e os editores usam, a tela de Configurações e o backup passaram a chegar junto com os editores,
   logo depois do título. Nada muda para quem joga.
+- **Os modificadores Mini, Bots gigantes e Ricochete (fase 1):** no Mini, todo mundo fica com metade do tamanho (o
+  alvo e a altura do olho junto); nos Bots gigantes, os bots ficam 3 vezes maiores, e debaixo de teto baixo o olho e a
+  mira deles param no teto; no Ricochete, a bala e o chumbo da escopeta quicam 1 vez no cenário, com o dano pela
+  distância toda. Ligam na Partida personalizada e caem na Roleta do Bobo Chaos. O online foi para o protocolo 11: quem
+  estiver com a versão antiga precisa atualizar para entrar na sala.
 - **O Sandbox na receita e na sim (fase 2):** cada time pode ter o próprio HP e as próprias armas, e o Sandbox tem o
   objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
   só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:

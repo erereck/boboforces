@@ -4,6 +4,9 @@ import {
   builtinBotRef,
   FALLBACK_BOT_REF,
   MATCH_RECIPE_FORMAT,
+  MAX_MODIFIERS,
+  MODIFIERS,
+  modifiersConflict,
   recipeBotCount,
   validateMatchRecipe,
   type MatchRecipe,
@@ -355,5 +358,21 @@ describe('Bobo Zombies (M3, fase 2a)', () => {
     if (!r.ok) return;
     expect(r.value.modifiers).toEqual(['lowGravity', 'vampire']);
     expect(r.value.chaos).toEqual({ count: 4, everyS: 20 });
+  });
+
+  it('M9 (fase 1): Mini, Bots gigantes e Ricochete: no fim da lista, cabem nos 16 bits e conflitam em pares', () => {
+    expect(MODIFIERS.length).toBeLessThanOrEqual(MAX_MODIFIERS);
+    expect(MODIFIERS.slice(13)).toEqual(['mini', 'giantBots', 'ricochet']);
+    const r = validateMatchRecipe(
+      { ...base(), modifiers: ['mini', 'giantBots', 'bigHead', 'ricochet'], weapons: { oneShot: true } },
+      PC,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // O Mini fica (o 1º) e tira os Bots gigantes; o Cabeção entra; o Ricochete sai pelo "um tiro mata" da regra.
+    expect(r.value.modifiers).toEqual(['mini', 'bigHead']);
+    expect(modifiersConflict('giantBots', 'bigHead')).toBe(true);
+    expect(modifiersConflict('ricochet', 'oneShot')).toBe(true);
+    expect(modifiersConflict('mini', 'ricochet')).toBe(false);
   });
 });

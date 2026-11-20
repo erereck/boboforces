@@ -252,7 +252,10 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
         const fresh = instances.actorFresh[i] === 1;
         // Manequim: só posa quando o prefixo muda (o resto do tempo as matrizes dele ficam paradas, sem upload).
         if (instances.actorMannequin[i] === 1 && !fresh && !rescale) continue;
-        const force = fresh || rescale || instances.recForce[r] === 1;
+        // M9 (fase 1): o corpo mudou de tamanho (o Mini e os Bots gigantes entram e saem com a Roleta): a pose "shifted"
+        // ficaria no tamanho velho, então recalcula.
+        const sized = instances.recScale[r] !== a.scale[i];
+        const force = fresh || rescale || sized || instances.recForce[r] === 1;
         const result = rig.pose(a, i, m, instances.recStart[r]! * MAT4, force);
         if (result === FIGURE_POSE_RESULT.hidden) {
           hide(r);
@@ -260,6 +263,7 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
           continue;
         }
         instances.recForce[r] = 0;
+        if (result === FIGURE_POSE_RESULT.computed) instances.recScale[r] = a.scale[i]!;
         if (headScale !== 1 && result === FIGURE_POSE_RESULT.computed) {
           const h = (instances.recStart[r]! + FIGURE_BONE.head) * MAT4;
           for (let c = 0; c < 9; c++) {

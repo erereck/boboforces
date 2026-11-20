@@ -4662,3 +4662,39 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   Também: o contrato do `startGame` (o `nullRenderer`) e os lugares do backup e das linhas de estatística nesta
   ARCHITECTURE, e o teste de largura do Laboratório que não achava os rótulos. O menu fechou em **332,3 KB**.
 
+### 20.3 Fase 1: Mini, Bots gigantes e Ricochete (20/11/2026)
+
+- **Os ids** (`format/src/match-recipe.ts`): `mini`, `giantBots` e `ricochet` nos bits 13 a 15 de `MODIFIERS`
+  (o código da máscara na rede é de 16 bits: a lista está cheia, e um 17º pede código mais largo e protocolo novo; um
+  teste conta). Conflitos novos: Mini com Gigantes (as escalas ficam em 0,5, 1 e 3), Gigantes com Cabeção (uma cabeça
+  de 2,6 m) e Ricochete com Um tiro mata (morrer de um tiro que quicou de onde não se vê).
+- **O tamanho sem estado novo** (`sim/hitbox.ts`, `CHAOS_SCALE` e `chaosScale`): um multiplicador puro da máscara,
+  do controlador e do tipo: o Mini dá 0,5 a todo corpo (zumbis também); os Gigantes dão 3 aos bobos de controlador de
+  bot. O tamanho de verdade é o `bodyScale` (Chonker, chefão) vezes esse. Quem assume um lugar fica com o corpo do
+  lugar: o humano que assume um bot (o sofá no meio da partida, o "assumir bot" do Aquário) vira gigante, e o bot que
+  fica no lugar de um humano que saiu continua normal (decisão menor: um sinal de "humano" replicado pedia protocolo e
+  snapshot novos).
+- **O que acompanha o tamanho:** as hitboxes (o raio vai ao espaço do corpo em tamanho 1, como no Chonker; o corte do
+  braço fica constante no mundo), a altura do olho (`simEyeHeight`: no Mini, a metade; no gigante, até 0,1 m abaixo
+  do primeiro bloco em cima, para não atirar através do teto), os pontos de mira dos bots e da mira assistida (no
+  gigante debaixo de teto, eles param no olho dele, que fica no corpo: `viewAimCeiling`/`viewAimPoint`), o desenho
+  (a pose é refeita quando a Roleta muda o tamanho), os marcadores em cima da cabeça, o clarão e o traçado do tiro, e o
+  efeito da morte (agora `bodyScale` × caos, então a morte do Chonker também sai do tamanho dele).
+- **O que não acompanha (decisão menor):** a caixa de colisão e a navegação (os gigantes não entalam nas portas, e os
+  mapas e os goldens não mudam); os gigantes só preferem caminhos com teto alto (`NavPath.headroomM`/`headroomCost`:
+  custo 2 por nó com menos de 5,25 m livres; o cache da busca compara a altura pedida). Também ficam: a compensação
+  de atraso usa o tamanho de agora (só uma janela de < 200 ms quando a Roleta troca), as explosões medem pela caixa
+  de colisão e o spawn seguro olha do olho normal.
+- **O Ricochete** (`sim/systems/weapons.ts`): a bala e cada chumbo que batem no cenário com uma normal (não de dentro
+  de um bloco) refletem uma vez (r = d − 2(d·n)n), saem 5 cm da parede e andam o alcance que sobrou, com hitboxes e
+  compensação de atraso; o dano é o da distância total, e a direção do acerto é a refletida. Quem atira não se acerta.
+  Sem sorteio novo. Foguete, granada, tinta e cuspe não quicam. O evento novo `ricochet` (quem, arma, ponto,
+  direção e comprimento) vai à rede (`PROTOCOL_VERSION` 11, com o `net.json`) e vira um traçado a partir do ponto do
+  quique; o impacto na parede já soltava as faíscas (o som do quique fica para depois).
+- **Os goldens:** os 15 que não usam a Roleta não mudaram; o do Bobo Chaos mudou porque a Roleta ganhou 3 opções
+  (`c1b4cd36` → `ae3a48fd`; na corrida ela sorteia o Ricochete e depois os Gigantes).
+- **A revisão (Opus) achou:** os gigantes debaixo de teto não se viam nem eram mirados (o olho parava no teto, mas os
+  pontos de mira da cabeça e do tronco ficavam dentro da laje: 0 tiro em 40 s numa sala de 3 m; depois da correção, 102
+  tiros e 9 abates, como sem teto); o cache de mira visível usava o corte do braço do tamanho 1; e o humano que assume
+  um bot vira gigante (documentado acima). Corrigido antes do commit.
+

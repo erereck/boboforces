@@ -21,6 +21,7 @@ import type {
   ShotEvent,
   SignalEvent,
   PointEvent,
+  RicochetEvent,
   SimEvent,
   SpawnEvent,
   UnstuckEvent,
@@ -226,6 +227,24 @@ export class EventQueue {
     2,
   );
 
+  /** M9 (fase 1): o Ricochete (até um por chumbo). */
+  private readonly ricochets = new EventPool<Mutable<RicochetEvent>>(
+    () => ({
+      type: 'ricochet',
+      tick: 0,
+      shooter: 0,
+      weapon: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      dirX: 0,
+      dirY: 0,
+      dirZ: 0,
+      distance: 0,
+    }),
+    16,
+  );
+
   get size(): number {
     return this.length;
   }
@@ -253,6 +272,7 @@ export class EventQueue {
     this.unstucks.reset();
     this.signals.reset();
     this.points.reset();
+    this.ricochets.reset();
   }
 
   /** Copia as referências para `out` (sem limpar `out`) e esvazia a fila. Os objetos valem até o próximo `clear`. */
@@ -286,6 +306,33 @@ export class EventQueue {
     e.originX = ox;
     e.originY = oy;
     e.originZ = oz;
+    e.dirX = dx;
+    e.dirY = dy;
+    e.dirZ = dz;
+    e.distance = distance;
+    this.push(e);
+  }
+
+  /** M9 (fase 1): a bala do Ricochete quicou em (x, y, z) e seguiu em `d*` por `distance` m. */
+  ricochet(
+    tick: number,
+    shooter: EntityId,
+    weapon: number,
+    x: number,
+    y: number,
+    z: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    distance: number,
+  ): void {
+    const e = this.ricochets.acquire();
+    e.tick = tick;
+    e.shooter = shooter;
+    e.weapon = weapon;
+    e.x = x;
+    e.y = y;
+    e.z = z;
     e.dirX = dx;
     e.dirY = dy;
     e.dirZ = dz;

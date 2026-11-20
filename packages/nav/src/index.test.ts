@@ -299,4 +299,32 @@ describe('nav: A* com orçamento', () => {
     expect(findPath(nav, a, b, paths[0]!, 100000)).toBe('found');
     expect(findPath(nav, a, b, extra, 100000)).toBe('found');
   });
+
+  it('M9 (fase 1): o teto baixo custa mais com `headroomM` (o bot gigante dá a volta pelo céu aberto)', () => {
+    // 8 × 16 m; um telhado a 3 m (célula y = 6) em x 0..6 m e z 6..10 m: reto por baixo ou a volta pelo x 6..8 m.
+    const grid = floorWorld(16, 32);
+    box(grid, 0, 6, 12, 11, 6, 19, CONCRETE);
+    const nav = buildNavGrid({ grid, blocks: BLOCKS }, METRICS) as NavGridImpl;
+    const a = nodeAt(nav, 1, 0.5, 2);
+    const b = nodeAt(nav, 1, 0.5, 14);
+    const low = (n: number): boolean => nav.ceilY[n]! - nav.topY[n]! < 5.25;
+    const under = (p: { nodes: Int32Array; length: number }): number => {
+      let k = 0;
+      for (let i = 0; i < p.length; i++) if (low(p.nodes[i]!)) k++;
+      return k;
+    };
+    const path = createNavPath(nav);
+    expect(findPath(nav, a, b, path, 100000)).toBe('found');
+    expect(under(path)).toBeGreaterThan(0);
+    // O mesmo pedido com o custo: a busca recomeça (não devolve o resultado guardado) e foge do telhado.
+    path.headroomM = 5.25;
+    path.headroomCost = 10;
+    expect(findPath(nav, a, b, path, 100000)).toBe('found');
+    expect(under(path)).toBe(0);
+    expect(path.nodes[path.length - 1]).toBe(b);
+    // Sem custo, de volta ao caminho reto.
+    path.headroomM = 0;
+    expect(findPath(nav, a, b, path, 100000)).toBe('found');
+    expect(under(path)).toBeGreaterThan(0);
+  });
 });

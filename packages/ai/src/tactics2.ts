@@ -1,7 +1,7 @@
 import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, wrapAngle } from '@boboforces/shared';
 import {
-  eyeHeightFor,
+  viewEyeHeight,
   GRENADE_THROW,
   WEAPON_CODE,
   WEAPON_FIRE,
@@ -89,7 +89,7 @@ function planFlank(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming, f
 /** Segurando o ângulo: parado (agachado se for cauteloso), mirando no peito da última posição do inimigo. */
 export function holdAngle(view: SimView, b: SoldierBrain, e: number, local: { x: number; y: number }): number {
   const e3 = e * 3;
-  const ey = view.position[e3 + 1]! + eyeHeightFor(view.flags[e]!);
+  const ey = view.position[e3 + 1]! + viewEyeHeight(view, e, view.flags[e]!);
   const dx = b.lastKnownX - view.position[e3]!;
   const dy = b.lastKnownY + 1.2 - ey;
   const dz = b.lastKnownZ - view.position[e3 + 2]!;
@@ -164,7 +164,7 @@ export function stepGrenade(
   const since = tick - b.grenadePhaseTick;
   const e3 = e * 3;
   const ex = view.position[e3]!;
-  const ey = view.position[e3 + 1]! + eyeHeightFor(view.flags[e]!);
+  const ey = view.position[e3 + 1]! + viewEyeHeight(view, e, view.flags[e]!);
   const ez = view.position[e3 + 2]!;
   const dx = b.grenadeX - ex;
   const dz = b.grenadeZ - ez;

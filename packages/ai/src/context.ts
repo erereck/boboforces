@@ -1,7 +1,6 @@
 import type { Rng } from '@boboforces/shared';
 import {
   type AimPoint,
-  aimPointWorld,
   CHAOS_MODS,
   ENTITY_FLAG,
   ENTITY_KIND,
@@ -9,6 +8,7 @@ import {
   MAX_HUMANS,
   MOD,
   type SimView,
+  viewAimPoint,
 } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import type { TeamBoard } from './team.ts';
@@ -178,7 +178,7 @@ export class AiContext {
   /**
    * Linha de visão do olho (ex, ey, ez) até a cabeça ou o tronco do corpo `t` (até 2 raios DDA, descontados do
    * orçamento do tick; sem orçamento devolve `false` e quem chama tenta de novo depois). Os pontos são os centros das
-   * hitboxes na postura e no pitch do alvo, levados ao mundo pelo yaw dele (`aimPointWorld`).
+   * hitboxes na postura e no pitch do alvo, levados ao mundo pelo yaw dele (`viewAimPoint`).
    */
   canSee(ex: number, ey: number, ez: number, t: number): boolean {
     const v = this.view!;
@@ -186,7 +186,8 @@ export class AiContext {
     const aim = this.aim;
     for (let k = 0; k < 2; k++) {
       if (this.raysLeft <= 0) return false;
-      aimPointWorld(v, t, k === 0, aim);
+      // M9 (fase 1): no Mini e no bot gigante, os pontos crescem com o corpo; o do gigante, até o teto dele.
+      viewAimPoint(v, t, k === 0, aim);
       const dx = aim.x - ex;
       const dy = aim.y - ey;
       const dz = aim.z - ez;
