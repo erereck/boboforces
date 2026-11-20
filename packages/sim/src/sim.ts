@@ -341,8 +341,11 @@ export interface SimRewind {
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-/** O componente conexo com mais nós (o Destravar só manda para ele; ilhas soltas não servem). Só na criação. */
-function mainComponent(nav: NavGrid): number {
+/**
+ * O componente conexo com mais nós (o Destravar só manda para ele; ilhas soltas não servem). Só na criação. M9 (fase
+ * 5b): exportado para a cena do dono escolher o lugar do "criar bot" com a mesma conta da sim (`ownerSpotNodes`).
+ */
+export function navMainComponent(nav: NavGrid): number {
   const counts = new Map<number, number>();
   let best = -1;
   let bestCount = 0;
@@ -550,7 +553,7 @@ export function createSim(config: SimConfig): Sim {
   const objective = recipe.mode === 'sandbox' ? (recipe.sandbox?.objective ?? SANDBOX_DEFAULTS.objective) : null;
   const { timeLimitS, scoreLimit } = matchLimits(recipe);
   // M9 (fase 2): os times sem ponto no mapa ganham casa (só no Sandbox; nos outros modos, os pontos do mapa).
-  const navMain = map.nav ? mainComponent(map.nav) : -1;
+  const navMain = map.nav ? navMainComponent(map.nav) : -1;
   // M9 (fase 2, revisão): só os times que começam com alguém ganham casa (o vazio não rouba ponto dos outros).
   const teamsMask = slots.reduce((mask, slot) => mask | (1 << slot.team), 0);
   const spawns = objective !== null ? sandboxSpawns(map, recipe.teams.length, navMain, teamsMask) : map.spawns;

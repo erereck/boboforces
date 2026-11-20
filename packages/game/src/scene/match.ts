@@ -363,7 +363,14 @@ import { HOST_AWAY_END_S, waitsForHost, type OnlineNetStats } from '../online-ap
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
 import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
-import { addReserveNames, createOwnerTools, OWNER_NO_TOOL, ownerHidden, type OwnerTools } from './owner-tools.ts';
+import {
+  addReserveNames,
+  createOwnerTools,
+  drawFrozenMarks,
+  OWNER_NO_TOOL,
+  ownerHidden,
+  type OwnerTools,
+} from './owner-tools.ts';
 import { ownerReserveFor } from '../owner-reserve.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
@@ -2436,6 +2443,30 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           logFull: () => driver.ownerLogFull,
         })
       : null;
+  /** M9 (fase 5b): o texto da plaquinha dos congelados (feito uma vez). */
+  const frozenTag = t('owner.frozenTag').toUpperCase();
+  /**
+   * M9 (fase 5b, prints): a plaquinha "CONGELADO" em cima dos bots congelados da vista `s` (o congelado vai no
+   * snapshot: o amigo online e o sofá também veem), na lista `out`. Revisão: na lista da HUD da vista (`fillHud`, antes
+   * das plaquinhas dela, como os balões); só a câmera livre e a de cima do Aquário, que vão sem HUD, desenham na lista
+   * da tela. A vista nos olhos de um bobo não marca ele mesmo; a posição é a desenhada (`alpha`, como o ator).
+   */
+  function drawFrozen(
+    out: DrawList,
+    fonts: UiFonts | null,
+    s: number,
+    rect: ProjectRect,
+    minText: number,
+    alpha: number,
+  ) {
+    const v = sim.view();
+    if (v.owner === null || paused) return;
+    const slot = slots[s]!;
+    const watching = s === 0 && aquarium && pilot < 0 && aqCam !== AQUARIUM_CAMERA.eyes;
+    const self = slot.controller >= 0 && !watching ? entityIndex(sim.controllerEntity(slot.controller)) : -1;
+    const font = fonts?.hud ?? null;
+    drawFrozenMarks(out, font, v, slot.desc.camera, rect, minText, frozenTag, self, drawnScale, hiddenNow, alpha);
+  }
   /** O tiro que armou a ferramenta (o clique em "Criar bot") não vale: só o próximo, depois de soltar. */
   let ownerFireLock = false;
   /** M9 (fase 5, revisão): a mira (ADS) que cancelou fica fora do bobo até soltar. */
@@ -5706,7 +5737,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
-  function fillHud(s: number, fonts: UiFonts | null, lay: HudScreenLayout, ui: UiFrame, rawLocked: boolean): void {
+  function fillHud(
+    s: number,
+    fonts: UiFonts | null,
+    lay: HudScreenLayout,
+    ui: UiFrame,
+    rawLocked: boolean,
+    alpha: number,
+  ): void {
     const slot = slots[s]!;
     const m = slot.model;
     const desc = slot.desc;
@@ -5716,7 +5754,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M2 (fase 2e): com o resultado na tela, a HUD sai (o véu e os botões ficam limpos).
     const aqNoHud =
       s === 0 && aquarium && pilot < 0 && (aqCam === AQUARIUM_CAMERA.free || aqCam === AQUARIUM_CAMERA.top);
-    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen || resultShown || aqNoHud) {
+    // M9 (fase 5b, prints): sob as páginas do dono (a tela inteira), a HUD do P1 sai: o Voltar compacto do canto de
+    // cima fica no lugar da plaquinha de abates e mortes, que aparecia em volta dele.
+    const ownerPageOpen = s === 0 && paused && pausePage === 'owner';
+    if (!hudVisible || entity === NULL_ENTITY || override || fontSpecimen || resultShown || aqNoHud || ownerPageOpen) {
       desc.hud = null;
       return;
     }
@@ -6158,6 +6199,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.tipText = slot.orderNotice;
       m.tipGlyph = -1;
     }
+    // M9 (fase 5b, revisão): a plaquinha dos congelados por baixo das plaquinhas da HUD desta vista (como os balões).
+    drawFrozen(slot.hud, fonts, s, lay.rects[s]!, lay.views[s]!.minTextPx, alpha);
     drawHud(slot.hud, fonts, m, lay.views[s]!);
     desc.hud = slot.hud;
     void ui;
@@ -7011,7 +7054,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       trace('vfx e câmeras');
       const fonts = host.fonts;
       const tUi0 = now();
-      for (let s = 0; s < slots.length; s++) fillHud(s, fonts, lay, ui, lastPointerLocked);
+      for (let s = 0; s < slots.length; s++) fillHud(s, fonts, lay, ui, lastPointerLocked, alpha);
       let uiMs = now() - tUi0;
       const tr0 = now();
       if (fontSpecimen) {
@@ -7035,6 +7078,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         drawFontSpecimen(list, fonts, ui.width, ui.height);
       } else {
         if (hudVisible && !resultShown && !(overrideCamera || overrideRoute)) {
+          // M9 (fase 5b, revisão): a câmera livre e a de cima do Aquário vão sem HUD: a plaquinha dos congelados vai
+          // na lista da tela, antes do resto (as vistas com HUD desenham a delas no `fillHud`).
+          if (aquarium && pilot < 0 && (aqCam === AQUARIUM_CAMERA.free || aqCam === AQUARIUM_CAMERA.top)) {
+            drawFrozen(list, fonts, 0, lay.rects[0]!, ui.options.minTextPx ?? 0, alpha);
+          }
           const sharedArea = lay.shared;
           if (training) {
             sharedHud.teamCount = 0;

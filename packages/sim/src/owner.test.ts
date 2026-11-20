@@ -20,7 +20,7 @@ import type { OwnerEvent, SimEvent } from './events.ts';
 import { aimPointWorld, type AimPoint } from './hitbox.ts';
 import { createInputFrames } from './loop.ts';
 import { createOwnerScript, OwnerLog } from './owner-script.ts';
-import { createSim, type Sim, type SimConfig, type SimMap } from './sim.ts';
+import { createSim, navMainComponent, type Sim, type SimConfig, type SimMap } from './sim.ts';
 import { MOD } from './systems/chaos.ts';
 import {
   isOwnerDormant,
@@ -28,6 +28,8 @@ import {
   ownerAllowed,
   ownerReserveCount,
   ownerReserveSlots,
+  ownerSpotNodes,
+  ownerSpotTaken,
   type OwnerCommand,
 } from './systems/owner.ts';
 
@@ -714,6 +716,47 @@ describe('Ferramentas do Dono: revisão', () => {
     expect(ev.ok).toBe(true);
     const e = entityIndex(ev.entity);
     expect(sim.view().position[e * 3]).toBeLessThanOrEqual(15 - METRICS.aabbWidth / 2);
+    sim.dispose();
+  });
+
+  it('fase 5b: a conta do lugar é pública (a cena escolhe o nó antes): em ordem, na área, e o nó mandado é o da sim', () => {
+    const map = { ...flatMap(), playArea: { minX: 2, minZ: 2, maxX: 15, maxZ: 38 } };
+    const sim = createSim({ recipe: recipe(), map, humans: 1, owner: { reserve: 2 } });
+    const f = createInputFrames();
+    const v = sim.view();
+    const nav = v.nav!;
+    const main = navMainComponent(nav);
+    const nodes = new Int32Array(8);
+    const d2 = new Float64Array(8);
+    const at = new Float64Array(3);
+    // Os 8 nós mais perto de (10, chão, 20), em ordem de distância, até 3 m e todos dentro da área.
+    const n = ownerSpotNodes(nav, main, v.playArea, 10, FLOOR, 20, 3, nodes, d2);
+    expect(n).toBe(8);
+    for (let k = 0; k < n; k++) {
+      nav.nodePosition(nodes[k]!, at, 0);
+      const d = (at[0]! - 10) ** 2 + (at[1]! - FLOOR) ** 2 + (at[2]! - 20) ** 2;
+      expect(d2[k]).toBeCloseTo(d, 9);
+      if (k > 0) expect(d2[k]).toBeGreaterThanOrEqual(d2[k - 1]!);
+      expect(d).toBeLessThanOrEqual(9);
+    }
+    // Perto da borda: nada fora da área (a meia largura da caixa conta); outro componente: nada.
+    const edge = ownerSpotNodes(nav, main, v.playArea, 15, FLOOR, 20, 3, nodes, d2);
+    for (let k = 0; k < edge; k++) {
+      nav.nodePosition(nodes[k]!, at, 0);
+      expect(at[0]).toBeLessThanOrEqual(15 - METRICS.aabbWidth / 2);
+    }
+    expect(ownerSpotNodes(nav, main + 1000, v.playArea, 10, FLOOR, 20, 3, nodes, d2)).toBe(0);
+    // O nó mandado no comando é o que a sim usa (distância 0); depois dele, o mesmo nó está tomado.
+    ownerSpotNodes(nav, main, v.playArea, 10.3, FLOOR, 20.2, 3, nodes, d2);
+    nav.nodePosition(nodes[3]!, at, 0);
+    expect(ownerSpotTaken(v, at[0]!, at[1]!, at[2]!)).toBe(false);
+    const { ev } = run(sim, f, { kind: 'spawnBot', team: 0, x: at[0]!, y: at[1]!, z: at[2]!, yaw: 0 });
+    const e = entityIndex(ev.entity);
+    expect([v.position[e * 3], v.position[e * 3 + 1], v.position[e * 3 + 2]]).toEqual([at[0], at[1], at[2]]);
+    expect(ownerSpotTaken(v, at[0]!, at[1]!, at[2]!)).toBe(true);
+    // Tirado da partida (dormente), o lugar fica livre de novo.
+    run(sim, f, { kind: 'remove', entity: ev.entity });
+    expect(ownerSpotTaken(v, at[0]!, at[1]!, at[2]!)).toBe(false);
     sim.dispose();
   });
 

@@ -44,6 +44,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   (liga e desliga no meio da partida) e a Câmera lenta (1×, 0,5× e 0,25×, só offline). A ferramenta escolhida fica
   armada na mira: o tiro aplica (o clique esquerdo, o gatilho direito, o botão Tiro) e a mira cancela. O jogo separa
   8 bots de reserva para o "Criar bot". No online, só o host usa, e o amigo vê tudo acontecer; o protocolo foi para 12.
+- **As Ferramentas do Dono pelos prints (fase 5b):** o bot criado nasce num lugar que você vê, perto da mira (antes,
+  às vezes, longe ou atrás de uma parede); o bot congelado ganha a plaquinha "CONGELADO" em cima da cabeça; os bots da
+  reserva ganham nomes bobos diferentes; e o HUD sai de trás das páginas do dono.
 
 ### M8: compartilhar, o Diretor e o Arcade (fechado em 20/11/2026)
 

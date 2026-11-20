@@ -691,6 +691,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'owner.fail.busy': 'Calma: comandos demais de uma vez',
   'owner.fail.full': 'Esta partida chegou ao limite de comandos do dono',
   'owner.fail.dead': 'Só com o seu bobo em jogo',
+  // M9 (fase 5b): a plaquinha em cima de cada bot congelado (em caixa alta no desenho).
+  'owner.frozenTag': 'Congelado',
   'result.aquarium.team': 'Vitória do time {team}',
   'custom.tab.match': 'Partida',
   'custom.tab.players': 'Jogadores',

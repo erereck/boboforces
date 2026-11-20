@@ -4858,7 +4858,7 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   a pausa cancela e reabre direto na página). Ela fica armada entre usos. O alvo é o bot na mira (`crosshairTarget`)
   ou o chão (o raio da câmera); nunca um jogador do sofá, o bot que você pilota no Aquário ou o que a câmera segue.
   Com o P1 morto, nada se aplica ("Só com o seu bobo em jogo"). A resposta da sim vira um aviso curto ("Bot criado:
-  Normal Bob", "Jorge congelado", ou a recusa: "Mire no chão", "Acabaram os bots da reserva").
+  Sergeant Noodle", "Jorge congelado", ou a recusa: "Mire no chão", "Acabaram os bots da reserva").
 - **A entrada:** o mapeador ganhou `release(action)`: armar, cancelar e pausar com a ferramenta soltam a mira
   alternada; depois de cancelar, a mira fica travada até soltar o botão, e a mira assistida não puxa; na web, o clique
   sem o mouse preso não aplica (é o clique de pegar o mouse de volta). No online, com a pausa do P1 aberta, o quadro
@@ -4875,5 +4875,33 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   câmera da morte; o clique de pegar o mouse aplicava; uma string por quadro; e a sonda de qualidade na câmera lenta.
   Corrigido antes do commit.
 - **Fica para depois:** as ferramentas no amigo online (pedir ao host), o "criar bot" escolhendo o bot da Oficina (a
-  reserva é de Normal Bob) e a câmera lenta no online (a sim do host não para).
+  reserva é de Normal Bob, com nomes do gerador) e a câmera lenta no online (a sim do host não para).
+
+### 20.9 Fase 5b: as Ferramentas do Dono pelos prints (20/11/2026)
+
+- **Os prints da rodada 33** (`local/m9/capturar-dono*.ts`) acharam: o botão Voltar das páginas do dono em cima do
+  contador de abates; o bot criado nascendo longe da mira (4 a 5 m ao lado, no Aquário) ou fora da vista (mirando o
+  alto de um muro); o congelado sem sinal nenhum depois do aviso; e todos os bots da reserva chamados "Normal Bob".
+- **O lugar do bot** (`game/scene/owner-tools.ts`, `ownerSpawnSpot`): antes de mandar o `spawnBot`, o jogo escolhe o nó
+  livre de navegação mais perto do ponto mirado (até 4 m) que a câmera vê (um raio da câmera até o nó, no peito ou no
+  olho); na parede, recua 0,6 m pelo raio e desce ao chão; sem nada visível, recua para a câmera de 1 em 1 m (até 4
+  vezes, pulando o recuo que anda menos de 0,5 m no chão), e se nada servir recusa ("Sem lugar livre perto da mira")
+  sem mandar o comando. Tudo numa passada só pelos nós (os 12 mais perto de cada recuo, até 16 com o teste de vista);
+  a câmera dentro de um bloco (a livre do Aquário) começa os raios no primeiro ponto livre (até 3 m). O filtro de nó
+  livre é o mesmo da sim (`ownerSpotNode`, `ownerSpotNodes`, `ownerSpotTaken`, `navMainComponent`), e o jogo manda o
+  centro do nó, então a sim escolhe o mesmo; o nó mandado e ainda sem resposta conta como ocupado (dois cliques no
+  mesmo tick, fácil na câmera lenta). Medido nos mapas de verdade (4.000 miras cada): no Construto, os bots fora da
+  vista foram de 588 a 0; no Ringue, de 60 a 0.
+- **O congelado:** uma plaquinha azul-gelo "CONGELADO" em cima da cabeça, no HUD de cada vista (como os balões dos
+  emotes; até 12 por vista, os mais perto), na posição desenhada do corpo; some com a pausa, a mais de 40 m, no bot
+  invisível e no bot de cujos olhos a câmera vê. Vale para o amigo online (o congelado vem no snapshot).
+- **Os nomes da reserva:** o gerador de nomes da Oficina (`game/src/bot-names.ts`) dá a cada bot da reserva um nome
+  bobo, pela semente da partida e a ordem da reserva, sem repetir os nomes de antes (bots da receita e humanos) — o
+  mesmo no host e no amigo, e o visual junto.
+- **O HUD:** a vista do P1 esconde o HUD com a página das ferramentas ou dos modificadores aberta (volta na pausa
+  simples e com a ferramenta armada).
+- **A revisão (Opus) achou:** a câmera dentro de um bloco sempre recusava; o custo de um clique recusado (5 passadas
+  pelos nós e 240 raios, um tranco no Switch); dois cliques no mesmo tick caindo no mesmo nó; a plaquinha por cima do
+  HUD de cada vista e um passo à frente do corpo; e o nome da reserva igual ao de um humano. Corrigido antes do
+  commit; nenhum golden mudou.
 

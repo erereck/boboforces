@@ -1,5 +1,6 @@
 import { builtinBotRef, MODIFIERS, modifiersConflict, type MatchRecipe, type ModifierId } from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
+import type { NavGrid } from '@boboforces/nav';
 import { u16ToYaw, yawToU16 } from '@boboforces/shared';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
@@ -448,51 +449,89 @@ function findSpot(ctx: SimContext, x: number, y: number, z: number): boolean {
     spot[2] = sp.z;
     return true;
   }
-  // Uma passada pelos nós guarda os `placeTries` mais perto (em ordem; no empate, o de índice menor fica na frente).
-  const max2 = OWNER.placeMaxDistM * OWNER.placeMaxDistM;
-  const tries = OWNER.placeTries;
-  const area = ctx.playArea;
-  const half = METRICS.aabbWidth / 2;
-  let found = 0;
-  for (let node = 0; node < nav.nodeCount; node++) {
-    if (nav.clearance[node] !== 1 || nav.component[node] !== ctx.navMainComponent) continue;
-    nav.nodePosition(node, spot, 0);
-    // As paredes invisíveis da área jogável (o movimento desconta a meia largura da caixa).
-    if (
-      area !== null &&
-      (spot[0]! < area.minX + half ||
-        spot[0]! > area.maxX - half ||
-        spot[2]! < area.minZ + half ||
-        spot[2]! > area.maxZ - half)
-    )
-      continue;
-    const d2 = (spot[0]! - x) ** 2 + (spot[1]! - y) ** 2 + (spot[2]! - z) ** 2;
-    if (d2 > max2 || (found === tries && d2 >= candD2[tries - 1]!)) continue;
-    let k = found < tries ? found++ : tries - 1;
-    while (k > 0 && candD2[k - 1]! > d2) {
-      candD2[k] = candD2[k - 1]!;
-      candNode[k] = candNode[k - 1]!;
-      k--;
-    }
-    candD2[k] = d2;
-    candNode[k] = node;
-  }
+  const found = ownerSpotNodes(nav, ctx.navMainComponent, ctx.playArea, x, y, z, OWNER.placeMaxDistM, candNode, candD2);
   for (let i = 0; i < found; i++) {
     nav.nodePosition(candNode[i]!, spot, 0);
-    if (!occupied(ctx, spot[0]!, spot[1]!, spot[2]!)) return true;
+    if (!ownerSpotTaken(ctx.s, spot[0]!, spot[1]!, spot[2]!)) return true;
   }
   return false;
 }
 
-/** Algum corpo em jogo em cima do ponto (pés)? */
-function occupied(ctx: SimContext, x: number, y: number, z: number): boolean {
-  const s = ctx.s;
+const nodeAt = new Float64Array(3);
+
+/**
+ * M9 (fase 5b, revisão): o nó serve de lugar para o "criar bot"? Em pé, do componente principal (`main`) e dentro da
+ * área jogável (o movimento desconta a meia largura da caixa). Escreve o centro dele (pés) em `out` quando passa da
+ * altura livre e do componente. O filtro do `ownerSpotNodes`: a cena usa o mesmo numa passada só por vários pontos.
+ */
+export function ownerSpotNode(
+  nav: NavGrid,
+  main: number,
+  area: SimView['playArea'],
+  node: number,
+  out: Float64Array,
+): boolean {
+  if (nav.clearance[node] !== 1 || nav.component[node] !== main) return false;
+  nav.nodePosition(node, out, 0);
+  if (area === null) return true;
+  const half = METRICS.aabbWidth / 2;
+  const x = out[0]!;
+  const z = out[2]!;
+  return x >= area.minX + half && x <= area.maxX - half && z >= area.minZ + half && z <= area.maxZ - half;
+}
+
+/**
+ * M9 (fase 5b): os nós candidatos do "criar bot" perto do ponto (pés, m): os em pé do componente principal (`main`,
+ * o `navMainComponent`) dentro da área jogável, até `maxDist` m, os `nodes.length` mais perto em ordem de distância
+ * (empate: o de índice menor), com a distância² de cada um em `d2`. Devolve quantos. A sim (`findSpot`) e a cena (que
+ * escolhe um nó à vista da câmera antes de mandar o comando) fazem a mesma conta, então o nó que a cena manda é o
+ * primeiro da sim.
+ */
+export function ownerSpotNodes(
+  nav: NavGrid,
+  main: number,
+  area: SimView['playArea'],
+  x: number,
+  y: number,
+  z: number,
+  maxDist: number,
+  nodes: Int32Array,
+  d2: Float64Array,
+): number {
+  // Uma passada pelos nós guarda os `tries` mais perto (em ordem; no empate, o de índice menor fica na frente).
+  const max2 = maxDist * maxDist;
+  const tries = Math.min(nodes.length, d2.length);
+  if (tries === 0) return 0;
+  let found = 0;
+  for (let node = 0; node < nav.nodeCount; node++) {
+    if (!ownerSpotNode(nav, main, area, node, nodeAt)) continue;
+    const d = (nodeAt[0]! - x) ** 2 + (nodeAt[1]! - y) ** 2 + (nodeAt[2]! - z) ** 2;
+    if (d > max2 || (found === tries && d >= d2[tries - 1]!)) continue;
+    let k = found < tries ? found++ : tries - 1;
+    while (k > 0 && d2[k - 1]! > d) {
+      d2[k] = d2[k - 1]!;
+      nodes[k] = nodes[k - 1]!;
+      k--;
+    }
+    d2[k] = d;
+    nodes[k] = node;
+  }
+  return found;
+}
+
+/** M9 (fase 5b): algum corpo em jogo em cima do ponto (pés)? (A sim e a cena: o estado e a view têm os mesmos campos.) */
+export function ownerSpotTaken(
+  bodies: Pick<SimView, 'count' | 'alive' | 'kind' | 'flags' | 'position'>,
+  x: number,
+  y: number,
+  z: number,
+): boolean {
   const clear2 = OWNER.placeClearM * OWNER.placeClearM;
-  for (let j = 0; j < s.count; j++) {
-    if (s.alive[j] === 0 || !isBody(s.kind[j]!) || (s.flags[j]! & F.dead) !== 0) continue;
-    const dx = s.position[j * 3]! - x;
-    const dz = s.position[j * 3 + 2]! - z;
-    if (dx * dx + dz * dz < clear2 && Math.abs(s.position[j * 3 + 1]! - y) < METRICS.bodyHeight) return true;
+  for (let j = 0; j < bodies.count; j++) {
+    if (bodies.alive[j] === 0 || !isBody(bodies.kind[j]!) || (bodies.flags[j]! & F.dead) !== 0) continue;
+    const dx = bodies.position[j * 3]! - x;
+    const dz = bodies.position[j * 3 + 2]! - z;
+    if (dx * dx + dz * dz < clear2 && Math.abs(bodies.position[j * 3 + 1]! - y) < METRICS.bodyHeight) return true;
   }
   return false;
 }

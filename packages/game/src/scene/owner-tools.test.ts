@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { builtinBotRef, DEFAULT_SETTINGS, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import {
+  builtinBotRef,
+  decodeMap,
+  decodeModelPack,
+  DEFAULT_SETTINGS,
+  MATCH_RECIPE_FORMAT,
+  parseLayerManifest,
+  type MatchRecipe,
+} from '@boboforces/format';
 import { createRawInputState, keyIndex, MOUSE_BUTTON, PAD_BUTTON, type RawInputState } from '@boboforces/input';
 import type { Platform } from '@boboforces/platform-api';
 import {
@@ -13,9 +21,15 @@ import {
   ENTITY_KIND,
   isOwnerDormant,
   makeEntityId,
+  METRICS,
   MOD,
+  navMainComponent,
+  OWNER,
+  ownerSpotNodes,
+  ownerSpotTaken,
   WEAPON_CODE,
   WEAPONS,
+  type OwnerCommand,
   type OwnerEvent,
   type Sim,
   type SimEvent,
@@ -42,6 +56,7 @@ import {
   type TextContent,
   type UiNode,
 } from '@boboforces/ui';
+import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { startGame, type GameHandle } from '../game.ts';
 import { createNullRenderer } from '../null-renderer.ts';
@@ -50,22 +65,30 @@ import { OWNER_RESERVE, ownerReserveFor, ownerToolsAllowed } from '../owner-rese
 import { pauseScreen } from '../pause.ts';
 import type { SceneBundle, SceneRequest } from '../scene-api.ts';
 import { aquariumPauseItems } from './aquarium.ts';
-import { PRIMARY_ORDER } from './death.ts';
+import { controllerNames, PRIMARY_ORDER } from './death.ts';
+import { botLookIndices } from './figures.ts';
 import { SCENE_MODULE } from './index.ts';
 import {
   addReserveNames,
   createOwnerTools,
+  drawFrozenMarks,
   OWNER_ACTION,
   OWNER_LIVE_MODIFIERS,
   OWNER_NO_TOOL,
   OWNER_TOOL,
+  OWNER_UI,
   ownerDormantCount,
+  ownerGroundPoint,
   ownerHidden,
+  ownerRayOrigin,
   ownerModsScreen,
+  ownerSees,
+  ownerSpawnSpot,
   ownerToolsScreen,
   type OwnerTools,
 } from './owner-tools.ts';
 import { summarizeMatch, createMatchStats } from './result.ts';
+import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
 
 /**
  * M9 (fase 5): as Ferramentas do Dono no jogo. Primeiro o módulo da página e da ferramenta armada contra uma sim
@@ -343,7 +366,7 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
     sim.dispose();
   });
 
-  it('a reserva: 8 no Sandbox (no teto do aparelho), nada fora dele; nomes da reserva como os da receita', () => {
+  it('a reserva: 8 no Sandbox (no teto do aparelho), nada fora dele; cada bot da reserva com um nome', () => {
     const r = sandboxRecipe();
     expect(OWNER_RESERVE).toBe(8);
     expect(ownerToolsAllowed(r)).toBe(true);
@@ -355,9 +378,46 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
     expect(ownerReserveFor(withoutSandbox(r, 'zombies'), 1, 24)).toBeNull();
     const names: string[] = ['P1'];
     addReserveNames(names, r, 1, 2);
-    expect(names[BOT_CONTROLLER_BASE + 5]).toBe('Normal Bob');
-    expect(names[BOT_CONTROLLER_BASE + 6]).toBe('Normal Bob');
+    expect(names[BOT_CONTROLLER_BASE + 5]).toBeDefined();
+    expect(names[BOT_CONTROLLER_BASE + 6]).toBeDefined();
     expect(names[BOT_CONTROLLER_BASE + 7]).toBeUndefined();
+  });
+
+  it('fase 5b: os bots da reserva têm nomes diferentes, longe dos da receita, e a mesma conta dá os mesmos nomes', () => {
+    const r = sandboxRecipe();
+    const reserveBase = BOT_CONTROLLER_BASE + 5;
+    const withReserve = (recipe: MatchRecipe, n: number): string[] => {
+      const names = controllerNames(recipe, 1);
+      addReserveNames(names, recipe, 1, n);
+      return names;
+    };
+    const names = withReserve(r, 8);
+    const reserve = names.slice(reserveBase, reserveBase + 8);
+    expect(reserve).toHaveLength(8);
+    // Os 8 diferentes entre si, nenhum "Normal Bob" e nenhum igual a um bot da receita.
+    expect(new Set(reserve).size).toBe(8);
+    expect(reserve).not.toContain('Normal Bob');
+    for (const name of reserve) expect(names.slice(BOT_CONTROLLER_BASE, reserveBase)).not.toContain(name);
+    // Nomes bobos do gerador da Oficina ("Sergeant Noodle").
+    for (const name of reserve) expect(name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    // A mesma receita dá os mesmos nomes (o host e o amigo online).
+    expect(withReserve(r, 8)).toEqual(names);
+    // Revisão: um humano com o nome que a reserva sortearia (o da sala, o mesmo nos dois lados): a reserva desvia.
+    const human = controllerNames(r, 1);
+    human[0] = reserve[2]!;
+    addReserveNames(human, r, 1, 8);
+    const dodged = human.slice(reserveBase, reserveBase + 8);
+    expect(dodged).not.toContain(reserve[2]);
+    expect(new Set(dodged).size).toBe(8);
+    expect(dodged.slice(0, 2)).toEqual(reserve.slice(0, 2));
+    // Os primeiros da reserva não mudam com o tamanho dela; outra semente, outros nomes.
+    expect(withReserve(r, 3).slice(reserveBase, reserveBase + 3)).toEqual(reserve.slice(0, 3));
+    expect(withReserve({ ...r, seed: 6 }, 8).slice(reserveBase)).not.toEqual(reserve);
+    // Os looks saem do nome: a reserva não veste um look só.
+    const looks = botLookIndices(names, 12);
+    expect(new Set(reserve.map((_, k) => looks[reserveBase + k])).size).toBeGreaterThan(1);
+    // Sem reserva, nada muda.
+    expect(withReserve(r, 0)).toEqual(controllerNames(r, 1));
   });
 
   it('o resultado não premia quem está fora (o "Covarde" sem tiro ia para um bot da reserva)', () => {
@@ -442,6 +502,350 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
     expect(squash(drawnText(list)).toLowerCase()).toContain('criarbot·laranja');
     glyphs();
     expect(squash(drawnText(list)).toLowerCase()).toContain('criarbot·azul');
+    sim.dispose();
+  });
+});
+
+describe('fase 5b (prints): o lugar do "criar bot" à vista e a plaquinha dos congelados', () => {
+  const { map } = buildSyntheticConstruto({ nav: true });
+  /**
+   * A mureta de 2 m do lado sul do Construto sintético: x 15–19 m, y 0,5–2,5 m, z 54–55 m (o chão fica em y 0,5).
+   * Os nós da navegação de teste têm 1 m (centros nos meios-metros: z 53,5 do lado norte, 55,5 do lado sul).
+   */
+  const WALL = { minX: 15, maxX: 19, top: 2.5, minZ: 54, maxZ: 55 } as const;
+  const CHEST = 1.1;
+
+  function setup(reserve = 3) {
+    const recipe = sandboxRecipe();
+    const sim = createSim({ recipe, map, humans: 1, owner: { reserve } });
+    const frames = createInputFrames();
+    const step = (): OwnerEvent[] => {
+      sim.step(frames);
+      const events: SimEvent[] = [];
+      sim.drainEvents(events);
+      return events.filter((ev): ev is OwnerEvent => ev.type === 'owner').map((ev) => ({ ...ev }));
+    };
+    return { recipe, sim, step, main: navMainComponent(sim.view().nav!) };
+  }
+  /** O rumo e a inclinação da câmera em `o` olhando para `p` (o rumo 0 olha para −Z). */
+  function aim(o: readonly number[], p: readonly number[]): { yaw: number; pitch: number } {
+    const dx = p[0]! - o[0]!;
+    const dy = p[1]! - o[1]!;
+    const dz = p[2]! - o[2]!;
+    return { yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) };
+  }
+  /** O nó que a sim escolheria SEM a cena: o livre mais perto do ponto, até 8 m (a conta de antes da fase 5b). */
+  function simOnly(v: SimView, main: number, x: number, y: number, z: number): Float64Array {
+    const nodes = new Int32Array(OWNER.placeTries);
+    const d2 = new Float64Array(OWNER.placeTries);
+    const n = ownerSpotNodes(v.nav!, main, v.playArea, x, y, z, OWNER.placeMaxDistM, nodes, d2);
+    const out = new Float64Array(3);
+    for (let k = 0; k < n; k++) {
+      v.nav!.nodePosition(nodes[k]!, out, 0);
+      if (!ownerSpotTaken(v, out[0]!, out[1]!, out[2]!)) return out;
+    }
+    throw new Error('nenhum nó');
+  }
+  const sees = (v: SimView, o: ArrayLike<number>, p: ArrayLike<number>): boolean =>
+    ownerSees(v, o[0]!, o[1]!, o[2]!, p[0]!, p[1]! + CHEST, p[2]!) ||
+    ownerSees(v, o[0]!, o[1]!, o[2]!, p[0]!, p[1]! + METRICS.eyeHeight, p[2]!);
+
+  it('a sim põe o bot exatamente no nó que a cena escolheu (à vista, perto do ponto), virado para a câmera', () => {
+    const { recipe, sim, step, main } = setup();
+    const v = sim.view();
+    // A câmera alta ao sul da mureta (como a câmera livre do Aquário), mirando no alto dela, um pouco ao norte do meio.
+    const cam = [17.2, 7, 60] as const;
+    const target = [17.2, WALL.top, 54.4] as const;
+    const { yaw, pitch } = aim(cam, target);
+    const ground = new Float64Array(3);
+    expect(ownerGroundPoint(v, cam[0], cam[1], cam[2], yaw, pitch, ground)).toBe(true);
+    // O raio bate no alto do muro (um chão, para o raio); na navegação de teste o alto dela é um nó (desce dele).
+    expect(ground[1]).toBeCloseTo(WALL.top, 5);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBeNull();
+    expect(Math.hypot(spot[0]! - ground[0]!, spot[1]! - ground[1]!, spot[2]! - ground[2]!)).toBeLessThan(1);
+    expect(sees(v, cam, spot)).toBe(true);
+    // A conta da sim sozinha começa pelo mesmo nó (o que a cena manda é o primeiro dela).
+    expect([...simOnly(v, main, spot[0]!, spot[1]!, spot[2]!)]).toEqual([...spot]);
+    // Pela ferramenta: a sim põe o bot exatamente no nó escolhido (o nó a distância 0 é o primeiro dela).
+    const tools = createOwnerTools({
+      recipe,
+      command: (cmd) => sim.command(cmd),
+      view: () => sim.view(),
+      nameOf: () => 'Bot',
+      primaries: PRIMARY_ORDER,
+      weaponNames: WEAPONS.map((w) => w.id),
+      slowAllowed: true,
+      log: () => {},
+    });
+    tools.action(nav(OWNER_ACTION.spawn));
+    tools.apply(v, cam[0], cam[1], cam[2], yaw, pitch, -1, () => false);
+    const [ev] = step();
+    expect(ev).toMatchObject({ command: 'spawnBot', ok: true });
+    const e = entityIndex(ev!.entity);
+    expect(
+      Math.hypot(v.position[e * 3]! - spot[0]!, v.position[e * 3 + 1]! - spot[1]!, v.position[e * 3 + 2]! - spot[2]!),
+    ).toBeLessThan(1e-4);
+    // Virado para a câmera (o rumo de quem criou).
+    expect(Math.abs(Math.sin(v.yaw[e]!))).toBeLessThan(0.1);
+    sim.dispose();
+  });
+
+  it('mirando no pé do muro: o bot nasce na frente dele, do lado de quem mira, perto do ponto e à vista', () => {
+    const { sim, main } = setup();
+    const v = sim.view();
+    const cam = [17, 0.5 + METRICS.eyeHeight, 61] as const;
+    const target = [17, 0.7, WALL.maxZ] as const;
+    const { yaw, pitch } = aim(cam, target);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBeNull();
+    expect(spot[2]).toBeGreaterThan(WALL.maxZ);
+    expect(Math.hypot(spot[0]! - target[0], spot[2]! - target[2])).toBeLessThan(1);
+    expect(sees(v, cam, spot)).toBe(true);
+    sim.dispose();
+  });
+
+  it('o alto do muro da borda (4 m, sem nó por perto): volta pelo raio e cai no chão de dentro, à vista', () => {
+    const { sim, main } = setup();
+    const v = sim.view();
+    // O muro da borda oeste: x 3,5–4 m, até y 4,5 m; a área jogável começa em x 4 (os nós a partir de 4,5).
+    const cam = [10, 8, 40] as const;
+    const { yaw, pitch } = aim(cam, [3.75, 4.5, 40]);
+    const ground = new Float64Array(3);
+    expect(ownerGroundPoint(v, cam[0], cam[1], cam[2], yaw, pitch, ground)).toBe(true);
+    expect(ground[1]).toBeCloseTo(4.5, 5);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBeNull();
+    expect(spot[1]).toBeCloseTo(0.5, 5);
+    expect(spot[0]).toBeGreaterThan(4);
+    expect(spot[0]).toBeLessThan(7);
+    expect(sees(v, cam, spot)).toBe(true);
+    sim.dispose();
+  });
+
+  it('nenhum nó livre à vista (de fora da área, com o muro na frente): recusa sem mandar o comando', () => {
+    const { recipe, sim, step, main } = setup();
+    const v = sim.view();
+    // Do lado de fora do muro da borda, olhando para o chão de fora: os nós da área ficam atrás do muro.
+    const cam = [1.5, 0.5 + METRICS.eyeHeight, 40] as const;
+    const { yaw, pitch } = aim(cam, [1.5, 0.5, 37]);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBe('place');
+    const sent: OwnerCommand[] = [];
+    const logs: string[] = [];
+    const tools = createOwnerTools({
+      recipe,
+      command: (cmd) => {
+        sent.push(cmd);
+        return sim.command(cmd);
+      },
+      view: () => sim.view(),
+      nameOf: () => 'Bot',
+      primaries: PRIMARY_ORDER,
+      weaponNames: WEAPONS.map((w) => w.id),
+      slowAllowed: true,
+      log: (line) => logs.push(line),
+    });
+    tools.action(nav(OWNER_ACTION.spawn));
+    tools.apply(v, cam[0], cam[1], cam[2], yaw, pitch, -1, () => false);
+    expect(sent).toEqual([]);
+    expect(tools.notice).toBe('Sem lugar livre perto da mira');
+    expect(logs).toContain('[partida] dono: criar bot recusado (place)');
+    expect(step()).toEqual([]);
+    sim.dispose();
+  });
+
+  it('o nó à vista ocupado por um bobo fica de fora: o bot nasce no próximo livre à vista', () => {
+    const { sim, step, main } = setup();
+    const v = sim.view();
+    const cam = [17.2, 7, 60] as const;
+    const { yaw, pitch } = aim(cam, [17.2, WALL.top, 54.4]);
+    const first = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, first)).toBeNull();
+    // Um bot da reserva no nó escolhido (o comando da sim, sem a cena), e de novo: outro nó, livre e à vista.
+    sim.command({ kind: 'spawnBot', team: 0, x: first[0]!, y: first[1]!, z: first[2]!, yaw: 0 });
+    expect(step()[0]).toMatchObject({ ok: true });
+    const second = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, second)).toBeNull();
+    expect(Math.hypot(second[0]! - first[0]!, second[2]! - first[2]!)).toBeGreaterThan(OWNER.placeClearM);
+    expect(ownerSpotTaken(v, second[0]!, second[1]!, second[2]!)).toBe(false);
+    expect(sees(v, cam, second)).toBe(true);
+    sim.dispose();
+  });
+
+  it('revisão: a câmera dentro de um bloco (a livre do Aquário atravessa): os raios saem do lado de fora; funda demais, "Mire no chão"', () => {
+    const { recipe, sim, main } = setup();
+    const v = sim.view();
+    // Dentro da mureta (x 15–19, y 0,5–2,5, z 54–55), olhando para o sul, para o chão a 3,5 m: a 0,5 m sai dela.
+    const cam = [17.2, 1.5, 54.5] as const;
+    const { yaw, pitch } = aim(cam, [17.2, 0.5, 58]);
+    const ground = new Float64Array(3);
+    // O raio da câmera bate a 0 m (sem normal): sozinho, ele não acha chão.
+    expect(ownerGroundPoint(v, cam[0], cam[1], cam[2], yaw, pitch, ground)).toBe(false);
+    const eye = new Float64Array(3);
+    expect(ownerRayOrigin(v, cam[0], cam[1], cam[2], yaw, pitch, eye)).toBe(true);
+    expect(eye[2]).toBeGreaterThanOrEqual(WALL.maxZ);
+    expect(eye[2]).toBeLessThan(WALL.maxZ + 0.3);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(v, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBeNull();
+    expect(spot[2]).toBeGreaterThan(WALL.maxZ);
+    expect(Math.hypot(spot[0]! - 17.2, spot[2]! - 58)).toBeLessThan(1);
+    expect(sees(v, eye, spot)).toBe(true);
+    // No meio da torre central (8 × 8 m, até y 3,5): 3 m pela mira não saem dela. A recusa é "Mire no chão".
+    const deep = [40, 2, 40] as const;
+    expect(ownerRayOrigin(v, deep[0], deep[1], deep[2], 0, -0.3, eye)).toBe(false);
+    expect(ownerSpawnSpot(v, main, deep[0], deep[1], deep[2], 0, -0.3, spot)).toBe('aimGround');
+    const sent: OwnerCommand[] = [];
+    const tools = createOwnerTools({
+      recipe,
+      command: (cmd) => {
+        sent.push(cmd);
+        return sim.command(cmd);
+      },
+      view: () => sim.view(),
+      nameOf: () => 'Bot',
+      primaries: PRIMARY_ORDER,
+      weaponNames: WEAPONS.map((w) => w.id),
+      slowAllowed: true,
+      log: () => {},
+    });
+    tools.action(nav(OWNER_ACTION.spawn));
+    tools.apply(v, deep[0], deep[1], deep[2], 0, -0.3, -1, () => false);
+    expect(sent).toEqual([]);
+    expect(tools.notice).toBe('Mire no chão');
+    sim.dispose();
+  });
+
+  it('revisão: o clique recusado passa pelos nós uma vez só (não uma por volta) e testa a vista de poucos nós', () => {
+    const { sim, main } = setup();
+    const v = sim.view();
+    const nav0 = v.nav!;
+    let positions = 0;
+    const counted = Object.create(nav0, {
+      nodePosition: {
+        value: (node: number, out: Float64Array, offset?: number): void => {
+          positions++;
+          nav0.nodePosition(node, out, offset);
+        },
+      },
+    }) as typeof nav0;
+    const cv = Object.create(v, { nav: { value: counted } }) as SimView;
+    // De fora do muro da borda, olhando para o chão de fora: 3 voltas (até a câmera), nenhuma com nó à vista.
+    const cam = [1.5, 0.5 + METRICS.eyeHeight, 40] as const;
+    const { yaw, pitch } = aim(cam, [1.5, 0.5, 37]);
+    const spot = new Float64Array(3);
+    expect(ownerSpawnSpot(cv, main, cam[0], cam[1], cam[2], yaw, pitch, spot)).toBe('place');
+    let walkable = 0;
+    for (let n = 0; n < nav0.nodeCount; n++) if (nav0.clearance[n] === 1 && nav0.component[n] === main) walkable++;
+    // Uma passada (um `nodePosition` por nó em pé do componente) mais os candidatos testados (no máximo 5 × 12).
+    expect(positions).toBeGreaterThanOrEqual(walkable);
+    expect(positions).toBeLessThanOrEqual(walkable + 5 * OWNER_UI.spotPerRound);
+    // Da câmera de cima (inclinada para baixo), as voltas de 1 m andam pouco no chão: as que ficam a menos de 0,5 m da
+    // anterior não contam, e a passada continua uma só.
+    positions = 0;
+    const high = [17.2, 30, 70] as const;
+    const steep = aim(high, [17.2, WALL.top, 54.4]);
+    ownerSpawnSpot(cv, main, high[0], high[1], high[2], steep.yaw, steep.pitch, spot);
+    expect(positions).toBeLessThanOrEqual(walkable + 5 * OWNER_UI.spotPerRound);
+    sim.dispose();
+  });
+
+  it('revisão: dois cliques antes da resposta (o mesmo tick, a câmera lenta) escolhem nós diferentes, os dois à vista', () => {
+    const { recipe, sim, step } = setup();
+    const v = sim.view();
+    const sent: OwnerCommand[] = [];
+    const tools = createOwnerTools({
+      recipe,
+      command: (cmd) => {
+        sent.push(cmd);
+        return sim.command(cmd);
+      },
+      view: () => sim.view(),
+      nameOf: () => 'Bot',
+      primaries: PRIMARY_ORDER,
+      weaponNames: WEAPONS.map((w) => w.id),
+      slowAllowed: true,
+      log: () => {},
+    });
+    const cam = [17.2, 7, 60] as const;
+    const { yaw, pitch } = aim(cam, [17.2, 0.5, 57]);
+    tools.action(nav(OWNER_ACTION.spawn));
+    tools.apply(v, cam[0], cam[1], cam[2], yaw, pitch, -1, () => false);
+    tools.apply(v, cam[0], cam[1], cam[2], yaw, pitch, -1, () => false);
+    expect(sent).toHaveLength(2);
+    const [a, b] = sent as [Extract<OwnerCommand, { kind: 'spawnBot' }>, Extract<OwnerCommand, { kind: 'spawnBot' }>];
+    expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThanOrEqual(OWNER.placeClearM);
+    // A sim põe cada um exatamente no nó mandado, os dois à vista da câmera.
+    const events = step();
+    expect(events.map((ev) => ev.ok)).toEqual([true, true]);
+    for (const [k, ev] of events.entries()) {
+      const e = entityIndex(ev.entity);
+      const c = sent[k] as Extract<OwnerCommand, { kind: 'spawnBot' }>;
+      expect(Math.hypot(v.position[e * 3]! - c.x, v.position[e * 3 + 2]! - c.z)).toBeLessThan(1e-4);
+      expect(sees(v, cam, Float64Array.of(c.x, c.y, c.z))).toBe(true);
+    }
+    // Respondidos, o lugar deixa de estar "mandado": o próximo clique vê os bots (ocupado) e vai para outro nó.
+    tools.apply(v, cam[0], cam[1], cam[2], yaw, pitch, -1, () => false);
+    const c3 = sent[2] as Extract<OwnerCommand, { kind: 'spawnBot' }>;
+    expect(ownerSpotTaken(v, c3.x, c3.y, c3.z)).toBe(false);
+    sim.dispose();
+  });
+
+  it('a plaquinha "CONGELADO" em cima do bot congelado, só na vista e só enquanto ele está congelado', () => {
+    const { sim, step } = setup();
+    const v = sim.view();
+    const bot = entityIndex(sim.controllerEntity(BOT_CONTROLLER_BASE + 2));
+    const bx = v.position[bot * 3]!;
+    const by = v.position[bot * 3 + 1]!;
+    const bz = v.position[bot * 3 + 2]!;
+    // A câmera 6 m ao sul do bot, na altura dos olhos, olhando para ele (o rumo 0 olha para −Z).
+    const cam = { x: bx, y: by + 1.55, z: bz + 6, yaw: 0, pitch: 0, fovY: 1.2 };
+    const rect = { x: 0, y: 0, width: 1280, height: 720 };
+    const list = createDrawList(256);
+    const label = t('owner.frozenTag').toUpperCase();
+    const draw = (
+      c: typeof cam = cam,
+      self = -1,
+      hidden: Uint8Array | null = null,
+      view: SimView = v,
+      alpha = 1,
+    ): { text: string; top: number } => {
+      resetDrawList(list, 1280, 720);
+      drawFrozenMarks(list, FONTS.hud, view, c, rect, 13, label, self, () => 1, hidden, alpha);
+      let top = Infinity;
+      for (let k = 0; k < list.count; k++) top = Math.min(top, list.geom[k * DRAW_FLOATS_PER_COMMAND + 1]!);
+      return { text: squash(drawnText(list)).toLowerCase(), top };
+    };
+    expect(label).toBe('CONGELADO');
+    // Solto: nada.
+    expect(draw().text).toBe('');
+    sim.command({ kind: 'freeze', entity: makeEntityId(bot, v.generation[bot]!), on: true });
+    step();
+    expect(v.owner!.frozen[bot]).toBe(1);
+    // Congelado: a plaquinha, acima do meio da tela (em cima da cabeça dele).
+    const shown = draw();
+    expect(shown.text).toBe('congelado');
+    expect(shown.top).toBeLessThan(360);
+    // De costas para ele, longe demais, ele mesmo (a vista nos olhos dele), invisível, ou passando da borda de cima: nada.
+    expect(draw({ ...cam, yaw: Math.PI }).text).toBe('');
+    expect(draw({ ...cam, z: bz + 60 }).text).toBe('');
+    expect(draw(cam, bot).text).toBe('');
+    const hidden = new Uint8Array(v.capacity);
+    hidden[bot] = 1;
+    expect(draw(cam, -1, hidden).text).toBe('');
+    expect(draw({ ...cam, pitch: -0.5 }).text).toBe('');
+    // Revisão: a plaquinha vai na posição desenhada do corpo (entre o tick de antes e o de agora, pelo `alpha`): com
+    // o corpo 1 m mais baixo no tick de antes, no alpha 0 ela fica mais baixa na tela, e no alpha 1 igual à de agora.
+    const prev = Float64Array.from(v.prevPosition);
+    prev[bot * 3 + 1] = by - 1;
+    const falling = Object.create(v, { prevPosition: { value: prev } }) as SimView;
+    expect(draw(cam, -1, null, falling, 1).top).toBe(shown.top);
+    expect(draw(cam, -1, null, falling, 0).top).toBeGreaterThan(shown.top + 20);
+    expect(draw(cam, -1, null, falling, 0.5).top).toBeGreaterThan(shown.top + 10);
+    // Solto de novo: some.
+    sim.command({ kind: 'freeze', entity: makeEntityId(bot, v.generation[bot]!), on: false });
+    step();
+    expect(draw().text).toBe('');
     sim.dispose();
   });
 });
@@ -649,6 +1053,8 @@ async function play(
   };
   const platform = createFakePlatform(store);
   let ui: DrawList | null = null;
+  /** Fase 5b: a HUD da vista do P1 (a plaquinha de abates e mortes, a vida), `null` quando a vista vai sem HUD. */
+  let hud: DrawList | null = null;
   const bundle: SceneBundle = {
     module: { createScene: (host, request) => SCENE_MODULE.createScene(host, { ...request, ...patch }) },
   };
@@ -659,6 +1065,9 @@ async function play(
       const r = createNullRenderer();
       r.drawUi = (list, view) => {
         if (view === undefined) ui = list;
+      };
+      r.renderViews = (views) => {
+        hud = views[0]?.hud ?? null;
       };
       return r;
     },
@@ -676,7 +1085,12 @@ async function play(
   // A contagem de 3 s.
   platform.pump(200);
   // O texto desenhado, sem espaços e em minúsculas (os botões e os títulos saem em caixa alta).
-  return { platform, game, text: () => squash(drawnText(ui)).toLowerCase() };
+  return {
+    platform,
+    game,
+    text: () => squash(drawnText(ui)).toLowerCase(),
+    hudText: () => squash(drawnText(hud)).toLowerCase(),
+  };
 }
 
 /** O Sandbox no Construto: o jogador e 3 Vibe Bob de cada lado; o objetivo "nenhum" (não acaba sozinho). */
@@ -700,28 +1114,47 @@ const reserveActive = (v: SimView): number => {
 
 describe('as Ferramentas do Dono na cena (startGame, NullRenderer)', () => {
   it('Sandbox offline: a reserva de 8, a página na pausa, "criar bot" onde mira com o aviso, o placar sem os de fora e a câmera lenta', async () => {
-    const { platform, game, text } = await play(SANDBOX);
+    // A semente da partida fixa (o JOGAR sorteia uma): os nomes da reserva saem dela.
+    const { platform, game, text, hudText } = await play(SANDBOX, { seed: 777 });
     const sim = game.match!.sim;
     const v = sim.view();
     expect(v.owner).not.toBeNull();
     expect(v.owner!.reserve).toBe(8);
     expect(ownerDormantCount(v)).toBe(8);
-    // O placar (Tab) não lista os 8 da reserva (Normal Bob): só os 7 da partida.
+    // Fase 5b: cada bot da reserva com o nome dele (a mesma conta da cena).
+    const names = controllerNames({ ...SANDBOX, seed: 777 }, 1);
+    addReserveNames(names, { ...SANDBOX, seed: 777 }, 1, 8);
+    const reserveNames = names.slice(v.owner!.reserveBase).map((n) => squash(n).toLowerCase());
+    expect(reserveNames).toHaveLength(8);
+    // O placar (Tab) não lista os 8 da reserva: só os 7 da partida.
     platform.rawNext.keys[keyIndex('Tab')] = 1;
     platform.pump(2);
     expect(text()).toContain('vibebob');
-    expect(text()).not.toContain('normalbob');
+    for (const name of reserveNames) expect(text()).not.toContain(name);
     platform.rawNext.keys[keyIndex('Tab')] = 0;
     platform.pump(2);
     // A pausa: o botão das ferramentas no canto de cima (para cima do Continuar); Enter abre a página, Enter arma.
     platform.tap('KeyP');
     expect(game.paused).toBe(true);
     expect(text()).toContain('ferramentas');
+    // Fase 5b (prints): na pausa, a HUD do P1 fica (apagada pelo véu); na página do dono, sai (o Voltar do canto ficava
+    // em cima da plaquinha de abates e mortes).
+    expect(hudText()).toContain('abates');
     platform.tap('ArrowUp');
     platform.tap('Enter');
     expect(text()).toContain('criarbot');
     expect(text()).toContain('câmeralenta');
     expect(text()).toContain('botsnareserva:8');
+    expect(hudText()).not.toContain('abates');
+    expect(hudText()).toBe('');
+    // Os modificadores também (e voltando dela, o foco fica nos Modificadores: 4 para cima até o Criar bot).
+    for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(text()).toContain('modificadoresaovivo');
+    expect(hudText()).toBe('');
+    platform.tap('Backspace');
+    expect(text()).toContain('criarbot');
+    for (let i = 0; i < 4; i++) platform.tap('ArrowUp');
     platform.tap('Enter');
     expect(game.paused).toBe(false);
     expect(platform.logLines).toContain('[partida] dono: armou own.spawn');
@@ -756,11 +1189,13 @@ describe('as Ferramentas do Dono na cena (startGame, NullRenderer)', () => {
       v.position[spawned * 3 + 2]! - v.position[me * 3 + 2]!,
     );
     expect(d).toBeLessThan(12);
-    // O aviso na tela, e o novo bot no placar.
-    expect(text()).toContain('botcriado:normalbob');
+    // O aviso na tela com o nome do 1º da reserva, e o novo bot no placar (só ele da reserva).
+    expect(text()).toContain(`botcriado:${reserveNames[0]}`);
+    expect(hudText()).toContain('abates');
     platform.rawNext.keys[keyIndex('Tab')] = 1;
     platform.pump(2);
-    expect(text()).toContain('normalbob');
+    expect(text()).toContain(reserveNames[0]);
+    for (const name of reserveNames.slice(1)) expect(text()).not.toContain(name);
     platform.rawNext.keys[keyIndex('Tab')] = 0;
     // A mira (botão direito) cancela.
     platform.rawNext.mouseButtons = MOUSE_BUTTON.right;
@@ -1010,6 +1445,63 @@ describe('as Ferramentas do Dono na cena: a revisão', () => {
     expect(frozenBots(av)).toBe(6);
     aq.game.dispose();
   }, 180_000);
+
+  it('fase 5b: a plaquinha "CONGELADO" fica em cima dos congelados (o Aquário seguindo um, a câmera livre e o amigo online)', async () => {
+    const aq = await play(SANDBOX, { spectate: true });
+    const a = aq.game.match!;
+    const av = a.sim.view();
+    const freezeAll = (on: boolean): void => {
+      for (const i of recipeBots(av)) a.command({ kind: 'freeze', entity: makeEntityId(i, av.generation[i]!), on });
+      aq.platform.pump(2);
+    };
+    // Ninguém congelado: nada.
+    expect(aq.hudText()).not.toContain('congelado');
+    // Todos congelados: a câmera que segue um bot (atrás dele) vê a plaquinha em cima da cabeça dele. Revisão: na lista
+    // da HUD da vista (por baixo das plaquinhas dela), não na da tela.
+    freezeAll(true);
+    expect(frozenBots(av)).toBe(7);
+    expect(aq.hudText()).toContain('congelado');
+    expect(aq.text()).not.toContain('congelado');
+    // A câmera livre (sem HUD) também: ela sai dos olhos do bot seguido; um pouco para trás, ele aparece na frente.
+    aq.platform.tap('KeyT');
+    aq.platform.tap('KeyT');
+    aq.platform.rawNext.keys[keyIndex('KeyS')] = 1;
+    aq.platform.pump(20);
+    aq.platform.rawNext.keys[keyIndex('KeyS')] = 0;
+    aq.platform.pump(2);
+    expect(aq.text()).toContain('câmeralivre');
+    expect(aq.hudText()).toBe('');
+    expect(aq.text()).toContain('congelado');
+    // Na pausa, a plaquinha sai (o véu cobre a partida).
+    aq.platform.tap('KeyP');
+    expect(aq.game.paused).toBe(true);
+    expect(aq.text()).not.toContain('congelado');
+    aq.platform.tap('KeyP');
+    // Soltos: some.
+    freezeAll(false);
+    expect(frozenBots(av)).toBe(0);
+    expect(aq.text()).not.toContain('congelado');
+    expect(aq.hudText()).not.toContain('congelado');
+    aq.game.dispose();
+
+    // O amigo online não tem as ferramentas, mas vê os congelados do host (o congelado vem no snapshot).
+    const client = await play(SANDBOX, { online: fakeSession('client', 8) });
+    const cv = client.game.match!.sim.view();
+    expect(cv.owner).not.toBeNull();
+    // (O snapshot de mentira não chega: a marca vai direto no estado do dono da sim do amigo.) Girando a câmera, algum
+    // congelado aparece com a plaquinha.
+    expect(client.hudText()).not.toContain('congelado');
+    for (const i of recipeBots(cv)) cv.owner!.frozen[i] = 1;
+    client.platform.rawNext.pointerLocked = true;
+    let seen = false;
+    for (let k = 0; k < 90 && !seen; k++) {
+      client.platform.rawNext.mouseDX = 60;
+      client.platform.pump(1);
+      seen = client.hudText().includes('congelado');
+    }
+    expect(seen).toBe(true);
+    client.game.dispose();
+  }, 180_000);
 });
 
 describe('a página do dono e a pausa com o item cabem (atlas real)', () => {
@@ -1175,5 +1667,62 @@ describe('a página do dono e a pausa com o item cabem (atlas real)', () => {
     expect(ids(pauseScreen.build({ challenge: true, owner: true }))).toContain('owner');
     expect(ids(pauseScreen.build({ challenge: true, owner: true, player: 1 }))).toEqual(['resume', 'leave']);
     expect(ids(pauseScreen.build({ challenge: true }))).not.toContain('owner');
+  });
+});
+
+describe('fase 5b (prints): o "criar bot" no Construto de verdade', () => {
+  /** O Construto pelo caminho do loading (a grade, as props e a navegação de verdade), como o `sandbox-maps.test`. */
+  function loadConstruto() {
+    const text = (path: string): string => new TextDecoder().decode(readRuntimeAsset(path));
+    const manifest = parseLayerManifest(JSON.parse(text('textures/blocos16.json')) as unknown);
+    const layers = new Map(manifest.layers.map((l, i) => [l.name, i] as const));
+    const world = buildMapWorld({
+      map: decodeMap(readRuntimeAsset('maps/construto.bfmap')),
+      blockDefs: parseBlockDefs(JSON.parse(text('blocks/blocks.json')) as unknown),
+      blockLayer: (name) => layers.get(name),
+      models: decodeModelPack(readRuntimeAsset('models/modelos.bfmodel')).models,
+    });
+    return buildSimMap(world, buildMapNav(world));
+  }
+
+  it('mirando no pé de uma parede e no alto de um muro: antes o bot nascia atrás, fora da vista; agora, do lado da câmera', () => {
+    const recipe: MatchRecipe = {
+      ...SANDBOX,
+      seed: 1,
+      teams: [{ humans: 1, bots: [{ ref: normal, count: 2 }] }, { bots: [] }],
+    };
+    const sim = createSim({ recipe, map: loadConstruto(), humans: 1, owner: { reserve: 8 } });
+    const v = sim.view();
+    const main = navMainComponent(v.nav!);
+    const sees = (o: readonly number[], p: ArrayLike<number>): boolean =>
+      ownerSees(v, o[0]!, o[1]!, o[2]!, p[0]!, p[1]! + 1.1, p[2]!) ||
+      ownerSees(v, o[0]!, o[1]!, o[2]!, p[0]!, p[1]! + METRICS.eyeHeight, p[2]!);
+    // Achados por sorteio (4.000 mirados no Construto): de pé, mirando numa parede a 17 m e no chão a 4 m (o nó mais
+    // perto fica atrás de um obstáculo baixo); e a câmera alta (como a livre do Aquário) mirando no alto de um muro.
+    const cases = [
+      { cam: [54.5, 2.55, 59.5], yaw: -1.777066225278402, pitch: 0.03758976211538545 },
+      { cam: [18.5, 2.55, 66.5], yaw: 0.16318507681060135, pitch: -0.3577256123302504 },
+      { cam: [26.5, 7, 11.5], yaw: -2.4067351382246294, pitch: -0.5002034963108599 },
+    ] as const;
+    const ground = new Float64Array(3);
+    const spot = new Float64Array(3);
+    const nodes = new Int32Array(OWNER.placeTries);
+    const d2 = new Float64Array(OWNER.placeTries);
+    for (const { cam, yaw, pitch } of cases) {
+      const [ox, oy, oz] = cam;
+      // Antes: o ponto do chão com 0,3 m antes da parede e o nó livre mais perto dele (a conta da sim, até 8 m).
+      expect(ownerGroundPoint(v, ox, oy, oz, yaw, pitch, ground, -0.3)).toBe(true);
+      const n = ownerSpotNodes(v.nav!, main, v.playArea, ground[0]!, ground[1]!, ground[2]!, 8, nodes, d2);
+      expect(n).toBeGreaterThan(0);
+      const before = new Float64Array(3);
+      v.nav!.nodePosition(nodes[0]!, before, 0);
+      expect(ownerSpotTaken(v, before[0]!, before[1]!, before[2]!)).toBe(false);
+      expect(sees(cam, before), `antes ${before.join(', ')}`).toBe(false);
+      // Agora: um nó à vista, a menos de 2,5 m (no chão) de onde o raio bateu.
+      expect(ownerSpawnSpot(v, main, ox, oy, oz, yaw, pitch, spot)).toBeNull();
+      expect(sees(cam, spot), `agora ${spot.join(', ')}`).toBe(true);
+      expect(Math.hypot(spot[0]! - ground[0]!, spot[2]! - ground[2]!)).toBeLessThan(2.5);
+    }
+    sim.dispose();
   });
 });

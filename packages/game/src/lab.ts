@@ -14,7 +14,6 @@ import {
   type BotRules,
   type BotSkill,
 } from '@boboforces/format';
-import type { Rng } from '@boboforces/shared';
 import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
 import { botDisplayName, botLevelOf } from './bot-card.ts';
 import { ALLOWED_CHOICES, ALLOWED_KEYS } from './custom-match.ts';
@@ -455,38 +454,8 @@ export function labSummary(d: BotDocument): string {
   });
 }
 
-// Gerador de nomes bobos em inglês (§6.7, #15: "Private Pickles", "Sergeant Noodle"). Nomes de bot são dado do
-// jogador, como os de fábrica: ficam em inglês, fora da tabela de textos.
-const RANKS = ['Private', 'Corporal', 'Sergeant', 'Captain', 'Major', 'Colonel', 'General', 'Cadet', 'Agent', 'Doctor'];
-const NOUNS = [
-  'Pickles',
-  'Noodle',
-  'Waffle',
-  'Biscuit',
-  'Nugget',
-  'Muffin',
-  'Pudding',
-  'Taco',
-  'Meatball',
-  'Pancake',
-  'Dumpling',
-  'Bagel',
-  'Cupcake',
-  'Potato',
-  'Burrito',
-  'Nacho',
-  'Sprinkles',
-  'Toast',
-];
-
-/** Um nome bobo novo, fora dos já usados (no limite, ganha um número). */
-export function rollBotName(rng: Rng, taken: ReadonlySet<string>): string {
-  for (let tries = 0; tries < 40; tries++) {
-    const name = `${RANKS[rng.int(0, RANKS.length)]!} ${NOUNS[rng.int(0, NOUNS.length)]!}`;
-    if (!taken.has(name)) return name;
-  }
-  return `${RANKS[0]!} ${NOUNS[0]!} ${rng.int(2, 100)}`;
-}
+// M9 (fase 5b): o gerador de nomes bobos mora no `bot-names` (a reserva do dono no jogo usa o mesmo).
+export { rollBotName } from './bot-names.ts';
 
 /** O nome digitado: só letras latinas, números, espaço e pontuação simples (o atlas do HUD), sem sobrar espaço. */
 export function cleanBotName(text: string): string {
