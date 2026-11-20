@@ -91,6 +91,7 @@ import {
   pushPaintBall,
   pushPropImpact,
   pushTracer,
+  TRACER_STYLE,
   pushTrail,
   resetFxQueue,
   type ViewDesc,
@@ -235,6 +236,7 @@ import {
 import { CELLS_PER_METER, isCellSolid, sampleLightGrid } from '@boboforces/world';
 import { seatRecipe, type LocalSeat } from './seats.ts';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
+import { approachScale, cameraInsideBody } from './body-scale.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
 import {
   calibrationFactor,
@@ -292,6 +294,7 @@ import {
   countdownLine,
   createDeathState,
   deathCamAngles,
+  deathCamBackoff,
   deathTexts,
   DEATH_CAM,
   endDeath,
@@ -1100,6 +1103,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M9 (fase 3): os limites que a sim joga (no Sandbox, os padrões e o objetivo), não os crus da receita.
   const { timeLimitS, scoreLimit } = matchLimits(recipe);
   const camAngles = { yaw: 0, pitch: 0 };
+  /** M9 (fase 1b): a direção do recuo da câmera de morte (`deathCamBackoff`). */
+  const camBack = { x: 0, z: 0 };
   // M2 (fase 2d): HUD da partida (kill feed, placar do Tab, contagem inicial e marcadores dos aliados).
   const killFeed = createKillFeedModel();
   const scoreboard = createScoreboardModel();
@@ -1267,6 +1272,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    */
   let velPrev = new Float32Array(3);
   let velCur = new Float32Array(3);
+  /**
+   * M9 (fase 1b): a escala dos modificadores desenhada de cada entidade (0 = fora do desenho): anda até a da sim
+   * (`SimView.chaosScale`) pelo `approachScale`, para o gigante não estalar ao passar debaixo de uma porta. O boneco,
+   * os marcadores em cima da cabeça, o clarão do tiro, o desmonte e a câmera de morte usam esta.
+   */
+  let shownScale = new Float32Array(1);
 
   // --- vistas ---
   /** Fase 1c: cresce quando alguém entra no meio (o layout da HUD é refeito). */
@@ -1901,6 +1912,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     figureTeam = new Uint8Array(capacity);
     velPrev = new Float32Array(capacity * 3);
     velCur = new Float32Array(capacity * 3);
+    shownScale = new Float32Array(capacity);
+  }
+  /** M9 (fase 1b): a escala dos modificadores desenhada da entidade `i` (a da sim, se ela ainda não foi desenhada). */
+  function drawnScale(v: SimView, i: number): number {
+    if (i >= v.count) return 1;
+    const k = i < shownScale.length ? shownScale[i]! : 0;
+    return k > 0 ? k : chaosScaleOf(v, i);
   }
   /** Vista em 1ª pessoa que segue a entidade (a câmera nomeada da vista 0 não conta); -1 = nenhuma. */
   function viewOfEntity(entity: number): number {
@@ -1963,8 +1981,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             shotAt[i] = timeS;
           }
           // Boca do cano aproximada (o render usa a do viewmodel para o dono em 1ª pessoa). M9 (fase 1): no Mini e no
-          // gigante, a arma fica na escala do corpo.
-          const size = i < v.count ? chaosScaleOf(v, i) : 1;
+          // gigante, a arma fica na escala do corpo (fase 1b: a desenhada, e o clarão também).
+          const size = drawnScale(v, i);
           const yaw = Math.atan2(-ev.dirX, -ev.dirZ);
           const rx = Math.cos(yaw) * size;
           const rz = -Math.sin(yaw) * size;
@@ -1973,7 +1991,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const mz = ev.originZ + ev.dirZ * 0.7 * size + rz * 0.16;
           const owner = viewOfEntity(ev.shooter);
           const weapon = modelOf(ev.weapon);
-          pushMuzzleFlash(fx, ev.shooter, mx, my, mz, ev.dirX, ev.dirY, ev.dirZ, owner, weapon);
+          pushMuzzleFlash(fx, ev.shooter, mx, my, mz, ev.dirX, ev.dirY, ev.dirZ, owner, weapon, size);
           if (ev.distance > 1.5 * size) {
             const d = ev.distance;
             pushTracer(fx, mx, my, mz, ev.originX + ev.dirX * d, ev.originY + ev.dirY * d, ev.originZ + ev.dirZ * d);
@@ -1982,10 +2000,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           break;
         }
         case 'ricochet': {
-          // M9 (fase 1): o Ricochete: o rastro sai do ponto do quique.
+          // M9 (fase 1): o Ricochete: o rastro sai do ponto do quique (fase 1b: no estilo dele, que dá para ver).
           if (ev.distance > 0.5) {
             const d = ev.distance;
-            pushTracer(fx, ev.x, ev.y, ev.z, ev.x + ev.dirX * d, ev.y + ev.dirY * d, ev.z + ev.dirZ * d);
+            const x1 = ev.x + ev.dirX * d;
+            const y1 = ev.y + ev.dirY * d;
+            const z1 = ev.z + ev.dirZ * d;
+            pushTracer(fx, ev.x, ev.y, ev.z, x1, y1, z1, TRACER_STYLE.ricochet);
           }
           break;
         }
@@ -2054,7 +2075,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M6 (fase 4b): o invisível que morre não tem pose recente para desmontar: só o "poof", no lugar certo.
           d.figure = hiddenNow[i] === 1 ? NO_FIGURE : figureOf[i]!;
           // M9 (fase 1): o tamanho de quem caiu (o Mini e o gigante desmontam do tamanho que tinham).
-          d.scale = v.bodyScale[i]! * chaosScaleOf(v, i);
+          d.scale = v.bodyScale[i]! * drawnScale(v, i);
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           pushDeath(fx, d);
           onDeath(s, ev.victim, ev.killer, ev.weapon);
@@ -2190,7 +2211,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const my = ev.y + dy * 0.8 - 0.1;
             const mz = ev.z + dz * 0.8;
             const owner = viewOfEntity(ev.owner);
-            pushMuzzleFlash(fx, ev.owner, mx, my, mz, dx, dy, dz, owner, modelOf(ev.weapon));
+            pushMuzzleFlash(fx, ev.owner, mx, my, mz, dx, dy, dz, owner, modelOf(ev.weapon), drawnScale(v, i));
             flashViews(mx, my, mz, owner);
           }
           break;
@@ -3872,6 +3893,38 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     player.writeFrame(drain, 0);
   }
 
+  /** M9 (fase 1b): quantos atores do frame são entidades da sim (os primeiros; depois vêm os manequins). */
+  let entityActors = 0;
+
+  /**
+   * M9 (fase 1b): o corpo dos modificadores maior que o normal (o bot gigante) com a câmera de uma vista em 1ª pessoa
+   * dentro dele (`cameraInsideBody`) some nessa vista, pelo mesmo caminho do próprio corpo (o `localSlot` do ator vira
+   * o da vista; nenhum programa novo). Com a colisão normal o gigante encosta no jogador e a tela virava perna. Um ator
+   * só some numa vista (no sofá, a primeira cuja câmera está dentro dele); quem já é corpo de uma vista fica como está.
+   * Depois das câmeras do frame, antes do desenho.
+   */
+  function hideBodiesAroundCameras(): void {
+    // quente:
+    const pos = actors.position;
+    for (let n = 0; n < entityActors && n < actors.count; n++) {
+      if (actors.localSlot[n] !== 255) continue;
+      const i = entityIndex(actors.entity[n]!);
+      if (i >= shownScale.length || shownScale[i]! <= 1) continue;
+      const sc = actors.scale[n]!;
+      const k = n * 3;
+      for (let s = 0; s < slots.length; s++) {
+        const desc = slots[s]!.desc;
+        if (desc.thirdPerson || desc.localSlot !== s) continue;
+        const c = desc.camera;
+        if (cameraInsideBody(c.x, c.y, c.z, pos[k]!, pos[k + 1]!, pos[k + 2]!, sc)) {
+          actors.localSlot[n] = s;
+          break;
+        }
+      }
+    }
+    // fim-quente
+  }
+
   /**
    * O `ActorBuffer` do frame (#56): o boneco do FutBobo de cada entidade viva (gabarito, skin de 2 camadas, postura da
    * MESMA `figurePostureOf` da sim, expressão e velocidade interpolada) e os manequins do grupo da câmera. A piscada, a
@@ -3889,6 +3942,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     let n = 0;
     for (let i = 0; i < v.count && n < actors.capacity; i++) {
       hiddenNow[i] = 0;
+      // M9 (fase 1b): fora do desenho, a escala desenhada esquece (o próximo desenho começa na da sim, sem crescer).
+      const lastScale = shownScale[i]!;
+      shownScale[i] = 0;
       if (v.alive[i] !== 1) continue;
       const kind = v.kind[i]!;
       if (kind !== ENTITY_KIND.bobo && kind !== ENTITY_KIND.zombie) continue;
@@ -3939,8 +3995,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.localSlot[n] = local >= 0 ? local : 255;
       actors.entity[n] = id;
       actors.kind[n] = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
-      // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto). M9 (fase 1): o Mini e os Bots gigantes.
-      const chaosK = chaosScaleOf(v, i);
+      // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto). M9 (fase 1): o Mini e os Bots gigantes
+      // (fase 1b: a escala da sim, apertada debaixo de teto, com o desenho andando até ela sem estalo).
+      const chaosK = approachScale(lastScale, chaosScaleOf(v, i), dt);
+      shownScale[i] = chaosK;
       actors.scale[n] = v.bodyScale[i]! * chaosK;
       let expression: number = FACE_EXPRESSION.neutral;
       if (flash[i]! > 0.3) expression = FACE_EXPRESSION.pain;
@@ -3963,6 +4021,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.recoil[n] = recoil[i]!;
       n++;
     }
+    entityActors = n;
     // Manequins do mapa (vitrine sempre; os de print com a câmera deles): não são entidades da sim.
     for (let m = 0; m < mqCount && n < actors.capacity; m++) {
       const group = mqGroup[m]!;
@@ -5282,7 +5341,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // M2 (fase 2c): câmera de morte, um pouco acima do olho, virando para quem matou.
       c.y += DEATH_CAM.riseM * Math.min(1, st.t / DEATH_CAM.turnS);
       c.fovY = verticalFov(fovDeg, aspect);
-      deathCamAngles(st, v, c.x, c.y, c.z, alpha, Math.atan(Math.tan(c.fovY / 2) * DEATH_CAM.killerLift), camAngles);
+      // M9 (fase 1b): o peito de quem matou na escala dele (a desenhada) e, se ele é grande (o gigante colado na
+      // vítima enchia a tela com a perna), a câmera recua no plano até ele caber (parando antes da parede).
+      const killerScale = isCurrentEntity(v, st.killer) ? drawnScale(v, entityIndex(st.killer)) : 1;
+      const back = deathCamBackoff(st, v, c.x, c.y, c.z, alpha, c.fovY, killerScale, camBack);
+      c.x += camBack.x * back;
+      c.z += camBack.z * back;
+      const lift = Math.atan(Math.tan(c.fovY / 2) * DEATH_CAM.killerLift);
+      deathCamAngles(st, v, c.x, c.y, c.z, alpha, lift, camAngles, killerScale);
       c.yaw = camAngles.yaw;
       c.pitch = clamp(camAngles.pitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
       slot.adsBlend = 0;
@@ -5377,6 +5443,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     vm.roll = 0;
     // Braços do viewmodel com a skin do boneco do dono (1ª das 2 camadas, a mesma do `ActorBuffer.skin`).
     vm.skin = skinLayer[e] !== 0xffff ? skinLayer[e]! : 0;
+    // M9 (fase 1b): de propósito, o viewmodel NÃO acompanha a escala do corpo (`SimView.chaosScale`): no Mini (e no
+    // humano que assume um bot gigante) a arma em 1ª pessoa fica do tamanho de sempre. O olho já desce ou sobe com o
+    // corpo; a arma encolhida sumiria no canto e a gigante taparia a tela. O mundo (o clarão, o traçado) é que escala.
     vm.scale = scale;
     sampleLightGrid(loaded.lightGrid, c.x, c.y, c.z, lightScratch, 0);
     vm.lightSky = lightScratch[0]!;
@@ -5672,7 +5741,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           desc.camera,
           lay.rects[s]!,
           v.position[o]!,
-          v.position[o + 1]! + EMOTE_HEIGHT_M * chaosScaleOf(v, i),
+          v.position[o + 1]! + EMOTE_HEIGHT_M * drawnScale(v, i),
           v.position[o + 2]!,
           projected,
         )
@@ -5777,7 +5846,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           desc.camera,
           rect,
           v.position[j * 3]!,
-          v.position[j * 3 + 1]! + JUGG_MARK_HEIGHT_M * chaosScaleOf(v, j),
+          v.position[j * 3 + 1]! + JUGG_MARK_HEIGHT_M * drawnScale(v, j),
           v.position[j * 3 + 2]!,
           Math.max(16, rect.height * 0.06),
           projected,
@@ -5803,7 +5872,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (entityIndex(sim.controllerEntity(seatCtrl[k]!)) === j) seat = seatNum[k]!;
         }
         const o = j * 3;
-        const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M * chaosScaleOf(v, j);
+        const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M * drawnScale(v, j);
         if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
         if (seat < 0 && projected[2]! > ALLY_MARKER_MAX_M) continue;
         m.markers[m.markerCount * 2] = projected[0]!;
@@ -6722,6 +6791,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       updateBuys(raw);
       updateOrders(raw, dt);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
+      hideBodiesAroundCameras();
       // M2 (fase 7b): cada vista ouve da própria câmera; passos, coração e contagem andam com a partida.
       matchSound.setListenerCount(slots.length);
       for (let s = 0; s < slots.length; s++) {

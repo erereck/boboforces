@@ -760,7 +760,7 @@ function swingKnife(ctx: SimContext, e: number, def: WeaponDef): void {
   const back = tfx * dx + tfz * dz > BACKSTAB_COS;
   const table = ctx.figures.table;
   if (table === null) throw new Error('sim: tabela de jogo solta (dispose)');
-  aimPointWorldWith(table, s, best, false, knifePoint, ctx.figures.chaosScaleOf(s, best));
+  aimPointWorldWith(table, s, best, false, knifePoint, s.chaosScale[best]!);
   ctx.events.melee(ctx.tick, attacker, s.idOf(best));
   const i = ctx.damage.push(
     best,

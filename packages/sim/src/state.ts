@@ -166,6 +166,13 @@ export class SimState {
   readonly zombieType = new Uint8Array(MAX_ENTITIES);
   /** M3 (fase 3b): escala do corpo (Chonker 1,3, chefão 1,8): a hitbox e o desenho crescem juntos; 1 = normal. */
   readonly bodyScale = new Float32Array(MAX_ENTITIES).fill(1);
+  /**
+   * M9 (fase 1b): a escala dos modificadores de cada corpo (Mini, Bots gigantes), já apertada debaixo de teto baixo
+   * (`updateChaosScales`). DERIVADA, fora de `fields` (não entra no hash nem no snapshot): sai só da posição, dos bits,
+   * do controlador, do tipo, da máscara e da grade, no fim de cada tick (e na criação, na leitura de snapshot e no
+   * `commit` do amigo online, que calcula a dele). 1 = normal; multiplica o `bodyScale`.
+   */
+  readonly chaosScale = new Float32Array(MAX_ENTITIES).fill(1);
   /** M3 (fase 4c): as vantagens do Bobo Zombies (bits de `PERK`); perdidas ao cair. */
   readonly perks = new Uint8Array(MAX_ENTITIES);
   /** M3 (fase 3d): pontos de conserto de barricada ganhos nesta onda (o teto é `repairPointsPerWave`). */

@@ -14,6 +14,7 @@ import {
   WEAPON_ZONE,
 } from '@boboforces/sim';
 import { t, type HudModel, type StringKey } from '@boboforces/ui';
+import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 
 /**
  * M2 (fase 2c): a tela de morte (gameplay.md §5.5; GDD §3.8). Lógica pura, sem DOM e sem alocar por frame: a câmera
@@ -66,8 +67,17 @@ export const DEATH_CAM = {
   holdS: 1.5,
   /** A câmera sobe isto acima do olho (m), para olhar por cima do corpo se desmontando. */
   riseM: 0.45,
-  /** Altura do ponto mirado em quem matou (m acima dos pés): o peito. */
+  /** Altura do ponto mirado em quem matou (m acima dos pés): o peito. M9 (fase 1b): vezes a escala dele. */
   chestM: 1.1,
+  /**
+   * M9 (fase 1b): o corpo maior que o normal (o bot gigante) cabe na tela: a câmera recua no plano, para longe dele,
+   * até ficar a `fitM` × escala ÷ tan(meio fov vertical) do eixo dele (a meia altura do corpo com folga), no máximo
+   * `maxBackM`. Colado na vítima, o gigante enchia a tela com a perna.
+   */
+  fitM: 1.2,
+  maxBackM: 6,
+  /** O recuo para isto antes da parede atrás (m). */
+  wallM: 0.3,
   /**
    * Quem matou aparece acima do centro, nesta fração da meia altura da tela: no centro fica a contagem do respawn,
    * que o cobriria.
@@ -193,7 +203,8 @@ export function radialIndex(x: number, y: number, count: number): number {
 /**
  * Mira da câmera de morte (em `out`): parte da mira da morte e vira em `turnS` para o peito de quem matou, seguindo-o
  * enquanto ele existir, um pouco abaixo dele (`liftRad`: ele aparece acima da contagem do centro); sem matador
- * (acidente, queda, o próprio foguete), fica onde estava.
+ * (acidente, queda, o próprio foguete), fica onde estava. M9 (fase 1b): `killerScale` é a escala do corpo de quem
+ * matou (o Mini e o gigante; a do desenho): o peito sobe e desce com ela.
  */
 export function deathCamAngles(
   st: DeathState,
@@ -204,6 +215,7 @@ export function deathCamAngles(
   alpha: number,
   liftRad: number,
   out: { yaw: number; pitch: number },
+  killerScale = 1,
 ): void {
   out.yaw = st.startYaw;
   out.pitch = st.startPitch;
@@ -211,7 +223,7 @@ export function deathCamAngles(
   const k = entityIndex(st.killer);
   const o = k * 3;
   const dx = lerp(view.prevPosition[o]!, view.position[o]!, alpha) - eyeX;
-  const dy = lerp(view.prevPosition[o + 1]!, view.position[o + 1]!, alpha) + DEATH_CAM.chestM - eyeY;
+  const dy = lerp(view.prevPosition[o + 1]!, view.position[o + 1]!, alpha) + DEATH_CAM.chestM * killerScale - eyeY;
   const dz = lerp(view.prevPosition[o + 2]!, view.position[o + 2]!, alpha) - eyeZ;
   const flat = Math.hypot(dx, dz);
   if (flat < 1e-3) return;
@@ -219,6 +231,51 @@ export function deathCamAngles(
   out.yaw = lerpAngle(st.startYaw, Math.atan2(-dx, -dz), blend);
   out.pitch = lerp(st.startPitch, Math.atan2(dy, flat) - liftRad, blend);
 }
+
+const backHit = createRayHit();
+
+/**
+ * M9 (fase 1b): o recuo da câmera de morte, no olho (eyeX, eyeY, eyeZ), para o corpo grande de quem matou caber na
+ * tela (`DEATH_CAM.fitM`). Escreve em `out` a direção no plano (unitária, para longe dele) e devolve quanto recuar (m;
+ * 0 com escala ≤ 1, sem matador ou já longe), crescendo com a virada (`turnS`) e parando `wallM` antes da parede atrás.
+ */
+export function deathCamBackoff(
+  st: DeathState,
+  view: SimView,
+  eyeX: number,
+  eyeY: number,
+  eyeZ: number,
+  alpha: number,
+  fovY: number,
+  killerScale: number,
+  out: { x: number; z: number },
+): number {
+  out.x = 0;
+  out.z = 0;
+  if (killerScale <= 1 || st.killer === st.victim || !isCurrentEntity(view, st.killer)) return 0;
+  const o = entityIndex(st.killer) * 3;
+  const dx = eyeX - lerp(view.prevPosition[o]!, view.position[o]!, alpha);
+  const dz = eyeZ - lerp(view.prevPosition[o + 2]!, view.position[o + 2]!, alpha);
+  const flat = Math.hypot(dx, dz);
+  if (flat < 1e-3) return 0;
+  const ux = dx / flat;
+  const uz = dz / flat;
+  out.x = ux;
+  out.z = uz;
+  const need = (DEATH_CAM.fitM * killerScale) / Math.tan(fovY / 2);
+  const blend = smoothstep(0, 1, clamp(st.t / DEATH_CAM.turnS, 0, 1));
+  let back = Math.min(DEATH_CAM.maxBackM, Math.max(0, need - flat)) * blend;
+  if (back <= 0) return 0;
+  const wall = DEATH_CAM.wallM;
+  if (
+    raycastGrid(view.world, view.blocks, eyeX, eyeY, eyeZ, ux, 0, uz, back + wall, BACK_MASK, backHit, view.colliders)
+  )
+    back = Math.max(0, backHit.distance - wall);
+  return back;
+}
+
+/** O que segura o recuo da câmera de morte: bloco sólido ou que tapa a visão. */
+const BACK_MASK = BLOCK_FLAG.solid | BLOCK_FLAG.blocksSight;
 
 /**
  * Perdendo feio (GDD §3.8)? Só da metade da partida em diante (do tempo ou da meta, o que estiver mais adiantado). No

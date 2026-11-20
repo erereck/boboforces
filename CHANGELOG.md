@@ -19,6 +19,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   mira deles param no teto; no Ricochete, a bala e o chumbo da escopeta quicam 1 vez no cenário, com o dano pela
   distância toda. Ligam na Partida personalizada e caem na Roleta do Bobo Chaos. O online foi para o protocolo 11: quem
   estiver com a versão antiga precisa atualizar para entrar na sala.
+- **Os gigantes debaixo do teto (fase 1b, pelos prints):** o gigante encolhe debaixo de teto baixo (e cresce de volta
+  ao sair), em vez de atravessar a laje; a câmera da morte enquadra o gigante inteiro; o gigante colado em você não
+  cobre mais a tela; o clarão do tiro acompanha o tamanho de quem atira; e o traço do ricochete ficou mais grosso e
+  dura mais, para dar para ver.
 - **O Sandbox na receita e na sim (fase 2):** cada time pode ter o próprio HP e as próprias armas, e o Sandbox tem o
   objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
   só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:

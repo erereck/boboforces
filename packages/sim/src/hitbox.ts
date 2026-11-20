@@ -71,6 +71,10 @@ export const ARM_HIT_CUT_M = METRICS.aabbWidth / 2 + 0.45;
  * mudam (como no Chonker). De propósito não escreve no `bodyScale`: ele só entra no hash do Zombies e do Royale, e os
  * zumbis nascem escrevendo nele.
  *
+ * M9 (fase 1b): debaixo de teto baixo o gigante encolhe (`CHAOS_SQUEEZE`, `squeezedScale`); a escala de verdade de
+ * cada corpo fica no `SimState.chaosScale` (derivado, `updateChaosScales`), que as hitboxes, o olho, a mira da IA e o
+ * desenho leem (`SimView.chaosScale`, `chaosScaleOf`). Esta função dá só a escala da máscara (sem o aperto).
+ *
  * Limites aceitos (revisão da fase 1), sem estado novo na rede:
  * - **Quem assume um lugar fica com o corpo do lugar**: o "gigante" é o controlador de bot, não quem joga. O humano
  *   que entra no meio da partida pelo sofá, ou que assume um bot no Aquário, vira gigante (o lugar é de bot); o bot que
@@ -102,16 +106,81 @@ export function chaosScale(mask: number, controller: number, kind: number): numb
     : 1;
 }
 
-/** O que `chaosScaleOf` lê (a `SimView` serve). */
-export interface ChaosBodies {
+/** O que `chaosMaskScaleOf` lê (a `SimView` serve). */
+export interface ChaosMaskBodies {
   readonly chaos: { readonly masks: Int32Array } | null;
   readonly controller: Int16Array;
   readonly kind: Uint8Array;
 }
 
-/** `chaosScale` do corpo `e` pela máscara ligada na view (1 sem modificadores). */
-export function chaosScaleOf(v: ChaosBodies, e: number): number {
+/**
+ * `chaosScale` do corpo `e` pela máscara ligada na view (1 sem modificadores), SEM o aperto do teto: "este corpo é
+ * gigante?" (a IA prefere caminhos de teto alto por isto, para a escolha não piscar a cada porta).
+ */
+export function chaosMaskScaleOf(v: ChaosMaskBodies, e: number): number {
   return v.chaos === null ? 1 : chaosScale(v.chaos.masks[0]!, v.controller[e]!, v.kind[e]!);
+}
+
+/** O que `chaosScaleOf` lê (a `SimView` e o `SimState` servem). */
+export interface ChaosBodies {
+  readonly chaosScale: Float32Array;
+}
+
+/**
+ * M9 (fase 1b): a escala dos modificadores do corpo `e` agora, já apertada debaixo de teto (`SimState.chaosScale`,
+ * derivada no fim de cada tick). É a das hitboxes, do olho, da mira da IA e do desenho. 1 = normal.
+ */
+export function chaosScaleOf(v: ChaosBodies, e: number): number {
+  return v.chaosScale[e]!;
+}
+
+/**
+ * M9 (fase 1b): o aperto do gigante debaixo de teto baixo. A escala de um corpo maior que 1 vira
+ * clamp((livre − `gapM`) ÷ topo, 1, escala), com "livre" a altura dos pés até o primeiro bloco em cima (um raio da
+ * grade por gigante por tick) e "topo" a altura do desenho em pé ou agachado (com o cabelo e o chapéu: o recorte do
+ * cabelo do render vai a 1,99 m em pé e 0,99 m agachado; a hitbox, a `FIGURE_MAX_TOP_M` 1,81 e `FIGURE_CROUCH_TOP_M`
+ * 0,97). Assim a cabeça, a arma e o olho do gigante nunca entram na laje; o tamanho 1 é o piso (a caixa de colisão
+ * normal já cabe). O Mini e o tamanho 1 não apertam.
+ */
+export const CHAOS_SQUEEZE = { gapM: 0.1, standTopM: 2, crouchTopM: 1 } as const;
+
+/** O que barra o gigante em cima: bloco sólido ou que para bala ou visão (vidro e grade também). */
+const SQUEEZE_MASK = BLOCK_FLAG.solid | BLOCK_FLAG.blocksBullets | BLOCK_FLAG.blocksSight;
+
+/**
+ * M9 (fase 1b): a escala `k` da máscara apertada pela altura livre `free` (m, dos pés ao primeiro bloco em cima; ≥
+ * `Infinity` = céu aberto) com os bits `flags` (agachado usa o topo agachado). Pura.
+ */
+export function squeezedScale(k: number, free: number, flags: number): number {
+  if (k <= 1) return k;
+  const top = (flags & ENTITY_FLAG.crouching) !== 0 ? CHAOS_SQUEEZE.crouchTopM : CHAOS_SQUEEZE.standTopM;
+  const fit = (free - CHAOS_SQUEEZE.gapM) / top;
+  return fit >= k ? k : fit <= 1 ? 1 : fit;
+}
+
+const squeezeHit = createRayHit();
+
+/**
+ * M9 (fase 1b): a escala do corpo de escala `k` da máscara com os pés em (x, y, z) e os bits `flags`: o raio da
+ * grade sobe do olho normal (sempre dentro da caixa de colisão, livre de bloco) até onde o topo em escala chegaria.
+ */
+export function squeezedScaleAt(
+  grid: WorldGrid,
+  blocks: BlockRegistry,
+  colliders: StaticColliders | null,
+  x: number,
+  y: number,
+  z: number,
+  flags: number,
+  k: number,
+): number {
+  if (k <= 1) return k;
+  const crouched = (flags & ENTITY_FLAG.crouching) !== 0;
+  const from = crouched ? METRICS.crouchEyeHeight : METRICS.eyeHeight;
+  const top = crouched ? CHAOS_SQUEEZE.crouchTopM : CHAOS_SQUEEZE.standTopM;
+  const reach = top * k + CHAOS_SQUEEZE.gapM - from;
+  if (!raycastGrid(grid, blocks, x, y + from, z, 0, 1, 0, reach, SQUEEZE_MASK, squeezeHit, colliders)) return k;
+  return squeezedScale(k, from + squeezeHit.distance, flags);
 }
 
 const HF = FIGURE_HIT_FIELD;
@@ -319,11 +388,6 @@ export class FigureHitCache {
   headScale = 1;
   private headTop = 0;
   private headSide = 0;
-  /**
-   * M9 (fase 1): os bits de tamanho (Mini, Bots gigantes) da máscara aplicada (`chaosScale`); 0 = todos no tamanho do
-   * `bodyScale`. As caixas do cache ficam no frame de tamanho 1, então trocar não esvazia nada.
-   */
-  chaosMask = 0;
 
   /** `slots` = slots com cache (controladores); mais 1 sem cache. */
   constructor(table: FigureGameTable | null, slots: number) {
@@ -333,16 +397,6 @@ export class FigureHitCache {
     this.stampKey = new Int32Array(slots + 1).fill(-1);
     this.ray[R_CUT] = ARM_HIT_CUT_M;
     if (table !== null) this.setTable(table);
-  }
-
-  /** M9 (fase 1): a máscara de modificadores aplicada (só os bits de tamanho ficam). */
-  setChaosMask(mask: number): void {
-    this.chaosMask = mask & CHAOS_SCALE_BITS;
-  }
-
-  /** M9 (fase 1): a escala dos modificadores do corpo `e` (1 sem Mini nem Bots gigantes). */
-  chaosScaleOf(s: SimState, e: number): number {
-    return this.chaosMask === 0 ? 1 : chaosScale(this.chaosMask, s.controller[e]!, s.kind[e]!);
   }
 
   /** Troca a tabela (o chão da fase larga é recalculado só quando ela muda) e esvazia o cache. */
@@ -400,8 +454,9 @@ export class FigureHitCache {
   testEntity(s: SimState, e: number, posture: number, tick: number): number {
     const c = s.controller[e]!;
     const slot = c >= 0 && c < this.spare ? c : this.spare;
-    // M9 (fase 1): o Mini e os Bots gigantes multiplicam a escala do corpo.
-    const k = this.chaosMask === 0 ? 1 : chaosScale(this.chaosMask, c, s.kind[e]!);
+    // M9 (fase 1): o Mini e os Bots gigantes multiplicam a escala do corpo (fase 1b: a do fim do tick anterior, já
+    // apertada debaixo de teto; as caixas do cache ficam no frame de tamanho 1, então mudar não esvazia nada).
+    const k = s.chaosScale[e]!;
     const sc = k === 1 ? s.bodyScale[e]! : s.bodyScale[e]! * k;
     if (sc === 1)
       return this.test(posture, s.position, e * 3, s.yaw, s.pitch, e, slot, e * KEY_POSTURES + posture, tick);
@@ -1023,6 +1078,10 @@ const eyeHit = createRayHit();
  * não muda. Maior (o gigante, de caixa normal): o olho em escala, mas nunca além do primeiro bloco (que para bala ou
  * visão) logo acima do olho normal, menos `GIANT_EYE_CEILING_GAP_M`: um raio da grade para cima. Sem isto o gigante
  * embaixo de um teto veria e atiraria do andar de cima.
+ *
+ * M9 (fase 1b): com a escala já apertada (`SimState.chaosScale`), o olho em escala fica sempre abaixo do teto na
+ * posição em que ela foi medida (o fim do tick): o corte só pega no tick em que o gigante entra debaixo de um teto ou
+ * levanta de agachado (a escala é a do fim do tick anterior). Fica como rede de segurança.
  */
 export function scaledEyeHeight(
   grid: WorldGrid,
@@ -1068,40 +1127,21 @@ export function viewEyeHeight(v: EyeBodies, e: number, flags: number): number {
 }
 
 /**
- * M9 (revisão da fase 1): o teto do ponto de mira do corpo `i` (y no mundo), ou `Infinity`. Só o gigante embaixo de um
- * teto tem: lá a cabeça e o peito em escala ficam dentro ou acima do telhado, e todo raio de visão até eles bateria
- * nele (os gigantes dentro de casa não se viam nem eram vistos). O teto é o olho dele já limitado (10 cm abaixo do
- * bloco), um ponto que ainda cai no corpo (o tronco; num corredor de 2 m, o quadril). A céu aberto, nada muda.
+ * M9 (revisão da fase 1): `aimPointWorld` do corpo `i` na escala dos modificadores dele (`chaosScaleOf`). É o ponto
+ * que a IA olha e mira. Fase 1b: a escala já vem apertada debaixo de teto, então a cabeça e o peito do gigante dentro
+ * de casa ficam abaixo da laje (antes o ponto era cortado no olho dele, `viewAimCeiling`, que saiu).
  */
-export function viewAimCeiling(v: EyeBodies, i: number, flags: number): number {
-  const k = chaosScaleOf(v, i);
-  if (k <= 1) return Infinity;
-  const i3 = i * 3;
-  const y = v.position[i3 + 1]!;
-  const eye = scaledEyeHeight(v.world, v.blocks, v.colliders, v.position[i3]!, y, v.position[i3 + 2]!, flags, k);
-  return eye < eyeHeightFor(flags) * k ? y + eye : Infinity;
-}
-
-/**
- * M9 (revisão da fase 1): `aimPointWorld` do corpo `i` na escala dos modificadores dele (`chaosScaleOf`) e nunca acima
- * do `viewAimCeiling`. Devolve `true` quando o teto cortou (o desvio da parte vista, `visibleAimOffset`, não vale).
- * É o ponto que a IA olha e mira (e a assistência de mira do jogo usa o mesmo teto).
- */
-export function viewAimPoint(v: EyeBodies & BodyArrays, i: number, head: boolean, out: AimPoint): boolean {
+export function viewAimPoint(v: ChaosBodies & BodyArrays, i: number, head: boolean, out: AimPoint): void {
   aimPointWorld(v, i, head, out, chaosScaleOf(v, i));
-  const top = viewAimCeiling(v, i, v.flags[i]!);
-  if (out.y <= top) return false;
-  out.y = top;
-  return true;
 }
 
-/** M9 (fase 1): o olho do corpo `e` com os bits `flags` na sim (a máscara aplicada pelo `applyChaos`). */
+/** M9 (fase 1): o olho do corpo `e` com os bits `flags` na sim (a escala do `SimState.chaosScale`). */
 export function simEyeHeight(
-  ctx: Pick<SimContext, 's' | 'grid' | 'blocks' | 'colliders' | 'figures'>,
+  ctx: Pick<SimContext, 's' | 'grid' | 'blocks' | 'colliders'>,
   e: number,
   flags: number,
 ): number {
-  const k = ctx.figures.chaosScaleOf(ctx.s, e);
+  const k = ctx.s.chaosScale[e]!;
   if (k === 1) return eyeHeightFor(flags);
   const p = ctx.s.position;
   const e3 = e * 3;

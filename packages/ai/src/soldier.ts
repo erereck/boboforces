@@ -13,6 +13,7 @@ import { BUTTON, ORDER, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from 
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, pitchToI16, wrapAngle, yawToU16, type Rng } from '@boboforces/shared';
 import {
   viewAimPoint,
+  chaosMaskScaleOf,
   chaosScaleOf,
   ENTITY_FLAG,
   ENTITY_KIND,
@@ -1071,12 +1072,12 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     b.aimOffsetPosture = posture;
     b.aimOffsetNextTick = tick + t.visibleAimRefresh;
   }
-  // M9 (fase 1): o ponto cresce com o corpo do alvo; o do gigante embaixo de um teto fica abaixo dele, e aí o desvio da
-  // parte vista (calculado para o ponto em escala) não vale.
-  const capped = viewAimPoint(view, b.target, b.aimHead, aimPoint);
-  const offX = capped ? 0 : off.x;
-  const offY = capped ? 0 : off.y;
-  const offZ = capped ? 0 : off.z;
+  // M9 (fase 1): o ponto cresce com o corpo do alvo (fase 1b: o do gigante debaixo de teto, na escala apertada, que
+  // fica abaixo da laje; o desvio da parte vista é da mesma escala).
+  viewAimPoint(view, b.target, b.aimHead, aimPoint);
+  const offX = off.x;
+  const offY = off.y;
+  const offZ = off.z;
   const ty = view.yaw[b.target]!;
   const tc = Math.cos(ty);
   const ts = Math.sin(ty);
@@ -1779,7 +1780,7 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   const e = c.ctrlToEntity[b.controller]!;
   if (e < 0) return;
   // M9 (fase 1): o bot gigante foge do teto baixo nos caminhos.
-  b.follower.giant = chaosScaleOf(view, e) > 1;
+  b.follower.giant = chaosMaskScaleOf(view, e) > 1;
   const fl = view.flags[e]!;
   if ((fl & F.dead) !== 0) {
     if (!b.wasDead) b.follower.clear();

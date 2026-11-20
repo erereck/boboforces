@@ -23,6 +23,7 @@ import {
   countdownLine,
   createDeathState,
   deathCamAngles,
+  deathCamBackoff,
   deathTexts,
   DEATH_CAM,
   fillDeathBanner,
@@ -117,6 +118,50 @@ describe('câmera de morte', () => {
     st.t = 5;
     deathCamAngles(st, v, 10, 2, 30, 1, 0.1, out);
     expect(out.yaw).toBe(0.7);
+  });
+
+  it('M9 (fase 1b): o peito de quem matou na escala dele (o gigante: o triplo da altura)', () => {
+    const { sim } = duel();
+    const v = sim.view();
+    const st = createDeathState();
+    beginDeath(st, sim.controllerEntity(0), sim.controllerEntity(4), WEAPON_CODE.rifle, 0, 0);
+    st.t = DEATH_CAM.turnS;
+    const out = { yaw: 0, pitch: 0 };
+    // Olho a 10 m do matador (pés a 0,5 m) na altura do peito normal: olhando reto; o do gigante fica acima.
+    const eyeY = 0.5 + DEATH_CAM.chestM;
+    deathCamAngles(st, v, 10, eyeY, 30, 1, 0, out, 1);
+    expect(out.pitch).toBeCloseTo(0, 9);
+    deathCamAngles(st, v, 10, eyeY, 30, 1, 0, out, 3);
+    expect(out.pitch).toBeCloseTo(Math.atan2(DEATH_CAM.chestM * 2, 10), 9);
+    deathCamAngles(st, v, 10, eyeY, 30, 1, 0, out, 0.5);
+    expect(out.pitch).toBeCloseTo(Math.atan2(-DEATH_CAM.chestM / 2, 10), 9);
+  });
+
+  it('M9 (fase 1b): a câmera recua do gigante colado até ele caber, para antes da parede; o normal não recua', () => {
+    const { sim } = duel();
+    const v = sim.view();
+    const st = createDeathState();
+    beginDeath(st, sim.controllerEntity(0), sim.controllerEntity(4), WEAPON_CODE.rifle, 0, 0);
+    const dir = { x: 0, z: 0 };
+    const fovY = 1.2;
+    // O matador nos pés em (10; 20); o olho a 1 m dele, em z = 21: recuar é ir para +Z.
+    expect(deathCamBackoff(st, v, 10, 2, 21, 1, fovY, 1, dir)).toBe(0);
+    st.t = 0;
+    expect(deathCamBackoff(st, v, 10, 2, 21, 1, fovY, 3, dir)).toBe(0);
+    st.t = DEATH_CAM.turnS;
+    const need = (DEATH_CAM.fitM * 3) / Math.tan(fovY / 2);
+    expect(deathCamBackoff(st, v, 10, 2, 21, 1, fovY, 3, dir)).toBeCloseTo(need - 1, 9);
+    expect([dir.x, dir.z]).toEqual([0, 1]);
+    // Já longe (mais que o necessário): nada.
+    expect(deathCamBackoff(st, v, 10, 2, 20 + need + 1, 1, fovY, 3, dir)).toBe(0);
+    // Sem matador: nada.
+    const alone = createDeathState();
+    beginDeath(alone, sim.controllerEntity(0), NULL_ENTITY, WEAPON_KILL_PLANE, 0, 0);
+    alone.t = 5;
+    expect(deathCamBackoff(alone, v, 10, 2, 21, 1, fovY, 3, dir)).toBe(0);
+    // Uma parede em z = 23 m (célula 46, até 5 m de altura): o recuo para 0,3 m antes dela.
+    fillBox(v.world, 0, 1, 46, 39, 10, 46, concrete);
+    expect(deathCamBackoff(st, v, 10, 2, 21, 1, fovY, 3, dir)).toBeCloseTo(2 - DEATH_CAM.wallM, 9);
   });
 });
 

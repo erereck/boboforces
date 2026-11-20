@@ -45,6 +45,12 @@ export interface SimView {
   readonly zombieType: Uint8Array;
   /** M3 (fase 3b): escala do corpo (o render desenha nela; a hitbox cresce junto). */
   readonly bodyScale: Float32Array;
+  /**
+   * M9 (fase 1b): a escala dos modificadores (Mini, Bots gigantes) de cada corpo, já apertada debaixo de teto baixo:
+   * a das hitboxes, do olho e da mira da IA (`chaosScaleOf`). Multiplica o `bodyScale` no desenho. Derivada do estado
+   * do fim do tick (fora do hash e do snapshot; o amigo online calcula a dele). 1 = normal.
+   */
+  readonly chaosScale: Float32Array;
   /** M3 (fase 4c): as vantagens de cada bobo no Bobo Zombies (bits de `PERK`). */
   readonly perks: Uint8Array;
   /** M3 (fase 2b): os pontos de cada bobo no Bobo Zombies (0 fora do modo). */

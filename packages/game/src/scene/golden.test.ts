@@ -518,9 +518,11 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * Bots gigantes e o Ricochete entraram): `02b92b79` (Gravidade pesada, Só na cabeça e Festa; sai a pesada e entra o
  * Ricochete; sai a Festa e entram os Bots gigantes; 27 × 18). Na revisão da fase 1 a mira da IA no gigante embaixo de
  * teto passou a ficar abaixo dele: `ae3a48fd` (as mesmas trocas; 24 × 25, com morte súbita até o tick 10.832, onde
- * sai o Ricochete e entra a pesada). MUDA com a sim, a IA, o mapa ou os modificadores.
+ * sai o Ricochete e entra a pesada). Na fase 1b o gigante encolhe debaixo de teto baixo (a escala de cada corpo sai
+ * no fim do tick e as hitboxes usam a do tick anterior): `566e5be9` (as mesmas trocas; 24 × 22 nos 10.800 ticks, sem
+ * morte súbita). MUDA com a sim, a IA, o mapa ou os modificadores.
  */
-const GOLDEN_CHAOS_HASH = 'ae3a48fd';
+const GOLDEN_CHAOS_HASH = '566e5be9';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();

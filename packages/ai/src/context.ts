@@ -186,7 +186,8 @@ export class AiContext {
     const aim = this.aim;
     for (let k = 0; k < 2; k++) {
       if (this.raysLeft <= 0) return false;
-      // M9 (fase 1): no Mini e no bot gigante, os pontos crescem com o corpo; o do gigante, até o teto dele.
+      // M9 (fase 1): no Mini e no bot gigante, os pontos crescem com o corpo (o do gigante, na escala apertada debaixo
+      // de teto: abaixo da laje).
       viewAimPoint(v, t, k === 0, aim);
       const dx = aim.x - ex;
       const dy = aim.y - ey;

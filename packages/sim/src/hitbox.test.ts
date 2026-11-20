@@ -9,6 +9,7 @@ import {
   FIGURE_GRIP,
   FIGURE_HIT_FIELD as HF,
   FIGURE_HIT_STRIDE,
+  FIGURE_MAX_TOP_M,
   FIGURE_MODE,
   FIGURE_PART_CATEGORY,
   FIGURE_PITCH_SAMPLES,
@@ -50,7 +51,9 @@ import {
   boundFigureTable,
   CHAOS_SCALE,
   chaosScale,
+  chaosMaskScaleOf,
   chaosScaleOf,
+  CHAOS_SQUEEZE,
   createBoboHit,
   eyeHeightFor,
   FigureHitCache,
@@ -59,6 +62,8 @@ import {
   HITBOX_COUNT,
   rayVsBobo,
   scaledEyeHeight,
+  squeezedScale,
+  squeezedScaleAt,
   unbindFigureTable,
   visibleAimLocal,
   visibleAimOffset,
@@ -1058,6 +1063,10 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
     cache.beginRay(s.position[e * 3]!, h, -10, 0, 0, 1, 100);
     return cache.testEntity(s, e, STAND, tick++);
   }
+  /** A escala de cada corpo pela máscara, sem teto (o que o `updateChaosScales` escreve a céu aberto). */
+  function setScales(s: SimState, mask: number): void {
+    for (let e = 0; e < s.count; e++) s.chaosScale[e] = chaosScale(mask, s.controller[e]!, s.kind[e]!);
+  }
 
   it('a escala: o Mini vale para todo corpo; o gigante, só para os bobos dos bots', () => {
     expect(chaosScale(0, BOT_CONTROLLER_BASE, ENTITY_KIND.bobo)).toBe(1);
@@ -1068,27 +1077,65 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
     expect(chaosScale(GIANTS, ZOMBIE_CONTROLLER_BASE, ENTITY_KIND.zombie)).toBe(1);
     expect(chaosScale(GIANTS, BOT_CONTROLLER_BASE, ENTITY_KIND.projectile)).toBe(1);
     const view = { chaos: { masks: Int32Array.of(GIANTS, GIANTS, -1) }, ...bodies().s };
-    expect(chaosScaleOf(view, 1)).toBe(3);
-    expect(chaosScaleOf({ ...view, chaos: null }, 1)).toBe(1);
+    expect(chaosMaskScaleOf(view, 1)).toBe(3);
+    expect(chaosMaskScaleOf({ ...view, chaos: null }, 1)).toBe(1);
+    // A escala de agora é a do array derivado (a sim escreve no fim do tick).
+    expect(chaosScaleOf(view, 1)).toBe(1);
+    view.chaosScale[1] = 1.5;
+    expect(chaosScaleOf(view, 1)).toBe(1.5);
+  });
+
+  it('o aperto (fase 1b): clamp((livre − folga) ÷ topo, 1, escala); agachado usa o topo agachado; o Mini não aperta', () => {
+    const { gapM, standTopM, crouchTopM } = CHAOS_SQUEEZE;
+    // O topo do aperto cobre a hitbox (e o cabelo do desenho, que o render corta a 1,99 m e 0,99 m).
+    expect(standTopM).toBeGreaterThanOrEqual(FIGURE_MAX_TOP_M);
+    expect(crouchTopM).toBeGreaterThanOrEqual(FIGURE_CROUCH_TOP_M);
+    expect(squeezedScale(3, Infinity, 0)).toBe(3);
+    expect(squeezedScale(3, 3 * standTopM + gapM, 0)).toBe(3);
+    expect(squeezedScale(3, 2.5, 0)).toBeCloseTo((2.5 - gapM) / standTopM, 12);
+    expect(squeezedScale(3, 2.5, F.crouching)).toBe(Math.min(3, (2.5 - gapM) / crouchTopM));
+    expect(squeezedScale(3, 1.8, 0)).toBe(1);
+    expect(squeezedScale(1, 1.8, 0)).toBe(1);
+    expect(squeezedScale(CHAOS_SCALE.mini, 0.5, 0)).toBe(CHAOS_SCALE.mini);
+    // Pela grade: laje de 3,0 a 3,5 m (célula y = 6) sobre a metade x < 5 m; o chão até 0,5 m.
+    const blocks = createTestBlocks();
+    const concrete = makeCell(blocks.byKey('concrete')!.id);
+    const grid = createWorldGrid(20, 20, 20);
+    fillBox(grid, 0, 0, 0, 19, 0, 19, concrete);
+    fillBox(grid, 0, 6, 0, 9, 6, 19, concrete);
+    const at = (x: number, flags: number, k: number): number =>
+      squeezedScaleAt(grid, blocks, null, x, 0.5, 5, flags, k);
+    expect(at(7, 0, 3)).toBe(3);
+    const under = at(2, 0, 3);
+    expect(under).toBeCloseTo((2.5 - gapM) / standTopM, 9);
+    expect(under).toBeLessThan(3);
+    // O topo da hitbox e o olho em escala ficam abaixo da laje.
+    expect(0.5 + FIGURE_MAX_TOP_M * under).toBeLessThan(3 - gapM);
+    expect(0.5 + METRICS.eyeHeight * under).toBeLessThan(3 - gapM);
+    const crouched = at(2, F.crouching, 3);
+    expect(crouched).toBeGreaterThan(under);
+    expect(0.5 + FIGURE_CROUCH_TOP_M * crouched).toBeLessThan(3 - gapM);
+    expect(at(2, 0, 1)).toBe(1);
+    expect(at(2, 0, CHAOS_SCALE.mini)).toBe(CHAOS_SCALE.mini);
   });
 
   it('a hitbox: o tiro a 2,6 m pega o bot gigante e passa por cima do humano; o Mini erra a 0,95 m', () => {
     const { s, human, bot } = bodies();
     const cache = new FigureHitCache(table, 8);
     expect([shoot(cache, s, human, 2.6), shoot(cache, s, bot, 2.6)]).toEqual([-1, -1]);
-    cache.setChaosMask(GIANTS);
+    setScales(s, GIANTS);
     expect(shoot(cache, s, human, 2.6)).toBe(-1);
     // 2,6 m é a cintura do gigante (5,25 m); a 5 m, a cabeça dele.
     expect(shoot(cache, s, bot, 2.6)).toBeGreaterThanOrEqual(0);
     expect(shoot(cache, s, bot, 5)).toBe(FIGURE_BONE.head);
     // O Mini (0,875 m de altura): 0,95 m passa por cima dos dois; 0,8 m é a cabeça e 0,5 m o tronco.
-    cache.setChaosMask(MINI);
+    setScales(s, MINI);
     expect(shoot(cache, s, human, 1.2)).toBe(-1);
     expect(shoot(cache, s, bot, 0.95)).toBe(-1);
     expect(shoot(cache, s, human, 0.8)).toBe(FIGURE_BONE.head);
     expect(shoot(cache, s, human, 0.5)).toBe(FIGURE_BONE.torso);
     // Sem bits de tamanho, como antes.
-    cache.setChaosMask(MOD_BIT_NONE);
+    setScales(s, MOD_BIT_NONE);
     expect(shoot(cache, s, human, 1.2)).toBeGreaterThanOrEqual(0);
     cache.release();
   });
@@ -1098,7 +1145,7 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
     // Fuzil no ADS: os braços vão para a frente, até ~2 m do eixo no gigante.
     const ads = figurePosture(FIGURE_STANCE.stand, FIGURE_GRIP.rifle, FIGURE_MODE.ads, false);
     const cache = new FigureHitCache(table, 8);
-    cache.setChaosMask(GIANTS);
+    setScales(s, GIANTS);
     const rng = createRng('m9-braco');
     const px = s.position[bot * 3]!;
     const pz = s.position[bot * 3 + 2]!;
@@ -1123,7 +1170,7 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
     expect(arms).toBeGreaterThan(50);
     expect(far).toBeLessThanOrEqual(ARM_HIT_CUT_M + 1e-9);
     // O raio volta como estava: o corpo normal seguinte continua com o corte de sempre.
-    cache.setChaosMask(MOD_BIT_NONE);
+    setScales(s, MOD_BIT_NONE);
     cache.release();
   });
 
@@ -1172,7 +1219,7 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
       return cache.testEntity(s, bot, ads, tick++);
     };
     expect(FIGURE_PART_CATEGORY[toHead(1)]).toBe(2);
-    cache.setChaosMask(GIANTS);
+    setScales(s, GIANTS);
     expect(toHead(CHAOS_SCALE.giantBots)).toBe(FIGURE_BONE.head);
     cache.release();
   });

@@ -74,7 +74,9 @@ export {
   boundFigureTable,
   CHAOS_SCALE,
   CHAOS_SCALE_BITS,
+  CHAOS_SQUEEZE,
   chaosScale,
+  chaosMaskScaleOf,
   chaosScaleOf,
   createBoboHit,
   eyeHeightFor,
@@ -84,8 +86,9 @@ export {
   rayBoxEntry,
   rayVsBobo,
   scaledEyeHeight,
+  squeezedScale,
+  squeezedScaleAt,
   unbindFigureTable,
-  viewAimCeiling,
   viewAimPoint,
   viewEyeHeight,
   visibleAimLocal,
@@ -95,6 +98,7 @@ export {
   type BoboHit,
   type BodyArrays,
   type ChaosBodies,
+  type ChaosMaskBodies,
   type EyeBodies,
 } from './hitbox.ts';
 export { WEAPON_KILL_PLANE, WEAPON_NONE, WEAPON_NUKE, WEAPON_ZONE } from './context.ts';

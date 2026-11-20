@@ -6,6 +6,7 @@ import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { secondsToTicks } from '../constants.ts';
 import { WEAPON_NONE, type MatchMods, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
+import { CHAOS_SCALE_BITS, chaosScale, squeezedScaleAt } from '../hitbox.ts';
 
 /**
  * M6 (fase 4): os modificadores (GDD §4.5.3) e a Roleta do Bobo Chaos.
@@ -19,8 +20,8 @@ import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
  * - **Aplicar** a máscara troca o perfil de movimento da partida (`ctx.profile`: um dos 6 feitos na criação, sem
  *   alocar) e liga os modificadores de arma (`ctx.mods`, a cópia da partida). Os outros efeitos olham a máscara na
  *   hora (`modOn`): munição infinita (armas), vampiro (dano), tudo explode e troca de arma por abate (morte) e, no M9,
- *   o Ricochete (armas). O Mini e os Bots gigantes vão para as hitboxes (`setChaosMask`); o olho, a IA e o desenho
- *   tiram o tamanho da máscara (`chaosScale`).
+ *   o Ricochete (armas). O Mini e os Bots gigantes viram a escala de cada corpo no fim do tick
+ *   (`updateChaosScales`, apertada debaixo de teto), que as hitboxes, o olho, a IA e o desenho leem.
  */
 export const MOD = Object.fromEntries(MODIFIERS.map((id, i) => [id, 1 << i])) as Readonly<Record<ModifierId, number>>;
 
@@ -52,6 +53,8 @@ export class ChaosState {
   readonly masks = new Int32Array(3);
   /** A máscara já aplicada no perfil e nas regras (fora do estado: sai das `masks`). */
   applied = -1;
+  /** M9 (fase 1b): o `SimState.chaosScale` tem algum valor diferente de 1 (fora do estado: só poupa o `fill`). */
+  scaled = false;
   /**
    * Só o amigo online: a máscara do snapshot mais novo, que vale para a predição do próprio movimento (a view mostra a
    * do snapshot atrasado, ~100 ms antes). -1 = a das `masks` (o host e as sims sem rede).
@@ -130,10 +133,44 @@ export function applyChaos(ctx: SimContext): void {
   const v = (mask & MOD.speed) !== 0 ? 1 : 0;
   ctx.profile = c.profiles[g * 2 + v]!;
   ctx.figures.setHeadScale((mask & MOD.bigHead) !== 0 ? CHAOS_MODS.bigHead : 1);
-  // M9 (fase 1): o Mini e os Bots gigantes (o tamanho sai da máscara na hora: `chaosScale`).
-  ctx.figures.setChaosMask(mask);
   c.mods.headshotOnly = c.baseMods.headshotOnly || (mask & MOD.headshotOnly) !== 0;
   c.mods.oneShot = c.baseMods.oneShot || (mask & MOD.oneShot) !== 0;
+}
+
+/**
+ * M9 (fase 1b): a escala dos modificadores de cada corpo (`SimState.chaosScale`): a da máscara ATIVA (`masks[0]`, a
+ * que a view mostra; `chaosScale`), com o gigante apertado debaixo de teto baixo (`squeezedScaleAt`: um raio da grade
+ * por gigante, vivo ou morto). Derivada do estado do fim do tick (posição, bits, controlador, tipo, máscara e grade): o
+ * `step` chama no fim, antes de sincronizar a view, e a criação, a leitura de snapshot e o `commit` do amigo online
+ * também; nada disso entra no hash. Quem lê dentro do tick (as hitboxes, o olho da sim) usa a do fim do tick anterior,
+ * a mesma que a IA viu. Sem tamanho na máscara, tudo fica 1 (um `fill` só na saída). Sem alocação.
+ */
+export function updateChaosScales(ctx: SimContext): void {
+  const c = ctx.chaos;
+  if (c === null) return;
+  const s = ctx.s;
+  const out = s.chaosScale;
+  const mask = c.masks[0]! & CHAOS_SCALE_BITS;
+  if (mask === 0) {
+    if (c.scaled) {
+      out.fill(1);
+      c.scaled = false;
+    }
+    return;
+  }
+  c.scaled = true;
+  // quente:
+  const p = s.position;
+  for (let e = 0; e < s.count; e++) {
+    const k = chaosScale(mask, s.controller[e]!, s.kind[e]!);
+    if (k <= 1 || s.alive[e] !== 1) {
+      out[e] = k;
+      continue;
+    }
+    const e3 = e * 3;
+    out[e] = squeezedScaleAt(ctx.grid, ctx.blocks, ctx.colliders, p[e3]!, p[e3 + 1]!, p[e3 + 2]!, s.flags[e]!, k);
+  }
+  // fim-quente
 }
 
 /** Os bits que a Roleta pode pôr com `mask` ligada (sem os ligados e sem os que conflitam com eles). */

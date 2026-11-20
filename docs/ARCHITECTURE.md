@@ -4677,7 +4677,8 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
 - **O que acompanha o tamanho:** as hitboxes (o raio vai ao espaço do corpo em tamanho 1, como no Chonker; o corte do
   braço fica constante no mundo), a altura do olho (`simEyeHeight`: no Mini, a metade; no gigante, até 0,1 m abaixo
   do primeiro bloco em cima, para não atirar através do teto), os pontos de mira dos bots e da mira assistida (no
-  gigante debaixo de teto, eles param no olho dele, que fica no corpo: `viewAimCeiling`/`viewAimPoint`), o desenho
+  gigante debaixo de teto, eles param no olho dele, que fica no corpo; na fase 1b, §20.7, o encolher substituiu isso),
+  o desenho
   (a pose é refeita quando a Roleta muda o tamanho), os marcadores em cima da cabeça, o clarão e o traçado do tiro, e o
   efeito da morte (agora `bodyScale` × caos, então a morte do Chonker também sai do tamanho dele).
 - **O que não acompanha (decisão menor):** a caixa de colisão e a navegação (os gigantes não entalam nas portas, e os
@@ -4796,4 +4797,36 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   o confirmar abre o teclado); o teste dos mapas do Sandbox ganhou 30 s (a navegação do mapa real, com a suíte toda).
 - **Ficam:** quem assiste o aliado na eliminação não vê o nome dele nem a vida dele no quadro de baixo; o placar do Tab
   é translúcido sobre o feed; com 4 times, os bots de mesmo preset têm o mesmo nome.
+
+### 20.7 Fase 1b: os gigantes debaixo do teto (20/11/2026)
+
+- **Os prints da rodada 32** (`local/m9/prints/gigantes-*.png`) mostraram os gigantes atravessando o teto dos
+  abrigos de spawn (o tronco e a cabeça dentro da laje, um pedaço da arma flutuando embaixo), o gigante colado no
+  jogador cobrindo a tela inteira (na câmera da morte, a perna dele), o clarão do tiro do tamanho de sempre num Mini e o
+  traço do ricochete quase invisível (2,5 cm, 40 ms num quique curto).
+- **O encolher** (`sim/hitbox.ts`, `CHAOS_SQUEEZE`; `sim/systems/chaos.ts`, `updateChaosScales`): o corpo com
+  escala de máscara k > 1 fica com clamp((livre − 0,1) / topo, 1, k), onde livre é a altura dos pés até o primeiro
+  bloco sólido, que para bala ou que tapa a vista (um raio na grade para cima, do olho normal, por gigante por tick) e
+  topo é 2 m em pé ou 1 m agachado ou deslizando (a altura desenhada com cabelo e chapéu; as hitboxes vão a 1,81 e
+  0,97 m). O Mini e os corpos normais nunca encolhem. O valor mora em `SimState.chaosScale` (fora do hash e do
+  snapshot: sai do estado que já está neles), calculado na criação, no fim de cada `step`, no `readSnapshot` e no
+  `remote.commit` (o amigo online calcula com a grade e as posições dele); as hitboxes, o olho da sim, a mira da faca e
+  dos bots, a vista deles, a mira assistida e o desenho leem dele (`SimView.chaosScale`, `chaosScaleOf`); o
+  `viewAimCeiling` saiu. O `chaosMaskScaleOf` (sem o encolher) decide se o bot prefere caminho de teto alto, para a
+  escolha não piscar em cada porta. Dentro de um tick vale o valor do tick anterior (o mesmo que a IA viu); o limite do
+  olho debaixo do teto fica como rede de segurança para esse tick.
+- **No desenho** (`game/scene/body-scale.ts`, `approachScale`): o corpo anda até o valor da sim (encolhe a 10/s, cresce
+  a 3/s) e pula direto ao nascer; o corpo, os marcadores, o clarão, a quebra da morte e a câmera da morte usam esse
+  valor; as hitboxes usam o da sim, na hora.
+- **A câmera:** a câmera da morte mira no peito × o tamanho de quem matou e recua na horizontal até o gigante caber
+  (`DEATH_CAM.fitM`, até 6 m, parando 0,3 m antes de parede; `deathCamBackoff`); o gigante cujo corpo contém a câmera
+  em 1ª pessoa some só naquela vista (o mesmo caminho que esconde o próprio corpo, sem programa novo; na tela dividida,
+  só uma vista por vez).
+- **O clarão e o traço:** `pushMuzzleFlash` recebe o tamanho (o desenhado de quem atira); `pushTracer` recebe um estilo
+  (`render/src/fx/tracer.ts`): o do ricochete tem 5 cm, é mais claro e opaco, tem cauda de 4 m e vive de 0,12 a
+  0,35 s; o traço normal não mudou (um teste prende os valores). No Mini, a arma na mão continua do tamanho normal (de
+  propósito: um comentário diz).
+- **O golden do Chaos:** `ae3a48fd` → `566e5be9` (as mesmas trocas da Roleta, 24 × 22); os outros não mudaram.
+- **Ficam:** o encolher olha um raio só, no centro do corpo (meio debaixo da beira do teto, o ombro ainda pode
+  atravessar); quando a Roleta troca, o tamanho chega um tick depois.
 

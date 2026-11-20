@@ -71,6 +71,8 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    baixo), o quique das balas e dos chumbos com o evento `ricochet` (protocolo 11), as linhas na Partida personalizada,
    a Roleta e os conflitos (Mini com Gigantes, Gigantes com Cabeção, Ricochete com Um tiro mata).
    - **feita em 20/11** (ARCHITECTURE §20.3): o protocolo 11; o golden do Chaos foi para `ae3a48fd`.
+   - **1b, pelos prints** (ARCHITECTURE §20.7): o gigante encolhe debaixo do teto; o golden do Chaos foi para
+     `566e5be9`.
 2. **O Sandbox na receita e na sim** (pista C): o HP e as armas por time, o bloco `sandbox` com o objetivo (pontos,
    eliminação ou nenhum), o Sandbox como o TDM na regeneração e na munição, os times 2 e 3 longe das bases dos outros,
    e um golden novo com 4 times.

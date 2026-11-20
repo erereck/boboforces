@@ -1,5 +1,11 @@
 import {
   builtinBotRef,
+  createFigureGameTable,
+  FIGURE_GRIP,
+  FIGURE_MAX_TOP_M,
+  FIGURE_MODE,
+  FIGURE_STANCE,
+  figurePosture,
   MATCH_RECIPE_FORMAT,
   MODIFIER_CONFLICTS,
   MODIFIERS,
@@ -7,16 +13,25 @@ import {
   type ModifierId,
 } from '@boboforces/format';
 import { BUTTON, type InputFrame } from '@boboforces/input';
-import { pitchToI16, yawToU16 } from '@boboforces/shared';
+import { BitReader, BitWriter, pitchToI16, yawToU16 } from '@boboforces/shared';
 import { cellCenter, createTestBlocks, createWorldGrid, fillBox, makeCell, type MapSpawn } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
 import { BOT_CONTROLLER_BASE, SIM_HZ } from './constants.ts';
-import { entityIndex } from './entity.ts';
+import { ENTITY_FLAG, entityIndex } from './entity.ts';
 import type { SimEvent } from './events.ts';
-import { aimPointWorld, GIANT_EYE_CEILING_GAP_M, type AimPoint } from './hitbox.ts';
+import {
+  aimPointWorld,
+  CHAOS_SCALE,
+  CHAOS_SQUEEZE,
+  chaosScaleOf,
+  FigureHitCache,
+  GIANT_EYE_CEILING_GAP_M,
+  type AimPoint,
+} from './hitbox.ts';
 import { createInputFrames } from './loop.ts';
 import { createSim, type Sim, type SimMap } from './sim.ts';
+import type { SimState } from './state.ts';
 import { MOD } from './systems/chaos.ts';
 
 /**
@@ -221,7 +236,132 @@ describe('Mini e Bots gigantes na sim (M9 fase 1)', () => {
     // O gigante: só o bot; o humano continua com o olho normal.
     expect(shotY(['giantBots'], false, 0)).toBeCloseTo(METRICS.eyeHeight, 9);
     expect(shotY(['giantBots'], false, bot)).toBeCloseTo(METRICS.eyeHeight * 3, 9);
-    expect(shotY(['giantBots'], true, bot)).toBeCloseTo(3 - GIANT_EYE_CEILING_GAP_M - 0.5, 9);
+    // Fase 1b: debaixo da laje o gigante encolhe (2,5 m livres) e o olho vai junto, abaixo do teto.
+    const k = Math.fround((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.standTopM);
+    expect(shotY(['giantBots'], true, bot)).toBeCloseTo(METRICS.eyeHeight * k, 9);
+    expect(METRICS.eyeHeight * k).toBeLessThan(2.5 - GIANT_EYE_CEILING_GAP_M);
+  });
+
+  /**
+   * Fase 1b: o bot gigante (B) com a laje de 3,0 a 3,5 m em cima (o chão vai até 0,5 m) e o humano (A) a céu aberto.
+   * `crouch` agacha o bot pela entrada dele. Devolve a escala do bot, a do humano e o topo do bot que leva tiro.
+   */
+  function squeezeRun(
+    mods: readonly ModifierId[],
+    roof: boolean,
+    crouch = false,
+  ): { sim: Sim; bot: number; human: number; f: InputFrame[] } {
+    const map = cornerMap();
+    if (roof) fillBox(map.grid, 18, 6, 40, 26, 6, 47, concrete);
+    const r = recipe(mods, 'rifle', {
+      teams: [{ humans: 1, bots: [] }, { bots: [{ ref: builtinBotRef('normal'), count: 1 }] }],
+    });
+    const sim = createSim({ recipe: r, map, humans: 1 });
+    const f = createInputFrames();
+    if (crouch) f[BOT_CONTROLLER_BASE]!.buttons = BUTTON.crouch;
+    for (let i = 0; i < 4 * SIM_HZ; i++) sim.step(f);
+    return { sim, bot: entity(sim, BOT_CONTROLLER_BASE), human: entity(sim, 0), f };
+  }
+
+  /** O topo (m acima dos pés) das hitboxes do corpo `e` na escala da view: o raio horizontal mais alto que acerta. */
+  function hitTop(sim: Sim, e: number, posture: number): number {
+    const v = sim.view();
+    const cache = new FigureHitCache(createFigureGameTable(), 64);
+    const s = v as unknown as SimState;
+    const x = v.position[e * 3]!;
+    const y = v.position[e * 3 + 1]!;
+    const z = v.position[e * 3 + 2]!;
+    let top = 0;
+    let tick = 1;
+    for (let h = 0; h < 7; h += 0.01) {
+      for (let a = 0; a < 8; a++) {
+        const yaw = (a * Math.PI) / 4;
+        const dx = Math.sin(yaw);
+        const dz = Math.cos(yaw);
+        cache.beginRay(x - dx * 10, y + h, z - dz * 10, dx, 0, dz, 100);
+        if (cache.testEntity(s, e, posture, tick++) >= 0) top = h;
+      }
+    }
+    cache.release();
+    return top;
+  }
+
+  it('fase 1b: debaixo da laje o gigante encolhe e a hitbox fica abaixo dela; a céu aberto, o triplo', () => {
+    const under = squeezeRun(['giantBots'], true);
+    const v = under.sim.view();
+    const k = chaosScaleOf(v, under.bot);
+    expect(k).toBeLessThan(CHAOS_SCALE.giantBots);
+    expect(k).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.standTopM, 6);
+    expect(chaosScaleOf(v, under.human)).toBe(1);
+    const stand = figurePosture(FIGURE_STANCE.stand, FIGURE_GRIP.rifle, FIGURE_MODE.base, false);
+    const top = hitTop(under.sim, under.bot, stand);
+    expect(v.position[under.bot * 3 + 1]! + top).toBeLessThan(3);
+    expect(top).toBeGreaterThan(FIGURE_MAX_TOP_M);
+    under.sim.dispose();
+    const open = squeezeRun(['giantBots'], false);
+    expect(chaosScaleOf(open.sim.view(), open.bot)).toBe(CHAOS_SCALE.giantBots);
+    expect(hitTop(open.sim, open.bot, stand)).toBeGreaterThan(FIGURE_MAX_TOP_M * 2.9);
+    open.sim.dispose();
+  });
+
+  it('fase 1b: agachado, o gigante aperta pelo topo agachado (fica maior que em pé)', () => {
+    const run = squeezeRun(['giantBots'], true, true);
+    const v = run.sim.view();
+    expect(v.flags[run.bot]! & ENTITY_FLAG.crouching).not.toBe(0);
+    const k = chaosScaleOf(v, run.bot);
+    expect(k).toBeCloseTo(Math.min(3, (2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.crouchTopM), 6);
+    const crouch = figurePosture(FIGURE_STANCE.crouch, FIGURE_GRIP.rifle, FIGURE_MODE.base, false);
+    expect(v.position[run.bot * 3 + 1]! + hitTop(run.sim, run.bot, crouch)).toBeLessThan(3);
+    run.sim.dispose();
+  });
+
+  it('fase 1b: sem tamanho na máscara, ou no Mini, nada aperta (o teto não muda nada)', () => {
+    for (const roof of [false, true]) {
+      const none = squeezeRun([], roof);
+      expect(Array.from(none.sim.view().chaosScale.subarray(0, none.sim.view().count))).toEqual(
+        Array.from({ length: none.sim.view().count }, () => 1),
+      );
+      none.sim.dispose();
+      const mini = squeezeRun(['mini'], roof);
+      const mv = mini.sim.view();
+      expect([chaosScaleOf(mv, mini.bot), chaosScaleOf(mv, mini.human)]).toEqual([0.5, 0.5]);
+      mini.sim.dispose();
+    }
+  });
+
+  it('fase 1b: determinístico, e a escala volta igual da leitura de snapshot (ela não entra nele)', () => {
+    const play = (): { hash: number; scales: number[]; sim: Sim; f: InputFrame[] } => {
+      const run = squeezeRun(['giantBots'], true);
+      // O bot anda para fora da laje e volta: a escala muda no caminho.
+      for (let i = 0; i < 120; i++) {
+        run.f[BOT_CONTROLLER_BASE]!.moveY = i < 60 ? 127 : -127;
+        run.sim.step(run.f);
+      }
+      const v = run.sim.view();
+      return { hash: run.sim.stateHash(), scales: Array.from(v.chaosScale.subarray(0, v.count)), ...run };
+    };
+    const a = play();
+    const b = play();
+    expect(b.hash).toBe(a.hash);
+    expect(b.scales).toEqual(a.scales);
+    // O snapshot de A numa sim nova: a mesma escala (refeita do estado lido) e, seguindo junto, o mesmo hash.
+    const w = new BitWriter(64 * 1024);
+    a.sim.writeSnapshot(w);
+    const c = squeezeRun(['giantBots'], true);
+    c.sim.readSnapshot(new BitReader(w.bytes()));
+    const cv = c.sim.view();
+    expect(Array.from(cv.chaosScale.subarray(0, cv.count))).toEqual(a.scales);
+    expect(c.sim.stateHash()).toBe(a.hash);
+    for (let i = 0; i < 60; i++) {
+      a.f[BOT_CONTROLLER_BASE]!.moveY = 127;
+      a.sim.step(a.f);
+      c.sim.step(a.f);
+    }
+    expect(c.sim.stateHash()).toBe(a.sim.stateHash());
+    expect(Array.from(cv.chaosScale.subarray(0, cv.count))).toEqual(
+      Array.from(a.sim.view().chaosScale.subarray(0, cv.count)),
+    );
+    for (const r of [a, b, c]) r.sim.dispose();
   });
 
   it('a Roleta nunca põe dois que conflitam (Mini e gigantes, gigantes e Cabeção, Ricochete e um tiro mata)', () => {

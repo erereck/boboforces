@@ -36,8 +36,9 @@ export const FX_STRIDE = 16;
 
 /**
  * Pedidos de VFX do frame em SoA. `data[i·16 + k]` por tipo (os campos não citados ficam 0):
- * - muzzleFlash: 0–2 boca do cano (m), 3–5 direção, 6 slot local dono (-1 = ninguém), 7 modelo da arma
- * - tracer: 0–2 início, 3–5 fim
+ * - muzzleFlash: 0–2 boca do cano (m), 3–5 direção, 6 slot local dono (-1 = ninguém), 7 modelo da arma, 8 tamanho
+ *   (M9: a escala do corpo de quem atirou, o Mini e o gigante; 0 = 1)
+ * - tracer: 0–2 início, 3–5 fim, 6 estilo (`TRACER_STYLE`; M9: o do Ricochete é mais grosso, claro e demorado)
  * - impactBlock: 0–2 ponto, 3–5 normal, 6 id local do bloco, 7 face (`NORMAL_TABLE`), 8 cubinhos
  * - impactActor: 0–2 ponto, 3–5 direção do tiro, 6 osso atingido (`FigurePart`, 0..11), 7 cubinhos; `entity` = alvo
  * - impactProp: 0–2 ponto, 3–5 normal, 6 prop atingida (índice em `RenderMap.props` = ordem do `.bfmap`; o `game`
@@ -90,6 +91,19 @@ function put3(d: Float32Array, o: number, a: number, b: number, c: number): void
   d[o + 2] = c;
 }
 
+/** M9 (fase 1b): o estilo do traçante (`data[6]` do pedido). */
+export const TRACER_STYLE = {
+  /** O tiro de sempre. */
+  normal: 0,
+  /** O quique do Ricochete: mais grosso, mais claro e com vida mínima maior (o quique curto sumia em 40 ms). */
+  ricochet: 1,
+} as const;
+export type TracerStyle = (typeof TRACER_STYLE)[keyof typeof TRACER_STYLE];
+
+/**
+ * `size` (M9, fase 1b): a escala do corpo de quem atirou (o Mini e o gigante; 1 = normal): o clarão e a fumacinha do
+ * cano crescem junto com a arma do boneco. O clarão do viewmodel (`ownerSlot` ≥ 0) não muda.
+ */
 export function pushMuzzleFlash(
   q: FxQueue,
   entity: number,
@@ -101,6 +115,7 @@ export function pushMuzzleFlash(
   dirZ: number,
   ownerSlot: number,
   weaponModel: number,
+  size = 1,
 ): boolean {
   const o = slot(q, FX_KIND.muzzleFlash, entity);
   if (o < 0) return false;
@@ -108,6 +123,7 @@ export function pushMuzzleFlash(
   put3(q.data, o + 3, dirX, dirY, dirZ);
   q.data[o + 6] = ownerSlot;
   q.data[o + 7] = weaponModel;
+  q.data[o + 8] = size;
   return true;
 }
 
@@ -119,11 +135,13 @@ export function pushTracer(
   x1: number,
   y1: number,
   z1: number,
+  style: TracerStyle = TRACER_STYLE.normal,
 ): boolean {
   const o = slot(q, FX_KIND.tracer, 0);
   if (o < 0) return false;
   put3(q.data, o, x0, y0, z0);
   put3(q.data, o + 3, x1, y1, z1);
+  q.data[o + 6] = style;
   return true;
 }
 

@@ -71,7 +71,7 @@ import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './
 import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
 import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
-import { applyChaos, ChaosState, chaosOf, chaosSystem } from './systems/chaos.ts';
+import { applyChaos, ChaosState, chaosOf, chaosSystem, updateChaosScales } from './systems/chaos.ts';
 import { createFortress } from './systems/fortress.ts';
 import { createRoundState, ROUND_PHASE, roundFrozen, roundsSystem } from './systems/rounds.ts';
 import { createStrikeState, STRIKE, STRIKE_BUY_BASE, STRIKE_SHOP, strikeSystem } from './systems/strike.ts';
@@ -842,6 +842,8 @@ export function createSim(config: SimConfig): Sim {
     spawnRoyaleLoot(ctx);
     planZone(ctx);
   }
+  // M9 (fase 1b): a escala de cada corpo (os fixos da receita valem desde o tick 0).
+  updateChaosScales(ctx);
   events.matchPhase(0, match.phase);
   bindFigureTable(figureTable);
 
@@ -898,6 +900,7 @@ export function createSim(config: SimConfig): Sim {
     health: s.health,
     zombieType: s.zombieType,
     bodyScale: s.bodyScale,
+    chaosScale: s.chaosScale,
     perks: s.perks,
     points: s.points,
     armor: s.armor,
@@ -1098,6 +1101,8 @@ export function createSim(config: SimConfig): Sim {
       // M6 (fase 4): os modificadores que chegaram (a gravidade e a velocidade da predição).
       applyChaos(ctx);
       mapObjects?.sync();
+      // M9 (fase 1b): o amigo calcula a escala de cada corpo com a grade e as posições dele (a mesma conta do host).
+      updateChaosScales(ctx);
       ctx.figures.invalidate();
       events.clear();
       keepEvents = false;
@@ -1279,6 +1284,8 @@ export function createSim(config: SimConfig): Sim {
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);
+      // M9 (fase 1b): a escala de cada corpo pelo estado do fim do tick (a view, a IA e o próximo tick leem esta).
+      updateChaosScales(ctx);
       ctx.tick++;
       ctx.rewind?.record(s, ctx.tick);
       syncView();
@@ -1300,6 +1307,8 @@ export function createSim(config: SimConfig): Sim {
       readState(ctx, r);
       // M3 (fase 3d): tábuas e portas do snapshot voltam para a colisão e a navegação.
       mapObjects?.sync();
+      // M9 (fase 1b): a escala de cada corpo é derivada (fora do snapshot): refeita do estado lido.
+      updateChaosScales(ctx);
       // O tick volta e as posições mudam: as caixas guardadas do tick não valem mais.
       ctx.figures.invalidate();
       events.clear();

@@ -82,6 +82,7 @@ import {
   type ParticleRing,
 } from './particles.ts';
 import { PARTICLE_KIND } from './shader.ts';
+import { tracerLife, tracerLookOf } from './tracer.ts';
 import type { CollisionWorld } from './verlet.ts';
 
 /** Tamanho dos anéis (arte-ux.md §4.1: traçantes 128, marcas de tiro 256). */
@@ -309,23 +310,25 @@ export function createFxPass(ctx: PassContext): FxPass {
   function muzzleFlash(o: number): void {
     const d = pending.data;
     const owner = d[o + 6]! >= 0 && d[o + 6]! < 4 ? Math.round(d[o + 6]!) : -1;
-    const x = d[o]! + d[o + 3]! * 0.05;
-    const y = d[o + 1]! + d[o + 4]! * 0.05;
-    const z = d[o + 2]! + d[o + 5]! * 0.05;
+    // M9 (fase 1b): o clarão do Mini e do gigante na escala do corpo (0 = pedido antigo, tamanho 1).
+    const k = d[o + 8]! > 0 ? d[o + 8]! : 1;
+    const x = d[o]! + d[o + 3]! * 0.05 * k;
+    const y = d[o + 1]! + d[o + 4]! * 0.05 * k;
+    const z = d[o + 2]! + d[o + 5]! * 0.05 * k;
     resetParticleSpec(spec);
     spec.kind = PARTICLE_KIND.star;
     spec.owner = owner;
     spec.x = x;
     spec.y = y;
     spec.z = z;
-    spec.size = 0.32;
+    spec.size = 0.32 * k;
     spec.growth = 1.2;
     spec.life = 0.05;
     spec.rotation = rng.range(0, Math.PI);
     setColor(0xffdb73, 1);
     emitParticle(rings.additive, spec, clock);
     spec.kind = PARTICLE_KIND.round;
-    spec.size = 0.9;
+    spec.size = 0.9 * k;
     spec.life = 0.07;
     setColor(0xffbf59, 0.35);
     emitParticle(rings.additive, spec, clock);
@@ -336,12 +339,12 @@ export function createFxPass(ctx: PassContext): FxPass {
     spec.x = x;
     spec.y = y;
     spec.z = z;
-    spec.size = 0.1;
+    spec.size = 0.1 * k;
     spec.growth = 3;
     spec.life = 0.5;
-    spec.vx = d[o + 3]! * 0.6;
-    spec.vy = d[o + 4]! * 0.6 + 0.4;
-    spec.vz = d[o + 5]! * 0.6;
+    spec.vx = d[o + 3]! * 0.6 * k;
+    spec.vy = (d[o + 4]! * 0.6 + 0.4) * k;
+    spec.vz = d[o + 5]! * 0.6 * k;
     spec.gravity = -0.6;
     setColor(0xd9d9d9, 0.3);
     emitParticle(rings.alpha, spec, clock);
@@ -354,6 +357,8 @@ export function createFxPass(ctx: PassContext): FxPass {
   function tracer(o: number): void {
     const d = pending.data;
     const len = Math.hypot(d[o + 3]! - d[o]!, d[o + 4]! - d[o + 1]!, d[o + 5]! - d[o + 2]!);
+    // M9 (fase 1b): o estilo (o quique do Ricochete mais grosso, claro e demorado; `TRACER_LOOK`).
+    const look = tracerLookOf(d[o + 6]!);
     resetParticleSpec(spec);
     spec.kind = PARTICLE_KIND.streak;
     spec.x = d[o]!;
@@ -362,10 +367,10 @@ export function createFxPass(ctx: PassContext): FxPass {
     spec.x1 = d[o + 3]!;
     spec.y1 = d[o + 4]!;
     spec.z1 = d[o + 5]!;
-    spec.vx = 2.6;
-    spec.size = 0.025;
-    spec.life = Math.min(0.3, Math.max(0.04, len / 320));
-    setColor(0xffeb99, 0.85);
+    spec.vx = look.tail;
+    spec.size = look.size;
+    spec.life = tracerLife(look, len);
+    setColor(look.color, look.alpha);
     emitParticle(rings.additive, spec, clock);
   }
 
