@@ -4905,3 +4905,28 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   HUD de cada vista e um passo à frente do corpo; e o nome da reserva igual ao de um humano. Corrigido antes do
   commit; nenhum golden mudou.
 
+### 20.10 Fechamento do M9 (20/11/2026)
+
+- **O que entrou:** a dieta do menu da web (349,6 → 332,9 KB, com o `size-check` reprovando texto que o menu
+  desenharia cru), os modificadores Mini, Bots gigantes (o gigante encolhe debaixo do teto) e Ricochete, o Bobo
+  Sandbox completo (até 4 times com nome, vida e armas; Pontos, Eliminação ou Nenhum; o Cenário; jogar ou assistir) e
+  as Ferramentas do Dono (criar bot onde mira, congelar, trocar o time, dar arma, tirar da partida, os modificadores ao
+  vivo e a câmera lenta offline; no online, só o host). Com isso, o "M6+" do roadmap está todo feito.
+- **Como andou (#82):** as frentes independentes rodaram ao mesmo tempo, cada uma num agente com a própria cópia do
+  repositório (worktree com `node_modules` próprio: sem ele, os `@boboforces/*` resolvem para o `main`); cada fase
+  entrou no `main` por squash, com o portão inteiro, uma revisão do Opus e os achados corrigidos antes de publicar.
+  Lição: o ramo de um agente que juntou o ramo de outro antes do squash dá conflito em massa; aplicar só a diferença da
+  fase (`git diff --binary --full-index base fase | git apply -3 --index`) resolve.
+- **As versões:** `PROTOCOL_VERSION` 12 (o evento `ricochet` no 11; a reserva do dono no começo da partida no 12) e o
+  `net.json` junto; snapshot da sim 20 (os campos do dono, só com as ferramentas); os campos opcionais `hp`/`weapons`
+  do time e o bloco `sandbox` sem mudar a versão da receita.
+- **Os goldens:** dos 16 de antes do M9, 15 não mudaram; o do Bobo Chaos foi para `566e5be9` (a Roleta sorteia os 3
+  modificadores novos); o do Sandbox é `35764306`.
+- **O custo:** `PERF.md` §1q (sim + IA por tick com o Mini, os Gigantes, o Ricochete, o Sandbox de 4 times e a reserva
+  do dono: no ruído da referência).
+- **As revisões:** uma do Opus por fase (as listas nas §20.1 a §20.9), mais as duas rodadas de prints, que acharam o
+  gigante atravessando o teto, a câmera engolida, o menu de arma na eliminação e as armas fora do time.
+- **Fica para depois:** a Base Aérea no Sandbox (os pontos dos times 2 e 3 em cima dos muros), as cores de time
+  escolhidas, o nome e a vida do aliado assistido na eliminação, o placar do Tab opaco, as ferramentas no amigo online,
+  o "criar bot" com os bots da Oficina, o som do ricochete e o encolher pelo ombro (um raio só, no centro).
+

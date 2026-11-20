@@ -91,6 +91,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    - **feita em 20/11** (ARCHITECTURE §20.8): o botão no canto da pausa, a ferramenta armada na mira, o protocolo 12.
    - **5b, pelos prints** (ARCHITECTURE §20.9): o bot criado à vista, a plaquinha do congelado e os nomes da reserva.
 6. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
+   - **feita em 20/11** (ARCHITECTURE §20.10, PERF §1q): as rodadas de prints 32 e 33 fecham as do M9.
 
 Rodadas de prints: depois da fase 1 (os modificadores), da fase 3 (o Sandbox) e da fase 5 (as ferramentas).
 

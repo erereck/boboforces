@@ -433,6 +433,25 @@ de tempo. 600 ticks de aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em `loc
 O que saiu do menu está na ARCHITECTURE §20.2. Os maiores pedaços que ainda ficam: o `three` (130,1 KB), o atlas das
 fontes (119,6 KB), a tabela de textos do menu, o `game.ts` e o validador da receita.
 
+## 1q. O que o M9 pôs na partida (fechamento; 20/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node 26.7 com JIT), no Construto com 8 bots, semente 42, sem limite de tempo. 600 ticks
+de aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em `local/m9/medir-m9.ts`, medida com outros agentes rodando
+testes na mesma máquina (o máximo da referência, 5 ms, é um GC/JIT do aquecimento).
+
+| Caso | Média (ms) | p50 | p99 | Máx |
+|---|---|---|---|---|
+| TDM 4 contra 4 (referência) | 0,063 | 0,041 | 0,403 | 5,03 |
+| TDM com o Mini | 0,041 | 0,029 | 0,250 | 1,11 |
+| TDM com os Bots gigantes | 0,044 | 0,033 | 0,246 | 0,73 |
+| TDM com o Ricochete | 0,033 | 0,023 | 0,206 | 1,38 |
+| Sandbox 4 times de 2 (Nenhum) | 0,034 | 0,024 | 0,202 | 0,78 |
+| Sandbox 4×2 com a reserva do dono (8) | 0,037 | 0,027 | 0,226 | 0,69 |
+
+- Nada do M9 aparece no custo: os gigantes fazem até 2 raios curtos para cima por tick (o encolher), o Ricochete um
+  raio a mais por tiro que bate na parede, e os 8 bots dormentes da reserva não pensam nem andam (a IA só os guarda).
+- O menu da web: 332,9 KB de 350 (size-check), depois da dieta da fase 0 (§1p).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M9: o Bobo Sandbox e os modificadores de tamanho (planejado em 20/11/2026)
+### M9: o Bobo Sandbox e os modificadores de tamanho (fechado em 20/11/2026)
 
 - **Plano** em `docs/PLANO_M9.md` (#82): a dieta do menu da web, os modificadores Mini, Bots gigantes e Ricochete, o
   Bobo Sandbox completo e as Ferramentas do Dono. As frentes independentes andam ao mesmo tempo, cada uma num agente
@@ -44,6 +44,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   (liga e desliga no meio da partida) e a Câmera lenta (1×, 0,5× e 0,25×, só offline). A ferramenta escolhida fica
   armada na mira: o tiro aplica (o clique esquerdo, o gatilho direito, o botão Tiro) e a mira cancela. O jogo separa
   8 bots de reserva para o "Criar bot". No online, só o host usa, e o amigo vê tudo acontecer; o protocolo foi para 12.
+- **Fechamento (fase 6):** dos goldens de antes, só o do Bobo Chaos mudou (a Roleta ganhou 3 modificadores); o
+  Sandbox ganhou o dele. O protocolo do online foi a 12 e o snapshot da sim a 20 (só com as Ferramentas do Dono); o
+  menu da web ficou em 332,9 KB (de 349,6). As rodadas de prints 32 e 33 mostram tudo, com as perguntas AH1–AH8 (do
+  plano), AI1–AI4 e AJ1–AJ3.
 - **As Ferramentas do Dono pelos prints (fase 5b):** o bot criado nasce num lugar que você vê, perto da mira (antes,
   às vezes, longe ou atrás de uma parede); o bot congelado ganha a plaquinha "CONGELADO" em cima da cabeça; os bots da
   reserva ganham nomes bobos diferentes; e o HUD sai de trás das páginas do dono.
