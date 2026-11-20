@@ -54,7 +54,14 @@ export function isFfaMode(mode: string): boolean {
 /**
  * Família Bobo Warfare (regeneração, respawn padrão, caixinha de munição). M2 (fase 5d): o Bobo Training joga com as
  * mesmas regras (sem placar e sem fim: tempo e meta zerados). M6: o Juggernaut (fase 3) e o Paintball (fase 5) também.
+ * M9 (fase 2): e o Bobo Sandbox (o placar de abates por time, como o TDM).
  */
 export function isWarfareMode(mode: string): boolean {
-  return mode.startsWith('warfare.') || mode === 'training' || mode === 'juggernaut' || mode === 'paintball';
+  return (
+    mode.startsWith('warfare.') ||
+    mode === 'training' ||
+    mode === 'juggernaut' ||
+    mode === 'paintball' ||
+    mode === 'sandbox'
+  );
 }

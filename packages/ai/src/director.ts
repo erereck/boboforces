@@ -216,6 +216,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   // M7 (fase 7): no Royale a vida também não volta (só o kit cura).
   ctx.noRegen = recipe.mode === 'paintball' || recipe.mode === 'royale.mini';
   ctx.royaleMode = recipe.mode === 'royale.mini';
+  ctx.sandboxHunt = recipe.mode === 'sandbox' && recipe.sandbox?.objective === 'elimination';
   ctx.royaleClaims = ctx.royaleMode ? new RoyaleClaims() : null;
   ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';
   // M7 (fase 3): o BoboStrike (o sorteio do site de cada rodada).

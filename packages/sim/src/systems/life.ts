@@ -4,6 +4,7 @@ import { canSwap, MOD, modOn, swapPrimary } from './chaos.ts';
 import { paintDamage, paintLoadout } from './paintball.ts';
 import { strikeArmor, strikeKill } from './strike.ts';
 import { ROYALE, ROYALE_UNDECIDED, royaleDrops, royaleLoadout, ZONE } from './royale.ts';
+import { SANDBOX_UNDECIDED, sandboxLeader, sandboxSurvivor } from './sandbox.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -530,6 +531,12 @@ export function rulesSystem(ctx: SimContext): void {
     }
     return;
   }
+  // M9 (fase 2): a eliminação do Sandbox acaba com o último time de pé (todos caindo no mesmo tick: empate).
+  const survivor = sandboxSurvivor(ctx);
+  if (survivor !== SANDBOX_UNDECIDED) {
+    endMatch(ctx, survivor);
+    return;
+  }
   if (m.phase === 'suddenDeath') {
     const lead = leader(ctx);
     if (lead >= 0) endMatch(ctx, lead);
@@ -613,6 +620,8 @@ function leader(ctx: SimContext): number {
   let bestScore = -1;
   let tie = false;
   leaderEntity = NULL_ENTITY;
+  // M9 (fase 2): na eliminação do Sandbox, quem tem mais gente viva.
+  if (ctx.sandbox !== null && ctx.sandbox.elimination) return sandboxLeader(ctx);
   // M6 (fase 3): o Juggernaut também é de cada um (os pontos de Jugg), mesmo com os caçadores no mesmo time.
   if (ctx.ffa || ctx.party.jugg !== null) {
     for (let e = 0; e < s.count; e++) {
@@ -652,8 +661,14 @@ export function spawnSystem(ctx: SimContext): void {
     if ((fl & F.dead) !== 0) {
       // M3 (fase 2a): no Bobo Zombies quem volta é o diretor de ondas (bobos na onda seguinte, zumbis do pool). M7
       // (fase 0): nas rodadas sem respawn, quem morre espera a próxima.
-      // M7 (fase 6): no Royale, ninguém volta.
-      if (ctx.zombiesMode || ctx.royale !== null || (ctx.rounds !== null && !ctx.rounds.rules.respawn)) continue;
+      // M7 (fase 6): no Royale, ninguém volta. M9 (fase 2): nem na eliminação do Sandbox.
+      if (
+        ctx.zombiesMode ||
+        ctx.royale !== null ||
+        (ctx.rounds !== null && !ctx.rounds.rules.respawn) ||
+        (ctx.sandbox !== null && ctx.sandbox.elimination)
+      )
+        continue;
       if (s.respawnTicks[e]! > 0) s.respawnTicks[e]!--;
       if (s.respawnTicks[e] === 0 && ctx.match.phase !== 'ended') respawn(ctx, e, pickSpawn(ctx, e));
       continue;

@@ -42,3 +42,14 @@ export const MATCH_DEFAULTS = {
   unstuckMinDistM: 2,
   botUnstuckRespawnAt: 3,
 } as const;
+
+/**
+ * M9 (fase 2): a casa dos times do Bobo Sandbox sem ponto de spawn no mapa (os mapas só marcam os times 0 e 1): a base
+ * são `basePoints` nós da navegação em cruz em volta da casa, a `baseSpreadM` um do outro; a casa fica a `marginM` da
+ * borda da área jogável.
+ */
+export const SANDBOX_SPAWN = {
+  basePoints: 4,
+  baseSpreadM: 2.5,
+  marginM: 4,
+} as const;

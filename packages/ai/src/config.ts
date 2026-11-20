@@ -315,6 +315,11 @@ export const AI_SOLDIER = {
   hordeSpreadM: 3,
   hordeGuardM: 3,
   /**
+   * M9 (fase 2): na eliminação do Bobo Sandbox (sem respawn), o passeio é o inimigo vivo mais perto, num ponto a até
+   * tantos metros dele: ninguém fica rodando à toa e a partida acaba.
+   */
+  huntSpreadM: 6,
+  /**
    * Refaz a escolha da parte visível da cabeça ou do tronco do alvo (`visibleAimOffset`, ~26 raios: ~10 µs com JIT e
    * 0,23–0,26 ms jitless) a cada (s), além de na troca de alvo e de postura dele.
    */

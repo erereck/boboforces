@@ -727,6 +727,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     if (c.strikeMode && e >= 0 && pickStrikeGoal(c, b, e, y, from)) return;
     // M7 (fase 7): no Royale o passeio fica dentro do próximo círculo (por um ponto de loot dele).
     if (c.royaleMode && e >= 0 && pickRoyaleGoal(c, b, e, from)) return;
+    // M9 (fase 2): na eliminação do Sandbox, caçar o inimigo vivo mais perto.
+    if (c.sandboxHunt && e >= 0 && pickHuntGoal(c, b, e, x, z, from)) return;
     // M2 (fase 3f): o N4 às vezes vai caçar onde os humanos ficam (a célula mais quente).
     if (board !== null && b.intelligence.learn && b.rng.chance(AI_TEAM.huntChance)) {
       const cell = board.hottest(team, x, z, AI_TEAM.huntMinM, AI_TEAM.huntMaxM, AI_TEAM.minHeat);
@@ -931,6 +933,41 @@ function pickHordeGoal(
     view.position[target * 3 + 2]! + b.rng.range(-r, r),
   );
   if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  setWanderGoal(c, b, e);
+  return true;
+}
+
+/**
+ * M9 (fase 2): o passeio da eliminação do Sandbox: um ponto a até `huntSpreadM` do inimigo vivo mais perto (de
+ * qualquer time; o grupo chega espalhado). `false` = ninguém alcançável (segue o passeio do Warfare).
+ */
+function pickHuntGoal(c: AiContext, b: SoldierBrain, e: number, x: number, z: number, from: number): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  let target = -1;
+  let best = Infinity;
+  let targetNode = -1;
+  for (let i = 0; i < view.count; i++) {
+    if (view.kind[i] !== ENTITY_KIND.bobo || !c.living(i) || !c.hostile(e, i)) continue;
+    const d = Math.hypot(view.position[i * 3]! - x, view.position[i * 3 + 2]! - z);
+    if (d >= best) continue;
+    // M9 (fase 2, revisão): o inimigo onde a navegação não chega (outra ilha, uma laje sem rampa) não segura a caça:
+    // vale o próximo mais perto.
+    const node = nav.nearestNode(view.position[i * 3]!, view.position[i * 3 + 1]!, view.position[i * 3 + 2]!);
+    if (node < 0 || (from >= 0 && nav.component[node] !== nav.component[from])) continue;
+    best = d;
+    target = i;
+    targetNode = node;
+  }
+  if (target < 0) return false;
+  const r = AI_SOLDIER.huntSpreadM;
+  let n = nav.nearestNode(
+    view.position[target * 3]! + b.rng.range(-r, r),
+    view.position[target * 3 + 1]!,
+    view.position[target * 3 + 2]! + b.rng.range(-r, r),
+  );
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) n = targetNode;
   nav.nodePosition(n, nodePos, 0);
   setWanderGoal(c, b, e);
   return true;

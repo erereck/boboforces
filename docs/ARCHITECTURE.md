@@ -4586,3 +4586,45 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
 - **Fica para depois:** a resposta das ordens para o cliente online, o Diretor no Zombies e nos spawns, o Personalizado
   do Diretor, trocar o objetivo do Diretor na pausa e o filtro do Me cobre pelos atacantes de quem mandou.
 
+## 20. M9: o Bobo Sandbox e os modificadores de tamanho
+
+Plano em `docs/PLANO_M9.md` (#82; pergunta AH1). As fases andam em pistas paralelas (agentes com worktree próprio) e
+entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; a ordem dos commits é a de chegada.
+
+### 20.1 Fase 2: o Sandbox na receita e na sim (20/11/2026)
+
+- **A receita** (`format/src/match-recipe.ts`): no time, `hp` (1 a 1000, arredondado) e `weapons` (validadas como
+  o `weapons.allowed`); o bloco `sandbox: { objective }` (`points`, `elimination` ou `none`; o padrão é
+  `points`), que fora do modo `sandbox` cai com `recipe.invalidField`. Sem versão nova de formato. Para o menu
+  não crescer, os leitores dos blocos do Juggernaut, do Royale e do Diretor viraram um só, e a checagem de lista de
+  armas um ajudante.
+- **O objetivo** (`sim/systems/sandbox.ts`, `SANDBOX_DEFAULTS` em `sim/config/rules.ts`): em `points` e
+  `elimination`, o tempo e a meta que faltam na receita viram os do TDM (600 s e 75 abates); o 0 explícito continua
+  "sem limite". A eliminação ignora a meta: ninguém renasce, vence o último time com alguém vivo (os últimos morrendo no
+  mesmo tick dão empate) e só decide partidas que começaram com 2 times ou mais. No fim do tempo, vence o time com mais
+  vivos; no empate, os abates entre os empatados; depois a morte súbita de 60 s; depois o empate. O `finish()` usa a
+  mesma regra. `none` ignora os dois limites.
+- **As regras por time:** só no modo `sandbox`, para humanos e bots. O HP próprio do bot (`bot@1`, quando não é
+  o padrão de 100) e a lista de armas dele (quando não vazia) valem sobre as do time. As armas do time cruzam com o
+  `weapons.allowed` da partida (sem nada em comum, fica a da partida) e são tudo o que o time carrega: `['shotgun']`
+  tira a pistola, a faca e a granada. O renascer remonta o equipamento pela mesma máscara.
+- **As casas dos times 2 e 3:** quem tem spawn no mapa fica com eles. Cada time sem spawn ganha uma casa no meio do
+  maior vão de ângulo entre as bases que existem, na distância média delas ao centro da área de jogo (no Construto, o
+  time 2 a oeste e o 3 a leste), com até 4 pontos em cruz a 2,5 m pela grade de navegação; os spawns "de qualquer time"
+  mais perto de uma casa que de outra base viram daquele time. Sem navegação, os "de qualquer time" mais perto. Os
+  outros modos usam os spawns do mapa como sempre.
+- **A sim:** o Sandbox tem a regeneração, as caixas de munição e o placar por abate do TDM (`isWarfareMode`). Nada
+  entra no estado, no hash ou no snapshot (a versão fica 19): as regras saem da receita, que o amigo também tem.
+- **A IA:** na eliminação, o bot sem alvo anda até o inimigo vivo mais perto (com 6 m de desvio sorteado). A
+  hostilidade já era `time !==` e o quadro do time já tinha 4 times.
+- **O golden do Sandbox:** `35764306` (4 times de 3 bots Normais no Construto, cada time com HP e armas próprios,
+  eliminação; 38 s, vence o time 2 com 1 de pé). Os 16 de antes não mudaram.
+- **A revisão (Opus) achou:** a eliminação sem tempo podia não acabar (um time escondido onde a navegação não chega):
+  agora ela sempre tem tempo (o 0 vira os 600 s do Sandbox), e a caça pula o inimigo que a navegação não alcança; o
+  Destravar na eliminação curava (o renascer completo): agora fica com a vida e sem proteção, como o Jugg; o time que
+  começa vazio ganhava casa e roubava o ponto sem time do vizinho; e os zumbis do teste de carga liam os spawns do mapa
+  em vez dos da partida. Tudo corrigido antes do commit; o golden do Sandbox ficou `35764306` (38 s; o Verde vence
+  com 1 de pé). Para a fase 3: o HUD ler o tempo e a meta de verdade (não os da receita), a tela de morte da eliminação
+  sem contagem para renascer e o "entrar no meio" do sofá sem cair num bot morto.
+- **O menu da web:** 349,7 KB (+0,1): o validador ficou do mesmo tamanho com a junção dos leitores de bloco.
+

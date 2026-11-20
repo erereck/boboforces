@@ -72,7 +72,11 @@ function unstuck(ctx: SimContext, e: number): void {
   if ((bot && s.unstuckCount[e]! >= MATCH_DEFAULTS.botUnstuckRespawnAt) || !findNode(ctx, bot)) {
     // M6 (fase 3, revisão): o Jugg destravado no spawn continua com a vida que tinha e sem proteção.
     // M6 (fase 6b): o soldado da Horda armada também (a vida dele é a da onda).
-    const jugg = (ctx.party.jugg !== null && s.team[e] === 1) || (ctx.zombieArmed && isHorde(ctx, e));
+    // M9 (fase 2, revisão): na eliminação do Sandbox também (ninguém renasce, então o Destravar não pode curar).
+    const jugg =
+      (ctx.party.jugg !== null && s.team[e] === 1) ||
+      (ctx.zombieArmed && isHorde(ctx, e)) ||
+      (ctx.sandbox !== null && ctx.sandbox.elimination);
     const health = s.health[e]!;
     respawn(ctx, e, pickSpawn(ctx, e));
     if (jugg) {

@@ -6,6 +6,16 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M9: o Bobo Sandbox e os modificadores de tamanho (planejado em 20/11/2026)
+
+- **Plano** em `docs/PLANO_M9.md` (#82): a dieta do menu da web, os modificadores Mini, Bots gigantes e Ricochete, o
+  Bobo Sandbox completo e as Ferramentas do Dono. As frentes independentes andam ao mesmo tempo, cada uma num agente
+  com a sua cópia do repositório. Perguntas AH1–AH8 no padrão.
+- **O Sandbox na receita e na sim (fase 2):** cada time pode ter o próprio HP e as próprias armas, e o Sandbox tem o
+  objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
+  só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:
+  ela chega na fase 3.
+
 ### M8: compartilhar, o Diretor e o Arcade (fechado em 20/11/2026)
 
 - **Plano** em `docs/PLANO_M8.md` (P-004, no padrão do #81): os códigos e os links da Oficina (bot e preset), os

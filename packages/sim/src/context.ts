@@ -3,6 +3,7 @@ import type { FortressState } from './systems/fortress.ts';
 import type { RoundState } from './systems/rounds.ts';
 import type { StrikeState } from './systems/strike.ts';
 import type { RoyaleState } from './systems/royale.ts';
+import type { SandboxState } from './systems/sandbox.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
@@ -227,6 +228,8 @@ export interface SimContext {
   /** M7 (fase 6): o Bobo Royale Mini (`null` fora dele) e o sorteio do loot e da zona. */
   readonly royale: RoyaleState | null;
   readonly rngRoyale: Rng;
+  /** M9 (fase 2): o Bobo Sandbox (`null` fora dele). */
+  readonly sandbox: SandboxState | null;
   /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
   readonly training: boolean;
   readonly hz: number;

@@ -50,6 +50,8 @@ export class AiContext {
    * diretor).
    */
   strikeMode = false;
+  /** M9 (fase 2): a eliminação do Bobo Sandbox (sem respawn: o passeio é caçar o inimigo vivo mais perto). */
+  sandboxHunt = false;
   /** M7 (fase 7): o Bobo Royale (o loot, a zona e o LOD C) e quem mira cada item do chão. */
   royaleMode = false;
   royaleClaims: RoyaleClaims | null = null;

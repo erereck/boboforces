@@ -5,6 +5,7 @@ import {
   type MatchRecipe,
   PAINTBALL_DEFAULTS,
   resolveBot,
+  SANDBOX_DEFAULTS,
   ZOMBIES_DEFAULTS,
   royaleSquadSize,
 } from '@boboforces/format';
@@ -82,6 +83,7 @@ import {
   royaleZoneSystem,
   spawnRoyaleLoot,
 } from './systems/royale.ts';
+import { sandboxSpawns } from './systems/sandbox.ts';
 import { zombiesSystem } from './systems/zombies.ts';
 import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
@@ -343,9 +345,19 @@ function createEntityRules(maxHp: number): EntityRules {
   };
 }
 
+/** Máscara (bit = código da arma) dos ids da lista; id desconhecido fica de fora; lista vazia = 0 (todas). */
+function weaponMaskOf(ids: readonly string[]): number {
+  let mask = 0;
+  for (const id of ids) {
+    const code = WEAPONS.findIndex((w) => w.id === id);
+    if (code >= 0) mask |= 1 << code;
+  }
+  return mask;
+}
+
 /**
  * Regras do bot `e` (gameplay.md §6.5). A vida do bot só troca a da partida quando a regra muda o padrão (100): um
- * preset com 150 de vida dá 150 também aos bots sem regra.
+ * preset com 150 de vida dá 150 também aos bots sem regra. M9 (fase 2): no Sandbox, `matchHp` é a vida do time.
  */
 function applyBotRules(r: EntityRules, e: number, rules: typeof DEFAULT_BOT_RULES, matchHp: number): void {
   r.maxHp[e] = rules.hp !== DEFAULT_BOT_RULES.hp ? rules.hp : matchHp;
@@ -357,12 +369,7 @@ function applyBotRules(r: EntityRules, e: number, rules: typeof DEFAULT_BOT_RULE
       : rules.ammo === 'infiniteReserve'
         ? AMMO_RULE.infiniteReserve
         : AMMO_RULE.normal;
-  let mask = 0;
-  for (const id of rules.weapons) {
-    const code = WEAPONS.findIndex((w) => w.id === id);
-    if (code >= 0) mask |= 1 << code;
-  }
-  r.weaponMask[e] = mask;
+  r.weaponMask[e] = weaponMaskOf(rules.weapons);
   r.flags[e] =
     (rules.headshotImmune ? RULE_FLAG.headshotImmune : 0) | (rules.explodeOnDeath ? RULE_FLAG.explodeOnDeath : 0);
 }
@@ -398,11 +405,7 @@ function applyMatchWeaponRules(r: EntityRules, e: number, recipe: MatchRecipe): 
   if (w.ammo === 'infiniteClip') r.ammo[e] = AMMO_RULE.infiniteClip;
   else if (w.ammo === 'infiniteReserve' && r.ammo[e] !== AMMO_RULE.infiniteClip) r.ammo[e] = AMMO_RULE.infiniteReserve;
   if (w.allowed !== undefined && w.allowed.length > 0) {
-    let mask = 0;
-    for (const id of w.allowed) {
-      const code = WEAPONS.findIndex((def) => def.id === id);
-      if (code >= 0) mask |= 1 << code;
-    }
+    const mask = weaponMaskOf(w.allowed);
     const both = r.weaponMask[e]! & mask;
     r.weaponMask[e] = r.weaponMask[e] === 0 || both === 0 ? mask : both;
   }
@@ -516,7 +519,26 @@ export function createSim(config: SimConfig): Sim {
   const roundsMode = strikeMode || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
   // M7 (fase 6): no Royale, quem acaba a partida é o último esquadrão (a zona fecha em ~8 min): sem tempo nem meta.
   const royaleMode = recipe.mode === 'royale.mini';
-  const timeLimitS = roundsMode || royaleMode ? 0 : (recipe.match?.timeLimitS ?? 0);
+  // M9 (fase 2): no Sandbox, o objetivo decide o fim: os pontos e a eliminação com o tempo da receita (ausente = o
+  // padrão do Sandbox), a meta só nos pontos, e o "nenhum" sem tempo nem meta (`SANDBOX_DEFAULTS`).
+  const objective = recipe.mode === 'sandbox' ? (recipe.sandbox?.objective ?? SANDBOX_DEFAULTS.objective) : null;
+  const noLimits = roundsMode || royaleMode || objective === 'none';
+  // M9 (fase 2, revisão): a eliminação sempre tem tempo (sem zona, um time escondido onde a navegação não chega
+  // seguraria a partida para sempre): o 0 ou a falta viram o padrão do Sandbox.
+  const timeLimitS = noLimits
+    ? 0
+    : objective === 'elimination'
+      ? recipe.match?.timeLimitS || SANDBOX_DEFAULTS.timeLimitS
+      : (recipe.match?.timeLimitS ?? (objective !== null ? SANDBOX_DEFAULTS.timeLimitS : 0));
+  const scoreLimit =
+    noLimits || objective === 'elimination'
+      ? 0
+      : (recipe.match?.scoreLimit ?? (objective !== null ? SANDBOX_DEFAULTS.scoreLimit : 0));
+  // M9 (fase 2): os times sem ponto no mapa ganham casa (só no Sandbox; nos outros modos, os pontos do mapa).
+  const navMain = map.nav ? mainComponent(map.nav) : -1;
+  // M9 (fase 2, revisão): só os times que começam com alguém ganham casa (o vazio não rouba ponto dos outros).
+  const teamsMask = slots.reduce((mask, slot) => mask | (1 << slot.team), 0);
+  const spawns = objective !== null ? sandboxSpawns(map, recipe.teams.length, navMain, teamsMask) : map.spawns;
   const countdownS = config.countdownS ?? 0;
   assert(Number.isFinite(countdownS) && countdownS >= 0 && countdownS <= 30, `sim: contagem inválida (${countdownS})`);
   const countdownTicks = secondsToTicks(countdownS, hz);
@@ -567,7 +589,7 @@ export function createSim(config: SimConfig): Sim {
     zombieColliders: mapObjects?.zombieColliders ?? map.colliders ?? null,
     mapObjects,
     domination,
-    spawns: map.spawns,
+    spawns,
     // M0/M1: só o perfil Bobo existe; os outros ids caem nele até o M2.
     profile: baseProfile,
     zombieProfile: zombieSpeed(MOVEMENT_ZOMBIE, recipe),
@@ -575,7 +597,7 @@ export function createSim(config: SimConfig): Sim {
     warfare: isWarfareMode(recipe.mode),
     paintHits: recipe.mode === 'paintball' ? (recipe.paintball?.hits ?? PAINTBALL_DEFAULTS.hits) : 0,
     fortress:
-      zombiesMode && recipe.zombies?.variant === 'fortress' ? createFortress(map.spawns, map.grid, map.blocks) : null,
+      zombiesMode && recipe.zombies?.variant === 'fortress' ? createFortress(spawns, map.grid, map.blocks) : null,
     // M7 (fase 0): as rodadas do Jugg Fixo (uma por participante, até o teto).
     strike: strikeMode ? createStrikeState(map.bombSites ?? []) : null,
     rngStrike: root.fork('strike'),
@@ -590,6 +612,13 @@ export function createSim(config: SimConfig): Sim {
         )
       : null,
     rngRoyale: root.fork('royale'),
+    sandbox:
+      objective !== null
+        ? {
+            elimination: objective === 'elimination',
+            teamsMask,
+          }
+        : null,
     rounds: strikeMode
       ? createRoundState({
           buyTicks: secondsToTicks(STRIKE.buyS, hz),
@@ -620,15 +649,15 @@ export function createSim(config: SimConfig): Sim {
     spawnProtectTicks: secondsToTicks(recipe.players?.spawnProtectionS ?? MATCH_DEFAULTS.spawnProtectionS, hz),
     regenDelayTicks: secondsToTicks(MATCH_DEFAULTS.regenDelayS, hz),
     regenPerTick: (MATCH_DEFAULTS.regenPerS * REGEN_FACTOR[recipe.players?.regen ?? 'default']) / hz,
-    scoreLimit: roundsMode || royaleMode ? 0 : (recipe.match?.scoreLimit ?? 0),
+    scoreLimit,
     suddenDeathTicks: secondsToTicks(MATCH_DEFAULTS.suddenDeathS, hz),
     assistWindowTicks: secondsToTicks(MATCH_DEFAULTS.assistWindowS, hz),
     assistMinDamage: MATCH_DEFAULTS.assistMinDamage,
     killPlaneCreditTicks: secondsToTicks(MATCH_DEFAULTS.killPlaneCreditS, hz),
-    spawnScore: new Float64Array(map.spawns.length),
-    spawnMark: new Uint8Array(map.spawns.length),
+    spawnScore: new Float64Array(spawns.length),
+    spawnMark: new Uint8Array(spawns.length),
     nav: map.nav ?? null,
-    navMainComponent: map.nav ? mainComponent(map.nav) : -1,
+    navMainComponent: navMain,
     ammoBoxTicks: secondsToTicks(MATCH_DEFAULTS.ammoBoxLifeS, hz),
     rules: createEntityRules(recipe.players?.hp ?? BASE_HP),
     mods: chaos?.mods ?? baseMods,
@@ -696,7 +725,7 @@ export function createSim(config: SimConfig): Sim {
   const perTeam = new Int32Array(MAX_TEAMS);
   let controllerCount = 0;
   // M7 (fase 6): no Royale, cada esquadrão nasce num ponto sorteado (sem repetir enquanto houver ponto).
-  const royaleSpots = ctx.royale !== null ? royaleSpawnOrder(map.spawns, ctx) : null;
+  const royaleSpots = ctx.royale !== null ? royaleSpawnOrder(spawns, ctx) : null;
   slots.forEach((slot, i) => {
     // M6 (fase 3, revisão): no Juggernaut todo mundo começa caçando (o time 1 é só do Jugg, que o modo sorteia), mesmo
     // que a sala ou o sofá tenha posto alguém do outro lado.
@@ -711,7 +740,13 @@ export function createSim(config: SimConfig): Sim {
     // M3 (fase 2b): os pontos do começo no Bobo Zombies (M6, fase 6b: o soldado da horda não tem).
     const horde = zombieArmed && slot.bot !== null && slot.team === 1;
     if (zombiesMode && !horde) s.points[id & 0xffff] = ZOMBIE_POINTS.start;
-    if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, ctx.maxHp);
+    // M9 (fase 2): no Sandbox, a vida e as armas do time (humanos e bots; a regra do próprio bot ganha).
+    const teamRules = ctx.sandbox !== null ? recipe.teams[slot.team] : undefined;
+    const hp = teamRules?.hp ?? ctx.maxHp;
+    if (slot.bot !== null) applyBotRules(ctx.rules, id & 0xffff, resolveBot(recipe, slot.bot).rules, hp);
+    else ctx.rules.maxHp[id & 0xffff] = hp;
+    if (teamRules?.weapons !== undefined && ctx.rules.weaponMask[id & 0xffff] === 0)
+      ctx.rules.weaponMask[id & 0xffff] = weaponMaskOf(teamRules.weapons);
     applyMatchWeaponRules(ctx.rules, id & 0xffff, recipe);
     // M6 (fase 6b): o humano que a receita pôs no time 1 da Horda armada nasce com o time 0.
     const team = zombieArmed && slot.bot === null ? 0 : slot.team;
@@ -726,16 +761,12 @@ export function createSim(config: SimConfig): Sim {
       s.flags[id & 0xffff] = ENTITY_FLAG.dead;
       s.respawnTicks[id & 0xffff] = 0;
     } else {
-      respawn(
-        ctx,
-        id & 0xffff,
-        initialSpawn(map.spawns, team, spread, spread ? i : k, ctx.training && slot.team !== 0),
-      );
+      respawn(ctx, id & 0xffff, initialSpawn(spawns, team, spread, spread ? i : k, ctx.training && slot.team !== 0));
     }
     controllerCount = Math.max(controllerCount, slot.controller + 1);
   });
   if (zombies > 0) {
-    const order = zombieSpawnOrder(map.spawns, s);
+    const order = zombieSpawnOrder(spawns, s);
     for (let i = 0; i < zombies; i++) {
       const controller = ZOMBIE_CONTROLLER_BASE + i;
       const id = s.allocate(ENTITY_KIND.zombie, NO_TEAM, controller);

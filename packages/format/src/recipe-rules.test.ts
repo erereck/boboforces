@@ -96,3 +96,75 @@ describe('regras da receita (fase 4e)', () => {
     expect(junk.ok && junk.warnings.map((w) => w.code)).toContain('recipe.invalidField');
   });
 });
+
+describe('M9 (fase 2): o Bobo Sandbox na receita', () => {
+  const four = (extra: Record<string, unknown>[]): Record<string, unknown>[] =>
+    [0, 1, 2, 3].map((i) => ({ bots: [{ ref: 'builtin:normal-bob', count: 2 }], ...extra[i] }));
+
+  it('4 times com vida e armas e o objetivo passam limpos e voltam iguais (ida e volta)', () => {
+    const input = recipe({
+      mode: 'sandbox',
+      sandbox: { objective: 'elimination' },
+      teams: four([
+        { name: 'Laranja', hp: 150, weapons: ['shotgun', 'knife'] },
+        { hp: 1 },
+        { weapons: [] },
+        { hp: 1000, weapons: ['sniper'] },
+      ]),
+    });
+    const r = validateMatchRecipe(input, LIMITS);
+    expect(r.ok && r.warnings).toEqual([]);
+    if (!r.ok) return;
+    expect(r.value.sandbox).toEqual({ objective: 'elimination' });
+    expect(r.value.teams.map((t) => [t.hp, t.weapons])).toEqual([
+      [150, ['shotgun', 'knife']],
+      [1, undefined],
+      [undefined, []],
+      [1000, ['sniper']],
+    ]);
+    const again = validateMatchRecipe(JSON.parse(JSON.stringify(r.value)) as unknown, LIMITS);
+    expect(again.ok && again.value).toEqual(r.value);
+  });
+
+  it('vida fora da faixa é limitada e arredondada; arma desconhecida e tipo errado saem com aviso', () => {
+    const r = validateMatchRecipe(
+      recipe({
+        mode: 'sandbox',
+        teams: four([
+          { hp: 0 },
+          { hp: 5000 },
+          { hp: 33.6, weapons: ['shotgun', 'laser', 'shotgun', 3] },
+          { hp: 'x', weapons: 'rifle' },
+        ]),
+      }),
+      LIMITS,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.teams.map((t) => [t.hp, t.weapons])).toEqual([
+      [1, undefined],
+      [1000, undefined],
+      [34, ['shotgun']],
+      [undefined, undefined],
+    ]);
+    const paths = r.warnings.map((w) => `${w.path}:${w.code}`);
+    expect(paths).toContain('teams[0].hp:recipe.valueClamped');
+    expect(paths).toContain('teams[1].hp:recipe.valueClamped');
+    expect(paths).toContain('teams[2].weapons:content.missingWeapon');
+    expect(paths).toContain('teams[3].hp:recipe.invalidField');
+    expect(paths).toContain('teams[3].weapons:recipe.invalidField');
+    for (const w of r.warnings) expect(ISSUE_CODES as readonly string[]).toContain(w.code);
+  });
+
+  it('o objetivo fora da lista sai com aviso; o bloco fora do modo sandbox é ignorado com aviso', () => {
+    const bad = validateMatchRecipe(recipe({ mode: 'sandbox', sandbox: { objective: 'capture' } }), LIMITS);
+    expect(bad.ok && bad.value.sandbox).toEqual({});
+    expect(bad.ok && bad.warnings.map((w) => w.path)).toContain('sandbox.objective');
+    const tdm = validateMatchRecipe(recipe({ sandbox: { objective: 'none' } }), LIMITS);
+    expect(tdm.ok && tdm.value.sandbox).toBeUndefined();
+    expect(tdm.ok && tdm.warnings.map((w) => `${w.path}:${w.code}`)).toEqual(['sandbox:recipe.invalidField']);
+    // A vida e as armas do time ficam (a sim só usa no Sandbox).
+    const kept = validateMatchRecipe(recipe({ teams: [{ hp: 50, bots: [] }] }), LIMITS);
+    expect(kept.ok && kept.value.teams[0]?.hp).toBe(50);
+  });
+});

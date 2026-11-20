@@ -72,6 +72,8 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 2. **O Sandbox na receita e na sim** (pista C): o HP e as armas por time, o bloco `sandbox` com o objetivo (pontos,
    eliminação ou nenhum), o Sandbox como o TDM na regeneração e na munição, os times 2 e 3 longe das bases dos outros,
    e um golden novo com 4 times.
+   - **feita em 20/11** (ARCHITECTURE §20.1): o objetivo, as regras por time e as casas dos times 2 e 3; golden
+     `35764306`.
 3. **O Sandbox no jogo:** o modo na Partida personalizada (a aba Times com até 4 times: nome, bots, HP e armas; o
    objetivo), jogar ou assistir, salvar como Cenário (preset), e o que hoje supõe 2 times (o HUD, o feed, os nomes dos
    times, o placar, o resultado, o sofá e o lobby online).

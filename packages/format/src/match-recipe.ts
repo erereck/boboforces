@@ -58,6 +58,12 @@ export interface TeamRecipe {
   /** `'all'` = todos os humanos locais entram neste time; número = quantos slots humanos. Ausente = nenhum. */
   readonly humans?: 'all' | number;
   readonly bots: readonly BotSlotRecipe[];
+  /**
+   * M9 (fase 2): o Bobo Sandbox: a vida (1 a 1000) e as armas permitidas (como `weapons.allowed`) de todo o time,
+   * humanos e bots; a regra do próprio bot (`bot@1`) ganha da do time. Só valem com `mode: 'sandbox'`.
+   */
+  readonly hp?: number;
+  readonly weapons?: readonly string[];
 }
 
 export interface MatchRules {
@@ -225,6 +231,23 @@ export interface DirectorRules {
   readonly goal?: DirectorGoal;
 }
 
+/**
+ * M9 (fase 2): o Bobo Sandbox (`mode: 'sandbox'`, GDD §4.1.2): até 4 times; o objetivo é a eliminação (sem respawn; o
+ * último time de pé vence), os pontos (como o TDM; padrão) ou nenhum (o "brinquedo": sem tempo nem meta).
+ */
+export const SANDBOX_OBJECTIVES = ['elimination', 'points', 'none'] as const;
+export type SandboxObjective = (typeof SANDBOX_OBJECTIVES)[number];
+export interface SandboxRules {
+  /** Ausente = pontos. */
+  readonly objective?: SandboxObjective;
+}
+
+/**
+ * M9 (fase 2): os padrões do Sandbox. Nos pontos e na eliminação, o tempo e a meta AUSENTES da receita são os do TDM
+ * (10 min, 75 abates); o 0 explícito continua "sem limite". Na eliminação a meta não vale; no "nenhum", nem o tempo.
+ */
+export const SANDBOX_DEFAULTS = { objective: 'points', timeLimitS: 600, scoreLimit: 75 } as const;
+
 /** Participantes por esquadrão de cada formato do Royale. */
 export function royaleSquadSize(squad: RoyaleSquad | undefined): number {
   return squad === 'quad' ? 4 : squad === 'duo' ? 2 : 1;
@@ -314,6 +337,8 @@ export interface MatchRecipe {
   readonly royale?: RoyaleRules;
   /** M8 (fase 5): o Diretor de Partida (ausente = desligado; no Bobo Zombies não vale). */
   readonly director?: DirectorRules;
+  /** M9 (fase 2): o Bobo Sandbox (só com `mode: 'sandbox'`). */
+  readonly sandbox?: SandboxRules;
   /** FFA usa um time só com todo mundo. */
   readonly teams: readonly TeamRecipe[];
   /** M2 (fase 3a): bots do jogador levados no preset (`bot@1` já validados; refs `embedded:<id>`). */
@@ -333,6 +358,8 @@ export const RECIPE_RANGES = {
   scoreLimit: { min: 0, max: 999 },
   viewDistanceM: { min: 20 },
   hp: { min: 25, max: 1000 },
+  // M9 (fase 2): a vida do time no Sandbox (a faixa da regra do bot).
+  teamHp: { min: 1, max: 1000 },
   respawnS: { min: 0, max: 15 },
   spawnProtectionS: { min: 0, max: 5 },
   gravity: { min: 0.25, max: 2 },
@@ -377,6 +404,7 @@ const TOP_KEYS = [
   'juggernaut',
   'royale',
   'director',
+  'sandbox',
   'teams',
   'embeddedBots',
 ] as const;
@@ -409,7 +437,7 @@ const WEAPON_KEYS = [
   'ladder',
 ] as const;
 const HUD_KEYS = ['killFeed', 'hitmarker', 'allyMarkers'] as const;
-const TEAM_KEYS = ['name', 'humans', 'bots'] as const;
+const TEAM_KEYS = ['name', 'humans', 'bots', 'hp', 'weapons'] as const;
 const BOT_KEYS = ['ref', 'count'] as const;
 
 /** Quantos bots a receita põe em campo (soma de todos os `count`). */
@@ -692,40 +720,48 @@ function readPaintball(ctx: Ctx, value: unknown): Record<string, unknown> | unde
   return Object.assign(out, unknownFields(value, ['hits']));
 }
 
-/** M7 (fase 0): o Juggernaut (a variante). */
-function readJuggernaut(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+/**
+ * Os blocos de uma escolha só: o Juggernaut (M7, fase 0: a variante), o Bobo Royale (fase 6: os esquadrões), o Diretor
+ * de Partida (M8, fase 5: o objetivo) e o Bobo Sandbox (M9, fase 3: o objetivo).
+ */
+const CHOICE_BLOCKS = [
+  ['juggernaut', 'variant', JUGGERNAUT_VARIANTS],
+  ['royale', 'squad', ROYALE_SQUADS],
+  ['director', 'goal', DIRECTOR_GOALS],
+  ['sandbox', 'objective', SANDBOX_OBJECTIVES],
+] as const;
+
+function readChoiceBlock(
+  ctx: Ctx,
+  value: unknown,
+  block: string,
+  key: string,
+  allowed: readonly string[],
+): Record<string, unknown> | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) {
-    warn(ctx, 'juggernaut', 'recipe.invalidField', describe(value));
+    warn(ctx, block, 'recipe.invalidField', describe(value));
     return undefined;
   }
   const out: Record<string, unknown> = {};
-  readChoice(ctx, value, 'variant', 'juggernaut', JUGGERNAUT_VARIANTS, out);
-  return Object.assign(out, unknownFields(value, ['variant']));
+  readChoice(ctx, value, key, block, allowed, out);
+  return Object.assign(out, unknownFields(value, [key]));
 }
 
-/** M8 (fase 5): o Diretor de Partida (o objetivo). */
-function readDirector(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
+/** Ids de arma conhecidos, sem repetir (`weapons.allowed` e, M9, as armas do time); o resto vira aviso. */
+function readWeaponIds(ctx: Ctx, value: unknown, path: string): string[] | undefined {
   if (value === undefined) return undefined;
-  if (!isPlainObject(value)) {
-    warn(ctx, 'director', 'recipe.invalidField', describe(value));
+  if (!Array.isArray(value)) {
+    warn(ctx, path, 'recipe.invalidField', describe(value));
     return undefined;
   }
-  const out: Record<string, unknown> = {};
-  readChoice(ctx, value, 'goal', 'director', DIRECTOR_GOALS, out);
-  return Object.assign(out, unknownFields(value, ['goal']));
-}
-
-/** M7 (fase 6): o Bobo Royale (o formato dos esquadrões). */
-function readRoyale(ctx: Ctx, value: unknown): Record<string, unknown> | undefined {
-  if (value === undefined) return undefined;
-  if (!isPlainObject(value)) {
-    warn(ctx, 'royale', 'recipe.invalidField', describe(value));
-    return undefined;
+  const ids: string[] = [];
+  for (const id of value) {
+    const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
+    if (r !== null && r.status === 'known' && !ids.includes(r.local)) ids.push(r.local);
+    else warn(ctx, path, 'content.missingWeapon', describe(id));
   }
-  const out: Record<string, unknown> = {};
-  readChoice(ctx, value, 'squad', 'royale', ROYALE_SQUADS, out);
-  return Object.assign(out, unknownFields(value, ['squad']));
+  return ids;
 }
 
 /** M6 (fase 4): a Roleta do Bobo Chaos. */
@@ -780,19 +816,8 @@ function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
     if (typeof ff === 'number' && (FRIENDLY_FIRE_LEVELS as readonly number[]).includes(ff)) out['friendlyFire'] = ff;
     else warn(ctx, 'weapons.friendlyFire', 'recipe.invalidField', describe(ff));
   }
-  const allowed = value['allowed'];
-  if (allowed !== undefined) {
-    if (!Array.isArray(allowed)) warn(ctx, 'weapons.allowed', 'recipe.invalidField', describe(allowed));
-    else {
-      const ids: string[] = [];
-      for (const id of allowed) {
-        const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
-        if (r !== null && r.status === 'known' && !ids.includes(r.local)) ids.push(r.local);
-        else warn(ctx, 'weapons.allowed', 'content.missingWeapon', describe(id));
-      }
-      out['allowed'] = ids;
-    }
-  }
+  const allowed = readWeaponIds(ctx, value['allowed'], 'weapons.allowed');
+  if (allowed !== undefined) out['allowed'] = allowed;
   // M6 (fase 2): a escada do Gun Game (armas conhecidas, na ordem; repetidas valem: a escada é dela).
   const ladder = value['ladder'];
   if (ladder !== undefined) {
@@ -880,6 +905,11 @@ function readTeam(
   }
   const name = readText(ctx, value['name'], `${path}.name`, RECIPE_RANGES.teamNameMaxLength);
   if (name !== undefined) out['name'] = name;
+  // M9 (fase 2): a vida (inteira) e as armas do time no Sandbox.
+  readRange(ctx, value, 'hp', path, RECIPE_RANGES.teamHp, out);
+  if (out['hp'] !== undefined) out['hp'] = Math.round(out['hp'] as number);
+  const weapons = readWeaponIds(ctx, value['weapons'], `${path}.weapons`);
+  if (weapons !== undefined) out['weapons'] = weapons;
 
   let humans: 'all' | number | undefined;
   const h = value['humans'];
@@ -1045,12 +1075,13 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (chaos !== undefined) out['chaos'] = chaos;
   const paintball = readPaintball(ctx, doc['paintball']);
   if (paintball !== undefined) out['paintball'] = paintball;
-  const juggernaut = readJuggernaut(ctx, doc['juggernaut']);
-  if (juggernaut !== undefined) out['juggernaut'] = juggernaut;
-  const royale = readRoyale(ctx, doc['royale']);
-  if (royale !== undefined) out['royale'] = royale;
-  const director = readDirector(ctx, doc['director']);
-  if (director !== undefined) out['director'] = director;
+  for (const [block, key, allowed] of CHOICE_BLOCKS) {
+    const v = readChoiceBlock(ctx, doc[block], block, key, allowed);
+    if (v === undefined) continue;
+    // M9 (fase 2): o bloco do Sandbox fora dele não vale nada: sai com aviso.
+    if (block === 'sandbox' && out['mode'] !== 'sandbox') warn(ctx, block, 'recipe.invalidField', String(out['mode']));
+    else out[block] = v;
+  }
 
   const teamsIn = doc['teams'];
   if (!Array.isArray(teamsIn) || teamsIn.length === 0) {
@@ -1072,7 +1103,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
       if (t.out['name'] !== undefined) team['name'] = t.out['name'];
       if (t.humans !== undefined) team['humans'] = t.humans;
       team['bots'] = t.bots;
-      return Object.assign(team, unknownFields(t.out, TEAM_KEYS));
+      // Depois dos bots: a vida e as armas do time (M9) e os campos desconhecidos.
+      return Object.assign(team, unknownFields(t.out, ['name']));
     });
   }
 

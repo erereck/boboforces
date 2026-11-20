@@ -985,6 +985,98 @@ function runArcadeGolden(): { hash: string; score: [number, number] } {
   return out;
 }
 
+/**
+ * M9 (fase 2): o Bobo Sandbox na eliminação: 4 times de 3 bots Normal no Construto, cada um com a sua vida e as suas
+ * armas, semente 42, até acabar (teto de 10 min). Os times 2 e 3 não têm ponto no mapa: nascem na casa que a sim dá a
+ * eles (a oeste e a leste, longe das bases do norte e do sul). Confere a casa, que ninguém volta, que a partida acaba
+ * com um vencedor e o hash entre execuções. Gravado na fase 2 do M9 (20/11/2026): `35764306` (38 s; o Verde vence
+ * com 1 de pé; abatidos 3/3/2/3; a casa dos times 2 e 3 a 39,1 m das bases). MUDA com a sim, a IA ou o mapa.
+ */
+const GOLDEN_SANDBOX_HASH = '35764306';
+
+function runSandboxGolden(): {
+  hash: string;
+  seconds: number;
+  winner: number;
+  killed: number[];
+  alive: number[];
+  /** A menor distância (m, no plano) de um bot dos times 2 e 3 no tick 0 até um ponto de spawn dos times 0 e 1. */
+  homeGap: number;
+  phase: string;
+} {
+  const { map } = loadWorld();
+  const normal = (count: number) => [{ ref: builtinBotRef('normal'), count }];
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'sandbox',
+      map: 'construto',
+      seed: 42,
+      sandbox: { objective: 'elimination' },
+      match: { timeLimitS: 600 },
+      teams: [
+        { name: 'Laranja', bots: normal(3) },
+        { name: 'Azul', hp: 150, weapons: ['shotgun', 'pistol', 'knife', 'grenade'], bots: normal(3) },
+        { name: 'Verde', hp: 75, weapons: ['sniper', 'pistol', 'knife'], bots: normal(3) },
+        { name: 'Roxo', hp: 120, weapons: ['smg', 'rifle', 'knife', 'grenade'], bots: normal(3) },
+      ],
+    },
+    map,
+    humans: 0,
+    onEvents: (events, sim) => {
+      for (const ev of events) if (ev.type === 'kill') killed[sim.view().team[ev.victim & 0xffff]!]!++;
+    },
+  });
+  const killed = [0, 0, 0, 0];
+  let homeGap = Infinity;
+  const v0 = match.sim.view();
+  for (let e = 0; e < v0.count; e++) {
+    if (v0.team[e]! < 2) continue;
+    for (const sp of map.spawns) {
+      if (sp.team !== 0 && sp.team !== 1) continue;
+      homeGap = Math.min(homeGap, Math.hypot(sp.x - v0.position[e * 3]!, sp.z - v0.position[e * 3 + 2]!));
+    }
+  }
+  let t = 0;
+  for (; t < 600 * 60 + 5 && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const alive = [0, 0, 0, 0];
+  for (let e = 0; e < v.count; e++) {
+    if (v.kind[e] === ENTITY_KIND.bobo && (v.flags[e]! & ENTITY_FLAG.dead) === 0) alive[v.team[e]!]!++;
+  }
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    seconds: Math.round(t / 60),
+    winner: v.match.winnerTeam,
+    killed,
+    alive,
+    homeGap: Math.round(homeGap * 10) / 10,
+    phase: v.match.phase,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Sandbox (M9, fase 2) com 4 times de bots no Construto', () => {
+  it('os times 2 e 3 nascem longe das bases; ninguém volta; acaba com o último time de pé; hash estável', () => {
+    const a = runSandboxGolden();
+    const b = runSandboxGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg =
+      `${a.seconds} s, vencedor ${a.winner}, abatidos ${a.killed.join('/')}, vivos ${a.alive.join('/')}, ` +
+      `casa a ${a.homeGap} m das bases, fase ${a.phase}`;
+    console.log(`[sandbox] ${msg} · hash ${a.hash}`);
+    expect(a.homeGap, msg).toBeGreaterThan(25);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.winner, msg).toBeGreaterThanOrEqual(0);
+    for (let t = 0; t < 4; t++) {
+      expect(a.killed[t], msg).toBeLessThanOrEqual(3);
+      expect(a.alive[t]! > 0, msg).toBe(t === a.winner);
+    }
+    expect(a.hash, msg).toBe(GOLDEN_SANDBOX_HASH);
+  }, 240_000);
+});
+
 describe('golden do Arcade (M8, fechamento) com bots no Construto', () => {
   it('os bots brigam no perfil Arcade; hash estável', () => {
     const a = runArcadeGolden();
