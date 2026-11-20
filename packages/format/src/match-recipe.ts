@@ -1,5 +1,5 @@
 import { validateBot, type BotDocument } from './bot.ts';
-import { isValidContentLocal, resolveContent } from './content-ids.ts';
+import { DEFAULT_WEAPON_LOCAL, isValidContentLocal, resolveContent, resolveWeaponId } from './content-ids.ts';
 import type { FormatId } from './format-id.ts';
 import { migrateDocument } from './migrations.ts';
 import { ENGINE_MAX_BOTS, ENGINE_MAX_LOCAL_HUMANS, ENGINE_MAX_TEAMS } from './platform-profiles.ts';
@@ -771,7 +771,11 @@ function readChoiceBlock(
   return Object.assign(out, unknownFields(value, [key]));
 }
 
-/** Ids de arma conhecidos, sem repetir (`weapons.allowed` e, M9, as armas do time); o resto vira aviso. */
+/**
+ * Ids de arma conhecidos, sem repetir (`weapons.allowed` e, M9, as armas do time); o resto vira aviso. M10 (revisão):
+ * a arma desconhecida com categoria cai na da categoria (`resolveWeaponId`); se a lista não for vazia e nada sobrar,
+ * fica a pistola (a lista queria restringir: vazia seria "todas").
+ */
 function readWeaponIds(ctx: Ctx, value: unknown, path: string): string[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) {
@@ -780,10 +784,14 @@ function readWeaponIds(ctx: Ctx, value: unknown, path: string): string[] | undef
   }
   const ids: string[] = [];
   for (const id of value) {
-    const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
-    if (r !== null && r.status === 'known' && !ids.includes(r.local)) ids.push(r.local);
-    else warn(ctx, path, 'content.missingWeapon', describe(id));
+    const local = typeof id === 'string' ? resolveWeaponId(id) : null;
+    if (local === null) warn(ctx, path, 'content.missingWeapon', describe(id));
+    else {
+      if (local !== id) warn(ctx, path, 'content.missingWeapon', `${String(id)} → ${local}`);
+      if (!ids.includes(local)) ids.push(local);
+    }
   }
+  if (ids.length === 0 && value.length > 0) ids.push(DEFAULT_WEAPON_LOCAL);
   return ids;
 }
 
@@ -841,15 +849,19 @@ function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
   }
   const allowed = readWeaponIds(ctx, value['allowed'], 'weapons.allowed');
   if (allowed !== undefined) out['allowed'] = allowed;
-  // M6 (fase 2): a escada do Gun Game (armas conhecidas, na ordem; repetidas valem: a escada é dela).
+  // M6 (fase 2): a escada do Gun Game (armas conhecidas, na ordem; repetidas valem: a escada é dela). M10 (revisão):
+  // a desconhecida com categoria vira a da categoria (`resolveWeaponId`).
   const ladder = value['ladder'];
   if (ladder !== undefined) {
     const ids: string[] = [];
     if (Array.isArray(ladder)) {
       for (const id of ladder) {
-        const r = typeof id === 'string' ? resolveContent('weapon', id) : null;
-        if (r !== null && r.status === 'known') ids.push(r.local);
-        else warn(ctx, 'weapons.ladder', 'content.missingWeapon', describe(id));
+        const local = typeof id === 'string' ? resolveWeaponId(id) : null;
+        if (local === null) warn(ctx, 'weapons.ladder', 'content.missingWeapon', describe(id));
+        else {
+          if (local !== id) warn(ctx, 'weapons.ladder', 'content.missingWeapon', `${String(id)} → ${local}`);
+          ids.push(local);
+        }
       }
     }
     const { min, max } = RECIPE_RANGES.ladderLength;

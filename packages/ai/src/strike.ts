@@ -1,6 +1,7 @@
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import {
   BOMB,
+  isPrimaryWeapon,
   MAX_HUMANS,
   ROUND,
   ROUND_PHASE,
@@ -173,7 +174,9 @@ export function strikeBuy(c: AiContext, e: number): number {
   const k = e * WEAPON_SLOT_COUNT;
   const primary = view.loadout[k + WEAPON_SLOT.primary];
   const rifle = primary === WEAPON_CODE.rifle || primary === WEAPON_CODE.sniper;
-  const anyGun = rifle || primary === WEAPON_CODE.smg || primary === WEAPON_CODE.shotgun || primary === WEAPON_CODE.lmg;
+  // Qualquer primária de fogo conta como arma (M10: as novas também; o foguete não, como antes). As novas o bot não
+  // compra (a lista de compra dele é a de sempre); ganha pela regra das armas permitidas.
+  const anyGun = rifle || (primary !== undefined && primary !== WEAPON_CODE.rocket && isPrimaryWeapon(primary));
   if (!rifle && money >= PRICE_RIFLE + PRICE_ARMOR50) return BUY_RIFLE;
   if (!anyGun && money >= FORCE_BUY) return BUY_SMG;
   const k3 = k + WEAPON_SLOT.throwable;

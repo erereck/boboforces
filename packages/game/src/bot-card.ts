@@ -28,6 +28,12 @@ export const WEAPON_CATEGORY: Readonly<Record<string, string>> = {
   knife: 'melee',
   grenade: 'throwable',
   lmg: 'lmg',
+  // M10 (fases 6 e 7): as armas novas ("só escopeta automática" não se confunde com "só escopeta").
+  'rifle.dmr': 'dmr',
+  'pistol.revolver': 'revolver',
+  'shotgun.auto': 'autoShotgun',
+  'sniper.crossbow': 'crossbow',
+  'rocket.grenade-launcher': 'launcher',
 };
 
 /** As regras ativas de um bot numa linha ("500 de vida · só escopeta"); `''` = nenhuma. */

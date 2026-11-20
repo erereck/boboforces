@@ -1,11 +1,12 @@
-import { FIGURE_BONE, type FigurePart } from '@boboforces/format';
+import { FIGURE_BONE, FIGURE_PART_CATEGORY, type FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
-import { weaponDef, type WeaponDef } from '../config/weapons.ts';
+import { WEAPON_FIRE, weaponDef, type WeaponDef } from '../config/weapons.ts';
 import { canHurt, hostile, isBody, PART_TORSO, type SimContext } from '../context.ts';
 import { secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, type EntityId } from '../entity.ts';
 import { figurePostureOf, weaponGrip } from '../hitbox.ts';
+import { partDamage } from './part-damage.ts';
 
 /**
  * Passo 4: projéteis (M2, fase 1b; tecnico.md §4.1). Foguete e granada vivem num pool fixo do estado
@@ -14,7 +15,11 @@ import { figurePostureOf, weaponGrip } from '../hitbox.ts';
  *   bala) e pelas hitboxes dos inimigos; o primeiro contato explode. Acerto direto: `damage` no alvo (sem a área nele)
  *   e a área nos outros. Sem contato, explode no fim do alcance (`rangeM / projectileSpeed`);
  * - **granada:** com gravidade, quica nos blocos (perde 60% da velocidade normal e 30% da tangente), atravessa corpos e
- *   explode no pavio (`fuseS`, menos o tempo cozinhando na mão).
+ *   explode no pavio (`fuseS`, menos o tempo cozinhando na mão);
+ * - M10 (fase 7) **virote** (`WEAPON_FIRE.bolt`, a besta): o ramo do foguete, com a gravidade da arma, sem explosão: no
+ *   corpo, o dano da parte acertada (`partDamage`, como a bala: a cabeça vale); no bloco, crava (`projectile` `stick`, na
+ *   superfície e com a direção do voo, para o render mostrar o virote preso; o mundo não muda); no fim do alcance, some.
+ *   A granada do lança-granadas é o foguete com gravidade (explode no contato, corpo ou bloco).
  * A explosão (`explode`) cai em linha reta do centro até a borda, mede a distância até o ponto mais perto da AABB de
  * cada corpo, exige linha de visão do centro até esse ponto (blocos que param bala) e aplica `selfDamageMul` em quem
  * lançou (autodano, gameplay.md §5.1: 50%). Aliados não levam dano (fogo amigo desligado no M2). O dano vai para a fila
@@ -204,9 +209,33 @@ export function projectileSystem(ctx: SimContext): void {
           const hx = x + dx * t;
           const hy = y + dy * t;
           const hz = z + dz * t;
+          if (def.fire === WEAPON_FIRE.bolt) {
+            // M10 (fase 7): o virote acerta como bala (a parte acertada vale; sem queda de dano) e não explode.
+            const amount = partDamage(ctx, def, 0, hitBone, target);
+            const i = ctx.damage.push(
+              target,
+              owner,
+              amount,
+              FIGURE_PART_CATEGORY[hitBone]!,
+              hitBone,
+              def.code,
+              hx,
+              hy,
+              hz,
+            );
+            ctx.damage.setDirection(i, dx, dy, dz, def.killForce);
+            s.freeProjectile(p);
+            continue;
+          }
           const i = ctx.damage.push(target, owner, def.damage, PART_TORSO, hitBone, def.code, hx, hy, hz);
           ctx.damage.setDirection(i, dx, dy, dz, def.killForce);
           explode(ctx, hx, hy, hz, def, owner, target);
+          s.freeProjectile(p);
+          continue;
+        }
+        if (rayHit.hit && def.fire === WEAPON_FIRE.bolt) {
+          // M10 (fase 7): o virote crava no bloco (só o evento: o render mostra o virote preso; o mundo não muda).
+          ctx.events.projectile(ctx.tick, 'stick', p, def.code, owner, rayHit.x, rayHit.y, rayHit.z, vx, vy, vz);
           s.freeProjectile(p);
           continue;
         }
@@ -289,7 +318,9 @@ export function projectileSystem(ctx: SimContext): void {
       continue;
     }
     if (--s.projFuseTicks[p]! <= 0) {
-      explode(ctx, s.projPosition[p3]!, s.projPosition[p3 + 1]!, s.projPosition[p3 + 2]!, def, owner, -1);
+      // M10 (fase 7): o virote no fim do alcance só some (não explode).
+      if (def.fire !== WEAPON_FIRE.bolt)
+        explode(ctx, s.projPosition[p3]!, s.projPosition[p3 + 1]!, s.projPosition[p3 + 2]!, def, owner, -1);
       s.freeProjectile(p);
     }
   }

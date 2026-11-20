@@ -7,7 +7,9 @@ import { HEADSHOT_MULTIPLIER } from './metrics.ts';
  *
  * Cada arma tem um CÓDIGO numérico estável (`WEAPON_CODE`), que é o índice em `WEAPONS`: é o que vai no estado da sim
  * (`SimView.weapon`, `loadout`), nos eventos (`weapon`) e no render. O fuzil é 0, como o slot 0 do M1. Códigos nunca
- * mudam nem são reaproveitados (regra 20, como os IDs de conteúdo); arma nova entra no fim.
+ * mudam nem são reaproveitados (regra 20, como os IDs de conteúdo); arma nova entra no fim. M10: as 5 armas novas
+ * ficam nos códigos 27 a 31 (`WEAPONS_M10`), depois das armas de modo e das raridades do Royale; o arsenal inteiro do
+ * jogador é o `ARSENAL`.
  */
 
 /** Como a arma dispara (`WeaponDef.fire`). */
@@ -16,12 +18,21 @@ export const WEAPON_FIRE = {
   bullet: 0,
   /** Hitscan de `pellets` raios num cone fixo; o dano soma por alvo (um item de dano por alvo e por tiro). */
   pellets: 1,
-  /** Projétil reto que explode no contato (foguete; fase 1b). */
+  /**
+   * Projétil que explode no contato (foguete, reto; fase 1b). Com `projectileGravity`, em arco: a bola de tinta e, M10,
+   * a granada do lança-granadas.
+   */
   projectile: 2,
   /** Golpe à frente até `meleeRangeM` (faca). */
   melee: 3,
   /** Arremesso com gravidade, quica e explode no pavio (granada; fase 1b). */
   thrown: 4,
+  /**
+   * M10 (fase 7): virote (besta): projétil com gravidade que acerta o corpo como bala (a parte vale: cabeça, membros) e,
+   * no bloco, crava (o evento `projectile` `stick`; o render mostra o virote preso por alguns segundos, sem mexer no
+   * mundo). Não explode.
+   */
+  bolt: 5,
 } as const;
 export type WeaponFire = (typeof WEAPON_FIRE)[keyof typeof WEAPON_FIRE];
 
@@ -31,7 +42,7 @@ export type WeaponFire = (typeof WEAPON_FIRE)[keyof typeof WEAPON_FIRE];
  */
 export const WEAPON_SLOT = { primary: 0, secondary: 1, melee: 2, throwable: 3 } as const;
 
-/** Código estável de cada arma = índice em `WEAPONS`. */
+/** Código estável de cada arma (= índice em `WEAPONS` nas do M2; as do M10 em `WEAPONS_M10`). */
 export const WEAPON_CODE = {
   rifle: 0,
   pistol: 1,
@@ -42,12 +53,34 @@ export const WEAPON_CODE = {
   knife: 6,
   grenade: 7,
   lmg: 8,
+  // M10 (fases 6 e 7): as armas novas, depois das armas de modo e das raridades do Royale (9 a 26).
+  dmr: 27,
+  revolver: 28,
+  autoShotgun: 29,
+  crossbow: 30,
+  grenadeLauncher: 31,
 } as const;
 export type WeaponCode = (typeof WEAPON_CODE)[keyof typeof WEAPON_CODE];
 
-/** Categoria exibida ("Rattler · Fuzil") e usada pela IA para o alcance preferido. */
+/**
+ * Categoria exibida ("Rattler · Fuzil") e usada pela IA para o alcance preferido. M10: uma por arma nova (a categoria
+ * é o tipo da arma no HUD e no card do bot: "só escopeta" e "só escopeta automática" não se confundem).
+ */
 export type WeaponCategory =
-  'pistol' | 'smg' | 'rifle' | 'shotgun' | 'sniper' | 'explosive' | 'melee' | 'throwable' | 'lmg';
+  | 'pistol'
+  | 'smg'
+  | 'rifle'
+  | 'shotgun'
+  | 'sniper'
+  | 'explosive'
+  | 'melee'
+  | 'throwable'
+  | 'lmg'
+  | 'dmr'
+  | 'revolver'
+  | 'autoShotgun'
+  | 'crossbow'
+  | 'launcher';
 
 export interface WeaponDef {
   /** ID de conteúdo sem prefixo (`weapon:rifle`). Nunca muda. */
@@ -486,7 +519,11 @@ export const WEAPON_LMG: WeaponDef = {
   grip: FIGURE_GRIP.rifle,
 };
 
-/** Todas as armas, no índice do código (`WEAPONS[c].code === c`). */
+/**
+ * As 9 armas do M2, no índice do código (`WEAPONS[c].code === c`, de 0 a 8). As do M10 têm códigos depois das armas de
+ * modo (`WEAPONS_M10`); o arsenal inteiro do jogador (o loadout, os menus, as regras) é o `ARSENAL`. Quem sorteia entre
+ * as armas com golden gravado (a troca por abate do Chaos, a Caixa Misteriosa) continua nesta lista.
+ */
 export const WEAPONS: readonly WeaponDef[] = [
   WEAPON_RIFLE,
   WEAPON_PISTOL,
@@ -499,9 +536,248 @@ export const WEAPONS: readonly WeaponDef[] = [
   WEAPON_LMG,
 ];
 
+// --- M10 (fases 6 e 7): as 5 armas do arsenal futuro (GDD §4.3.3). Números meus (revisáveis), conferidos pelo robô
+// de balanceamento (`npm run balance -- --weapons`): o TTK de cada uma na faixa da classe dela (GDD §4.3).
+
+/**
+ * DMR (`weapon:rifle.dmr`, "Pinpoint"): o semiautomático de média e longa (gameplay.md §4.2: "pune quem erra"). 46 no
+ * corpo, 2,0x, semi até 300/min, pente de 10, 2,5 s, 100% até 50 m e 34 aos 90 m (3 tiros no corpo a qualquer
+ * distância, 0,40 s; 2 na cabeça, 0,20 s), zoom 2,5x. Do quadril abre muito (2,5°); mirado, quase não espalha.
+ */
+export const WEAPON_DMR: WeaponDef = {
+  ...BASE,
+  id: 'rifle.dmr',
+  code: WEAPON_CODE.dmr,
+  slot: WEAPON_SLOT.primary,
+  category: 'dmr',
+  fire: WEAPON_FIRE.bullet,
+  damage: 46,
+  headMultiplier: HEADSHOT_MULTIPLIER.sniper,
+  rpm: 300,
+  automatic: false,
+  clipSize: 10,
+  reserve: 30,
+  reloadS: 2.5,
+  falloffStartM: 50,
+  falloffEndM: 90,
+  minDamage: 34,
+  rangeM: 220,
+  hipSpreadDeg: 2.5,
+  adsSpreadMul: 0.08,
+  adsInS: 0.3,
+  adsZoom: 2.5,
+  recoilKickDeg: 1.4,
+  recoilMaxDeg: 4.5,
+  recoilPatternDeg: 0.1,
+  recoilYawNoiseDeg: 0.2,
+  recoilRecoverDelayS: 0.12,
+  recoilRecoverDegPerS: 14,
+  killForce: 8,
+  grip: FIGURE_GRIP.rifle,
+};
+
+/**
+ * Revólver (`weapon:pistol.revolver`, "Hand Cannon"): a secundária pesada (AK5: escolhida como a pistola, pelas armas
+ * permitidas; `loadoutSecondary`). 50 no corpo, 1,5x, semi até 120/min, tambor de 6, 2,4 s, 100% até 22 m e 34 aos
+ * 45 m (2 tiros no corpo de perto, 0,50 s; 3 longe). Recuo forte.
+ */
+export const WEAPON_REVOLVER: WeaponDef = {
+  ...BASE,
+  id: 'pistol.revolver',
+  code: WEAPON_CODE.revolver,
+  slot: WEAPON_SLOT.secondary,
+  category: 'revolver',
+  fire: WEAPON_FIRE.bullet,
+  damage: 50,
+  headMultiplier: HEADSHOT_MULTIPLIER.default,
+  rpm: 120,
+  automatic: false,
+  clipSize: 6,
+  reserve: 18,
+  reloadS: 2.4,
+  falloffStartM: 22,
+  falloffEndM: 45,
+  minDamage: 34,
+  rangeM: 150,
+  hipSpreadDeg: 1.2,
+  adsSpreadMul: 0.25,
+  adsInS: 0.22,
+  adsZoom: 1.25,
+  recoilKickDeg: 3.2,
+  recoilMaxDeg: 5,
+  recoilPatternDeg: 0.2,
+  recoilYawNoiseDeg: 0.3,
+  recoilRecoverDelayS: 0.12,
+  recoilRecoverDegPerS: 16,
+  killForce: 8,
+  grip: FIGURE_GRIP.pistol,
+};
+
+/**
+ * Escopeta automática (`weapon:shotgun.auto`, "Leafblower"): 8 chumbos × 9 (menos que a pump), 1,25x, 180/min
+ * automática, pente de 8 (de caixa: recarga inteira de 2,6 s), 100% até 6 m e 0 aos 16 m: de perto, 2 tiros (0,33 s).
+ */
+export const WEAPON_AUTO_SHOTGUN: WeaponDef = {
+  ...BASE,
+  id: 'shotgun.auto',
+  code: WEAPON_CODE.autoShotgun,
+  slot: WEAPON_SLOT.primary,
+  category: 'autoShotgun',
+  fire: WEAPON_FIRE.pellets,
+  damage: 9,
+  headMultiplier: HEADSHOT_MULTIPLIER.shotgun,
+  rpm: 180,
+  automatic: true,
+  clipSize: 8,
+  reserve: 24,
+  reloadS: 2.6,
+  falloffStartM: 6,
+  falloffEndM: 16,
+  minDamage: 0,
+  rangeM: 35,
+  pellets: 8,
+  pelletSpreadDeg: 4.5,
+  hipSpreadDeg: 1,
+  adsSpreadMul: 0.6,
+  adsInS: 0.25,
+  adsZoom: 1.1,
+  recoilKickDeg: 1.8,
+  recoilMaxDeg: 6,
+  recoilPatternDeg: 0.3,
+  recoilYawNoiseDeg: 0.4,
+  recoilRecoverDelayS: 0.15,
+  recoilRecoverDegPerS: 14,
+  killForce: 7,
+  grip: FIGURE_GRIP.rifle,
+};
+
+/**
+ * Besta (`weapon:sniper.crossbow`, "Twang"): o virote (`WEAPON_FIRE.bolt`) sai a 70 m/s com gravidade de 5 m/s² (cai
+ * ~0,8 m aos 40 m), 90 no corpo sem queda e 2,0x na cabeça (1 virote na cabeça, 2 no corpo), 1 no pente e 12 de
+ * reserva, recarga de 1,5 s (o TTK no corpo é a recarga). No bloco, o virote crava (cosmético). Revisão: do quadril abre
+ * 3,5° (não é uma sniper sem luneta); mirada, 0,18°. A regra "Sniper mata no corpo" (`category === 'sniper'`,
+ * `partDamage`) não vale para ela: a categoria da besta é a dela.
+ */
+export const WEAPON_CROSSBOW: WeaponDef = {
+  ...BASE,
+  id: 'sniper.crossbow',
+  code: WEAPON_CODE.crossbow,
+  slot: WEAPON_SLOT.primary,
+  category: 'crossbow',
+  fire: WEAPON_FIRE.bolt,
+  damage: 90,
+  headMultiplier: HEADSHOT_MULTIPLIER.sniper,
+  rpm: 60,
+  automatic: false,
+  clipSize: 1,
+  reserve: 12,
+  reloadS: 1.5,
+  falloffStartM: NO_FALLOFF,
+  falloffEndM: NO_FALLOFF,
+  minDamage: 90,
+  rangeM: 150,
+  hipSpreadDeg: 3.5,
+  adsSpreadMul: 0.05,
+  adsInS: 0.28,
+  adsZoom: 1.8,
+  recoilKickDeg: 1.6,
+  recoilMaxDeg: 3,
+  recoilPatternDeg: 0,
+  recoilYawNoiseDeg: 0.2,
+  recoilRecoverDelayS: 0.2,
+  recoilRecoverDegPerS: 10,
+  killForce: 9,
+  grip: FIGURE_GRIP.rifle,
+  projectileSpeed: 70,
+  projectileGravity: 5,
+};
+
+/**
+ * Lança-granadas (`weapon:rocket.grenade-launcher`, "Bloop"): a granada sai a 30 m/s em arco (gravidade de 12 m/s²) e
+ * explode no CONTATO, com corpo ou com bloco (o ramo do foguete, com gravidade; sem quicar, ao contrário da granada de
+ * mão): o papel é o fogo indireto por cima da cobertura. 85 no acerto direto e área de 85 → 0 em 3,5 m (2 acertos
+ * matam), 90/min, pente de 6 e 12 de reserva, recarga de 3,2 s, autodano de 50%. Sem contato, explode no ar no fim do
+ * alcance (60 m, 2 s de voo).
+ */
+export const WEAPON_GRENADE_LAUNCHER: WeaponDef = {
+  ...BASE,
+  id: 'rocket.grenade-launcher',
+  code: WEAPON_CODE.grenadeLauncher,
+  slot: WEAPON_SLOT.primary,
+  category: 'launcher',
+  fire: WEAPON_FIRE.projectile,
+  damage: 85,
+  headMultiplier: 1,
+  rpm: 90,
+  automatic: false,
+  clipSize: 6,
+  reserve: 12,
+  reloadS: 3.2,
+  falloffStartM: NO_FALLOFF,
+  falloffEndM: NO_FALLOFF,
+  minDamage: 85,
+  rangeM: 60,
+  hipSpreadDeg: 0.8,
+  adsSpreadMul: 0.5,
+  adsInS: 0.3,
+  adsZoom: 1.25,
+  recoilKickDeg: 2.4,
+  recoilMaxDeg: 5,
+  recoilPatternDeg: 0,
+  recoilYawNoiseDeg: 0.3,
+  recoilRecoverDelayS: 0.2,
+  recoilRecoverDegPerS: 10,
+  killForce: 11,
+  grip: FIGURE_GRIP.rifle,
+  projectileSpeed: 30,
+  projectileGravity: 12,
+  blastDamage: 85,
+  blastRadiusM: 3.5,
+  selfDamageMul: 0.5,
+};
+
+/** M10: o código da primeira arma nova (as de `WEAPONS_M10` vêm em seguida, na ordem do código). */
+export const WEAPON_M10_FIRST = 27;
+
+/** M10: as armas novas, no índice `código − WEAPON_M10_FIRST`. */
+export const WEAPONS_M10: readonly WeaponDef[] = [
+  WEAPON_DMR,
+  WEAPON_REVOLVER,
+  WEAPON_AUTO_SHOTGUN,
+  WEAPON_CROSSBOW,
+  WEAPON_GRENADE_LAUNCHER,
+];
+
+/**
+ * M10: o arsenal do jogador, as armas que entram no loadout, nos menus, nas regras (`weapons.allowed`, as do bot e as
+ * do time) e nas escadas: as do M2 e as do M10. A posição aqui é o bit da arma em `EntityRules.weaponMask`
+ * (`weaponMaskBit`): as do M2 ficam no bit do próprio código (as máscaras de antes não mudam) e as do M10 nos bits 9 a
+ * 13 (a máscara é de 16 bits).
+ */
+export const ARSENAL: readonly WeaponDef[] = [...WEAPONS, ...WEAPONS_M10];
+
+/** Bit de cada código na máscara de armas (0 = fora do arsenal). Montado uma vez: a sim consulta por tick. */
+const MASK_BIT_OF_CODE = new Uint16Array(256);
+ARSENAL.forEach((w, i) => {
+  MASK_BIT_OF_CODE[w.code] = 1 << i;
+});
+
+/** O bit da arma `code` em `EntityRules.weaponMask` (0 no que não é do arsenal: arma de modo, `WEAPON_NONE`). */
+export function weaponMaskBit(code: number): number {
+  return code >= 0 && code < MASK_BIT_OF_CODE.length ? MASK_BIT_OF_CODE[code]! : 0;
+}
+
+/** O código da arma do arsenal com o id de conteúdo `id` (sem prefixo), ou -1. */
+export function weaponCodeOf(id: string): number {
+  for (let i = 0; i < ARSENAL.length; i++) if (ARSENAL[i]!.id === id) return ARSENAL[i]!.code;
+  return -1;
+}
+
 /** Arma do código, ou `null` (sem arma: `WEAPON_NONE`, código desconhecido). */
 export function weaponDef(code: number): WeaponDef | null {
   if (code < WEAPONS.length) return WEAPONS[code]!;
+  if (code >= WEAPON_M10_FIRST && code < WEAPON_M10_FIRST + WEAPONS_M10.length)
+    return WEAPONS_M10[code - WEAPON_M10_FIRST]!;
   return code === WEAPON_GOO
     ? ZOMBIE_GOO
     : code === WEAPON_SPIT
@@ -558,14 +834,33 @@ export const DEFAULT_PRIMARY: WeaponCode = WEAPON_CODE.rifle;
 
 /** O código serve de primária (slot 0)? */
 export function isPrimaryWeapon(code: number): boolean {
-  // M6 (fase 5): só o arsenal (`WEAPONS`): as armas de modo (Desmontador, Big Brrt, tinta) não são escolha do jogador.
-  if (code < 0 || code >= WEAPONS.length) return false;
+  // M6 (fase 5): só o arsenal: as armas de modo (Desmontador, Big Brrt, tinta) não são escolha do jogador. M10: as do
+  // M2 e as novas (`ARSENAL`).
+  if (weaponMaskBit(code) === 0) return false;
   const def = weaponDef(code);
   return def !== null && def.slot === WEAPON_SLOT.primary;
 }
 
 /** O resto do loadout do Bobo Warfare (gameplay.md §4.1): pistola, faca e granada, nos slots 1–3. */
 export const DEFAULT_LOADOUT_REST: readonly WeaponCode[] = [WEAPON_CODE.pistol, WEAPON_CODE.knife, WEAPON_CODE.grenade];
+
+/**
+ * M10 (AK5): a secundária do loadout pela máscara das armas permitidas (`EntityRules.weaponMask`): o revólver quando a
+ * lista o cita (escolhido como a pistola: no Laboratório, nas armas da partida e nas do time); senão a pistola, que a
+ * lista ainda pode tirar. Sem restrição (máscara 0), a pistola, como sempre.
+ */
+export function loadoutSecondary(mask: number): WeaponCode {
+  return (mask & weaponMaskBit(WEAPON_CODE.revolver)) !== 0 ? WEAPON_CODE.revolver : WEAPON_CODE.pistol;
+}
+
+/** A 1ª primária que a máscara libera, na ordem do arsenal (`ARSENAL`), ou -1 (a lista só tem armas de outros slots). */
+export function firstAllowedPrimary(mask: number): number {
+  for (let i = 0; i < ARSENAL.length; i++) {
+    const w = ARSENAL[i]!;
+    if ((mask & (1 << i)) !== 0 && w.slot === WEAPON_SLOT.primary) return w.code;
+  }
+  return -1;
+}
 
 /**
  * Multiplicador da dispersão por estado (gameplay.md §3.4). Agachado vale parado ou andando; no ar ganha de tudo.
@@ -755,11 +1050,14 @@ export function isPaintWeapon(code: number): boolean {
   return code >= WEAPON_PAINT_MARKER && code <= WEAPON_PAINT_BUCKET;
 }
 
-/** A primária de tinta de quem escolheu `primary` (sniper → a de tinta; escopeta → o pump; o resto → o marcador). */
+/**
+ * A primária de tinta de quem escolheu `primary` (sniper → a de tinta; escopeta → o pump; o resto → o marcador). M10:
+ * o DMR e a besta → a sniper de tinta; a escopeta automática → o pump.
+ */
 export function paintPrimaryFor(primary: number): number {
-  return primary === WEAPON_CODE.sniper
+  return primary === WEAPON_CODE.sniper || primary === WEAPON_CODE.dmr || primary === WEAPON_CODE.crossbow
     ? WEAPON_PAINT_SNIPER
-    : primary === WEAPON_CODE.shotgun
+    : primary === WEAPON_CODE.shotgun || primary === WEAPON_CODE.autoShotgun
       ? WEAPON_PAINT_PUMP
       : WEAPON_PAINT_MARKER;
 }
@@ -820,6 +1118,12 @@ export const ROYALE_WEAPONS: readonly WeaponDef[] = ROYALE_RARITY_BASES.flatMap(
   rarityVariant(WEAPONS[b]!, 1, WEAPON_ROYALE_FIRST + i * 2),
   rarityVariant(WEAPONS[b]!, 2, WEAPON_ROYALE_FIRST + i * 2 + 1),
 ]);
+
+// M10 (revisão): as raras e épicas do Royale (a partir de 19) não podem invadir os códigos das armas novas (27 a 31):
+// uma raridade a mais para uma arma nova precisa de códigos depois delas.
+if (WEAPON_ROYALE_FIRST + ROYALE_WEAPONS.length > WEAPON_M10_FIRST) {
+  throw new Error('weapons: os códigos das raridades do Royale passaram dos das armas do M10');
+}
 
 /** O código da arma `base` na raridade (0 = comum: o próprio `base`, como a arma sem raridade). */
 export function royaleWeaponCode(base: number, rarity: number): number {

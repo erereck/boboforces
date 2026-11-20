@@ -602,7 +602,8 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'a', labelKey: 'custom.row.allyMarkers', value: 'Desligado' },
           { id: 'b', labelKey: 'custom.row.enemies', value: 'Jorge the Immortal' },
           { id: 'c', labelKey: 'custom.row.ammo', value: 'Reserva infinita' },
-          { id: 'd', labelKey: 'custom.row.allowed', value: 'Só metralhadora' },
+          // M10: "Só lança-granadas" é a escolha de armas mais comprida.
+          { id: 'd', labelKey: 'custom.row.allowed', value: 'Só lança-granadas' },
           { id: 'e', labelKey: 'custom.row.regen', value: 'Desligada' },
           { id: 'f', labelKey: 'custom.row.friendlyFire', value: 'Desligado' },
           { id: 'g', labelKey: 'custom.row.headshotOnly', value: 'Ligado' },

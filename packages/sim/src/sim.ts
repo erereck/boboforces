@@ -26,7 +26,7 @@ import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } 
 import { BASE_HP, METRICS } from './config/metrics.ts';
 import { resolveMovementProfile, type MovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
-import { DEFAULT_PRIMARY, isPrimaryWeapon, WEAPONS } from './config/weapons.ts';
+import { DEFAULT_PRIMARY, isPrimaryWeapon, weaponCodeOf, weaponMaskBit } from './config/weapons.ts';
 import {
   MOVEMENT_DOWNED,
   MOVEMENT_ZOMBIE,
@@ -374,12 +374,15 @@ function createEntityRules(maxHp: number): EntityRules {
   };
 }
 
-/** Máscara (bit = código da arma) dos ids da lista; id desconhecido fica de fora; lista vazia = 0 (todas). */
+/**
+ * Máscara (o bit de cada arma: `weaponMaskBit`, M10) dos ids da lista; id desconhecido fica de fora; lista vazia = 0
+ * (todas).
+ */
 function weaponMaskOf(ids: readonly string[]): number {
   let mask = 0;
   for (const id of ids) {
-    const code = WEAPONS.findIndex((w) => w.id === id);
-    if (code >= 0) mask |= 1 << code;
+    const code = weaponCodeOf(id);
+    if (code >= 0) mask |= weaponMaskBit(code);
   }
   return mask;
 }

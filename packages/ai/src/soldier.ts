@@ -83,7 +83,15 @@ import {
   personaTravel,
 } from './persona.ts';
 import { COVER_PHASE, onDamaged, seekCover, updateCover } from './tactics.ts';
-import { GRENADE_PHASE, holdAngle, maybeStartGrenade, onTargetLost, retreatBelow, stepGrenade } from './tactics2.ts';
+import {
+  GRENADE_PHASE,
+  holdAngle,
+  maybeStartGrenade,
+  onTargetLost,
+  retreatBelow,
+  stepGrenade,
+  throwPitch,
+} from './tactics2.ts';
 import {
   aimSkillForLevel,
   aimSkillFromBot,
@@ -1100,6 +1108,8 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   chooseSlot(view, b, e, dist);
   const held = weaponDef(view.weapon[e]!);
   const use: AiWeaponUse = held ? AI_WEAPON_USE[held.category] : AI_WEAPON_USE.rifle;
+  // M10 (fase 7): a besta e o lança-granadas sobem a mira pelo arco do projétil (a conta da granada, `throwPitch`).
+  let arcPitch = Number.NaN;
   if (held !== null && use.splash && held.projectileSpeed > 0) {
     // Foguete: no pé do alvo, adiantado pelo tempo de voo (velocidade atual do alvo).
     const t3 = tg * 3;
@@ -1109,6 +1119,16 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     dz = view.position[t3 + 2]! + view.velocity[t3 + 2]! * flight - ez;
     horiz = Math.sqrt(dx * dx + dz * dz);
     dist = Math.sqrt(horiz * horiz + dy * dy);
+    if (held.projectileGravity > 0) arcPitch = arcAim(horiz, dy, held.projectileSpeed, held.projectileGravity);
+  } else if (held !== null && held.fire === WEAPON_FIRE.bolt && held.projectileSpeed > 0) {
+    // M10 (fase 7): o virote: no ponto de sempre (cabeça ou tronco), adiantado pelo voo, com a mira subindo pelo arco.
+    const t3 = tg * 3;
+    const flight = dist / held.projectileSpeed;
+    dx += view.velocity[t3]! * flight;
+    dz += view.velocity[t3 + 2]! * flight;
+    horiz = Math.sqrt(dx * dx + dz * dz);
+    dist = Math.sqrt(horiz * horiz + dy * dy);
+    arcPitch = arcAim(horiz, dy, held.projectileSpeed, held.projectileGravity);
   } else if (held !== null && held.fire === WEAPON_FIRE.projectile && held.projectileSpeed > 0) {
     // M6 (fase 5): a bola de tinta: no ponto de sempre, adiantado pelo voo, e mais alto pela queda (½·g·t²).
     const t3 = tg * 3;
@@ -1120,7 +1140,7 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     dist = Math.sqrt(horiz * horiz + dy * dy);
   }
   let goalYaw = Math.atan2(-dx, -dz);
-  let goalPitch = Math.atan2(dy, horiz);
+  let goalPitch = Number.isNaN(arcPitch) ? Math.atan2(dy, horiz) : arcPitch;
   let buttons = 0;
 
   if (ready) {
@@ -1193,6 +1213,16 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   return buttons;
 }
 
+/**
+ * M10 (fase 7): o pitch que leva um projétil de saída `v` (m/s) e gravidade `g` (m/s²) a um ponto `d` m à frente e `dy`
+ * m acima (o arco baixo); fora do alcance, 45° (o mais longe que ele vai).
+ */
+function arcAim(d: number, dy: number, v: number, g: number): number {
+  if (g <= 0) return Math.atan2(dy, d);
+  const p = throwPitch(d, dy, v, g);
+  return Number.isNaN(p) ? Math.PI / 4 : p;
+}
+
 /** Pente e reserva do slot `slot` de `e` vazios? */
 function slotEmpty(view: SimView, e: number, slot: number): boolean {
   const k = e * WEAPON_SLOT_COUNT + slot;
@@ -1212,7 +1242,9 @@ function chooseSlot(view: SimView, b: SoldierBrain, e: number, dist: number): vo
   // M2 (fase 3g): loadout restrito (regra do bot): sem faca não troca para ela; sem nada além da primária, fica nela.
   const hasMelee = hasSlotWeapon(view, e, WEAPON_SLOT.melee);
   let want = b.wantSlot;
-  if (dist < AI_KNIFE.switchM && primary?.category !== 'shotgun' && hasMelee) want = WEAPON_SLOT.melee;
+  // As escopetas (M10: a automática também) matam de perto: com elas, nada de faca.
+  const shotgun = primary?.category === 'shotgun' || primary?.category === 'autoShotgun';
+  if (dist < AI_KNIFE.switchM && !shotgun && hasMelee) want = WEAPON_SLOT.melee;
   else if (want === WEAPON_SLOT.melee && (dist > AI_KNIFE.backM || !hasMelee)) want = WEAPON_SLOT.primary;
   if (want !== WEAPON_SLOT.melee) {
     const tooClose = primaryUse.pistolBelowM > 0 && dist < primaryUse.pistolBelowM;

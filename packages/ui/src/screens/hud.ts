@@ -201,13 +201,31 @@ export const MAX_ALLY_MARKERS = 24;
 /** M2 (fase 2c): formatos do menu da primária. */
 export const PRIMARY_LAYOUT = { none: 0, ring: 1, row: 2, line: 3 } as const;
 
-/** M2 (fase 2c): máximo de opções do menu da primária. */
-export const MAX_PRIMARY_OPTIONS = 8;
+/**
+ * M2 (fase 2c): máximo de opções do menu da primária. M10: 16 (as 10 primárias do radial da morte e os 13 itens da
+ * loja do BoboStrike).
+ */
+export const MAX_PRIMARY_OPTIONS = 16;
+
+/**
+ * M10: até tantas opções o anel é um círculo (o de sempre); com mais, ele abre numa elipse larga (`PrimaryHit.wide`),
+ * e a fileira quebra em até `MAX_PRIMARY_ROWS` linhas.
+ */
+export const RING_ROUND_MAX = 8;
+export const MAX_PRIMARY_ROWS = 3;
 
 export interface PrimaryHit {
   layout: number;
   count: number;
   readonly rects: Float32Array;
+  /**
+   * M10: o anel desenhado é o largo (mais de `RING_ROUND_MAX` opções, numa elipse, em ângulos que não são iguais): o
+   * cursor do radial escolhe a opção cuja plaquinha está na direção dele, a partir do centro do anel
+   * (`centerX`, `centerY`, px da superfície). No anel redondo, `wide` é falso e vale o ângulo de sempre.
+   */
+  wide: boolean;
+  centerX: number;
+  centerY: number;
 }
 
 /** Opção do menu da primária sob o ponto (px da superfície, com folga de `slack` px), ou -1. */
@@ -279,7 +297,14 @@ export function createHudModel(): HudModel {
     interactName: '',
     perks: 0,
     hardTimeHint: false,
-    primaryHit: { layout: PRIMARY_LAYOUT.none, count: 0, rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4) },
+    primaryHit: {
+      layout: PRIMARY_LAYOUT.none,
+      count: 0,
+      rects: new Float32Array(MAX_PRIMARY_OPTIONS * 4),
+      wide: false,
+      centerX: 0,
+      centerY: 0,
+    },
     markers: new Float32Array(MAX_ALLY_MARKERS * 2),
     markerCount: 0,
     markerColor: COLORS.texto,
@@ -1095,8 +1120,13 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     const count = Math.ceil(model.respawnS);
     const respawning = model.waitWave ? (model.waitText !== '' ? model.waitText : tx.waitWave) : tx.respawning;
     const smallH = Math.round(pad * 2 + capL + (showCount ? gap + capN : 0));
-    const r =
-      model.primaryNames.length > 0 && !compact ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s) : 0;
+    const r0 =
+      model.primaryNames.length > 0 && !compact
+        ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s, model.primaryNames.length)
+        : 0;
+    // M10: com mais de 8 opções o anel abre numa elipse; sem espaço para ela, fica a fileira (ou a linha).
+    const rx = r0 > 0 ? ringHalfWidth(model, view, hud, r0, labelPx, pad, gap, s) : 0;
+    const r = rx > 0 ? r0 : 0;
     let y: number;
     let h: number;
     if (r > 0) {
@@ -1122,9 +1152,11 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     const hit = model.primaryHit;
     hit.layout = PRIMARY_LAYOUT.none;
     hit.count = 0;
+    hit.wide = false;
     let below = y + h;
     if (model.primaryNames.length > 0) {
-      if (r > 0) below = drawPrimaryRing(out, hud, model, tx, cx, cy, r, labelPx, pad, gap, s);
+      if (r > 0)
+        below = drawPrimaryRing(out, hud, model, tx, cx, cy, r, rx, model.primaryNames.length, labelPx, pad, gap, s);
       else if (!compact) below = drawPrimaryRow(out, hud, model, view, cx, below + gap * 2, labelPx, pad, gap, s);
       if (hit.layout === PRIMARY_LAYOUT.none)
         below = drawPrimaryLine(out, hud, model, tx, cx, below + gap, labelPx, pad, s);
@@ -1139,10 +1171,33 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
   // M7 (fase 4): o anel da compra do BoboStrike (vivo, na compra), como o da primária da tela de morte.
   if (!model.dead && model.buyTitle !== '' && model.primaryNames.length > 0) {
     const ringH = Math.round(pad * 2 + capL);
-    const r = ringRadius(view, hud, ringH, labelPx, numberPx, pad, gap, s);
-    model.primaryHit.layout = PRIMARY_LAYOUT.none;
-    model.primaryHit.count = 0;
-    if (r > 0) drawPrimaryRing(out, hud, model, tx, cx, cy, r, labelPx, pad, gap, s, model.buyTitle);
+    const n = Math.min(model.primaryNames.length, MAX_PRIMARY_OPTIONS);
+    const r = ringRadius(view, hud, ringH, labelPx, numberPx, pad, gap, s, n);
+    // M10: os 13 itens da loja abrem o anel numa elipse. Revisão: sem espaço para ela (a vista pequena, o 2–4P), a
+    // fileira em linhas com o preço embaixo do nome e, sem espaço nem para ela, a linha "« item preço »": todo item da
+    // loja aparece em todo formato (o `game` anda passo a passo fora do anel). Até 8 opções (a roda das ordens), o anel
+    // redondo ou nada, como antes.
+    const rx = r > 0 ? ringHalfWidth(model, view, hud, r, labelPx, pad, gap, s) : 0;
+    const hit = model.primaryHit;
+    hit.layout = PRIMARY_LAYOUT.none;
+    hit.count = 0;
+    hit.wide = false;
+    if (rx > 0) drawPrimaryRing(out, hud, model, tx, cx, cy, r, rx, n, labelPx, pad, gap, s, model.buyTitle);
+    else if (n > RING_ROUND_MAX) {
+      const smallPx = labelPx * 0.8;
+      const capS = capHeightPx(hud, smallPx);
+      const titleH = Math.round(capS + pad * 2);
+      // Acima do meio (na compra o bobo está parado: a mira não precisa da tela), deixando embaixo as plaquinhas de vida
+      // e munição.
+      const titleY = Math.round(view.y + view.height * 0.26);
+      const top = titleY + titleH + gap;
+      const reserve = capN + pad * 2 + gap;
+      if (!compact) drawPrimaryRow(out, hud, model, view, cx, top, labelPx, pad, gap, s, true, reserve);
+      if (hit.layout === PRIMARY_LAYOUT.none) drawPrimaryLine(out, hud, model, tx, cx, top, labelPx, pad, s, true);
+      const lw = textWidth(hud, model.buyTitle, smallPx, 0.08);
+      plate(out, cx - lw / 2 - pad, titleY, lw + pad * 2, titleH, s);
+      paintText(out, hud, model.buyTitle, cx, titleY + pad, smallPx, COLORS.textoBaixo, 0.08, 0.5);
+    }
   }
   // M7 (fase 4): plantando ou desarmando, no meio (o rótulo e os segundos que faltam).
   if (!model.dead && model.downed === HUD_DOWNED.none && model.centerLabel !== '') {
@@ -1242,7 +1297,8 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
 /**
  * Raio do anel da primária numa vista, ou 0 se ele não cabe: até 22% do lado menor, deixando embaixo a faixa de quem
  * matou (com a dica), e em cima o rótulo, o placar e os abates. Menor que `minR`, as opções dos lados (a 60° do alto)
- * encostariam na plaquinha da contagem (`centerH` de altura).
+ * encostariam na plaquinha da contagem (`centerH` de altura). M10: com mais de `RING_ROUND_MAX` opções (a elipse
+ * larga), até 30% do lado menor: as opções dos lados se empilham e pedem altura.
  */
 function ringRadius(
   view: HudViewport,
@@ -1253,6 +1309,7 @@ function ringRadius(
   pad: number,
   gap: number,
   s: number,
+  count: number,
 ): number {
   const capL = capHeightPx(font, labelPx);
   const capS = capHeightPx(font, labelPx * 0.8);
@@ -1265,10 +1322,171 @@ function ringRadius(
     view.y + Math.max(view.insetTop, HUD_METRICS.marginY * s) + capHeightPx(font, numberPx) + pad * 2 + gap;
   const below = bottomEdge - cy - itemH / 2 - gap * 2 - bannerH;
   const above = cy - topEdge - itemH / 2 - gap - (capS + pad * 2);
-  const r = Math.min(Math.min(view.height, view.width) * 0.22, below, above);
+  const r = Math.min(Math.min(view.height, view.width) * (count > RING_ROUND_MAX ? 0.3 : 0.22), below, above);
   // As opções dos lados ficam r/2 acima e abaixo do centro: precisam passar da contagem com meio vão de folga.
   const minR = centerH + itemH + gap;
   return r >= minR ? Math.round(r) : 0;
+}
+
+/** M10: rascunho das larguras das opções (o anel largo e a fileira em linhas; sem alocar por quadro). */
+const optionW = new Float64Array(MAX_PRIMARY_OPTIONS);
+
+/** Largura da plaquinha da opção `i` do anel (o nome com espaçamento de rótulo, ou a categoria embaixo). */
+function ringItemWidth(
+  model: Readonly<HudModel>,
+  font: MsdfFont | null,
+  i: number,
+  labelPx: number,
+  pad: number,
+): number {
+  const name = model.primaryNames[i]!;
+  const cat = model.primaryCategories[i] ?? '';
+  return (
+    Math.max(textWidth(font, name, labelPx, HUD_METRICS.labelTracking), textWidth(font, cat, labelPx * 0.8)) + pad * 2
+  );
+}
+
+/**
+ * M10: o meio-eixo horizontal do anel de altura `r`: o próprio `r` (o círculo) até `RING_ROUND_MAX` opções; com mais, o
+ * do anel largo (`fitWideRing`); 0 = não cabe.
+ */
+function ringHalfWidth(
+  model: Readonly<HudModel>,
+  view: HudViewport,
+  font: MsdfFont | null,
+  r: number,
+  labelPx: number,
+  pad: number,
+  gap: number,
+  s: number,
+): number {
+  return model.primaryNames.length <= RING_ROUND_MAX ? r : fitWideRing(model, view, font, r, labelPx, pad, gap, s);
+}
+
+/** M10: o ângulo de cada opção no anel largo (a partir do alto, no sentido horário), de `fitWideRing`. */
+const ringAngle = new Float64Array(MAX_PRIMARY_OPTIONS);
+/** Passo da procura do ângulo de cada opção no anel largo (rad: 1°). */
+const RING_SCAN_STEP = Math.PI / 180;
+
+/** As plaquinhas das opções `i` e `j` nos ângulos `a` e `b` da elipse (`rx`, `ry`) se tocam (com o vão `gap`)? */
+function ringClash(
+  i: number,
+  j: number,
+  a: number,
+  b: number,
+  rx: number,
+  ry: number,
+  h: number,
+  gap: number,
+): boolean {
+  const dx = Math.abs(Math.sin(a) - Math.sin(b)) * rx;
+  const dy = Math.abs(Math.cos(a) - Math.cos(b)) * ry;
+  return dx < (optionW[i]! + optionW[j]!) / 2 + gap && dy < h + gap;
+}
+
+/** Nenhum par de opções do anel largo (nos ângulos de `ringAngle`) se toca? */
+function ringClear(n: number, rx: number, ry: number, h: number, gap: number): boolean {
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) if (ringClash(i, j, ringAngle[i]!, ringAngle[j]!, rx, ry, h, gap)) return false;
+  }
+  return true;
+}
+
+/**
+ * Arruma as `n` opções na elipse (`rx`, `ry`) em `ringAngle`: a 1ª no alto e cada uma no 1º ângulo, de grau em grau,
+ * em que não toca a anterior, mais `extra` (rad). Cabe se a última não toca a 1ª na volta e nenhum par se toca.
+ */
+function packRing(n: number, rx: number, ry: number, h: number, gap: number, extra: number): boolean {
+  const TAU = Math.PI * 2;
+  ringAngle[0] = 0;
+  for (let k = 1; k < n; k++) {
+    let a = ringAngle[k - 1]! + RING_SCAN_STEP;
+    while (a < TAU && ringClash(k - 1, k, ringAngle[k - 1]!, a, rx, ry, h, gap)) a += RING_SCAN_STEP;
+    a += extra;
+    if (a >= TAU) return false;
+    ringAngle[k] = a;
+  }
+  return !ringClash(n - 1, 0, ringAngle[n - 1]!, TAU, rx, ry, h, gap) && ringClear(n, rx, ry, h, gap);
+}
+
+/**
+ * Cache do anel largo: a mesma lista (as mesmas referências) na mesma vista e na mesma fonte não refaz a conta a cada
+ * quadro. A chave são números (sem montar texto por quadro) e as referências da lista e da fonte.
+ */
+let wideNames: readonly string[] | null = null;
+let wideCats: readonly string[] | null = null;
+let wideFont: MsdfFont | null = null;
+const WIDE_KEY_FIELDS = 10;
+const wideKey = new Float64Array(WIDE_KEY_FIELDS);
+let wideRx = 0;
+
+/** Grava o campo `i` da chave do cache do anel largo; devolve `same` e se o campo já era este. */
+function wideKeyPut(i: number, v: number, same: boolean): boolean {
+  const was = wideKey[i] === v;
+  wideKey[i] = v;
+  return same && was;
+}
+
+/**
+ * M10: o anel largo (mais de `RING_ROUND_MAX` opções): uma elipse da altura `r` e da maior largura que cabe na vista
+ * (até 3 vezes a altura). As opções não ficam em ângulos iguais (as dos lados se empilham, as de cima e de baixo
+ * ficam lado a lado): `packRing`, com o maior vão extra igual entre elas que ainda cabe (por bissecção), para a volta
+ * ficar repartida. Devolve a largura (o meio-eixo horizontal), com os ângulos em `ringAngle`, ou 0 se não couber (a
+ * tela de morte cai na fileira ou na linha; a loja do BoboStrike não mostra o anel). O cursor escolhe pela direção da
+ * plaquinha (`PrimaryHit.wide`).
+ */
+function fitWideRing(
+  model: Readonly<HudModel>,
+  view: HudViewport,
+  font: MsdfFont | null,
+  r: number,
+  labelPx: number,
+  pad: number,
+  gap: number,
+  s: number,
+): number {
+  const n = model.primaryNames.length;
+  if (n > MAX_PRIMARY_OPTIONS) return 0;
+  // M10 (revisão): a chave leva a fonte (a referência) e a escala da margem, além da vista e dos tamanhos.
+  let same = wideKeyPut(0, n, true);
+  same = wideKeyPut(1, view.width, same);
+  same = wideKeyPut(2, view.height, same);
+  same = wideKeyPut(3, view.insetLeft, same);
+  same = wideKeyPut(4, view.insetRight, same);
+  same = wideKeyPut(5, r, same);
+  same = wideKeyPut(6, labelPx, same);
+  same = wideKeyPut(7, pad, same);
+  same = wideKeyPut(8, gap, same);
+  same = wideKeyPut(9, s, same);
+  same = same && font === wideFont && model.primaryNames === wideNames && model.primaryCategories === wideCats;
+  if (same) return wideRx;
+  const capL = capHeightPx(font, labelPx);
+  const capS = capHeightPx(font, labelPx * 0.8);
+  const h = Math.round(pad * 2 + capL + gap * 0.5 + capS);
+  let maxW = 0;
+  for (let i = 0; i < n; i++) {
+    optionW[i] = ringItemWidth(model, font, i, labelPx, pad);
+    if (optionW[i]! > maxW) maxW = optionW[i]!;
+  }
+  const margin = Math.max(HUD_METRICS.marginX * s, view.insetLeft, view.insetRight);
+  let rx = Math.min(r * 3, view.width / 2 - margin - maxW / 2);
+  if (rx < r || !packRing(n, rx, r, h, gap, 0)) rx = 0;
+  else {
+    // O maior vão extra (até uma fatia igual da volta) com que tudo ainda cabe.
+    let lo = 0;
+    let hi = (Math.PI * 2) / n;
+    for (let it = 0; it < 10; it++) {
+      const mid = (lo + hi) / 2;
+      if (packRing(n, rx, r, h, gap, mid)) lo = mid;
+      else hi = mid;
+    }
+    packRing(n, rx, r, h, gap, lo);
+  }
+  wideNames = model.primaryNames;
+  wideCats = model.primaryCategories;
+  wideFont = font;
+  wideRx = rx;
+  return rx;
 }
 
 /** Guarda o retângulo da opção `i` em `primaryHit`. */
@@ -1348,7 +1566,9 @@ function drawDeathBanner(
 
 /**
  * Menu radial da primária (1–2P): as opções num anel de raio `r` em volta da contagem, a 1ª no alto e as outras no
- * sentido horário; a escolhida em âmbar. Em cima do anel, "ARMA DA PRÓXIMA VIDA". Devolve o y de baixo do anel.
+ * sentido horário; a escolhida em âmbar. Em cima do anel, "ARMA DA PRÓXIMA VIDA". Devolve o y de baixo do anel. M10:
+ * com mais de 8 opções, o anel largo: a elipse de meio-eixo `rx`, nos ângulos de `fitWideRing` (o centro vai para o
+ * `primaryHit`, para o cursor escolher pela direção). Desenha as `count` primeiras (a loja na vista pequena: as 8).
  */
 function drawPrimaryRing(
   out: DrawList,
@@ -1358,22 +1578,28 @@ function drawPrimaryRing(
   cx: number,
   cy: number,
   r: number,
+  rx: number,
+  count: number,
   labelPx: number,
   pad: number,
   gap: number,
   s: number,
   title: string = tx.choose,
 ): number {
-  const n = model.primaryNames.length;
+  const n = Math.min(count, model.primaryNames.length, MAX_PRIMARY_OPTIONS);
   const capL = capHeightPx(hud, labelPx);
   const smallPx = labelPx * 0.8;
   const capS = capHeightPx(hud, smallPx);
   const h = Math.round(pad * 2 + capL + gap * 0.5 + capS);
   let bottom = cy;
   let topY = cy;
+  const wide = n > RING_ROUND_MAX;
+  model.primaryHit.wide = wide;
+  model.primaryHit.centerX = cx;
+  model.primaryHit.centerY = cy;
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const ix = cx + Math.sin(a) * r;
+    const a = wide ? ringAngle[i]! : (i / n) * Math.PI * 2;
+    const ix = cx + Math.sin(a) * rx;
     const iy = cy - Math.cos(a) * r;
     const name = model.primaryNames[i]!;
     const cat = model.primaryCategories[i] ?? '';
@@ -1401,7 +1627,8 @@ function drawPrimaryRing(
 /**
  * Vistas baixas (640×360, celular): as opções numa fileira centrada embaixo da contagem, só com o nome (sem o
  * espaçamento de rótulo, para caber); a escolhida em
- * âmbar. Se a fileira não couber na largura, não desenha (fica a linha "« arma »"). Devolve o y de baixo.
+ * âmbar. Se a fileira não couber na largura, não desenha (fica a linha "« arma »"). Devolve o y de baixo. M10 (revisão):
+ * `cats` põe a categoria (o preço, na loja do BoboStrike) embaixo do nome, em letra menor.
  */
 function drawPrimaryRow(
   out: DrawList,
@@ -1414,30 +1641,79 @@ function drawPrimaryRow(
   pad: number,
   gap: number,
   s: number,
+  cats = false,
+  reserveBelow = -1,
 ): number {
-  const n = model.primaryNames.length;
+  const n = Math.min(model.primaryNames.length, MAX_PRIMARY_OPTIONS);
+  const smallPx = labelPx * 0.8;
   let total = gap * (n - 1);
-  for (let i = 0; i < n; i++) total += textWidth(hud, model.primaryNames[i]!, labelPx) + pad * 2;
-  if (total > view.width - 2 * Math.max(HUD_METRICS.marginX * s, view.insetLeft, view.insetRight)) return top;
-  const capL = capHeightPx(hud, labelPx);
-  const h = Math.round(capL + pad * 2);
-  const y = Math.round(top);
-  let x = cx - total / 2;
   for (let i = 0; i < n; i++) {
-    const name = model.primaryNames[i]!;
-    const w = textWidth(hud, name, labelPx) + pad * 2;
-    const chosen = i === model.primarySelected;
-    if (chosen) pushShape(out, Math.round(x), y, Math.round(w), h, COLORS.acao, Math.round(5 * s));
-    else plate(out, x, y, w, h, s);
-    noteOption(model, i, Math.round(x), y, Math.round(w), h);
-    paintText(out, hud, name, x + pad, y + pad, labelPx, chosen ? COLORS.textoSobreAcao : COLORS.texto);
-    x += w + gap;
+    const nameW = textWidth(hud, model.primaryNames[i]!, labelPx);
+    optionW[i] = (cats ? Math.max(nameW, textWidth(hud, model.primaryCategories[i] ?? '', smallPx)) : nameW) + pad * 2;
+    total += optionW[i]!;
+  }
+  const avail = view.width - 2 * Math.max(HUD_METRICS.marginX * s, view.insetLeft, view.insetRight);
+  const capL = capHeightPx(hud, labelPx);
+  const capCat = cats ? capHeightPx(hud, smallPx) : 0;
+  const h = Math.round(capL + pad * 2 + (cats ? gap * 0.5 + capCat : 0));
+  // M10: sem caber numa linha (as 10 primárias no 640×360), quebra em até `MAX_PRIMARY_ROWS` linhas iguais (a ordem
+  // segue da esquerda para a direita, linha a linha), se couberem acima da faixa de quem matou; senão, a linha "« »".
+  let rows = 1;
+  let per = n;
+  if (total > avail) {
+    rows = 0;
+    for (let k = 2; k <= MAX_PRIMARY_ROWS && rows === 0; k++) {
+      const p = Math.ceil(n / k);
+      let fits = true;
+      for (let first = 0; first < n && fits; first += p) fits = rowWidth(first, Math.min(n, first + p), gap) <= avail;
+      if (fits) {
+        rows = k;
+        per = p;
+      }
+    }
+    const capS = capHeightPx(hud, labelPx * 0.8);
+    // Embaixo, a faixa de quem matou (com a dica); a loja (revisão) diz quanto reservar.
+    const bannerH = reserveBelow >= 0 ? reserveBelow : pad * 2 + capS + gap + capL + gap + capL;
+    const bottomEdge = view.y + view.height - Math.max(view.insetBottom, HUD_METRICS.marginY * s);
+    if (rows === 0 || top + rows * h + (rows - 1) * gap + gap * 2 + bannerH > bottomEdge) return top;
+  }
+  let y = Math.round(top);
+  for (let first = 0; first < n; first += per) {
+    const last = Math.min(n, first + per);
+    let x = cx - rowWidth(first, last, gap) / 2;
+    for (let i = first; i < last; i++) {
+      const name = model.primaryNames[i]!;
+      const w = optionW[i]!;
+      const chosen = i === model.primarySelected;
+      if (chosen) pushShape(out, Math.round(x), y, Math.round(w), h, COLORS.acao, Math.round(5 * s));
+      else plate(out, x, y, w, h, s);
+      noteOption(model, i, Math.round(x), y, Math.round(w), h);
+      paintText(out, hud, name, x + pad, y + pad, labelPx, chosen ? COLORS.textoSobreAcao : COLORS.texto);
+      if (cats) {
+        const cat = model.primaryCategories[i] ?? '';
+        const catY = y + pad + capL + gap * 0.5;
+        paintText(out, hud, cat, x + pad, catY, smallPx, chosen ? COLORS.textoSobreAcao : COLORS.textoBaixo);
+      }
+      x += w + gap;
+    }
+    if (last < n) y += h + Math.round(gap);
   }
   model.primaryHit.layout = PRIMARY_LAYOUT.row;
   return y + h;
 }
 
-/** 3–4P (ou fileira sem espaço): só a escolhida, "« Rattler »", abaixo da contagem. Devolve o y de baixo. */
+/** M10: largura de uma linha da fileira (as opções de `first` até antes de `last`, com os vãos). */
+function rowWidth(first: number, last: number, gap: number): number {
+  let w = gap * (last - first - 1);
+  for (let i = first; i < last; i++) w += optionW[i]!;
+  return w;
+}
+
+/**
+ * 3–4P (ou fileira sem espaço): só a escolhida, "« Rattler »", abaixo da contagem. Devolve o y de baixo. M10 (revisão):
+ * `cats` põe a categoria (o preço, na loja) depois do nome; sem escolha ainda (-1, a loja recém-aberta), mostra a 1ª
+ * opção apagada.
+ */
 function drawPrimaryLine(
   out: DrawList,
   hud: MsdfFont | null,
@@ -1448,11 +1724,17 @@ function drawPrimaryLine(
   labelPx: number,
   pad: number,
   s: number,
+  cats = false,
 ): number {
-  const name = model.primaryNames[model.primarySelected] ?? '';
+  const sel = model.primarySelected;
+  const shown = sel < 0 ? 0 : sel;
+  const name = model.primaryNames[shown] ?? '';
+  const cat = cats ? (model.primaryCategories[shown] ?? '') : '';
   const capL = capHeightPx(hud, labelPx);
+  const space = cat !== '' ? Math.round(labelPx * 0.4) : 0;
   const w =
     textWidth(hud, name, labelPx, HUD_METRICS.labelTracking) +
+    (cat !== '' ? space + textWidth(hud, cat, labelPx) : 0) +
     textWidth(hud, tx.cyclePrev, labelPx) +
     textWidth(hud, tx.cycleNext, labelPx);
   const h = Math.round(capL + pad * 2);
@@ -1460,7 +1742,9 @@ function drawPrimaryLine(
   plate(out, cx - w / 2 - pad, y, w + pad * 2, h, s);
   let x = cx - w / 2;
   x += paintText(out, hud, tx.cyclePrev, x, y + pad, labelPx, COLORS.acao);
-  x += paintText(out, hud, name, x, y + pad, labelPx, COLORS.texto, HUD_METRICS.labelTracking);
+  const fg = sel < 0 ? COLORS.textoBaixo : COLORS.texto;
+  x += paintText(out, hud, name, x, y + pad, labelPx, fg, HUD_METRICS.labelTracking);
+  if (cat !== '') x += space + paintText(out, hud, cat, x + space, y + pad, labelPx, COLORS.textoBaixo);
   paintText(out, hud, tx.cycleNext, x, y + pad, labelPx, COLORS.acao);
   model.primaryHit.layout = PRIMARY_LAYOUT.line;
   return y + h;

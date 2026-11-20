@@ -93,7 +93,7 @@ export const EVENT_SCHEMA: { readonly [T in NetEventType]: readonly EvField<T>[]
     ['action', ['down', 'revive', 'selfRevive']],
   ],
   projectile: [
-    ['action', ['launch', 'bounce']],
+    ['action', ['launch', 'bounce', 'stick']],
     ['index', 'u16'],
     ['weapon', 'u8'],
     ['owner', 'u32'],

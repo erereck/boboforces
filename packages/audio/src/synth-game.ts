@@ -230,6 +230,41 @@ export const GUNSHOTS = {
     tailHz: 1200,
     drive: 2.4,
   },
+  // M10 (fase 6): o DMR (o estalo seco do fuzil com o corpo e a cauda mais longos, entre o fuzil e a sniper) e o
+  // revólver (a pistola bem mais grave e encorpada: o soco forte, "Hand Cannon"). A escopeta automática usa o tiro da
+  // pump um pouco mais agudo (no `game`).
+  dmr: {
+    durationS: 0.66,
+    seed: 0x0d01,
+    crack: 0.95,
+    bodyS: 0.032,
+    bodyBrightHz: 9500,
+    bodyDarkHz: 950,
+    thumpHz: 125,
+    thumpEndHz: 50,
+    thumpS: 0.085,
+    thump: 0.7,
+    tailS: 0.22,
+    tail: 0.24,
+    tailHz: 1300,
+    drive: 2.2,
+  },
+  revolver: {
+    durationS: 0.56,
+    seed: 0x0d02,
+    crack: 0.9,
+    bodyS: 0.03,
+    bodyBrightHz: 7500,
+    bodyDarkHz: 900,
+    thumpHz: 120,
+    thumpEndHz: 46,
+    thumpS: 0.085,
+    thump: 0.9,
+    tailS: 0.18,
+    tail: 0.24,
+    tailHz: 1200,
+    drive: 2.6,
+  },
 } as const satisfies Readonly<Record<string, GunshotRecipe>>;
 
 export type GunshotName = keyof typeof GUNSHOTS;
@@ -616,6 +651,93 @@ export function synthWaveClear(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   return finish(out, 0.65, 0.9, rate);
 }
 
+/**
+ * M10 (fase 7): a besta disparando ("twang"): a corda solta, um tom grave que despenca (310 → 150 Hz) com a 2ª
+ * harmônica curta por cima, e o clique do gatilho. Quedas por multiplicação (sem `exp` no laço: o Switch interpreta).
+ */
+export function synthTwang(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.42 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0d03);
+  const dBend = Math.exp(-1 / (0.02 * rate));
+  const dString = Math.exp(-1 / (0.1 * rate));
+  const dHarm = Math.exp(-1 / (0.035 * rate));
+  const dClick = Math.exp(-1 / (0.002 * rate));
+  let bend = 1;
+  let eString = 1;
+  let eHarm = 0.4;
+  let eClick = 0.7;
+  let p1 = 0;
+  let p2 = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const f = 150 + 160 * bend;
+    p1 += (TAU * f) / rate;
+    p2 += (TAU * f * 2.01) / rate;
+    const attack = t < 0.0015 ? t / 0.0015 : 1;
+    out[i] = (Math.sin(p1) * eString + Math.sin(p2) * eHarm) * attack + noise(rng) * eClick;
+    bend *= dBend;
+    eString *= dString;
+    eHarm *= dHarm;
+    eClick *= dClick;
+  }
+  return finish(out, 0.85, 1.6, rate);
+}
+
+/**
+ * M10 (fase 7): o lança-granadas ("bloop"): o soco oco do tubo, um seno que cai de 190 para 55 Hz, com um sopro curto
+ * de ruído escuro (a granada saindo).
+ */
+export function synthBloop(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.45 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0d04);
+  const puff: Lowpass2 = { a: 0, b: 0 };
+  const puffK = lowpassCoef(700, rate);
+  const dPitch = Math.exp(-1 / (0.045 * rate));
+  const dBody = Math.exp(-1 / (0.12 * rate));
+  const dPuff = Math.exp(-1 / (0.05 * rate));
+  let ePitch = 1;
+  let eBody = 1;
+  let ePuff = 1.6;
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    phase += (TAU * (55 + 135 * ePitch)) / rate;
+    const attack = t < 0.004 ? t / 0.004 : 1;
+    out[i] = Math.sin(phase) * eBody * attack + lp2(puff, noise(rng), puffK) * ePuff;
+    ePitch *= dPitch;
+    eBody *= dBody;
+    ePuff *= dPuff;
+  }
+  return finish(out, 0.9, 1.8, rate);
+}
+
+/** M10 (fase 7): o virote cravando no bloco ("tchok"): um toque seco de madeira (240 → 150 Hz) e o clique do impacto. */
+export function synthThunk(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.14 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0d05);
+  const dPitch = Math.exp(-1 / (0.015 * rate));
+  const dBody = Math.exp(-1 / (0.03 * rate));
+  const dClick = Math.exp(-1 / (0.0015 * rate));
+  let ePitch = 1;
+  let eBody = 1;
+  let eClick = 0.8;
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    phase += (TAU * (150 + 90 * ePitch)) / rate;
+    out[i] = Math.sin(phase) * eBody + noise(rng) * eClick;
+    ePitch *= dPitch;
+    eBody *= dBody;
+    eClick *= dClick;
+  }
+  return finish(out, 0.8, 1.5, rate);
+}
+
 /** Levantou (revivido): duas notas subindo. */
 export function synthRevive(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   const rate = sampleRate;
@@ -659,4 +781,8 @@ export const GAME_SYNTH_SOUNDS: Readonly<Record<string, () => Float32Array>> = {
   'drop-pega': () => synthDropTake(),
   'onda-limpa': () => synthWaveClear(),
   levantou: () => synthRevive(),
+  // M10 (fase 7): a besta, o lança-granadas e o virote cravando.
+  besta: () => synthTwang(),
+  'lanca-granadas': () => synthBloop(),
+  'virote-crava': () => synthThunk(),
 };

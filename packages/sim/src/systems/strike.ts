@@ -44,8 +44,12 @@ export const STRIKE = {
 } as const;
 
 /**
- * A loja do BoboStrike, na ordem do radial de compra (o `InputFrame.primary` = `STRIKE_BUY_BASE` + índice). Comprar o
- * que já tem não faz nada (a entrada repetida pela rede não compra duas vezes).
+ * A loja do BoboStrike (o `InputFrame.primary` = `STRIKE_BUY_BASE` + índice). Comprar o que já tem não faz nada (a
+ * entrada repetida pela rede não compra duas vezes). Item novo entra no FIM (o índice vai na entrada e no estado; o
+ * anel de compra segue esta ordem e, na vista pequena, mostra só os 8 primeiros). M10 (fases 6 e 7): as armas novas, com
+ * preços meus (revisáveis) entre os de antes: a escopeta automática acima da pump, o DMR entre o fuzil e a sniper, a
+ * besta e o lança-granadas caros (o lança-granadas é o único explosivo da loja), e o revólver, a secundária que troca a
+ * pistola.
  */
 export const STRIKE_SHOP = [
   { id: 'smg', price: 1200 },
@@ -56,6 +60,11 @@ export const STRIKE_SHOP = [
   { id: 'armor100', price: 1000 },
   { id: 'grenade', price: 300 },
   { id: 'kit', price: 400 },
+  { id: 'dmr', price: 3300 },
+  { id: 'autoShotgun', price: 2000 },
+  { id: 'crossbow', price: 3500 },
+  { id: 'grenadeLauncher', price: 3800 },
+  { id: 'revolver', price: 700 },
 ] as const;
 export type StrikeItemId = (typeof STRIKE_SHOP)[number]['id'];
 export const STRIKE_BUY_BASE = 200;
@@ -258,15 +267,17 @@ function buy(ctx: SimContext, e: number, item: number): void {
       break;
     }
     default: {
+      // As armas: no slot delas (M10: o revólver troca a pistola; o resto, a primária), cheias e na mão.
       const code = WEAPON_CODE[def.id];
-      if (s.loadout[k + WEAPON_SLOT.primary] === code) return;
       const w = weaponDef(code)!;
-      s.loadout[k + WEAPON_SLOT.primary] = code;
-      s.slotClip[k + WEAPON_SLOT.primary] = w.clipSize;
-      s.slotReserve[k + WEAPON_SLOT.primary] = w.reserve;
-      s.slot[e] = WEAPON_SLOT.primary;
+      const slot = w.slot;
+      if (s.loadout[k + slot] === code) return;
+      s.loadout[k + slot] = code;
+      s.slotClip[k + slot] = w.clipSize;
+      s.slotReserve[k + slot] = w.reserve;
+      s.slot[e] = slot;
       s.weapon[e] = code;
-      s.inWeapon[e] = WEAPON_SLOT.primary;
+      s.inWeapon[e] = slot;
       ctx.events.weapon(ctx.tick, s.idOf(e), code, 'switch');
     }
   }

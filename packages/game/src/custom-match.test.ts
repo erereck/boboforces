@@ -41,7 +41,8 @@ describe('Partida personalizada', () => {
     let r = DEBUT_PRESET;
     r = stepCustom('players', r, 'hp', 1, PC);
     r = stepCustom('players', r, 'regen', 1, PC);
-    r = stepCustom('weapons', r, 'allowed', 3, PC);
+    // M10: "Só escopeta" é a 5ª escolha (o DMR entrou depois do fuzil).
+    r = stepCustom('weapons', r, 'allowed', 4, PC);
     r = stepCustom('mods', r, 'oneShot', 0, PC);
     r = stepCustom('mods', r, 'friendly', 1, PC);
     r = stepCustom('mods', r, 'gravity', -1, PC);
@@ -506,7 +507,8 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     r = withTeamName(r, 0, 'Laranjada');
     r = withTeamName(r, 2, 'Os Verdes');
     r = stepCustom('teams', r, 'teamHp2', 1, PC);
-    r = stepCustom('teams', r, 'teamArms2', 4, PC);
+    // M10: "Só sniper" é a 7ª escolha (o DMR e a escopeta automática entraram antes).
+    r = stepCustom('teams', r, 'teamArms2', 6, PC);
     r = stepCustom('match', r, 'objective', 0, PC);
     const saved = { ...r, name: 'Cenário 4×4×4', seed: 0 };
     const checked = validateMatchRecipe(JSON.parse(JSON.stringify(saved)) as unknown, LIMITS);

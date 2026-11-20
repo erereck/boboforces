@@ -128,9 +128,15 @@ function shotSounds(weapon: number): readonly [SoundId, SoundId] | null {
     case WEAPON_CODE.lmg:
       return ['tiro-fuzil', 'tiro-fuzil-longe'];
     case WEAPON_CODE.shotgun:
+    case WEAPON_CODE.autoShotgun:
       return ['tiro-escopeta', 'tiro-escopeta-longe'];
     case WEAPON_CODE.sniper:
       return ['tiro-sniper', 'tiro-sniper-longe'];
+    // M10 (fase 6): o DMR e o revólver têm o tiro deles; a escopeta automática usa o da pump (`AUTO_SHOTGUN_PITCH`).
+    case WEAPON_CODE.dmr:
+      return ['tiro-dmr', 'tiro-dmr-longe'];
+    case WEAPON_CODE.revolver:
+      return ['tiro-revolver', 'tiro-revolver-longe'];
     default:
       return null;
   }
@@ -144,6 +150,9 @@ const PAINT_GAIN = 0.55;
 /** M6 (fase 3): o tiro da Big Brrt (o da SMG, mais grave e um pouco mais baixo: são 20 por segundo). */
 const BIG_BRRT_PITCH = 0.75;
 const BIG_BRRT_GAIN = 0.8;
+/** M10 (fase 6): a escopeta automática: o tiro da pump um pouco mais agudo e mais baixo (são 3 por segundo). */
+const AUTO_SHOTGUN_PITCH = 1.15;
+const AUTO_SHOTGUN_GAIN = 0.8;
 
 /**
  * Síntese dos sons `synth` do banco, um por vez dentro do orçamento do frame do loading (no Switch o JS é
@@ -561,8 +570,9 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           const rank = rankOf(v, ev.shooter);
           // M6 (fase 3): a Big Brrt é o tiro da SMG uma quarta abaixo (o "brrt" grave da minigun), um pouco mais baixo.
           const brrt = ev.weapon === WEAPON_BIG_BRRT;
-          const pitch = brrt ? BIG_BRRT_PITCH : 1;
-          const gain = brrt ? BIG_BRRT_GAIN : 1;
+          const auto = ev.weapon === WEAPON_CODE.autoShotgun;
+          const pitch = brrt ? BIG_BRRT_PITCH : auto ? AUTO_SHOTGUN_PITCH : 1;
+          const gain = brrt ? BIG_BRRT_GAIN : auto ? AUTO_SHOTGUN_GAIN : 1;
           if (rank === SOUND_RANK.own) playFlat(pair[0], nowS, ownGain() * gain, SOUND_RANK.own, pitch);
           else playAt(v, pair[0], pair[1], ev.originX, ev.originY, ev.originZ, nowS, rank, gain, pitch, 1);
           break;
@@ -645,6 +655,14 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
           if (ev.action === 'bounce') {
             const speed = Math.hypot(ev.vx, ev.vy, ev.vz);
             playAt(v, 'granada-quica', null, ev.x, ev.y, ev.z, nowS, rank, Math.min(1, 0.3 + speed / 12));
+          } else if (ev.action === 'stick') {
+            // M10 (fase 7): o virote cravando no bloco.
+            playAt(v, 'virote-crava', null, ev.x, ev.y, ev.z, nowS, SOUND_RANK.world);
+          } else if (ev.weapon === WEAPON_CODE.crossbow || ev.weapon === WEAPON_CODE.grenadeLauncher) {
+            // M10 (fase 7): a corda da besta e o "bloop" do lança-granadas.
+            const id: SoundId = ev.weapon === WEAPON_CODE.crossbow ? 'besta' : 'lanca-granadas';
+            if (rank === SOUND_RANK.own) playFlat(id, nowS, ownGain(), rank);
+            else playAt(v, id, null, ev.x, ev.y, ev.z, nowS, rank);
           } else if (isPaintWeapon(ev.weapon) && ev.weapon !== WEAPON_PAINT_BUCKET) {
             // M6 (fase 5): o marcador de tinta: o tiro da arma parecida, bem mais agudo e baixo (um "pop").
             const id: SoundId =

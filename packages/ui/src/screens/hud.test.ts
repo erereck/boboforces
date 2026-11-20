@@ -116,6 +116,38 @@ describe('HUD por vista: layout nas 4 resoluções e com 1 a 4 vistas', () => {
       });
     }
   }
+
+  // M10 (fases 6 e 7): a arma da mão com o rótulo mais comprido das armas novas ("Leafblower · Escopeta automática").
+  // A tela dividida só de 1280×720 para cima (como a tela de morte: nunca a 640×360 nem no celular).
+  it('M10: o rótulo mais comprido da arma cabe em todas as resoluções e vistas, sem tocar nada', () => {
+    for (const size of SIZES) {
+      const splits = [
+        [1, false],
+        [2, false],
+        [2, true],
+        [3, false],
+        [4, false],
+      ] as const;
+      for (const [count, vertical] of size.width >= 1280 ? splits : splits.slice(0, 1)) {
+        const minTextPx = count >= 3 ? MIN_TEXT.switchSplit : size.single;
+        const screen = layoutHudScreen(count, size.width, size.height, { minTextPx, vertical });
+        screen.views.forEach((view, i) => {
+          const m = sampleModel(i);
+          m.weaponName = 'Leafblower';
+          m.weaponCategory = 'Escopeta automática';
+          const list = createDrawList();
+          resetDrawList(list, size.width, size.height);
+          drawHud(list, fonts, m, view);
+          const tag = `${size.width}×${size.height}, ${count} vista(s)${vertical ? ' lado a lado' : ''}`;
+          for (const c of drawnCommands(list)) expect(inside(c, screen.rects[i] as HudRect), tag).toBe(true);
+          const ps = plates(list);
+          for (let a = 0; a < ps.length; a++) {
+            for (let b = a + 1; b < ps.length; b++) expect(overlaps(ps[a]!, ps[b]!), tag).toBe(false);
+          }
+        });
+      }
+    }
+  });
 });
 
 describe('HUD por vista: conteúdo', () => {
@@ -511,6 +543,162 @@ describe('tela de morte (M2, fase 2c)', () => {
       }
     }
     expect(hitPrimaryOption(big.primaryHit, 640, 360)).toBe(-1);
+  });
+
+  // M10 (fases 6 e 7): as 10 primárias do radial (as 6 de antes e o DMR, a escopeta automática, a besta e o
+  // lança-granadas) e os 13 itens da loja do BoboStrike.
+  const NAMES10 = [
+    'Rattler',
+    'Pinpoint',
+    'Buzzer',
+    'Door Knocker',
+    'Leafblower',
+    'Peekaboo',
+    'Twang',
+    'Kaboomer',
+    'Bloop',
+    'Lawnmower',
+  ];
+  const CATS10 = [
+    'Fuzil',
+    'DMR',
+    'SMG',
+    'Escopeta',
+    'Escopeta automática',
+    'Sniper',
+    'Besta',
+    'Lança-foguetes',
+    'Lança-granadas',
+    'Metralhadora',
+  ];
+
+  it('M10: 10 primárias nas 4 resoluções e em 2 vistas a 720p+: anel largo ou fileira em linhas, nada se tocando', () => {
+    const layouts: string[] = [];
+    for (const size of SIZES) {
+      for (const count of size.width >= 1280 ? [1, 2] : [1]) {
+        const v = layoutHudScreen(count, size.width, size.height, { minTextPx: size.single }).views[0]!;
+        const m = deadModel();
+        m.primaryNames = NAMES10;
+        m.primaryCategories = CATS10;
+        m.hardTimeHint = true;
+        const list = createDrawList();
+        drawHud(list, fonts, m, v);
+        const tag = `${size.width}×${size.height}, ${count} vista(s)`;
+        const cs = drawnCommands(list);
+        for (const c of cs) expect(inside(c, v), tag).toBe(true);
+        const boxes = [...plates(list), ...cs.filter((c) => c.op !== DRAW_OP.glyph && c.color === COLORS.acao)];
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            expect(overlaps(boxes[i]!, boxes[j]!), `${tag}: ${i} e ${j}`).toBe(false);
+          }
+        }
+        const hit = m.primaryHit;
+        layouts.push(`${size.width}:${count}:${hit.layout}:${hit.count}:${hit.wide}`);
+        // Toda opção desenhada é tocável no centro dela (o toque no celular).
+        for (let i = 0; i < hit.count; i++) {
+          const r = hit.rects;
+          expect(hitPrimaryOption(hit, r[i * 4]! + r[i * 4 + 2]! / 2, r[i * 4 + 1]! + r[i * 4 + 3]! / 2), tag).toBe(i);
+        }
+      }
+    }
+    // 640×360: a fileira em 2 linhas (cabe no toque); celular e 720p+: o anel largo; 2 vistas: a fileira.
+    expect(layouts).toEqual([
+      `640:1:${PRIMARY_LAYOUT.row}:10:false`,
+      `667:1:${PRIMARY_LAYOUT.ring}:10:true`,
+      `1280:1:${PRIMARY_LAYOUT.ring}:10:true`,
+      `1280:2:${PRIMARY_LAYOUT.row}:10:false`,
+      `1920:1:${PRIMARY_LAYOUT.ring}:10:true`,
+      `1920:2:${PRIMARY_LAYOUT.row}:10:false`,
+    ]);
+  });
+
+  it('M10: a loja de 13 itens no anel largo (nada se tocando, dentro da vista); na vista pequena, a fileira ou a linha', () => {
+    const shop = [
+      'Buzzer',
+      'Door Knocker',
+      'Rattler',
+      'Peekaboo',
+      'Colete 50',
+      'Colete 100',
+      'Pineapple',
+      'Kit',
+      'Pinpoint',
+      'Leafblower',
+      'Twang',
+      'Bloop',
+      'Hand Cannon',
+    ];
+    const prices = shop.map(() => '$3.300');
+    const at = (w: number, h: number, min: number): { m: HudModel; list: DrawList; v: HudRect } => {
+      const v = layoutHudScreen(1, w, h, { minTextPx: min }).views[0]!;
+      const m = sampleModel();
+      m.buyTitle = 'COMPRAR';
+      m.primaryNames = shop;
+      m.primaryCategories = prices;
+      m.primarySelected = 9;
+      const list = createDrawList();
+      drawHud(list, fonts, m, v);
+      return { m, list, v };
+    };
+    for (const [w, h, min] of [
+      [667, 375, MIN_TEXT.phone],
+      [1280, 720, MIN_TEXT.tv],
+      [1920, 1080, MIN_TEXT.tv],
+    ] as const) {
+      const { m, list, v } = at(w, h, min);
+      expect([m.primaryHit.layout, m.primaryHit.count, m.primaryHit.wide], `${w}`).toEqual([
+        PRIMARY_LAYOUT.ring,
+        13,
+        true,
+      ]);
+      const r = m.primaryHit.rects;
+      for (let i = 0; i < 13; i++) {
+        const box = { op: DRAW_OP.rect, x: r[i * 4]!, y: r[i * 4 + 1]!, w: r[i * 4 + 2]!, h: r[i * 4 + 3]! };
+        expect(inside(box as DrawnCommand, v), `${w}: ${i}`).toBe(true);
+        for (let j = i + 1; j < 13; j++) {
+          const other = { x: r[j * 4]!, y: r[j * 4 + 1]!, w: r[j * 4 + 2]!, h: r[j * 4 + 3]! };
+          expect(overlaps(box as DrawnCommand, other as DrawnCommand), `${w}: ${i} e ${j}`).toBe(false);
+        }
+      }
+      expect(syntheticGlyphText(list)).toContain('HandCannon');
+    }
+    // Revisão: sem espaço para o anel largo, a fileira em linhas (nome e preço) ou a linha "« item preço »": os 13
+    // itens sempre ao alcance (nada só com os 8 de antes do M10, nada invisível).
+    const formats: string[] = [];
+    for (const [count, w, h, min, vertical] of [
+      [1, 640, 360, MIN_TEXT.switchSplit, false],
+      [2, 1280, 720, MIN_TEXT.tv, false],
+      [2, 1280, 720, MIN_TEXT.tv, true],
+      [4, 1280, 720, MIN_TEXT.switchSplit, false],
+    ] as const) {
+      const lay = layoutHudScreen(count, w, h, { minTextPx: min, vertical });
+      lay.views.forEach((v, i) => {
+        const m = sampleModel(i);
+        m.buyTitle = 'COMPRAR';
+        m.primaryNames = shop;
+        m.primaryCategories = prices;
+        m.primarySelected = 12;
+        const list = createDrawList();
+        drawHud(list, fonts, m, v);
+        const tag = `${w}×${h}, ${count} vista(s)${vertical ? ' lado a lado' : ''}`;
+        for (const c of drawnCommands(list)) expect(inside(c, lay.rects[i] as HudRect), tag).toBe(true);
+        const ps = plates(list);
+        for (let a = 0; a < ps.length; a++) {
+          for (let b = a + 1; b < ps.length; b++) expect(overlaps(ps[a]!, ps[b]!), `${tag}: ${a} e ${b}`).toBe(false);
+        }
+        const hit = m.primaryHit;
+        if (i === 0) formats.push(`${count}${vertical ? 'v' : ''}:${hit.layout}:${hit.count}`);
+        if (hit.layout === PRIMARY_LAYOUT.line) expect(syntheticGlyphText(list), tag).toContain('HandCannon$3.300');
+        else expect(hit.count, tag).toBe(13);
+        expect(syntheticGlyphText(list), tag).toContain('COMPRAR');
+      });
+    }
+    expect(formats).toEqual([
+      `1:${PRIMARY_LAYOUT.row}:13`,
+      `2:${PRIMARY_LAYOUT.row}:13`,
+      `2v:${PRIMARY_LAYOUT.ring}:13`,
+      `4:${PRIMARY_LAYOUT.line}:0`,
+    ]);
   });
 });
 

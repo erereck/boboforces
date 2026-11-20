@@ -15,6 +15,7 @@
  */
 import type { TexelVec3 } from '@boboforces/format';
 import {
+  LayerCanvas,
   ModelBuilder,
   shaded,
   type BoxPaint,
@@ -305,7 +306,8 @@ export function smg(): BuiltModel {
   m.socket('hand_l', body.index, [0, -3, -4.5], FORWARD);
   m.socket('muzzle', body.index, [0, 1.5, -13], FORWARD);
   m.socket('mag', body.index, [0, 0, -4.5], DOWN);
-  m.socket('sight', body.index, [0, 4.5, 0.5], FORWARD);
+  // M10 (revisão): meio texel acima da alça de mira (no meio dela, a caixa tapava metade do centro no ADS).
+  m.socket('sight', body.index, [0, 5.5, 0.5], FORWARD);
   return m.build();
 }
 
@@ -387,7 +389,7 @@ export function rocket(): BuiltModel {
   body.box([-1, -2, -3.5], [2, 2, 3], L, shaded(POLYMER_DARK));
   body.box([-2, 6, 4], [4, 1, 3], L, shaded(oliveDark));
 
-  // Ogiva carregada aparecendo na boca (some na recarga).
+  // Ogiva carregada aparecendo na boca (fica sempre à mostra: o render junta as peças numa malha só).
   warhead.box(
     [-1.5, -1.5, -2],
     [3, 3, 3],
@@ -629,6 +631,359 @@ export function bigBrrt(): BuiltModel {
   return m.build();
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// M10 (fases 6 e 7): as armas do arsenal futuro (GDD §4.3.3), com o id do modelo igual ao da arma (`rifle.dmr`…: o
+// `game` acha o modelo pelo id). Cada uma com a silhueta e a faixa de destaque dela: o DMR comprido e cinza-chumbo com
+// luneta curta e a faixa vermelha; o revólver de aço claro com tambor, cabo de madeira e o latão; a escopeta
+// automática preta, quadrada, com o carregador de caixa e a faixa verde; a besta de madeira com o arco largo e o
+// virote laranja na calha; o lança-granadas oliva, de cano gordo e tambor de 6, com a faixa laranja.
+
+/**
+ * DMR "Pinpoint": fuzil comprido de precisão, semiautomático. Receptor e coronha de polímero escuro com a faixa vermelha,
+ * guarda-mão com respiros, cano longo com freio de boca, luneta curta (zoom 2,5x) e o pente curto de 10.
+ */
+export function dmr(): BuiltModel {
+  const red = tone('tijolo', 3);
+  const m = new ModelBuilder('rifle.dmr', 'weapon', { flags: 0, debrisColor: POLYMER_DARK, blocksNav: false });
+  const L = m.layer('mdl_dmr', 'opaque', POLYMER_DARK);
+  const body = m.part('body');
+  const bolt = m.part('bolt', body.index);
+  const mag = m.part('mag', body.index, [0, 0, -3.5]);
+  const scope = m.part('scope', body.index, [0, 5, -2]);
+
+  body.box([-1.5, 0, -6], [3, 4, 10], L, (face, p) => {
+    shaded(POLYMER_DARK)(face, p);
+    if (face === 'right') p.rect(4, 1, 3, 1, tone('concreto', 0)); // janela de ejeção
+  });
+  body.box([-1.5, -1, 4], [3, 4, 10], L, (face, p) => {
+    shaded(POLYMER)(face, p);
+    if (SIDE(face)) {
+      // A faixa vermelha perto da soleira e o vão do polegar.
+      const x = face === 'right' ? p.w - 3 : 2;
+      for (let y = 0; y < p.h; y++) p.px(x, y, red);
+      p.rect(face === 'right' ? 1 : p.w - 4, 1, 3, 1, POLYMER_DARK);
+    }
+  });
+  body.box([-1.5, -1.5, 14], [3, 5, 1], L, shaded(tone('concreto', 0)));
+  body.box([-1.5, 0.5, -16], [3, 3, 10], L, (face, p) => {
+    shaded(POLYMER_DARK)(face, p);
+    if (SIDE(face)) for (let x = 1; x < p.w - 1; x += 2) p.px(x, 1, tone('concreto', 0));
+  });
+  body.box([-1, 1, -26], [2, 2, 10], L, shaded(GUNMETAL_DARK));
+  body.box([-1.5, 0.5, -29], [3, 3, 3], L, (face, p) => {
+    shaded(GUNMETAL)(face, p);
+    if (SIDE(face)) for (let x = 0; x < p.w; x += 2) p.px(x, 1, GUNMETAL_DARK);
+    if (face === 'front') p.px(1, 1, tone('neutro', 0));
+  });
+  body.box([-1, -5, 2], [2, 5, 3], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  body.box([-1, -2, -1], [2, 1, 3], L, shaded(POLYMER_DARK));
+  body.box([-0.5, -1, 0], [1, 1, 1], L, shaded(GUNMETAL));
+  body.box([-1, 4, -6], [2, 1, 9], L, (face, p) => {
+    shaded(GUNMETAL_DARK)(face, p);
+    if (face === 'top') for (let y = 0; y < p.h; y += 2) for (let x = 0; x < p.w; x++) p.px(x, y, GUNMETAL);
+  });
+
+  bolt.box([1.5, 2.5, -1], [1, 1, 2], L, shaded(GUNMETAL));
+
+  // Pente curto e reto, com a base vermelha.
+  mag.box([-1, -3, -1.5], [2, 3, 3], L, combine(shaded(GUNMETAL_DARK), stripeRow(2, red)));
+
+  // Luneta curta: tubo, campânulas com lente e os dois anéis.
+  scope.box([-1, 1, -4], [2, 2, 7], L, shaded(GUNMETAL_DARK));
+  scope.box([-1.5, 0.5, -6], [3, 3, 2], L, (face, p) => (face === 'front' ? lens(p) : shaded(GUNMETAL_DARK)(face, p)));
+  scope.box([-1.5, 0.5, 3], [3, 3, 2], L, (face, p) => (face === 'back' ? lens(p) : shaded(GUNMETAL_DARK)(face, p)));
+  const ring = scope.box([-1, 0, -3], [2, 1, 1], L, shaded(GUNMETAL));
+  scope.boxLike([-1, 0, 1], ring);
+
+  m.socket('hand_r', body.index, [0, -2.5, 3.5], FORWARD);
+  m.socket('hand_l', body.index, [0, 0.5, -12], FORWARD);
+  m.socket('muzzle', body.index, [0, 2, -29], FORWARD);
+  m.socket('mag', body.index, [0, 0, -3.5], DOWN);
+  // A mira no eixo da luneta, na lente de trás: no ADS o DMR é arma de luneta (o jogo esconde a arma e a HUD desenha a
+  // moldura, como na sniper; revisão).
+  m.socket('sight', scope.index, [0, 2, 5], FORWARD);
+  return m.build();
+}
+
+/**
+ * Revólver "Hand Cannon": aço claro, cano comprido com a costela em cima, tambor de 6 (a peça `mag`), cão atrás
+ * (`bolt`), cabo de madeira e os detalhes de latão.
+ */
+export function revolver(): BuiltModel {
+  const steel = tone('aco', 2);
+  const brass = tone('amarelo', 2);
+  const wood = tone('madeira', 2);
+  const m = new ModelBuilder('pistol.revolver', 'weapon', { flags: 0, debrisColor: steel, blocksNav: false });
+  const L = m.layer('mdl_revolver', 'opaque', GUNMETAL_DARK);
+  const body = m.part('body');
+  const hammer = m.part('bolt', body.index);
+  const drum = m.part('mag', body.index, [0, 1.5, -2.5]);
+
+  body.box([-1, 0, -5], [2, 3, 6], L, (face, p) => {
+    shaded(steel)(face, p);
+    if (SIDE(face)) p.px(face === 'right' ? 1 : p.w - 2, 1, GUNMETAL_DARK);
+  });
+  body.box([-1, 1.5, -13], [2, 2, 8], L, (face, p) => {
+    shaded(steel)(face, p);
+    if (face === 'top') for (let y = 0; y < p.h; y += 2) p.px(1, y, GUNMETAL);
+    if (face === 'front') p.px(0, 0, tone('neutro', 0));
+  });
+  body.box([-0.5, 0.5, -12], [1, 1, 7], L, shaded(GUNMETAL));
+  body.box([-0.5, 3.5, -13], [1, 1, 1], L, shaded(brass));
+  body.box([-1, 3, -1], [2, 1, 2], L, shaded(steel));
+  body.box([-1, -5, 0], [2, 5, 3], L, (face, p) => {
+    shaded(wood)(face, p);
+    if (SIDE(face)) for (let y = 1; y < p.h; y += 2) p.px(1, y, tone('madeira', 1));
+  });
+  body.box([-1, -6, 0.5], [2, 1, 2], L, shaded(brass));
+  body.box([-1, -2, -3], [2, 1, 3], L, shaded(GUNMETAL_DARK));
+  body.box([-0.5, -1, -2], [1, 1, 1], L, shaded(brass));
+
+  hammer.box([-0.5, 2.5, 1], [1, 2, 1], L, shaded(GUNMETAL));
+
+  // Tambor: a face da frente com as 6 câmaras.
+  drum.box([-1.5, -1.5, -1.5], [3, 3, 3], L, (face, p) => {
+    shaded(steel)(face, p);
+    if (face === 'front' || face === 'back') {
+      p.px(0, 0, GUNMETAL_DARK);
+      p.px(2, 0, GUNMETAL_DARK);
+      p.px(0, 2, GUNMETAL_DARK);
+      p.px(2, 2, GUNMETAL_DARK);
+    }
+    if (SIDE(face)) for (let y = 0; y < p.h; y++) p.px(1, y, GUNMETAL);
+  });
+
+  m.socket('hand_r', body.index, [0, -2.5, 1.5], FORWARD);
+  m.socket('hand_l', body.index, [-1, -3.5, 1.5], FORWARD);
+  m.socket('muzzle', body.index, [0, 2.5, -13], FORWARD);
+  m.socket('mag', body.index, [0, 1.5, -2.5], FORWARD);
+  m.socket('sight', body.index, [0, 4.5, -1], FORWARD);
+  return m.build();
+}
+
+/**
+ * Escopeta automática "Leafblower": preta e quadrada, alça de transporte em cima, capa do cano com respiros, a boca
+ * larga, a empunhadura da frente e o carregador de caixa de 8 (cartuchos vermelhos à mostra, base verde).
+ */
+export function autoShotgun(): BuiltModel {
+  const green = tone('grama', 3);
+  const shell = tone('tijolo', 2);
+  const m = new ModelBuilder('shotgun.auto', 'weapon', { flags: 0, debrisColor: POLYMER_DARK, blocksNav: false });
+  const L = m.layer('mdl_auto_shotgun', 'opaque', POLYMER_DARK);
+  const body = m.part('body');
+  const bolt = m.part('bolt', body.index);
+  const mag = m.part('mag', body.index, [0, 0, -5]);
+
+  body.box([-1.5, 0, -8], [3, 5, 12], L, (face, p) => {
+    shaded(POLYMER_DARK)(face, p);
+    if (SIDE(face)) for (let x = 0; x < p.w; x++) p.px(x, 1, green);
+    if (face === 'right') p.rect(5, 3, 3, 1, tone('concreto', 0));
+  });
+  body.box([-1.5, -1, 4], [3, 4, 9], L, (face, p) => {
+    shaded(POLYMER)(face, p);
+    if (SIDE(face)) p.rect(face === 'right' ? 2 : p.w - 5, 1, 3, 1, POLYMER_DARK);
+  });
+  body.box([-1.5, -1.5, 13], [3, 5, 1], L, shaded(tone('concreto', 0)));
+  body.box([-1.5, 1, -20], [3, 3, 12], L, (face, p) => {
+    shaded(POLYMER_DARK)(face, p);
+    if (SIDE(face) || face === 'top') for (let x = 1; x < p.w - 1; x += 2) p.px(x, 1, tone('concreto', 0));
+  });
+  body.box([-1, 1.5, -24], [2, 2, 4], L, shaded(GUNMETAL_DARK));
+  body.box([-2, 0.5, -26], [4, 4, 2], L, (face, p) => {
+    shaded(GUNMETAL)(face, p);
+    if (face === 'front') p.rect(1, 1, 2, 2, tone('neutro', 0));
+  });
+  body.box([-1, -5, 1], [2, 5, 3], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  body.box([-1, -2, -2], [2, 1, 3], L, shaded(POLYMER_DARK));
+  body.box([-1, 5, -6], [2, 1, 8], L, shaded(GUNMETAL_DARK));
+  body.box([-1, -3, -15], [2, 3, 2], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+
+  bolt.box([1.5, 3, -4], [1, 1, 2], L, shaded(GUNMETAL));
+
+  // Carregador de caixa: os cartuchos vermelhos de lado e a base verde.
+  mag.box([-1.5, -5, -2], [3, 5, 4], L, (face, p) => {
+    shaded(POLYMER_DARK)(face, p);
+    if (SIDE(face)) for (let y = 0; y < p.h - 1; y += 2) p.rect(1, y, p.w - 2, 1, shell);
+    if (face !== 'top') for (let x = 0; x < p.w; x++) p.px(x, p.h - 1, green);
+  });
+
+  m.socket('hand_r', body.index, [0, -2.5, 2.5], FORWARD);
+  m.socket('hand_l', body.index, [0, -3, -14], FORWARD);
+  m.socket('muzzle', body.index, [0, 2.5, -26], FORWARD);
+  m.socket('mag', body.index, [0, 0, -5], DOWN);
+  m.socket('sight', body.index, [0, 6.5, -2], FORWARD);
+  return m.build();
+}
+
+/**
+ * Besta "Twang": coronha de madeira em duas caixas, a calha de aço em cima, o arco largo na frente (as duas pás e as
+ * pontas viradas), a corda, a mira de ponto apoiada na coronha e o virote carregado na calha, de haste escura e penas
+ * laranja. O virote é a peça `mag`, mas fica sempre à mostra: o render junta as peças numa malha só (não esconde nada
+ * na recarga). Revisão: a mira (o soquete `sight`) passa meio texel acima da mira de ponto, por cima das penas e da
+ * corda (no soquete, a lente tapava o centro da tela no ADS de 1,8x).
+ */
+export function crossbow(): BuiltModel {
+  const wood = tone('madeira', 3);
+  const woodDark = tone('madeira', 1);
+  const orange = tone('laranja', 2);
+  const m = new ModelBuilder('sniper.crossbow', 'weapon', { flags: 0, debrisColor: wood, blocksNav: false });
+  const L = m.layer('mdl_crossbow', 'opaque', woodDark);
+  const body = m.part('body');
+  const loaded = m.part('mag', body.index, [0, 3, -6]);
+  const sight = m.part('scope', body.index, [0, 2, 4]);
+
+  body.box([-1.5, -2, -2], [3, 4, 15], L, (face, p) => {
+    shaded(wood)(face, p);
+    if (SIDE(face)) p.rect(face === 'right' ? 10 : p.w - 13, 1, 3, 2, woodDark); // vão do polegar
+  });
+  body.box([-1.5, -1, -12], [3, 3, 10], L, (face, p) => {
+    shaded(wood)(face, p);
+    if (SIDE(face)) for (let x = 2; x < p.w; x += 4) p.px(x, 1, woodDark);
+  });
+  body.box([-1, 2, -14], [2, 1, 10], L, (face, p) => {
+    shaded(GUNMETAL)(face, p);
+    if (face === 'top') for (let y = 0; y < p.h; y++) p.px(1, y, GUNMETAL_DARK);
+  });
+  // O arco: as pás de aço com a faixa laranja e as pontas viradas para trás.
+  const limb = body.box([-10, 1, -15], [8, 1, 2], L, (face, p) => {
+    shaded(GUNMETAL_DARK)(face, p);
+    if (face === 'top' || face === 'bottom') p.rect(Math.floor(p.w / 2), 0, 1, p.h, orange);
+  });
+  body.boxLike([2, 1, -15], limb, { mirror: true });
+  const tip = body.box([-11, 1, -14], [1, 1, 2], L, shaded(GUNMETAL));
+  body.boxLike([10, 1, -14], tip, { mirror: true });
+  body.box([-2, 0.5, -16], [4, 2, 2], L, shaded(GUNMETAL));
+  // A corda, de ponta a ponta do arco.
+  body.box([-10.5, 2, -13], [21, 1, 1], L, shaded(tone('placa', 1)));
+  body.box([-1, -5, 2], [2, 3, 3], L, combine(shaded(woodDark), grooves(tone('madeira', 0))));
+  body.box([-1, -3, -1], [2, 1, 3], L, shaded(GUNMETAL_DARK));
+  body.box([-1.5, -2, 13], [3, 4, 1], L, shaded(POLYMER_DARK));
+
+  // O virote na calha: haste escura, ponta de aço e as penas laranja atrás.
+  loaded.box([-0.5, 0, -3], [1, 1, 9], L, shaded(GUNMETAL_DARK));
+  loaded.box([-0.5, 0, -5], [1, 1, 2], L, shaded(tone('aco', 3)));
+  loaded.box([-1, -0.5, 6], [2, 2, 2], L, shaded(orange));
+
+  // Mira de ponto: a caixinha com a lente atrás, apoiada na coronha.
+  sight.box([-1, 0, -1], [2, 2, 3], L, (face, p) => (face === 'back' ? lens(p) : shaded(GUNMETAL_DARK)(face, p)));
+
+  m.socket('hand_r', body.index, [0, -2.5, 3.5], FORWARD);
+  m.socket('hand_l', body.index, [0, -1, -9], FORWARD);
+  m.socket('muzzle', body.index, [0, 3.5, -16], FORWARD);
+  m.socket('mag', body.index, [0, 3, -6], FORWARD);
+  m.socket('sight', sight.index, [0, 3, 2], FORWARD);
+  return m.build();
+}
+
+/**
+ * Lança-granadas "Bloop": oliva, de cano gordo com a boca escura e o anel laranja, o tambor de 6 granadas embaixo do
+ * receptor (a peça `mag`), a empunhadura da frente, a mira de folha e a coronha de duas hastes.
+ */
+export function grenadeLauncher(): BuiltModel {
+  const olive = tone('lona', 2);
+  const oliveDark = tone('lona', 1);
+  const orange = tone('laranja', 2);
+  const m = new ModelBuilder('rocket.grenade-launcher', 'weapon', {
+    flags: 0,
+    debrisColor: olive,
+    blocksNav: false,
+  });
+  const L = m.layer('mdl_grenade_launcher', 'opaque', oliveDark);
+  const body = m.part('body');
+  const drum = m.part('mag', body.index, [0, -1, -6]);
+  const leaf = m.part('scope', body.index, [0, 4, -7]);
+
+  body.box([-2, 0, -18], [4, 4, 10], L, (face, p) => {
+    shaded(olive)(face, p);
+    if (SIDE(face)) for (let x = 1; x < p.w; x += 3) p.rect(x, 0, 1, p.h, oliveDark);
+  });
+  body.box([-2.5, -0.5, -20], [5, 5, 2], L, (face, p) => {
+    shaded(GUNMETAL_DARK)(face, p);
+    if (face === 'front') p.rect(1, 1, 3, 3, tone('neutro', 0));
+    if (SIDE(face) || face === 'top') for (let y = 0; y < p.h; y++) p.px(0, y, orange);
+  });
+  body.box([-1.5, 0, -8], [3, 4, 9], L, (face, p) => {
+    shaded(GUNMETAL)(face, p);
+    if (face === 'right') p.rect(2, 1, 3, 1, GUNMETAL_DARK);
+  });
+  body.box([-1, -5, 0], [2, 5, 3], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  body.box([-1, -2, -3], [2, 1, 3], L, shaded(POLYMER_DARK));
+  body.box([-1, -3, -15], [2, 3, 2], L, combine(shaded(POLYMER), grooves(POLYMER_DARK)));
+  const rod = body.box([-1.5, 1, 1], [1, 1, 9], L, shaded(GUNMETAL_DARK));
+  body.boxLike([0.5, 1, 1], rod);
+  body.box([-1.5, -2, 10], [3, 5, 1], L, shaded(POLYMER_DARK));
+
+  // Tambor de 6: a frente com as bocas das câmaras e a faixa laranja.
+  drum.box([-2.5, -3, -3], [5, 5, 6], L, (face, p) => {
+    shaded(oliveDark)(face, p);
+    if (face === 'front' || face === 'back') {
+      for (const [x, y] of [
+        [1, 1],
+        [3, 1],
+        [1, 3],
+        [3, 3],
+      ] as const)
+        p.px(x, y, tone('neutro', 0));
+    }
+    if (SIDE(face)) for (let y = 0; y < p.h; y++) p.px(Math.floor(p.w / 2), y, orange);
+  });
+
+  leaf.box([-1, 0, -0.5], [2, 2, 1], L, shaded(GUNMETAL));
+
+  m.socket('hand_r', body.index, [0, -2.5, 1.5], FORWARD);
+  m.socket('hand_l', body.index, [0, -2, -14], FORWARD);
+  m.socket('muzzle', body.index, [0, 2, -20], FORWARD);
+  m.socket('mag', body.index, [0, -1, -6], DOWN);
+  m.socket('sight', leaf.index, [0, 2.5, 0], FORWARD);
+  return m.build();
+}
+
+/**
+ * M10 (fase 7): a camada dos 2 projéteis novos (o virote e a granada do lança-granadas), dividida para caber no
+ * orçamento do `modelos64` (`MODEL_LAYER_BUDGET`).
+ */
+export interface M10ProjectileLayers {
+  readonly shared: LayerCanvas;
+}
+
+export function createM10ProjectileLayers(): M10ProjectileLayers {
+  return { shared: new LayerCanvas('mdl_m10_projectiles', 'opaque', GUNMETAL_DARK) };
+}
+
+/**
+ * O virote em voo e cravado (`crossbow-bolt`): haste escura de 0,5 m, ponta de aço e as penas laranja (cruzadas).
+ * Origem no meio, ponta para −Z (a ponta fica a 0,34 m do meio; o render a enterra no bloco).
+ */
+export function crossbowBolt(layers: M10ProjectileLayers): BuiltModel {
+  const orange = tone('laranja', 2);
+  const m = new ModelBuilder('crossbow-bolt', 'pickup', { flags: 0, debrisColor: orange, blocksNav: false });
+  const L = m.useLayer(layers.shared);
+  const body = m.part('body');
+  body.box([-0.5, -0.5, -9], [1, 1, 16], L, shaded(GUNMETAL_DARK));
+  body.box([-1, -1, -11], [2, 2, 2], L, shaded(tone('aco', 3)));
+  body.box([-1.5, -0.5, 4], [3, 1, 3], L, shaded(orange));
+  body.box([-0.5, -1.5, 4], [1, 3, 3], L, shaded(tone('laranja', 3)));
+  return m.build();
+}
+
+/** A granada do lança-granadas em voo (`grenade-launcher-shell`): o corpo oliva com o anel laranja e a ponta escura. */
+export function grenadeLauncherShell(layers: M10ProjectileLayers): BuiltModel {
+  const m = new ModelBuilder('grenade-launcher-shell', 'pickup', {
+    flags: 0,
+    debrisColor: tone('lona', 2),
+    blocksNav: false,
+  });
+  const L = m.useLayer(layers.shared);
+  const body = m.part('body');
+  body.box([-1.5, -1.5, -2], [3, 3, 4], L, (face, p) => {
+    shaded(tone('lona', 2))(face, p);
+    if (SIDE(face) || face === 'top' || face === 'bottom') for (let y = 0; y < p.h; y++) p.px(1, y, tone('laranja', 2));
+  });
+  body.box([-1, -1, -3], [2, 2, 1], L, shaded(GUNMETAL_DARK));
+  body.box([-1.5, -1.5, 2], [3, 3, 1], L, shaded(tone('amarelo', 1)));
+  return m.build();
+}
+
 export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   pistol,
   rifle,
@@ -642,4 +997,16 @@ export const WEAPON_RECIPES: readonly (() => BuiltModel)[] = [
   rocketShell,
   desmontador,
   bigBrrt,
+  // M10 (fases 6 e 7).
+  dmr,
+  revolver,
+  autoShotgun,
+  crossbow,
+  grenadeLauncher,
+];
+
+/** M10 (fase 7): os projéteis novos (a camada deles é uma só, `createM10ProjectileLayers`). */
+export const M10_PROJECTILE_RECIPES: readonly ((layers: M10ProjectileLayers) => BuiltModel)[] = [
+  crossbowBolt,
+  grenadeLauncherShell,
 ];

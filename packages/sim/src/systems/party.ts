@@ -1,7 +1,7 @@
 import type { MatchRecipe } from '@boboforces/format';
 import { INFECTION_DEFAULTS } from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { WEAPON_BIG_BRRT, WEAPON_CODE, WEAPONS, weaponDef } from '../config/weapons.ts';
+import { WEAPON_BIG_BRRT, WEAPON_CODE, weaponCodeOf, weaponDef } from '../config/weapons.ts';
 import { MAX_ENTITIES } from '../constants.ts';
 import { AMMO_RULE, RULE_FLAG, WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, type EntityId } from '../entity.ts';
@@ -77,7 +77,7 @@ export function createPartyState(recipe: MatchRecipe): PartyState {
   const ids = recipe.weapons?.ladder ?? [];
   const codes: number[] = [];
   for (const id of ids) {
-    const code = WEAPONS.findIndex((def) => def.id === id);
+    const code = weaponCodeOf(id);
     if (code >= 0) codes.push(code);
   }
   return {

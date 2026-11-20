@@ -7,6 +7,7 @@ import {
   isKnownContentId,
   isValidContentLocal,
   resolveContent,
+  resolveWeaponId,
   RETIRED_CONTENT_IDS,
   splitContentId,
 } from './content-ids.ts';
@@ -43,6 +44,11 @@ const LOCKED_IDS = [
   'weapon:knife',
   'weapon:grenade',
   'weapon:lmg',
+  'weapon:rifle.dmr',
+  'weapon:pistol.revolver',
+  'weapon:shotgun.auto',
+  'weapon:sniper.crossbow',
+  'weapon:rocket.grenade-launcher',
   'block:missing',
   'block:concrete',
   'block:crate',
@@ -192,6 +198,13 @@ const LOCKED_IDS = [
   'model:inflatable-cube',
   'model:inflatable-wedge',
   'model:inflatable-wall',
+  'model:rifle.dmr',
+  'model:pistol.revolver',
+  'model:shotgun.auto',
+  'model:sniper.crossbow',
+  'model:rocket.grenade-launcher',
+  'model:crossbow-bolt',
+  'model:grenade-launcher-shell',
   'skin:recruit',
   'skin:mechanic',
   'skin:pilot',
@@ -293,6 +306,14 @@ describe('fallback de conteúdo (tecnico.md §14.5)', () => {
     expect(resolveContent('weapon', 'smg.compact')).toEqual({ status: 'fallback', local: 'smg' });
     expect(resolveContent('weapon', 'minigun')).toEqual({ status: 'fallback', local: 'pistol' });
     expect(resolveContent('weapon', 'dmr.long')).toEqual({ status: 'fallback', local: 'pistol' });
+  });
+
+  it('M10 (revisão): o id que a lista de armas guarda: o conhecido, ou a categoria do prefixo; sem ela, nada', () => {
+    expect(resolveWeaponId('rifle.dmr')).toBe('rifle.dmr');
+    expect(resolveWeaponId('shotgun.double')).toBe('shotgun');
+    expect(resolveWeaponId('rifle.dmr.long')).toBe('rifle');
+    expect(resolveWeaponId('minigun')).toBeNull();
+    expect(resolveWeaponId('dmr.long')).toBeNull();
   });
 
   it('bloco vira o xadrez, bot vira o Normal, visual volta ao padrão do slot, prop some', () => {

@@ -35,9 +35,10 @@ export const TEXTURE_ARRAYS: Readonly<Record<TextureArrayName, TextureArraySpec>
 /**
  * Camadas de `modelos64` reservadas no FIM do array para as skins compostas no loading (`Renderer.writeModelLayer`).
  * Cada skin do boneco do FutBobo ocupa `FIGURE_SKIN_LAYERS` (2) camadas seguidas (#56): 64 camadas = 32 skins de 2
- * camadas (o `game` reserva os looks da partida no loading; o Switch 3–4P com 16 bots e 4 humanos usa 10). O
- * `modelos64` fica com 88 de 128 camadas (9 de materiais, 15 de modelos e a reserva). No M2 (aparência por bot) a
- * reserva passa a vir do perfil, com o teto do array em 256 (mínimo do WebGL2).
+ * camadas (o `game` reserva os looks da partida no loading; o Switch 3–4P com 16 bots e 4 humanos usa 10). As 128
+ * camadas do `modelos64`: 9 de materiais, até 55 de modelos (o `MODEL_LAYER_BUDGET` do modelgen; o M10 usa 39) e a
+ * reserva de 64. No M2 (aparência por bot) a reserva passa a vir do perfil, com o teto do array em 256 (mínimo do
+ * WebGL2).
  */
 export const SKIN_LAYER_RESERVE = 64;
 

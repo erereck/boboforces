@@ -9,11 +9,11 @@ import {
   WEAPON_CODE,
   WEAPON_KILL_PLANE,
   WEAPON_NONE,
-  WEAPONS,
+  weaponCodeOf,
   type SimView,
   WEAPON_ZONE,
 } from '@boboforces/sim';
-import { t, type HudModel, type StringKey } from '@boboforces/ui';
+import { t, type HudModel, type PrimaryHit, type StringKey } from '@boboforces/ui';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 
 /**
@@ -22,13 +22,21 @@ import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
  * analógico), a faixa "nome · arma · HP" e a dica da derrota feia. O `scene/match.ts` liga isto às vistas.
  */
 
-/** Primárias do menu radial, na ordem do anel (a 1ª no alto, sentido horário). */
+/**
+ * Primárias do menu radial, na ordem do anel (a 1ª no alto, sentido horário). M10 (AK5): as 4 primárias novas entram
+ * ao lado da parecida (o DMR depois do fuzil, a escopeta automática depois da pump, a besta depois da sniper, o
+ * lança-granadas depois do lança-foguetes); com mais de 8, o anel é o largo da HUD (`PrimaryHit.wide`).
+ */
 export const PRIMARY_ORDER: readonly number[] = [
   WEAPON_CODE.rifle,
+  WEAPON_CODE.dmr,
   WEAPON_CODE.smg,
   WEAPON_CODE.shotgun,
+  WEAPON_CODE.autoShotgun,
   WEAPON_CODE.sniper,
+  WEAPON_CODE.crossbow,
   WEAPON_CODE.rocket,
+  WEAPON_CODE.grenadeLauncher,
   WEAPON_CODE.lmg,
 ];
 
@@ -42,7 +50,7 @@ export function primaryChoices(recipe: MatchRecipe, team: number): number[] {
     if (ids === undefined || ids.length === 0) return null;
     const out = new Set<number>();
     for (const id of ids) {
-      const code = WEAPONS.findIndex((w) => w.id === id);
+      const code = weaponCodeOf(id);
       if (code >= 0) out.add(code);
     }
     return out;
@@ -198,6 +206,41 @@ export function radialIndex(x: number, y: number, count: number): number {
   let a = Math.atan2(x, y);
   if (a < 0) a += Math.PI * 2;
   return Math.round(a / ((Math.PI * 2) / count)) % count;
+}
+
+/**
+ * M10 (revisão): um passo (`step` ±1) nas `count` opções a partir de `pick`, dando a volta; sem escolha ainda (-1), o
+ * passo para a frente vai à 1ª e o para trás à última.
+ */
+export function stepPick(pick: number, step: number, count: number): number {
+  if (count <= 0) return -1;
+  if (pick < 0) return step > 0 ? 0 : count - 1;
+  return (((pick + step) % count) + count) % count;
+}
+
+/**
+ * M10: a opção do anel que a HUD desenhou no quadro anterior na direção do cursor (x para a direita, y para cima),
+ * ou -1 na zona morta. No anel largo (`hit.wide`, mais de 8 opções numa elipse, em ângulos que não são iguais) vale a
+ * plaquinha mais perto em ângulo, vista do centro do anel; no redondo, o setor de sempre (`radialIndex`).
+ */
+export function ringPick(hit: PrimaryHit, x: number, y: number, count: number): number {
+  if (!hit.wide || hit.count === 0) return radialIndex(x, y, count);
+  if (Math.hypot(x, y) < RADIAL.pick) return -1;
+  const want = Math.atan2(x, y);
+  let best = -1;
+  let bestD = Infinity;
+  for (let i = 0; i < hit.count; i++) {
+    const r = hit.rects;
+    const ox = r[i * 4]! + r[i * 4 + 2]! / 2 - hit.centerX;
+    const oy = hit.centerY - (r[i * 4 + 1]! + r[i * 4 + 3]! / 2);
+    let d = Math.abs(Math.atan2(ox, oy) - want);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
 }
 
 /**

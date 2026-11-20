@@ -11,7 +11,11 @@ import {
 import { createMapKitLayers, MAP_KIT_RECIPES } from '../../../assets-src/models/map-kit.ts';
 import { createPickupLayers, PICKUP_RECIPES } from '../../../assets-src/models/pickups.ts';
 import { PROP_RECIPES } from '../../../assets-src/models/props.ts';
-import { WEAPON_RECIPES } from '../../../assets-src/models/weapons.ts';
+import {
+  createM10ProjectileLayers,
+  M10_PROJECTILE_RECIPES,
+  WEAPON_RECIPES,
+} from '../../../assets-src/models/weapons.ts';
 import { tone } from '../../skingen/src/palette.ts';
 import {
   buildMipStrip,
@@ -28,10 +32,11 @@ export const WEAPON_BOX_RANGE = { min: 6, max: 20 } as const;
 
 /**
  * Teto de camadas da tira `modelos64-modelos`. M1 a M9: 32 (um quarto do array). M10 (fase 0): 40, para as 2 camadas
- * compartilhadas do kit dos mapas novos e as armas do M10. O teto físico do array é 128 − 64 (reserva das skins,
- * `SKIN_LAYER_RESERVE`) − 9 (a tira de materiais) = 55 camadas. Decisão menor revisável.
+ * compartilhadas do kit dos mapas novos e as armas do M10. M10 (fases 6 e 7, revisão): o teto físico do array, 128 −
+ * 64 (reserva das skins, `SKIN_LAYER_RESERVE`) − 9 (a tira de materiais) = 55 camadas (o M10 usa 39). Decisão menor
+ * revisável.
  */
-export const MODEL_LAYER_BUDGET = 40;
+export const MODEL_LAYER_BUDGET = 55;
 
 export interface ModelsBuild {
   /** Modelos que entram no pacote (ID registrado), na ordem das receitas. */
@@ -49,11 +54,14 @@ export function buildModels(): ModelsBuild {
   const pickupLayers = createPickupLayers();
   // M10 (fase 0): as 2 camadas do kit dos mapas novos (silo, trator, feno; infláveis e o cabeço do cais).
   const kitLayers = createMapKitLayers();
+  // M10 (fase 7): a camada dos projéteis novos (o virote e a granada do lança-granadas).
+  const projectileLayers = createM10ProjectileLayers();
   const all: BuiltModel[] = [
     ...WEAPON_RECIPES.map((r) => r()),
     ...PROP_RECIPES.map((r) => r({ glow })),
     ...PICKUP_RECIPES.map((r) => r(pickupLayers)),
     ...MAP_KIT_RECIPES.map((r) => r(kitLayers)),
+    ...M10_PROJECTILE_RECIPES.map((r) => r(projectileLayers)),
   ];
   // Pacote na ordem do registro de conteúdo: o M2 acrescentou armas no FIM do registro, então os índices das props do
   // M1 não mudam (e a ordem das camadas segue a dos modelos).

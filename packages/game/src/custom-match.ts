@@ -116,27 +116,40 @@ export const CUSTOM_BOTS: readonly BotRef[] = [
 ];
 
 /** Escolhas de "armas permitidas": todas, ou uma só. */
-/** M2 (fase 5b): o Laboratório usa as mesmas escolhas de armas. */
+/**
+ * M2 (fase 5b): o Laboratório usa as mesmas escolhas de armas. M10 (fases 6 e 7): as armas novas, cada uma depois da
+ * parecida (o revólver depois da pistola: a secundária escolhida como ela, AK5; "só revólver" troca a pistola).
+ */
 export const ALLOWED_CHOICES: readonly (readonly string[])[] = [
   [],
   ['rifle'],
+  ['rifle.dmr'],
   ['smg'],
   ['shotgun'],
+  ['shotgun.auto'],
   ['sniper'],
+  ['sniper.crossbow'],
   ['rocket'],
+  ['rocket.grenade-launcher'],
   ['lmg'],
   ['pistol'],
+  ['pistol.revolver'],
   ['knife'],
 ];
 export const ALLOWED_KEYS: readonly StringKey[] = [
   'custom.allowed.all',
   'custom.allowed.rifle',
+  'custom.allowed.dmr',
   'custom.allowed.smg',
   'custom.allowed.shotgun',
+  'custom.allowed.autoShotgun',
   'custom.allowed.sniper',
+  'custom.allowed.crossbow',
   'custom.allowed.rocket',
+  'custom.allowed.grenadeLauncher',
   'custom.allowed.lmg',
   'custom.allowed.pistol',
+  'custom.allowed.revolver',
   'custom.allowed.knife',
 ];
 

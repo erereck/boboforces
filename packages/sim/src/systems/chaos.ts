@@ -1,7 +1,7 @@
 import { CHAOS_DEFAULTS, MODIFIERS, modifiersConflict, type MatchRecipe, type ModifierId } from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import type { MovementProfile } from '../config/movement.ts';
-import { WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
+import { WEAPON_SLOT, WEAPONS, weaponDef, weaponMaskBit } from '../config/weapons.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
 import { secondsToTicks } from '../constants.ts';
 import { WEAPON_NONE, type MatchMods, type SimContext } from '../context.ts';
@@ -247,7 +247,7 @@ export function swapPrimary(ctx: SimContext, k: number): void {
   // Quem não tem primária (só faca, por exemplo) continua sem.
   if (current === WEAPON_NONE) return;
   const mask = ctx.rules.weaponMask[k]!;
-  const allowed = (code: number): boolean => mask === 0 || (mask & (1 << code)) !== 0;
+  const allowed = (code: number): boolean => mask === 0 || (mask & weaponMaskBit(code)) !== 0;
   let n = 0;
   for (const w of WEAPONS) if (w.slot === WEAPON_SLOT.primary && w.code !== current && allowed(w.code)) n++;
   if (n === 0) return;

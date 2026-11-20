@@ -28,7 +28,7 @@ import {
   ownerSpotNodes,
   ownerSpotTaken,
   WEAPON_CODE,
-  WEAPONS,
+  ARSENAL,
   type OwnerCommand,
   type OwnerEvent,
   type Sim,
@@ -96,6 +96,10 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * NullRenderer e uma plataforma de mentira), lendo de volta o texto desenhado pelo atlas real.
  */
 
+/** Os ids das armas no índice do código (M10: as novas nos códigos 27 a 31), como os nomes que o jogo passa. */
+const WEAPON_IDS: string[] = [];
+for (const w of ARSENAL) WEAPON_IDS[w.code] = w.id;
+
 const normal = builtinBotRef('normal');
 const vibe = builtinBotRef('vibe');
 
@@ -160,7 +164,7 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
       view: () => sim.view(),
       nameOf: (v, i) => names[v.controller[i]!] ?? '?',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: true,
       log: (line) => logs.push(line),
     });
@@ -212,7 +216,8 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
     expect(tools.action(nav(OWNER_ACTION.spawn, -1))).toBe('rebuild');
     expect(tools.action(nav(OWNER_ACTION.weapon, 1))).toBe('rebuild');
     const values = buttons(tools.build(null)).map((b) => b.value);
-    expect(values.slice(1, 4)).toEqual(['Os Bobos', 'Os Bobos', 'smg']);
+    // M10: a 2ª primária do radial é o DMR.
+    expect(values.slice(1, 4)).toEqual(['Os Bobos', 'Os Bobos', 'rifle.dmr']);
     // A câmera lenta anda 1× → 0,5× → 0,25× → 1× (cada aperto avança).
     expect(tools.slow).toBe(1);
     tools.action(nav(OWNER_ACTION.slow));
@@ -445,7 +450,7 @@ describe('owner-tools (o módulo, com uma sim headless)', () => {
       view: () => sim.view(),
       nameOf: () => '?',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: false,
       log: () => {},
       logFull: () => full,
@@ -574,7 +579,7 @@ describe('fase 5b (prints): o lugar do "criar bot" à vista e a plaquinha dos co
       view: () => sim.view(),
       nameOf: () => 'Bot',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: true,
       log: () => {},
     });
@@ -642,7 +647,7 @@ describe('fase 5b (prints): o lugar do "criar bot" à vista e a plaquinha dos co
       view: () => sim.view(),
       nameOf: () => 'Bot',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: true,
       log: (line) => logs.push(line),
     });
@@ -705,7 +710,7 @@ describe('fase 5b (prints): o lugar do "criar bot" à vista e a plaquinha dos co
       view: () => sim.view(),
       nameOf: () => 'Bot',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: true,
       log: () => {},
     });
@@ -763,7 +768,7 @@ describe('fase 5b (prints): o lugar do "criar bot" à vista e a plaquinha dos co
       view: () => sim.view(),
       nameOf: () => 'Bot',
       primaries: PRIMARY_ORDER,
-      weaponNames: WEAPONS.map((w) => w.id),
+      weaponNames: WEAPON_IDS,
       slowAllowed: true,
       log: () => {},
     });

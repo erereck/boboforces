@@ -4,7 +4,6 @@ import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { clamp, DEG_TO_RAD, HALF_PI, TAU } from '@boboforces/shared';
 import { BLOCK_FLAG, cellBlock, createRayHit, raycastGrid } from '@boboforces/world';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { PART_DAMAGE_MULTIPLIER } from '../config/metrics.ts';
 import {
   BIG_BRRT_COOL,
   GRENADE_THROW,
@@ -13,21 +12,11 @@ import {
   WEAPON_BIG_BRRT,
   WEAPON_FIRE,
   WEAPON_SLOT,
-  weaponDamageAt,
   weaponDef,
   type WeaponDef,
 } from '../config/weapons.ts';
-import {
-  AMMO_RULE,
-  HIT_PARTS,
-  canHurt,
-  hostile,
-  isBody,
-  PART_HEAD,
-  PART_TORSO,
-  RULE_FLAG,
-  type SimContext,
-} from '../context.ts';
+import { AMMO_RULE, canHurt, hostile, isBody, PART_TORSO, type SimContext } from '../context.ts';
+import { partDamage } from './part-damage.ts';
 import { BOT_CONTROLLER_BASE, secondsToTicks } from '../constants.ts';
 import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY } from '../entity.ts';
 import { aimPointWorldWith, figurePostureOf, simEyeHeight, weaponGrip, type AimPoint } from '../hitbox.ts';
@@ -306,12 +295,14 @@ export function weaponSystem(ctx: SimContext): void {
       } else if (
         def.fire === WEAPON_FIRE.bullet ||
         def.fire === WEAPON_FIRE.pellets ||
-        def.fire === WEAPON_FIRE.projectile
+        def.fire === WEAPON_FIRE.projectile ||
+        def.fire === WEAPON_FIRE.bolt
       ) {
         if (s.slotClip[k] === 0) {
           if ((pressed & BUTTON.fire) !== 0) ctx.events.weapon(ctx.tick, s.idOf(e), s.weapon[e]!, 'empty');
         } else {
-          if (def.fire === WEAPON_FIRE.projectile) fireRocket(ctx, e, k, def, fl);
+          // M10 (fase 7): o virote da besta sai como o foguete (o pool de projéteis), com a gravidade da arma.
+          if (def.fire === WEAPON_FIRE.projectile || def.fire === WEAPON_FIRE.bolt) fireRocket(ctx, e, k, def, fl);
           else {
             // M5 (fase 2d): o tiro de um jogador remoto testa os alvos onde ele os via.
             ctx.rewind?.select(s, e, ctx.tick);
@@ -423,9 +414,6 @@ function coneOffset(ctx: SimContext, halfAngle: number): void {
   dir[1] = ny;
   dir[2] = nz;
 }
-
-/** M2 (fase 4e): dano da "sniper mata no corpo" (passa de qualquer vida da faixa da receita). */
-const SNIPER_KILL_DAMAGE = 10_000;
 
 /** Meio-ângulo da dispersão da mira (rad) pelo estado do corpo e pelo ADS; 0 sem espalhamento na partida. */
 function aimSpread(ctx: SimContext, e: number, def: WeaponDef, fl: number): number {
@@ -596,21 +584,8 @@ function castShot(
   return -1;
 }
 
-/**
- * Dano de 1 raio (ou chumbo) da arma `def` a `t` m no osso `bone` de `target`. Quem é imune a tiro de cabeça (regra
- * do bot, M2 fase 3b) leva na cabeça o dano do tronco.
- */
-function rayDamage(ctx: SimContext, def: WeaponDef, t: number, bone: FigurePart, target: number): number {
-  const cat = FIGURE_PART_CATEGORY[bone]!;
-  // M2 (fase 4e): sniper mata no corpo; só cabeça conta.
-  if (ctx.mods.sniperBodyKill && def.category === 'sniper') return SNIPER_KILL_DAMAGE;
-  if (ctx.mods.headshotOnly && cat !== PART_HEAD) return 0;
-  const base = weaponDamageAt(def, t);
-  if (cat === PART_HEAD) {
-    return base * ((ctx.rules.flags[target]! & RULE_FLAG.headshotImmune) !== 0 ? 1 : def.headMultiplier);
-  }
-  return base * PART_DAMAGE_MULTIPLIER[HIT_PARTS[cat] as 'torso' | 'arm' | 'leg'];
-}
+/** Dano de 1 raio (ou chumbo): `partDamage` (M10: em módulo próprio, o virote da besta usa o mesmo). */
+const rayDamage = partDamage;
 
 /** Bala ou chumbos: gasta 1 do pente, carrega a cadência e o recuo, e lança o(s) raio(s). */
 function fireHitscan(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: number): void {
@@ -791,7 +766,10 @@ function kickRecoil(ctx: SimContext, e: number, def: WeaponDef): void {
   );
 }
 
-/** Foguete: gasta 1, carrega a cadência e o recuo e lança do olho na direção da mira (com a dispersão do estado). */
+/**
+ * Foguete: gasta 1, carrega a cadência e o recuo e lança do olho na direção da mira (com a dispersão do estado). M10: o
+ * virote da besta e a granada do lança-granadas saem por aqui também (a gravidade é da arma, no `projectileSystem`).
+ */
 function fireRocket(ctx: SimContext, e: number, k: number, def: WeaponDef, fl: number): void {
   const s = ctx.s;
   s.slotClip[k] = s.slotClip[k]! - 1;

@@ -307,6 +307,12 @@ export const STRINGS_EXTRA_PT_BR = {
   'strike.item.armor100': 'Colete 100',
   'strike.item.grenade': 'Granada',
   'strike.item.kit': 'Kit',
+  // M10 (fases 6 e 7): as armas novas na loja (o tipo, como as de antes).
+  'strike.item.dmr': 'DMR',
+  'strike.item.autoShotgun': 'Escopeta auto',
+  'strike.item.crossbow': 'Besta',
+  'strike.item.grenadeLauncher': 'Lança-granadas',
+  'strike.item.revolver': 'Revólver',
   // M7 (fase 8): o Bobo Royale.
   'mode.name.royale': 'Bobo Royale',
   'mode.desc.royale': 'O último de pé vence.',
@@ -771,6 +777,12 @@ export const STRINGS_EXTRA_PT_BR = {
   'custom.allowed.lmg': 'Só metralhadora',
   'custom.allowed.pistol': 'Só pistola',
   'custom.allowed.knife': 'Só faca',
+  // M10 (fases 6 e 7): as armas novas (o revólver como a pistola, AK5).
+  'custom.allowed.dmr': 'Só DMR',
+  'custom.allowed.autoShotgun': 'Só escopeta auto',
+  'custom.allowed.crossbow': 'Só besta',
+  'custom.allowed.grenadeLauncher': 'Só lança-granadas',
+  'custom.allowed.revolver': 'Só revólver',
   'workshop.title': 'Oficina',
   'workshop.favorites': 'Favoritos',
   'workshop.mine': 'Seus bots',
@@ -1159,6 +1171,12 @@ export const STRINGS_EXTRA_PT_BR = {
   'weapon.knife': 'Butter Knife',
   'weapon.grenade': 'Pineapple',
   'weapon.lmg': 'Lawnmower',
+  // M10 (fases 6 e 7, AK2): as armas novas (nomes provisórios; os IDs não mudam).
+  'weapon.rifle.dmr': 'Pinpoint',
+  'weapon.pistol.revolver': 'Hand Cannon',
+  'weapon.shotgun.auto': 'Leafblower',
+  'weapon.sniper.crossbow': 'Twang',
+  'weapon.rocket.grenade-launcher': 'Bloop',
   // M3 (fase 4e): a arma maravilha do Bobo Zombies (nome provisório).
   'weapon.desmontador': 'Desmontador',
   'weapon.category.pistol': 'Pistola',
@@ -1170,6 +1188,11 @@ export const STRINGS_EXTRA_PT_BR = {
   'weapon.category.melee': 'Faca',
   'weapon.category.throwable': 'Granada',
   'weapon.category.lmg': 'Metralhadora',
+  'weapon.category.dmr': 'DMR',
+  'weapon.category.revolver': 'Revólver',
+  'weapon.category.autoShotgun': 'Escopeta automática',
+  'weapon.category.crossbow': 'Besta',
+  'weapon.category.launcher': 'Lança-granadas',
   /** Nomes dos bots de fábrica (gameplay.md §6.7; inglês bobo, #15 e #61). A chave é o id `bot:<id>`. */
   'bot.name.vibe-bob': 'Vibe Bob',
   'bot.name.chill-bob': 'Chill Bob',

@@ -133,6 +133,7 @@ import {
   type Sim,
   type SimEvent,
   type SimView,
+  type WeaponDef,
   SPREAD_STATE_MULTIPLIER,
   SPREAD_WALKING_SPEED,
   viewEyeHeight,
@@ -156,6 +157,9 @@ import {
   weaponGrip,
   weaponRarity,
   WEAPONS,
+  WEAPONS_M10,
+  WEAPON_M10_FIRST,
+  ARSENAL,
   ROYALE_WEAPONS,
   ROYALE,
   CIRCLE,
@@ -307,7 +311,9 @@ import {
   PRIMARY_ORDER,
   primaryChoices,
   radialIndex,
+  ringPick,
   stepCursor,
+  stepPick,
   type DeathState,
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
@@ -447,6 +453,14 @@ const PICKUP_SPIN_RAD_S = 1.2;
 /** Projéteis em voo e caixinhas no chão desenhados por frame (o resto fica de fora). */
 // M3 (fase 3d): + as tábuas das janelas (até 6 por janela) e as portas fechadas no mesmo buffer.
 const MAX_DRAWN_PROJECTILES = 384;
+/**
+ * M10 (fase 7): os virotes cravados (só do render): quantos ao mesmo tempo, quanto tempo ficam (s, "alguns segundos",
+ * GDD §4.3.3) e quanto o meio do modelo (`crossbow-bolt`, ponta a 0,34 m do meio) fica atrás da ponta (m): a ponta
+ * entra 4 cm no bloco (revisão: com 6 cm, ela passava das placas finas de 6,25 cm, os painéis e o corrimão).
+ */
+const STUCK_BOLT_MAX = 24;
+const STUCK_BOLT_S = 5;
+const STUCK_BOLT_BACK_M = 0.3;
 
 /** M3 (fase 5c): rajadas de cubinhos da gosma e das faíscas: velocidade (x, y, z) e espalhamento de cada uma. */
 const GOO_BURSTS: readonly number[] = [3, 4, 0, 1.2, -3, 4, 1, 1.2, 0, 5, -3, 1.2, 1, 3, 3, 1.5];
@@ -539,9 +553,10 @@ function livingMate(v: SimView, e: number): number {
 
 export function gripOfWeaponModel(id: string): FigureGrip {
   if (id === '') return FIGURE_GRIP.none;
-  for (let c = 0; c < WEAPONS.length; c++) if (WEAPONS[c]!.id === id) return WEAPONS[c]!.grip;
+  for (let c = 0; c < ARSENAL.length; c++) if (ARSENAL[c]!.id === id) return ARSENAL[c]!.grip;
   return MODEL_GRIP.get(id) ?? FIGURE_GRIP.rifle;
 }
+
 /**
  * M2: ajuste do viewmodel por código de arma (escala e deslocamento em m, só fora do ADS; +x direita, +y cima, −z
  * para longe). O lança-foguetes tem 19 cm de tubo e a traseira passa da mão: sem o ajuste tomava metade da tela.
@@ -588,6 +603,27 @@ const VIEWMODEL_TWEAK: readonly (ViewmodelTweak | null)[] = WEAPONS.map((w) =>
         : null,
 );
 
+/**
+ * M10 (fases 6 e 7): o ajuste das armas novas (os códigos 27 a 31, fora do índice de `VIEWMODEL_TWEAK`): o DMR é
+ * comprido como a sniper; a besta, larga (o arco tem 0,69 m de ponta a ponta); a escopeta automática e o
+ * lança-granadas, gordos (o carregador de caixa, o tambor). O revólver fica como está (pelos prints da 1ª pessoa).
+ */
+const VIEWMODEL_TWEAK_M10: ReadonlyMap<number, ViewmodelTweak> = new Map([
+  [WEAPON_CODE.dmr, { scale: 0.8, x: 0.04, y: -0.02, z: -0.08 }],
+  [WEAPON_CODE.autoShotgun, { scale: 0.82, x: 0.04, y: -0.03, z: -0.06 }],
+  [WEAPON_CODE.crossbow, { scale: 0.82, x: 0.04, y: -0.02, z: -0.06 }],
+  [WEAPON_CODE.grenadeLauncher, { scale: 0.82, x: 0.06, y: -0.03, z: -0.06 }],
+]);
+
+/**
+ * A arma mira por luneta: no ADS completo o viewmodel some e a HUD desenha a moldura. A partir de 3x de zoom (a sniper,
+ * as raras e a de tinta dela) e, M10 (revisão), o DMR (2,5x): mirar pela arma deixava a lente de trás tapando o centro.
+ * A besta e o resto miram pela arma (a mira passa por cima da alça ou da mira de ponto).
+ */
+function hasScope(def: WeaponDef): boolean {
+  return def.adsZoom >= 3 || def.code === WEAPON_CODE.dmr;
+}
+
 /** Primárias em rodízio do `weapons=mix` do bench. */
 const MIX_PRIMARIES = [
   WEAPON_CODE.rifle,
@@ -596,12 +632,17 @@ const MIX_PRIMARIES = [
   WEAPON_CODE.sniper,
   WEAPON_CODE.rocket,
   WEAPON_CODE.lmg,
+  // M10 (revisão): as primárias novas, no fim (os 6 primeiros controladores ficam com as de antes).
+  WEAPON_CODE.dmr,
+  WEAPON_CODE.autoShotgun,
+  WEAPON_CODE.crossbow,
+  WEAPON_CODE.grenadeLauncher,
 ] as const;
 
 /** Primária de cada controlador para o `weapons=` do bench (`mix` em rodízio; senão todos com a arma dada). */
 export function benchPrimaries(weapons: string): number[] {
   const out: number[] = [];
-  const fixed = WEAPONS.find((w) => w.id === weapons);
+  const fixed = ARSENAL.find((w) => w.id === weapons);
   for (let c = 0; c < MAX_CONTROLLERS; c++) {
     out.push(fixed ? fixed.code : MIX_PRIMARIES[c % MIX_PRIMARIES.length]!);
   }
@@ -1030,14 +1071,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   // --- modelos: arma por código da sim (M2: `SimView.weapon` é o código) e o alvo do ADS do viewmodel ---
   const modelIndex = loaded.world.modelIndex;
-  const weaponModel = new Uint8Array(WEAPONS.length).fill(NO_MODEL);
-  WEAPONS.forEach((w, code) => {
+  // M10: no índice do código, até a última arma nova (`WEAPONS_M10`; o modelo tem o id da arma, como as do M2).
+  const weaponModel = new Uint8Array(WEAPON_M10_FIRST + WEAPONS_M10.length).fill(NO_MODEL);
+  for (const w of ARSENAL) {
     const m = modelIndex.get(w.id);
-    if (m !== undefined) weaponModel[code] = m;
-  });
+    if (m !== undefined) weaponModel[w.code] = m;
+  }
   const aimOffsets = loaded.modelDocs.map((m) => viewmodelAimOffset(m));
   // M2: nome e categoria de cada arma na tabela pt-BR, resolvidos uma vez (a HUD só guarda a referência).
   const weaponNames = WEAPONS.map((w) => t(`weapon.${w.id}` as StringKey));
+  // M10: as armas novas (o nome em inglês bobo e a categoria, como as do M2).
+  for (const w of WEAPONS_M10) weaponNames[w.code] = t(`weapon.${w.id}` as StringKey);
   // M3 (fase 4e): o Desmontador fica fora de `WEAPONS` (só da caixa), mas tem nome e categoria no HUD.
   weaponNames[WEAPON_DESMONTADOR] = t('weapon.desmontador');
   // M6 (fase 3): a Big Brrt (só do Jugg) também. Fase 4: a explosão do "tudo explode" no kill feed.
@@ -1055,6 +1099,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M3 (fase 4a): os nomes em caixa alta do aviso da arma na parede (feitos uma vez). */
   const weaponNamesUpper = weaponNames.map((n) => n.toUpperCase());
   const weaponCategories = WEAPONS.map((w) => t(`weapon.category.${w.category}` as StringKey));
+  for (const w of WEAPONS_M10) weaponCategories[w.code] = t(`weapon.category.${w.category}` as StringKey);
   weaponCategories[WEAPON_DESMONTADOR] = t('weapon.category.explosive');
   weaponCategories[WEAPON_BIG_BRRT] = t('weapon.category.lmg');
   for (const code of [WEAPON_PAINT_MARKER, WEAPON_PAINT_PUMP, WEAPON_PAINT_SNIPER, WEAPON_PAINT_BUCKET]) {
@@ -1238,6 +1283,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M3 (fase 3b): o cuspe do Spitter usa o modelo da granada até a arte dos zumbis (fase 5).
   const desmontadorModel = modelIndex.get('desmontador') ?? NO_MODEL;
   const boltModel = modelIndex.get('desmontador-bolt') ?? NO_MODEL;
+  /** M10 (fase 7): o virote da besta (em voo e cravado) e a granada do lança-granadas em voo. */
+  const crossbowBoltModel = modelIndex.get('crossbow-bolt') ?? NO_MODEL;
+  const launcherShellModel = modelIndex.get('grenade-launcher-shell') ?? NO_MODEL;
   const bigBrrtModel = modelIndex.get('big-brrt') ?? weaponModel[WEAPON_CODE.lmg]!;
   /** M6 (fase 5): as armas de tinta usam os modelos do arsenal (SMG, escopeta, sniper e granada) até a arte delas. */
   const paintModel = (code: number): number =>
@@ -1259,10 +1307,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           ? bigBrrtModel
           : code === WEAPON_SPIT
             ? weaponModel[WEAPON_CODE.grenade]!
-            : code >= 0 && code < weaponModel.length
-              ? weaponModel[code]!
-              : weaponBase(code) !== code
-                ? (weaponModel[weaponBase(code)] ?? NO_MODEL)
+            : weaponBase(code) !== code
+              ? (weaponModel[weaponBase(code)] ?? NO_MODEL)
+              : // M10: o `weaponModel` vai até o código 31; as raras e épicas do Royale (19 a 26) usam o da base, acima.
+                code >= 0 && code < weaponModel.length
+                ? weaponModel[code]!
                 : NO_MODEL;
   /** M7 (fase 8): o colete e o kit de cura do Royale no chão. */
   const armorVestModel = modelIndex.get('armor-vest') ?? NO_MODEL;
@@ -2003,6 +2052,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       matchSound.event(ev, v, timeS);
       recordMatchEvent(matchStats, ev, human);
       if (ev.type === 'matchPhase' && ev.phase === 'ended' && endedAt < 0) endedAt = timeS;
+      // M10 (revisão): os virotes cravados saem quando a partida muda de fase e quando uma porta do Zombies abre (o
+      // virote podia estar nela). A rodada nova do BoboStrike e do Jugg Fixo limpa em `fillStuckBolts`.
+      if (ev.type === 'matchPhase' || (ev.type === 'door' && ev.action === 'open')) clearStuckBolts();
       switch (ev.type) {
         case 'shot': {
           const i = entityIndex(ev.shooter);
@@ -2227,7 +2279,22 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             }
             break;
           }
-          if (ev.action !== 'launch' || ev.weapon !== WEAPON_CODE.rocket) break;
+          // M10 (fase 7): o virote cravado fica no bloco alguns segundos (só do render; `fillStuckBolts`).
+          if (ev.action === 'stick') {
+            stickBolt(ev.x, ev.y, ev.z, ev.vx, ev.vy, ev.vz);
+            break;
+          }
+          // M10 (fase 7): a besta recua e põe o boneco atirando, sem clarão; o lança-granadas, como o foguete.
+          if (ev.action === 'launch' && ev.weapon === WEAPON_CODE.crossbow) {
+            const j = entityIndex(ev.owner);
+            if (j < recoil.length) {
+              recoil[j] = 1;
+              firing[j] = FIRING_S;
+            }
+            break;
+          }
+          if (ev.action !== 'launch' || (ev.weapon !== WEAPON_CODE.rocket && ev.weapon !== WEAPON_CODE.grenadeLauncher))
+            break;
           const i = entityIndex(ev.owner);
           if (i < recoil.length) {
             recoil[i] = 1;
@@ -4374,8 +4441,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         pushPaintBall(fx, bx, by, bz, paintColorOf(v, shooter));
         continue;
       }
+      // M10 (fase 7): o virote da besta e a granada do lança-granadas (modelos próprios).
       const model =
-        code === WEAPON_CODE.rocket ? rocketShellModel : code === WEAPON_DESMONTADOR ? boltModel : modelOf(code);
+        code === WEAPON_CODE.rocket
+          ? rocketShellModel
+          : code === WEAPON_DESMONTADOR
+            ? boltModel
+            : code === WEAPON_CODE.crossbow
+              ? crossbowBoltModel
+              : code === WEAPON_CODE.grenadeLauncher
+                ? launcherShellModel
+                : modelOf(code);
       if (model === NO_MODEL) continue;
       const o = p * 3;
       const x = lerp(pv.prevPosition[o]!, pv.position[o]!, alpha);
@@ -4403,6 +4479,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         projectiles.pitch[n] = Math.atan2(vy, Math.max(flat, 1e-6));
         projectiles.roll[n] = timeS * 10 + p;
         if (running && speed > 1e-6) pushTrail(fx, x, y, z, vx / speed, vy / speed, vz / speed);
+      } else if (code === WEAPON_CODE.crossbow) {
+        // O virote aponta para onde voa (o arco), sem girar.
+        projectiles.pitch[n] = Math.atan2(vy, Math.max(flat, 1e-6));
+        projectiles.roll[n] = 0;
       } else {
         projectiles.pitch[n] = speed > 0.5 ? timeS * 9 + p : 0;
         projectiles.roll[n] = 0;
@@ -4417,7 +4497,68 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     n = fillMapObjects(n);
     n = fillFortress(n);
     n = fillBomb(n);
+    n = fillStuckBolts(n);
     projectiles.count = n;
+  }
+
+  /**
+   * M10 (fase 7): os virotes cravados nos blocos (o evento `stick` da sim; só do render, o mundo não muda): ficam
+   * `STUCK_BOLT_S` segundos, no máximo `STUCK_BOLT_MAX` (o mais antigo dá lugar), com a ponta na superfície.
+   */
+  const stuckPos = new Float32Array(STUCK_BOLT_MAX * 3);
+  const stuckYaw = new Float32Array(STUCK_BOLT_MAX);
+  const stuckPitch = new Float32Array(STUCK_BOLT_MAX);
+  const stuckAt = new Float64Array(STUCK_BOLT_MAX).fill(-1e9);
+  let stuckNext = 0;
+  /** A rodada (BoboStrike, Jugg Fixo) em que os virotes cravaram: na rodada nova o mapa volta ao começo e eles saem. */
+  let stuckRound = -1;
+  /** Tira todos os virotes cravados (o relógio deles é o `timeS`, que para na pausa: lá eles ficam). */
+  function clearStuckBolts(): void {
+    stuckAt.fill(-1e9);
+    stuckNext = 0;
+  }
+  function stickBolt(x: number, y: number, z: number, vx: number, vy: number, vz: number): void {
+    const speed = Math.hypot(vx, vy, vz);
+    if (speed < 1e-6) return;
+    const flat = Math.hypot(vx, vz);
+    const k = stuckNext;
+    stuckNext = (stuckNext + 1) % STUCK_BOLT_MAX;
+    // O meio do virote fica para trás da ponta, para fora do bloco.
+    stuckPos[k * 3] = x - (vx / speed) * STUCK_BOLT_BACK_M;
+    stuckPos[k * 3 + 1] = y - (vy / speed) * STUCK_BOLT_BACK_M;
+    stuckPos[k * 3 + 2] = z - (vz / speed) * STUCK_BOLT_BACK_M;
+    stuckYaw[k] = flat > 1e-6 ? Math.atan2(-vx, -vz) : 0;
+    stuckPitch[k] = Math.atan2(vy, Math.max(flat, 1e-6));
+    stuckAt[k] = timeS;
+  }
+  function fillStuckBolts(first: number): number {
+    let n = first;
+    const rounds = sim.view().rounds;
+    const round = rounds === null ? -1 : rounds.data[ROUND.round]!;
+    if (round !== stuckRound) {
+      stuckRound = round;
+      clearStuckBolts();
+    }
+    if (crossbowBoltModel === NO_MODEL) return n;
+    for (let k = 0; k < STUCK_BOLT_MAX && n < projectiles.capacity; k++) {
+      if (timeS - stuckAt[k]! > STUCK_BOLT_S) continue;
+      const x = stuckPos[k * 3]!;
+      const y = stuckPos[k * 3 + 1]!;
+      const z = stuckPos[k * 3 + 2]!;
+      projectiles.model[n] = crossbowBoltModel;
+      projectiles.position[n * 3] = x;
+      projectiles.position[n * 3 + 1] = y;
+      projectiles.position[n * 3 + 2] = z;
+      projectiles.yaw[n] = stuckYaw[k]!;
+      projectiles.pitch[n] = stuckPitch[k]!;
+      projectiles.roll[n] = 0;
+      sampleLightGrid(loaded.lightGrid, x, y, z, lightScratch, 0);
+      projectiles.light[n * 3] = lightScratch[0]!;
+      projectiles.light[n * 3 + 1] = lightScratch[1]!;
+      projectiles.light[n * 3 + 2] = lightScratch[2]!;
+      n++;
+    }
+    return n;
   }
 
   /** M6 (fase 6a): o gerador do Fortress (o modelo de prop), no mesmo buffer das caixinhas. */
@@ -4998,7 +5139,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // O formato é o que a HUD desenhou no quadro anterior: anel pela direção; fileira e linha passo a passo.
       if (hit.layout === PRIMARY_LAYOUT.ring) {
         moveRadialCursor(st, wrapAngle(m.yaw), m.pitch);
-        pick = radialIndex(st.cursorX, st.cursorY, n);
+        pick = ringPick(hit, st.cursorX, st.cursorY, n);
       } else {
         const step = stepCursor(st, wrapAngle(m.yaw));
         if (step !== 0) pick = (current + step + n) % n;
@@ -5381,14 +5522,23 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const dyaw = wrapAngle(m.yaw - slot.buyYaw);
       const dpitch = m.pitch - slot.buyPitch;
       m.setAngles(slot.buyYaw, slot.buyPitch);
+      // M10: o formato que a HUD desenhou no quadro anterior (revisão: a loja aparece inteira em todo formato): no anel
+      // (o redondo ou o largo dos 13 itens), o giro de mira aponta; na fileira e na linha (a vista pequena), anda passo a
+      // passo, como o radial da morte.
+      const shopHit = slot.model.primaryHit;
       if (dyaw !== 0 || dpitch !== 0) {
-        moveRadialCursor(slot.buy, dyaw, dpitch);
-        const aimed = radialIndex(slot.buy.cursorX, slot.buy.cursorY, n);
-        if (aimed >= 0) slot.buyPick = aimed;
+        if (shopHit.layout === PRIMARY_LAYOUT.ring) {
+          moveRadialCursor(slot.buy, dyaw, dpitch);
+          const aimed = ringPick(shopHit, slot.buy.cursorX, slot.buy.cursorY, n);
+          if (aimed >= 0) slot.buyPick = aimed;
+        } else {
+          const step = stepCursor(slot.buy, dyaw);
+          if (step !== 0) slot.buyPick = stepPick(slot.buyPick, step, n);
+        }
       }
       // A troca de arma (e o D-pad) anda pelas opções; o tiro ou o usar compra a apontada.
-      if (m.wasPressed('nextWeapon')) slot.buyPick = (Math.max(-1, slot.buyPick) + 1) % n;
-      if (m.wasPressed('prevWeapon')) slot.buyPick = (Math.max(0, slot.buyPick) + n - 1) % n;
+      if (m.wasPressed('nextWeapon')) slot.buyPick = stepPick(slot.buyPick, 1, n);
+      if (m.wasPressed('prevWeapon')) slot.buyPick = stepPick(slot.buyPick, -1, n);
       let pick = m.wasPressed('fire') || m.wasPressed('use') ? slot.buyPick : -1;
       if (seat === 0 && device === 'touch') {
         // No toque, só o toque curto que começa e termina na mesma opção (arrastar o dedo não compra).
@@ -5606,8 +5756,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!
         : v.weapon[e]!,
     );
-    // Na luneta (zoom ≥ 3x quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD (fase 1e).
-    const scoped = held !== null && held.adsZoom >= 3 && slot.adsBlend > 0.85;
+    // Na luneta (zoom ≥ 3x, ou o DMR: `hasScope`; quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD
+    // (fase 1e).
+    const scoped = held !== null && hasScope(held) && slot.adsBlend > 0.85;
     vm.visible = !dead && model !== NO_MODEL && !scoped;
     // M2 (fase 6b): 3ª pessoa (na luneta volta à 1ª): a câmera vai para o ombro, o bobo aparece e o viewmodel some.
     slot.third = false;
@@ -5638,7 +5789,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
     // M6 (fase 5): a sniper de tinta usa o modelo (e o ajuste) da sniper.
     const vmCode = v.weapon[e] === WEAPON_PAINT_SNIPER ? WEAPON_CODE.sniper : weaponBase(v.weapon[e]!);
-    const tweak = VIEWMODEL_TWEAK[vmCode] ?? null;
+    // M10: as armas novas (códigos 27 a 31) têm o ajuste delas (`VIEWMODEL_TWEAK_M10`).
+    const tweak = VIEWMODEL_TWEAK[vmCode] ?? VIEWMODEL_TWEAK_M10.get(vmCode) ?? null;
     const away = 1 - ads;
     // [PROPOSTA] da integração: a pose da render-atores com a arma inteira passava de 40% da tela; 0,8 em 1–2P e
     // 0,6 em 3–4P deixavam a arma no canto (arte-ux.md §3.3: no máximo 25% da vista no 3–4P). M3 (fase 1d): a vista
@@ -6154,7 +6306,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       held && (held.fire === WEAPON_FIRE.melee || held.fire === WEAPON_FIRE.thrown || held.adsZoom >= 3)
         ? HUD_CROSSHAIR.dot
         : HUD_CROSSHAIR.cross;
-    m.scope = held && held.adsZoom >= 3 && slot.adsBlend > 0.85 ? 1 : 0;
+    m.scope = held && hasScope(held) && slot.adsBlend > 0.85 ? 1 : 0;
     // A retícula abre com a dispersão da arma no quadril (chumbos inclusive), fecha no ADS, e abre com o movimento.
     const hip = held ? Math.min(1, (held.hipSpreadDeg + held.pelletSpreadDeg) / 6) * (1 - slot.adsBlend) : 0;
     // Refino R1 (#79): o movimento abre a retícula pelo que a sim abre de verdade (o perfil: no Bobo quase nada

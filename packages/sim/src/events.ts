@@ -138,11 +138,13 @@ export interface WeaponEvent extends EventBase {
 /**
  * M2 (fase 1b): projétil (foguete, granada). `launch` quando sai (da arma, ou caindo da mão de quem morreu
  * cozinhando), `bounce` quando a granada quica forte (som). `index` é o slot no pool
- * (`SimView.projectiles`); o render acompanha a posição por lá.
+ * (`SimView.projectiles`); o render acompanha a posição por lá. M10 (fase 7): `stick` quando o virote da besta crava
+ * num bloco: (x, y, z) é o ponto na superfície e (vx, vy, vz) a velocidade da chegada (a direção do virote preso). O
+ * projétil sai do pool no mesmo tick; o virote preso é só do render.
  */
 export interface ProjectileEvent extends EventBase {
   readonly type: 'projectile';
-  readonly action: 'launch' | 'bounce';
+  readonly action: 'launch' | 'bounce' | 'stick';
   readonly index: number;
   readonly weapon: number;
   readonly owner: EntityId;

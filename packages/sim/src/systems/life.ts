@@ -25,13 +25,15 @@ import {
   DEFAULT_LOADOUT_REST,
   isPaintWeapon,
   DEFAULT_PRIMARY,
+  firstAllowedPrimary,
   isPrimaryWeapon,
+  loadoutSecondary,
   WEAPON_CODE,
   WEAPON_SLOT,
   WEAPON_ROCKET,
   ZOMBIE_GOO,
-  WEAPONS,
   weaponDef,
+  weaponMaskBit,
 } from '../config/weapons.ts';
 import { dropAmmoBox, dropZombieDrop } from './pickups.ts';
 import { explode, launchProjectile } from './projectiles.ts';
@@ -895,11 +897,10 @@ function chooseSpawn(ctx: SimContext, a: number, b: number, c: number): number {
   return k === 0 ? a : k === 1 ? b : c;
 }
 
-/** A 1ª primária permitida pela máscara, ou `WEAPON_NONE` (a lista só tem armas de outros slots). */
-function firstAllowedPrimary(mask: number): number {
-  for (let code = 0; code < WEAPONS.length; code++)
-    if ((mask & (1 << code)) !== 0 && isPrimaryWeapon(code)) return code;
-  return WEAPON_NONE;
+/** A 1ª primária permitida pela máscara (na ordem do arsenal), ou `WEAPON_NONE` (a lista só tem outros slots). */
+export function allowedPrimaryOrNone(mask: number): number {
+  const code = firstAllowedPrimary(mask);
+  return code < 0 ? WEAPON_NONE : code;
 }
 
 /** Põe o bobo (ou zumbi) `e` vivo no spawn `index`, com vida, munição e proteção cheias. */
@@ -927,16 +928,22 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   // com pente e reserva cheios. Zumbi não tem arma (o render não desenha nenhuma; o golpe é o `meleeSystem`).
   const k = e * WEAPON_SLOT_COUNT;
   // M2 (fase 3b): armas permitidas (regra do bot): o que não está na lista sai do loadout; a primária vira a 1ª
-  // permitida; a mão começa no 1º slot que sobrou.
+  // permitida; a mão começa no 1º slot que sobrou. M10 (AK5): a secundária é o revólver quando a lista o cita.
   const mask = ctx.rules.weaponMask[e]!;
   let primary = isPrimaryWeapon(s.primaryChoice[e]!) ? s.primaryChoice[e]! : DEFAULT_PRIMARY;
-  if (mask !== 0 && (mask & (1 << primary)) === 0) primary = firstAllowedPrimary(mask);
+  if (mask !== 0 && (mask & weaponMaskBit(primary)) === 0) primary = allowedPrimaryOrNone(mask);
   let first = -1;
   for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
-    let code = zombie ? WEAPON_NONE : slot === 0 ? primary : (DEFAULT_LOADOUT_REST[slot - 1] ?? WEAPON_NONE);
+    let code = zombie
+      ? WEAPON_NONE
+      : slot === WEAPON_SLOT.primary
+        ? primary
+        : slot === WEAPON_SLOT.secondary
+          ? loadoutSecondary(mask)
+          : (DEFAULT_LOADOUT_REST[slot - 1] ?? WEAPON_NONE);
     // M3 (fase 4a): no Bobo Zombies, o humano nasce sem a primária (vem da parede ou da caixa); os bots, com ela.
     if (slot === 0 && ctx.zombiesMode && s.controller[e]! < BOT_CONTROLLER_BASE) code = WEAPON_NONE;
-    if (mask !== 0 && code !== WEAPON_NONE && (mask & (1 << code)) === 0) code = WEAPON_NONE;
+    if (mask !== 0 && code !== WEAPON_NONE && (mask & weaponMaskBit(code)) === 0) code = WEAPON_NONE;
     const def = weaponDef(code);
     s.loadout[k + slot] = code;
     s.slotClip[k + slot] = def ? def.clipSize : 0;

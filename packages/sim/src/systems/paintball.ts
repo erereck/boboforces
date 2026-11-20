@@ -1,5 +1,12 @@
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { PAINT_BUCKET, paintPrimaryFor, WEAPON_CODE, WEAPON_SLOT, weaponDef } from '../config/weapons.ts';
+import {
+  PAINT_BUCKET,
+  paintPrimaryFor,
+  WEAPON_CODE,
+  WEAPON_SLOT,
+  weaponDef,
+  weaponMaskBit,
+} from '../config/weapons.ts';
 import { WEAPON_NONE, type SimContext } from '../context.ts';
 import { ENTITY_KIND } from '../entity.ts';
 
@@ -25,7 +32,7 @@ export function paintLoadout(ctx: SimContext, e: number): void {
   // Quem não tem primária (o bot só de faca) continua sem; o balde só para quem pode a granada.
   const chosen = s.loadout[k + WEAPON_SLOT.primary]!;
   const mask = ctx.rules.weaponMask[e]!;
-  const bucket = mask === 0 || (mask & (1 << WEAPON_CODE.grenade)) !== 0;
+  const bucket = mask === 0 || (mask & weaponMaskBit(WEAPON_CODE.grenade)) !== 0;
   const primary = chosen === WEAPON_NONE ? null : weaponDef(paintPrimaryFor(chosen))!;
   for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
     s.loadout[k + slot] = WEAPON_NONE;

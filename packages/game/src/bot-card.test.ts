@@ -1,6 +1,6 @@
 import { BUILTIN_BOTS, levelBot } from '@boboforces/format';
 import { createRng } from '@boboforces/shared';
-import { WEAPONS } from '@boboforces/sim';
+import { ARSENAL } from '@boboforces/sim';
 import { describe, expect, it } from 'vitest';
 import {
   botCardLines,
@@ -16,8 +16,9 @@ import {
 
 describe('card do bot', () => {
   it('a categoria das armas é a da tabela da sim', () => {
-    for (const w of WEAPONS) expect(WEAPON_CATEGORY[w.id], w.id).toBe(w.category);
-    expect(Object.keys(WEAPON_CATEGORY).sort()).toEqual(WEAPONS.map((w) => w.id).sort());
+    // M10: o arsenal inteiro (as armas do M2 e as novas).
+    for (const w of ARSENAL) expect(WEAPON_CATEGORY[w.id], w.id).toBe(w.category);
+    expect(Object.keys(WEAPON_CATEGORY).sort()).toEqual(ARSENAL.map((w) => w.id).sort());
   });
 
   it('o card mostra a habilidade, a cabeça, a mira e as regras; os de fábrica têm nome da tabela', () => {

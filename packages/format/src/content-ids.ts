@@ -73,6 +73,15 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'weapon:knife',
   'weapon:grenade',
   'weapon:lmg',
+  // M10 (fases 6 e 7): as armas novas (só acrescentadas, regra 20). O prefixo antes do `.` é a categoria do fallback
+  // (§14.5). As versões publicadas até aqui NÃO aplicam o fallback nas listas de armas (descartam o id que não
+  // conhecem: `['rifle.dmr']` vira "todas"); daqui em diante os leitores usam `resolveWeaponId`, e uma arma futura
+  // com o mesmo padrão cai na da categoria dela.
+  'weapon:rifle.dmr',
+  'weapon:pistol.revolver',
+  'weapon:shotgun.auto',
+  'weapon:sniper.crossbow',
+  'weapon:rocket.grenade-launcher',
   // Blocos (o `missing` é o xadrez de fallback)
   'block:missing',
   'block:concrete',
@@ -238,6 +247,14 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'model:inflatable-cube',
   'model:inflatable-wedge',
   'model:inflatable-wall',
+  // M10 (fases 6 e 7): as armas novas (o id do modelo é o da arma) e os 2 projéteis (só acrescentados, regra 20)
+  'model:rifle.dmr',
+  'model:pistol.revolver',
+  'model:shotgun.auto',
+  'model:sniper.crossbow',
+  'model:rocket.grenade-launcher',
+  'model:crossbow-bolt',
+  'model:grenade-launcher-shell',
   // Skins prontas do M1 (3 da cena-vitrine) e o zumbi comum do teste de estresse
   'skin:recruit',
   'skin:mechanic',
@@ -341,6 +358,21 @@ export type ContentResolution =
   | { readonly status: 'fallback'; readonly local: string | null }
   | { readonly status: 'dropped' }
   | { readonly status: 'refused' };
+
+/** A arma padrão de uma lista de armas que só citava armas desconhecidas (§14.5: "sem categoria conhecida, pistola"). */
+export const DEFAULT_WEAPON_LOCAL = 'pistol';
+
+/**
+ * M10 (revisão): o id de arma que uma lista de armas guarda (`weapons.allowed`, a escada, as armas do time e as do
+ * bot): o conhecido, o substituto do aposentado ou, ausente, a arma da categoria do prefixo (`shotgun.auto` numa versão
+ * sem ela vira `shotgun`); sem categoria conhecida, `null` (o leitor descarta, com aviso).
+ */
+export function resolveWeaponId(local: string): string | null {
+  const r = resolveContent('weapon', local);
+  if (r.status === 'known' || r.status === 'retired') return r.local;
+  if (r.status === 'fallback' && r.local !== null && local.startsWith(`${r.local}.`)) return r.local;
+  return null;
+}
 
 /** Resolve um ID local (sem prefixo) de um tipo, aplicando aposentadorias e a política de fallback. */
 export function resolveContent(kind: ContentKind, local: string): ContentResolution {

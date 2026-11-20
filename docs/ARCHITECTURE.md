@@ -5017,3 +5017,52 @@ commits é a de chegada.
 - **A revisão (Opus) achou:** um poleiro só de humano (do andaime leste para o telhado do depósito, com visada de
   52,2 m) e mais um do mesmo tipo; os dois avisos de "visto sem ver" nas escadas de dentro; a falta de um teste do
   `mapc` e da cena de bench; e a travessia mínima abaixo de 12 s. Corrigido antes do commit.
+
+### 21.4 Fases 6 e 7: as armas novas (20/11/2026)
+
+- **As cinco** (`sim/config/weapons.ts`; TTK sem errar, corpo/cabeça; medida pelo robô, Tryhard contra Tryhard):
+
+  | Arma (id, código) | Dano | Cabeça | Cadência | Pente + reserva | Alcance | TTK | Medido |
+  |---|---|---|---|---|---|---|---|
+  | DMR "Pinpoint" (`rifle.dmr`, 27) | 46 | 2,0x | 300/min, semi | 10 + 30 | cheio até 50 m, 34 a 90 m; luneta 2,5x | 0,40 / 0,20 s | 0,33 s a 30 m |
+  | Revólver "Hand Cannon" (`pistol.revolver`, 28, secundária) | 50 | 1,5x | 120/min | 6 + 18 | cheio até 22 m | 0,50 s | 0,54 s a 12 m |
+  | Escopeta automática "Leafblower" (`shotgun.auto`, 29) | 8 × 9 | 1,25x | 180/min, auto | 8 + 24 | cheio até 6 m, zero a 16 m | 0,33 s | 0,44 s a 6 m |
+  | Besta "Twang" (`sniper.crossbow`, 30) | 90, sem queda | 2,0x (a cabeça mata) | 1 virote por recarga | 1 + 12 | virote a 70 m/s, gravidade 5 m/s² | 1,50 s / 1 virote | 0,70 s a 25 m |
+  | Lança-granadas "Bloop" (`rocket.grenade-launcher`, 31) | 85 direto; explosão 85 → 0 em 3,5 m | — | 90/min | 6 + 12 | 30 m/s em arco, 60 m | 0,67 s | 0,88 s a 16 m |
+
+  A besta é um tipo de disparo novo (`WEAPON_FIRE.bolt`): no corpo, dano por parte como a bala; no bloco, o evento
+  `stick` (o virote fica 5 s cravado, só no desenho, até 24 de uma vez; some na rodada nova, na troca de fase e na porta
+  do Zombies que abre). Mira solta sem a mira (3,5°), custa $3.500 e os bots só atiram com a mira cheia; o "Sniper mata
+  no corpo" não vale para ela (a categoria é outra). O lança-granadas explode no contato com o corpo ou o bloco, sem
+  quicar (quicar pedia estado novo no hash), com 50% de dano em quem atira.
+- **Os ids e os códigos:** ids com ponto, cujo prefixo é a categoria (o DMR é um fuzil para quem não o conhece); os
+  códigos 27 a 31 depois das armas de modo e das raridades do Royale (um assert na carga impede que um dia se
+  encontrem); a lista `ARSENAL` com as 14; os bits 9 a 13 da máscara (16 bits). Os validadores de lista de armas, de
+  escada do Gun Game e das regras do bot passaram a aceitar o "cai na categoria" (`resolveWeaponId`): uma arma
+  desconhecida vira a categoria dela com aviso, e uma lista que ficaria vazia vira a pistola, não "todas". Os builds já
+  publicados descartam o id desconhecido (eles não têm isso).
+- **O revólver é secundária** (AK5): a secundária é o revólver quando a lista de armas o nomeia, senão a pistola (o
+  Laboratório, as regras da partida e do time, e o dono); sem restrição, nada muda. As armas da parede e da loja vão
+  para o espaço delas (o revólver troca a pistola).
+- **Onde aparecem:** no radial da morte (10 primárias: o anel largo a partir de 667 × 375, duas linhas a 640 × 360, uma
+  linha no 3–4P; `MAX_PRIMARY_OPTIONS` 16), nas Ferramentas do Dono, nas regras de arma da partida e do time, no
+  Laboratório, no card do bot, na loja do BoboStrike (13 itens; DMR $3.300, escopeta automática $2.000, besta $3.500,
+  lança-granadas $3.800, revólver $700; em vista pequena, a loja cai para linhas ou uma linha só, nunca esconde item),
+  nas escadas do Gun Game feitas à mão, nas armas da parede que um mapa puser e no Paintball (as versões de tinta).
+  **De fora, de propósito (os goldens não mudam):** o sorteio da primária dos bots, a escada padrão do Gun Game, o loot
+  do Royale, a troca do Chaos, a Caixa Misteriosa, o Surpreenda-me e as compras dos bots do BoboStrike: num jogo
+  normal, os bots só carregam as novas quando uma regra dá.
+- **A IA:** alcance e mira de cada uma, o arco e a antecipação da besta e do lança-granadas (os bots não atiram a
+  granada à queima-roupa). **Os sons** são sintetizados (os sons essenciais seguem em 130,4 KB).
+- **Os modelos** (`assets-src/models/weapons.ts`): um por arma (o id do modelo é o id da arma), o virote e a granada
+  numa camada só; 6 camadas no fim do `modelos64` (39 de 55: o teto do gerador subiu de 40 para 55, o real do array).
+  O DMR é arma de luneta (`hasScope`: com a mira cheia, a arma some e a moldura da luneta aparece, como na sniper); a
+  besta e a SMG miram meio texel acima da mira (antes, o bloco da mira tapava o centro da tela).
+- **O online:** `PROTOCOL_VERSION` 13 (a ação `stick` do evento de projétil), com o `net.json`.
+- **O custo:** a primeira partida em 954,7 KB de 1 MB (o kit e os modelos); gerar os mips no carregamento liberaria uns
+  34 KB, mas mexe no carregador, no Switch e no size-check (fica para quando precisar).
+- **As revisões (Opus) acharam:** na sim, os builds antigos que viram "todas as armas" com uma lista só de armas novas,
+  a loja do BoboStrike que escondia as novas no 3–4P, a besta forte demais pelo preço, o assert dos códigos, o cache do
+  anel sem a fonte e o virote cravado que ficava depois da rodada; nos modelos, a mira da besta tapando o centro, a mira
+  do DMR por cima da luneta, o virote atravessando painel fino, a mira solta da besta e o teto de camadas. Corrigido
+  antes do commit.

@@ -90,6 +90,16 @@ describe('bot@1', () => {
     expect(validateBot('bot')).toMatchObject({ ok: false });
   });
 
+  it('M10 (revisão): a arma de uma versão futura cai na da categoria; sem nada que sobre, fica a pistola', () => {
+    const weapons = (list: string[]): readonly string[] => {
+      const r = validateBot({ format: BOT_FORMAT, id: 'meu', name: 'Meu', rules: { weapons: list } });
+      return r.ok ? r.value.rules.weapons : ['recusado'];
+    };
+    expect(weapons(['sniper.crossbow', 'smg.mini', 'laser'])).toEqual(['sniper.crossbow', 'smg']);
+    expect(weapons(['laser'])).toEqual(['pistol']);
+    expect(weapons([])).toEqual([]);
+  });
+
   it('a receita valida os embutidos; a ref acha o de fábrica, o embutido, ou cai no Normal Bob', () => {
     const doc = {
       format: MATCH_RECIPE_FORMAT,

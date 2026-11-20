@@ -32,9 +32,11 @@ import {
   PRIMARY_ORDER,
   primaryChoices,
   radialIndex,
+  ringPick,
   RADIAL,
   rulesText,
   stepCursor,
+  stepPick,
 } from './death.ts';
 
 /** M2, fase 2c: a lógica pura da tela de morte (câmera, cursor do radial, faixa e derrota feia). */
@@ -90,7 +92,8 @@ describe('cursor do menu da primária', () => {
     expect(stepCursor(st, -per * 0.6)).toBe(1);
     expect(stepCursor(st, per * 1.01)).toBe(-1);
     expect(PRIMARY_ORDER[0]).toBe(WEAPON_CODE.rifle);
-    expect(PRIMARY_ORDER.length).toBe(6);
+    // M10 (AK5): as 6 de antes e as 4 primárias novas.
+    expect(PRIMARY_ORDER.length).toBe(10);
   });
 });
 
@@ -287,5 +290,63 @@ describe('M9 (fase 3b): as opções do radial pelo time', () => {
     expect(codes(primaryChoices(r, 0))).toEqual([WEAPON_CODE.rifle]);
     expect(codes(primaryChoices(r, 1))).toEqual([WEAPON_CODE.rifle, WEAPON_CODE.smg, WEAPON_CODE.shotgun]);
     expect(codes(primaryChoices(r, 2))).toEqual([WEAPON_CODE.rifle, WEAPON_CODE.smg, WEAPON_CODE.shotgun]);
+  });
+});
+
+describe('M10 (fases 6 e 7): as primárias novas no radial', () => {
+  const tdm: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'warfare.tdm',
+    map: 'construto',
+    seed: 1,
+    teams: [{ humans: 1, bots: [] }, { bots: [] }],
+  };
+  const codes = (list: number[]): number[] => list.map((i) => PRIMARY_ORDER[i]!);
+
+  it('o DMR, a escopeta automática, a besta e o lança-granadas entram ao lado da parecida; o weapons.allowed vale', () => {
+    expect(PRIMARY_ORDER).toEqual([
+      WEAPON_CODE.rifle,
+      WEAPON_CODE.dmr,
+      WEAPON_CODE.smg,
+      WEAPON_CODE.shotgun,
+      WEAPON_CODE.autoShotgun,
+      WEAPON_CODE.sniper,
+      WEAPON_CODE.crossbow,
+      WEAPON_CODE.rocket,
+      WEAPON_CODE.grenadeLauncher,
+      WEAPON_CODE.lmg,
+    ]);
+    const r: MatchRecipe = { ...tdm, weapons: { allowed: ['sniper.crossbow', 'rifle.dmr', 'pistol.revolver'] } };
+    expect(codes(primaryChoices(r, 0))).toEqual([WEAPON_CODE.dmr, WEAPON_CODE.crossbow]);
+  });
+
+  it('anel largo: o cursor escolhe a plaquinha na direção dele, vista do centro; no redondo, o setor de sempre', () => {
+    const hit = createHudModel().primaryHit;
+    // 3 plaquinhas de 20×10 em volta de (100, 100): no alto, à direita (mais para baixo) e à esquerda.
+    const put = (i: number, cx: number, cy: number): void => {
+      hit.rects[i * 4] = cx - 10;
+      hit.rects[i * 4 + 1] = cy - 5;
+      hit.rects[i * 4 + 2] = 20;
+      hit.rects[i * 4 + 3] = 10;
+    };
+    put(0, 100, 40);
+    put(1, 220, 130);
+    put(2, -20, 130);
+    hit.count = 3;
+    hit.wide = true;
+    hit.centerX = 100;
+    hit.centerY = 100;
+    expect(ringPick(hit, 0, 1, 3)).toBe(0);
+    expect(ringPick(hit, 1, -0.2, 3)).toBe(1);
+    expect(ringPick(hit, -1, -0.3, 3)).toBe(2);
+    expect(ringPick(hit, 0.1, 0.1, 3)).toBe(-1);
+    hit.wide = false;
+    expect(ringPick(hit, 1, 0, 4)).toBe(radialIndex(1, 0, 4));
+  });
+
+  it('revisão: a loja na fileira e na linha anda um passo de cada vez, dando a volta, a partir de nenhuma', () => {
+    expect([stepPick(-1, 1, 13), stepPick(-1, -1, 13)]).toEqual([0, 12]);
+    expect([stepPick(12, 1, 13), stepPick(0, -1, 13), stepPick(5, 1, 13)]).toEqual([0, 12, 6]);
+    expect(stepPick(3, 1, 0)).toBe(-1);
   });
 });

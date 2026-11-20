@@ -69,11 +69,12 @@ function buy(ctx: SimContext, e: number, w: number): void {
     return;
   }
   s.points[e] = s.points[e]! - cost;
-  s.loadout[k] = code;
-  s.slotClip[k] = def.clipSize;
-  s.slotReserve[k] = def.reserve;
+  // M10: no slot da arma (o revólver na parede troca a pistola; as primárias, a primária).
+  s.loadout[k + def.slot] = code;
+  s.slotClip[k + def.slot] = def.clipSize;
+  s.slotReserve[k + def.slot] = def.reserve;
   // Na mão na hora (sem a troca animada: a compra já é a pausa).
-  s.slot[e] = 0;
+  s.slot[e] = def.slot;
   s.weapon[e] = code;
   s.reloadTicks[e] = 0;
   s.switchTicks[e] = 0;

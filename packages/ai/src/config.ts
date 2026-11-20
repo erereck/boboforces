@@ -354,7 +354,10 @@ export interface AiWeaponUse {
   readonly needFullAds: boolean;
   /** Abaixo desta distância (m) troca a primária pela pistola (0 = nunca): foguete (autodano) e sniper (lenta). */
   readonly pistolBelowM: number;
-  /** Mira no pé do alvo com antecipação pela velocidade do projétil (foguete). */
+  /**
+   * Mira no pé do alvo com antecipação pela velocidade do projétil (foguete; M10: o lança-granadas, com a queda do arco
+   * também).
+   */
   readonly splash: boolean;
 }
 
@@ -368,6 +371,15 @@ export const AI_WEAPON_USE: Readonly<Record<WeaponCategory, AiWeaponUse>> = {
   pistol: { approachM: 20, retreatM: 0, adsMinM: 10, needFullAds: false, pistolBelowM: 0, splash: false },
   melee: { approachM: 0, retreatM: 0, adsMinM: Infinity, needFullAds: false, pistolBelowM: 0, splash: false },
   throwable: { approachM: 20, retreatM: 0, adsMinM: Infinity, needFullAds: false, pistolBelowM: 0, splash: false },
+  // M10 (fases 6 e 7): as armas novas. O DMR segura média e longa (recua de quem chega perto) e mira quase sempre (do
+  // quadril abre 2,5°); o revólver é a pistola; a escopeta automática chega ainda mais perto que a pump; a besta (3,5° no
+  // quadril, revisão) só atira com a mira cheia, como a sniper, e segura a média (o virote cai: a mira compensa o arco,
+  // `combat`); o lança-granadas no pé, como o foguete, sem atirar colado.
+  dmr: { approachM: 40, retreatM: 8, adsMinM: 4, needFullAds: false, pistolBelowM: 0, splash: false },
+  revolver: { approachM: 18, retreatM: 0, adsMinM: 10, needFullAds: false, pistolBelowM: 0, splash: false },
+  autoShotgun: { approachM: 5, retreatM: 0, adsMinM: Infinity, needFullAds: false, pistolBelowM: 0, splash: false },
+  crossbow: { approachM: 30, retreatM: 6, adsMinM: 0, needFullAds: true, pistolBelowM: 0, splash: false },
+  launcher: { approachM: 22, retreatM: 8, adsMinM: 12, needFullAds: false, pistolBelowM: 5, splash: true },
 };
 
 /** Faca: troca para ela com o alvo colado (m) e volta para a arma de fogo longe disto (m). */

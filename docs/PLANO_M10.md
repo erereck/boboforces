@@ -76,6 +76,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    Fortress.
 6. **As armas convencionais:** o DMR, o revólver e a escopeta automática.
 7. **As armas de projétil:** a besta (o virote preso no bloco por alguns segundos, cosmético) e o lança-granadas.
+   - **6 e 7 feitas em 20/11** (ARCHITECTURE §21.4): as cinco com modelos, o radial de 10 e o protocolo 13.
 8. **As pendências do M9:** a Base Aérea no Sandbox (os pontos dos times 2 e 3 no chão), a cor de cada time no
    Sandbox (uma paleta de cores de time, sem repetir) e o som do ricochete.
    - **feita em 20/11** (ARCHITECTURE §21.1): a Base Aérea no Sandbox, as 8 cores e o assobio sintetizado.

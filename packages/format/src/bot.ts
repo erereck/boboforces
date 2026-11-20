@@ -1,4 +1,4 @@
-import { resolveContent } from './content-ids.ts';
+import { DEFAULT_WEAPON_LOCAL, resolveWeaponId } from './content-ids.ts';
 import type { FormatId } from './format-id.ts';
 // Só tipos da receita: o `match-recipe.ts` importa este arquivo (valida os `embeddedBots`), e um import de valor faria
 // ciclo na inicialização.
@@ -468,12 +468,16 @@ export function validateBot(doc: unknown): ValidationResult<BotDocument> {
   if (r['weapons'] !== undefined) {
     if (Array.isArray(r['weapons']) && r['weapons'].every((w) => typeof w === 'string')) {
       // M8 (fase 0, revisão): só armas conhecidas (a aposentada vira a substituta). O card e o placar mostram o id: um
-      // texto qualquer vindo de um código passaria por cima do filtro de nomes.
-      for (const w of (r['weapons'] as string[]).slice(0, 16)) {
-        const c = resolveContent('weapon', w);
-        if ((c.status === 'known' || c.status === 'retired') && !weapons.includes(c.local)) weapons.push(c.local);
-        else if (c.status !== 'known' && c.status !== 'retired') warn(ctx, 'rules.weapons', 'content.missingWeapon');
+      // texto qualquer vindo de um código passaria por cima do filtro de nomes. M10 (revisão): a desconhecida com
+      // categoria vira a da categoria (`resolveWeaponId`); a lista que não sobrou nada fica com a pistola (vazia seria
+      // "todas").
+      const list = (r['weapons'] as string[]).slice(0, 16);
+      for (const w of list) {
+        const local = resolveWeaponId(w);
+        if (local === null || local !== w) warn(ctx, 'rules.weapons', 'content.missingWeapon');
+        if (local !== null && !weapons.includes(local)) weapons.push(local);
       }
+      if (weapons.length === 0 && list.length > 0) weapons.push(DEFAULT_WEAPON_LOCAL);
     } else warn(ctx, 'rules.weapons', 'bot.invalidField');
   }
   const rules: BotRules = {

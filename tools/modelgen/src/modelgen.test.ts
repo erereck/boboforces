@@ -170,6 +170,32 @@ describe('modelgen', () => {
     expect(byId.get('bollard')!.blocksNav).toBe(false);
   });
 
+  it('M10 (fases 6 e 7): as 5 armas novas (id do modelo = id da arma) e os 2 projéteis, camadas só no fim', () => {
+    const weapons = ['rifle.dmr', 'pistol.revolver', 'shotgun.auto', 'sniper.crossbow', 'rocket.grenade-launcher'];
+    for (const id of weapons) {
+      const m = byId.get(id);
+      expect(m?.kind, id).toBe('weapon');
+      // Uma camada por arma, como as do M2.
+      const layers = new Set(m!.parts.flatMap((p) => p.boxes.map((b) => b.layer)));
+      expect(layers.size, id).toBe(1);
+    }
+    // O virote e a granada do lança-granadas dividem uma camada (o orçamento do `modelos64`).
+    const shared = new Set(
+      ['crossbow-bolt', 'grenade-launcher-shell'].flatMap((id) =>
+        byId.get(id)!.parts.flatMap((p) => p.boxes.map((b) => b.layer)),
+      ),
+    );
+    expect([...shared]).toEqual(['mdl_m10_projectiles']);
+    expect(build.layers.slice(-6).map((l) => l.name)).toEqual([
+      'mdl_dmr',
+      'mdl_revolver',
+      'mdl_auto_shotgun',
+      'mdl_crossbow',
+      'mdl_grenade_launcher',
+      'mdl_m10_projectiles',
+    ]);
+  });
+
   it('modelo pronto com ID não registrado fica fora do pacote', () => {
     for (const m of build.pending) expect(byId.has(m.doc.id)).toBe(false);
   });

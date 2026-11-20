@@ -44,8 +44,8 @@ const tdm: MatchRecipe = {
 };
 
 describe('as Ferramentas do Dono e o online (a opção no começo)', () => {
-  it('o protocolo é o 12 e o começo leva a reserva (fora da faixa, conta como ausente)', () => {
-    expect(PROTOCOL_VERSION).toBe(12);
+  it('o protocolo é o 13 (M10) e o começo leva a reserva (fora da faixa, conta como ausente)', () => {
+    expect(PROTOCOL_VERSION).toBe(13);
     const start = { recipe: tdm, seed: 3, members: [{ slot: 0, name: 'Erick', team: 0, ready: true, controller: 0 }] };
     const round = (owner: unknown) =>
       parseLobbyStart(decodeLobbyPayload(encodeLobbyMessage(LOBBY_MSG.start, { ...start, owner })));

@@ -251,6 +251,21 @@ describe('validateMatchRecipe: normalização e fallback', () => {
     expect(value.players?.movement).toBe('bobo');
   });
 
+  it('M10 (revisão): arma de uma versão futura cai na da categoria; sem nada que sobre, a lista fica na pistola', () => {
+    const r = (weapons: Record<string, unknown>): MatchRecipe =>
+      ok(validateMatchRecipe({ ...base(), weapons }, PC)).value;
+    expect(r({ allowed: ['shotgun.double', 'rifle.dmr', 'laser'] }).weapons?.allowed).toEqual(['shotgun', 'rifle.dmr']);
+    expect(r({ allowed: ['laser'] }).weapons?.allowed).toEqual(['pistol']);
+    expect(r({ allowed: [] }).weapons?.allowed).toEqual([]);
+    expect(r({ ladder: ['smg.mini', 'sniper.crossbow', 'knife'] }).weapons?.ladder).toEqual([
+      'smg',
+      'sniper.crossbow',
+      'knife',
+    ]);
+    const { codes } = ok(validateMatchRecipe({ ...base(), weapons: { allowed: ['shotgun.double'] } }, PC));
+    expect(codes).toEqual(['content.missingWeapon']);
+  });
+
   it('limita números às faixas da gameplay.md §10.3', () => {
     const recipe = {
       ...base(),

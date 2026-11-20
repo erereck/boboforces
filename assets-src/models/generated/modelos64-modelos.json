@@ -203,6 +203,42 @@
       "kind": "opaque",
       "frames": 1,
       "cutout": false
+    },
+    {
+      "name": "mdl_dmr",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_revolver",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_auto_shotgun",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_crossbow",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_grenade_launcher",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
+    },
+    {
+      "name": "mdl_m10_projectiles",
+      "kind": "opaque",
+      "frames": 1,
+      "cutout": false
     }
   ]
 }

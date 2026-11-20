@@ -4,7 +4,14 @@ import type { NavGrid } from '@boboforces/nav';
 import { u16ToYaw, yawToU16 } from '@boboforces/shared';
 import { METRICS } from '../config/metrics.ts';
 import { MATCH_DEFAULTS } from '../config/rules.ts';
-import { isPrimaryWeapon, paintPrimaryFor, WEAPON_SLOT, WEAPONS, weaponDef } from '../config/weapons.ts';
+import {
+  isPrimaryWeapon,
+  loadoutSecondary,
+  paintPrimaryFor,
+  WEAPON_SLOT,
+  weaponDef,
+  weaponMaskBit,
+} from '../config/weapons.ts';
 import {
   BOT_CONTROLLER_BASE,
   MAX_BOTS,
@@ -20,7 +27,7 @@ import type { StateField } from '../state.ts';
 import type { SimView } from '../view.ts';
 import { MOD } from './chaos.ts';
 import { createPartyState, partyActive } from './party.ts';
-import { respawn } from './life.ts';
+import { allowedPrimaryOrNone, respawn } from './life.ts';
 
 /**
  * M9 (fase 4): as Ferramentas do Dono (gameplay.md "Bobo Sandbox completo", estilo gmod) na sim, sem UI.
@@ -381,16 +388,10 @@ function setTeam(ctx: SimContext, o: OwnerState, e: number, team: number): void 
   reequip(ctx, e);
 }
 
-/** A 1ª primária que a máscara libera, ou `WEAPON_NONE`. */
-function firstAllowedPrimary(mask: number): number {
-  for (let code = 0; code < WEAPONS.length; code++)
-    if ((mask & (1 << code)) !== 0 && isPrimaryWeapon(code)) return code;
-  return WEAPON_NONE;
-}
-
 /**
- * As armas do loadout que as regras de agora não liberam: a primária vira a 1ª liberada (cheia), as outras saem; a mão
- * vai para o 1º slot que sobrou se a dela saiu. Sem restrição (máscara 0), nada muda.
+ * As armas do loadout que as regras de agora não liberam: a primária vira a 1ª liberada (cheia), a secundária a
+ * liberada (M10: o revólver, se a lista o cita), as outras saem; a mão vai para o 1º slot que sobrou se a dela saiu.
+ * Sem restrição (máscara 0), nada muda.
  */
 function reequip(ctx: SimContext, e: number): void {
   const s = ctx.s;
@@ -400,8 +401,14 @@ function reequip(ctx: SimContext, e: number): void {
   let changed = false;
   for (let slot = 0; slot < WEAPON_SLOT_COUNT; slot++) {
     const code = s.loadout[k + slot]!;
-    if (code === WEAPON_NONE || (mask & (1 << code)) !== 0) continue;
-    const next = slot === WEAPON_SLOT.primary ? firstAllowedPrimary(mask) : WEAPON_NONE;
+    if (code === WEAPON_NONE || (mask & weaponMaskBit(code)) !== 0) continue;
+    const second = loadoutSecondary(mask);
+    const next =
+      slot === WEAPON_SLOT.primary
+        ? allowedPrimaryOrNone(mask)
+        : slot === WEAPON_SLOT.secondary && (mask & weaponMaskBit(second)) !== 0
+          ? second
+          : WEAPON_NONE;
     const def = weaponDef(next);
     s.loadout[k + slot] = next;
     s.slotClip[k + slot] = def ? def.clipSize : 0;
@@ -591,7 +598,7 @@ function givePrimary(ctx: SimContext, e: number, code: number): void {
   const k = e * WEAPON_SLOT_COUNT + WEAPON_SLOT.primary;
   s.primaryChoice[e] = code;
   const mask = ctx.rules.weaponMask[e]!;
-  if (mask !== 0) ctx.rules.weaponMask[e] = mask | (1 << code);
+  if (mask !== 0) ctx.rules.weaponMask[e] = mask | weaponMaskBit(code);
   if ((s.flags[e]! & F.dead) !== 0) return;
   s.loadout[k] = live;
   s.slotClip[k] = def.clipSize;
