@@ -33,6 +33,8 @@ export const GAME_ASSETS_M1 = {
   airbase: 'maps/airbase.bfmap',
   /** M7 (fase 5): a Ilha Tropical, o mapa do Bobo Royale Mini (~200 m). */
   island: 'maps/island.bfmap',
+  /** M10 (fase 2): o Canteiro de Obras (TDM, FFA e Sandbox). */
+  construction: 'maps/construction.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -57,4 +59,5 @@ export const MAP_ASSETS: Readonly<Record<string, string>> = {
   base: GAME_ASSETS_M1.base,
   airbase: GAME_ASSETS_M1.airbase,
   island: GAME_ASSETS_M1.island,
+  construction: GAME_ASSETS_M1.construction,
 };

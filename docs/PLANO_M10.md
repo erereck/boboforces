@@ -69,6 +69,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 1. **Porto de Contêineres** (médio): verticalidade e corredores entre pilhas de contêineres; TDM, FFA, Domination e
    Sandbox.
 2. **Canteiro de Obras** (médio): andaimes, vigas e o guindaste; TDM, FFA e Sandbox.
+   - **feita em 20/11** (ARCHITECTURE §21.3): 72 × 80 m, 3 andares, visada de 47,9 m.
 3. **Galpão de Paintball** (médio): interior colorido com infláveis; Bobo Paintball (e TDM).
 4. **Estação Lunar** (médio): a gravidade baixa de série (pergunta AK3), neon; Bobo Chaos (e TDM e FFA).
 5. **Fazenda à noite** (grande): o Bobo Zombies (janelas, portas pagas, armas na parede, caixa, vantagens) e o

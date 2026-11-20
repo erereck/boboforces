@@ -14,9 +14,10 @@ import type { StringKey, TestScreenModel } from '@boboforces/ui';
  */
 /**
  * M7 (fase 1): `airbase` = o TDM na Base Bobo (o mapa do BoboStrike). M7 (fase 5): `island` = o FFA na Ilha Tropical
- * (o mapa do Royale Mini; a memória da grade, o loading e o quadro no mapa grande antes do modo existir).
+ * (o mapa do Royale Mini; a memória da grade, o loading e o quadro no mapa grande antes do modo existir). M10 (fase 2):
+ * `construction` = o TDM no Canteiro de Obras.
  */
-export type BenchScene = 'construto' | 'vitrine' | 'zombies' | 'airbase' | 'island';
+export type BenchScene = 'construto' | 'vitrine' | 'zombies' | 'airbase' | 'island' | 'construction';
 
 /**
  * Uma rodada do bench (tecnico.md §24.1). A mesma cena vira o `/bench` da web e o NRO de teste do Switch.

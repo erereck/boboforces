@@ -4995,3 +4995,25 @@ commits é a de chegada.
   ajudantes sem checagem; o milho empilhado partido; o andaime com o friso fora do trilho; o nome de marca; e o mar do
   porto que deixaria os bots descerem nele. Corrigido antes do commit.
 
+### 21.3 Fase 2: o Canteiro de Obras (20/11/2026)
+
+- **O mapa** (`assets-src/maps/construction.ts`, `construction`, "Canteiro"): área de 72 × 80 m numa grade de
+  80 × 24 × 88 m, espelhado norte-sul (o time B no norte, o A no sul), de dia. Térreo a 1 m, 1º andar a 4 m e 2º a 7 m
+  (só o terço leste do prédio); o poço do elevador sobe a 11 m e o guindaste a 19 m. Três rotas: o pátio de materiais
+  (oeste, com o escritório de contêiner de 2 andares), o prédio (o térreo em zigue-zague em volta do poço) e o pátio do
+  guindaste (leste, com o depósito de contêiner e o guindaste; a carga fica pendurada sobre o prédio). Os andaimes
+  levam ao 1º (oeste) e ao 2º (leste) andar com passarela coberta embaixo; 6 subidas para o 1º e 3 para o 2º, para
+  nenhum alto se segurar sozinho. Modos: TDM, FFA e Sandbox (jogadores 2/12/16; 12 bots no Switch 3–4P).
+- **As medidas do `mapc`:** a maior linha de visão 47,93 m (declarada 50); 6 + 6 spawns no TDM e 16 no FFA, nenhum
+  visto de um inimigo; a travessia de spawn a spawn de 12,2 a 13,3 s; a cobertura a no máximo 5 m; 0 avisos;
+  `construction.bfmap` com 9,2 KB. Um teste do `mapc` (`tools/mapc/src/construction.test.ts`) prende tudo isso, mais
+  o "poleiro": nenhum topo sem navegação a até 3,7 m de um piso alcançável no máximo 0,5 m abaixo (o pulo correndo) nem
+  a até 1,2 m de um piso no máximo 1,5 m abaixo (o mantle). A cena de bench `scene=construction`.
+- **Os bots:** nas partidas da sim (TDM, FFA e Sandbox), ninguém travou e 3 a 10 bots chegam ao 1º andar; o 2º quase
+  não é escolhido como destino pela IA (o passeio sorteia um nó qualquer com 15 s de prazo; a fase 1c mexe nisso). As
+  escadas são em L e em U com lances de 1,5 m: a suavização da rota juntava um lance reto de 3 m num segmento só, e o
+  seguidor de caminho largava a rota (o defeito é da IA e vale para todo mapa; a fase 1c corrige), e um palete de 1 m
+  no deque do andaime quebra uma linha reta de subida até lá.
+- **A revisão (Opus) achou:** um poleiro só de humano (do andaime leste para o telhado do depósito, com visada de
+  52,2 m) e mais um do mesmo tipo; os dois avisos de "visto sem ver" nas escadas de dentro; a falta de um teste do
+  `mapc` e da cena de bench; e a travessia mínima abaixo de 12 s. Corrigido antes do commit.

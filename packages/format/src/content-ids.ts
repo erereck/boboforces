@@ -61,6 +61,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:airbase',
   // M7 (fase 5): a Ilha Tropical, o mapa do Bobo Royale (só acrescentado, regra 20)
   'map:island',
+  // M10 (fase 2): o Canteiro de Obras (só acrescentado, regra 20)
+  'map:construction',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

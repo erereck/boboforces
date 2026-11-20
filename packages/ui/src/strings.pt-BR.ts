@@ -161,6 +161,8 @@ export const STRINGS_PT_BR = {
   'map.base': 'Base Abandonada',
   'map.airbase': 'Base Bobo',
   'map.island': 'Ilha Tropical',
+  // M10 (fase 2): o Canteiro de Obras (nome provisório, pergunta AK2).
+  'map.construction': 'Canteiro',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
   'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',

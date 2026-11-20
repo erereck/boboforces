@@ -18,7 +18,7 @@ describe('mapas dos menus', () => {
       const map = decodeMap(bytes);
       expect([...map.meta.modes].sort(), id).toEqual([...MAP_MODES[id]].sort());
     }
-    expect(mapsForMode('warfare.ffa')).toEqual(['construto']);
+    expect(mapsForMode('warfare.ffa')).toEqual(['construto', 'construction']);
     expect(mapsForMode('royale.mini')).toEqual(['island']);
     expect(mapForMode('ringue', 'warfare.ffa')).toBe('construto');
     expect(mapBotCap('ringue', 40)).toBe(7);

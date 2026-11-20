@@ -337,7 +337,10 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     // A Base Bobo leva 9 bots (5 contra 5 com você).
     expect(presetBotCounts(airbase).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(9);
     valid(airbase);
-    expect(stepCustom('match', airbase, 'map', 1, PC).map).toBe('construto');
+    // M10 (fase 2): depois da Base Bobo, o Canteiro; e volta ao Construto.
+    const canteiro = stepCustom('match', airbase, 'map', 1, PC);
+    expect(canteiro.map).toBe('construction');
+    expect(stepCustom('match', canteiro, 'map', 1, PC).map).toBe('construto');
   });
 
   it('a aba Times: de 2 a 4 times, o seu time, e por time o nome, o bot, quantos, a vida e as armas', () => {

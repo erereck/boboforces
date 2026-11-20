@@ -15,6 +15,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   andaime, vigas, brita, grama sintética, rede, infláveis, regolito, painéis da estação, neon, celeiro, feno, milho,
   silo e trator), na paleta de sempre; os vermelhos e os amarelos ficaram escuros e foscos para não se confundirem
   com as cores de time. Ainda sem mapa: eles chegam nas fases 1 a 5.
+- **O Canteiro de Obras (fase 2):** um prédio em obra de 3 andares com andaimes, vigas e o guindaste, para TDM, FFA e
+  Sandbox; três rotas (o pátio de materiais, o prédio e o pátio do guindaste), seis subidas para o 1º andar.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).
