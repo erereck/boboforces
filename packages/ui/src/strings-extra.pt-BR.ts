@@ -1317,7 +1317,7 @@ export const STRINGS_EXTRA_PT_BR = {
   'custom.saveScenario': 'Salvar Cenário',
   'result.saveScenario': 'Salvar Cenário',
   'result.scenarioSaved': 'Cenário salvo',
-  'result.sandboxWinner': '{team} venceu · {own} × {other}',
+  'result.sandboxWinner': '{team} venceu · {other} × {own}',
   'hud.sandbox.out': 'Fora até o fim da partida',
 } as const satisfies Readonly<Record<string, string>>;
 

@@ -4782,3 +4782,18 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   do commit. Ficam: o placar do Tab numa lista só passa da tela de 640×360 a partir de 15 linhas (o TDM 2×8 já
   passava); os nomes de time vão ao amigo online sem o filtro de nomes (como os nomes dos jogadores hoje).
 
+### 20.6 Fase 3b: o Sandbox pelos prints (20/11/2026)
+
+- **Os prints da rodada 32** (`local/m9/capturar-sandbox-*.ts`) acharam: o menu "Arma da próxima vida" na tela de
+  morte da eliminação (não há próxima vida) e oferecendo armas que o time não pode pegar (a sim trocava para a primeira
+  permitida no renascer, sem avisar); o resultado com o placar de quem perdeu primeiro; e as setas na linha do nome do
+  time (o confirmar abre o teclado; as setas não faziam nada).
+- **O radial** (`scene/death.ts`, `primaryChoices(recipe, team)`): as opções são as primárias que a sim deixaria (as
+  armas do time no Sandbox cruzadas com o `weapons.allowed`, a mesma conta das regras por entidade); com 0 ou 1
+  opção, ou na eliminação do Sandbox, o radial não aparece. Vale também para a lista de armas da partida fora do
+  Sandbox (que antes oferecia todas).
+- **O resto:** o "{time} venceu · {o dele} × {o seu}"; a linha do nome do time é só para ler (`valueOnly`: sem setas,
+  o confirmar abre o teclado); o teste dos mapas do Sandbox ganhou 30 s (a navegação do mapa real, com a suíte toda).
+- **Ficam:** quem assiste o aliado na eliminação não vê o nome dele nem a vida dele no quadro de baixo; o placar do Tab
+  é translúcido sobre o feed; com 4 times, os bots de mesmo preset têm o mesmo nome.
+

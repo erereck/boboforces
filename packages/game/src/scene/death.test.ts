@@ -29,6 +29,7 @@ import {
   losingBadly,
   moveRadialCursor,
   PRIMARY_ORDER,
+  primaryChoices,
   radialIndex,
   RADIAL,
   rulesText,
@@ -216,5 +217,30 @@ describe('regras ativas à vista (GDD §6.5)', () => {
     beginDeath(st, sim.controllerEntity(0), NULL_ENTITY, WEAPON_KILL_PLANE, 0, 0);
     fillDeathBanner(m, st, v, controllerNames(recipe, 1), ['Rattler'], deathTexts(), rules);
     expect(m.deathRules).toBe('');
+  });
+});
+
+describe('M9 (fase 3b): as opções do radial pelo time', () => {
+  const base: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'sandbox',
+    map: 'construto',
+    seed: 1,
+    teams: [{ humans: 1, bots: [], weapons: ['rifle', 'pistol'] }, { bots: [], weapons: ['rocket'] }, { bots: [] }],
+  };
+  const codes = (list: number[]): number[] => list.map((i) => PRIMARY_ORDER[i]!);
+
+  it('no Sandbox, só as primárias do time; sem lista, todas; fora do Sandbox, a lista do time não vale', () => {
+    expect(codes(primaryChoices(base, 0))).toEqual([WEAPON_CODE.rifle]);
+    expect(codes(primaryChoices(base, 1))).toEqual([WEAPON_CODE.rocket]);
+    expect(primaryChoices(base, 2)).toHaveLength(PRIMARY_ORDER.length);
+    expect(primaryChoices({ ...base, mode: 'warfare.tdm' }, 0)).toHaveLength(PRIMARY_ORDER.length);
+  });
+
+  it('cruza com o weapons.allowed da partida (sem nada em comum, fica o da partida)', () => {
+    const r: MatchRecipe = { ...base, weapons: { allowed: ['smg', 'shotgun', 'rifle'] } };
+    expect(codes(primaryChoices(r, 0))).toEqual([WEAPON_CODE.rifle]);
+    expect(codes(primaryChoices(r, 1))).toEqual([WEAPON_CODE.rifle, WEAPON_CODE.smg, WEAPON_CODE.shotgun]);
+    expect(codes(primaryChoices(r, 2))).toEqual([WEAPON_CODE.rifle, WEAPON_CODE.smg, WEAPON_CODE.shotgun]);
   });
 });

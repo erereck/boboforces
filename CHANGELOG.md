@@ -28,6 +28,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   é o seu time; a linha Objetivo (Pontos, Eliminação ou Nenhum); "Salvar Cenário" e o "Assistir". No Construto e no
   Ringue. O HUD, o placar do Tab, o resultado, o sofá e a sala online agora entendem até 4 times, com os nomes; na
   eliminação, quem cai fica "Fora até o fim da partida" e assiste um aliado vivo.
+- **O Sandbox pelos prints (fase 3b):** na eliminação, o menu da arma da próxima vida some (não há próxima vida); nos
+  outros objetivos (e em qualquer modo com a lista de armas da partida), ele só oferece as armas que o seu time pode
+  pegar. O resultado põe o placar de quem venceu primeiro ("Lagartixas venceu · 4 × 2"), e a linha do nome do time
+  não mostra mais setas que não faziam nada.
 - **As Ferramentas do Dono na sim (fase 4):** criar um bot num ponto, tirar um bot da partida, congelar a IA dele,
   trocar o time, dar uma arma e ligar ou desligar um modificador no meio da partida, como comandos que valem no começo
   do próximo passo (gravados, para o replay). Ainda sem tela: o menu do dono chega na fase 5.

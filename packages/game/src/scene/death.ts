@@ -31,6 +31,35 @@ export const PRIMARY_ORDER: readonly number[] = [
   WEAPON_CODE.lmg,
 ];
 
+/**
+ * M9 (fase 3b): as opções do radial que o jogador do time `team` pode pegar (índices em `PRIMARY_ORDER`), pela
+ * mesma conta da sim: as armas do time (só no Sandbox) cruzadas com o `weapons.allowed` da partida (sem nada em
+ * comum, o da partida); sem lista, todas. Com 0 ou 1 opção, o radial não tem o que escolher.
+ */
+export function primaryChoices(recipe: MatchRecipe, team: number): number[] {
+  const codes = (ids: readonly string[] | undefined): Set<number> | null => {
+    if (ids === undefined || ids.length === 0) return null;
+    const out = new Set<number>();
+    for (const id of ids) {
+      const code = WEAPONS.findIndex((w) => w.id === id);
+      if (code >= 0) out.add(code);
+    }
+    return out;
+  };
+  const match = codes(recipe.weapons?.allowed);
+  let allowed = recipe.mode === 'sandbox' ? codes(recipe.teams[team]?.weapons) : null;
+  if (match !== null) {
+    if (allowed === null) allowed = match;
+    else {
+      const both = new Set([...allowed].filter((c) => match.has(c)));
+      allowed = both.size > 0 ? both : match;
+    }
+  }
+  const out: number[] = [];
+  for (let i = 0; i < PRIMARY_ORDER.length; i++) if (allowed === null || allowed.has(PRIMARY_ORDER[i]!)) out.push(i);
+  return out;
+}
+
 export const DEATH_CAM = {
   /** Tempo da virada até quem matou (s) e quanto dura a câmera de morte (gameplay.md §5.5). */
   turnS: 0.5,

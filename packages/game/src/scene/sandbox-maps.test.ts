@@ -117,6 +117,7 @@ describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
       }
       expect(moved, `${id}: bobos que andaram`).toBeGreaterThan(3);
       match.dispose();
-    });
+      // O mapa real com a navegação leva alguns segundos com a suíte toda rodando junto.
+    }, 30_000);
   }
 });

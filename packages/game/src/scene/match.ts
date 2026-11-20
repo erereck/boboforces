@@ -301,6 +301,7 @@ import {
   losingBadly,
   moveRadialCursor,
   PRIMARY_ORDER,
+  primaryChoices,
   radialIndex,
   stepCursor,
   type DeathState,
@@ -1080,6 +1081,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const primaryNames = PRIMARY_ORDER.map((code) => weaponNames[code] ?? '');
   const primaryCategories = PRIMARY_ORDER.map((code) => weaponCategories[code] ?? '');
   const NO_PRIMARIES: readonly string[] = [];
+  /**
+   * M9 (fase 3b): as opções do radial de cada time (índices em `PRIMARY_ORDER`), com os nomes e as categorias: no
+   * Sandbox, só as armas do time; com o `weapons.allowed`, só as da partida. O time fora da receita (FFA) usa o 0.
+   */
+  const teamChoices = recipe.teams.map((_, team) => primaryChoices(recipe, team));
+  const teamChoiceNames = teamChoices.map((c) => c.map((i) => primaryNames[i]!));
+  const teamChoiceCategories = teamChoices.map((c) => c.map((i) => primaryCategories[i]!));
+  const choicesOf = (team: number): number => (team >= 0 && team < teamChoices.length ? team : 0);
   /**
    * Escolha de cada jogador local no radial (índice em `PRIMARY_ORDER`; começa no fuzil, a primária padrão), por
    * assento (M3, fase 1d: o radial vale para o P2–P4 também).
@@ -4708,8 +4717,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const seat = humans > 0 ? seatOf(slots[sIdx]!.controller) : -1;
       if (seat < 0 || paused) continue;
       const m = seat === 0 ? player : extras[seat - 1]!;
-      const current = seatPrimary[seatNum[seat]!]!;
-      const n = PRIMARY_ORDER.length;
+      // M9 (fase 3b): na eliminação não há próxima vida; e o radial só anda nas armas que o time pode pegar.
+      if (sandboxElimination) continue;
+      const ent = sim.controllerEntity(slots[sIdx]!.controller);
+      const choices = teamChoices[choicesOf(ent === NULL_ENTITY ? 0 : sim.view().team[entityIndex(ent)]!)]!;
+      const n = choices.length;
+      if (n <= 1) continue;
+      const current = Math.max(0, choices.indexOf(seatPrimary[seatNum[seat]!]!));
       const hit = slots[sIdx]!.model.primaryHit;
       let pick = -1;
       // O formato é o que a HUD desenhou no quadro anterior: anel pela direção; fileira e linha passo a passo.
@@ -4732,8 +4746,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
       }
       if (pick >= 0 && pick !== current) {
-        seatPrimary[seatNum[seat]!] = pick;
-        m.setPrimary(PRIMARY_ORDER[pick]! + 1);
+        seatPrimary[seatNum[seat]!] = choices[pick]!;
+        m.setPrimary(PRIMARY_ORDER[choices[pick]!]! + 1);
       }
     }
   }
@@ -5806,9 +5820,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const human = seat >= 0;
       // M6 (fase 2): no Gun Game e no Infection a arma é do modo: sem o radial.
       // M7 (fase 4): no BoboStrike a arma se compra (sem o radial da morte).
-      m.primaryNames = human && !fixedLoadout && !strikeMode && !royaleMode ? primaryNames : NO_PRIMARIES;
-      m.primaryCategories = human && !fixedLoadout && !strikeMode && !royaleMode ? primaryCategories : NO_PRIMARIES;
-      m.primarySelected = human ? seatPrimary[seatNum[seat]!]! : 0;
+      // M9 (fase 3b): na eliminação do Sandbox também não (ninguém volta); e só as armas que o time pode pegar.
+      const ct = choicesOf(v.team[e]!);
+      const radial =
+        human && !fixedLoadout && !strikeMode && !royaleMode && !sandboxElimination && teamChoices[ct]!.length > 1;
+      m.primaryNames = radial ? teamChoiceNames[ct]! : NO_PRIMARIES;
+      m.primaryCategories = radial ? teamChoiceCategories[ct]! : NO_PRIMARIES;
+      m.primarySelected = radial ? Math.max(0, teamChoices[ct]!.indexOf(seatPrimary[seatNum[seat]!]!)) : 0;
       m.hardTimeHint = st.hint;
     } else {
       m.deathName = '';

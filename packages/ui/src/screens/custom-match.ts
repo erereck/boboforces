@@ -21,6 +21,8 @@ export interface CustomRowView {
   readonly swatch?: number;
   /** M9 (fase 3): a área do valor mais larga (o nome do time). */
   readonly valueWidth?: number;
+  /** M9 (fase 3b): o valor só para ler (sem setas): o nome do time (o confirmar abre o teclado). */
+  readonly valueOnly?: boolean;
   readonly value: string;
 }
 
@@ -66,6 +68,7 @@ export const customMatchScreen: Screen<CustomMatchState> = {
           ...(r.labelParams !== undefined ? { labelParams: r.labelParams } : {}),
           ...(r.swatch !== undefined ? { swatch: r.swatch } : {}),
           ...(r.valueWidth !== undefined ? { valueWidth: r.valueWidth } : {}),
+          ...(r.valueOnly === true ? { valueOnly: true } : {}),
           value: r.value,
         })),
         ...(state.share === true

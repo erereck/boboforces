@@ -95,6 +95,8 @@ interface RowDef {
   /** M9 (fase 3): o quadradinho da cor do time (RGB) antes do valor, e a área do valor mais larga (o nome do time). */
   readonly swatch?: number;
   readonly valueWidth?: number;
+  /** M9 (fase 3b): o valor só para ler (sem setas; o confirmar age): o nome do time, que abre o teclado. */
+  readonly valueOnly?: boolean;
   /** M8 (fase 2): com os tetos (os esquadrões), a linha do bot mostra o nome do esquadrão do time. */
   value(r: MatchRecipe, limits?: CustomLimits): string;
   step(r: MatchRecipe, delta: number, limits: CustomLimits): MatchRecipe;
@@ -962,6 +964,7 @@ function teamRows(r: MatchRecipe): readonly RowDef[] {
         labelParams,
         swatch: TEAM_COLORS[i]! >>> 8,
         valueWidth: CUSTOM_NAME_VALUE_WIDTH,
+        valueOnly: true,
         value: (rr) => teamName(rr, i),
         // O confirmar abre o teclado (o `game`); as setas não mudam o nome.
         step: (rr) => rr,
@@ -1257,6 +1260,7 @@ export function customRowViews(
   readonly labelParams?: TextParams;
   readonly swatch?: number;
   readonly valueWidth?: number;
+  readonly valueOnly?: boolean;
   readonly value: string;
 }[] {
   return customRows(tab, r).map((row) => ({
@@ -1265,6 +1269,7 @@ export function customRowViews(
     ...(row.labelParams !== undefined ? { labelParams: row.labelParams } : {}),
     ...(row.swatch !== undefined ? { swatch: row.swatch } : {}),
     ...(row.valueWidth !== undefined ? { valueWidth: row.valueWidth } : {}),
+    ...(row.valueOnly === true ? { valueOnly: true } : {}),
     value: row.value(r, limits),
   }));
 }
