@@ -16,6 +16,7 @@ import {
   type NetChannel,
   type NetHello,
 } from './protocol.ts';
+import type { LobbyStartOwner } from './lobby.ts';
 import { createNetLayout, type NetLayout } from './schema.ts';
 import { FrameRing, SnapshotEncoder } from './snapshot.ts';
 import type { NetEndpoint } from './transport.ts';
@@ -45,6 +46,21 @@ export interface NetHostConfig {
    * testes que medem a diferença.
    */
   readonly lagCompensation?: boolean;
+  /**
+   * M9 (fase 5): a opção do dono que o começo levou aos amigos (`LobbyStart.owner`; ausente = sem as ferramentas). A
+   * sim tem que ter sido criada com ela: com o dono, a reserva muda o conjunto de entidades e o layout da rede, e o
+   * amigo cria a dele pelo começo.
+   */
+  readonly owner?: LobbyStartOwner;
+}
+
+/**
+ * M9 (fase 5): a sim foi criada com a opção do dono que o começo leva (a mesma reserva), ou as duas estão sem ela? O
+ * host e o amigo conferem a mesma coisa: os dois lados criam a sim pelo mesmo começo.
+ */
+export function ownerMatches(sim: Sim, owner: LobbyStartOwner | undefined): boolean {
+  const o = sim.view().owner;
+  return o === null ? owner === undefined : owner !== undefined && o.reserve === owner.reserve;
 }
 
 /** M5 (fase 5a): sem entrada de verdade por tanto tempo, um bot assume a vaga do amigo até ele voltar (GDD §3.7). */
@@ -105,9 +121,9 @@ export interface NetHost {
 
 export function createNetHost(config: NetHostConfig): NetHost {
   const { sim, endpoint } = config;
-  // M9 (fase 4, revisão): a sim com as Ferramentas do Dono muda o conjunto de entidades e o layout (o estado dos
-  // modificadores sempre), e o protocolo ainda não leva a opção ao cliente: só offline até a fase 5.
-  assert(sim.view().owner === null, 'net: a partida com as Ferramentas do Dono ainda não vai para o online');
+  // M9 (fase 5): a sim com as Ferramentas do Dono muda o conjunto de entidades e o layout (o estado dos modificadores
+  // sempre): o começo leva a opção aos amigos, e a sim do host tem que ser a do começo.
+  assert(ownerMatches(sim, config.owner), 'net: a sim do host não tem a opção do dono que o começo levou');
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
   const compensate = config.lagCompensation ?? true;

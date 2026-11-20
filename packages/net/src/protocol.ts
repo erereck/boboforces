@@ -52,9 +52,9 @@ import {
 
 /**
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
- * versões diferentes (quem está na mais antiga atualiza).
+ * versões diferentes (quem está na mais antiga atualiza). M9 (fase 5): 12, o começo leva a opção do dono (`owner`).
  */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;

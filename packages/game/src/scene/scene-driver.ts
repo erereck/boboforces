@@ -1,5 +1,5 @@
 import type { BotDirectorWithStats } from '@boboforces/ai';
-import type { Sim } from '@boboforces/sim';
+import type { OwnerCommand, Sim } from '@boboforces/sim';
 import { createLocalDriver, createMatchSim, type LocalDriverConfig, type MatchDriver } from '../local-driver.ts';
 import {
   HOST_AWAY_END_S,
@@ -38,6 +38,14 @@ export interface SceneDriver extends MatchDriver {
    * num PvP, volta de mais de `HOST_AWAY_END_S` encerrando a partida. Fora do host online, nada.
    */
   setHidden(hidden: boolean, nowMs: number): void;
+  /**
+   * M9 (fase 5): um comando das Ferramentas do Dono (`LocalDriver.command`: vale no próximo tick e fica no log do
+   * replay). Devolve o número dele, ou -1: sem as ferramentas, com a fila cheia e sempre no cliente online (só o host
+   * usa; o amigo vê pelo snapshot).
+   */
+  command(cmd: OwnerCommand): number;
+  /** M9 (fase 5, revisão): o log do replay dos comandos do dono encheu (o `command` passa a recusar). */
+  readonly ownerLogFull: boolean;
 }
 
 export function createSceneDriver(config: LocalDriverConfig, online: OnlineSession | null = null): SceneDriver {
@@ -63,6 +71,10 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       hostAwayNotified: false,
       hostAbsentS: 0,
       setHidden: () => undefined,
+      command: (cmd) => d.command(cmd),
+      get ownerLogFull(): boolean {
+        return d.ownerLog.full;
+      },
       update: (s) => d.update(s),
       dispose: () => d.dispose(),
     };
@@ -96,6 +108,8 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       },
       setHidden: () => undefined,
       setHumanControlled: () => undefined,
+      command: () => -1,
+      ownerLogFull: false,
       update: (s) => (online.closed ? 0 : link.update(s)),
       // O link solta a sim junto (ela é dele).
       dispose: () => link.dispose(),
@@ -151,6 +165,10 @@ export function createSceneDriver(config: LocalDriverConfig, online: OnlineSessi
       return d.lastSimMs;
     },
     setHumanControlled: (c, on) => d.setHumanControlled(c, on),
+    command: (cmd) => d.command(cmd),
+    get ownerLogFull(): boolean {
+      return d.ownerLog.full;
+    },
     hostAbsentS: 0,
     hostAwayNotified: false,
     setHidden(hidden, nowMs): void {

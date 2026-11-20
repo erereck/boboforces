@@ -39,6 +39,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **As Ferramentas do Dono na sim (fase 4):** criar um bot num ponto, tirar um bot da partida, congelar a IA dele,
   trocar o time, dar uma arma e ligar ou desligar um modificador no meio da partida, como comandos que valem no começo
   do próximo passo (gravados, para o replay). Ainda sem tela: o menu do dono chega na fase 5.
+- **As Ferramentas do Dono no jogo (fase 5):** no Sandbox, o botão "Ferramentas do Dono" no canto da pausa abre a
+  página: Criar bot (com o time), Trocar de time, Dar arma, Congelar/soltar, Tirar da partida, os Modificadores
+  (liga e desliga no meio da partida) e a Câmera lenta (1×, 0,5× e 0,25×, só offline). A ferramenta escolhida fica
+  armada na mira: o tiro aplica (o clique esquerdo, o gatilho direito, o botão Tiro) e a mira cancela. O jogo separa
+  8 bots de reserva para o "Criar bot". No online, só o host usa, e o amigo vê tudo acontecer; o protocolo foi para 12.
 
 ### M8: compartilhar, o Diretor e o Arcade (fechado em 20/11/2026)
 

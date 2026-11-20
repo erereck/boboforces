@@ -51,6 +51,7 @@ import {
   createKeyboardMouseProfile,
   createTouchProfile,
   BUTTON,
+  FRAME_HUMAN,
   keyIndex,
   MAX_GAMEPADS,
   PAD_BUTTON,
@@ -333,6 +334,7 @@ import {
   aquariumPauseHelp,
   aquariumPauseItems,
   aquariumSpeedText,
+  aquariumBarTop,
   drawAquariumBar,
   livingBobo,
   nextAquariumCamera,
@@ -361,6 +363,8 @@ import { HOST_AWAY_END_S, waitsForHost, type OnlineNetStats } from '../online-ap
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
 import { buildMinimapPlan, drawMinimap, type MinimapPlan } from './minimap.ts';
+import { addReserveNames, createOwnerTools, OWNER_NO_TOOL, ownerHidden, type OwnerTools } from './owner-tools.ts';
+import { ownerReserveFor } from '../owner-reserve.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
@@ -1060,6 +1064,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (clean !== '' && c < humans) names[c] = clean;
     });
   }
+  /**
+   * M9 (fase 5): as Ferramentas do Dono (só no Sandbox): a reserva de bots dormentes. Offline, 8 no teto de bots do
+   * aparelho (AH7); online, a que o host mandou no começo (a sim do amigo tem que ser a do host). Os bots da reserva
+   * ganham nome (e, pelo nome, look) como os da receita, a mesma conta nos dois lados.
+   */
+  const ownerReserve =
+    request.kind !== 'play'
+      ? null
+      : request.online
+        ? (request.online.ownerReserve ?? null)
+        : ownerReserveFor(recipe, humans, profile.maxBots);
+  if (ownerReserve !== null) addReserveNames(names, recipe, humans, ownerReserve);
   /** M2 (fase 8a): o look de cada bot pelo nome (o mesmo bot veste o mesmo look em qualquer partida). */
   const botLook = botLookIndices(names, figures.botLooks);
   /** M2 (fase 4e): o que a regra da partida deixa a HUD mostrar (`MatchRecipe.hud`) e a assistência permitida. */
@@ -1153,7 +1169,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 3e): avisos do time (x, y, z) lidos do diretor. */
   const pingScratch = new Float64Array(MAX_TEAM_PINGS * 3);
   // M2 (fase 2e): pausa com páginas, nível dos bots adversários, Destravar e o resultado.
-  let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' | 'players' = 'main';
+  let pausePage: 'main' | 'challenge' | 'settings' | 'calibrated' | 'players' | 'owner' = 'main';
   // M2 (fase 5f): no Bobo Training, "Ajustar desafio" vira "Calibrar mira".
   const pauseState = {
     challenge: request.kind === 'play' && recipe.mode !== 'training' && request.online?.role !== 'client',
@@ -2236,6 +2252,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               `${ev.fromZ.toFixed(1)})${ev.respawned ? ' → spawn' : ''}`,
           );
           break;
+        case 'owner':
+          // M9 (fase 5): a resposta a um comando do dono (só no host): o aviso na tela.
+          ownerTools?.onEvent(ev, v);
+          break;
         default:
           break;
       }
@@ -2268,6 +2288,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           return;
         }
         player.writeFrame(out, seq);
+        // M9 (fase 5, revisão): no online a sim anda com a pausa aberta: o que se aperta no menu (o clique num item, o
+        // confirmar do controle) não chega ao bobo.
+        if (paused && pausedBy === 0 && driver.online) {
+          out.buttons &= FRAME_HUMAN;
+          out.moveX = 0;
+          out.moveY = 0;
+        }
         if (aqUseLock) {
           if (player.isDown('use')) out.buttons &= ~BUTTON.use;
           else aqUseLock = false;
@@ -2280,6 +2307,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         // M2 (fase 6e): no toque, "atirar sozinho" aperta o gatilho com a retícula num inimigo.
         if (device === 'touch' && host.settings.current.controls.touch.autoFire && enemyUnderCrosshair()) {
           out.buttons |= BUTTON.fire;
+        }
+        // M9 (fase 5): com uma ferramenta do dono armada, o tiro e a mira são dela (o bobo não atira nem mira). Revisão:
+        // a mira que cancelou fica fora até soltar (senão o aperto do cancelar vira um ADS).
+        if (ownerTools !== null) {
+          if (ownerTools.armed !== OWNER_NO_TOOL) out.buttons &= ~(BUTTON.fire | BUTTON.ads);
+          else if (ownerAdsLock) out.buttons &= ~BUTTON.ads;
         }
         // M2 (fase 2e): "Destravar" da pausa vira o botão por um tick (a sim age na borda).
         if (unstuckPending) {
@@ -2307,6 +2340,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       ...(bench ? { primaries: benchPrimaries(bench.weapons) } : {}),
       // M2 (fase 2d): a contagem de 3 s só nas partidas de verdade (o bench, a vitrine e os prints começam jogando).
       ...(request.kind === 'play' ? { countdownS: MATCH_DEFAULTS.countdownS } : {}),
+      // M9 (fase 5): as Ferramentas do Dono (o Sandbox): a reserva vai à sim, à IA e ao log do replay.
+      ...(ownerReserve !== null ? { owner: { reserve: ownerReserve } } : {}),
     },
     request.online ?? null,
   );
@@ -2385,6 +2420,86 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     ['pause', 'aquarium.hint.pause'],
   ] as const;
 
+  // --- M9 (fase 5): as Ferramentas do Dono (o Sandbox; só quem manda: offline, o P1 do sofá ou o host online) ---
+  const ownerTools: OwnerTools | null =
+    ownerReserve !== null && request.online?.role !== 'client'
+      ? createOwnerTools({
+          recipe,
+          command: (cmd) => driver.command(cmd),
+          view: () => sim.view(),
+          nameOf: (v, i) => nameOf(v, i),
+          primaries: PRIMARY_ORDER,
+          weaponNames,
+          // A câmera lenta só offline; no Aquário assistindo, a velocidade dele já faz isso (de 0,25× a 4×).
+          slowAllowed: !driver.online && !aquarium,
+          log: (line) => host.log(line),
+          logFull: () => driver.ownerLogFull,
+        })
+      : null;
+  /** O tiro que armou a ferramenta (o clique em "Criar bot") não vale: só o próximo, depois de soltar. */
+  let ownerFireLock = false;
+  /** M9 (fase 5, revisão): a mira (ADS) que cancelou fica fora do bobo até soltar. */
+  let ownerAdsLock = false;
+  /** A ferramenta (ou a trava do ADS do cancelar) segura o tiro e a mira do P1: sem ADS, sem zoom e sem assistência. */
+  function ownerHolds(): boolean {
+    return ownerTools !== null && (ownerTools.armed !== OWNER_NO_TOOL || ownerAdsLock);
+  }
+  /** Armou pela página: o tiro que armou não vale e o ADS alternado (os Ajustes) solta. */
+  function ownerArmed(): void {
+    ownerFireLock = true;
+    player.release('ads');
+  }
+  /** A dica dos botões da ferramenta armada (refeita quando o dispositivo ou os botões mudam). */
+  let ownerHint = '';
+  let ownerHintDevice: DeviceKind | null = null;
+  function ownerHintText(): string {
+    if (device !== ownerHintDevice) {
+      ownerHintDevice = device;
+      const fire = profiles[device].game.fire?.[0];
+      const ads = profiles[device].game.ads?.[0];
+      ownerHint =
+        fire !== undefined && ads !== undefined
+          ? t('owner.hint', { apply: bindingLabel(fire), cancel: bindingLabel(ads) })
+          : '';
+    }
+    return ownerHint;
+  }
+  /**
+   * Com uma ferramenta armada (jogando ou assistindo): a mira (ADS) cancela e o tiro aplica no que a câmera do P1 mira.
+   * Revisão: o cancelar solta o ADS alternado e trava o ADS até soltar; morto (a câmera é a da morte ou a de um aliado)
+   * não aplica; no Aquário seguindo um bobo (ou nos olhos dele), ele não conta; e na web, o clique sem o ponteiro preso
+   * só devolve o mouse ao jogo.
+   */
+  function ownerInput(): void {
+    const tools = ownerTools;
+    if (tools === null) return;
+    if (ownerAdsLock && !player.isDown('ads')) ownerAdsLock = false;
+    if (tools.armed === OWNER_NO_TOOL) return;
+    if (player.wasPressed('ads')) {
+      tools.cancel();
+      player.release('ads');
+      ownerAdsLock = true;
+      return;
+    }
+    if (ownerFireLock) {
+      if (!player.isDown('fire')) ownerFireLock = false;
+      return;
+    }
+    if (!player.wasPressed('fire')) return;
+    if (device === 'keyboardMouse' && platform.id === 'web' && !lastPointerLocked) return;
+    const v = sim.view();
+    let self = -1;
+    if (humans > 0) {
+      self = entityIndex(sim.controllerEntity(me));
+      if ((v.flags[self]! & ENTITY_FLAG.dead) !== 0) {
+        tools.fail('dead');
+        return;
+      }
+    } else if (aquarium && (aqCam === AQUARIUM_CAMERA.follow || aqCam === AQUARIUM_CAMERA.eyes)) self = aqFollowed();
+    const c = slots[0]!.desc.camera;
+    tools.apply(v, c.x, c.y, c.z, c.yaw, c.pitch, self, (ctrl) => seatOf(ctrl) >= 0);
+  }
+
   /** O bobo que a vista do Aquário segue (índice; -1 = nenhum). */
   function aqFollowed(): number {
     const c = slots[0]!.controller;
@@ -2428,6 +2543,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (aqCam === AQUARIUM_CAMERA.free) aqCam = AQUARIUM_CAMERA.follow;
     }
     if (player.wasPressed('scoreboard')) aqList = !aqList;
+    // M9 (fase 5): a ferramenta do dono também vale assistindo (o raio sai da câmera).
+    ownerInput();
     if (player.wasPressed('use')) takeBot();
     else if (player.wasPressed('pause')) pause();
     if (aqCam === AQUARIUM_CAMERA.free) {
@@ -2472,6 +2589,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const i = aqFollowed();
     if (i < 0 || !livingBobo(v, i)) return;
     const c = slots[0]!.controller;
+    // M9 (fase 5, revisão): o bot congelado pelo dono volta a se mexer (a sim ignoraria a entrada de quem assume, e o
+    // dono não mira em quem pilota). Vale no próximo passo, como todo comando.
+    if (v.owner?.frozen[i] === 1) driver.command({ kind: 'freeze', entity: sim.controllerEntity(c), on: false });
     pilot = c;
     me = c;
     humans = 1;
@@ -2932,6 +3052,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const be = entityIndex(sim.controllerEntity(s.controller));
       const dead = be < 0 || (v.flags[be]! & ENTITY_FLAG.dead) !== 0;
       if (dead && sandboxElimination) continue;
+      // M9 (fase 5): o bot que o dono tirou da partida (dormente) não recebe ninguém; revisão: nem o congelado (a sim
+      // ignora a entrada dele, e o dono não mira em quem é do sofá para soltar).
+      if (be >= 0 && (ownerHidden(v, be) || v.owner?.frozen[be] === 1)) continue;
       const n = (ffa ? 0 : (humansIn[s.team] ?? 0)) * 2 + (dead ? 1 : 0);
       if (n < best) {
         best = n;
@@ -3269,6 +3392,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     matchSound.silence();
     // M2 (fase 5f): refeita ao abrir (calibrando, o item é "Pular calibração").
     if (pausePage === 'main') pauseMain();
+    // M9 (fase 5): pausar com uma ferramenta do dono armada desarma e abre a página dela (para escolher outra).
+    if (ownerTools !== null && ownerTools.armed !== OWNER_NO_TOOL && pausedBy === 0) {
+      ownerTools.cancel();
+      player.release('ads');
+      ownerTools.openTools();
+      pauseMenu.focus(null);
+      ownerPage();
+    }
   }
 
   // --- M5 (fase 5a): o host online ausente (só no cliente) ---
@@ -3369,6 +3500,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       players: couch && host.localEdition === true,
       battery: batteryLine(),
       director: directorPauseLine(),
+      // M9 (fase 5): as Ferramentas do Dono (o Sandbox), no alto da pausa do P1.
+      owner: ownerTools !== null,
       // M7 (fase 9): os itens do Aquário (a velocidade, assumir e voltar a assistir).
       ...(aquarium
         ? {
@@ -3384,6 +3517,32 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     };
     const help = (aquarium ? aquariumPauseHelp(pauseMainFocus) : null) ?? pauseHelp(pauseMainFocus, st);
     pauseMenu.setRoot(pauseScreen.build({ ...st, help }));
+  }
+
+  /** M9 (fase 5): a página das Ferramentas do Dono (ou a dos modificadores), montada pelo `owner-tools`. */
+  let ownerFocus: string | null = null;
+  function ownerPage(): void {
+    pausePage = 'owner';
+    ownerFocus = pauseMenu.focusedId;
+    pauseMenu.setRoot(ownerTools!.build(ownerFocus));
+  }
+  /** Uma navegação da página do dono: armou (fecha a pausa), voltou à pausa ou mudou um valor (refaz a página). */
+  function ownerPageAction(nav: MenuNavigation): void {
+    const tools = ownerTools!;
+    const before = tools.page;
+    const r = tools.action(nav);
+    if (r === 'resume') {
+      resume();
+      ownerArmed();
+    } else if (r === 'back') {
+      // O foco volta para o item das ferramentas na pausa.
+      pauseMenu.focus('owner');
+      pauseMain();
+    } else if (r === 'rebuild') {
+      // Trocou de página: o foco vai para o inicial dela (o último item usado).
+      if (tools.page !== before) pauseMenu.focus(null);
+      ownerPage();
+    } else if (pauseMenu.focusedId !== ownerFocus) ownerPage();
   }
 
   function startCalibration(): void {
@@ -3465,6 +3624,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     profiles = buildProfiles();
     player.setProfile(profiles[device]);
     aqHintDevice = null;
+    ownerHintDevice = null;
     for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(seatProfile(seatNum[k + 1]!, extraDevices[k]!.kind));
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
@@ -3564,6 +3724,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === PAUSE_ACTION.players) {
         openPlayers();
         return 'none';
+      } else if (a === PAUSE_ACTION.owner && ownerTools !== null) {
+        ownerTools.openTools();
+        ownerPage();
+        return 'none';
       } else if (a === AQUARIUM_ACTION.speed) {
         // M7 (fase 9): a próxima velocidade (a pausa fica aberta, com o foco no item).
         aqSpeed = nextAquariumSpeed(aqSpeed, aqMaxSpeed);
@@ -3587,6 +3751,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (pausePage === 'players') {
       if (a === PLAYERS_ACTION.resume) resume();
       else if (nav.back) pauseMain();
+      return 'none';
+    }
+    if (pausePage === 'owner') {
+      ownerPageAction(nav);
       return 'none';
     }
     if (pausePage === 'calibrated') {
@@ -3984,11 +4152,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (timeS - spawnT[i]! < SPAWN_S) pose |= ACTOR_POSE.spawning;
       actors.pose[n] = pose;
       // M6 (fase 2): o 1º infectado muda de time vivo (sem o evento de spawn): a cara troca aqui. Fase 3: o Jugg também
-      // muda de time vivo (quem derruba o Jugg), e a roupa é a do time.
+      // muda de time vivo (quem derruba o Jugg), e a roupa é a do time. M9 (fase 5): o "trocar de time" do dono também.
       if (
         skinLayer[i] === 0xffff ||
         (infection && (v.team[i] === 1) !== (figureOf[i] === infectedFigure)) ||
-        (juggernaut && figureTeam[i] !== v.team[i])
+        ((juggernaut || v.owner !== null) && figureTeam[i] !== v.team[i])
       ) {
         resolveEntityFigure(v, i);
       }
@@ -4715,6 +4883,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (let i = 0; i < v.count && n < SCOREBOARD_MAX_ROWS; i++) {
       if (v.alive[i] !== 1 || v.kind[i] !== ENTITY_KIND.bobo) continue;
       if (hordeArmed && v.team[i] === 1) continue;
+      // M9 (fase 5): os bots fora de jogo pelo dono (a reserva, os tirados) não estão na partida.
+      if (ownerHidden(v, i)) continue;
       let k = n++;
       while (k > 0) {
         const p = scoreOrder[k - 1]!;
@@ -5384,7 +5554,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const shakePitch = Math.sin(timeS * 53 + 1) * SHAKE_AMPLITUDE * slot.shake;
     c.yaw = yaw + v.recoilYaw[e]! + shakeYaw;
     c.pitch = clamp(pitch + v.recoilPitch[e]! + shakePitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
-    const adsWanted = local !== null ? !dead && !paused && local.isDown('ads') : (flags & ENTITY_FLAG.ads) !== 0;
+    // M9 (fase 5, revisão): com a ferramenta do dono (ou a trava do cancelar), o P1 não mira (nem o zoom).
+    const adsWanted =
+      local !== null
+        ? !dead && !paused && local.isDown('ads') && !(local === player && ownerHolds())
+        : (flags & ENTITY_FLAG.ads) !== 0;
     const adsTarget = adsWanted && !dead ? 1 : 0;
     // M2: o ADS entra no tempo da arma na mão (`adsInS`) e o zoom é o dela (`adsZoom`; a sniper tem 4x).
     const held = weaponDef(v.weapon[e]!);
@@ -6694,10 +6868,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         } else if (!paused) {
           const yaw0 = player.yaw;
           const pitch0 = player.pitch;
-          // M7 (fase 9): a assistência mira do bobo do P1 (no Aquário, o bot assumido; no online, o da sala).
-          const scale = frozen ? 1 : aimAssistBefore(player, me);
+          // M7 (fase 9): a assistência mira do bobo do P1 (no Aquário, o bot assumido; no online, o da sala). M9 (fase
+          // 5, revisão): não com a ferramenta do dono (o ADS que cancela não puxa a mira para um inimigo).
+          const noAssist = frozen || ownerHolds();
+          const scale = noAssist ? 1 : aimAssistBefore(player, me);
           player.update(raw, frozen ? 0 : dt, scale);
-          if (!frozen) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
+          if (!noAssist) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
           if (!ghostDone && device === 'touch' && !frozen) {
             ghostT += dt;
             if (player.moveX !== 0 || player.moveY !== 0) ghostMoved += dt;
@@ -6712,6 +6888,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             !ghostDone && device === 'touch'
               ? Math.min(1, ghostT / GHOST.fadeS)
               : Math.max(0, ghostAlpha - dt / GHOST.fadeS);
+          // M9 (fase 5): com uma ferramenta do dono armada, o tiro aplica e a mira cancela.
+          if (!frozen) ownerInput();
           if (player.wasPressed('camera') && thirdAllowed) saveVideo({ view: thirdPerson ? 'first' : 'third' });
           if (player.wasPressed('shoulder') && thirdPerson)
             saveVideo({ shoulder: shoulderSide > 0 ? 'left' : 'right' });
@@ -6741,6 +6919,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (capture.active) finishCapture(capture.update(raw));
           else if (player.wasPressed('pause') || extraPause > 0) resume();
           else if (pausePage !== 'players' || !playersInput(raw)) {
+            // M9 (fase 5, revisão): no online a sim anda com a pausa aberta: a resposta do dono refaz a página (um
+            // modificador recusado apaga, a reserva muda).
+            if (ownerTools !== null && ownerTools.takeChanged() && pausePage === 'owner') ownerPage();
             signal = pauseAction(pauseMenu.update(menu, raw, ui), raw);
           }
         }
@@ -6754,12 +6935,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const running = (!paused || driver.online) && !frozen;
       trace('entrada');
       if (running) {
-        // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render).
-        lastTicks = driver.update(aquarium && pilot < 0 ? dt * aqSpeed : dt);
+        // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render). M9 (fase 5): a câmera lenta
+        // do dono (só offline) desacelera do mesmo jeito.
+        lastTicks = driver.update((aquarium && pilot < 0 ? dt * aqSpeed : dt) * (ownerTools?.slow ?? 1));
         trace('sim e IA');
         timeS += dt;
-        // M7 (fase 9, revisão): acelerado, o frame faz mais ticks: a sonda da qualidade não conta.
-        if (!(aquarium && pilot < 0 && aqSpeed > 1)) probeQuality(dt);
+        ownerTools?.update(dt);
+        // M7 (fase 9, revisão): acelerado, o frame faz mais ticks: a sonda da qualidade não conta. M9 (fase 5, revisão):
+        // na câmera lenta do dono, menos ticks por frame: também não.
+        if (!(aquarium && pilot < 0 && aqSpeed > 1) && (ownerTools?.slow ?? 1) >= 1) probeQuality(dt);
         decay(dt);
         if (!resultShown && endedAt < 0) updateTips(dt);
         if (overrideRoute) routeTime += dt;
@@ -6941,6 +7125,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (aquarium && pilot < 0 && !paused) {
             refreshAquariumTexts();
             drawAquariumBar(list, fonts?.hud ?? null, aqStatus, aqHint, ui.width, ui.height, hs, minText);
+          }
+          // M9 (fase 5): a ferramenta do dono armada e as respostas, na vista do P1 (na câmera livre e na de cima do
+          // Aquário, sem HUD, com uma cruz no meio).
+          if (ownerTools !== null && !paused) {
+            const r0 = lay.rects[0]!;
+            const noHud = aquarium && pilot < 0 && (aqCam === AQUARIUM_CAMERA.free || aqCam === AQUARIUM_CAMERA.top);
+            const font = fonts?.hud ?? null;
+            // Revisão: assistindo, acima da faixa do Aquário.
+            const limit = aquarium && pilot < 0 ? aquariumBarTop(aqHint, ui.height, hs, minText) : Infinity;
+            ownerTools.draw(list, font, r0.x, r0.y, r0.width, r0.height, minText, ownerHintText(), noHud, limit);
           }
           if ((humans > 0 || aquarium) && device === 'touch' && !paused) {
             const tf = touchFrame;

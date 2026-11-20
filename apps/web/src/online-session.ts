@@ -89,12 +89,19 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
     names,
     // M5 (fase 6b): o pool de zumbis do host (o amigo cria a sim com o mesmo número).
     ...(start.zombies !== undefined ? { zombiePool: start.zombies } : {}),
+    // M9 (fase 5): a reserva do dono (o Sandbox), a mesma nos dois lados.
+    ...(start.owner !== undefined ? { ownerReserve: start.owner.reserve } : {}),
     get closed(): boolean {
       return setup.isClosed();
     },
     attachHost(sim): OnlineHostLink {
       setup.onAttached?.(true);
-      const host = net.createNetHost({ sim, endpoint: counted.endpoint, snapshotHz: setup.snapshotHz });
+      const host = net.createNetHost({
+        sim,
+        endpoint: counted.endpoint,
+        snapshotHz: setup.snapshotHz,
+        ...(start.owner !== undefined ? { owner: start.owner } : {}),
+      });
       // O controlador de cada lugar e o peer de cada controlador (mudam quando alguém cai e volta, 5b).
       const controllerOfSlot = new Map<number, number>();
       const peerOfController = new Map<number, number>();
@@ -204,6 +211,7 @@ export function createOnlineSession(setup: OnlineMatchSetup): OnlineSession {
         ...(setup.welcome ? { welcome: setup.welcome } : {}),
         writeLocalFrame,
         onEvents,
+        ...(start.owner !== undefined ? { owner: start.owner } : {}),
       });
       const stats: OnlineNetStats = {
         get sentBytes() {

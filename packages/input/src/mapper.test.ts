@@ -178,6 +178,33 @@ describe('teclado e mouse', () => {
     expect(m.isDown('crouch')).toBe(false);
   });
 
+  it('M9 (fase 5, revisão): `release` desliga o ADS alternado (e o guardado); sem alternância, nada de borda falsa', () => {
+    const raw = createRawInputState();
+    const m = kbm({ ...createKeyboardMouseProfile(), toggleAds: true });
+    raw.mouseButtons = MOUSE_BUTTON.right;
+    m.update(raw, DT);
+    raw.mouseButtons = 0;
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(true);
+    m.release('ads');
+    expect(m.isDown('ads')).toBe(false);
+    expect(frameOf(m).buttons & BUTTON.ads).toBe(0);
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(false);
+    // O próximo aperto liga de novo (é uma borda de verdade).
+    raw.mouseButtons = MOUSE_BUTTON.right;
+    m.update(raw, DT);
+    expect([m.isDown('ads'), m.wasPressed('ads')]).toEqual([true, true]);
+    // Sem alternância: segurado continua segurado (quem chama segura até soltar), e o próximo quadro não inventa outro
+    // aperto.
+    const h = kbm();
+    h.update(raw, DT);
+    h.release('ads');
+    expect(frameOf(h).buttons & BUTTON.ads).toBe(BUTTON.ads);
+    h.update(raw, DT);
+    expect([h.isDown('ads'), h.wasPressed('ads')]).toEqual([true, false]);
+  });
+
   it('refino R1 (#79): a corrida alternada solta quando o jogador para de ir para a frente', () => {
     const raw = createRawInputState();
     const m = kbm({ ...createKeyboardMouseProfile(), toggleSprint: true });

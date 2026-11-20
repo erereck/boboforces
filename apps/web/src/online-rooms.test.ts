@@ -369,3 +369,54 @@ describe('o host no celular (M5 fase 6b)', () => {
     host.leave();
   });
 });
+
+describe('as Ferramentas do Dono no começo (M9 fase 5)', () => {
+  it('a reserva do dono vai no começo: host e amigo criam a sim com ela e o net confere que é a mesma', async () => {
+    const { service, pump } = fakeInternet();
+    const host = service.create({ name: 'Erick', team: 0, ready: true }, 30);
+    const bia = service.join(host.code, { name: 'Bia', team: 1, ready: true }, id(1));
+    await pump(30, [host, bia]);
+    const placed = onlineRecipe(
+      recipe,
+      host.view!.members.map((m) => m.team),
+    );
+    const started = host.start(placed.recipe, 5, placed.controllers, 0, 6);
+    await pump(10, [host, bia]);
+    expect(started.session.ownerReserve).toBe(6);
+    expect(bia.match!.session.ownerReserve).toBe(6);
+    const { map } = buildSyntheticConstruto();
+    const sim = (owner: boolean) =>
+      createMatchSim({
+        recipe: { ...placed.recipe, seed: 5 },
+        map,
+        humans: 2,
+        writeHumanFrame: () => undefined,
+        ...(owner ? { owner: { reserve: 6 } } : {}),
+      });
+    // A sim sem a opção que o começo levou é recusada nos dois lados; com ela, os dois ligam.
+    expect(() => started.session.attachHost(sim(false))).toThrow(/opção do dono/);
+    expect(() =>
+      bia.match!.session.attachClient(
+        sim(false),
+        () => {},
+        () => {},
+      ),
+    ).toThrow(/opção do dono/);
+    const hostLink = started.session.attachHost(sim(true));
+    const clientLink = bia.match!.session.attachClient(
+      sim(true),
+      () => {},
+      () => {},
+    );
+    clientLink.dispose();
+    hostLink.dispose();
+    // Sem o dono (o começo de sempre), nada na sessão.
+    host.reopen();
+    await pump(10, [host, bia]);
+    const plain = host.start(placed.recipe, 6, placed.controllers, 0);
+    await pump(10, [host, bia]);
+    expect(plain.session.ownerReserve).toBeUndefined();
+    expect(bia.match!.session.ownerReserve).toBeUndefined();
+    host.leave();
+  });
+});

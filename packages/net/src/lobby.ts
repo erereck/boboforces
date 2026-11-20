@@ -101,10 +101,23 @@ export interface LobbyStart {
    * mesmo número. Ausente = cada um com o seu.
    */
   readonly zombies?: number;
+  /**
+   * M9 (fase 5, protocolo 12): as Ferramentas do Dono (só no Sandbox): a reserva de bots dormentes da sim do host, já
+   * cortada nos tetos (`ownerReserveCount`). O amigo cria a sim com a mesma opção (o conjunto de entidades e o layout da
+   * rede mudam com ela). Ausente = sem as ferramentas.
+   */
+  readonly owner?: LobbyStartOwner;
+}
+
+/** M9 (fase 5): a opção do dono que o começo leva (`SimOwnerConfig`, pela forma: o lobby não importa a sim). */
+export interface LobbyStartOwner {
+  readonly reserve: number;
 }
 
 /** O maior pool de zumbis que o começo aceita (`MAX_ZOMBIES` da sim). */
 export const MAX_START_ZOMBIES = 64;
+/** M9 (fase 5): a maior reserva do dono que o começo aceita (`OWNER.maxReserve` da sim). */
+export const MAX_START_OWNER_RESERVE = 16;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -208,7 +221,20 @@ export function parseLobbyStart(v: unknown): LobbyStart | null {
     typeof zombies === 'number' && Number.isInteger(zombies) && zombies >= 0 && zombies <= MAX_START_ZOMBIES
       ? { zombies }
       : {};
-  return { recipe: o['recipe'], seed, members: out, ...pool };
+  return { recipe: o['recipe'], seed, members: out, ...pool, ...parseStartOwner(o['owner']) };
+}
+
+/**
+ * M9 (fase 5): a opção do dono que veio do host (não confiável): fora da faixa conta como ausente. O host da mesma
+ * versão (o handshake confere o protocolo) sempre manda a reserva já cortada, de 0 a 16.
+ */
+function parseStartOwner(v: unknown): { owner?: LobbyStartOwner } {
+  if (typeof v !== 'object' || v === null) return {};
+  const reserve = (v as Record<string, unknown>)['reserve'];
+  if (typeof reserve !== 'number' || !Number.isInteger(reserve) || reserve < 0 || reserve > MAX_START_OWNER_RESERVE) {
+    return {};
+  }
+  return { owner: { reserve } };
 }
 
 // ---------------------------------------------------------------------------------------------------------------

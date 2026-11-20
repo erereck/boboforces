@@ -3,8 +3,9 @@ import { assert, BitReader, BitWriter } from '@boboforces/shared';
 import type { Sim, SimEvent } from '@boboforces/sim';
 import { EventQueue } from './events.ts';
 import { applyFrame, createRemoteState, type NetFrame } from './frame.ts';
-import type { NetMatchDriver } from './host.ts';
+import { ownerMatches, type NetMatchDriver } from './host.ts';
 import { InputHistory } from './inputs.ts';
+import type { LobbyStartOwner } from './lobby.ts';
 import { interpolate, OwnView, patchOwn } from './view-sync.ts';
 import {
   checkHello,
@@ -46,6 +47,11 @@ export interface ClientDriverConfig {
    * objetos de pool, valem só durante a chamada).
    */
   readonly onEvents?: (events: readonly SimEvent[], sim: Sim) => void;
+  /**
+   * M9 (fase 5): a opção do dono que veio no começo (`LobbyStart.owner`; ausente = sem as ferramentas). A sim do
+   * cliente tem que ter sido criada com ela (a mesma reserva do host), senão o layout não bate com o do host.
+   */
+  readonly owner?: LobbyStartOwner;
 }
 
 /** `connecting` até o host responder; `rejected` com o veredito (quem atualiza) ou sala cheia. */
@@ -119,9 +125,9 @@ const REPLAY = 64;
  */
 export function createClientDriver(config: ClientDriverConfig): ClientDriver {
   const { sim, endpoint, host, writeLocalFrame } = config;
-  // M9 (fase 4, revisão): a sim do cliente precisa do layout do host, e o protocolo ainda não leva a opção do dono: uma
-  // sim com as Ferramentas do Dono não entra no online até a fase 5 (ver `createNetHost`).
-  assert(sim.view().owner === null, 'net: a partida com as Ferramentas do Dono ainda não vai para o online');
+  // M9 (fase 5): a sim do cliente precisa do layout do host: criada com a opção do dono que o começo trouxe (ver
+  // `createNetHost`).
+  assert(ownerMatches(sim, config.owner), 'net: a sim do amigo não tem a opção do dono que o começo trouxe');
   const hello = config.hello ?? localHello();
   const layout = createNetLayout(sim.view());
   /** M6 (fase 4): o global da máscara dos modificadores (-1 = partida sem eles). */

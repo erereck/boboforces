@@ -93,6 +93,11 @@ export interface InputMapper {
   setProfile(profile: ControlProfile): void;
   /** Troca o dispositivo do slot (reconexão do controle em outro índice). Zera toques, alternâncias e travas. */
   setDevice(device: DeviceBinding): void;
+  /**
+   * M9 (fase 5, revisão): solta a ação agora (com alternância, desliga o alternado; e o que estava guardado para o
+   * próximo quadro sai). As Ferramentas do Dono usam no ADS: armar e cancelar não deixam o bobo mirando.
+   */
+  release(action: GameAction): void;
 }
 
 // Fonte compilada: tipo de dispositivo.
@@ -315,6 +320,18 @@ class Mapper implements InputMapper {
 
   setPrimary(codePlusOne: number): void {
     this.primary = clamp(Math.floor(codePlusOne), 0, 255);
+  }
+
+  release(action: GameAction): void {
+    const a = GAME_ACTION_INDEX[action];
+    const bit = ACTION_BIT[a] ?? 0;
+    this.pressed[a] = 0;
+    this.latchBits &= ~bit;
+    // Sem alternância, o botão segurado continua segurado (soltar à força faria uma borda falsa no próximo quadro).
+    if (this.toggleMask[a] !== 1) return;
+    this.toggled[a] = 0;
+    this.down[a] = 0;
+    this.downBits &= ~bit;
   }
 
   isDown(action: GameAction): boolean {

@@ -166,13 +166,21 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
       setSummary: (text, teams, teamCount) => lobby.setSummary(text, teams, teamCount),
       setLocked: (on) => lobby.setLocked(on),
       kick: (slot) => lobby.kick(slot),
-      start(recipe: MatchRecipe, seed: number, controllers: readonly number[], zombies: number): OnlineMatchStart {
+      start(
+        recipe: MatchRecipe,
+        seed: number,
+        controllers: readonly number[],
+        zombies: number,
+        ownerReserve?: number,
+      ): OnlineMatchStart {
         // Os jogadores na ordem do estado que a tela mostrou (é nessa ordem que vieram os controladores).
         const start: LobbyStart = {
           recipe,
           seed,
           members: view.members.map((m, i) => ({ ...toLobby(m), slot: m.slot, controller: controllers[i] ?? i })),
           zombies,
+          // M9 (fase 5): a reserva do dono (o Sandbox): o amigo cria a sim com a mesma.
+          ...(ownerReserve !== undefined ? { owner: { reserve: ownerReserve } } : {}),
         };
         lobby.start(start);
         status = 'playing';

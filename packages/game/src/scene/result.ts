@@ -1,4 +1,4 @@
-import { ENTITY_KIND, entityIndex, NULL_ENTITY, type SimEvent, type SimView } from '@boboforces/sim';
+import { ENTITY_KIND, entityIndex, isOwnerDormant, NULL_ENTITY, type SimEvent, type SimView } from '@boboforces/sim';
 import type { MatchRecord } from '../scene-api.ts';
 
 /**
@@ -201,8 +201,9 @@ export interface MatchSummary {
   readonly uglyLoss: boolean;
 }
 
+/** M9 (fase 5): os bots fora de jogo pelo dono (a reserva do Sandbox, os tirados) não concorrem a nada. */
 function isBobo(view: SimView, i: number): boolean {
-  return view.alive[i] === 1 && view.kind[i] === ENTITY_KIND.bobo;
+  return view.alive[i] === 1 && view.kind[i] === ENTITY_KIND.bobo && !isOwnerDormant(view, i);
 }
 
 /** O bobo com a maior `score` (empate: a menor `tie`, depois o menor índice); -1 se nenhum passa no `ok`. */

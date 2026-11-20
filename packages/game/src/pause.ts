@@ -17,6 +17,8 @@ export const PAUSE_ACTION = {
   calibrate: 'calibrate',
   /** M4 (fase 3): a página Jogadores (refazer os assentos do sofá). */
   players: 'players',
+  /** M9 (fase 5): a página das Ferramentas do Dono (só no Sandbox, só o P1; `scene/owner-tools.ts`). */
+  owner: 'owner',
 } as const;
 
 /** M4 (fase 3): a página Jogadores: Continuar volta à partida (o B do P1 volta à pausa). */
@@ -52,6 +54,8 @@ export interface PauseState {
   readonly director?: string;
   /** M7 (fase 9): os itens do P1 já montados (os do Aquário); ausente = os de sempre. */
   readonly items?: readonly UiNode[];
+  /** M9 (fase 5): o P1 tem o botão das Ferramentas do Dono (o Sandbox), no canto de cima. */
+  readonly owner?: boolean;
 }
 
 /** Refino R4 (#79): a frase de cada item da pausa (o que ele faz), pelo id do botão. */
@@ -63,6 +67,7 @@ const PAUSE_HELP: Readonly<Record<string, StringKey>> = {
   quit: 'pause.help.quit',
   leave: 'pause.help.leave',
   players: 'pause.help.players',
+  owner: 'pause.help.owner',
 };
 
 /** A frase do item com o foco (`''` sem frase). Calibrar e Pular calibração dependem do estado. */
@@ -87,6 +92,11 @@ export const pauseScreen: Screen<PauseState | null> = {
       id: 'root',
       color: COLORS.veu,
       children: [
+        // M9 (fase 5): as Ferramentas do Dono (o Sandbox, só o P1) num botão compacto no canto de cima, fora da coluna:
+        // no celular os alvos de toque crescem, e um 7º item na coluna passava da tela. No D-pad, para cima do Continuar.
+        ...((state?.owner ?? false) && (state?.player ?? 0) === 0
+          ? [button('owner', 'pause.owner', PAUSE_ACTION.owner, { compact: true, anchor: 'topRight' })]
+          : []),
         {
           kind: 'column',
           id: 'main',

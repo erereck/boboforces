@@ -145,6 +145,18 @@ export function stepFlyCamera(
 }
 
 /**
+ * M9 (fase 5, revisão): onde a faixa do Aquário começa (px da superfície), a mesma conta do `drawAquariumBar`: o que
+ * fica em cima dela (a faixa da ferramenta do dono) termina antes.
+ */
+export function aquariumBarTop(hint: string, height: number, scale: number, minTextPx: number): number {
+  const px = Math.max(Math.round(15 * scale), minTextPx);
+  const hintPx = Math.max(Math.round(11 * scale), minTextPx);
+  const h1 = Math.round(px * 1.7);
+  const h2 = hint === '' ? 0 : Math.round(hintPx * 1.7);
+  return height - Math.round(Math.max(18 * scale, 8)) - h2 - h1;
+}
+
+/**
  * A faixa do Aquário embaixo, no meio: a linha do estado ("AQUÁRIO · 2× · SEGUINDO JORGE") e a dos botões, menor. Não
  * aloca (os textos vêm prontos e só mudam quando o estado muda).
  */
@@ -164,11 +176,10 @@ export function drawAquariumBar(
   const pad = Math.round(px * 0.5);
   const w1 = measureText(font, status, px, 0.06) + pad * 2;
   const w2 = hint === '' ? 0 : measureText(font, hint, hintPx, 0.02) + pad * 2;
-  const h1 = Math.round(px * 1.7);
   const h2 = hint === '' ? 0 : Math.round(hintPx * 1.7);
-  const bottom = height - Math.round(Math.max(18 * scale, 8));
-  const y2 = bottom - h2;
-  const y1 = y2 - h1;
+  const y1 = aquariumBarTop(hint, height, scale, minTextPx);
+  const h1 = Math.round(px * 1.7);
+  const y2 = y1 + h1;
   const x1 = Math.round((width - w1) / 2);
   pushRect(out, x1, y1, w1, h1, withAlpha(COLORS.bunker, 0.85));
   pushRect(out, x1, y1, w1, Math.max(2, Math.round(2 * scale)), COLORS.acao);

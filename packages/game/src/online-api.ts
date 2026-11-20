@@ -103,6 +103,12 @@ export interface OnlineSession {
    * Ausente = o teto do aparelho.
    */
   readonly zombiePool?: number;
+  /**
+   * M9 (fase 5): as Ferramentas do Dono (só no Sandbox): a reserva de bots dormentes da sim do host, já cortada nos
+   * tetos. A cena do amigo cria a sim com a mesma opção (as entidades e o layout da rede são os do host); só o host usa
+   * as ferramentas. Ausente = sem elas.
+   */
+  readonly ownerReserve?: number;
   /** A sala acabou (o host saiu, fui expulso, a conexão caiu): a cena volta ao menu. */
   readonly closed: boolean;
   attachHost(sim: Sim): OnlineHostLink;
@@ -212,9 +218,16 @@ export interface OnlineRoom {
   kick(slot: number): void;
   /**
    * Host: começa com a receita já com os amigos nos times (`controllers` na ordem de `view.members`). `zombies` (M5
-   * fase 6b): o pool de zumbis da sim do host, que vai aos amigos.
+   * fase 6b): o pool de zumbis da sim do host, que vai aos amigos. `ownerReserve` (M9 fase 5): a reserva do dono no
+   * Sandbox (`ownerReserveFor`), que também vai aos amigos; ausente = sem as Ferramentas do Dono.
    */
-  start(recipe: MatchRecipe, seed: number, controllers: readonly number[], zombies: number): OnlineMatchStart;
+  start(
+    recipe: MatchRecipe,
+    seed: number,
+    controllers: readonly number[],
+    zombies: number,
+    ownerReserve?: number,
+  ): OnlineMatchStart;
   /** Host: a partida acabou e a sala volta ao lobby. */
   reopen(): void;
   /** Copia o link da sala (`#sala=XXXXX`); `false` se a área de transferência recusou. */

@@ -88,6 +88,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    - **feita em 20/11** (ARCHITECTURE §20.4): snapshot 20 só com as ferramentas; offline só até a fase 5.
 5. **As Ferramentas do Dono no jogo:** o menu do dono (uma página da pausa e uma roda para mirar e aplicar), a câmera
    lenta (só offline), o online (só o host manda; os amigos veem pelo snapshot), o sofá (só o jogador 1) e o Switch.
+   - **feita em 20/11** (ARCHITECTURE §20.8): o botão no canto da pausa, a ferramenta armada na mira, o protocolo 12.
 6. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 Rodadas de prints: depois da fase 1 (os modificadores), da fase 3 (o Sandbox) e da fase 5 (as ferramentas).

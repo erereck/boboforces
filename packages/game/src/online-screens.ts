@@ -49,6 +49,7 @@ import {
   type OnlineRooms,
   type OnlineSession,
 } from './online-api.ts';
+import { ownerReserveFor } from './owner-reserve.ts';
 import {
   capRoomRecipe,
   hostSnapshotHz,
@@ -480,7 +481,9 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       view.members.map((m) => m.team),
     );
     const seed = deps.seed() >>> 0;
-    const match = r.start(placed.recipe, seed, placed.controllers, lim.maxZombies);
+    // M9 (fase 5): no Sandbox, a reserva do dono (no teto de bots da sala) vai aos amigos junto com o começo.
+    const owner = ownerReserveFor(placed.recipe, view.members.length, lim.maxBots) ?? undefined;
+    const match = r.start(placed.recipe, seed, placed.controllers, lim.maxZombies, owner);
     deps.log(
       `[online] partida ${placed.recipe.mode} com ${view.members.length} jogador(es), semente ${seed}, até ${lim.maxBots} bots e ${lim.maxZombies} zumbis`,
     );

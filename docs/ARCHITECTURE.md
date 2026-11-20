@@ -4838,3 +4838,42 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   do tamanho velho; e o clarão do foguete fora do lugar. Corrigido antes de publicar (três testes repetem os cenários:
   a porta, o levantar e a compensação); nenhum golden mudou.
 
+### 20.8 Fase 5: as Ferramentas do Dono no jogo (20/11/2026)
+
+- **Quando ligam** (`game/src/owner-reserve.ts`): só no Sandbox (`ownerAllowed` e o modo), offline, no sofá (só o
+  P1) e no online (só o host). A reserva é 8 (AH7), cortada no teto de bots do aparelho (ou da sala) menos os bots da
+  receita; o host calcula e manda no começo da partida (`PROTOCOL_VERSION` 12, com o `net.json`), e os dois lados
+  recusam começar se a reserva da sim não bater com a mandada. Os bots da reserva têm o mesmo nome e o mesmo visual
+  no host e no amigo. O amigo monta a mesma sim, sem a página (`command()` devolve -1).
+- **A página** (`game/src/scene/owner-tools.ts`, no pedaço da cena, pela `PauseState.items` como o Aquário): o botão
+  compacto "Ferramentas do Dono" no canto de cima à direita da pausa do P1 (e do Aquário); no D-pad, para cima a
+  partir do Continuar (um 7º item na coluna estourava o celular, medido). Sem rolagem (o toque não rola lista): Criar
+  bot, Trocar de time e Dar arma são linhas com o valor nas setas (o time, a primária); Congelar/soltar e Tirar da
+  partida lado a lado; Modificadores (os 15 que ligam ao vivo, todos menos o Arcade, em 3 colunas: aceso = ligado; a
+  página se refaz quando a sim responde, então a recusa e o par que desliga aparecem); Câmera lenta (cada aperto
+  passa por 1×, 0,5× e 0,25×; só offline e fora do Aquário, que já tem a velocidade dele).
+- **A ferramenta armada:** escolher fecha a pausa com a ferramenta armada; uma faixa embaixo do centro mostra
+  ("CRIAR BOT · LARANJA") e a dica do aparelho. Enquanto armada, o tiro e a mira saem do bobo: aplicar = clique
+  esquerdo, gatilho direito ou o botão Tiro do toque; cancelar = clique direito, gatilho esquerdo ou o botão Mira (e
+  a pausa cancela e reabre direto na página). Ela fica armada entre usos. O alvo é o bot na mira (`crosshairTarget`)
+  ou o chão (o raio da câmera); nunca um jogador do sofá, o bot que você pilota no Aquário ou o que a câmera segue.
+  Com o P1 morto, nada se aplica ("Só com o seu bobo em jogo"). A resposta da sim vira um aviso curto ("Bot criado:
+  Normal Bob", "Jorge congelado", ou a recusa: "Mire no chão", "Acabaram os bots da reserva").
+- **A entrada:** o mapeador ganhou `release(action)`: armar, cancelar e pausar com a ferramenta soltam a mira
+  alternada; depois de cancelar, a mira fica travada até soltar o botão, e a mira assistida não puxa; na web, o clique
+  sem o mouse preso não aplica (é o clique de pegar o mouse de volta). No online, com a pausa do P1 aberta, o quadro
+  dele vai sem botões e sem movimento (antes, os cliques da pausa atiravam no host, e o confirmar pulava).
+- **Os dormentes** somem do placar, da lista do Aquário, do resultado e dos prêmios, e do "entrar no meio" do sofá (que
+  também pula os congelados; assumir um bot congelado no Aquário o solta). O feed, o minimapa, os marcadores e os
+  nomes já pulavam os mortos.
+- **A câmera lenta** multiplica o dt antes do teto do passo fixo (o mesmo caminho da velocidade do Aquário), volta a
+  1× em cada partida e fica fora da sonda de qualidade. O `LocalDriver` grava os comandos (até 4.096; cheio, o aviso
+  diz "Esta partida chegou ao limite de comandos do dono").
+- **A revisão (Opus) achou:** o bot congelado assumido por alguém ficava preso; com "Mirar: alternar", o cancelar
+  falhava e o bobo ficava mirando; o aperto de cancelar vazava como mira; no online, os cliques da pausa do host
+  chegavam à sim; a faixa da ferramenta cobria a do Aquário; o log cheio dava um aviso errado; a ferramenta valia pela
+  câmera da morte; o clique de pegar o mouse aplicava; uma string por quadro; e a sonda de qualidade na câmera lenta.
+  Corrigido antes do commit.
+- **Fica para depois:** as ferramentas no amigo online (pedir ao host), o "criar bot" escolhendo o bot da Oficina (a
+  reserva é de Normal Bob) e a câmera lenta no online (a sim do host não para).
+
