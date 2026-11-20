@@ -1,6 +1,6 @@
 import { botPrimaries, createBotDirectorWithPaths } from '@boboforces/ai';
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
+import { BUTTON, FRAME_HUMAN, quantizeAxis, type InputFrame } from '@boboforces/input';
 import { yawToU16 } from '@boboforces/shared';
 import { createInputFrames, createSim, createSimLoop, ENTITY_FLAG, type Sim, type SimEvent } from '@boboforces/sim';
 import { buildSyntheticConstruto, TEST_NAV_PATHS } from '@boboforces/sim/testing';
@@ -26,17 +26,25 @@ const recipe: MatchRecipe = {
   ],
 };
 
-/** Humano `slot` andando e atirando, igual em qualquer aparelho (depende só do seq). */
-function play(slot: number, out: InputFrame, seq: number): void {
+/** M8 (fecho): a mesma partida com o modificador Arcade (a predição com o pulo duplo, o bunny hop e o wall jump). */
+const arcadeRecipe: MatchRecipe = { ...recipe, modifiers: ['arcade'] };
+
+/**
+ * Humano `slot` andando e atirando, igual em qualquer aparelho (depende só do seq). No Arcade, com a marca de quadro
+ * de jogador (o mapeador liga) e um 2º toque no pulo no ar (o pulo duplo).
+ */
+function play(slot: number, out: InputFrame, seq: number, arcade = false): void {
   out.yaw = yawToU16(slot * 1.7 + seq * 0.015);
   out.pitch = 0;
   out.moveY = quantizeAxis(seq % 200 < 150 ? 1 : -1);
   out.moveX = quantizeAxis(slot % 2 === 0 ? 0.3 : -0.3);
-  out.buttons = (seq % 30 < 14 ? BUTTON.fire : 0) | (seq % 90 === 0 ? BUTTON.jump : 0);
+  const jump = seq % 90 === 0 || (arcade && seq % 90 === 20);
+  out.buttons = (seq % 30 < 14 ? BUTTON.fire : 0) | (jump ? BUTTON.jump : 0) | (arcade ? FRAME_HUMAN : 0);
 }
 
 /** O que o `LocalDriver` do `game` faz (a sim, a IA e o passo fixo), com os slots remotos vindo da rede. */
 function hostInner(
+  recipe: MatchRecipe,
   writeHuman: (slot: number, out: InputFrame, seq: number) => void,
   onEvents: (events: readonly SimEvent[], sim: Sim) => void,
 ): NetMatchDriver & { sim: Sim } {
@@ -71,14 +79,17 @@ function hostInner(
  * snapshots e a interpolação de 100 ms fica com menos folga: o p99 sobe de ~2 para ~5 cm (invisível num bobo).
  */
 const RATES = [
-  { hz: 30, p99: 0.05 },
-  { hz: 20, p99: 0.08 },
+  { hz: 30, p99: 0.05, arcade: false },
+  { hz: 20, p99: 0.08, arcade: false },
+  // M8 (fecho): o Arcade a 30 Hz (o estado dele no privado do snapshot e na predição).
+  { hz: 30, p99: 0.05, arcade: true },
 ] as const;
 
 describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
   it.each(RATES)(
-    'host + 3 clientes com 80 ms, variação e 5% de perda, snapshots a $hz Hz: termina igual em todos',
-    ({ hz, p99: p99Max }) => {
+    'host + 3 clientes com 80 ms, variação e 5% de perda, snapshots a $hz Hz (Arcade: $arcade): termina igual em todos',
+    ({ hz, p99: p99Max, arcade }) => {
+      const r = arcade ? arcadeRecipe : recipe;
       const net = createLoopback({ seed: 9, latencyMs: 80, jitterMs: 25, loss: 0.05, duplicate: 0.01 });
       // O host é o peer 0 e joga no slot 0; os clientes 1..3 nos slots 1..3.
       let netHost: ReturnType<typeof createNetHost> | null = null;
@@ -89,8 +100,9 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
       // Os abates de cada um, na ordem (host e clientes), e o tick mostrado quando cada evento saiu.
       const hostKills: number[] = [];
       const inner = hostInner(
+        r,
         (slot, out, seq) => {
-          if (slot === 0) play(0, out, seq);
+          if (slot === 0) play(0, out, seq, arcade);
           else netHost!.writeRemoteFrame(slot, out);
         },
         (events, s) => {
@@ -118,10 +130,10 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
         clientKills.push(kills);
         clients.push(
           createClientDriver({
-            sim: createSim({ recipe, map, humans: HUMANS, primaries: botPrimaries(recipe, HUMANS) }),
+            sim: createSim({ recipe: r, map, humans: HUMANS, primaries: botPrimaries(r, HUMANS) }),
             endpoint: net.endpoint(slot),
             host: 0,
-            writeLocalFrame: (out, seq) => play(slot, out, seq),
+            writeLocalFrame: (out, seq) => play(slot, out, seq, arcade),
             onEvents: (events) => {
               const shown = Math.floor(clients[slot - 1]!.renderTick);
               for (const ev of events) {

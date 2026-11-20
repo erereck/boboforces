@@ -947,3 +947,52 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
     expect(a.hash, msg).toBe(GOLDEN_ROYALE_HASH);
   }, 240_000);
 });
+
+/**
+ * M8 (fase 8): o TDM 4 contra 4 de bots Normal no Construto com o modificador Arcade, semente 42, 2 min. Os bots não
+ * fazem bunny hop nem wall jump (a marca de quadro de jogador), mas andam e pulam no perfil Arcade (o pulo duplo, o
+ * deslize, o tiro correndo). Confere que houve luta e o hash entre execuções. Gravado no fechamento do M8 (20/11/2026):
+ * `3e7df5b3` (15 × 18).
+ * MUDA com a sim, a IA, o mapa ou o perfil Arcade.
+ */
+const GOLDEN_ARCADE_HASH = '3e7df5b3';
+
+function runArcadeGolden(): { hash: string; score: [number, number] } {
+  const { map } = loadWorld();
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'construto',
+      seed: 42,
+      match: { timeLimitS: 120, scoreLimit: 0 },
+      modifiers: ['arcade'],
+      teams: [
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 4 }] },
+      ],
+    },
+    map,
+    humans: 0,
+  });
+  for (let t = 0; t < 120 * 60 + 5 && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    score: [v.match.teamScore[0]!, v.match.teamScore[1]!] as [number, number],
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Arcade (M8, fechamento) com bots no Construto', () => {
+  it('os bots brigam no perfil Arcade; hash estável', () => {
+    const a = runArcadeGolden();
+    const b = runArcadeGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg = `placar ${a.score.join('×')}`;
+    console.log(`[arcade] ${msg} · hash ${a.hash}`);
+    expect(a.score[0] + a.score[1], msg).toBeGreaterThan(4);
+    expect(a.hash, msg).toBe(GOLDEN_ARCADE_HASH);
+  }, 240_000);
+});

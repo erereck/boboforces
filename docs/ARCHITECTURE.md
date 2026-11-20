@@ -4576,7 +4576,9 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
   novos `squad@1`; os campos opcionais `director` (receita) e `loyalty` (bot) sem mudar versão.
 - **Os goldens:** os 15 de antes do M8 não mudaram (TDM `b36eb8e1`, Zombies `edc93590`, Posto `6c4eaf90`, os 8 do
   M6 e os 4 do M7): o Diretor só mede com humanos, as ordens só sorteiam no fluxo delas e o estado do Arcade só entra
-  no hash com ele.
+  no hash com ele. O golden novo do M8: o TDM com o Arcade no Construto (`3e7df5b3`, 15 × 18). A partida pela rede de
+  mentira (`net/src/match.test.ts`) roda também com o Arcade (os humanos pulando duplo): termina igual no host e nos
+  3 amigos, com a predição abaixo de 1% de erro.
 - **O custo:** `PERF.md` §1o (sim + IA por tick com o Arcade e com o Diretor: iguais à referência, no ruído). O menu
   da web ficou em 349,6 KB de 350: o que o M8 pôs nele (os textos curtos, o validador do `director`, a lealdade, as
   ordens no `input`) está no limite, e a próxima coisa do menu precisa tirar algo antes (pendência para o M9).
