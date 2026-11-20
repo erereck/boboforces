@@ -236,7 +236,7 @@ describe('mapc: validações com o mundo', () => {
     );
     expect(tight.errors.some((e) => e.includes('MEDIDA'))).toBe(true);
     // Duas compilações com as sondas do braço e do deslize (#56): passa de 5 s com a máquina carregada.
-  }, 30000);
+  }, 120_000); // M10: com vários agentes rodando testes juntos, os do Construto passaram de 30 s.
 
   it('acusa porta desalinhada, fresta de 0,5 m e spawn inimigo visível', () => {
     const r = compileMap(
@@ -322,7 +322,7 @@ describe('mapc: validações com o mundo', () => {
     expect(empty.doc.light.emitters).toHaveLength(0);
     expect(r.doc.light.emitters).toHaveLength(1);
     expect(r.doc.light.emitters[0]!.level).toBe(6);
-  }, 30_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M5, fase 5c).
+  }, 120_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M5, fase 5c).
 
   it('em pé pede ceil(aabbHeight / 0,5) células livres: 4 com o bobo de 1,75 m (decisões #53 e #55)', () => {
     expect(STAND_CELLS).toBe(Math.ceil(METRICS.aabbHeight / BLOCK_SIZE));
@@ -389,7 +389,7 @@ describe('mapc: validações com o mundo', () => {
     expect(wall(3, 'fence-wire').checks.seenWithoutSeeing).toBe(0); // tela: deixa ver
     expect(wall(4).warnings.some((w) => w.startsWith('visto sem ver'))).toBe(false);
     // Sete compilações da arena: ~3,5 s sozinho, 5,9 s com o check inteiro rodando (08/11/2026).
-  }, 30000);
+  }, 120_000);
 
   it('avisos de cobertura rente à hitbox: baixa em [0,95; 0,98) e alta em [1,75; 1,81) (PLANO do porte §B5)', () => {
     expect(LOW_COVER_BAND).toEqual([METRICS.aabbCrouchHeight, FIGURE_CROUCH_TOP_M + 0.01]);
@@ -422,7 +422,7 @@ describe('mapc: validações com o mundo', () => {
       );
       expect([r.checks.lowCover, r.checks.highCover]).toEqual([0, 0]);
     }
-  }, 30_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M3, fase 6e).
+  }, 120_000); // Monta um mundo: com o portão inteiro em paralelo passou de 5 s (M3, fase 6e).
 
   it('braço armado e corpo no deslize através de barreira: medida com sonda fixa (J-M4, risco 14 do PLANO)', () => {
     // Sondas sintéticas (a conta não depende da tabela da frente "figura"): a mão com o mesmo alcance em todas as
@@ -632,7 +632,7 @@ describe('mapc: Construto', () => {
     expect(back.grid.sizeX).toBe(160);
     const png = decodePng(renderTopView(a));
     expect([png.width, png.height]).toEqual([640, 640]);
-  }, 90_000); // Compila o Construto inteiro: com o portão em paralelo passou dos 30 s (M5, fase 5c).
+  }, 180_000); // Compila o Construto inteiro: com o portão em paralelo passou dos 30 s (M5, fase 5c).
 
   it('olho do METRICS nas câmeras e rotas; régua de métricas fora da área e fora dos outros prints (#53)', () => {
     const r = compileMap(construto, { ...OPTIONS, requirePrintMarkers: true, maxSightLimitM: 50 });
@@ -749,7 +749,7 @@ describe('mapc: Construto', () => {
     expect(visibleFrom('print:doses')).toBe(0);
     // A própria câmera da régua vê a régua (sanidade da conta acima).
     expect(visibleFrom('print:altura')).toBeGreaterThan(0);
-  }, 30000);
+  }, 120_000);
 
   it('régua a 45° (decisão 6 da §I do PLANO do porte): a de perfil girada 45°, com os 3 no quadro e as cabeças à vista', () => {
     const r = compileMap(construto, { ...OPTIONS, requirePrintMarkers: true, maxSightLimitM: 50 });
@@ -785,7 +785,7 @@ describe('mapc: Construto', () => {
       ];
       expect(lineOfSight(r.sight, cam.x, cam.y, cam.z, hx, hy, hz)).toBe(true);
     });
-  }, 30000);
+  }, 120_000);
 
   it('fila e close do boneco: marcadores opcionais nos lugares do PLANO do porte (§B16), dentro dos quadros', () => {
     const r = compileMap(construto, { ...OPTIONS, requirePrintMarkers: true, maxSightLimitM: 50 });

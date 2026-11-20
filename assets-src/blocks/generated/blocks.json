@@ -530,6 +530,442 @@
       "frames": 1,
       "variants": 3,
       "stepSound": "dirt"
+    },
+    {
+      "key": "container-red",
+      "shape": "cube",
+      "faces": ["container_red", "container_red", "container_red", "container_red", "container_red", "container_red"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-blue",
+      "shape": "cube",
+      "faces": [
+        "container_blue",
+        "container_blue",
+        "container_blue",
+        "container_blue",
+        "container_blue",
+        "container_blue"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-green",
+      "shape": "cube",
+      "faces": [
+        "container_green",
+        "container_green",
+        "container_green",
+        "container_green",
+        "container_green",
+        "container_green"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-tan",
+      "shape": "cube",
+      "faces": ["container_tan", "container_tan", "container_tan", "container_tan", "container_tan", "container_tan"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-red-door",
+      "shape": "cube",
+      "faces": [
+        "container_red",
+        "container_red",
+        "container_red",
+        "container_red",
+        "container_red_door",
+        "container_red_door"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-blue-door",
+      "shape": "cube",
+      "faces": [
+        "container_blue",
+        "container_blue",
+        "container_blue",
+        "container_blue",
+        "container_blue_door",
+        "container_blue_door"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-green-door",
+      "shape": "cube",
+      "faces": [
+        "container_green",
+        "container_green",
+        "container_green",
+        "container_green",
+        "container_green_door",
+        "container_green_door"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "container-tan-door",
+      "shape": "cube",
+      "faces": [
+        "container_tan",
+        "container_tan",
+        "container_tan",
+        "container_tan",
+        "container_tan_door",
+        "container_tan_door"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "asphalt",
+      "shape": "cube",
+      "faces": ["asphalt", "asphalt", "asphalt", "asphalt", "asphalt", "asphalt"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation", "randomUv"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 3,
+      "stepSound": "concrete"
+    },
+    {
+      "key": "asphalt-line",
+      "shape": "cube",
+      "faces": ["asphalt", "asphalt", "asphalt_line", "asphalt", "asphalt", "asphalt"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "concrete"
+    },
+    {
+      "key": "crane-lattice",
+      "shape": "cube",
+      "faces": ["crane_lattice", "crane_lattice", "crane_lattice", "crane_lattice", "crane_lattice", "crane_lattice"],
+      "flags": ["solid", "cutout", "walkable"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "crane-cable",
+      "shape": "panel",
+      "faces": ["crane_cable", "crane_cable", "crane_cable", "crane_cable", "crane_cable", "crane_cable"],
+      "flags": ["cutout"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "hazard-block",
+      "shape": "cube",
+      "faces": ["railing", "railing", "railing", "railing", "railing", "railing"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "concrete"
+    },
+    {
+      "key": "scaffold-rail",
+      "shape": "postRail",
+      "faces": ["scaffold_pipe", "scaffold_pipe", "scaffold_pipe", "scaffold_pipe", "scaffold_pipe", "scaffold_pipe"],
+      "flags": ["solid"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "steel-beam",
+      "shape": "cube",
+      "faces": ["steel_beam", "steel_beam", "steel_plate", "steel_plate", "steel_beam", "steel_beam"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "steel-column",
+      "shape": "cube",
+      "faces": ["steel_column", "steel_column", "steel_plate", "steel_plate", "steel_column", "steel_column"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "rebar",
+      "shape": "cross",
+      "faces": ["rebar", "rebar", "rebar", "rebar", "rebar", "rebar"],
+      "flags": ["cutout"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": ""
+    },
+    {
+      "key": "gravel",
+      "shape": "cube",
+      "faces": ["gravel", "gravel", "gravel", "gravel", "gravel", "gravel"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation", "randomUv"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 3,
+      "stepSound": "dirt"
+    },
+    {
+      "key": "barrier-rail",
+      "shape": "postRail",
+      "faces": [
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe"
+      ],
+      "flags": ["solid"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "barrier-block",
+      "shape": "cube",
+      "faces": [
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe",
+        "barrier_stripe"
+      ],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "concrete"
+    },
+    {
+      "key": "cement-bags",
+      "shape": "cube",
+      "faces": ["cement_bags", "cement_bags", "cement_bags_top", "cement_bags_top", "cement_bags", "cement_bags"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "canvas"
+    },
+    {
+      "key": "turf",
+      "shape": "cube",
+      "faces": ["turf", "turf", "turf", "turf", "turf", "turf"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation", "randomUv"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 3,
+      "stepSound": "grass"
+    },
+    {
+      "key": "turf-line",
+      "shape": "cube",
+      "faces": ["turf", "turf", "turf_line", "turf", "turf", "turf"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "grass"
+    },
+    {
+      "key": "net",
+      "shape": "panel",
+      "faces": ["net", "net", "net", "net", "net", "net"],
+      "flags": ["solid", "cutout"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "canvas"
+    },
+    {
+      "key": "regolith",
+      "shape": "cube",
+      "faces": ["regolith", "regolith", "regolith", "regolith", "regolith", "regolith"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation", "randomUv"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 3,
+      "stepSound": "dirt"
+    },
+    {
+      "key": "station-panel",
+      "shape": "cube",
+      "faces": ["station_panel", "station_panel", "station_panel", "station_panel", "station_panel", "station_panel"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 2,
+      "stepSound": "metal"
+    },
+    {
+      "key": "station-floor",
+      "shape": "cube",
+      "faces": ["station_panel", "station_panel", "station_floor", "station_panel", "station_panel", "station_panel"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "neon-trim",
+      "shape": "cube",
+      "faces": ["neon_trim", "neon_trim", "station_panel", "station_panel", "neon_trim", "neon_trim"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "emissive"],
+      "emissive": 10,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "airlock-door",
+      "shape": "cube",
+      "faces": ["airlock_door", "airlock_door", "station_panel", "station_panel", "airlock_door", "airlock_door"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "metal"
+    },
+    {
+      "key": "barn-wood",
+      "shape": "cube",
+      "faces": ["barn_wood", "barn_wood", "barn_wood", "barn_wood", "barn_wood", "barn_wood"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "barn-door-a",
+      "shape": "cube",
+      "faces": ["barn_door_b", "barn_door_a", "barn_wood", "barn_wood", "barn_door_a", "barn_door_b"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "barn-door-b",
+      "shape": "cube",
+      "faces": ["barn_door_a", "barn_door_b", "barn_wood", "barn_wood", "barn_door_b", "barn_door_a"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "wood-trim",
+      "shape": "cube",
+      "faces": ["wood_trim", "wood_trim", "wood_trim", "wood_trim", "wood_trim", "wood_trim"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "siding",
+      "shape": "cube",
+      "faces": ["siding", "siding", "siding", "siding", "siding", "siding"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
+    },
+    {
+      "key": "hay-bale",
+      "shape": "cube",
+      "faces": ["hay_bale", "hay_bale", "hay_bale_top", "hay_bale_top", "hay_bale", "hay_bale"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "grass"
+    },
+    {
+      "key": "farmland",
+      "shape": "cube",
+      "faces": ["dirt", "dirt", "farmland", "dirt", "dirt", "dirt"],
+      "flags": ["solid", "blocksBullets", "blocksSight", "walkable", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "dirt"
+    },
+    {
+      "key": "crops",
+      "shape": "cross",
+      "faces": ["crops", "crops", "crops", "crops", "crops", "crops"],
+      "flags": ["cutout", "blocksSight", "colorVariation"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 2,
+      "stepSound": ""
+    },
+    {
+      "key": "wood-rail-fence",
+      "shape": "postRail",
+      "faces": ["wood", "wood", "wood", "wood", "wood", "wood"],
+      "flags": ["solid"],
+      "emissive": 0,
+      "frames": 1,
+      "variants": 1,
+      "stepSound": "wood"
     }
   ]
 }

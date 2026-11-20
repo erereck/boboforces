@@ -4,7 +4,8 @@
  * manifesto `layers@1` em `generated/`. Regenerar: `npm run texgen`.
  *
  * As camadas são resolvidas SEMPRE por nome (o `BlockDef` aponta a face pelo nome e o runtime acha o índice no
- * manifesto); a ordem da lista só agrupa por família. Camada publicada nunca muda de nome: os nomes do M0 (`concrete`,
+ * manifesto); a ordem da lista só agrupa por família, mas camada nova entra no FIM (o índice das publicadas não muda;
+ * o teste "ordem publicada" do texgen trava isso). Camada publicada nunca muda de nome: os nomes do M0 (`concrete`,
  * `metal`, `wood`, `grass`, `grass_side`, `dirt`, `brick`, `test_floor`) continuam valendo.
  *
  * Regras de pixel-art (arte-ux.md §1.3): materiais contínuos (concreto, grama, terra, água) são seamless e sem borda;
@@ -13,9 +14,14 @@
  */
 import type { LayerRecipe } from '../../tools/texgen/src/paint.ts';
 import { BENCH_TEXTURES } from './blocos16/bancada.ts';
+import { CONSTRUCTION_TEXTURES } from './blocos16/canteiro.ts';
 import { CONSTRUTO_TEXTURES } from './blocos16/construto.ts';
+import { FARM_TEXTURES } from './blocos16/fazenda.ts';
+import { MOON_TEXTURES } from './blocos16/lua.ts';
 import { METAL_WOOD_TEXTURES } from './blocos16/metal-madeira.ts';
 import { ISLAND_TEXTURES, NATURE_TEXTURES } from './blocos16/natureza.ts';
+import { PAINTBALL_TEXTURES } from './blocos16/paintball.ts';
+import { PORT_TEXTURES } from './blocos16/porto.ts';
 import { SIGN_TEXTURES } from './blocos16/sinais.ts';
 
 export const BLOCK_TEXTURES: readonly LayerRecipe[] = [
@@ -25,4 +31,10 @@ export const BLOCK_TEXTURES: readonly LayerRecipe[] = [
   ...SIGN_TEXTURES,
   ...BENCH_TEXTURES,
   ...ISLAND_TEXTURES,
+  // M10 (fase 0): o kit dos 5 mapas novos (porto, canteiro, galpão de paintball, estação lunar e fazenda).
+  ...PORT_TEXTURES,
+  ...CONSTRUCTION_TEXTURES,
+  ...PAINTBALL_TEXTURES,
+  ...MOON_TEXTURES,
+  ...FARM_TEXTURES,
 ];

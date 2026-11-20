@@ -13,6 +13,30 @@ import { decodePng } from './png.ts';
 import { validateTexture } from './validate.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
+
+/**
+ * Ordem PUBLICADA da tira `blocos16` (M0 a M9 e o kit do M10): o índice de cada camada não muda (os mapas, os goldens
+ * e o `uEmissiveLayers` do render contam com isso). Camada nova entra no FIM desta lista e da tira.
+ */
+const PUBLISHED_BLOCK_LAYERS = `
+concrete concrete_b concrete_c concrete_d concrete_stripe test_floor test_floor_b test_floor_c
+test_floor_stripe test_floor_stripe_b sector_marker_1 sector_marker_2 sector_marker_3 sector_marker_4
+sector_marker_5 sector_marker_6 sector_marker_7 sector_marker_8 sector_marker_9 test_wall anti_slip
+cinder_block brick metal checker_plate metal_roof railing fence_wire grate crate crate_top canvas wood
+fence_wood log log_top grass grass_b grass_c grass_side grass_side_b grass_side_c dirt dirt_b dirt_c leaves
+leaves_b tall_grass tall_grass_b tall_grass_c flowers flowers_b flowers_c bush bush_b light_panel lamp
+led_strip exit_sign danger_sign_a danger_sign_b glass water water#1 water#2 water#3 missing sand sand_b
+sand_c
+container_red container_red_door container_blue container_blue_door container_green
+container_green_door container_tan container_tan_door asphalt asphalt_b asphalt_c asphalt_line crane_lattice
+crane_cable scaffold_pipe steel_beam steel_column steel_plate rebar gravel gravel_b gravel_c barrier_stripe
+cement_bags cement_bags_top turf turf_b turf_c turf_line net regolith regolith_b regolith_c station_panel
+station_panel_b station_floor neon_trim airlock_door barn_wood barn_door_a barn_door_b wood_trim siding
+hay_bale hay_bale_top farmland crops crops_b
+`
+  .trim()
+  .split(/\s+/);
+
 const blocks = buildStripAssets(BLOCK_STRIP);
 const materials = buildStripAssets(MODEL_MATERIALS_STRIP);
 
@@ -32,6 +56,43 @@ describe('camadas de blocos16', () => {
       expect(names, m0).toContain(m0);
     }
     expect(names.length).toBeLessThanOrEqual(TEXTURE_ARRAYS.blocos16.maxLayers);
+  });
+
+  it('ordem publicada: as camadas de antes não mudam de índice (camada nova só no fim da tira)', () => {
+    const names = blocks.layers.map((l) => l.name);
+    expect(names.slice(0, PUBLISHED_BLOCK_LAYERS.length)).toEqual(PUBLISHED_BLOCK_LAYERS);
+    // M10 (fase 0): o kit dos mapas novos começa logo depois da areia da Ilha (a última camada do M9).
+    expect(names.indexOf('container_red')).toBe(names.indexOf('sand_c') + 1);
+  });
+
+  it('M10: os materiais contínuos do kit têm 3 variantes e o neon é a única camada emissiva nova', () => {
+    const groups = layerGroups(blocks.layers);
+    for (const base of ['asphalt', 'gravel', 'turf', 'regolith']) {
+      expect(groups.get(base), base).toMatchObject({ variants: 3, material: 'continuo' });
+    }
+    const fresh = blocks.layers.slice(blocks.layers.findIndex((l) => l.name === 'container_red'));
+    expect(fresh.filter((l) => l.kind === 'emissive').map((l) => l.name)).toEqual(['neon_trim']);
+    expect(fresh.filter((l) => l.kind === 'cutout').map((l) => l.name)).toEqual([
+      'crane_lattice',
+      'crane_cable',
+      'rebar',
+      'net',
+      'crops',
+      'crops_b',
+    ]);
+  });
+
+  it('M10: o milharal empilha sem quebrar o talo (as duas variantes têm os talos nas mesmas colunas)', () => {
+    const opaqueCols = (name: string, y: number): number[] => {
+      const d = blocks.layers.find((l) => l.name === name)!.image.data;
+      const cols: number[] = [];
+      for (let x = 0; x < 16; x++) if (d[(y * 16 + x) * 4 + 3]! > 0) cols.push(x);
+      return cols;
+    };
+    // A linha de cima de um bloco encosta na de baixo do bloco de cima (variante sorteada por célula).
+    for (const a of ['crops', 'crops_b']) {
+      for (const b of ['crops', 'crops_b']) expect(opaqueCols(a, 15), `${a} × ${b}`).toEqual(opaqueCols(b, 0));
+    }
   });
 
   it('todas passam no validador e só usam a paleta mestra', () => {

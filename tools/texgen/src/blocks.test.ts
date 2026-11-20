@@ -10,7 +10,7 @@ import {
   type BlockSourceDef,
 } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { BLOCK_DEFS, PENDING_BLOCK_IDS, STEP_SOUNDS } from '../../../assets-src/blocks/blocks.ts';
+import { BLOCK_DEFS, CONTAINER_COLOR_KEYS, PENDING_BLOCK_IDS, STEP_SOUNDS } from '../../../assets-src/blocks/blocks.ts';
 import { registeredBlockKeys, validateBlockDefs } from './blocks.ts';
 import { buildStripAssets, layerGroups } from './generate.ts';
 import { BLOCK_STRIP } from './outputs.ts';
@@ -59,6 +59,46 @@ describe('definições de bloco (blocks@1)', () => {
     // Ao longo de Z: visto de +X a tangente é −Z (B à esquerda); visto de −X, é +Z (A à esquerda).
     expect(byKey('danger-sign-b').faces[0]).toBe('danger_sign_a');
     expect(byKey('danger-sign-a').faces[1]).toBe('danger_sign_a');
+  });
+
+  it('M10: o kit dos mapas novos segue as regras de material e as faces das montagens', () => {
+    const has = (key: string, flag: string): boolean => (byKey(key).flags as readonly string[]).includes(flag);
+    // Contêiner: a porta fica nas faces ±Z da forma canônica (a montagem gira 1 quarto para X), o resto é a chapa.
+    for (const c of CONTAINER_COLOR_KEYS) {
+      const door = byKey(`container-${c}-door`);
+      expect(door.faces.slice(4)).toEqual([`container_${c}_door`, `container_${c}_door`]);
+      for (const f of door.faces.slice(0, 4)) expect(f).toBe(`container_${c}`);
+      expect(byKey(`container-${c}`).faces.every((f) => f === `container_${c}`)).toBe(true);
+    }
+    // Porta de celeiro: as faces cruzam como as do PERIGO (o X lê certo dos dois lados).
+    expect(byKey('barn-door-a').faces).toEqual([
+      'barn_door_b',
+      'barn_door_a',
+      'barn_wood',
+      'barn_wood',
+      'barn_door_a',
+      'barn_door_b',
+    ]);
+    expect(byKey('barn-door-b').faces[4]).toBe('barn_door_b');
+    expect(byKey('barn-door-b').faces[5]).toBe('barn_door_a');
+    // Treliça, rede e cerca de travessas param o movimento e deixam passar bala e visão (como a cerca de arame).
+    for (const k of ['crane-lattice', 'net']) {
+      expect(has(k, 'solid') && !has(k, 'blocksBullets') && !has(k, 'blocksSight'), k).toBe(true);
+    }
+    // Cabo, ferros de espera e milharal não colidem nem param bala.
+    for (const k of ['crane-cable', 'rebar', 'crops']) {
+      for (const f of ['solid', 'blocksBullets', 'walkable']) expect(has(k, f), `${k} ${f}`).toBe(false);
+    }
+    // O milharal alto esconde o bobo em pé do jogador, então tapa a visão dos bots também (a bala passa).
+    expect(has('crops', 'blocksSight')).toBe(true);
+    expect(has('rebar', 'blocksSight') || has('crane-cable', 'blocksSight')).toBe(false);
+    expect(['rebar', 'crops'].map((k) => byKey(k).shape)).toEqual(['cross', 'cross']);
+    // O milharal empilha 2 a 4 blocos: sem balanço (só o vértice de cima balançaria e o talo quebraria).
+    expect(has('crops', 'swaysInWind')).toBe(false);
+    for (const k of ['scaffold-rail', 'barrier-rail', 'wood-rail-fence']) expect(byKey(k).shape, k).toBe('postRail');
+    expect(byKey('neon-trim').emissive).toBeGreaterThan(0);
+    expect(byKey('neon-trim').emissive).toBeLessThan(byKey('light-panel').emissive);
+    expect(byKey('hazard-block').faces.every((f) => f === 'railing')).toBe(true);
   });
 
   it('o validador pega face inexistente, variante faltando, quadro errado e passe trocado', () => {

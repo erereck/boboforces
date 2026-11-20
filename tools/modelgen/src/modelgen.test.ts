@@ -11,7 +11,8 @@ import {
   type ModelDocument,
 } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
-import { buildModelOutputs, buildModels, validateModels, WEAPON_BOX_RANGE } from './generate.ts';
+import { createMapKitLayers, MAP_KIT_RECIPES } from '../../../assets-src/models/map-kit.ts';
+import { buildModelOutputs, buildModels, MODEL_LAYER_BUDGET, validateModels, WEAPON_BOX_RANGE } from './generate.ts';
 import { MODELGEN_OUTPUTS, MODELS_OUT_DIR, ROOT } from './paths.ts';
 
 const build = buildModels();
@@ -121,6 +122,52 @@ describe('modelgen', () => {
         }
       }
     }
+  });
+
+  it('ordem publicada das camadas de modelo: as de antes não mudam de índice (camada nova só no fim)', () => {
+    const published = `
+      mdl_pistol mdl_rifle mdl_sniper mdl_barrel mdl_water_tank mdl_jeep mdl_floodlight mdl_glow mdl_pipe mdl_column
+      mdl_tarp mdl_generator mdl_tree mdl_sandbags mdl_crate_large mdl_smg mdl_shotgun mdl_rocket mdl_knife
+      mdl_grenade mdl_lmg mdl_rocket_shell mdl_ammo_box mdl_zombie_misc mdl_zombie_door mdl_mystery_box
+      mdl_perk_chonky mdl_perk_speedy mdl_perk_buddy mdl_desmontador mdl_big_brrt mdl_map_kit_1 mdl_map_kit_2
+    `
+      .trim()
+      .split(/\s+/);
+    expect(build.layers.slice(0, published.length).map((l) => l.name)).toEqual(published);
+    expect(build.layers.length).toBeLessThanOrEqual(MODEL_LAYER_BUDGET);
+  });
+
+  it('M10: as 8 props do kit dos mapas dividem 2 camadas e seguem as regras de cobertura', () => {
+    const kit = MAP_KIT_RECIPES.map((r) => r(createMapKitLayers()).doc.id);
+    expect(kit.sort()).toEqual(
+      [
+        'bollard',
+        'silo',
+        'tractor',
+        'hay-roll',
+        'inflatable-can',
+        'inflatable-cube',
+        'inflatable-wedge',
+        'inflatable-wall',
+      ].sort(),
+    );
+    const layers = new Set(kit.flatMap((id) => byId.get(id)!.parts.flatMap((p) => p.meshes.map((s) => s.layer))));
+    expect([...layers].sort()).toEqual(['mdl_map_kit_1', 'mdl_map_kit_2']);
+    const top = (id: string): number => Math.max(...byId.get(id)!.colliders.map((c) => c.max[1])) / 32;
+    // Cobertura alta (≥ 1,75 m) para bala e visão; a baixa (1 m) só tapa a visão em parte.
+    for (const id of ['inflatable-can', 'inflatable-wall', 'silo']) {
+      expect(top(id), id).toBeGreaterThanOrEqual(2);
+      expect(byId.get(id)!.flags & MODEL_FLAG.partialSight, id).toBe(0);
+    }
+    for (const id of ['inflatable-cube', 'inflatable-wedge', 'hay-roll', 'tractor']) {
+      expect(byId.get(id)!.flags & MODEL_FLAG.partialSight, id).not.toBe(0);
+    }
+    expect(top('inflatable-cube')).toBe(1);
+    // Colisão em degraus onde uma caixa só faria parede invisível (as encostas da cunha, as rodas e o assento do trator).
+    expect(byId.get('inflatable-wedge')!.colliders.length).toBe(2);
+    expect(byId.get('tractor')!.colliders.length).toBe(6);
+    // O cabeço do cais é um degrau (sem navegação), como o cano.
+    expect(byId.get('bollard')!.blocksNav).toBe(false);
   });
 
   it('modelo pronto com ID não registrado fica fora do pacote', () => {

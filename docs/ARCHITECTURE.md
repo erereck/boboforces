@@ -4961,3 +4961,37 @@ commits é a de chegada.
   lobby aceitava mais cores que times. Corrigido antes do commit. Fica: a plaquinha do congelado (#A8E6FF) perto do
   Ciano, e o Amarelo e o Ciano perto das cores do P1 e do P2 (diferem pela forma dos marcadores).
 
+### 21.2 Fase 0: o kit dos mapas novos (20/11/2026)
+
+- **Os blocos** (`assets-src/blocks/blocks.ts`, `assets-src/textures/blocos16/*.ts`): 38 ids novos e 48 camadas novas
+  no fim do `blocos16` (de 70 para 118 de 256; as 70 de antes, com os mips, ficaram iguais byte a byte, e um teste
+  prende a ordem publicada). Porto: contêineres em 4 cores (corpo e porta), asfalto (3 variantes) e a faixa pintada, a
+  treliça do guindaste (sólida, mas bala e vista passam, como a laje de grade), o cabo (painel fino, sem colisão) e o
+  bloco de aviso; Canteiro: o tubo do andaime, a viga e o pilar de aço, o vergalhão (cruz, sem colisão), a brita (3
+  variantes), a barreira e os sacos de cimento; Galpão: a grama sintética (3 variantes), a faixa e a rede (segura o
+  movimento, deixa passar bala e vista, como a cerca de arame); Lua: o regolito (3 variantes, uma com cratera), o painel
+  e o piso da estação, o neon (emissivo) e a porta da eclusa (as janelas são o vidro de sempre); Fazenda: a madeira do
+  celeiro, a porta do celeiro (o X branco, lido certo dos dois lados), o acabamento, o lambri, o feno, a terra arada, o
+  milho (cruz; segura a vista, bala passa; empilha sem emenda) e a cerca de ripas. Tudo na paleta mestra de 64 cores
+  (que já estava cheia), sem texto e sem contorno preto.
+- **As peças** (`assets-src/models/map-kit.ts`): o cabeço, o silo, o trator (6 caixas de colisão em degraus), o rolo de
+  feno e os infláveis (o cilindro, o cubo, a cunha — `model:inflatable-wedge`, nunca o nome de uma marca — e a parede),
+  em 2 camadas novas do `modelos64` (de 31 para 33). O teto do gerador de modelos subiu de 32 para 40 camadas (decisão
+  menor revisável: as armas novas também usam; o teto real do array é 55).
+- **Os ajudantes de montagem** (`assets-src/maps/kit.ts`, não é mapa): `container()` (põe o contêiner com as portas
+  viradas certo e devolve a altura para empilhar), `towerCrane()` (o guindaste de treliça com lança, contrapeso, cabine
+  e a carga pendurada; recusa parâmetro fora da lança), `barnDoor()` (o padrão das portas, em metros inteiros) e
+  `harborWater()` (o mar do porto: o fundo a mais de 3 m abaixo do cais e a 1,5 m abaixo da água, para a navegação não
+  descer no mar, e a altura do plano de morte entre os dois).
+- **O contraste com as cores de time** (a pergunta AK6 pede que elas não se confundam com o cenário): os vermelhos
+  (o contêiner vermelho, o celeiro, as vigas, o trator e o inflável) foram para o óxido escuro, os amarelos (o
+  guindaste, a faixa e a cunha) para o ocre fosco, o painel da estação para o cinza médio e o neon para um branco
+  quente, longe do Ciano (`local/m10/kit/contraste.png`: as 8 cores de time na frente de cada parede, em cor e em
+  cinza). Ficam perto em cinza o celeiro e a viga do Vermelho (separados pela saturação) e a parede da estação de
+  quase todas (8 cores de 0,32 a 0,82 de luma não deixam nenhum cinza a 0,25 de todas).
+- **O custo:** a primeira partida foi de 919,2 para 941,1 KB (de 1 MB); as texturas de 64,4 para 80,1 KB (de 150).
+- **A revisão (Opus) achou:** as cores do kit perto das cores de time novas (acima); o milho que escondia o jogador de
+  quem joga mas não dos bots (agora segura a vista); as caixas de colisão da cunha e do trator maiores que a forma; os
+  ajudantes sem checagem; o milho empilhado partido; o andaime com o friso fora do trilho; o nome de marca; e o mar do
+  porto que deixaria os bots descerem nele. Corrigido antes do commit.
+

@@ -8,6 +8,7 @@ import {
   validateModelPack,
   type ModelPack,
 } from '@boboforces/format';
+import { createMapKitLayers, MAP_KIT_RECIPES } from '../../../assets-src/models/map-kit.ts';
 import { createPickupLayers, PICKUP_RECIPES } from '../../../assets-src/models/pickups.ts';
 import { PROP_RECIPES } from '../../../assets-src/models/props.ts';
 import { WEAPON_RECIPES } from '../../../assets-src/models/weapons.ts';
@@ -25,6 +26,13 @@ import { MODELGEN_OUTPUTS } from './paths.ts';
 /** Faixa de caixas por arma (arte-ux.md §3.2). */
 export const WEAPON_BOX_RANGE = { min: 6, max: 20 } as const;
 
+/**
+ * Teto de camadas da tira `modelos64-modelos`. M1 a M9: 32 (um quarto do array). M10 (fase 0): 40, para as 2 camadas
+ * compartilhadas do kit dos mapas novos e as armas do M10. O teto físico do array é 128 − 64 (reserva das skins,
+ * `SKIN_LAYER_RESERVE`) − 9 (a tira de materiais) = 55 camadas. Decisão menor revisável.
+ */
+export const MODEL_LAYER_BUDGET = 40;
+
 export interface ModelsBuild {
   /** Modelos que entram no pacote (ID registrado), na ordem das receitas. */
   readonly models: readonly BuiltModel[];
@@ -39,10 +47,13 @@ export function buildModels(): ModelsBuild {
   const glow = new LayerCanvas('mdl_glow', 'emissive', tone('emissivo', 1));
   // M3 (fase 5c): a camada dos modelos pequenos do Bobo Zombies (orçamento de 32 camadas).
   const pickupLayers = createPickupLayers();
+  // M10 (fase 0): as 2 camadas do kit dos mapas novos (silo, trator, feno; infláveis e o cabeço do cais).
+  const kitLayers = createMapKitLayers();
   const all: BuiltModel[] = [
     ...WEAPON_RECIPES.map((r) => r()),
     ...PROP_RECIPES.map((r) => r({ glow })),
     ...PICKUP_RECIPES.map((r) => r(pickupLayers)),
+    ...MAP_KIT_RECIPES.map((r) => r(kitLayers)),
   ];
   // Pacote na ordem do registro de conteúdo: o M2 acrescentou armas no FIM do registro, então os índices das props do
   // M1 não mudam (e a ordem das camadas segue a dos modelos).
@@ -80,10 +91,8 @@ export function validateModels(build: ModelsBuild): string[] {
       problems.push(`model:${m.id}: ${boxes} caixas (arma usa ${WEAPON_BOX_RANGE.min} a ${WEAPON_BOX_RANGE.max})`);
     }
   }
-  if (build.layers.length > TEXTURE_ARRAYS.modelos64.maxLayers / 4) {
-    problems.push(
-      `${build.layers.length} camadas de modelo (orçamento do M1: ${TEXTURE_ARRAYS.modelos64.maxLayers / 4})`,
-    );
+  if (build.layers.length > MODEL_LAYER_BUDGET) {
+    problems.push(`${build.layers.length} camadas de modelo (orçamento: ${MODEL_LAYER_BUDGET})`);
   }
   return problems;
 }

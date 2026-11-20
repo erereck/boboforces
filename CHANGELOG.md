@@ -11,6 +11,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Plano** em `docs/PLANO_M10.md` (#83): os 5 mapas que faltam da lista do GDD (Porto de Contêineres, Canteiro de
   Obras, Galpão de Paintball, Estação Lunar e Fazenda à noite), 5 armas do arsenal futuro (DMR, revólver, escopeta
   automática, besta e lança-granadas) e as pendências do M9, em ondas paralelas. Perguntas AK1–AK6 no padrão.
+- **O kit dos mapas novos (fase 0):** 38 blocos e 8 peças novos para os 5 mapas (contêineres, guindaste, asfalto,
+  andaime, vigas, brita, grama sintética, rede, infláveis, regolito, painéis da estação, neon, celeiro, feno, milho,
+  silo e trator), na paleta de sempre; os vermelhos e os amarelos ficaram escuros e foscos para não se confundirem
+  com as cores de time. Ainda sem mapa: eles chegam nas fases 1 a 5.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

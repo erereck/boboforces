@@ -65,6 +65,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 0. **O kit dos mapas novos:** os blocos e as peças que os 5 mapas pedem (o contêiner e o guindaste do porto, o andaime
    e a viga do canteiro, os infláveis e o piso colorido do galpão, o regolito, o metal e o neon da estação, o celeiro,
    o feno e a cerca da fazenda), na paleta e na densidade de sempre, dentro do orçamento de texturas.
+   - **feita em 20/11** (ARCHITECTURE §21.2): 38 blocos e 8 peças; a primeira partida em 941 KB.
 1. **Porto de Contêineres** (médio): verticalidade e corredores entre pilhas de contêineres; TDM, FFA, Domination e
    Sandbox.
 2. **Canteiro de Obras** (médio): andaimes, vigas e o guindaste; TDM, FFA e Sandbox.
