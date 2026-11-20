@@ -29,7 +29,14 @@ export {
   type DoorDef,
   type WallBuyDef,
 } from './map-objects.ts';
-export { expandRecipe, isFfaMode, isWarfareMode, type ControllerSlot } from './recipe.ts';
+export {
+  expandRecipe,
+  isFfaMode,
+  isWarfareMode,
+  matchLimits,
+  type ControllerSlot,
+  type MatchLimits,
+} from './recipe.ts';
 // M6 (fase 1): o Domination.
 export { ControlPoints, DOMINATION, type ControlPointDef, type ControlPointsView } from './systems/domination.ts';
 export { JUGG_FIXED, JUGGERNAUT, juggernautHp } from './systems/party.ts';

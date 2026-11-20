@@ -170,6 +170,67 @@ describe('placar do Tab', () => {
     }
   });
 
+  it('M9 (fase 3): o Sandbox com 4 times, cada tabela com a cor, os pontos e o nome do time, tudo dentro da tela', () => {
+    const names = ['Os Bobões da Rua', 'Azul', 'Verde', 'MMMMMMMMMMMMMMMM'];
+    for (const [w, h, min] of [
+      [1280, 720, MIN_TEXT.tv],
+      [667, 375, MIN_TEXT.phone],
+      [640, 360, MIN_TEXT.switchSplit],
+    ] as const) {
+      const m = createScoreboardModel();
+      m.title = 'Bobo Sandbox';
+      m.teamCount = 4;
+      m.rowCount = 12;
+      for (let tIdx = 0; tIdx < 4; tIdx++) {
+        m.teamScores[tIdx] = 10 + tIdx;
+        m.teamNames[tIdx] = names[tIdx]!;
+      }
+      for (let r = 0; r < 12; r++) {
+        m.name[r] = r === 0 ? 'P1' : 'Normal Bob';
+        m.team[r] = r % 4;
+        m.kills[r] = 12 - r;
+      }
+      const list = createDrawList();
+      drawScoreboard(list, fonts, m, w, h, min);
+      const bottom = Math.max(...drawnCommands(list).map((c) => c.y + c.h));
+      expect(bottom, `${w}×${h}`).toBeLessThanOrEqual(h + 0.5);
+      within(list, w, h);
+      const cs = drawnCommands(list);
+      for (let tIdx = 0; tIdx < 4; tIdx++) {
+        expect(
+          cs.some((c) => c.op !== DRAW_OP.glyph && c.color === TEAM_COLORS[tIdx]),
+          `${w}: time ${tIdx}`,
+        ).toBe(true);
+      }
+      const text = syntheticGlyphText(list);
+      const tablesDrawn = cs.filter((c) => c.op !== DRAW_OP.glyph && c.color === COLORS.hudFundo).length;
+      if (w === 640) {
+        // Na tela pequena, 4 tabelas não cabem nem em grade: uma lista só, os pontos dos times no cabeçalho.
+        expect(tablesDrawn).toBe(1);
+        expect(text).toContain('BoboSandbox10111213ABATES');
+        continue;
+      }
+      // Em grade de 2 colunas (empilhadas, passariam da altura).
+      expect(tablesDrawn).toBe(4);
+      expect(text).toContain('10OsBobõesdaRua');
+      expect(text).toContain('12Verde');
+      // Os pontos e o nome (na cor do time) não entram na coluna dos abates, nem o nome comprido (encolhe).
+      const glyphs = cs.filter((c) => c.op === DRAW_OP.glyph);
+      for (let tIdx = 0; tIdx < 4; tIdx++) {
+        const own = glyphs.filter((c) => c.color === TEAM_COLORS[tIdx]);
+        const left = Math.min(...own.map((c) => c.x));
+        const top = Math.min(...own.map((c) => c.y));
+        const titles = glyphs.filter(
+          (c) => c.color === COLORS.textoBaixo && c.x > left && Math.abs(c.y - top) < 4 * (w / 640),
+        );
+        expect(titles.length, `${w}: time ${tIdx}`).toBeGreaterThan(0);
+        expect(Math.max(...own.map((c) => c.x + c.w)), `${w}: time ${tIdx}`).toBeLessThan(
+          Math.min(...titles.map((c) => c.x)),
+        );
+      }
+    }
+  });
+
   it('os títulos das colunas não se encostam', () => {
     const list = createDrawList();
     drawScoreboard(list, fonts, sample(2), W, H, MIN_TEXT.tv);
@@ -196,6 +257,29 @@ describe('contagem inicial e morte súbita', () => {
     drawMatchCountdown(list, fonts, 2.3, 'Hoje: 6 × Normal Bob e 2 × Camper Carl', 640, 360, MIN_TEXT.phone, extra);
     within(list, 640, 360);
     expect(syntheticGlyphText(list)).toContain('SeuNêmesisvoltou');
+  });
+
+  it('M9 (fase 3): o placar do alto com os 4 times do Sandbox e o relógio cabe em 640×360 e no sofá de 4', () => {
+    for (const [w, h, views] of [
+      [640, 360, 1],
+      [1280, 720, 4],
+    ] as const) {
+      const lay = layoutHudScreen(views, w, h, { minTextPx: MIN_TEXT.switchSplit });
+      const m = createHudSharedModel();
+      m.teamCount = 4;
+      for (let i = 0; i < 4; i++) m.teamScores[i] = 100 + i;
+      m.timeLeftS = 599;
+      const list = createDrawList();
+      drawHudShared(list, fonts, m, lay.shared);
+      within(list, w, h);
+      const cs = drawnCommands(list);
+      for (let i = 0; i < 4; i++)
+        expect(
+          cs.some((c) => c.color === TEAM_COLORS[i]),
+          `${w}: time ${i}`,
+        ).toBe(true);
+      expect(syntheticGlyphText(list)).toContain('9:59');
+    }
   });
 
   it('o placar compartilhado ganha "MORTE SÚBITA" embaixo, com o relógio', () => {

@@ -7,9 +7,11 @@ import { t, type StringKey } from '@boboforces/ui';
 export const MENU_MAPS = ['construto', 'ringue', 'posto', 'base', 'airbase', 'island'] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
+// M9 (fase 3): o Bobo Sandbox nos mapas com casa no chão para os times 2 e 3 (o Construto e o Ringue). A Base Bobo fica
+// de fora: a casa deles cai nos quebra-vistas de 2,5 m das rotas oeste e leste (3 dos 4 pontos da base em cima deles).
 export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
-  construto: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies'],
-  ringue: ['warfare.tdm', 'training'],
+  construto: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies', 'sandbox'],
+  ringue: ['warfare.tdm', 'training', 'sandbox'],
   // M3 (fase 3d): o Posto Avançado é só do Bobo Zombies (janelas e porta paga).
   posto: ['zombies'],
   // M3 (fase 5a): a Base Abandonada, o mapa do Bobo Zombies.

@@ -129,6 +129,14 @@ describe('a sala do Online na web (M5 fase 4c)', () => {
     const before = host.view;
     await pump(5, [host, bia, caio]);
     expect(host.view).toBe(before);
+    expect(bia.view!.teamCount).toBeUndefined();
+    // M9 (fase 3): o Sandbox com 4 times: os amigos sabem quantos (a escolha do time anda até o Roxo).
+    host.setSummary('Sandbox · 3×3×3×3 · Construto', true, 4);
+    await pump(5, [host, bia, caio]);
+    expect(bia.view!.teamCount).toBe(4);
+    host.setSummary('Times · Construto', true);
+    await pump(5, [host, bia, caio]);
+    expect(bia.view!.teamCount).toBeUndefined();
     await bia.copyLink();
     expect(copied).toEqual([`https://jogo.test/#sala=${host.code}`]);
 

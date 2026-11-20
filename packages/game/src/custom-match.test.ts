@@ -1,12 +1,17 @@
 import { builtinBot, DEBUT_PRESET, presetBotCounts, validateMatchRecipe, type MatchRecipe } from '@boboforces/format';
+import { TEAM_COLORS } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import {
   CUSTOM_TABS,
   customHelp,
+  customNameTeam,
   customRows,
+  customRowViews,
   customTabs,
   presetName,
+  SANDBOX_TABS,
   stepCustom,
+  withTeamName,
   ZOMBIES_TABS,
 } from './custom-match.ts';
 
@@ -15,7 +20,7 @@ import {
 const PC = { maxBots: 40, maxViewM: 140 };
 const PHONE = { maxBots: 12, maxViewM: 90 };
 
-function value(tab: (typeof CUSTOM_TABS)[number], r: MatchRecipe, id: string): string {
+function value(tab: Parameters<typeof customRows>[0], r: MatchRecipe, id: string): string {
   return customRows(tab, r)
     .find((x) => x.id === id)!
     .value(r);
@@ -257,7 +262,9 @@ describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
     z = stepCustom('match', z, 'map', -1, PC);
     expect(z.map).toBe('posto');
     z = stepCustom('match', z, 'quantity', 1, PC);
-    const tdm = stepCustom('match', z, 'mode', 1, PC);
+    // M9 (fase 3): depois do Zombies vem o Sandbox; dois passos, os Times.
+    expect(stepCustom('match', z, 'mode', 1, PC).mode).toBe('sandbox');
+    const tdm = stepCustom('match', z, 'mode', 2, PC);
     expect(tdm.mode).toBe('warfare.tdm');
     expect(tdm.map).toBe('construto');
     expect(tdm.zombies).toBeUndefined();
@@ -277,10 +284,178 @@ describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
   });
 });
 
+describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
+  const LIMITS = { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 };
+  const valid = (r: MatchRecipe): void => {
+    const checked = validateMatchRecipe(r, LIMITS);
+    expect(checked.ok && checked.warnings).toEqual([]);
+  };
+  const ids = (tab: Parameters<typeof customRows>[0], r: MatchRecipe): string[] => customRows(tab, r).map((x) => x.id);
+  /** Dos Times, para trás: o Sandbox é o último do ciclo. */
+  const toSandbox = (r: MatchRecipe = DEBUT_PRESET): MatchRecipe => stepCustom('match', r, 'mode', -1, PC);
+  const withTeams = (n: number, limits = PC): MatchRecipe => {
+    let r = toSandbox();
+    while (r.teams.length < n) r = stepCustom('teams', r, 'teams', 1, limits);
+    return r;
+  };
+
+  it('dos Times: as abas do Sandbox, os 2 times de agora, sem o Diretor; o objetivo manda no tempo e na meta', () => {
+    const s = toSandbox({ ...DEBUT_PRESET, director: { goal: 'balanced' } });
+    expect(s.mode).toBe('sandbox');
+    expect(s.map).toBe('construto');
+    expect(s.director).toBeUndefined();
+    expect(customTabs(s)).toEqual(SANDBOX_TABS);
+    expect(presetBotCounts(s)).toEqual([3, 4]);
+    expect(value('match', s, 'mode')).toBe('Sandbox');
+    expect(ids('match', s)).toEqual(['mode', 'map', 'objective', 'time', 'score', 'view']);
+    expect(value('match', s, 'objective')).toBe('Pontos');
+    valid(s);
+    const elim = stepCustom('match', s, 'objective', 0, PC);
+    expect(elim.sandbox).toEqual({ objective: 'elimination' });
+    expect(value('match', elim, 'objective')).toBe('Eliminação');
+    // Na eliminação a meta não vale, e o tempo não tem o "sem limite" (a sim dá 10 min ao 0).
+    expect(ids('match', elim)).toEqual(['mode', 'map', 'objective', 'time', 'view']);
+    let noTime = stepCustom('match', { ...elim, match: { timeLimitS: 0 } }, 'time', 0, PC);
+    expect(value('match', { ...elim, match: { timeLimitS: 0 } }, 'time')).toBe('10 min');
+    for (let i = 0; i < 10; i++) noTime = stepCustom('match', noTime, 'time', 1, PC);
+    expect(noTime.match?.timeLimitS).toBeGreaterThan(0);
+    valid(elim);
+    const toy = stepCustom('match', elim, 'objective', 1, PC);
+    expect(toy.sandbox).toEqual({ objective: 'none' });
+    expect(ids('match', toy)).toEqual(['mode', 'map', 'objective', 'view']);
+    valid(toy);
+    // De volta aos pontos (o padrão): o bloco sai.
+    expect(stepCustom('match', toy, 'objective', 1, PC).sandbox).toBeUndefined();
+    // Sem tempo e meta na receita, as linhas mostram os padrões do Sandbox (10 min, 75 abates).
+    const bare = { ...s, match: {} };
+    expect([value('match', bare, 'time'), value('match', bare, 'score')]).toEqual(['10 min', '75 abates']);
+    // Os mapas do Sandbox.
+    const ringue = stepCustom('match', s, 'map', 1, PC);
+    expect(ringue.map).toBe('ringue');
+    expect(stepCustom('match', ringue, 'map', 1, PC).map).toBe('construto');
+  });
+
+  it('a aba Times: de 2 a 4 times, o seu time, e por time o nome, o bot, quantos, a vida e as armas', () => {
+    let r = withTeams(4);
+    expect(r.teams).toHaveLength(4);
+    // O time novo vem com o bot e a quantidade do último.
+    expect(presetBotCounts(r)).toEqual([3, 4, 4, 4]);
+    expect(stepCustom('teams', r, 'teams', 1, PC).teams).toHaveLength(4);
+    const perTeam = (i: number): string[] => [`teamName${i}`, `bot${i}`, `count${i}`, `teamHp${i}`, `teamArms${i}`];
+    expect(ids('teams', r)).toEqual(['teams', 'you', ...perTeam(0), ...perTeam(1), ...perTeam(2), ...perTeam(3)]);
+    // Os rótulos levam a cor do time; o nome e o seu time, o quadradinho da cor.
+    const views = customRowViews('teams', r, PC);
+    const name2 = views.find((v) => v.id === 'teamName2')!;
+    expect([name2.labelKey, name2.labelParams, name2.value]).toEqual([
+      'custom.row.teamName',
+      { team: 'Verde' },
+      'Verde',
+    ]);
+    expect(name2.swatch).toBe(TEAM_COLORS[2]! >>> 8);
+    expect(views.find((v) => v.id === 'teamHp3')!.labelParams).toEqual({ team: 'Roxo' });
+    expect(views.find((v) => v.id === 'you')!.value).toBe('Laranja');
+    // O nome: o digitado aparece; vazio (ou o da cor) volta ao da cor.
+    r = withTeamName(r, 2, '  Os Bobões ');
+    expect(r.teams[2]!.name).toBe('Os Bobões');
+    expect(value('teams', r, 'teamName2')).toBe('Os Bobões');
+    expect(withTeamName(r, 2, '').teams[2]!.name).toBeUndefined();
+    expect(withTeamName(r, 2, 'Verde').teams[2]!.name).toBeUndefined();
+    // As setas não mexem no nome (o confirmar abre o teclado: `customNameTeam`).
+    expect(stepCustom('teams', r, 'teamName2', 1, PC)).toBe(r);
+    expect([customNameTeam('teamName2'), customNameTeam('teams'), customNameTeam('teamHp2')]).toEqual([2, -1, -1]);
+    // A vida: os passos de 1 a 1000 (ausente = a da partida).
+    expect(value('teams', r, 'teamHp1')).toBe('100');
+    r = stepCustom('teams', r, 'teamHp1', -1, PC);
+    expect(r.teams[1]!.hp).toBe(75);
+    for (let i = 0; i < 12; i++) r = stepCustom('teams', r, 'teamHp3', -1, PC);
+    expect(r.teams[3]!.hp).toBe(1);
+    for (let i = 0; i < 12; i++) r = stepCustom('teams', r, 'teamHp0', 1, PC);
+    expect(r.teams[0]!.hp).toBe(1000);
+    // As armas: todas (sem o campo) ou uma primária só.
+    r = stepCustom('teams', r, 'teamArms1', 1, PC);
+    expect([r.teams[1]!.weapons, value('teams', r, 'teamArms1')]).toEqual([['rifle'], 'Só fuzil']);
+    expect(stepCustom('teams', r, 'teamArms1', -1, PC).teams[1]!.weapons).toBeUndefined();
+    // Quantos: o seu time pode ficar só com você; os outros, com 1 no mínimo.
+    for (let i = 0; i < 6; i++) r = stepCustom('teams', r, 'count0', -1, PC);
+    for (let i = 0; i < 6; i++) r = stepCustom('teams', r, 'count2', -1, PC);
+    expect(presetBotCounts(r)).toEqual([0, 4, 1, 4]);
+    valid(r);
+    // O seu time: os humanos vão para o Azul; o Laranja, sem ninguém, ganha 1 bot.
+    r = stepCustom('teams', r, 'you', 1, PC);
+    expect(r.teams.map((tm) => tm.humans)).toEqual([undefined, 'all', undefined, undefined]);
+    expect(presetBotCounts(r)).toEqual([1, 4, 1, 4]);
+    expect(value('teams', r, 'you')).toBe('Azul');
+    // Agora o Azul pode ficar só com você.
+    for (let i = 0; i < 6; i++) r = stepCustom('teams', r, 'count1', -1, PC);
+    expect(presetBotCounts(r)[1]).toBe(0);
+    valid(r);
+    // Tirar times: sai o último; os humanos que estavam nele voltam ao Laranja.
+    r = stepCustom('teams', r, 'you', -2, PC);
+    expect(r.teams[3]!.humans).toBe('all');
+    r = stepCustom('teams', r, 'teams', -1, PC);
+    expect(r.teams).toHaveLength(3);
+    expect(r.teams[0]!.humans).toBe('all');
+    r = stepCustom('teams', r, 'teams', -1, PC);
+    expect(stepCustom('teams', r, 'teams', -1, PC).teams).toHaveLength(2);
+    valid(r);
+  });
+
+  it('os bots cabem no teto do aparelho e do mapa: o time novo e os maiores cedem; o Ringue leva 7', () => {
+    const phone = withTeams(4, PHONE);
+    expect(presetBotCounts(phone)).toEqual([3, 4, 4, 1]);
+    for (let i = 0; i < 5; i++) expect(stepCustom('teams', phone, 'count3', 1, PHONE)).toEqual(phone);
+    const ringue = stepCustom('match', phone, 'map', 1, PHONE);
+    expect(ringue.map).toBe('ringue');
+    expect(presetBotCounts(ringue).reduce((a, b) => a + b, 0)).toBe(7);
+    expect(presetBotCounts(ringue).every((n, i) => n >= (i === 0 ? 0 : 1))).toBe(true);
+    valid(ringue);
+  });
+
+  it('saindo do Sandbox: o seu time contra os bots de todos os outros, sem os nomes, a vida e as armas', () => {
+    let r = withTeams(4);
+    r = withTeamName(r, 1, 'Os Bobões');
+    r = stepCustom('teams', r, 'teamHp1', 1, PC);
+    r = stepCustom('teams', r, 'you', 1, PC);
+    r = stepCustom('match', r, 'objective', 0, PC);
+    const tdm = stepCustom('match', r, 'mode', 1, PC);
+    expect(tdm.mode).toBe('warfare.tdm');
+    expect(tdm.sandbox).toBeUndefined();
+    expect(tdm.teams).toHaveLength(2);
+    expect(tdm.teams[0]!.humans).toBe('all');
+    // O Azul (o seu) vira o time 0; os outros 3 somam o mesmo bot numa linha só.
+    expect(tdm.teams[0]!.bots).toEqual(r.teams[1]!.bots);
+    expect(tdm.teams[1]!.bots).toEqual([{ ref: DEBUT_PRESET.teams[1]!.bots[0]!.ref, count: 3 + 4 + 4 }]);
+    expect(tdm.teams.some((tm) => tm.name !== undefined || tm.hp !== undefined)).toBe(false);
+    expect(tdm.match).toMatchObject({ timeLimitS: 300, scoreLimit: 30 });
+    valid(tdm);
+    // E para o Zombies (o ciclo para trás), também sem o bloco do Sandbox.
+    const z = stepCustom('match', r, 'mode', -1, PC);
+    expect([z.mode, z.sandbox, z.teams.length]).toEqual(['zombies', undefined, 1]);
+  });
+
+  it('salvar como Cenário: a receita passa pelo validador inteira e volta igual', () => {
+    let r = withTeams(3);
+    r = withTeamName(r, 0, 'Laranjada');
+    r = withTeamName(r, 2, 'Os Verdes');
+    r = stepCustom('teams', r, 'teamHp2', 1, PC);
+    r = stepCustom('teams', r, 'teamArms2', 4, PC);
+    r = stepCustom('match', r, 'objective', 0, PC);
+    const saved = { ...r, name: 'Cenário 4×4×4', seed: 0 };
+    const checked = validateMatchRecipe(JSON.parse(JSON.stringify(saved)) as unknown, LIMITS);
+    expect(checked.ok && checked.warnings).toEqual([]);
+    if (!checked.ok) return;
+    expect(checked.value).toEqual(saved);
+    expect(checked.value.teams[2]).toMatchObject({ name: 'Os Verdes', hp: 150, weapons: ['sniper'] });
+    expect(checked.value.sandbox).toEqual({ objective: 'elimination' });
+  });
+});
+
 describe('Partida personalizada: a frase de ajuda (refino R4c, #79)', () => {
-  it('toda linha e toda aba, nos 3 modos, têm frase; os botões do canto não', () => {
-    for (const mode of ['warfare.tdm', 'warfare.ffa', 'zombies'] as const) {
-      const r = { ...DEBUT_PRESET, mode, ...(mode === 'zombies' ? { map: 'base' } : {}) } as MatchRecipe;
+  it('toda linha e toda aba, nos 4 modos, têm frase; os botões do canto não', () => {
+    for (const mode of ['warfare.tdm', 'warfare.ffa', 'zombies', 'sandbox'] as const) {
+      let r = { ...DEBUT_PRESET, mode, ...(mode === 'zombies' ? { map: 'base' } : {}) } as MatchRecipe;
+      // M9 (fase 3): o Sandbox com os 4 times (as linhas de cada um usam a frase sem o número).
+      for (let i = 0; i < 2 && mode === 'sandbox'; i++) r = stepCustom('teams', r, 'teams', 1, PC);
       const tabs = customTabs(r);
       tabs.forEach((tab, i) => {
         expect(customHelp(tabs, `tab:${i}`), `${mode}/${tab}`).not.toBe('');

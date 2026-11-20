@@ -4744,3 +4744,41 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   ainda podia pontuar; o ponto fora da área de jogo; o online desalinhado (acima); e as regras do time do Sandbox no
   bot criado ou trocado. Tudo corrigido antes do commit; nenhum golden mudou.
 
+### 20.5 Fase 3: o Sandbox no jogo (20/11/2026)
+
+- **A Partida personalizada** (`game/src/custom-match.ts`): o Sandbox é o último da linha Modo; entra a partir dos 2
+  times de agora (o Diretor sai) e, ao sair, vira Times com o seu time contra todos os outros bots juntos. Na aba
+  Partida, a linha **Objetivo** depois do mapa (Pontos, Eliminação, Nenhum): a eliminação esconde a meta e não tem
+  "sem limite" no tempo; o Nenhum esconde os dois. A aba **Times** (no lugar da Bots): "Times" de 2 a 4 (o time novo
+  copia o bot e a quantidade do último, cortado no teto do aparelho e do mapa), "Seu time" (com o quadradinho da cor)
+  e, por time, o nome, o bot, quantos, a vida (1, 10, 25 … 1000) e as armas ("Todas" ou uma primária).
+- **O nome do time** (`game/src/name-entry.ts`, a mesma lógica da Oficina): o confirmar abre o teclado do aparelho
+  (o swkbd no Switch, o campo do navegador na web) ou o teclado do jogo (com o controle na web, ou sem teclado do
+  sistema); até 15 caracteres (cabem ao lado do quadradinho); vazio volta ao nome da cor; cancelar devolve a receita
+  de antes inteira.
+- **O Cenário:** no Sandbox o botão é "Salvar Cenário" e o preset se chama "Cenário 3×3×2"; os resumos de 3 e 4 times
+  são "3×3×2×2"; o resultado também diz "Salvar Cenário". Os mapas do Sandbox: Construto e Ringue (o `.bfmap` deles
+  só ganhou o modo na lista). A Base Aérea fica de fora: 3 dos 4 pontos que a sim dá aos times 2 e 3 caem em cima dos
+  muros de 2,5 m (pendência: preferir nós no chão no `sandboxSpawns`).
+- **O que supunha 2 times:** o sofá (os jogadores 2 a 4 escolhem o time contando a partir do do P1; com 3 ou 4 times o
+  card mostra o nome da cor); a sala online (o lobby manda quantos times há, um campo que o cliente antigo ignora, e a
+  escolha vai do "Tanto faz" ao Roxo; no empate, o "Tanto faz" cai primeiro no time de casa da receita); o HUD (os 4
+  placares); o placar do Tab (o nome de cada time depois do placar, em 2 colunas; a 640×360, uma lista com a faixa da
+  cor; os modos de 2 times também ganharam o nome); o resultado ("{time} venceu · 12 × 20", com o placar de quem
+  venceu), o feed do Domination e o resultado do Aquário com os nomes; o "Ajustar desafio" mexe em todo time que não é
+  o seu; a linha "Hoje" da contagem e o máximo da barra de vida seguem o seu time.
+- **Os limites de verdade** (`sim/recipe.ts`, `matchLimits(recipe)`): a mesma conta do `createSim` (a eliminação
+  sempre com tempo), que o HUD e a dica da derrota feia leem no lugar da receita crua. Na eliminação, quem cai vê
+  "Fora até o fim da partida" e, passada a câmera de morte, assiste um aliado vivo (como no BoboStrike); o sofá que
+  entra no meio pega um bot vivo (na eliminação, nunca um morto).
+- **Os textos:** os do Sandbox moram na tabela extra, menos os que o JS do menu cita (o Cenário, o teclado do nome, o
+  `mode.short.sandbox` do resumo do JOGAR e os nomes de time do card do sofá), que foram para a do menu (o `size-check`
+  conferiu). O menu ficou em **332,8 KB**.
+- **A revisão (Opus) achou:** as chaves do menu acima (o `mode.short.sandbox` e os nomes de time do sofá apareceriam
+  crus na web até o pedaço dos editores chegar); gravar o nome vazio não voltava à cor e cancelar cortava o nome
+  importado (de até 24 caracteres); o resultado juntava o nome de quem venceu com o maior placar dos outros (na
+  eliminação, nem sempre o dele); o "Tanto faz" do online ignorava o "Seu time"; a linha "Hoje" pegava o time do
+  controlador 0 (no sofá, nem sempre o P1); e quem caía na eliminação ficava 10 min na câmera de morte. Corrigido antes
+  do commit. Ficam: o placar do Tab numa lista só passa da tela de 640×360 a partir de 15 linhas (o TDM 2×8 já
+  passava); os nomes de time vão ao amigo online sem o filtro de nomes (como os nomes dos jogadores hoje).
+

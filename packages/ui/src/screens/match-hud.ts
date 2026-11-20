@@ -1,6 +1,6 @@
 import { pushRect, pushShape, type DrawList } from '../draw-list.ts';
 import type { MsdfFont, UiFonts } from '../font.ts';
-import { capHeightPx, numberWidth, paintNumber, paintText, textWidth } from '../paint.ts';
+import { capHeightPx, fitTextPx, numberWidth, paintNumber, paintText, textWidth } from '../paint.ts';
 import { t } from '../text.ts';
 import { COLORS, TEAM_COLORS, withAlpha } from '../tokens.ts';
 import { HUD_METRICS, hudLabelPx, hudNumberPx } from './hud.ts';
@@ -140,9 +140,14 @@ export interface ScoreboardModel {
   title: string;
   /** M8 (fase 5): a linha embaixo do título ("Diretor: bots –½"); `''` = sem a linha. */
   note: string;
-  /** 0 = FFA (uma lista só); 2 = TDM. */
+  /** 0 = FFA (uma lista só); 2 = TDM. M9 (fase 3): até 4 (o Sandbox). */
   teamCount: number;
   readonly teamScores: number[];
+  /**
+   * M9 (fase 3): o nome de cada time no cabeçalho da tabela dele, depois dos pontos (o do Sandbox, ou o da cor; `''` =
+   * sem nome). Encolhe para caber na coluna dos nomes. O `game` preenche uma vez.
+   */
+  readonly teamNames: string[];
   rowCount: number;
   /** Por linha, já na ordem de exibição (o `game` ordena: abates, depois menos mortes). */
   readonly name: string[];
@@ -171,6 +176,7 @@ export function createScoreboardModel(): ScoreboardModel {
     note: '',
     teamCount: 0,
     teamScores: [0, 0, 0, 0],
+    teamNames: ['', '', '', ''],
     rowCount: 0,
     name: new Array<string>(n).fill(''),
     team: new Uint8Array(n),
@@ -235,15 +241,7 @@ export function drawScoreboard(
   );
   const nameW = Math.round(Math.max(textWidth(font, tx.player, px * 0.85), px * 9));
   const tableW = nameW + numW * 3 + gap * 4 + pad * 2;
-  const tables = m.teamCount > 0 ? m.teamCount : 1;
-  const sideBySide = tables === 1 || tableW * tables + gap * 2 * (tables - 1) <= width - pad * 4;
-  let maxRows = 0;
-  for (let tIdx = 0; tIdx < tables; tIdx++) {
-    let n = 0;
-    for (let r = 0; r < m.rowCount; r++) if (tables === 1 || m.team[r] === tIdx) n++;
-    if (n > maxRows) maxRows = n;
-  }
-  const tableH = rowH * (maxRows + 1) + pad * 2 + gap;
+  const teamTables = m.teamCount > 0 ? m.teamCount : 1;
   // Legenda das regras: a maior entre os times (lado a lado) ou a de cada um (empilhados).
   const rulePx = px * 0.8;
   const ruleCap = capHeightPx(font, rulePx);
@@ -252,8 +250,32 @@ export function drawScoreboard(
   const plateH = (n: number): number => Math.round(pad * 2 + (n - 1) * ruleH + ruleCap);
   const footer = (n: number): number => (n > 0 ? gap + plateH(n) : 0);
   const titleCap = capHeightPx(font, titlePx);
-  const totalW = sideBySide ? tableW * tables + gap * 2 * (tables - 1) : tableW;
-  const tablesH = titleCap + gap * 2 + (sideBySide ? tableH : tableH * tables + gap * (tables - 1));
+  // Uma tabela por time: lado a lado se couber, senão empilhadas. M9 (fase 3): 3 ou 4 tabelas (o Sandbox) vão numa grade
+  // de 2 colunas; se nem assim couberem na altura (a tela pequena), uma lista só, com a cor do time em cada linha e os
+  // pontos dos times no cabeçalho (`merged`).
+  let tables = teamTables;
+  let maxRows = 0;
+  let tableH = 0;
+  let cols = 1;
+  let gridRows = 1;
+  let tablesH = 0;
+  for (;;) {
+    maxRows = 0;
+    for (let tIdx = 0; tIdx < tables; tIdx++) {
+      let n = 0;
+      for (let r = 0; r < m.rowCount; r++) if (tables === 1 || m.team[r] === tIdx) n++;
+      if (n > maxRows) maxRows = n;
+    }
+    tableH = rowH * (maxRows + 1) + pad * 2 + gap;
+    const sideBySide = tables === 1 || tableW * tables + gap * 2 * (tables - 1) <= width - pad * 4;
+    cols = sideBySide ? tables : tables > 2 && tableW * 2 + gap * 2 <= width - pad * 4 ? 2 : 1;
+    gridRows = Math.ceil(tables / cols);
+    tablesH = titleCap + gap * 2 + tableH * gridRows + gap * (gridRows - 1);
+    if (tables > 2 && tablesH > height - pad * 2) tables = 1;
+    else break;
+  }
+  const merged = tables === 1 && teamTables > 1;
+  const totalW = tableW * cols + gap * 2 * (cols - 1);
   // M8 (fase 5): a linha do Diretor de Partida embaixo do título; sem espaço (o placar cheio numa tela pequena), na
   // ponta direita da linha do título.
   const noteLine = m.note !== '' ? Math.round(ruleCap + gap) : 0;
@@ -264,12 +286,16 @@ export function drawScoreboard(
   const spare = height - pad * 2 - baseH;
   let ruleLimit = 0;
   for (let tIdx = 0; tIdx < tables; tIdx++) ruleLimit = Math.max(ruleLimit, rulesOf(m, tables, tIdx));
-  while (ruleLimit > 0 && (sideBySide ? footer(ruleLimit) : tables * footer(ruleLimit)) > spare) ruleLimit--;
+  while (ruleLimit > 0 && gridRows * footer(ruleLimit) > spare) ruleLimit--;
   const shown = (tIdx: number): number => Math.min(ruleLimit, rulesOf(m, tables, tIdx));
+  // A legenda de uma fileira da grade: a maior entre as tabelas dela.
+  const rowFooter = (row: number): number => {
+    let f = 0;
+    for (let tIdx = row * cols; tIdx < Math.min(tables, (row + 1) * cols); tIdx++) f = Math.max(f, footer(shown(tIdx)));
+    return f;
+  };
   let legendH = 0;
-  for (let tIdx = 0; tIdx < tables; tIdx++) {
-    legendH = sideBySide ? Math.max(legendH, footer(shown(tIdx))) : legendH + footer(shown(tIdx));
-  }
+  for (let row = 0; row < gridRows; row++) legendH += rowFooter(row);
   const totalH = baseH + legendH;
   const x0 = Math.round((width - totalW) / 2);
   let y0 = Math.round(Math.max(pad, (height - totalH) / 2));
@@ -289,16 +315,32 @@ export function drawScoreboard(
   }
   let stackY = y0;
   for (let tIdx = 0; tIdx < tables; tIdx++) {
-    const tx0 = sideBySide ? x0 + tIdx * (tableW + gap * 2) : x0;
-    const ty0 = sideBySide ? y0 : stackY;
-    stackY += tableH + gap + footer(shown(tIdx));
+    const col = tIdx % cols;
+    const tx0 = x0 + col * (tableW + gap * 2);
+    const ty0 = stackY;
+    // A fileira seguinte começa depois da tabela mais a maior legenda desta fileira.
+    if (col === cols - 1 || tIdx === tables - 1) stackY += tableH + gap + rowFooter(Math.floor(tIdx / cols));
     const color = tables > 1 ? (TEAM_COLORS[tIdx] as number) : COLORS.acao;
     pushShape(out, tx0, ty0, tableW, tableH, COLORS.hudFundo, Math.round(5 * s));
     pushRect(out, tx0, ty0, tableW, Math.max(2, Math.round(2 * s)), color);
     // Cabeçalho: os pontos do time (TDM) e os nomes das colunas.
     const hy = ty0 + pad;
-    if (tables > 1) paintNumber(out, font, m.teamScores[tIdx] ?? 0, 0, tx0 + pad, hy, px, color);
-    else paintText(out, font, tx.player, tx0 + pad, hy, px * 0.85, COLORS.textoBaixo, 0.08);
+    if (tables > 1) {
+      const scoreW = paintNumber(out, font, m.teamScores[tIdx] ?? 0, 0, tx0 + pad, hy, px, color);
+      // M9 (fase 3): o nome do time depois dos pontos, encolhido para caber na coluna dos nomes.
+      const name = m.teamNames[tIdx] ?? '';
+      if (name !== '') {
+        const room = nameW - scoreW - gap;
+        const namePx = fitTextPx(font, name, px * 0.85, 0, room, px * 0.55);
+        paintText(out, font, name, tx0 + pad + scoreW + gap, hy + cap - capHeightPx(font, namePx), namePx, color);
+      }
+    } else if (merged) {
+      // M9 (fase 3): a lista só dos times: os pontos de cada time, na cor dele, no lugar do "JOGADOR".
+      let pen = tx0 + pad;
+      for (let k = 0; k < teamTables; k++) {
+        pen += paintNumber(out, font, m.teamScores[k] ?? 0, 0, pen, hy, px, TEAM_COLORS[k] as number) + gap * 2;
+      }
+    } else paintText(out, font, tx.player, tx0 + pad, hy, px * 0.85, COLORS.textoBaixo, 0.08);
     const colX = (k: number): number => tx0 + pad + nameW + gap + k * (numW + gap) + numW;
     paintText(out, font, tx.kills, colX(0), hy, px * 0.85, COLORS.textoBaixo, 0.08, 1);
     paintText(out, font, tx.deaths, colX(1), hy, px * 0.85, COLORS.textoBaixo, 0.08, 1);
@@ -307,6 +349,8 @@ export function drawScoreboard(
     for (let r = 0; r < m.rowCount; r++) {
       if (tables > 1 && m.team[r] !== tIdx) continue;
       if (m.local[r] === 1) pushRect(out, tx0 + 2, ry - pad * 0.5, tableW - 4, rowH, withAlpha(COLORS.acao, 0.18));
+      // M9 (fase 3): na lista só, a cor do time na ponta da linha.
+      if (merged) pushRect(out, tx0 + 2, ry, Math.max(2, Math.round(2 * s)), cap, TEAM_COLORS[m.team[r]!] as number);
       const fg = m.dead[r] === 1 ? COLORS.textoBaixo : m.local[r] === 1 ? COLORS.acao : COLORS.texto;
       paintText(out, font, m.name[r]!, tx0 + pad, ry, px, fg);
       paintNumber(out, font, m.kills[r]!, 0, colX(0), ry, px, fg, 1);

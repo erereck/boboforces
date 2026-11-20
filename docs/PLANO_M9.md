@@ -79,6 +79,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 3. **O Sandbox no jogo:** o modo na Partida personalizada (a aba Times com até 4 times: nome, bots, HP e armas; o
    objetivo), jogar ou assistir, salvar como Cenário (preset), e o que hoje supõe 2 times (o HUD, o feed, os nomes dos
    times, o placar, o resultado, o sofá e o lobby online).
+   - **feita em 20/11** (ARCHITECTURE §20.5): no Construto e no Ringue; a Base Aérea fica de fora por enquanto.
 4. **As Ferramentas do Dono na sim:** a fila de comandos do dono (com o tick em que valem, aplicada num ponto fixo do
    passo, gravável para replay), a reserva de bots dormentes do Sandbox (criar bot num ponto), congelar a IA, trocar o
    time, dar arma e ligar ou desligar um modificador ao vivo; o teste headless por um roteiro de comandos.

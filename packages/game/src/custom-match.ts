@@ -3,9 +3,11 @@ import {
   BOT_LEVELS,
   builtinBotRef,
   FRIENDLY_FIRE_LEVELS,
+  ENGINE_MAX_TEAMS,
   MODIFIERS,
   modifiersConflict,
   REGEN_RULES,
+  SANDBOX_DEFAULTS,
   ZOMBIES_DEFAULTS,
   ZOMBIES_WAVE_CHOICES,
   type BotDocument,
@@ -14,12 +16,22 @@ import {
   type MatchRecipe,
   type ModifierId,
   type PlayerRules,
+  type SandboxObjective,
+  type TeamRecipe,
   type WeaponRules,
   type HudRules,
   type ZombiesRules,
 } from '@boboforces/format';
-import { formatDecimal, t, type StringKey } from '@boboforces/ui';
+import {
+  CUSTOM_NAME_VALUE_WIDTH,
+  formatDecimal,
+  t,
+  TEAM_COLORS,
+  type StringKey,
+  type TextParams,
+} from '@boboforces/ui';
 import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
+import { teamColorName, teamName } from './team-names.ts';
 
 /**
  * M2 (fase 4e): o editor da Partida personalizada (gameplay.md §10.3), lógica pura sobre a receita. Cada aba tem
@@ -29,7 +41,8 @@ import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './map
  */
 
 export const CUSTOM_TABS = ['match', 'players', 'weapons', 'bots', 'mods', 'hud'] as const;
-export type CustomTab = (typeof CUSTOM_TABS)[number];
+/** M9 (fase 3): a aba Times é do Bobo Sandbox (no lugar da aba Bots). */
+export type CustomTab = (typeof CUSTOM_TABS)[number] | 'teams';
 
 /**
  * M3 (fase 6b): as abas do Bobo Zombies: Partida (as regras do modo), Jogadores (os bots de apoio e o movimento),
@@ -37,9 +50,22 @@ export type CustomTab = (typeof CUSTOM_TABS)[number];
  */
 export const ZOMBIES_TABS = ['match', 'players', 'weapons', 'hud'] as const satisfies readonly CustomTab[];
 
-/** As abas da receita (o Bobo Zombies tem as dele). */
+/**
+ * M9 (fase 3): as abas do Bobo Sandbox: a aba Times (de 2 a 4 times, cada um com nome, bots, vida e armas) logo depois
+ * da Partida, no lugar da aba Bots.
+ */
+export const SANDBOX_TABS = [
+  'match',
+  'teams',
+  'players',
+  'weapons',
+  'mods',
+  'hud',
+] as const satisfies readonly CustomTab[];
+
+/** As abas da receita (o Bobo Zombies e o Bobo Sandbox têm as deles). */
 export function customTabs(r: MatchRecipe): readonly CustomTab[] {
-  return r.mode === 'zombies' ? ZOMBIES_TABS : CUSTOM_TABS;
+  return r.mode === 'zombies' ? ZOMBIES_TABS : r.mode === 'sandbox' ? SANDBOX_TABS : CUSTOM_TABS;
 }
 
 export const CUSTOM_TAB_LABELS: Readonly<Record<CustomTab, StringKey>> = {
@@ -49,6 +75,7 @@ export const CUSTOM_TAB_LABELS: Readonly<Record<CustomTab, StringKey>> = {
   bots: 'custom.tab.bots',
   mods: 'custom.tab.mods',
   hud: 'custom.tab.hud',
+  teams: 'custom.tab.teams',
 };
 
 export interface CustomLimits {
@@ -63,6 +90,11 @@ export interface CustomLimits {
 interface RowDef {
   readonly id: string;
   readonly labelKey: StringKey;
+  /** M9 (fase 3): os parâmetros do rótulo (as linhas de cada time do Sandbox: "Verde: vida"). */
+  readonly labelParams?: TextParams;
+  /** M9 (fase 3): o quadradinho da cor do time (RGB) antes do valor, e a área do valor mais larga (o nome do time). */
+  readonly swatch?: number;
+  readonly valueWidth?: number;
   /** M8 (fase 2): com os tetos (os esquadrões), a linha do bot mostra o nome do esquadrão do time. */
   value(r: MatchRecipe, limits?: CustomLimits): string;
   step(r: MatchRecipe, delta: number, limits: CustomLimits): MatchRecipe;
@@ -147,6 +179,21 @@ const withZombies = (r: MatchRecipe, z: Partial<ZombiesRules>): MatchRecipe => (
 });
 const botsOf = (r: MatchRecipe, team: number): number => (r.teams[team]?.bots ?? []).reduce((n, b) => n + b.count, 0);
 const refOf = (r: MatchRecipe, team: number): BotRef => r.teams[team]?.bots[0]?.ref ?? builtinBotRef('normal');
+const sandbox = (r: MatchRecipe): boolean => r.mode === 'sandbox';
+
+/** M9 (fase 3): o time dos humanos (o que tem `humans`; sem nenhum, o 0). */
+export function homeTeam(r: MatchRecipe): number {
+  return Math.max(
+    0,
+    r.teams.findIndex((tm) => tm.humans === 'all' || (tm.humans ?? 0) > 0),
+  );
+}
+
+/** O mínimo de bots do time: o seu time (o 0 nos Times; no Sandbox, o dos humanos) pode ficar só com você. */
+function minBots(r: MatchRecipe, team: number): number {
+  if (ffa(r)) return 1;
+  return team === (sandbox(r) ? homeTeam(r) : 0) ? 0 : 1;
+}
 
 const EMBEDDED = 'embedded:';
 
@@ -253,14 +300,29 @@ function fitMap(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   if (r.mode === 'zombies') return r;
   const cap = mapBotCap(r.map, l.maxBots);
   if (ffa(r)) return botsOf(r, 0) > cap ? setTotal(r, 0, cap) : r;
+  if (sandbox(r)) {
+    // M9 (fase 3): corta um bot por vez do time com mais bots acima do mínimo dele (no empate, o de depois).
+    let out = r;
+    let total = r.teams.reduce((n, _tm, i) => n + botsOf(r, i), 0);
+    while (total > cap) {
+      let pick = -1;
+      for (let i = 0; i < out.teams.length; i++) {
+        if (botsOf(out, i) > minBots(out, i) && (pick < 0 || botsOf(out, i) >= botsOf(out, pick))) pick = i;
+      }
+      if (pick < 0) break;
+      out = setTotal(out, pick, botsOf(out, pick) - 1);
+      total--;
+    }
+    return out;
+  }
   const enemies = Math.min(botsOf(r, 1), Math.ceil(cap / 2));
   const allies = Math.min(botsOf(r, 0), cap - enemies);
   if (enemies === botsOf(r, 1) && allies === botsOf(r, 0)) return r;
   return setTotal(setTotal(r, 1, enemies), 0, allies);
 }
 
-/** M3 (fase 6b): os modos da linha Modo, na ordem do ciclo. */
-const CUSTOM_MODES = ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies'] as const;
+/** M3 (fase 6b): os modos da linha Modo, na ordem do ciclo. M9 (fase 3): o Bobo Sandbox no fim. */
+const CUSTOM_MODES = ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies', 'sandbox'] as const;
 /** M6 (fase 1): a meta e o tempo do Domination (GDD §4.1.2; os da sim, `DOMINATION`). */
 const DOMINATION_MATCH = { timeLimitS: 600, scoreLimit: 200 } as const;
 
@@ -273,6 +335,9 @@ export const ZOMBIES_SUPPORT_MAX = 3;
 function stepMode(r: MatchRecipe, delta: number, l: CustomLimits): MatchRecipe {
   const i = Math.max(0, (CUSTOM_MODES as readonly string[]).indexOf(r.mode));
   const next = CUSTOM_MODES[cycleIndex(CUSTOM_MODES.length, i, delta)]!;
+  // M9 (fase 3): o Sandbox nasce dos Times; saindo dele, os Times de agora (o seu time contra o resto) seguem o ciclo.
+  if (next === 'sandbox') return syncEmbedded(toSandbox(r, l), l);
+  if (sandbox(r)) r = fromSandbox(r, l);
   if (next === 'zombies') return syncEmbedded(toZombies(r, l), l);
   let warfare = r.mode === 'zombies' ? fromZombies(r, l) : r;
   // M6 (fase 1): o Domination usa os times do TDM (do FFA, divide antes), com a meta dos pontos.
@@ -328,6 +393,49 @@ function fromZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   };
 }
 
+/**
+ * M9 (fase 3): para o Bobo Sandbox, a partir dos Times (do FFA, divide; do Zombies, os Times do JOGAR; do Domination,
+ * o tempo e a meta do TDM): os 2 times de agora, sem o Diretor de Partida (ele mira um adversário, e aqui são até 3).
+ */
+function toSandbox(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  let base = r.mode === 'zombies' ? fromZombies(r, l) : r;
+  if (ffa(base)) base = switchMode(base, l.maxBots);
+  const { director: _director, ...rest } = base;
+  const match = base.mode === 'warfare.domination' ? { ...base.match, timeLimitS: 600, scoreLimit: 75 } : base.match;
+  return fitMap(
+    { ...rest, mode: 'sandbox', map: mapForMode(base.map, 'sandbox'), ...(match !== undefined ? { match } : {}) },
+    l,
+  );
+}
+
+/**
+ * M9 (fase 3): do Sandbox para os Times: o seu time (com os bots dele) contra os bots de todos os outros juntos (o mesmo
+ * bot soma numa linha), sem os nomes, a vida e as armas por time; o tempo e a meta que a linha mostrava.
+ */
+function fromSandbox(r: MatchRecipe, l: CustomLimits): MatchRecipe {
+  const { sandbox: _sandbox, ...rest } = r;
+  const home = homeTeam(r);
+  const enemies: { ref: BotRef; count: number }[] = [];
+  r.teams.forEach((tm, i) => {
+    if (i === home) return;
+    for (const b of tm.bots) {
+      const same = enemies.find((e) => e.ref === b.ref);
+      if (same) same.count += b.count;
+      else if (b.count > 0) enemies.push({ ref: b.ref, count: b.count });
+    }
+  });
+  if (enemies.length === 0) enemies.push({ ref: refOf(r, home), count: 1 });
+  return fitMap(
+    {
+      ...rest,
+      mode: 'warfare.tdm',
+      match: { ...r.match, timeLimitS: timeOf(r), scoreLimit: scoreOf(r) },
+      teams: [{ humans: 'all', bots: r.teams[home]?.bots ?? [] }, { bots: enemies }],
+    },
+    l,
+  );
+}
+
 /** TDM ↔ FFA mantendo a quantidade de bots: o FFA junta todo mundo num time; o TDM divide (você no primeiro). */
 function switchMode(r: MatchRecipe, maxBots: number): MatchRecipe {
   if (ffa(r)) {
@@ -368,13 +476,54 @@ const mult = (v: number): string => {
   return t('custom.mult', { n: text });
 };
 
+/** M9 (fase 3): o objetivo do Sandbox (ausente = pontos). */
+const objectiveOf = (r: MatchRecipe): SandboxObjective => r.sandbox?.objective ?? SANDBOX_DEFAULTS.objective;
+/** M9 (fase 3): a ordem da linha Objetivo (o padrão primeiro). */
+const OBJECTIVES: readonly SandboxObjective[] = ['points', 'elimination', 'none'];
+
+/**
+ * O tempo e a meta como a sim joga (`matchLimits`): fora do Sandbox, os da receita (ausente = sem); no Sandbox,
+ * ausentes = os padrões dele, e a eliminação sempre com tempo.
+ */
+function timeOf(r: MatchRecipe): number {
+  const s = r.match?.timeLimitS;
+  if (!sandbox(r)) return s ?? 0;
+  return objectiveOf(r) === 'elimination' ? s || SANDBOX_DEFAULTS.timeLimitS : (s ?? SANDBOX_DEFAULTS.timeLimitS);
+}
+function scoreOf(r: MatchRecipe): number {
+  return r.match?.scoreLimit ?? (sandbox(r) ? SANDBOX_DEFAULTS.scoreLimit : 0);
+}
+
 /** M3 (fase 6b): a linha Modo (Times, Todos contra todos, Zombies); o mapa acompanha (o Ringue não tem FFA). */
 const MODE_ROW: RowDef = {
   id: 'mode',
   labelKey: 'quick.mode',
   value: (r) =>
-    t(r.mode === 'zombies' ? 'mode.short.zombies' : ffa(r) ? 'mode.short.warfare.ffa' : 'mode.short.warfare.tdm'),
+    t(
+      r.mode === 'zombies'
+        ? 'mode.short.zombies'
+        : sandbox(r)
+          ? 'mode.short.sandbox'
+          : ffa(r)
+            ? 'mode.short.warfare.ffa'
+            : 'mode.short.warfare.tdm',
+    ),
   step: (r, d, l) => stepMode(r, d, l),
+};
+
+/**
+ * M9 (fase 3): o objetivo do Sandbox: Pontos (o fim do TDM), Eliminação (sem renascer) ou Nenhum (o "brinquedo", sem
+ * tempo nem meta). Pontos é o padrão: sai do bloco.
+ */
+const OBJECTIVE_ROW: RowDef = {
+  id: 'objective',
+  labelKey: 'custom.row.objective',
+  value: (r) => t(`custom.objective.${objectiveOf(r)}` as StringKey),
+  step: (r, d) => {
+    const next = OBJECTIVES[cycleIndex(OBJECTIVES.length, OBJECTIVES.indexOf(objectiveOf(r)), d)]!;
+    const { sandbox: _drop, ...rest } = r;
+    return next === SANDBOX_DEFAULTS.objective ? rest : { ...rest, sandbox: { objective: next } };
+  },
 };
 
 const MATCH_ROWS: readonly RowDef[] = [
@@ -393,25 +542,25 @@ const MATCH_ROWS: readonly RowDef[] = [
     id: 'time',
     labelKey: 'custom.row.time',
     value: (r) => {
-      const s = r.match?.timeLimitS ?? 0;
+      const s = timeOf(r);
       return s === 0 ? t('quick.noTime') : t('summary.time', { min: Math.round(s / 60) });
     },
     step: (r, d) => {
-      const cur = r.match?.timeLimitS ?? 0;
-      const i = cycleIndex(TIMES.length, Math.max(0, TIMES.indexOf(cur)), d);
-      return { ...r, match: { ...r.match, timeLimitS: TIMES[i]! } };
+      // M9 (fase 3): na eliminação do Sandbox a partida sempre tem tempo (sem o "sem limite").
+      const list = objectiveOf(r) === 'elimination' ? TIMES.filter((s) => s > 0) : TIMES;
+      const i = cycleIndex(list.length, Math.max(0, list.indexOf(timeOf(r))), d);
+      return { ...r, match: { ...r.match, timeLimitS: list[i]! } };
     },
   },
   {
     id: 'score',
     labelKey: 'custom.row.score',
     value: (r) => {
-      const n = r.match?.scoreLimit ?? 0;
+      const n = scoreOf(r);
       return n === 0 ? t('custom.noScore') : t('custom.kills', { n });
     },
     step: (r, d) => {
-      const cur = r.match?.scoreLimit ?? 0;
-      const i = cycleIndex(SCORES.length, Math.max(0, SCORES.indexOf(cur)), d);
+      const i = cycleIndex(SCORES.length, Math.max(0, SCORES.indexOf(scoreOf(r))), d);
       return { ...r, match: { ...r.match, scoreLimit: SCORES[i]! } };
     },
   },
@@ -649,15 +798,14 @@ const WEAPON_ROWS: readonly RowDef[] = [
 ];
 
 function allowedIndex(r: MatchRecipe): number {
-  const a = weapons(r).allowed ?? [];
-  const i = ALLOWED_CHOICES.findIndex((c) => c.length === a.length && c.every((id) => a.includes(id)));
-  return i < 0 ? 0 : i;
+  return choiceIndex(weapons(r).allowed ?? []);
 }
 
-function botRows(r: MatchRecipe): readonly RowDef[] {
-  const choose = (team: number): RowDef => ({
+/** A escolha do bot do time `team` (o de fábrica, o da Oficina ou o esquadrão). */
+function chooseRow(team: number, labelKey: StringKey): RowDef {
+  return {
     id: `bot${team}`,
-    labelKey: ffa(r) ? 'custom.row.bot' : team === 0 ? 'custom.row.allyBot' : 'custom.row.enemyBot',
+    labelKey,
     value: (rr, l) => {
       const bots = rr.teams[team]?.bots ?? [];
       if (bots.length < 2) return botName(refOf(rr, team), rr);
@@ -677,22 +825,170 @@ function botRows(r: MatchRecipe): readonly RowDef[] {
         const teams = rr.teams.map((tm, k) => (k === team ? { ...tm, bots: q.bots.map((b) => ({ ...b })) } : tm));
         return syncEmbedded(fitMap({ ...rr, teams }, l), l);
       }
-      const next = setTeam(rr, team, pick as BotRef, Math.max(team === 0 && !ffa(rr) ? 0 : 1, botsOf(rr, team)));
+      const next = setTeam(rr, team, pick as BotRef, Math.max(minBots(rr, team), botsOf(rr, team)));
       return syncEmbedded(next, l);
     },
-  });
-  const count = (team: number): RowDef => ({
+  };
+}
+
+/** Quantos bots o time `team` tem (do mínimo dele até o teto do mapa menos os bots dos outros times). */
+function countRow(team: number, labelKey: StringKey): RowDef {
+  return {
     id: `count${team}`,
-    labelKey: ffa(r) ? 'quick.size' : team === 0 ? 'custom.row.allies' : 'custom.row.enemies',
+    labelKey,
     value: (rr) => String(botsOf(rr, team)),
     step: (rr, d, l) => {
-      const other = ffa(rr) ? 0 : botsOf(rr, 1 - team);
-      const min = team === 0 && !ffa(rr) ? 0 : 1;
-      const n = Math.max(min, Math.min(mapBotCap(rr.map, l.maxBots) - other, teamTotal(rr, team) + d));
+      let other = 0;
+      if (!ffa(rr)) for (let k = 0; k < rr.teams.length; k++) if (k !== team) other += botsOf(rr, k);
+      const n = Math.max(minBots(rr, team), Math.min(mapBotCap(rr.map, l.maxBots) - other, teamTotal(rr, team) + d));
       return syncEmbedded(setTotal(rr, team, n), l);
     },
+  };
+}
+
+function botRows(r: MatchRecipe): readonly RowDef[] {
+  if (ffa(r)) return [chooseRow(0, 'custom.row.bot'), countRow(0, 'quick.size'), DIRECTOR_ROW];
+  return [
+    chooseRow(0, 'custom.row.allyBot'),
+    countRow(0, 'custom.row.allies'),
+    chooseRow(1, 'custom.row.enemyBot'),
+    countRow(1, 'custom.row.enemies'),
+    DIRECTOR_ROW,
+  ];
+}
+
+/** M9 (fase 3): a vida do time no Sandbox (de 1, o "um toque derruba", a 1000; ausente = a da partida). */
+const TEAM_HPS = [1, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000];
+
+const teamHpOf = (r: MatchRecipe, team: number): number => r.teams[team]?.hp ?? players(r).hp ?? 100;
+
+/** Índice de uma lista de armas nas escolhas (`ALLOWED_CHOICES`; desconhecida = Todas). */
+function choiceIndex(list: readonly string[]): number {
+  const i = ALLOWED_CHOICES.findIndex((c) => c.length === list.length && c.every((id) => list.includes(id)));
+  return i < 0 ? 0 : i;
+}
+
+/** Troca um campo do time `team` (`undefined` tira o campo: o nome, a vida e as armas voltam ao padrão). */
+function withTeamField<K extends 'name' | 'hp' | 'weapons'>(
+  r: MatchRecipe,
+  team: number,
+  key: K,
+  value: TeamRecipe[K] | undefined,
+): MatchRecipe {
+  const teams = r.teams.map((tm, i) => {
+    if (i !== team) return tm;
+    const { [key]: _drop, ...rest } = tm;
+    return (value === undefined ? rest : { ...rest, [key]: value }) as unknown as TeamRecipe;
   });
-  return ffa(r) ? [choose(0), count(0), DIRECTOR_ROW] : [choose(0), count(0), choose(1), count(1), DIRECTOR_ROW];
+  return { ...r, teams };
+}
+
+/**
+ * M9 (fase 3): o nome do time `team` (o que o jogador digitou; vazio ou o da cor = sem nome, o da cor aparece). Só o
+ * que o teclado aceita (`cleanTypedName` na digitação), no máximo `TEAM_NAME_MAX`.
+ */
+export function withTeamName(r: MatchRecipe, team: number, name: string): MatchRecipe {
+  const clean = name.trim();
+  return withTeamField(r, team, 'name', clean === '' || clean === teamColorName(team) ? undefined : clean);
+}
+
+/** M9 (fase 3): a linha do nome do time é `teamName<i>`: o confirmar abre o teclado (o `game` cuida); -1 = outra. */
+export function customNameTeam(rowId: string): number {
+  const m = /^teamName([0-3])$/.exec(rowId);
+  return m ? Number(m[1]) : -1;
+}
+
+/** M9 (fase 3): os humanos (todos os locais) passam para o time `to`; o time que eles deixam fica com 1 bot no mínimo. */
+function moveHumans(r: MatchRecipe, to: number, l: CustomLimits): MatchRecipe {
+  const from = homeTeam(r);
+  const teams = r.teams.map((tm, i): TeamRecipe => {
+    const { humans: _humans, ...rest } = tm;
+    if (i === to) return { ...rest, humans: 'all' };
+    if (i === from && botsOf(r, i) === 0) return { ...rest, bots: [{ ref: refOf(r, i), count: 1 }] };
+    return rest;
+  });
+  return fitMap({ ...r, teams }, l);
+}
+
+/**
+ * M9 (fase 3): um time a mais (até 4) ou a menos (até 2). O novo vem com o bot e a quantidade do último time (dentro do
+ * teto do mapa; sem folga, os maiores cedem); quem sai é o último, e os humanos que estavam nele vão para o 1º.
+ */
+function stepTeams(r: MatchRecipe, delta: number, l: CustomLimits): MatchRecipe {
+  const n = r.teams.length;
+  if (delta > 0 && n < ENGINE_MAX_TEAMS) {
+    const last = n - 1;
+    const room = mapBotCap(r.map, l.maxBots) - r.teams.reduce((s, _tm, i) => s + botsOf(r, i), 0);
+    const count = Math.max(1, Math.min(Math.max(1, botsOf(r, last)), room));
+    const team: TeamRecipe = { bots: [{ ref: refOf(r, last), count }] };
+    return syncEmbedded(fitMap({ ...r, teams: [...r.teams, team] }, l), l);
+  }
+  if (delta < 0 && n > 2) {
+    const home = homeTeam(r);
+    let out: MatchRecipe = { ...r, teams: r.teams.slice(0, n - 1) };
+    if (home === n - 1) out = moveHumans(out, 0, l);
+    return syncEmbedded(out, l);
+  }
+  return r;
+}
+
+const TEAMS_ROW: RowDef = {
+  id: 'teams',
+  labelKey: 'custom.row.teams',
+  value: (r) => String(r.teams.length),
+  step: (r, d, l) => stepTeams(r, d, l),
+};
+
+/** M9 (fase 3): a aba Times do Sandbox: quantos times, o seu e, por time, o nome, o bot, quantos, a vida e as armas. */
+function teamRows(r: MatchRecipe): readonly RowDef[] {
+  const home = homeTeam(r);
+  const rows: RowDef[] = [
+    TEAMS_ROW,
+    {
+      id: 'you',
+      labelKey: 'custom.row.you',
+      swatch: TEAM_COLORS[home]! >>> 8,
+      valueWidth: CUSTOM_NAME_VALUE_WIDTH,
+      value: (rr) => teamName(rr, homeTeam(rr)),
+      step: (rr, d, l) => moveHumans(rr, cycleIndex(rr.teams.length, homeTeam(rr), d), l),
+    },
+  ];
+  for (let i = 0; i < r.teams.length; i++) {
+    const labelParams = { team: teamColorName(i) };
+    rows.push(
+      {
+        id: `teamName${i}`,
+        labelKey: 'custom.row.teamName',
+        labelParams,
+        swatch: TEAM_COLORS[i]! >>> 8,
+        valueWidth: CUSTOM_NAME_VALUE_WIDTH,
+        value: (rr) => teamName(rr, i),
+        // O confirmar abre o teclado (o `game`); as setas não mudam o nome.
+        step: (rr) => rr,
+      },
+      { ...chooseRow(i, 'custom.row.teamBot'), labelParams },
+      { ...countRow(i, 'custom.row.teamCount'), labelParams },
+      {
+        id: `teamHp${i}`,
+        labelKey: 'custom.row.teamHp',
+        labelParams,
+        value: (rr) => String(teamHpOf(rr, i)),
+        step: (rr, d) => withTeamField(rr, i, 'hp', stepList(TEAM_HPS, teamHpOf(rr, i), d)),
+      },
+      {
+        id: `teamArms${i}`,
+        labelKey: 'custom.row.teamArms',
+        labelParams,
+        value: (rr) => t(ALLOWED_KEYS[choiceIndex(rr.teams[i]?.weapons ?? [])]!),
+        step: (rr, d) => {
+          const k = cycleIndex(ALLOWED_CHOICES.length, choiceIndex(rr.teams[i]?.weapons ?? []), d);
+          const list = ALLOWED_CHOICES[k]!;
+          return withTeamField(rr, i, 'weapons', list.length > 0 ? list : undefined);
+        },
+      },
+    );
+  }
+  return rows;
 }
 
 /** M8 (fase 5): o Diretor de Partida na aba Bots: desligado (sem o bloco), Relax, Equilibrado ou Desafio. */
@@ -861,6 +1157,22 @@ function zombiePlayerRows(r: MatchRecipe): readonly RowDef[] {
 /** M3 (fase 6b): Armas no Bobo Zombies: as armas vêm da parede e da caixa, então só o dano, a mira e o recuo. */
 const ZOMBIE_WEAPON_IDS = new Set(['damage', 'ads', 'assist']);
 
+/**
+ * M9 (fase 3): a aba Partida do Sandbox: o objetivo depois do mapa; o tempo só com objetivo (o "nenhum" não acaba) e a
+ * meta só nos pontos (a eliminação acaba com o último time de pé).
+ */
+function sandboxMatchRows(r: MatchRecipe): readonly RowDef[] {
+  const objective = objectiveOf(r);
+  const out: RowDef[] = [];
+  for (const row of MATCH_ROWS) {
+    if (row.id === 'time' && objective === 'none') continue;
+    if (row.id === 'score' && objective !== 'points') continue;
+    out.push(row);
+    if (row.id === 'map') out.push(OBJECTIVE_ROW);
+  }
+  return out;
+}
+
 /** As linhas de uma aba (as de Bots dependem do modo). */
 export function customRows(tab: CustomTab, r: MatchRecipe): readonly RowDef[] {
   if (r.mode === 'zombies') {
@@ -875,7 +1187,9 @@ export function customRows(tab: CustomTab, r: MatchRecipe): readonly RowDef[] {
   }
   switch (tab) {
     case 'match':
-      return MATCH_ROWS;
+      return sandbox(r) ? sandboxMatchRows(r) : MATCH_ROWS;
+    case 'teams':
+      return sandbox(r) ? teamRows(r) : [];
     case 'players':
       return movementOf(r) === 'custom'
         ? [MOVEMENT_ROW, ...CUSTOM_MOVEMENT_ROWS, ...PLAYER_ROWS]
@@ -920,9 +1234,39 @@ export function customHelp(tabs: readonly CustomTab[], focusedId: string | null)
     key = `custom.help.tab.${tab}`;
   } else if (focusedId.startsWith('row:')) key = `custom.help.${focusedId.slice(4)}`;
   else return '';
-  // O `t` devolve a própria chave quando ela não existe.
-  const text = t(key as StringKey);
-  return text === key ? '' : text;
+  // O `t` devolve a própria chave quando ela não existe. M9 (fase 3): as linhas de cada time (`teamHp2`, `bot3`) usam a
+  // frase sem o número.
+  for (const k of [key, key.replace(/\d+$/, '')]) {
+    const text = t(k as StringKey);
+    if (text !== k) return text;
+  }
+  return '';
+}
+
+/**
+ * M9 (fase 3): as linhas da aba como a tela mostra (o rótulo com o time, o quadradinho da cor e o valor). Mora aqui,
+ * no pedaço dos editores, para o menu da web não pagar por ela.
+ */
+export function customRowViews(
+  tab: CustomTab,
+  r: MatchRecipe,
+  limits: CustomLimits,
+): {
+  readonly id: string;
+  readonly labelKey: StringKey;
+  readonly labelParams?: TextParams;
+  readonly swatch?: number;
+  readonly valueWidth?: number;
+  readonly value: string;
+}[] {
+  return customRows(tab, r).map((row) => ({
+    id: row.id,
+    labelKey: row.labelKey,
+    ...(row.labelParams !== undefined ? { labelParams: row.labelParams } : {}),
+    ...(row.swatch !== undefined ? { swatch: row.swatch } : {}),
+    ...(row.valueWidth !== undefined ? { valueWidth: row.valueWidth } : {}),
+    value: row.value(r, limits),
+  }));
 }
 
 export function presetName(base: string, taken: (name: string) => boolean): string {

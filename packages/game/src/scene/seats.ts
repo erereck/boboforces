@@ -9,8 +9,11 @@ import { isFfaMode } from '@boboforces/sim';
  */
 export interface LocalSeat {
   readonly device: DeviceBinding;
-  /** 0 = no time do P1; 1 = no time adversário. O do P1 não conta (é sempre 0); no FFA e no treino também não. */
-  readonly side: 0 | 1;
+  /**
+   * 0 = no time do P1; 1 = no time adversário. O do P1 não conta (é sempre 0); no FFA e no treino também não. M9 (fase
+   * 3): no Sandbox, o k-ésimo time depois do do P1 (dando a volta).
+   */
+  readonly side: number;
 }
 
 export interface SeatedRecipe {
@@ -45,31 +48,38 @@ function keepBots(bots: readonly BotSlotRecipe[], keep: number): BotSlotRecipe[]
  */
 export function seatRecipe(recipe: MatchRecipe, seats: readonly LocalSeat[]): SeatedRecipe {
   if (seats.length <= 1) return { recipe, controllers: [0] };
+  // M9 (fase 3): o P1 fica no time dos humanos da receita (no Sandbox pode não ser o 0); os outros contam a partir dele.
+  const n = Math.max(1, recipe.teams.length);
+  const home = Math.max(
+    0,
+    recipe.teams.findIndex((tm) => (tm.humans ?? 0) !== 0),
+  );
   return placeHumans(
     recipe,
-    seats.map((s, i) => (i === 0 ? 0 : s.side)),
+    seats.map((s, i) => (i === 0 ? home : (home + s.side) % n)),
   );
 }
 
 /**
- * M5 (fase 4b): os humanos na receita pelo lado de cada um (0 ou 1), na ordem dada: o sofá (o P1 sempre no 0) e o
+ * M5 (fase 4b): os humanos na receita pelo time de cada um, na ordem dada: o sofá (o P1 no time dos humanos) e o
  * online (cada um no time que escolheu). No FFA, no treino e nos modos de um time só, todos ficam no 0. M6 (fase 6b): no
- * Bobo Zombies também (na Horda armada o time 1 é só a horda de bots).
+ * Bobo Zombies também (na Horda armada o time 1 é só a horda de bots). M9 (fase 3): de 0 a 3 (o Sandbox); um time que a
+ * receita não tem vale o 0. Os controladores seguem a ordem da sim (`expandRecipe`): os humanos do time 0, depois os do
+ * 1, e assim por diante.
  */
-export function placeHumans(recipe: MatchRecipe, chosen: readonly (0 | 1)[]): SeatedRecipe {
+export function placeHumans(recipe: MatchRecipe, chosen: readonly number[]): SeatedRecipe {
   const n = chosen.length;
   const training = recipe.mode === 'training';
   const oneTeam = training || isFfaMode(recipe.mode) || recipe.mode === 'zombies' || recipe.teams.length < 2;
-  const sides = chosen.map((s) => (oneTeam ? 0 : s));
-  const want = [0, 0];
+  const sides = chosen.map((s) => (oneTeam || !(s >= 0 && s < recipe.teams.length) ? 0 : s));
+  const want = recipe.teams.map(() => 0);
   for (const s of sides) want[s]!++;
   const controllers: number[] = new Array<number>(n);
   let next = 0;
-  for (let i = 0; i < n; i++) if (sides[i] === 0) controllers[i] = next++;
-  for (let i = 0; i < n; i++) if (sides[i] === 1) controllers[i] = next++;
+  for (let t = 0; t < recipe.teams.length; t++) for (let i = 0; i < n; i++) if (sides[i] === t) controllers[i] = next++;
   const teams: TeamRecipe[] = recipe.teams.map((team, t) => {
     const before = team.humans === 'all' ? 1 : (team.humans ?? 0);
-    const now = t < 2 ? want[t]! : 0;
+    const now = want[t]!;
     const bots = training ? team.bots : keepBots(team.bots, Math.max(0, before + botCount(team.bots) - now));
     return { ...team, humans: now, bots };
   });

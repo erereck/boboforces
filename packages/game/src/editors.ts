@@ -10,10 +10,13 @@ export {
   CUSTOM_TABS,
   customHelp,
   customRows,
+  customRowViews,
   customTabs,
   presetName,
   stepCustom,
 } from './custom-match.ts';
+// M9 (fase 3): o nome dos times do Sandbox (o teclado da Partida personalizada).
+export { customNameEntry, type NameEntry } from './name-entry.ts';
 export { cleanBotName, LAB_TAB_LABELS, LAB_TABS, labRows, labSummary, rollBotName, stepLab } from './lab.ts';
 export { customMatchScreen, labScreen, workshopScreen } from '@boboforces/ui';
 

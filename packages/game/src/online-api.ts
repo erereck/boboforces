@@ -114,16 +114,23 @@ export interface OnlineSession {
 }
 
 /**
- * Os jogadores da sala na receita do host: cada um no time que escolheu (0 ou 1; -1 = tanto faz, vai para o lado com
- * menos gente), no lugar de bots do mesmo time, na ordem dos controladores da sim (o time 0 primeiro). `teams` está na
- * ordem dos jogadores (o host primeiro); devolve o controlador de cada um, na mesma ordem.
+ * Os jogadores da sala na receita do host: cada um no time que escolheu (-1 = tanto faz, vai para o lado com menos
+ * gente; no empate, o de número menor), no lugar de bots do mesmo time, na ordem dos controladores da sim (o time 0
+ * primeiro). `teams` está na ordem dos jogadores (o host primeiro); devolve o controlador de cada um, na mesma ordem.
+ * M9 (fase 3): os times vão de 0 a 3 (o Sandbox); um time que a receita não tem vale como "tanto faz".
  */
 export function onlineRecipe(recipe: MatchRecipe, teams: readonly number[]): SeatedRecipe {
-  const count = [0, 0];
-  for (const t of teams) if (t === 0 || t === 1) count[t]!++;
-  const sides: (0 | 1)[] = teams.map((t) => {
-    if (t === 0 || t === 1) return t;
-    const side: 0 | 1 = count[1]! < count[0]! ? 1 : 0;
+  const n = Math.max(2, recipe.teams.length);
+  const count = new Array<number>(n).fill(0);
+  const valid = (t: number): boolean => Number.isInteger(t) && t >= 0 && t < n;
+  for (const t of teams) if (valid(t)) count[t]!++;
+  // M9 (fase 3, revisão): no empate, o time de casa da receita (o "Seu time" do Sandbox) vem primeiro.
+  const home = recipe.teams.findIndex((t) => t.humans === 'all' || (t.humans ?? 0) > 0);
+  const first = home >= 0 && home < n ? home : 0;
+  const sides = teams.map((t) => {
+    if (valid(t)) return t;
+    let side = first;
+    for (let k = 0; k < n; k++) if (count[k]! < count[side]!) side = k;
     count[side]!++;
     return side;
   });
@@ -162,6 +169,8 @@ export interface OnlineRoomView {
   readonly summary: string;
   /** A partida escolhida tem times (no FFA e no Bobo Zombies, a escolha do time não vale). */
   readonly teams: boolean;
+  /** M9 (fase 3): quantos times a escolha do time anda (3 ou 4 no Sandbox; ausente = 2). */
+  readonly teamCount?: number;
   readonly playing: boolean;
   readonly members: readonly OnlineRoomMember[];
 }
@@ -194,8 +203,11 @@ export interface OnlineRoom {
   /** 1x por frame, em qualquer tela: a conexão e o lobby andam também durante a partida. */
   update(): void;
   setChoice(choice: OnlineRoomChoice): void;
-  /** Host: o resumo da partida que os amigos veem e se ela tem times. */
-  setSummary(text: string, teams: boolean): void;
+  /**
+   * Host: o resumo da partida que os amigos veem e se ela tem times. M9 (fase 3): e quantos (o Sandbox vai a 4;
+   * ausente = 2).
+   */
+  setSummary(text: string, teams: boolean, teamCount?: number): void;
   setLocked(on: boolean): void;
   kick(slot: number): void;
   /**

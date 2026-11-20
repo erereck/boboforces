@@ -23,6 +23,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
   só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:
   ela chega na fase 3.
+- **O Sandbox no jogo (fase 3):** na Partida personalizada, o modo Sandbox (o último da linha Modo): a aba Times
+  com 2 a 4 times, cada um com nome (o teclado do aparelho), bots, vida (1 a 1000) e armas (todas ou uma só), e qual
+  é o seu time; a linha Objetivo (Pontos, Eliminação ou Nenhum); "Salvar Cenário" e o "Assistir". No Construto e no
+  Ringue. O HUD, o placar do Tab, o resultado, o sofá e a sala online agora entendem até 4 times, com os nomes; na
+  eliminação, quem cai fica "Fora até o fim da partida" e assiste um aliado vivo.
 - **As Ferramentas do Dono na sim (fase 4):** criar um bot num ponto, tirar um bot da partida, congelar a IA dele,
   trocar o time, dar uma arma e ligar ou desligar um modificador no meio da partida, como comandos que valem no começo
   do próximo passo (gravados, para o replay). Ainda sem tela: o menu do dono chega na fase 5.

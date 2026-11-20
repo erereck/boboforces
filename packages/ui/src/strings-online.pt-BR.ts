@@ -72,6 +72,9 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.team.any': 'Tanto faz',
   'online.team.0': 'Laranja',
   'online.team.1': 'Azul',
+  // M9 (fase 3): os times 2 e 3 do Bobo Sandbox.
+  'online.team.2': 'Verde',
+  'online.team.3': 'Roxo',
   'online.team.solo': 'Cada um por si',
   'online.room.kick': 'Tirar',
   'online.room.lock': 'Trancar',

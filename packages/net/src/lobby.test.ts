@@ -12,6 +12,7 @@ import {
   isLobbyMessage,
   parseLobbyChoice,
   parseLobbyStart,
+  parseLobbyState,
   type LobbyChoice,
   type LobbyClient,
 } from './lobby.ts';
@@ -52,6 +53,14 @@ describe('código da sala (M5 fase 4a)', () => {
       ready: true,
     });
     expect(parseLobbyChoice('oi', 'X')).toBeNull();
+  });
+
+  it('M9 (fase 3): o estado da sala diz quantos times a partida tem (3 ou 4 no Sandbox; 2 não vai)', () => {
+    const state = (teamCount: unknown) =>
+      parseLobbyState({ code: 'ABCDE', summary: 'Sandbox', teams: true, teamCount, playing: false, members: [] });
+    expect(state(4)?.teamCount).toBe(4);
+    expect(state(3)?.teamCount).toBe(3);
+    for (const bad of [2, 5, 1, 2.5, '4', undefined]) expect(state(bad), String(bad)).not.toHaveProperty('teamCount');
   });
 });
 

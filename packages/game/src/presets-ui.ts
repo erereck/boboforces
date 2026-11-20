@@ -2,6 +2,7 @@ import {
   BOT_LEVELS,
   builtinBotRef,
   MATCH_RECIPE_FORMAT,
+  SANDBOX_DEFAULTS,
   ZOMBIES_DEFAULTS,
   presetBotCounts,
   presetLevel,
@@ -25,13 +26,27 @@ function ffa(recipe: MatchRecipe): boolean {
   return recipe.mode === 'warfare.ffa';
 }
 
-/** "4 contra 4" (você conta no seu time) ou "8 bobos" no FFA. */
+/**
+ * M9 (fase 3): os tamanhos dos times, com você no seu, juntos por "×" ("3×3×2×2"; o "×" da tabela, um par por vez):
+ * o Sandbox com 3 ou 4 times.
+ */
+function teamSizes(recipe: MatchRecipe, counts: readonly number[]): string {
+  let out = '';
+  recipe.teams.forEach((team, i) => {
+    const n = counts[i]! + humansIn(team);
+    out = i === 0 ? String(n) : t('summary.teamsShort', { a: out, b: n });
+  });
+  return out;
+}
+
+/** "4 contra 4" (você conta no seu time) ou "8 bobos" no FFA. M9 (fase 3): com 3 ou 4 times, "3×3×2×2". */
 function sides(recipe: MatchRecipe): string {
   const counts = presetBotCounts(recipe);
   if (ffa(recipe) || recipe.teams.length < 2) {
     const n = counts.reduce((a, b) => a + b, 0) + recipe.teams.reduce((a, team) => a + humansIn(team), 0);
     return t('summary.ffa', { n });
   }
+  if (recipe.teams.length > 2) return teamSizes(recipe, counts);
   const a = counts[0]! + humansIn(recipe.teams[0]!);
   const b = counts[1]! + humansIn(recipe.teams[1]!);
   return t('summary.teams', { a, b });
@@ -39,8 +54,21 @@ function sides(recipe: MatchRecipe): string {
 
 /** "5 min ou 30 abates", "10 min", "até 30 abates"; `''` sem limite na receita. */
 function duration(recipe: MatchRecipe): string {
-  const time = recipe.match?.timeLimitS ?? 0;
-  const score = recipe.match?.scoreLimit ?? 0;
+  let time = recipe.match?.timeLimitS ?? 0;
+  let score = recipe.match?.scoreLimit ?? 0;
+  // M9 (fase 3): no Sandbox, o objetivo manda (como o `matchLimits` da sim): os padrões dele, a eliminação sem meta e
+  // sempre com tempo, e o "nenhum" sem os dois.
+  if (recipe.mode === 'sandbox') {
+    const objective = recipe.sandbox?.objective ?? SANDBOX_DEFAULTS.objective;
+    const rawTime = recipe.match?.timeLimitS;
+    time =
+      objective === 'none'
+        ? 0
+        : objective === 'elimination'
+          ? rawTime || SANDBOX_DEFAULTS.timeLimitS
+          : (rawTime ?? SANDBOX_DEFAULTS.timeLimitS);
+    score = objective === 'points' ? (recipe.match?.scoreLimit ?? SANDBOX_DEFAULTS.scoreLimit) : 0;
+  }
   const min = Math.round(time / 60);
   if (time > 0 && score > 0) return t('summary.timeOrScore', { min, n: score });
   if (time > 0) return t('summary.time', { min });
@@ -136,13 +164,10 @@ export function presetShortcut(recipe: MatchRecipe): { label: string; caption: s
     };
   }
   const counts = presetBotCounts(recipe);
-  let size: string;
-  if (ffa(recipe) || recipe.teams.length < 2) size = t('quick.bots', { n: counts.reduce((a, b) => a + b, 0) });
-  else {
-    const a = counts[0]! + humansIn(recipe.teams[0]!);
-    const b = counts[1]! + humansIn(recipe.teams[1]!);
-    size = t('summary.teamsShort', { a, b });
-  }
+  const size =
+    ffa(recipe) || recipe.teams.length < 2
+      ? t('quick.bots', { n: counts.reduce((a, b) => a + b, 0) })
+      : teamSizes(recipe, counts);
   const name = (recipe.name ?? '').trim();
   const label = name !== '' ? name : [size, levelName(recipe)].filter((p) => p !== '').join(' ');
   const caption = [t(`mode.short.${recipe.mode}` as StringKey), duration(recipe)]

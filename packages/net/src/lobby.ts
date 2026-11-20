@@ -79,6 +79,8 @@ export interface LobbyState {
   readonly summary: string;
   /** M5 (fase 4c): a partida escolhida tem times (a escolha do time só vale aí). */
   readonly teams: boolean;
+  /** M9 (fase 3): quantos times (3 ou 4 no Sandbox; ausente = 2). */
+  readonly teamCount?: number;
   /** M5 (fase 4c): a partida está rolando; ao voltar a `false`, quem estava nela volta ao lobby. */
   readonly playing: boolean;
   readonly members: readonly LobbyMember[];
@@ -167,14 +169,21 @@ export function parseLobbyState(v: unknown): LobbyState | null {
   const parsed = members.map(parseMember);
   if (parsed.some((m) => m === null)) return null;
   const summary = o['summary'];
+  const teamCount = o['teamCount'];
   return {
     code: o['code'].slice(0, 8),
     locked: o['locked'] === true,
     summary: typeof summary === 'string' ? summary.slice(0, MAX_SUMMARY_CHARS) : '',
     teams: o['teams'] !== false,
+    ...(validTeamCount(teamCount) && teamCount !== 2 ? { teamCount } : {}),
     playing: o['playing'] === true,
     members: parsed as LobbyMember[],
   };
+}
+
+/** M9 (fase 3): de 2 a 4 times (os times da escolha vão de -1 a 3). */
+function validTeamCount(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= 4;
 }
 
 /** O começo que o host mandou. */
@@ -226,7 +235,8 @@ export interface LobbyHost {
   /** Lê o lobby e manda o estado se mudou. A cada frame. */
   update(): void;
   setHostChoice(choice: LobbyChoice): void;
-  setSummary(text: string, teams?: boolean): void;
+  /** M9 (fase 3): `teamCount` = quantos times a escolha anda (2 a 4; ausente = 2). */
+  setSummary(text: string, teams?: boolean, teamCount?: number): void;
   setLocked(on: boolean): void;
   /** Tira um amigo da sala (ele recebe o aviso). */
   kick(slot: number): void;
@@ -273,6 +283,8 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
   let locked = false;
   let summary = '';
   let teams = true;
+  /** M9 (fase 3): quantos times (2 = o de sempre, que não vai na mensagem). */
+  let teamCount = 2;
   let started = false;
   let dirty = true;
   /** M5 (fase 5b): o id do aparelho de cada lugar, quem caiu na partida em andamento (por id) e quem foi tirado. */
@@ -281,7 +293,15 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
   const banned = new Set<string>();
   let lastStart: LobbyStart | null = null;
 
-  const state = (): LobbyState => ({ code, locked, summary, teams, playing: started, members });
+  const state = (): LobbyState => ({
+    code,
+    locked,
+    summary,
+    teams,
+    ...(teamCount !== 2 ? { teamCount } : {}),
+    playing: started,
+    members,
+  });
   const broadcast = (): void => {
     const bytes = encodeLobbyMessage(LOBBY_MSG.lobby, state());
     for (const peer of peers.values()) endpoint.send(peer, 'reliable', bytes);
@@ -423,9 +443,10 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       members = members.map((m) => (m.slot === 0 ? host : m));
       dirty = true;
     },
-    setSummary(text, withTeams = true): void {
+    setSummary(text, withTeams = true, count = 2): void {
       summary = text.slice(0, MAX_SUMMARY_CHARS);
       teams = withTeams;
+      teamCount = validTeamCount(count) ? count : 2;
       dirty = true;
     },
     setLocked(on): void {

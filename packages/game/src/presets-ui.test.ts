@@ -1,7 +1,7 @@
 import { DEBUT_PRESET, presetLevel, validateMatchRecipe, withPresetLevel, type MatchRecipe } from '@boboforces/format';
 import { createRng } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
-import { presetLines, presetSummary, rollSurprise } from './presets-ui.ts';
+import { presetLines, presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 
 /** M2, fase 4c: o preset em texto e o sorteio do Surpreenda-me. */
 
@@ -30,6 +30,27 @@ describe('preset em texto', () => {
       'Todos contra todos · 8 bobos · Construto · Diretor ligado',
     );
     expect(presetLines(ffa).at(-1)).toBe('10 min');
+  });
+
+  it('M9 (fase 3): o Cenário do Sandbox com 3 e 4 times: "3×3×2×2", e a duração pelo objetivo', () => {
+    const bots = (count: number) => [{ ref: 'builtin:normal-bob' as const, count }];
+    const four: MatchRecipe = {
+      ...DEBUT_PRESET,
+      mode: 'sandbox',
+      match: {},
+      teams: [{ humans: 'all', bots: bots(2) }, { bots: bots(3) }, { bots: bots(2) }, { bots: bots(2) }],
+    };
+    expect(presetSummary(four)).toBe('Sandbox · Normal · 3×3×2×2 · Construto');
+    expect(presetShortcut(four)).toEqual({ label: '3×3×2×2 Normal', caption: 'Sandbox · 10 min ou 75 abates' });
+    expect(presetShortcut({ ...four, name: 'Cenário 3×3×2×2' }).label).toBe('Cenário 3×3×2×2');
+    const three = { ...four, teams: four.teams.slice(0, 3) };
+    expect(presetSummary(three)).toBe('Sandbox · Normal · 3×3×2 · Construto');
+    // A eliminação sem meta (e sempre com tempo); o "nenhum", sem os dois.
+    const elim = { ...three, sandbox: { objective: 'elimination' as const }, match: { timeLimitS: 0, scoreLimit: 30 } };
+    expect(presetLines(elim)).toEqual(['Bobo Sandbox', 'Construto', 'Normal', '3×3×2', '10 min']);
+    expect(presetShortcut({ ...three, sandbox: { objective: 'none' } }).caption).toBe('Sandbox');
+    // Com 2 times, o de sempre.
+    expect(presetSummary({ ...four, teams: four.teams.slice(0, 2) })).toBe('Sandbox · Normal · 3 contra 3 · Construto');
   });
 });
 

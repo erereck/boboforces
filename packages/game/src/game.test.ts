@@ -933,6 +933,36 @@ describe('orçamento de skins do boneco (E.16, #56): 2 camadas por skin, 32 na r
     figures.dispose();
   });
 
+  it('M9 (fase 3): o Sandbox com 4 times: cada time veste a sua cor, no PC (6 looks) e no Switch (3), sem estouro', () => {
+    for (const [profileId, skins] of [
+      ['pc', 6 * 5 + 1],
+      ['switch34p', 3 * 5 + 1],
+    ] as const) {
+      const { profile } = benchRecipe(profileId, 1, 4);
+      const { figures, writes } = paint({
+        profile,
+        teamCount: 4,
+        mannequins: MANNEQUINS,
+        prints: false,
+        capacity: CAPACITY,
+        onDemand: false,
+        table: tableOnce(),
+      });
+      // A rotação × (sem time e os 4 times) + o zumbi, dentro das 32 da reserva.
+      expect(writes, profileId).toHaveLength(skins);
+      expect(figures.plan.overflow, profileId).toEqual([]);
+      for (let team = 0; team < 4; team++) {
+        for (let p = 0; p < figures.botLooks; p++) {
+          expect(setOf(figures, figures.botSkin(p, team)), `${profileId}: time ${team}`).toEqual({
+            look: FIGURE_BOT_ROTATION[p],
+            team,
+          });
+        }
+      }
+      figures.dispose();
+    }
+  });
+
   it('pc: 19 skins (6 looks × 3 times + zumbi); com o pedido de prints a fila inteira cabe (31)', () => {
     const { profile, recipe } = benchRecipe('pc', 1, 12);
     const base = {
@@ -1596,6 +1626,49 @@ describe('Partida personalizada (M2, fase 4e)', () => {
     platform.tap('ArrowLeft');
     platform.tap('Enter');
     expect(game.screen).toBe('custom');
+    game.dispose();
+  }, 120_000);
+
+  it('M9 (fase 3): o Bobo Sandbox: o modo, a aba Times, o nome pelo teclado, Salvar Cenário e COMEÇAR com 4 times', async () => {
+    const { platform, game } = await bootToTitle();
+    const kb = systemKeyboard(platform);
+    titleTo(platform, 'modes');
+    platform.tap('Enter');
+    platform.tap('ArrowLeft');
+    platform.tap('Enter');
+    expect(game.screen).toBe('custom');
+    // Do COMEÇAR até a 1ª linha (o Modo) e esquerda: o Sandbox (o último do ciclo).
+    for (let k = 0; k < 3; k++) platform.tap('ArrowLeft');
+    for (let k = 0; k < 8; k++) platform.tap('ArrowUp');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowLeft');
+    // E: a aba Times; baixo: a linha Times (+2: 4 times); baixo 2: o nome do Laranja; o confirmar abre o teclado.
+    platform.tap('KeyE');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('ArrowRight');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(kb.listener).not.toBeNull();
+    kb.listener!.onChange('Os Bobões', 9);
+    kb.listener!.onSubmit('Os Bobões');
+    platform.pump(2);
+    // Baixo até sair das linhas: o Salvar Cenário.
+    for (let k = 0; k < 24; k++) platform.tap('ArrowDown');
+    platform.tap('Enter');
+    const saved = game.save.presets.saved[0]!;
+    expect(saved.name).toMatch(/^Cenário /);
+    expect(saved.mode).toBe('sandbox');
+    expect(saved.teams.map((tm) => tm.name)).toEqual(['Os Bobões', undefined, undefined, undefined]);
+    // Direita 2 (Assistir, COMEÇAR): a partida com os 4 times.
+    platform.tap('ArrowRight');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    const v = game.match!.sim.view();
+    expect(new Set(Array.from(v.team.slice(0, v.count))).size).toBe(4);
     game.dispose();
   }, 120_000);
 });

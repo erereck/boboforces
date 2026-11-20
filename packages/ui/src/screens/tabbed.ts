@@ -1,4 +1,5 @@
 import type { StringKey } from '../strings.pt-BR.ts';
+import type { TextParams } from '../text.ts';
 import { COLORS } from '../tokens.ts';
 import type { ButtonVariant, UiNode } from '../tree.ts';
 import { TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from './tabbed-ids.ts';
@@ -20,9 +21,13 @@ export type TabbedRow =
       readonly kind: 'option';
       readonly id: string;
       readonly labelKey: StringKey;
+      /** M9 (fase 3): os parâmetros do rótulo (as linhas de cada time do Sandbox: "Verde: vida"). */
+      readonly labelParams?: TextParams;
       readonly value: string;
       /** M2 (fase 6c): quadradinho da cor (RGB) antes do valor (as cores do Meu Bobo). */
       readonly swatch?: number;
+      /** M9 (fase 3): a área do valor (px de referência) mais larga que a da tela (o nome do time, de 16 letras). */
+      readonly valueWidth?: number;
     }
   | { readonly kind: 'value'; readonly id: string; readonly labelKey: StringKey; readonly value: string }
   | {
@@ -78,14 +83,21 @@ function rowNode(row: TabbedRow, width: number, valueWidth: number | null): UiNo
       return {
         kind: 'button',
         id: `${TABBED_ROW_PREFIX}${row.id}`,
-        text: { key: row.labelKey },
+        text:
+          row.kind === 'option' && row.labelParams !== undefined
+            ? { key: row.labelKey, params: row.labelParams }
+            : { key: row.labelKey },
         action: `${TABBED_ROW_PREFIX}${row.id}`,
         value: { literal: row.value },
         ...(row.kind === 'value' ? { valueOnly: true } : {}),
         ...(row.kind === 'option' && row.swatch !== undefined ? { swatch: row.swatch } : {}),
         variant: 'secondary',
         width,
-        ...(valueWidth !== null ? { valueWidth } : {}),
+        ...(row.kind === 'option' && row.valueWidth !== undefined
+          ? { valueWidth: row.valueWidth }
+          : valueWidth !== null
+            ? { valueWidth }
+            : {}),
       };
     case 'action':
       return {

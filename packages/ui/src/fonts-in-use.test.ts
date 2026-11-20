@@ -36,7 +36,7 @@ import { labScreen } from './screens/lab.ts';
 import { labIntroScreen } from './screens/lab-intro.ts';
 import { quickMatchScreen } from './screens/quick-match.ts';
 import { surpriseScreen } from './screens/surprise.ts';
-import { customMatchScreen } from './screens/custom-match.ts';
+import { CUSTOM_NAME_VALUE_WIDTH, customMatchScreen } from './screens/custom-match.ts';
 import { BUTTON, BUTTON_COMPACT, MIN_TEXT, MIN_TOUCH_TARGET, OPTION } from './tokens.ts';
 import type { Rect, UiNode } from './tree.ts';
 
@@ -944,6 +944,76 @@ describe('estouro de texto com o atlas real', () => {
           target.name,
         ).toBe(true);
       }
+    }
+  });
+
+  it('M9 (fase 3): a aba Times do Sandbox (o rótulo com o time, o nome com a cor) e o Salvar Cenário cabem', () => {
+    const swatch = (i: number): number => TEAM_COLORS[i]! >>> 8;
+    const team = { team: 'Laranja' };
+    const wide = CUSTOM_NAME_VALUE_WIDTH;
+    // O nome do time digitado vai a 15 caracteres (`TEAM_NAME_MAX` do game): os mais largos de cada jeito.
+    for (const name of ['Os Bobos da Rua', 'MMMMMMMMMMMMMMM', 'WWWWWWWWWWWWWWW', 'ÇÃÕÊÂÁÉÍÓÚÀÔÜÑÆ']) {
+      const tree = customMatchScreen.build({
+        tabs: [
+          'custom.tab.match',
+          'custom.tab.teams',
+          'custom.tab.players',
+          'custom.tab.weapons',
+          'custom.tab.mods',
+          'custom.tab.hud',
+        ],
+        tab: 1,
+        rows: [
+          { id: 'teams', labelKey: 'custom.row.teams', value: '4' },
+          { id: 'you', labelKey: 'custom.row.you', value: name, swatch: swatch(0), valueWidth: wide },
+          {
+            id: 'teamName0',
+            labelKey: 'custom.row.teamName',
+            labelParams: team,
+            value: name,
+            swatch: swatch(0),
+            valueWidth: wide,
+          },
+          { id: 'bot0', labelKey: 'custom.row.teamBot', labelParams: team, value: 'Jorge the Immortal' },
+          { id: 'count0', labelKey: 'custom.row.teamCount', labelParams: team, value: '12' },
+          { id: 'teamHp0', labelKey: 'custom.row.teamHp', labelParams: team, value: '1000' },
+          { id: 'teamArms0', labelKey: 'custom.row.teamArms', labelParams: team, value: 'Só metralhadora' },
+          { id: 'objective', labelKey: 'custom.row.objective', value: 'Eliminação' },
+        ],
+        summary: 'Sandbox · Normal · 4×4×4×4 · Construto',
+        note: 'Cenário salvo: Cenário 4×4×4×4 2',
+        help: t('custom.help.teamHp'),
+        scenario: true,
+      });
+      for (const target of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
+        const layout = layoutFor(tree, target);
+        expectNoOverflow(layout, target);
+        expect(layout.texts.get(layout.byId.get('save')!)!.text, target.name).toBe('SALVAR CENÁRIO');
+        expect(layout.texts.get(layout.byId.get('row:count0')!)!.text, target.name).toMatch(/^LARANJA: QUANTOS$/i);
+        // O nome e o quadradinho da cor (que o `expectNoOverflow` não conta) cabem juntos entre as setas.
+        for (const id of ['row:you', 'row:teamName0']) {
+          const node = layout.byId.get(id)!;
+          const r = layout.rects.get(node)!;
+          const s = layout.scale;
+          const between = (wide - 2 * OPTION.arrow) * s;
+          const sw = Math.round(r.h * 0.4) + Math.round(OPTION.swatchGap * s);
+          expect(layout.values.get(node)!.width + sw, `${target.name}: ${id} "${name}"`).toBeLessThanOrEqual(between);
+        }
+      }
+    }
+    // O sofá com 3 ou 4 times: o lado é o nome da cor.
+    const couch = couchScreen.build({
+      seats: [
+        { device: 'Controle 1', side: null, disconnected: false },
+        { device: 'Controle 2', side: 1, sideText: 'Laranja', disconnected: false, tune: 'Mira 1,2× · Y invertido' },
+        { device: 'Controle 3', side: 3, sideText: 'Roxo', disconnected: false },
+        { device: 'Controle 4', side: 0, sideText: 'Verde', disconnected: false },
+      ],
+      match: 'Sandbox · Normal · 4×4×4×4 · Construto',
+      keyboardFree: false,
+    });
+    for (const target of [...SWITCH_TARGETS.slice(0, 4), WEB_TARGETS[0]!, WEB_TARGETS[4]!]) {
+      expectNoOverflow(layoutFor(couch, target), target);
     }
   });
 

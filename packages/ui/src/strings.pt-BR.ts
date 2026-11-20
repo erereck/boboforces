@@ -204,6 +204,15 @@ export const STRINGS_PT_BR = {
   'rule.explodeOnDeath': 'explode ao morrer',
   'result.openLab': 'Abrir Laboratório',
   'mode.zombies': 'Bobo Zombies',
+  // M9 (fase 3, revisão): também citadas pelo JS do menu (o Cenário, o teclado do nome do time, o sofá).
+  'custom.scenario': 'Cenário',
+  'custom.savedScenario': 'Cenário salvo: {name}',
+  'custom.typing': 'Digite o nome do time e aperte Enter (Esc desfaz).',
+  'mode.short.sandbox': 'Sandbox',
+  'feed.teamName.0': 'Laranja',
+  'feed.teamName.1': 'Azul',
+  'feed.teamName.2': 'Verde',
+  'feed.teamName.3': 'Roxo',
 } as const satisfies Readonly<Record<string, string>>;
 
 /**

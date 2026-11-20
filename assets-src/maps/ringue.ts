@@ -206,7 +206,7 @@ const ringue: MapScript = {
     b.meta({
       nameKey: 'map.ringue.name',
       // X1 e 2v2 (TDM pequeno) e o treino; FFA não: numa arena de 36 m, os nascimentos se veem (gameplay.md §8.5).
-      modes: ['warfare.tdm', 'training'],
+      modes: ['warfare.tdm', 'training', 'sandbox'],
       players: { min: 2, ideal: 4, max: 8 },
       maxSightLineM: 50,
       botCaps: { switch34p: 6 },

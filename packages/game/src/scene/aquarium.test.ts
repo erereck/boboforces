@@ -51,6 +51,29 @@ describe('Aquário: a receita só de bots', () => {
     );
     expect(expandRecipe(r, 0).filter((s) => s.team === 0)).toHaveLength(3);
   });
+
+  it('M9 (fase 3): o Sandbox com 4 times e você no Verde: o seu lugar vira um bot do Verde, sem perder nada', () => {
+    const r = spectateRecipe(
+      {
+        ...recipe(
+          [
+            { name: 'Laranjada', hp: 50, bots: [{ ref: chill, count: 2 }] },
+            { bots: [{ ref: normal, count: 2 }] },
+            { humans: 'all', name: 'Os Verdes', weapons: ['sniper'], bots: [] },
+            { hp: 300, bots: [{ ref: normal, count: 3 }] },
+          ],
+          'sandbox',
+        ),
+        sandbox: { objective: 'elimination' },
+      },
+      normal,
+    );
+    const slots = expandRecipe(r, 0);
+    expect(slots.filter((s) => s.bot === null)).toHaveLength(0);
+    expect([0, 1, 2, 3].map((t) => slots.filter((s) => s.team === t).length)).toEqual([2, 2, 1, 3]);
+    expect(r.teams[2]).toEqual({ name: 'Os Verdes', weapons: ['sniper'], bots: [{ ref: normal, count: 1 }] });
+    expect([r.teams[0]!.hp, r.teams[3]!.hp, r.sandbox]).toEqual([50, 300, { objective: 'elimination' }]);
+  });
 });
 
 describe('Aquário: a velocidade e as câmeras', () => {

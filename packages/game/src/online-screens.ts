@@ -168,15 +168,21 @@ export function recipeHasTeams(recipe: MatchRecipe): boolean {
   );
 }
 
-/** O time na sala: -1 (tanto faz) → 0 → 1 → -1. */
-export function stepTeam(team: number, delta: number): number {
-  const order = [-1, 0, 1];
-  const i = Math.max(0, order.indexOf(team));
-  return order[(i + (delta < 0 ? 2 : 1)) % 3]!;
+/** M9 (fase 3): quantos times a escolha anda (0 = sem times; o Sandbox vai a 4). */
+export function recipeTeamCount(recipe: MatchRecipe): number {
+  return recipeHasTeams(recipe) ? Math.max(2, Math.min(4, recipe.teams.length)) : 0;
 }
 
-function teamLabel(team: number): string {
-  return t(team === 0 ? 'online.team.0' : team === 1 ? 'online.team.1' : 'online.team.any');
+/** O time na sala: -1 (tanto faz) → 0 → 1 → -1. M9 (fase 3): com `count` times, até o `count - 1` (o Sandbox). */
+export function stepTeam(team: number, delta: number, count = 2): number {
+  const n = Math.max(2, Math.min(4, count)) + 1;
+  const i = Math.max(0, Math.min(n - 1, team + 1));
+  return ((i + (delta < 0 ? n - 1 : 1)) % n) - 1;
+}
+
+/** O nome do time na sala (a cor: o amigo não tem a receita); fora dos times da partida, "tanto faz". */
+function teamLabel(team: number, count = 2): string {
+  return t(team >= 0 && team < count ? (`online.team.${team}` as StringKey) : 'online.team.any');
 }
 
 export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
@@ -267,7 +273,12 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     const text = deps.summary(playedRecipe(r));
     if (text === sentSummary) return;
     sentSummary = text;
-    r.setSummary(text, recipeHasTeams(recipe));
+    r.setSummary(text, recipeHasTeams(recipe), Math.max(2, recipeTeamCount(recipe)));
+  }
+
+  /** M9 (fase 3): quantos times a escolha anda: o host sabe pela receita; o amigo, pelo que o host mandou. */
+  function teamCountOf(r: OnlineRoom): number {
+    return r.role === 'host' ? Math.max(2, recipeTeamCount(recipe)) : (r.view?.teamCount ?? 2);
   }
 
   function rebuild(): void {
@@ -552,6 +563,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   function roomRows(r: OnlineRoom): OnlineRoomMemberRow[] {
     const view = r.view;
     if (view === null) return [];
+    const count = teamCountOf(r);
     return view.members.map((m) => {
       const name = memberName(m);
       const you = m.slot === r.mySlot;
@@ -559,8 +571,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
         slot: m.slot,
         name,
         you,
-        team: view.teams ? teamLabel(m.team) : '',
-        teamColor: view.teams && (m.team === 0 || m.team === 1) ? TEAM_COLORS[m.team]! : COLORS.texto,
+        team: view.teams ? teamLabel(m.team, count) : '',
+        teamColor: view.teams && m.team >= 0 && m.team < count ? TEAM_COLORS[m.team]! : COLORS.texto,
         status:
           m.slot === 0
             ? t('online.room.host')
@@ -616,7 +628,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
           hints,
           host,
           members: roomRows(room),
-          team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true)) ? teamLabel(team) : null,
+          team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true)) ? teamLabel(team, teamCountOf(room)) : null,
           locked: view?.locked ?? false,
           note: note !== '' ? note : view?.locked ? t('online.room.locked') : '',
         }),
@@ -687,7 +699,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
       if (nav.back) menu.focus('leave');
       else if (a === ONLINE_ACTION.leave) closeRoom(null);
       else if (a === ONLINE_ACTION.team) {
-        team = stepTeam(team, nav.delta === 0 ? 1 : nav.delta);
+        team = stepTeam(team, nav.delta === 0 ? 1 : nav.delta, teamCountOf(r));
         setChoice();
       } else if (a === ONLINE_ACTION.copy) {
         void r.copyLink().then((ok) => {

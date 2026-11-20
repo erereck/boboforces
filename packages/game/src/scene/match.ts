@@ -171,6 +171,7 @@ import {
   STRIKE_BUY_BASE,
   STRIKE_DATA,
   STRIKE_SHOP,
+  matchLimits,
 } from '@boboforces/sim';
 import {
   ageKillFeed,
@@ -350,6 +351,7 @@ import {
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
 import { cleanTypedName } from '../names.ts';
+import { teamName } from '../team-names.ts';
 import { HOST_AWAY_END_S, waitsForHost, type OnlineNetStats } from '../online-api.ts';
 import { createMatchSound } from './sound.ts';
 import { createZombieMusic } from './zombie-music.ts';
@@ -900,6 +902,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const strikeMode = recipe.mode === 'strike';
   /** M7 (fase 8): o Bobo Royale (o `team` é o esquadrão: sem colete de time; a zona, o loot e a colocação). */
   const royaleMode = recipe.mode === 'royale.mini';
+  /** M9 (fase 3): o Bobo Sandbox (até 4 times; na eliminação, quem morre fica fora até o fim). */
+  const sandboxMode = recipe.mode === 'sandbox';
+  const sandboxElimination = sandboxMode && recipe.sandbox?.objective === 'elimination';
   const solo = ffa || juggernaut;
   const warnings: string[] = [...request.benchWarnings, ...setup.warnings, ...setup.recipe.warnings];
   // Alarme do orçamento de skins (#56, PLANO §B15): conjunto além da reserva veste o padrão do próprio time.
@@ -1083,13 +1088,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** Derrota feia (GDD §3.8): mortes seguidas do humano sem abate e se a dica já saiu nesta partida. */
   let deathsWithoutKill = 0;
   let hardHintUsed = false;
-  const timeLimitS = recipe.match?.timeLimitS ?? 0;
-  const scoreLimit = recipe.match?.scoreLimit ?? 0;
+  // M9 (fase 3): os limites que a sim joga (no Sandbox, os padrões e o objetivo), não os crus da receita.
+  const { timeLimitS, scoreLimit } = matchLimits(recipe);
   const camAngles = { yaw: 0, pitch: 0 };
   // M2 (fase 2d): HUD da partida (kill feed, placar do Tab, contagem inicial e marcadores dos aliados).
   const killFeed = createKillFeedModel();
   const scoreboard = createScoreboardModel();
   scoreboard.title = t(`mode.${recipe.mode}` as StringKey);
+  // M9 (fase 3): o nome de cada time no cabeçalho da tabela dele (o que o Sandbox deu, ou o da cor).
+  for (let i = 0; i < recipe.teams.length && i < scoreboard.teamNames.length; i++) {
+    scoreboard.teamNames[i] = teamName(recipe, i);
+  }
   // A legenda das regras: um bot diferente por linha, embaixo do time dele.
   scoreboard.ruleCount = 0;
   for (const slot of expandRecipe(recipe, humans)) {
@@ -1102,7 +1111,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     scoreboard.ruleCount++;
   }
   const scoreOrder = new Int16Array(SCOREBOARD_MAX_ROWS);
-  const todayLine = countdownLine(recipe, humans, names);
+  const todayLine = countdownLine(recipe, humans, names, me);
   /** M8 (fase 4, revisão): os controladores que um jogador já assumiu (o sofá, o Aquário): não contam como bot. */
   const everHuman = new Set<number>();
   /**
@@ -1147,8 +1156,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       : request.recipe
         ? (presetLevel(request.recipe) ?? 'normal')
         : (request.level ?? 'normal');
-  /** Time dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA. */
-  const challengeTeam = solo || royaleMode || aquarium ? -1 : 1;
+  /**
+   * Times dos bots que o "Ajustar desafio" muda: o adversário no TDM (o humano é do time 0), todos no FFA (-1). M9 (fase
+   * 3): no Sandbox, todos os times menos o seu.
+   */
+  const challengeTeams: readonly number[] =
+    solo || royaleMode || aquarium
+      ? [-1]
+      : sandboxMode
+        ? recipe.teams
+            .map((_tm, i) => i)
+            .filter((i) => i !== (expandRecipe(recipe, humans).find((sl) => sl.controller === me)?.team ?? 0))
+        : [1];
   let unstuckPending = false;
   let matchStats = createMatchStats(1);
   let endedAt = -1;
@@ -2508,8 +2527,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
     } else if (solo) {
       if (winner >= 0) return t('result.ffaWinner', { name: nameOf(v, winner) });
-    } else if (v.match.winnerTeam === 0 || v.match.winnerTeam === 1) {
-      return t('result.aquarium.team', { team: t(`feed.teamName.${v.match.winnerTeam}` as StringKey) });
+    } else if (v.match.winnerTeam >= 0 && v.match.winnerTeam < recipe.teams.length) {
+      // M9 (fase 3): os 4 times do Sandbox, com o nome que a receita deu.
+      return t('result.aquarium.team', { team: teamName(recipe, v.match.winnerTeam) });
     }
     return t('result.draw');
   }
@@ -2872,13 +2892,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     let best = Number.POSITIVE_INFINITY;
     for (const s of recipeSlots) {
       if (s.bot === null || seatOf(s.controller) >= 0 || !seatableBot(s.team)) continue;
-      const n = ffa ? 0 : (humansIn[s.team] ?? 0);
+      // M9 (fase 3): de preferência um bot vivo; na eliminação do Sandbox, só vivo (quem morreu não volta).
+      const be = entityIndex(sim.controllerEntity(s.controller));
+      const dead = be < 0 || (v.flags[be]! & ENTITY_FLAG.dead) !== 0;
+      if (dead && sandboxElimination) continue;
+      const n = (ffa ? 0 : (humansIn[s.team] ?? 0)) * 2 + (dead ? 1 : 0);
       if (n < best) {
         best = n;
         pick = s.controller;
       }
     }
-    if (pick < 0) return;
+    if (pick < 0) {
+      if (sandboxElimination) host.log('[partida] sofá: sem bot vivo para entrar (eliminação); entra na próxima');
+      return;
+    }
     let num = 0;
     while (seatNum.includes(num)) num++;
     const m = createInputMapper(d, seatProfile(num, d.kind));
@@ -3539,7 +3566,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const level = challengeLevel(a);
       if (level !== null) {
         currentLevel = level;
-        const n = driver.director?.setLevel(level, challengeTeam) ?? 0;
+        let n = 0;
+        for (const team of challengeTeams) n += driver.director?.setLevel(level, team) ?? 0;
         host.log(`[partida] desafio: ${level} (${n} bots)`);
         pauseMain();
       } else if (nav.back || a === 'back') pauseMain();
@@ -3668,6 +3696,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const royalePlace = rov !== null && human >= 0 ? (rov.place[v.team[human]!] ?? 0) : 0;
     const royalePlaceLine =
       royalePlace > 0 ? t('result.royalePlace' as StringKey, { place: royalePlace, squads: rov!.squads }) : '';
+    // M9 (fase 3): no Sandbox com outro time na frente, quem venceu (pelo nome) junto do placar.
+    const winnerTeam = v.match.winnerTeam;
+    const sandboxLine =
+      sandboxMode && !watching && sum.outcome === 'loss' && winnerTeam >= 0 && winnerTeam < recipe.teams.length
+        ? t('result.sandboxWinner' as StringKey, {
+            team: teamName(recipe, winnerTeam),
+            own: sum.ownScore,
+            // M9 (fase 3, revisão): o placar de quem venceu (na eliminação, nem sempre o maior).
+            other: v.match.teamScore[winnerTeam] ?? 0,
+          })
+        : '';
     const data: ResultScreenData = {
       title,
       titleColor: watching
@@ -3681,6 +3720,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       other: sum.otherScore,
       ...(zombiesMode ? { scoreLine: t('result.zombiesWave', { wave }) } : {}),
       ...(royalePlaceLine !== '' ? { scoreLine: royalePlaceLine } : {}),
+      ...(sandboxLine !== '' ? { scoreLine: sandboxLine } : {}),
+      ...(sandboxMode ? { scenario: true } : {}),
       // M7 (fase 9): assistindo, sem os números pessoais; no FFA e no Royale, sem o placar.
       ...(watching ? { watching: true } : {}),
       ...(watching && (solo || rov !== null) ? { scoreLine: '' } : {}),
@@ -4402,7 +4443,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   /** M6 (fase 1): os textos do Domination no kill feed (resolvidos uma vez: o evento não cria string). */
   const pointFeed = {
-    teams: [t('feed.teamName.0'), t('feed.teamName.1')],
+    // M9 (fase 3): o nome que a receita deu ao time (ou o da cor).
+    teams: recipe.teams.map((_tm, i) => teamName(recipe, i)),
     captured: t('feed.pointCaptured'),
     lost: t('feed.pointLost'),
     points: [...t('hud.pointLetters')].map((letter) => t('feed.point', { letter })),
@@ -4470,6 +4512,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     bomb: sk('hud.strike.bomb').toUpperCase(),
   };
   const strikeItems = STRIKE_SHOP.map((it) => sk(`strike.item.${it.id}`));
+  /** M9 (fase 3): morto na eliminação do Sandbox (no lugar do "Renascendo"). */
+  const sandboxOutText = sk('hud.sandbox.out').toUpperCase();
   // M7 (fase 8): os textos do Bobo Royale.
   const royaleTx = {
     kits: sk('hud.royale.kits').toUpperCase(),
@@ -5194,7 +5238,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     // M7 (fase 4): no BoboStrike, passada a câmera de morte, assiste um aliado vivo (em 3ª pessoa, atrás dele).
     // Fase 9: no Aquário assistindo, não (a câmera passa para quem matou).
-    const mate = dead && (strikeMode || royaleMode) && st.t >= STRIKE_SPECTATE_S && !watching ? livingMate(v, e) : -1;
+    const mate =
+      dead && (strikeMode || royaleMode || sandboxElimination) && st.t >= STRIKE_SPECTATE_S && !watching
+        ? livingMate(v, e)
+        : -1;
     if (mate >= 0) {
       const q = mate * 3;
       const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
@@ -5407,7 +5454,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const e = entityIndex(entity);
     const flags = v.flags[e]!;
     m.health = v.health[e]!;
-    m.maxHealth = recipe.players?.hp ?? 100;
+    // M9 (fase 3): no Sandbox, a vida do time (a sim dá a mesma a humanos e bots; a regra do bot ganha: o `max`).
+    m.maxHealth = sandboxMode
+      ? Math.max(recipe.teams[v.team[e]!]?.hp ?? recipe.players?.hp ?? 100, m.health)
+      : (recipe.players?.hp ?? 100);
     m.clip = heldClip(v, e);
     m.reserve = heldReserve(v, e);
     m.kills = v.kills[e]!;
@@ -5424,8 +5474,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M3 (fase 4c): as vantagens e a vida máxima com a Chonky Cola.
     m.perks = zombiesMode ? v.perks[e]! : 0;
     if ((m.perks & PERK.chonky) !== 0) m.maxHealth = Math.round(m.maxHealth * ZOMBIE_PERKS.chonkyHpMul);
-    m.waitWave = (zombiesMode || strikeMode || royaleMode) && m.dead;
-    m.waitText = strikeMode ? strikeTx.wait : '';
+    // M9 (fase 3): na eliminação do Sandbox ninguém volta: "fora até o fim" no lugar da contagem do renascer.
+    m.waitWave = (zombiesMode || strikeMode || royaleMode || sandboxElimination) && m.dead;
+    m.waitText = strikeMode ? strikeTx.wait : sandboxElimination ? sandboxOutText : '';
     if ((zombiesMode || royaleMode) && (flags & ENTITY_FLAG.downed) !== 0 && !m.dead) {
       if (v.selfUp[e] === 1) {
         m.downed = HUD_DOWNED.selfUp;
@@ -6710,10 +6761,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           } else if (royaleMode) {
             sharedHud.teamCount = 0;
           } else if (!ffa && !juggernaut && request.kind === 'play') {
-            sharedHud.teamCount = 2;
+            // M9 (fase 3): o Sandbox mostra os seus 3 ou 4 times.
+            const teams = sandboxMode ? Math.min(recipe.teams.length, sharedHud.teamScores.length) : 2;
+            sharedHud.teamCount = teams;
             const score = sim.view().match.teamScore;
-            sharedHud.teamScores[0] = score[0]!;
-            sharedHud.teamScores[1] = score[1]!;
+            for (let i = 0; i < teams; i++) sharedHud.teamScores[i] = score[i]!;
           } else {
             sharedHud.teamCount = 0;
           }

@@ -761,6 +761,8 @@ export function startGame(deps: GameDeps): GameHandle {
   };
   /** Refino R4c: o foco com que a Partida personalizada foi montada (a frase de ajuda é dele). */
   let customHelpFocus: string | null = null;
+  /** M9 (fase 3): digitando o nome de um time do Sandbox (o teclado mora no pedaço dos editores). */
+  let customTyping: EditorsModule.NameEntry | null = null;
   function rebuildCustom(): void {
     const ed = editors!;
     customHelpFocus = customMenu.focusedId;
@@ -772,11 +774,9 @@ export function startGame(deps: GameDeps): GameHandle {
       ed.customMatchScreen.build({
         tabs: tabs.map((id) => ed.CUSTOM_TAB_LABELS[id]),
         tab: customTab,
-        rows: ed.customRows(tab, customRecipe).map((r) => ({
-          id: r.id,
-          labelKey: r.labelKey,
-          value: r.value(customRecipe, customLimits),
-        })),
+        rows: ed.customRowViews(tab, customRecipe, customLimits),
+        // M9 (fase 3): no Sandbox, o preset é um Cenário.
+        scenario: customRecipe.mode === 'sandbox',
         summary: presetSummary(customRecipe),
         note: customNote,
         help: ed.customHelp(tabs, customHelpFocus),
@@ -871,6 +871,8 @@ export function startGame(deps: GameDeps): GameHandle {
         // M6 (fase 1): os textos do pedaço (a tabela extra), registrados aqui: a chamada no topo dele some no build.
         registerStrings(m.EXTRA_STRINGS);
         editors = m;
+        // M9 (fase 3): o resumo do JOGAR pode usar a tabela extra (o modo do Sandbox): refaz com ela.
+        refreshTitle();
         // M4 (fase 2c): bots e presets da pasta `oficina/` do cartão, uma vez (o importador mora no pedaço das telas
         // de edição, fora do menu da web; o Switch carrega esse pedaço logo no boot). O que não entra vai ao registro.
         if (deps.workshopFiles) {
@@ -901,10 +903,12 @@ export function startGame(deps: GameDeps): GameHandle {
   /** Salva o preset com nome do gerador ("Times 4×4 De boa"; repetido, " 2"); devolve o aviso para a tela. */
   function saveCustomPreset(recipe: MatchRecipe): string {
     const short = presetShortcut({ ...recipe, name: '' }).label;
-    const base = `${t(`mode.short.${recipe.mode}` as StringKey)} ${short}`;
+    // M9 (fase 3): o preset do Sandbox é um Cenário ("Cenário 3×3×2").
+    const scenario = recipe.mode === 'sandbox';
+    const base = `${t(scenario ? 'custom.scenario' : (`mode.short.${recipe.mode}` as StringKey))} ${short}`;
     const name = editors!.presetName(base, (n) => save.presets.saved.some((p) => p.name === n));
     const ok = save.savePreset({ ...recipe, name, seed: 0 });
-    return ok ? t('custom.saved', { name }) : t('custom.full');
+    return ok ? t(scenario ? 'custom.savedScenario' : 'custom.saved', { name }) : t('custom.full');
   }
 
   /** Abre a Partida Rápida como o último preset estava (com o modo pedido, se veio dos Modos). */
@@ -1084,12 +1088,17 @@ export function startGame(deps: GameDeps): GameHandle {
     );
   }
 
+  /** M9 (fase 3): quantos lados o jogador 2 a 4 escolhe (os times da receita; o Sandbox vai a 4). */
+  function couchSideCount(): number {
+    return couchTeams() ? couchPresets[couchPreset]!.teams.length : 1;
+  }
+
   function couchSeats(): LocalSeat[] {
-    const teams = couchTeams();
+    const n = couchSideCount();
     const out: LocalSeat[] = [];
     for (const s of locals.slots) {
       if (s.device === null) continue;
-      out.push({ device: s.device, side: s.index > 0 && teams && couchSides[s.index] === 1 ? 1 : 0 });
+      out.push({ device: s.device, side: s.index > 0 ? couchSides[s.index]! % n : 0 });
     }
     return out;
   }
@@ -1123,14 +1132,20 @@ export function startGame(deps: GameDeps): GameHandle {
     if (quitArmed) sig |= 1 << 25;
     if (sig === couchSig) return;
     couchSig = sig;
-    const teams = couchTeams();
-    const seats: CouchSeatView[] = locals.slots.map((s) => ({
-      device: s.device ? couchDeviceLabel(s.device) : null,
-      side: s.index > 0 && teams && s.device !== null ? (couchSides[s.index] === 1 ? 1 : 0) : null,
-      disconnected: s.device !== null && !s.connected,
-      tune: s.index > 0 && s.device !== null ? couchTune(s.index) : null,
-    }));
+    const n = couchSideCount();
     const preset = couchPresets[couchPreset];
+    // M9 (fase 3): com 3 ou 4 times, o lado é o nome da cor do time (contado a partir do do P1).
+    const home = Math.max(0, preset?.teams.findIndex((tm) => (tm.humans ?? 0) !== 0) ?? 0);
+    const seats: CouchSeatView[] = locals.slots.map((s) => {
+      const side = s.index > 0 && n > 1 && s.device !== null ? couchSides[s.index]! % n : null;
+      return {
+        device: s.device ? couchDeviceLabel(s.device) : null,
+        side,
+        ...(side !== null && n > 2 ? { sideText: t(`feed.teamName.${(home + side) % n}` as StringKey) } : {}),
+        disconnected: s.device !== null && !s.connected,
+        tune: s.index > 0 && s.device !== null ? couchTune(s.index) : null,
+      };
+    });
     couchMenu.setRoot(
       couchScreen.build({
         seats,
@@ -1217,7 +1232,8 @@ export function startGame(deps: GameDeps): GameHandle {
         couchSides[k] = 0;
         log(`[game] sofá: P${k + 1} saiu`);
       } else if (couchTeams() && (menuInput.pressedBy(d, 'left') || menuInput.pressedBy(d, 'right'))) {
-        couchSides[k] = couchSides[k] === 1 ? 0 : 1;
+        const n = couchSideCount();
+        couchSides[k] = ((couchSides[k]! % n) + (menuInput.pressedBy(d, 'left') ? n - 1 : 1)) % n;
       } else if (menuInput.pressedBy(d, 'tabPrev') || menuInput.pressedBy(d, 'tabNext')) {
         // M3 (fase 1e): os ombros mudam a mira deste jogador em 0,1×; o botão de cima inverte o Y. Fica guardado.
         const dir = menuInput.pressedBy(d, 'tabNext') ? 1 : -1;
@@ -1292,7 +1308,7 @@ export function startGame(deps: GameDeps): GameHandle {
     lastSpectate = spectate;
     if (seats.length >= 2) {
       log(
-        `[game] sofá: ${seats.length} jogadores (${seats.map((s) => couchDeviceLabel(s.device) + (s.side === 1 ? ' contra' : '')).join(', ')})`,
+        `[game] sofá: ${seats.length} jogadores (${seats.map((s) => couchDeviceLabel(s.device) + (s.side > 0 ? ' contra' : '')).join(', ')})`,
       );
     }
     const p1 = seats.length >= 1 ? seats[0]!.device : null;
@@ -1716,6 +1732,19 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
       }
       case 'custom': {
+        // M9 (fase 3): o nome de um time: o teclado do jogo desenha por cima; com o do sistema, a tela fica parada.
+        if (customTyping !== null) {
+          const typing = customTyping.frame(menuInput, raw, u, list);
+          if (typing !== 'done') {
+            if (typing === 'system') customMenu.draw(list, u);
+            renderer.renderViews(NO_VIEWS);
+            renderer.drawUi(list);
+            break;
+          }
+          customTyping = null;
+          customNote = '';
+          rebuildCustom();
+        }
         const nav = customMenu.update(menuInput, raw, u);
         const a = nav.activated;
         if (nav.tab !== 0) {
@@ -1741,14 +1770,27 @@ export function startGame(deps: GameDeps): GameHandle {
           rebuildCustom();
         } else if (a !== null && a.startsWith(CUSTOM_ROW_PREFIX)) {
           const id = a.slice(CUSTOM_ROW_PREFIX.length);
-          customRecipe = editors!.stepCustom(
-            editors!.customTabs(customRecipe)[customTab]!,
-            customRecipe,
+          customTyping = editors!.customNameEntry(
             id,
             nav.delta,
-            customLimits,
+            platform,
+            menuInput.lastDevice === 'gamepad',
+            () => customRecipe,
+            (r) => {
+              customRecipe = r;
+              rebuildCustom();
+            },
           );
-          customNote = '';
+          if (customTyping === null) {
+            customRecipe = editors!.stepCustom(
+              editors!.customTabs(customRecipe)[customTab]!,
+              customRecipe,
+              id,
+              nav.delta,
+              customLimits,
+            );
+          }
+          customNote = customTyping?.system === true ? t('custom.typing') : '';
           rebuildCustom();
         }
         // Refino R4c: a frase de ajuda segue o foco.

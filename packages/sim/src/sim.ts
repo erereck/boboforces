@@ -63,7 +63,7 @@ import { ENTITY_FLAG, ENTITY_KIND, NO_TEAM, NULL_ENTITY, type EntityId } from '.
 import { EventQueue } from './event-queue.ts';
 import { bindFigureTable, FigureHitCache, unbindFigureTable } from './hitbox.ts';
 import type { SimEvent } from './events.ts';
-import { expandRecipe, isFfaMode, isWarfareMode } from './recipe.ts';
+import { expandRecipe, isFfaMode, isWarfareMode, matchLimits } from './recipe.ts';
 import { hashState, readState, writeState } from './snapshot.ts';
 import { REWIND_HISTORY, REWIND_MAX_S, RewindState } from './rewind.ts';
 import { SimState } from './state.ts';
@@ -545,21 +545,10 @@ export function createSim(config: SimConfig): Sim {
   const roundsMode = strikeMode || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
   // M7 (fase 6): no Royale, quem acaba a partida é o último esquadrão (a zona fecha em ~8 min): sem tempo nem meta.
   const royaleMode = recipe.mode === 'royale.mini';
-  // M9 (fase 2): no Sandbox, o objetivo decide o fim: os pontos e a eliminação com o tempo da receita (ausente = o
-  // padrão do Sandbox), a meta só nos pontos, e o "nenhum" sem tempo nem meta (`SANDBOX_DEFAULTS`).
+  // M9 (fase 2): no Sandbox, o objetivo decide o fim (fase 3: `matchLimits`, a mesma conta que o HUD lê; a eliminação
+  // sempre tem tempo).
   const objective = recipe.mode === 'sandbox' ? (recipe.sandbox?.objective ?? SANDBOX_DEFAULTS.objective) : null;
-  const noLimits = roundsMode || royaleMode || objective === 'none';
-  // M9 (fase 2, revisão): a eliminação sempre tem tempo (sem zona, um time escondido onde a navegação não chega
-  // seguraria a partida para sempre): o 0 ou a falta viram o padrão do Sandbox.
-  const timeLimitS = noLimits
-    ? 0
-    : objective === 'elimination'
-      ? recipe.match?.timeLimitS || SANDBOX_DEFAULTS.timeLimitS
-      : (recipe.match?.timeLimitS ?? (objective !== null ? SANDBOX_DEFAULTS.timeLimitS : 0));
-  const scoreLimit =
-    noLimits || objective === 'elimination'
-      ? 0
-      : (recipe.match?.scoreLimit ?? (objective !== null ? SANDBOX_DEFAULTS.scoreLimit : 0));
+  const { timeLimitS, scoreLimit } = matchLimits(recipe);
   // M9 (fase 2): os times sem ponto no mapa ganham casa (só no Sandbox; nos outros modos, os pontos do mapa).
   const navMain = map.nav ? mainComponent(map.nav) : -1;
   // M9 (fase 2, revisão): só os times que começam com alguém ganham casa (o vazio não rouba ponto dos outros).

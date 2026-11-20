@@ -32,8 +32,12 @@ export interface CouchHome {
 export interface CouchSeatView {
   /** O dispositivo ("Controle 2", "Teclado e mouse"); `null` = assento vago. */
   readonly device: string | null;
-  /** 0 = com o P1, 1 = contra; `null` no P1 e quando o modo não tem times. */
-  readonly side: 0 | 1 | null;
+  /**
+   * 0 = com o P1, 1 = contra; `null` no P1 e quando o modo não tem times. M9 (fase 3): no Sandbox com 3 ou 4 times, o
+   * k-ésimo time depois do do P1, com o nome dele em `sideText` (no lugar do "Contra o P1").
+   */
+  readonly side: number | null;
+  readonly sideText?: string;
   /** O controle do assento caiu (o assento fica guardado até ele voltar). */
   readonly disconnected: boolean;
   /** M3 (fase 1e): o ajuste do jogador ("Mira 1,2× · Y invertido"); `null` no P1 (usa os Ajustes) e nos vagos. */
@@ -109,7 +113,11 @@ function seatCard(seat: CouchSeatView, k: number, keyboardFree: boolean): UiNode
     if (seat.disconnected) line('Lost', { key: 'couch.disconnected' }, COLORS.perigo);
     else if (k === 0) line('Role', { key: 'couch.p1' }, COLORS.textoBaixo);
     else if (seat.side !== null) {
-      line('Side', { key: seat.side === 0 ? 'couch.side.with' : 'couch.side.against' }, COLORS.acao);
+      const side: TextContent =
+        seat.side > 0 && seat.sideText !== undefined
+          ? { literal: seat.sideText }
+          : { key: seat.side === 0 ? 'couch.side.with' : 'couch.side.against' };
+      line('Side', side, COLORS.acao);
     }
     if (seat.tune) line('Tune', { literal: seat.tune }, COLORS.texto);
     if (k > 0 && seat.side !== null) line('HintSide', { key: 'couch.hint.side' }, COLORS.textoBaixo);

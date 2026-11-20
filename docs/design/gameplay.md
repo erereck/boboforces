@@ -828,6 +828,14 @@ Estilo CoD Zombies, com **bobos-zumbi cartoon**: mesmo estilo dos bobos, curvado
   - Jogar ou só assistir. Salvar como Cenário, que é um preset.
   - **Ferramentas do Dono** (estilo gmod): criar um bot onde você está mirando; congelar a IA; trocar o time de um bot; dar uma arma a ele; mudar regra ao vivo; câmera lenta (só offline).
   - No online, só o host usa as ferramentas.
+- **Na Partida personalizada (M9, fase 3; decisões menores, revisáveis):**
+  - O Sandbox é o último modo do ciclo da linha Modo (Times → Todos contra todos → Domination → Zombies → Sandbox). Ele nasce dos 2 times de agora, sem o Diretor de Partida; sair dele volta aos Times com o seu time contra os bots de todos os outros.
+  - A aba **Times** fica no lugar da aba Bots: "Times" (2 a 4; o novo copia o bot e a quantidade do último), "Seu time" e, por time, "Time Laranja" (o nome; confirmar abre o teclado, como o do bot na Oficina; até 15 letras), "Laranja: bot", "Laranja: quantos", "Laranja: vida" (1, 10, 25… 1000) e "Laranja: armas" (Todas ou uma primária só). Os rótulos usam a cor (fixa pela posição); o nome aparece no valor, no placar e no resultado.
+  - O **Objetivo** fica na aba Partida, depois do mapa: Pontos (tempo e meta), Eliminação (só o tempo, sempre com algum) e Nenhum (sem os dois).
+  - Os mapas: o Construto e o Ringue. A Base Bobo fica de fora por enquanto: a casa que a sim dá aos times 2 e 3 cai em cima dos quebra-vistas de 2,5 m das rotas oeste e leste.
+  - O preset do Sandbox é um **Cenário** ("Salvar Cenário", "Cenário 3×3×2"); o resumo de 3 ou 4 times é "3×3×2×2".
+  - No sofá, os jogadores 2 a 4 escolhem o time contando a partir do do P1 (com 3 ou 4 times, o cartão mostra a cor); na sala online, de "Tanto faz" ao Roxo. O "Ajustar desafio" muda os bots de todos os times menos o seu.
+  - O placar do Tab com 3 ou 4 times vai numa grade de 2 colunas; na tela pequena (640×360), numa lista só, com a cor do time em cada linha e os pontos dos times no cabeçalho.
 
 #### Bobo Juggernaut (M6+)
 - **O Juggernaut:**

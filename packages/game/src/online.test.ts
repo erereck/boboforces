@@ -1,10 +1,11 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { BUTTON, type InputFrame } from '@boboforces/input';
-import type { Sim, SimEvent } from '@boboforces/sim';
+import { expandRecipe, type Sim, type SimEvent } from '@boboforces/sim';
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
 import { describe, expect, it } from 'vitest';
 import type { OnlineClientLink, OnlineHostLink, OnlineSession } from './online-api.ts';
 import { ONLINE_CONTROL, onlineRecipe } from './online-api.ts';
+import { recipeTeamCount, stepTeam } from './online-screens.ts';
 import { sceneRecipe } from './scene/match.ts';
 import { createSceneDriver } from './scene/scene-driver.ts';
 import { PLATFORM_PROFILES } from '@boboforces/format';
@@ -36,6 +37,24 @@ describe('a receita da sala (M5 fase 4b)', () => {
     const ffa = onlineRecipe({ ...tdm, mode: 'warfare.ffa', teams: [{ humans: 'all', bots: [] }] }, [1, 0, -1]);
     expect(ffa.controllers).toEqual([0, 1, 2]);
     expect(ffa.recipe.teams[0]!.humans).toBe(3);
+  });
+
+  it('M9 (fase 3): a escolha do time na sala anda pelos times da partida (o Sandbox vai ao Roxo)', () => {
+    const walk = (count: number, delta: number): number[] => {
+      const seen: number[] = [];
+      let team = -1;
+      for (let i = 0; i < count + 1; i++) seen.push((team = stepTeam(team, delta, count)));
+      return seen;
+    };
+    expect(walk(2, 1)).toEqual([0, 1, -1]);
+    expect(walk(4, 1)).toEqual([0, 1, 2, 3, -1]);
+    expect(walk(4, -1)).toEqual([3, 2, 1, 0, -1]);
+    // Sem o número, os 2 de sempre.
+    expect(stepTeam(1, 1)).toBe(-1);
+    const sandbox: MatchRecipe = { ...tdm, mode: 'sandbox', teams: [...tdm.teams, { bots: [] }, { bots: [] }] };
+    expect([recipeTeamCount(tdm), recipeTeamCount(sandbox), recipeTeamCount({ ...tdm, mode: 'warfare.ffa' })]).toEqual([
+      2, 4, 0,
+    ]);
   });
 });
 
@@ -140,6 +159,50 @@ describe('a receita da cena online (M5 fase 4b)', () => {
     expect(bots).toBe(18);
     expect(PLATFORM_PROFILES.mobile.maxBots).toBeLessThan(18);
     expect([r.humans, r.seatControllers, r.recipe.seed]).toEqual([4, [2], 99]);
+  });
+
+  it('M9 (fase 3): o Sandbox de 4 times passa pela cena: o sofá (P1 no Verde) e a sala (um em cada time)', () => {
+    const normal = [{ ref: builtinBotRef('normal'), count: 3 }];
+    const sandbox: MatchRecipe = {
+      ...tdm,
+      mode: 'sandbox',
+      map: 'construto',
+      sandbox: { objective: 'elimination' },
+      teams: [
+        { name: 'Laranjada', bots: normal },
+        { bots: normal },
+        { humans: 'all', hp: 200, bots: normal },
+        { weapons: ['sniper'], bots: normal },
+      ],
+    };
+    const base = {
+      kind: 'play',
+      bench: null,
+      benchWarnings: [],
+      seed: 5,
+      convention: undefined as unknown as SceneRequest['convention'],
+      device: null,
+      gamepad: 0,
+      recipe: sandbox,
+    } as const;
+    const pad = (index: number, side: number) => ({ device: { kind: 'gamepad' as const, index }, side });
+    // O sofá: P1 no Verde (o time dos humanos), P2 um time depois (o Roxo), P3 dois (o Laranja).
+    const couch = sceneRecipe({ ...base, seats: [pad(0, 0), pad(1, 1), pad(2, 2)] }, PLATFORM_PROFILES.pc);
+    expect(couch.recipe.teams.map((tm) => tm.humans)).toEqual([1, 0, 1, 1]);
+    expect(couch.recipe.teams[2]!.hp).toBe(200);
+    expect(couch.recipe.sandbox).toEqual({ objective: 'elimination' });
+    expect(couch.humans).toBe(3);
+    const slots = expandRecipe(couch.recipe, couch.humans);
+    expect(couch.seatControllers.map((c) => slots.find((s) => s.controller === c)!.team)).toEqual([2, 3, 0]);
+    // A sala: o host no Roxo e os amigos nos outros (a receita do host vai como está).
+    const fake = fakeOnline('host');
+    const room = onlineRecipe(sandbox, [3, 0, 1, 2]);
+    const online = sceneRecipe(
+      { ...base, recipe: room.recipe, online: { ...fake.session, humans: 4, localController: room.controllers[0]! } },
+      PLATFORM_PROFILES.pc,
+    );
+    expect(online.recipe.teams.map((tm) => tm.humans)).toEqual([1, 1, 1, 1]);
+    expect(expandRecipe(online.recipe, 4).find((s) => s.controller === online.seatControllers[0])!.team).toBe(3);
   });
 });
 

@@ -57,6 +57,8 @@ export interface ResultScreenData {
    * vazio, sem a linha do placar (o FFA e o Royale, em que o "0 × 0" não diz nada).
    */
   readonly watching?: boolean;
+  /** M9 (fase 3): o Bobo Sandbox: o preset é um Cenário ("Salvar Cenário", "Cenário salvo"). */
+  readonly scenario?: boolean;
 }
 
 const RECORD_TITLE = {
@@ -223,8 +225,17 @@ export const resultScreen: Screen<ResultScreenData> = {
                     children: [
                       button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
                       d.presetSaved
-                        ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
-                        : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
+                        ? button(
+                            'savePreset',
+                            d.scenario === true ? 'result.scenarioSaved' : 'result.presetSaved',
+                            RESULT_ACTION.savePreset,
+                            { disabled: true },
+                          )
+                        : button(
+                            'savePreset',
+                            d.scenario === true ? 'result.saveScenario' : 'result.savePreset',
+                            RESULT_ACTION.savePreset,
+                          ),
                       button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
                     ],
                   } as UiNode,

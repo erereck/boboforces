@@ -1,4 +1,5 @@
 import type { StringKey } from '../strings.pt-BR.ts';
+import type { TextParams } from '../text.ts';
 import type { Screen } from '../tree.ts';
 import { buildTabbed, TABBED_LAYOUT } from './tabbed.ts';
 // M6 (fase 2): as ações moram em `editor-actions.ts` (o menu da web não leva a tela por causa delas).
@@ -15,6 +16,11 @@ export { CUSTOM_ACTION, CUSTOM_ROW_PREFIX, CUSTOM_SHARE_ROW, CUSTOM_TAB_PREFIX }
 export interface CustomRowView {
   readonly id: string;
   readonly labelKey: StringKey;
+  /** M9 (fase 3): os parâmetros do rótulo (o time das linhas do Sandbox) e o quadradinho da cor do time (RGB). */
+  readonly labelParams?: TextParams;
+  readonly swatch?: number;
+  /** M9 (fase 3): a área do valor mais larga (o nome do time). */
+  readonly valueWidth?: number;
   readonly value: string;
 }
 
@@ -32,10 +38,18 @@ export interface CustomMatchState {
   readonly forRoom?: boolean;
   /** M8 (fase 1): a linha Compartilhar no fim da aba (código e link do preset; só na web). */
   readonly share?: boolean;
+  /** M9 (fase 3): o Bobo Sandbox: o preset se chama Cenário ("Salvar Cenário"). */
+  readonly scenario?: boolean;
 }
 
 /** Medidas (px de referência): a coluna das linhas e a altura da janela dela. */
 export const CUSTOM_LAYOUT = TABBED_LAYOUT;
+
+/**
+ * M9 (fase 3): a área do valor das linhas com o nome de um time (o nome e o seu time, com o quadradinho da cor): 15
+ * letras largas não cabem nos 320 de sempre; o rótulo dessas linhas é curto ("Time Laranja", "Seu time").
+ */
+export const CUSTOM_NAME_VALUE_WIDTH = 480;
 
 export const customMatchScreen: Screen<CustomMatchState> = {
   id: 'customMatch',
@@ -45,7 +59,15 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       tabs: state.tabs,
       tab: state.tab,
       rows: [
-        ...state.rows.map((r) => ({ kind: 'option' as const, id: r.id, labelKey: r.labelKey, value: r.value })),
+        ...state.rows.map((r) => ({
+          kind: 'option' as const,
+          id: r.id,
+          labelKey: r.labelKey,
+          ...(r.labelParams !== undefined ? { labelParams: r.labelParams } : {}),
+          ...(r.swatch !== undefined ? { swatch: r.swatch } : {}),
+          ...(r.valueWidth !== undefined ? { valueWidth: r.valueWidth } : {}),
+          value: r.value,
+        })),
         ...(state.share === true
           ? [{ kind: 'action' as const, id: CUSTOM_SHARE_ROW, label: { key: 'custom.share' as const } }]
           : []),
@@ -55,7 +77,11 @@ export const customMatchScreen: Screen<CustomMatchState> = {
       ...(state.help !== undefined ? { help: state.help } : {}),
       buttons: [
         { id: CUSTOM_ACTION.back, labelKey: 'menu.back', variant: 'secondary' },
-        { id: CUSTOM_ACTION.save, labelKey: 'custom.save', variant: 'secondary' },
+        {
+          id: CUSTOM_ACTION.save,
+          labelKey: state.scenario === true ? 'custom.saveScenario' : 'custom.save',
+          variant: 'secondary',
+        },
         // M7 (fase 9): o Aquário (a mesma partida só com bots, para assistir); da sala do Online, não.
         ...(state.forRoom === true
           ? []

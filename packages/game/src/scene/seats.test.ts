@@ -1,6 +1,7 @@
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { expandRecipe } from '@boboforces/sim';
 import { describe, expect, it } from 'vitest';
+import { onlineRecipe } from '../online-api.ts';
 import { seatRecipe, type LocalSeat } from './seats.ts';
 
 const ref = 'builtin:normal-bob';
@@ -85,5 +86,43 @@ describe('assentos do sofá (M3, fase 1a)', () => {
     expect(r.recipe.teams[0]!.bots).toEqual([{ ref, count: 1 }]);
     expect(r.recipe.teams[1]!.bots).toEqual([]);
     expect(teamSizes(r.recipe, 4)).toEqual([3, 2]);
+  });
+});
+
+describe('M9 (fase 3): o sofá e a sala com até 4 times (o Bobo Sandbox)', () => {
+  const sandbox: MatchRecipe = {
+    ...tdm,
+    mode: 'sandbox',
+    teams: [
+      { bots: [{ ref, count: 3 }] },
+      { bots: [{ ref, count: 3 }] },
+      { humans: 'all', bots: [{ ref, count: 2 }] },
+      { bots: [{ ref, count: 3 }] },
+    ],
+  };
+  const seat = (index: number, side: number): LocalSeat => ({ device: { kind: 'gamepad', index }, side });
+
+  it('sofá: o P1 no time dos humanos da receita (o Verde); os outros contam a partir dele, dando a volta', () => {
+    const r = seatRecipe(sandbox, [seat(0, 0), seat(1, 1), seat(2, 2), seat(3, 0)]);
+    // P1 e P4 no Verde (2), P2 no Roxo (3), P3 no Laranja (0, dando a volta); cada time do mesmo tamanho.
+    expect(r.recipe.teams.map((tm) => tm.humans)).toEqual([1, 0, 2, 1]);
+    expect(teamSizes(r.recipe, 4)).toEqual([3, 3, 3, 3]);
+    // Os controladores seguem a ordem da sim: o Laranja (P3), o Verde (P1 e P4), o Roxo (P2).
+    expect(r.controllers).toEqual([1, 3, 0, 2]);
+    const slots = expandRecipe(r.recipe, 4);
+    expect(r.controllers.map((c) => slots.find((s) => s.controller === c)!.team)).toEqual([2, 3, 0, 2]);
+  });
+
+  it('sala: cada um no time que escolheu (0 a 3); "tanto faz" vai para o time com menos gente (no empate, o de casa)', () => {
+    const r = onlineRecipe(sandbox, [3, -1, 1, -1]);
+    expect(r.recipe.teams.map((tm) => tm.humans)).toEqual([1, 1, 1, 1]);
+    expect(teamSizes(r.recipe, 4)).toEqual([3, 3, 3, 3]);
+    const slots = expandRecipe(r.recipe, 4);
+    // M9 (fase 3, revisão): no empate, o "tanto faz" cai primeiro no time de casa da receita (o Verde, 2).
+    expect(r.controllers.map((c) => slots.find((s) => s.controller === c)!.team)).toEqual([3, 2, 1, 0]);
+    // Um time que a receita não tem (o 3 num Sandbox de 3) vale como "tanto faz".
+    const three = { ...sandbox, teams: sandbox.teams.slice(0, 3) };
+    const t3 = onlineRecipe(three, [3, 2]);
+    expect(t3.recipe.teams.map((tm) => tm.humans)).toEqual([1, 0, 1]);
   });
 });

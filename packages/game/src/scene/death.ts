@@ -281,11 +281,23 @@ export { rulesText } from '../bot-card.ts';
  * Linha da contagem inicial (gameplay.md §2.2: "Hoje: 6 Jorges"): os bots do outro time (no FFA, todos), agrupados por
  * nome na ordem da receita: "Hoje: 6 × Normal Bob". Sem bot adversário, `''`. Só na criação da partida.
  */
-export function countdownLine(recipe: MatchRecipe, humans: number, names: readonly string[]): string {
+export function countdownLine(
+  recipe: MatchRecipe,
+  humans: number,
+  names: readonly string[],
+  me: number | null = null,
+): string {
   const ffa = recipe.mode === 'warfare.ffa';
   const counts = new Map<string, number>();
-  for (const slot of expandRecipe(recipe, humans)) {
-    if (slot.bot === null || (!ffa && slot.team === 0)) continue;
+  const slots = expandRecipe(recipe, humans);
+  // M9 (fase 3): o seu time é o do jogador 1 (`me`; no Sandbox pode não ser o 0, e no sofá o controlador 0 pode
+  // ser outro jogador); sem ele, o do 1º humano; sem humano, o 0.
+  const own =
+    (me !== null ? slots.find((s) => s.controller === me)?.team : undefined) ??
+    slots.find((s) => s.bot === null)?.team ??
+    0;
+  for (const slot of slots) {
+    if (slot.bot === null || (!ffa && slot.team === own)) continue;
     const name = names[slot.controller] ?? '';
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
