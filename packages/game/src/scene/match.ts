@@ -107,6 +107,7 @@ import {
   ENTITY_KIND,
   entityIndex,
   expandRecipe,
+  chaosMaskScaleOf,
   chaosScaleOf,
   figurePostureOf,
   GRENADE_THROW,
@@ -1278,6 +1279,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * os marcadores em cima da cabeça, o clarão do tiro, o desmonte e a câmera de morte usam esta.
    */
   let shownScale = new Float32Array(1);
+  /** M9 (revisão da fase 1b): a escala da MÁSCARA de cada entidade no último desenho (mudou = a Roleta: pula direto). */
+  let shownMaskScale = new Float32Array(1);
 
   // --- vistas ---
   /** Fase 1c: cresce quando alguém entra no meio (o layout da HUD é refeito). */
@@ -1913,6 +1916,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     velPrev = new Float32Array(capacity * 3);
     velCur = new Float32Array(capacity * 3);
     shownScale = new Float32Array(capacity);
+    shownMaskScale = new Float32Array(capacity);
   }
   /** M9 (fase 1b): a escala dos modificadores desenhada da entidade `i` (a da sim, se ela ainda não foi desenhada). */
   function drawnScale(v: SimView, i: number): number {
@@ -2207,11 +2211,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const dx = ev.vx / speed;
             const dy = ev.vy / speed;
             const dz = ev.vz / speed;
-            const mx = ev.x + dx * 0.8;
-            const my = ev.y + dy * 0.8 - 0.1;
-            const mz = ev.z + dz * 0.8;
+            // M9 (fase 1b): a boca do lança-foguetes e o clarão na escala do corpo de quem atirou.
+            const size = drawnScale(v, i);
+            const mx = ev.x + dx * 0.8 * size;
+            const my = ev.y + (dy * 0.8 - 0.1) * size;
+            const mz = ev.z + dz * 0.8 * size;
             const owner = viewOfEntity(ev.owner);
-            pushMuzzleFlash(fx, ev.owner, mx, my, mz, dx, dy, dz, owner, modelOf(ev.weapon), drawnScale(v, i));
+            pushMuzzleFlash(fx, ev.owner, mx, my, mz, dx, dy, dz, owner, modelOf(ev.weapon), size);
             flashViews(mx, my, mz, owner);
           }
           break;
@@ -3899,9 +3905,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /**
    * M9 (fase 1b): o corpo dos modificadores maior que o normal (o bot gigante) com a câmera de uma vista em 1ª pessoa
    * dentro dele (`cameraInsideBody`) some nessa vista, pelo mesmo caminho do próprio corpo (o `localSlot` do ator vira
-   * o da vista; nenhum programa novo). Com a colisão normal o gigante encosta no jogador e a tela virava perna. Um ator
-   * só some numa vista (no sofá, a primeira cuja câmera está dentro dele); quem já é corpo de uma vista fica como está.
-   * Depois das câmeras do frame, antes do desenho.
+   * o da vista; nenhum programa novo). Com a colisão normal o gigante encosta no jogador e a tela virava perna. Depois
+   * das câmeras do frame, antes do desenho. Limites (o `localSlot` é um só por ator e só vale em 1ª pessoa):
+   * - um ator só some numa vista: no sofá, a primeira cuja câmera está dentro dele;
+   * - o gigante que já é o corpo de uma vista (o jogador do sofá num lugar de bot, o piloto do Aquário) fica como está:
+   *   na vista de outro jogador com a câmera dentro dele, ele aparece;
+   * - as vistas em 3ª pessoa e as câmeras do Aquário (de cima e seguindo: `localSlot` −1) nunca escondem ninguém; a de
+   *   ombro já se afasta do corpo seguido, e a de cima fica acima de todos.
    */
   function hideBodiesAroundCameras(): void {
     // quente:
@@ -3996,8 +4006,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.entity[n] = id;
       actors.kind[n] = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
       // M3 (fase 3b): Chonker e chefão maiores (a hitbox da sim cresce junto). M9 (fase 1): o Mini e os Bots gigantes
-      // (fase 1b: a escala da sim, apertada debaixo de teto, com o desenho andando até ela sem estalo).
-      const chaosK = approachScale(lastScale, chaosScaleOf(v, i), dt);
+      // (fase 1b: a escala da sim, apertada debaixo de teto, com o desenho andando até ela sem estalo; a Roleta, que
+      // troca a escala da máscara e a hitbox inteira de uma vez, pula direto).
+      const maskK = chaosMaskScaleOf(v, i);
+      const chaosK = approachScale(lastScale, chaosScaleOf(v, i), dt, maskK !== shownMaskScale[i]);
+      shownMaskScale[i] = maskK;
       shownScale[i] = chaosK;
       actors.scale[n] = v.bodyScale[i]! * chaosK;
       let expression: number = FACE_EXPRESSION.neutral;

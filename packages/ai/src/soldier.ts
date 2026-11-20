@@ -301,6 +301,11 @@ export class SoldierBrain {
   aimOffsetPosture = -1;
   /** Tick em que o desvio é refeito. */
   aimOffsetNextTick = 0;
+  /**
+   * M9 (revisão da fase 1b): a escala do alvo (`chaosScaleOf`) quando o desvio foi escolhido. O desvio é em metros:
+   * se o alvo muda de tamanho (o gigante passa por uma porta), ele vai na proporção até o próximo refazer.
+   */
+  aimOffsetScale = 1;
   errYaw = 0;
   errPitch = 0;
   errNextTick = 0;
@@ -567,6 +572,7 @@ function acquire(view: SimView, b: SoldierBrain, t: number, tick: number): void 
   b.aimOffset.z = 0;
   b.aimOffsetPosture = -1;
   b.aimOffsetNextTick = 0;
+  b.aimOffsetScale = 1;
   b.errNextTick = 0;
 }
 
@@ -1068,16 +1074,19 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
     eyePoint.x = ex;
     eyePoint.y = ey;
     eyePoint.z = ez;
-    visibleAimOffset(view, tg, b.aimHead, eyePoint, off, chaosScaleOf(view, tg));
+    b.aimOffsetScale = chaosScaleOf(view, tg);
+    visibleAimOffset(view, tg, b.aimHead, eyePoint, off, b.aimOffsetScale);
     b.aimOffsetPosture = posture;
     b.aimOffsetNextTick = tick + t.visibleAimRefresh;
   }
   // M9 (fase 1): o ponto cresce com o corpo do alvo (fase 1b: o do gigante debaixo de teto, na escala apertada, que
-  // fica abaixo da laje; o desvio da parte vista é da mesma escala).
+  // fica abaixo da laje). Revisão: o desvio da parte vista vai na escala de agora (escolhido noutra, na proporção).
   viewAimPoint(view, b.target, b.aimHead, aimPoint);
-  const offX = off.x;
-  const offY = off.y;
-  const offZ = off.z;
+  const sizeNow = chaosScaleOf(view, tg);
+  const resize = sizeNow === b.aimOffsetScale ? 1 : sizeNow / b.aimOffsetScale;
+  const offX = off.x * resize;
+  const offY = off.y * resize;
+  const offZ = off.z * resize;
   const ty = view.yaw[b.target]!;
   const tc = Math.cos(ty);
   const ts = Math.sin(ty);

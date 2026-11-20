@@ -270,6 +270,49 @@ describe('instâncias dos bonecos (E.14)', () => {
     }
   });
 
+  it('M9 (revisão da fase 1b): a escala mudando quadro a quadro não força a pose; quando ela para, força uma vez', () => {
+    // Rig de teste: guarda o `force` de cada pose do ator 1 e devolve `shifted` sem `force` (um ator em L2).
+    const rest = createRestFigureRig();
+    const forced: boolean[] = [];
+    const rig: FigureRig = {
+      setTable: (t) => rest.setTable(t),
+      setLod: () => {},
+      begin: () => {},
+      pose(actors, i, out, o, force) {
+        if (i === 1) forced.push(force);
+        if (!force) return FIGURE_POSE_RESULT.shifted;
+        rest.pose(actors, i, out, o, true);
+        return FIGURE_POSE_RESULT.computed;
+      },
+      expression: 0,
+      hairCeilingY: Infinity,
+      weapon: () => false,
+      end: () => {},
+      stats: { l0: 0, l1: 0, l2: 0 },
+      dispose: () => {},
+    };
+    const frame = createFigureFrame(rig, createFigureInstances());
+    frame.setFigures(templates, gameTable());
+    const a = actorsOf(2);
+    a.scale[1] = 3;
+    let f = 1;
+    frame.update(frameCtx(), a, f++);
+    // O gigante entrando debaixo da laje: a escala desenhada desce 3 → 1,2 em 5 quadros.
+    for (const k of [2.6, 2.2, 1.8, 1.4, 1.2]) {
+      a.scale[1] = k;
+      frame.update(frameCtx(), a, f++);
+    }
+    // Parada: uma pose forçada no tamanho novo, e depois nenhuma.
+    for (let n = 0; n < 3; n++) frame.update(frameCtx(), a, f++);
+    expect(forced).toEqual([true, false, false, false, false, false, true, false, false]);
+    // A Roleta (um pulo só): o quadro do pulo não força, o seguinte sim.
+    a.scale[1] = 0.5;
+    frame.update(frameCtx(), a, f++);
+    frame.update(frameCtx(), a, f++);
+    frame.update(frameCtx(), a, f++);
+    expect(forced.slice(9)).toEqual([false, true, false]);
+  });
+
   it('4ª linha: luz, expressão e clarão por caixa; o gêmeo do VS devolve a expressão', () => {
     const inst = createFigureInstances();
     const frame = createFigureFrame(createRestFigureRig(), inst);

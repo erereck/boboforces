@@ -50,6 +50,11 @@ export interface FigureInstances {
   readonly recForce: Uint8Array;
   /** M9 (fase 1): a escala do ator (`ActorBuffer.scale`) na última pose calculada (0 = nenhuma); mudou, `force`. */
   readonly recScale: Float32Array;
+  /**
+   * M9 (revisão da fase 1b): a escala do ator no último quadro (posado ou não): enquanto ela muda quadro a quadro, a
+   * troca de tamanho não força a pose (o `figure-frame` só força quando ela para).
+   */
+  readonly recSeenScale: Float32Array;
   /** Por ator do `ActorBuffer` (índice do quadro): registro (−1 = não desenhado) e "posar com `force`". */
   readonly actorRecord: Int16Array;
   readonly actorFresh: Uint8Array;
@@ -114,6 +119,7 @@ export function createFigureInstances(actors = FIGURE_ACTORS_MAX, boxes = FIGURE
   const recArmed = new Uint8Array(recs);
   const recForce = new Uint8Array(recs);
   const recScale = new Float32Array(recs);
+  const recSeenScale = new Float32Array(recs);
   const free = new Int16Array(recs);
   let freeLen = 0;
   /** Atores em ordem de faixa (sem os manequins) e os manequins em ordem de prefixo. */
@@ -239,6 +245,7 @@ export function createFigureInstances(actors = FIGURE_ACTORS_MAX, boxes = FIGURE
     recArmed,
     recForce,
     recScale,
+    recSeenScale,
     get actorRecord() {
       return actorRecord;
     },
@@ -329,6 +336,7 @@ export function createFigureInstances(actors = FIGURE_ACTORS_MAX, boxes = FIGURE
         recArmed[r] = 0;
         recForce[r] = 0;
         recScale[r] = 0;
+        recSeenScale[r] = 0;
         events++;
         if (isM === 1) prefixChanged = true;
       } else if (recTemplate[r] !== template || recBoxes[r] !== boxes) {

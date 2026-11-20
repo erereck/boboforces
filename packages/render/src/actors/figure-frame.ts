@@ -253,8 +253,14 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
         // Manequim: só posa quando o prefixo muda (o resto do tempo as matrizes dele ficam paradas, sem upload).
         if (instances.actorMannequin[i] === 1 && !fresh && !rescale) continue;
         // M9 (fase 1): o corpo mudou de tamanho (o Mini e os Bots gigantes entram e saem com a Roleta): a pose "shifted"
-        // ficaria no tamanho velho, então recalcula.
-        const sized = instances.recScale[r] !== a.scale[i];
+        // ficaria no tamanho velho, então recalcula. Revisão da fase 1b: o gigante passando por uma porta muda de
+        // tamanho a cada quadro por ~0,2 s; forçar todo quadro passava por cima do LOD (até fora da tela, ~50–64 µs
+        // por pose no Switch). Enquanto a escala ainda muda, o L0 recalcula sozinho, o L1 em quadro sim, quadro não, e
+        // o L2 (fora das vistas) fica; quando ela para, a pose do tamanho velho é forçada UMA vez.
+        const sc = a.scale[i]!;
+        const settling = instances.recSeenScale[r] !== sc;
+        instances.recSeenScale[r] = sc;
+        const sized = !settling && instances.recScale[r] !== sc;
         const force = fresh || rescale || sized || instances.recForce[r] === 1;
         const result = rig.pose(a, i, m, instances.recStart[r]! * MAT4, force);
         if (result === FIGURE_POSE_RESULT.hidden) {

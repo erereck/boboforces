@@ -1085,18 +1085,16 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
     expect(chaosScaleOf(view, 1)).toBe(1.5);
   });
 
-  it('o aperto (fase 1b): clamp((livre − folga) ÷ topo, 1, escala); agachado usa o topo agachado; o Mini não aperta', () => {
-    const { gapM, standTopM, crouchTopM } = CHAOS_SQUEEZE;
-    // O topo do aperto cobre a hitbox (e o cabelo do desenho, que o render corta a 1,99 m e 0,99 m).
-    expect(standTopM).toBeGreaterThanOrEqual(FIGURE_MAX_TOP_M);
-    expect(crouchTopM).toBeGreaterThanOrEqual(FIGURE_CROUCH_TOP_M);
-    expect(squeezedScale(3, Infinity, 0)).toBe(3);
-    expect(squeezedScale(3, 3 * standTopM + gapM, 0)).toBe(3);
-    expect(squeezedScale(3, 2.5, 0)).toBeCloseTo((2.5 - gapM) / standTopM, 12);
-    expect(squeezedScale(3, 2.5, F.crouching)).toBe(Math.min(3, (2.5 - gapM) / crouchTopM));
-    expect(squeezedScale(3, 1.8, 0)).toBe(1);
-    expect(squeezedScale(1, 1.8, 0)).toBe(1);
-    expect(squeezedScale(CHAOS_SCALE.mini, 0.5, 0)).toBe(CHAOS_SCALE.mini);
+  it('o aperto (fase 1b): clamp((livre − folga) ÷ topo em pé, 1, escala), em toda postura; o Mini não aperta', () => {
+    const { gapM, topM } = CHAOS_SQUEEZE;
+    // O topo do aperto cobre a hitbox (e o cabelo do desenho, que o render corta a 1,99 m).
+    expect(topM).toBeGreaterThanOrEqual(FIGURE_MAX_TOP_M);
+    expect(squeezedScale(3, Infinity)).toBe(3);
+    expect(squeezedScale(3, 3 * topM + gapM)).toBe(3);
+    expect(squeezedScale(3, 2.5)).toBeCloseTo((2.5 - gapM) / topM, 12);
+    expect(squeezedScale(3, 1.8)).toBe(1);
+    expect(squeezedScale(1, 1.8)).toBe(1);
+    expect(squeezedScale(CHAOS_SCALE.mini, 0.5)).toBe(CHAOS_SCALE.mini);
     // Pela grade: laje de 3,0 a 3,5 m (célula y = 6) sobre a metade x < 5 m; o chão até 0,5 m.
     const blocks = createTestBlocks();
     const concrete = makeCell(blocks.byKey('concrete')!.id);
@@ -1107,14 +1105,13 @@ describe('Mini e Bots gigantes (M9, fase 1)', () => {
       squeezedScaleAt(grid, blocks, null, x, 0.5, 5, flags, k);
     expect(at(7, 0, 3)).toBe(3);
     const under = at(2, 0, 3);
-    expect(under).toBeCloseTo((2.5 - gapM) / standTopM, 9);
+    expect(under).toBeCloseTo((2.5 - gapM) / topM, 9);
     expect(under).toBeLessThan(3);
     // O topo da hitbox e o olho em escala ficam abaixo da laje.
     expect(0.5 + FIGURE_MAX_TOP_M * under).toBeLessThan(3 - gapM);
     expect(0.5 + METRICS.eyeHeight * under).toBeLessThan(3 - gapM);
-    const crouched = at(2, F.crouching, 3);
-    expect(crouched).toBeGreaterThan(under);
-    expect(0.5 + FIGURE_CROUCH_TOP_M * crouched).toBeLessThan(3 - gapM);
+    // Revisão: agachado, a mesma escala (o raio sai do olho agachado, mas o topo é o de pé): agachar não cresce.
+    expect(at(2, F.crouching, 3)).toBe(under);
     expect(at(2, 0, 1)).toBe(1);
     expect(at(2, 0, CHAOS_SCALE.mini)).toBe(CHAOS_SCALE.mini);
   });

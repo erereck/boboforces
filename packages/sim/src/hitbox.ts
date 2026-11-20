@@ -79,8 +79,8 @@ export const ARM_HIT_CUT_M = METRICS.aabbWidth / 2 + 0.45;
  * - **Quem assume um lugar fica com o corpo do lugar**: o "gigante" é o controlador de bot, não quem joga. O humano
  *   que entra no meio da partida pelo sofá, ou que assume um bot no Aquário, vira gigante (o lugar é de bot); o bot que
  *   ocupa o lugar de um humano que saiu continua normal (o lugar é de humano).
- * - **A volta no tempo** (o tiro do amigo online) testa as posições antigas com o tamanho da máscara de AGORA: só
- *   difere nos < 200 ms em volta da troca da Roleta que liga ou desliga um tamanho.
+ * - **A volta no tempo** (o tiro do amigo online) testa cada corpo onde estava e no tamanho que tinha naquele tick
+ *   (revisão da fase 1b: o `RewindState` guarda o `SimState.chaosScale` junto da posição).
  * - **As explosões** medem a distância até a caixa de colisão, que não muda: o Mini leva o estilhaço de um bobo inteiro
  *   e o gigante, o de um normal.
  * - **O spawn seguro** (`life.ts`, quem enxerga o ponto) usa o olho normal de todos.
@@ -128,7 +128,7 @@ export interface ChaosBodies {
 
 /**
  * M9 (fase 1b): a escala dos modificadores do corpo `e` agora, já apertada debaixo de teto (`SimState.chaosScale`,
- * derivada no fim de cada tick). É a das hitboxes, do olho, da mira da IA e do desenho. 1 = normal.
+ * derivada depois do movimento e no fim de cada tick). É a das hitboxes, do olho, da mira da IA e do desenho. 1 = normal.
  */
 export function chaosScaleOf(v: ChaosBodies, e: number): number {
   return v.chaosScale[e]!;
@@ -136,25 +136,26 @@ export function chaosScaleOf(v: ChaosBodies, e: number): number {
 
 /**
  * M9 (fase 1b): o aperto do gigante debaixo de teto baixo. A escala de um corpo maior que 1 vira
- * clamp((livre − `gapM`) ÷ topo, 1, escala), com "livre" a altura dos pés até o primeiro bloco em cima (um raio da
- * grade por gigante por tick) e "topo" a altura do desenho em pé ou agachado (com o cabelo e o chapéu: o recorte do
- * cabelo do render vai a 1,99 m em pé e 0,99 m agachado; a hitbox, a `FIGURE_MAX_TOP_M` 1,81 e `FIGURE_CROUCH_TOP_M`
- * 0,97). Assim a cabeça, a arma e o olho do gigante nunca entram na laje; o tamanho 1 é o piso (a caixa de colisão
- * normal já cabe). O Mini e o tamanho 1 não apertam.
+ * clamp((livre − `gapM`) ÷ `topM`, 1, escala), com "livre" a altura dos pés até o primeiro bloco em cima (um raio da
+ * grade por gigante, depois do movimento e no fim do tick) e `topM` a altura do desenho EM PÉ com o cabelo e o chapéu
+ * (o recorte do cabelo do render vai a 1,99 m; a hitbox, a `FIGURE_MAX_TOP_M` 1,81). Assim a cabeça, a arma e o olho do
+ * gigante nunca entram na laje; o tamanho 1 é o piso (a caixa de colisão normal já cabe). O Mini e o tamanho 1 não
+ * apertam. Revisão da fase 1b: o topo é o de pé em TODA postura. Com o topo agachado (1 m) o gigante dentro de casa
+ * dobrava de tamanho ao agachar (1,2 → 2,4 debaixo de 2,5 m livres) e, no tick em que levantava, a hitbox em pé ia
+ * na escala agachada, com a cabeça acima da laje; os bots agacham em rajadas no combate.
  */
-export const CHAOS_SQUEEZE = { gapM: 0.1, standTopM: 2, crouchTopM: 1 } as const;
+export const CHAOS_SQUEEZE = { gapM: 0.1, topM: 2 } as const;
 
 /** O que barra o gigante em cima: bloco sólido ou que para bala ou visão (vidro e grade também). */
 const SQUEEZE_MASK = BLOCK_FLAG.solid | BLOCK_FLAG.blocksBullets | BLOCK_FLAG.blocksSight;
 
 /**
- * M9 (fase 1b): a escala `k` da máscara apertada pela altura livre `free` (m, dos pés ao primeiro bloco em cima; ≥
- * `Infinity` = céu aberto) com os bits `flags` (agachado usa o topo agachado). Pura.
+ * M9 (fase 1b): a escala `k` da máscara apertada pela altura livre `free` (m, dos pés ao primeiro bloco em cima;
+ * `Infinity` = céu aberto). Pura; a mesma em pé e agachado.
  */
-export function squeezedScale(k: number, free: number, flags: number): number {
+export function squeezedScale(k: number, free: number): number {
   if (k <= 1) return k;
-  const top = (flags & ENTITY_FLAG.crouching) !== 0 ? CHAOS_SQUEEZE.crouchTopM : CHAOS_SQUEEZE.standTopM;
-  const fit = (free - CHAOS_SQUEEZE.gapM) / top;
+  const fit = (free - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM;
   return fit >= k ? k : fit <= 1 ? 1 : fit;
 }
 
@@ -162,7 +163,8 @@ const squeezeHit = createRayHit();
 
 /**
  * M9 (fase 1b): a escala do corpo de escala `k` da máscara com os pés em (x, y, z) e os bits `flags`: o raio da
- * grade sobe do olho normal (sempre dentro da caixa de colisão, livre de bloco) até onde o topo em escala chegaria.
+ * grade sobe do olho normal (o agachado, se agachado: sempre dentro da caixa de colisão, livre de bloco) até onde o
+ * topo em escala chegaria.
  */
 export function squeezedScaleAt(
   grid: WorldGrid,
@@ -175,12 +177,10 @@ export function squeezedScaleAt(
   k: number,
 ): number {
   if (k <= 1) return k;
-  const crouched = (flags & ENTITY_FLAG.crouching) !== 0;
-  const from = crouched ? METRICS.crouchEyeHeight : METRICS.eyeHeight;
-  const top = crouched ? CHAOS_SQUEEZE.crouchTopM : CHAOS_SQUEEZE.standTopM;
-  const reach = top * k + CHAOS_SQUEEZE.gapM - from;
+  const from = (flags & ENTITY_FLAG.crouching) !== 0 ? METRICS.crouchEyeHeight : METRICS.eyeHeight;
+  const reach = CHAOS_SQUEEZE.topM * k + CHAOS_SQUEEZE.gapM - from;
   if (!raycastGrid(grid, blocks, x, y + from, z, 0, 1, 0, reach, SQUEEZE_MASK, squeezeHit, colliders)) return k;
-  return squeezedScale(k, from + squeezeHit.distance, flags);
+  return squeezedScale(k, from + squeezeHit.distance);
 }
 
 const HF = FIGURE_HIT_FIELD;
@@ -454,8 +454,8 @@ export class FigureHitCache {
   testEntity(s: SimState, e: number, posture: number, tick: number): number {
     const c = s.controller[e]!;
     const slot = c >= 0 && c < this.spare ? c : this.spare;
-    // M9 (fase 1): o Mini e os Bots gigantes multiplicam a escala do corpo (fase 1b: a do fim do tick anterior, já
-    // apertada debaixo de teto; as caixas do cache ficam no frame de tamanho 1, então mudar não esvazia nada).
+    // M9 (fase 1): o Mini e os Bots gigantes multiplicam a escala do corpo (fase 1b: a da posição depois do movimento
+    // deste tick, já apertada debaixo de teto; as caixas do cache ficam no frame de tamanho 1, mudar não esvazia nada).
     const k = s.chaosScale[e]!;
     const sc = k === 1 ? s.bodyScale[e]! : s.bodyScale[e]! * k;
     if (sc === 1)
@@ -1079,9 +1079,9 @@ const eyeHit = createRayHit();
  * visão) logo acima do olho normal, menos `GIANT_EYE_CEILING_GAP_M`: um raio da grade para cima. Sem isto o gigante
  * embaixo de um teto veria e atiraria do andar de cima.
  *
- * M9 (fase 1b): com a escala já apertada (`SimState.chaosScale`), o olho em escala fica sempre abaixo do teto na
- * posição em que ela foi medida (o fim do tick): o corte só pega no tick em que o gigante entra debaixo de um teto ou
- * levanta de agachado (a escala é a do fim do tick anterior). Fica como rede de segurança.
+ * M9 (fase 1b): com a escala já apertada (`SimState.chaosScale`, medida depois do movimento e com o topo em pé em toda
+ * postura), o olho em escala fica sempre abaixo do teto na posição em que ela foi medida; o corte fica como rede de
+ * segurança.
  */
 export function scaledEyeHeight(
   grid: WorldGrid,

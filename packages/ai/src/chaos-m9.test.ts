@@ -187,7 +187,7 @@ function roomDuel(roof: boolean): {
 describe('revisão da fase 1: os gigantes debaixo de teto', () => {
   it('embaixo da laje de 3 m os dois encolhem, se veem, atiram e se acertam (a mira fica abaixo do teto)', () => {
     const indoor = roomDuel(true);
-    expect(indoor.scale).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.standTopM, 6);
+    expect(indoor.scale).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM, 6);
     for (const y of indoor.tops) expect(y).toBeLessThan(3 - CHAOS_SQUEEZE.gapM);
     expect(indoor.clear).toEqual([true, true]);
     expect(indoor.shots, `${indoor.shots} tiros`).toBeGreaterThan(20);

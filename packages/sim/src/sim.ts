@@ -1263,6 +1263,10 @@ export function createSim(config: SimConfig): Sim {
       chaosSystem(ctx);
       unstuckSystem(ctx);
       movementSystem(ctx);
+      // M9 (revisão da fase 1b): a escala de cada corpo onde ele está agora (depois do movimento, do destravar e do
+      // `spawnBot` do dono): o tiro, a faca e o olho deste tick usam esta (no tick em que o gigante passa a porta, a
+      // de fora atravessava a laje). A Roleta que ligou um tamanho neste tick também já vale.
+      updateChaosScales(ctx);
       weaponSystem(ctx);
       meleeSystem(ctx);
       // M5 (fase 5d): ping e emotes (depois do movimento e da mira deste tick).
@@ -1284,7 +1288,8 @@ export function createSim(config: SimConfig): Sim {
       rulesSystem(ctx);
       spawnSystem(ctx);
       zombiesSystem(ctx);
-      // M9 (fase 1b): a escala de cada corpo pelo estado do fim do tick (a view, a IA e o próximo tick leem esta).
+      // M9 (fase 1b): de novo, pelo estado do fim do tick (o renascer e as rodadas teleportam): a view, a IA, o
+      // snapshot lido de volta e o histórico do tiro no passado leem esta.
       updateChaosScales(ctx);
       ctx.tick++;
       ctx.rewind?.record(s, ctx.tick);

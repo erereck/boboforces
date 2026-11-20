@@ -4807,16 +4807,18 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
 - **O encolher** (`sim/hitbox.ts`, `CHAOS_SQUEEZE`; `sim/systems/chaos.ts`, `updateChaosScales`): o corpo com
   escala de máscara k > 1 fica com clamp((livre − 0,1) / topo, 1, k), onde livre é a altura dos pés até o primeiro
   bloco sólido, que para bala ou que tapa a vista (um raio na grade para cima, do olho normal, por gigante por tick) e
-  topo é 2 m em pé ou 1 m agachado ou deslizando (a altura desenhada com cabelo e chapéu; as hitboxes vão a 1,81 e
-  0,97 m). O Mini e os corpos normais nunca encolhem. O valor mora em `SimState.chaosScale` (fora do hash e do
+  topo é 2 m em qualquer postura (a altura desenhada com cabelo e chapéu; a hitbox em pé vai a 1,81 m; agachar nunca
+  faz o gigante crescer). O Mini e os corpos normais nunca encolhem. O valor mora em `SimState.chaosScale` (fora do hash e do
   snapshot: sai do estado que já está neles), calculado na criação, no fim de cada `step`, no `readSnapshot` e no
-  `remote.commit` (o amigo online calcula com a grade e as posições dele); as hitboxes, o olho da sim, a mira da faca e
+  `remote.commit`, e também logo depois do movimento (a porta e o teletransporte valem no mesmo tick; o amigo online
+  calcula com a grade e as posições dele); a compensação de atraso guarda o tamanho de cada tick junto da pose; as hitboxes, o olho da sim, a mira da faca e
   dos bots, a vista deles, a mira assistida e o desenho leem dele (`SimView.chaosScale`, `chaosScaleOf`); o
   `viewAimCeiling` saiu. O `chaosMaskScaleOf` (sem o encolher) decide se o bot prefere caminho de teto alto, para a
   escolha não piscar em cada porta. Dentro de um tick vale o valor do tick anterior (o mesmo que a IA viu); o limite do
   olho debaixo do teto fica como rede de segurança para esse tick.
 - **No desenho** (`game/scene/body-scale.ts`, `approachScale`): o corpo anda até o valor da sim (encolhe a 10/s, cresce
-  a 3/s) e pula direto ao nascer; o corpo, os marcadores, o clarão, a quebra da morte e a câmera da morte usam esse
+  a 8/s), pula direto ao nascer e quando a Roleta muda o tamanho (a pose é refeita uma vez quando o tamanho assenta, não
+  a cada quadro); o corpo, os marcadores, o clarão, a quebra da morte e a câmera da morte usam esse
   valor; as hitboxes usam o da sim, na hora.
 - **A câmera:** a câmera da morte mira no peito × o tamanho de quem matou e recua na horizontal até o gigante caber
   (`DEATH_CAM.fitM`, até 6 m, parando 0,3 m antes de parede; `deathCamBackoff`); o gigante cujo corpo contém a câmera
@@ -4828,5 +4830,11 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   propósito: um comentário diz).
 - **O golden do Chaos:** `ae3a48fd` → `566e5be9` (as mesmas trocas da Roleta, 24 × 22); os outros não mudaram.
 - **Ficam:** o encolher olha um raio só, no centro do corpo (meio debaixo da beira do teto, o ombro ainda pode
-  atravessar); quando a Roleta troca, o tamanho chega um tick depois.
+  atravessar).
+- **A revisão (Opus) achou:** a compensação de atraso testava a pose antiga com o tamanho de agora (um tiro do teto
+  acertava a cabeça acima da laje); agachado, o gigante debaixo do teto dobrava de tamanho, e no tick de levantar a
+  cabeça passava a laje; no tick de cruzar a porta, a hitbox usava o tamanho de fora; o corpo desenhado crescia devagar
+  (até 0,67 s de hitbox maior que o desenho); a pose refeita a cada quadro fora da tela; a mira dos bots com o desvio
+  do tamanho velho; e o clarão do foguete fora do lugar. Corrigido antes de publicar (três testes repetem os cenários:
+  a porta, o levantar e a compensação); nenhum golden mudou.
 

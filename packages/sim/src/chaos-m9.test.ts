@@ -237,7 +237,7 @@ describe('Mini e Bots gigantes na sim (M9 fase 1)', () => {
     expect(shotY(['giantBots'], false, 0)).toBeCloseTo(METRICS.eyeHeight, 9);
     expect(shotY(['giantBots'], false, bot)).toBeCloseTo(METRICS.eyeHeight * 3, 9);
     // Fase 1b: debaixo da laje o gigante encolhe (2,5 m livres) e o olho vai junto, abaixo do teto.
-    const k = Math.fround((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.standTopM);
+    const k = Math.fround((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM);
     expect(shotY(['giantBots'], true, bot)).toBeCloseTo(METRICS.eyeHeight * k, 9);
     expect(METRICS.eyeHeight * k).toBeLessThan(2.5 - GIANT_EYE_CEILING_GAP_M);
   });
@@ -291,7 +291,7 @@ describe('Mini e Bots gigantes na sim (M9 fase 1)', () => {
     const v = under.sim.view();
     const k = chaosScaleOf(v, under.bot);
     expect(k).toBeLessThan(CHAOS_SCALE.giantBots);
-    expect(k).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.standTopM, 6);
+    expect(k).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM, 6);
     expect(chaosScaleOf(v, under.human)).toBe(1);
     const stand = figurePosture(FIGURE_STANCE.stand, FIGURE_GRIP.rifle, FIGURE_MODE.base, false);
     const top = hitTop(under.sim, under.bot, stand);
@@ -304,12 +304,12 @@ describe('Mini e Bots gigantes na sim (M9 fase 1)', () => {
     open.sim.dispose();
   });
 
-  it('fase 1b: agachado, o gigante aperta pelo topo agachado (fica maior que em pé)', () => {
+  it('fase 1b (revisão): agachado, o gigante fica do mesmo tamanho (o topo é o de pé em toda postura)', () => {
     const run = squeezeRun(['giantBots'], true, true);
     const v = run.sim.view();
     expect(v.flags[run.bot]! & ENTITY_FLAG.crouching).not.toBe(0);
     const k = chaosScaleOf(v, run.bot);
-    expect(k).toBeCloseTo(Math.min(3, (2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.crouchTopM), 6);
+    expect(k).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM, 6);
     const crouch = figurePosture(FIGURE_STANCE.crouch, FIGURE_GRIP.rifle, FIGURE_MODE.base, false);
     expect(v.position[run.bot * 3 + 1]! + hitTop(run.sim, run.bot, crouch)).toBeLessThan(3);
     run.sim.dispose();
@@ -384,5 +384,142 @@ describe('Mini e Bots gigantes na sim (M9 fase 1)', () => {
     expect(bad).toEqual([]);
     // Os três novos saem na Roleta.
     expect(seen & (MOD.mini | MOD.giantBots | MOD.ricochet)).toBe(MOD.mini | MOD.giantBots | MOD.ricochet);
+  });
+});
+
+/**
+ * Revisão da fase 1b: o humano A em cima da laje (3,0 a 3,5 m de altura em x 9..13,5 m e z 20..24 m; o chão vai até
+ * 0,5 m) atira em y = 4,2 m, em cima do bot gigante B: acima da laje, o tiro só acerta B se a hitbox dele atravessa o
+ * teto. B começa em (11,25; `bz`), virado para −Z.
+ */
+describe('revisão da fase 1b: o gigante debaixo da laje não leva tiro por cima dela', () => {
+  const SHOT_Y = 4.2;
+  const LIVE = 4 * SIM_HZ;
+
+  function slab(bz: number, rewind = false): { sim: Sim; f: InputFrame[]; a: number; b: number } {
+    const grid = createWorldGrid(40, 16, 80);
+    fillBox(grid, 0, 0, 0, 39, 0, 79, concrete);
+    fillBox(grid, 18, 6, 40, 26, 6, 47, concrete);
+    const spawns: MapSpawn[] = [
+      { x: cellCenter(18), y: 3.5, z: cellCenter(42), yaw: 0, team: 0 },
+      { x: cellCenter(22), y: 0.5, z: bz, yaw: 0, team: 1 },
+    ];
+    const r = recipe(['giantBots'], 'rifle', {
+      teams: [{ humans: 1, bots: [] }, { bots: [{ ref: builtinBotRef('normal'), count: 1 }] }],
+    });
+    const sim = createSim({ recipe: r, map: { grid, blocks, spawns }, humans: 1 });
+    if (rewind) sim.rewind.enable();
+    return { sim, f: createInputFrames(), a: entity(sim, 0), b: entity(sim, BOT_CONTROLLER_BASE) };
+  }
+
+  /** A mira em (x, `SHOT_Y`, z) e atira neste passo; devolve as alturas dos acertos em B. */
+  function shoot(run: ReturnType<typeof slab>, x: number, z: number): number[] {
+    const { sim, f, a, b } = run;
+    const v = sim.view();
+    const dx = x - v.position[a * 3]!;
+    const dy = SHOT_Y - (v.position[a * 3 + 1]! + METRICS.eyeHeight);
+    const dz = z - v.position[a * 3 + 2]!;
+    f[0]!.yaw = yawToU16(Math.atan2(-dx, -dz));
+    f[0]!.pitch = pitchToI16(Math.atan2(dy, Math.hypot(dx, dz)));
+    f[0]!.buttons = BUTTON.fire;
+    sim.step(f);
+    f[0]!.buttons = 0;
+    const events: SimEvent[] = [];
+    sim.drainEvents(events);
+    expect(events.some((ev) => ev.type === 'shot')).toBe(true);
+    const ys: number[] = [];
+    for (const ev of events) if (ev.type === 'hit' && entityIndex(ev.target) === b) ys.push(ev.y);
+    return ys;
+  }
+
+  /** B anda para −Z: a posição (x, z) e a escala de B depois de cada passo, até `steps` passos. */
+  function walk(run: ReturnType<typeof slab>, steps: number): { x: number; z: number; k: number }[] {
+    const { sim, f, b } = run;
+    const track: { x: number; z: number; k: number }[] = [];
+    f[BOT_CONTROLLER_BASE]!.moveY = 127;
+    for (let t = 0; t < steps; t++) {
+      sim.step(f);
+      sim.drainEvents([]);
+      const v = sim.view();
+      track.push({ x: v.position[b * 3]!, z: v.position[b * 3 + 2]!, k: v.chaosScale[b]! });
+    }
+    return track;
+  }
+
+  function warm(run: ReturnType<typeof slab>): void {
+    for (let i = 0; i < LIVE; i++) {
+      run.sim.step(run.f);
+      run.sim.drainEvents([]);
+    }
+  }
+
+  it('o tick em que ele passa para debaixo da laje: o tiro usa a escala da posição nova (não a de fora)', () => {
+    // Uma volta de sondagem acha o passo em que B (vindo de fora, z 26,25) entra debaixo da laje (z < 24).
+    const probe = slab(cellCenter(52));
+    warm(probe);
+    const track = walk(probe, 90);
+    probe.sim.dispose();
+    const T = track.findIndex((p) => p.z < 24);
+    expect(T).toBeGreaterThan(0);
+    expect(track[T - 1]!.k).toBe(CHAOS_SCALE.giantBots);
+    expect(track[T]!.k).toBeLessThan(1.5);
+    // Controle: um passo antes (B ainda fora, no triplo), o mesmo tiro em y 4,2 acerta.
+    const before = slab(cellCenter(52));
+    warm(before);
+    walk(before, T - 1);
+    expect(shoot(before, track[T - 1]!.x, track[T - 1]!.z).length).toBeGreaterThan(0);
+    before.sim.dispose();
+    // No passo da entrada, o tiro sai depois do movimento: B já está apertado e nada passa da laje.
+    const cross = slab(cellCenter(52));
+    warm(cross);
+    walk(cross, T);
+    expect(shoot(cross, track[T]!.x, track[T]!.z)).toEqual([]);
+    cross.sim.dispose();
+  });
+
+  it('levantar debaixo da laje: agachado ele não cresce, e no tick em que levanta nada passa da laje', () => {
+    const run = slab(cellCenter(44));
+    run.f[BOT_CONTROLLER_BASE]!.buttons = BUTTON.crouch;
+    warm(run);
+    const v = run.sim.view();
+    expect(v.flags[run.b]! & ENTITY_FLAG.crouching).not.toBe(0);
+    const k = chaosScaleOf(v, run.b);
+    expect(k).toBeCloseTo((2.5 - CHAOS_SQUEEZE.gapM) / CHAOS_SQUEEZE.topM, 6);
+    run.f[BOT_CONTROLLER_BASE]!.buttons = 0;
+    expect(shoot(run, v.position[run.b * 3]!, v.position[run.b * 3 + 2]!)).toEqual([]);
+    expect(v.flags[run.b]! & ENTITY_FLAG.crouching).toBe(0);
+    expect(chaosScaleOf(v, run.b)).toBe(k);
+    run.sim.dispose();
+  });
+
+  it('o tiro no passado: B é testado no tamanho que tinha (saindo da laje, a cabeça de agora não volta para lá)', () => {
+    // B na beira da laje (z 20,75) sai para −Z; o tiro de A volta até o último passo em que B estava embaixo.
+    const run = slab(cellCenter(41), true);
+    warm(run);
+    const start = run.sim.tick;
+    const track = walk(run, 30);
+    const out = track.findIndex((p) => p.k === CHAOS_SCALE.giantBots);
+    expect(out).toBeGreaterThan(0);
+    expect(out).toBeLessThan(20);
+    const inside = track[out - 1]!;
+    expect(inside.k).toBeLessThan(1.5);
+    // O passo `i` do trajeto termina no tick `start + i + 1` (a numeração do histórico).
+    const back = run.sim.tick - (start + out);
+    expect(back).toBeLessThanOrEqual(run.sim.rewind.maxTicks);
+    run.f[BOT_CONTROLLER_BASE]!.moveY = 0;
+    // Voltando até onde B estava debaixo da laje: o tamanho de lá (1,2), e nada passa da laje.
+    const rewound = run.sim.rewind.rewound;
+    run.sim.rewind.set(0, back);
+    expect(shoot(run, inside.x, inside.z)).toEqual([]);
+    expect(run.sim.rewind.rewound).toBe(rewound + 1);
+    // A escala de agora volta depois do tiro (o `swapOut`).
+    expect(chaosScaleOf(run.sim.view(), run.b)).toBe(CHAOS_SCALE.giantBots);
+    // Controle: sem voltar (depois da cadência), B está fora, no triplo, e o tiro em y 4,2 na posição de agora acerta.
+    run.sim.rewind.set(0, 0);
+    for (let i = 0; i < 20; i++) run.sim.step(run.f);
+    run.sim.drainEvents([]);
+    const v = run.sim.view();
+    expect(shoot(run, v.position[run.b * 3]!, v.position[run.b * 3 + 2]!).length).toBeGreaterThan(0);
+    run.sim.dispose();
   });
 });

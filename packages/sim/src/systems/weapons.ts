@@ -472,7 +472,7 @@ function castRay(ctx: SimContext, e: number, ox: number, oy: number, oz: number,
     const fj = s.flags[j]!;
     if ((fj & F.dead) !== 0) continue;
     // M5 (fase 2d): voltando no tempo, cada alvo é testado onde estava (postura daquele tick; o cache das caixas
-    // usa o tick antigo como chave). M9: com o tamanho da máscara de agora (o Mini e o gigante; `CHAOS_SCALE`).
+    // usa o tick antigo como chave). M9: no tamanho daquele tick (o Mini e o gigante, apertado ou não; `RewindState`).
     const rw = ctx.rewind;
     if (rw !== null && rw.active > 0) {
       if (!rw.has(j)) continue;

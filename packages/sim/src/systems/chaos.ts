@@ -140,10 +140,11 @@ export function applyChaos(ctx: SimContext): void {
 /**
  * M9 (fase 1b): a escala dos modificadores de cada corpo (`SimState.chaosScale`): a da máscara ATIVA (`masks[0]`, a
  * que a view mostra; `chaosScale`), com o gigante apertado debaixo de teto baixo (`squeezedScaleAt`: um raio da grade
- * por gigante, vivo ou morto). Derivada do estado do fim do tick (posição, bits, controlador, tipo, máscara e grade): o
- * `step` chama no fim, antes de sincronizar a view, e a criação, a leitura de snapshot e o `commit` do amigo online
- * também; nada disso entra no hash. Quem lê dentro do tick (as hitboxes, o olho da sim) usa a do fim do tick anterior,
- * a mesma que a IA viu. Sem tamanho na máscara, tudo fica 1 (um `fill` só na saída). Sem alocação.
+ * por gigante, vivo ou morto). Derivada só do estado de agora (posição, bits, controlador, tipo, máscara e grade), fora
+ * do hash e do snapshot. O `step` chama duas vezes: logo depois do movimento (o tiro, a faca e o olho do tick usam a da
+ * posição nova; revisão da fase 1b) e no fim, antes de sincronizar a view (a view, a IA, o histórico do tiro no
+ * passado e o snapshot); a criação, a leitura de snapshot e o `commit` do amigo online também. Sem tamanho na máscara,
+ * tudo fica 1 (um `fill` só na saída). Sem alocação.
  */
 export function updateChaosScales(ctx: SimContext): void {
   const c = ctx.chaos;

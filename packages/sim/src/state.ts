@@ -169,8 +169,8 @@ export class SimState {
   /**
    * M9 (fase 1b): a escala dos modificadores de cada corpo (Mini, Bots gigantes), já apertada debaixo de teto baixo
    * (`updateChaosScales`). DERIVADA, fora de `fields` (não entra no hash nem no snapshot): sai só da posição, dos bits,
-   * do controlador, do tipo, da máscara e da grade, no fim de cada tick (e na criação, na leitura de snapshot e no
-   * `commit` do amigo online, que calcula a dele). 1 = normal; multiplica o `bodyScale`.
+   * do controlador, do tipo, da máscara e da grade, depois do movimento e no fim de cada tick (e na criação, na leitura
+   * de snapshot e no `commit` do amigo online, que calcula a dele). 1 = normal; multiplica o `bodyScale`.
    */
   readonly chaosScale = new Float32Array(MAX_ENTITIES).fill(1);
   /** M3 (fase 4c): as vantagens do Bobo Zombies (bits de `PERK`); perdidas ao cair. */
