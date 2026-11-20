@@ -99,6 +99,7 @@ import type * as EditorsModule from './editors.ts';
 import type * as OnlineModule from './online-screens.ts';
 import type { OnlineRoom, OnlineRooms, OnlineSession } from './online-api.ts';
 import { trainingPreset } from './training.ts';
+import { colorName, teamColorIndex } from './team-colors.ts';
 import {
   factoryPresets,
   QUICK_MODES,
@@ -1141,7 +1142,8 @@ export function startGame(deps: GameDeps): GameHandle {
       return {
         device: s.device ? couchDeviceLabel(s.device) : null,
         side,
-        ...(side !== null && n > 2 ? { sideText: t(`feed.teamName.${(home + side) % n}` as StringKey) } : {}),
+        // M10 (fase 8): a cor escolhida no Sandbox dá o nome.
+        ...(side !== null && n > 2 && preset ? { sideText: colorName(teamColorIndex(preset, (home + side) % n)) } : {}),
         disconnected: s.device !== null && !s.connected,
         tune: s.index > 0 && s.device !== null ? couchTune(s.index) : null,
       };

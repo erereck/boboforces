@@ -6,6 +6,15 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M10: mapas e armas novos (planejado em 20/11/2026)
+
+- **Plano** em `docs/PLANO_M10.md` (#83): os 5 mapas que faltam da lista do GDD (Porto de Contêineres, Canteiro de
+  Obras, Galpão de Paintball, Estação Lunar e Fazenda à noite), 5 armas do arsenal futuro (DMR, revólver, escopeta
+  automática, besta e lança-granadas) e as pendências do M9, em ondas paralelas. Perguntas AK1–AK6 no padrão.
+- **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
+  dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
+  sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).
+
 ### M9: o Bobo Sandbox e os modificadores de tamanho (fechado em 20/11/2026)
 
 - **Plano** em `docs/PLANO_M9.md` (#82): a dieta do menu da web, os modificadores Mini, Bots gigantes e Ricochete, o

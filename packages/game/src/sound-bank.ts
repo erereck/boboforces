@@ -82,6 +82,8 @@ export const SOUNDS = {
   'impacto-vidro': sfx('file', 0.32),
   'impacto-macio': sfx('file', 0.35),
   'impacto-bobo': sfx('file', 0.5, SOUND_RANK.ally),
+  // M10 (fase 8): o quique do Ricochete (sintetizado: 0 KB). O cooldown junta os chumbos da escopeta num quique só.
+  ricochete: sfx('synth', 0.5, SOUND_RANK.world, 0.06),
   // Movimento: o compasso dos passos é por bobo, sem cooldown global.
   'passo-concreto-1': sfx('file', 0.3, SOUND_RANK.world, 0),
   'passo-concreto-2': sfx('file', 0.3, SOUND_RANK.world, 0),

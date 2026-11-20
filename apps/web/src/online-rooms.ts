@@ -75,6 +75,7 @@ function toView(s: LobbyState): OnlineRoomView {
     summary: s.summary,
     teams: s.teams,
     ...(s.teamCount !== undefined ? { teamCount: s.teamCount } : {}),
+    ...(s.teamColors !== undefined ? { teamColors: s.teamColors } : {}),
     playing: s.playing,
     members: s.members.map((m) => ({
       slot: m.slot,
@@ -163,7 +164,7 @@ export function createWebRooms(deps: WebRoomsDeps): OnlineRooms {
         if (!attached && status !== 'playing') drain(matchEp);
       },
       setChoice: (c) => lobby.setHostChoice(toLobby(c)),
-      setSummary: (text, teams, teamCount) => lobby.setSummary(text, teams, teamCount),
+      setSummary: (text, teams, teamCount, teamColors) => lobby.setSummary(text, teams, teamCount, teamColors),
       setLocked: (on) => lobby.setLocked(on),
       kick: (slot) => lobby.kick(slot),
       start(

@@ -188,6 +188,40 @@ describe('sons da partida (fase 7b)', () => {
     expect(mixer.played).toHaveLength(2);
   });
 
+  it('M10 (fase 8): o ricochete toca o "piiiu" no ponto do quique; os chumbos do mesmo tiro viram um só', () => {
+    const { v, me, bot, mixer, sound } = setup();
+    const ricochet = (shooter: number, tick: number, x: number): SimEvent => ({
+      type: 'ricochet',
+      tick,
+      shooter,
+      weapon: WEAPON_CODE.shotgun,
+      x,
+      y: 1,
+      z: 22,
+      dirX: 0,
+      dirY: 0,
+      dirZ: 1,
+      distance: 6,
+    });
+    sound.event(ricochet(bot, 10, 12), v, 1);
+    expect(mixer.played).toEqual([expect.objectContaining({ sound: 'ricochete', priority: SOUND_RANK.enemy, x: 12 })]);
+    const rate = mixer.played[0]!.rate;
+    expect(rate).toBeGreaterThanOrEqual(0.88);
+    expect(rate).toBeLessThanOrEqual(1.12);
+    // A mesma bala no mesmo tick (os chumbos de um tiro só): um som só.
+    mixer.played.length = 0;
+    sound.event(ricochet(bot, 10, 12), v, 2);
+    expect(mixer.played).toHaveLength(0);
+    // 8 chumbos da sua escopeta quicando no mesmo instante: um "piiiu" só, no mundo (com posição), não na cabeça.
+    for (let k = 0; k < 8; k++) sound.event(ricochet(me, 20, 8 + k), v, 3);
+    expect(mixer.played.map((p) => [p.sound, p.priority, p.x])).toEqual([['ricochete', SOUND_RANK.own, 8]]);
+    // M10 (fase 8, revisão): o ricochete de um bot logo antes não engole o seu (o seu não espera o cooldown).
+    mixer.played.length = 0;
+    sound.event(ricochet(bot, 30, 12), v, 4);
+    sound.event(ricochet(me, 30, 9), v, 4.01);
+    expect(mixer.played.map((p) => p.x)).toEqual([12, 9]);
+  });
+
   it('retorno: plic no corpo, PLOC na cabeça, dano em você; a regra sem hitmarker cala o plic', () => {
     const { v, me, bot, mixer, sound } = setup();
     sound.event(hit(me, bot, 'torso'), v, 1);

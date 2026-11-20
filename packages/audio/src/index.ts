@@ -42,6 +42,7 @@ export {
   synthRocket,
   synthSwing,
   synthPop,
+  synthRicochet,
   synthCountBeep,
   synthJingle,
   synthHeartbeat,

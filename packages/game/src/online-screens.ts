@@ -33,7 +33,7 @@ import {
   registerStrings,
   STRINGS_ONLINE_PT_BR,
   t,
-  TEAM_COLORS,
+  TEAM_PALETTE,
   type DrawList,
   type MenuNavigation,
   type OnlineRoomMemberRow,
@@ -50,6 +50,7 @@ import {
   type OnlineSession,
 } from './online-api.ts';
 import { ownerReserveFor } from './owner-reserve.ts';
+import { teamColorIndex } from './team-colors.ts';
 import {
   capRoomRecipe,
   hostSnapshotHz,
@@ -181,9 +182,13 @@ export function stepTeam(team: number, delta: number, count = 2): number {
   return ((i + (delta < 0 ? n - 1 : 1)) % n) - 1;
 }
 
-/** O nome do time na sala (a cor: o amigo não tem a receita); fora dos times da partida, "tanto faz". */
-function teamLabel(team: number, count = 2): string {
-  return t(team >= 0 && team < count ? (`online.team.${team}` as StringKey) : 'online.team.any');
+/**
+ * O nome do time na sala (a cor: o amigo não tem a receita); fora dos times da partida, "tanto faz". M10 (fase 8):
+ * `colors` = a cor de cada time (índices da paleta, que o Sandbox escolhe); ausente, a da posição.
+ */
+function teamLabel(team: number, count = 2, colors?: readonly number[]): string {
+  if (!(team >= 0 && team < count)) return t('online.team.any');
+  return t(`online.team.${colors?.[team] ?? team}` as StringKey);
 }
 
 export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
@@ -272,14 +277,26 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   function publishSummary(r: OnlineRoom): void {
     summaryView = r.view;
     const text = deps.summary(playedRecipe(r));
-    if (text === sentSummary) return;
-    sentSummary = text;
-    r.setSummary(text, recipeHasTeams(recipe), Math.max(2, recipeTeamCount(recipe)));
+    const count = Math.max(2, recipeTeamCount(recipe));
+    const colors = teamColorsOf(r, count);
+    // M10 (fase 8): a cor dos times também conta (o Sandbox com outra cor e o mesmo resumo).
+    const sent = `${text}|${colors.join()}`;
+    if (sent === sentSummary) return;
+    sentSummary = sent;
+    r.setSummary(text, recipeHasTeams(recipe), count, colors);
   }
 
   /** M9 (fase 3): quantos times a escolha anda: o host sabe pela receita; o amigo, pelo que o host mandou. */
   function teamCountOf(r: OnlineRoom): number {
     return r.role === 'host' ? Math.max(2, recipeTeamCount(recipe)) : (r.view?.teamCount ?? 2);
+  }
+
+  /** M10 (fase 8): a cor (índice da paleta) de cada time: o host sabe pela receita; o amigo, pelo que o host mandou. */
+  function teamColorsOf(r: OnlineRoom, count = teamCountOf(r)): number[] {
+    const sent = r.view?.teamColors;
+    const out: number[] = [];
+    for (let i = 0; i < count; i++) out.push(r.role === 'host' ? teamColorIndex(recipe, i) : (sent?.[i] ?? i));
+    return out;
   }
 
   function rebuild(): void {
@@ -567,6 +584,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     const view = r.view;
     if (view === null) return [];
     const count = teamCountOf(r);
+    const colors = teamColorsOf(r, count);
     return view.members.map((m) => {
       const name = memberName(m);
       const you = m.slot === r.mySlot;
@@ -574,8 +592,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
         slot: m.slot,
         name,
         you,
-        team: view.teams ? teamLabel(m.team, count) : '',
-        teamColor: view.teams && m.team >= 0 && m.team < count ? TEAM_COLORS[m.team]! : COLORS.texto,
+        team: view.teams ? teamLabel(m.team, count, colors) : '',
+        teamColor: view.teams && m.team >= 0 && m.team < count ? TEAM_PALETTE[colors[m.team]!]! : COLORS.texto,
         status:
           m.slot === 0
             ? t('online.room.host')
@@ -631,7 +649,9 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
           hints,
           host,
           members: roomRows(room),
-          team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true)) ? teamLabel(team, teamCountOf(room)) : null,
+          team: (host ? recipeHasTeams(recipe) : (view?.teams ?? true))
+            ? teamLabel(team, teamCountOf(room), teamColorsOf(room))
+            : null,
           locked: view?.locked ?? false,
           note: note !== '' ? note : view?.locked ? t('online.room.locked') : '',
         }),

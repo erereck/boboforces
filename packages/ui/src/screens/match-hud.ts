@@ -148,6 +148,8 @@ export interface ScoreboardModel {
    * sem nome). Encolhe para caber na coluna dos nomes. O `game` preenche uma vez.
    */
   readonly teamNames: string[];
+  /** M10 (fase 8): a cor de cada time (RGBA): a do `TEAM_COLORS`, ou a que o Sandbox escolheu. O `game` preenche uma vez. */
+  readonly teamColors: number[];
   rowCount: number;
   /** Por linha, já na ordem de exibição (o `game` ordena: abates, depois menos mortes). */
   readonly name: string[];
@@ -177,6 +179,7 @@ export function createScoreboardModel(): ScoreboardModel {
     teamCount: 0,
     teamScores: [0, 0, 0, 0],
     teamNames: ['', '', '', ''],
+    teamColors: TEAM_COLORS.slice(0, 4),
     rowCount: 0,
     name: new Array<string>(n).fill(''),
     team: new Uint8Array(n),
@@ -320,7 +323,7 @@ export function drawScoreboard(
     const ty0 = stackY;
     // A fileira seguinte começa depois da tabela mais a maior legenda desta fileira.
     if (col === cols - 1 || tIdx === tables - 1) stackY += tableH + gap + rowFooter(Math.floor(tIdx / cols));
-    const color = tables > 1 ? (TEAM_COLORS[tIdx] as number) : COLORS.acao;
+    const color = tables > 1 ? (m.teamColors[tIdx] ?? COLORS.texto) : COLORS.acao;
     pushShape(out, tx0, ty0, tableW, tableH, COLORS.hudFundo, Math.round(5 * s));
     pushRect(out, tx0, ty0, tableW, Math.max(2, Math.round(2 * s)), color);
     // Cabeçalho: os pontos do time (TDM) e os nomes das colunas.
@@ -338,7 +341,7 @@ export function drawScoreboard(
       // M9 (fase 3): a lista só dos times: os pontos de cada time, na cor dele, no lugar do "JOGADOR".
       let pen = tx0 + pad;
       for (let k = 0; k < teamTables; k++) {
-        pen += paintNumber(out, font, m.teamScores[k] ?? 0, 0, pen, hy, px, TEAM_COLORS[k] as number) + gap * 2;
+        pen += paintNumber(out, font, m.teamScores[k] ?? 0, 0, pen, hy, px, m.teamColors[k] ?? COLORS.texto) + gap * 2;
       }
     } else paintText(out, font, tx.player, tx0 + pad, hy, px * 0.85, COLORS.textoBaixo, 0.08);
     const colX = (k: number): number => tx0 + pad + nameW + gap + k * (numW + gap) + numW;
@@ -350,7 +353,8 @@ export function drawScoreboard(
       if (tables > 1 && m.team[r] !== tIdx) continue;
       if (m.local[r] === 1) pushRect(out, tx0 + 2, ry - pad * 0.5, tableW - 4, rowH, withAlpha(COLORS.acao, 0.18));
       // M9 (fase 3): na lista só, a cor do time na ponta da linha.
-      if (merged) pushRect(out, tx0 + 2, ry, Math.max(2, Math.round(2 * s)), cap, TEAM_COLORS[m.team[r]!] as number);
+      if (merged)
+        pushRect(out, tx0 + 2, ry, Math.max(2, Math.round(2 * s)), cap, m.teamColors[m.team[r]!] ?? COLORS.texto);
       const fg = m.dead[r] === 1 ? COLORS.textoBaixo : m.local[r] === 1 ? COLORS.acao : COLORS.texto;
       paintText(out, font, m.name[r]!, tx0 + pad, ry, px, fg);
       paintNumber(out, font, m.kills[r]!, 0, colX(0), ry, px, fg, 1);

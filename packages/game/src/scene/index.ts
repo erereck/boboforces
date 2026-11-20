@@ -6,6 +6,7 @@ import type { Scene, SceneHost, SceneModule, SceneRequest } from '../scene-api.t
 import { FIGURE_SKIN_LAYERS } from '@boboforces/format';
 import { drawLoadingScreen, loadingStepIndex, type DrawList, type LoadingModel } from '@boboforces/ui';
 import type { ViewDesc } from '@boboforces/render/data';
+import { teamColorTable } from '../team-colors.ts';
 import { createSceneFigures, type SceneFigures } from './figures.ts';
 import { createConstrutoLoader, type LoadingTimes } from './load.ts';
 import { createConstrutoMatch, profileFor, sceneRecipe, type ConstrutoMatch } from './match.ts';
@@ -127,6 +128,8 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
       figures = createSceneFigures({
         profile,
         teamCount: recipe.recipe.teams.length,
+        // M10 (fase 8): as skins de cada time vestem a cor dele (a que o Sandbox escolheu).
+        teamColors: teamColorTable(recipe.recipe),
         zombieKinds: recipe.recipe.mode === 'zombies',
         mannequins: loaded.doc.markers.mannequins,
         prints: request.bench?.prints ?? false,

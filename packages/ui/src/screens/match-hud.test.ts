@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDrawList, DRAW_OP } from '../draw-list.ts';
 import { drawnCommands, syntheticFontPack, syntheticGlyphText } from '../test-fixtures.ts';
-import { COLORS, MIN_TEXT, TEAM_COLORS } from '../tokens.ts';
+import { COLORS, MIN_TEXT, TEAM_COLORS, TEAM_PALETTE } from '../tokens.ts';
 import { createHudSharedModel, drawHudShared, layoutHudScreen } from './hud.ts';
 import {
   ageKillFeed,
@@ -229,6 +229,42 @@ describe('placar do Tab', () => {
         );
       }
     }
+  });
+
+  it('M10 (fase 8): a cor de cada time vem do modelo (a que o Sandbox escolheu), também na lista só e no placar do alto', () => {
+    const chosen = [TEAM_PALETTE[4]!, TEAM_PALETTE[1]!, TEAM_PALETTE[7]!];
+    const m = createScoreboardModel();
+    // Sem escolha, as da posição.
+    expect(m.teamColors).toEqual(TEAM_COLORS);
+    m.title = 'Bobo Sandbox';
+    m.teamCount = 3;
+    m.rowCount = 6;
+    for (let tIdx = 0; tIdx < 3; tIdx++) m.teamColors[tIdx] = chosen[tIdx]!;
+    for (let r = 0; r < 6; r++) {
+      m.name[r] = 'Normal Bob';
+      m.team[r] = r % 3;
+    }
+    for (const [w, h, min] of [
+      [1280, 720, MIN_TEXT.tv],
+      [640, 360, MIN_TEXT.switchSplit],
+    ] as const) {
+      const list = createDrawList();
+      drawScoreboard(list, fonts, m, w, h, min);
+      const colors = new Set(drawnCommands(list).map((c) => c.color));
+      for (const c of chosen) expect(colors.has(c), `${w}: ${c.toString(16)}`).toBe(true);
+      // O Laranja e o Verde da posição (os times 0 e 2 escolheram outra cor) não aparecem.
+      expect([colors.has(TEAM_COLORS[0]!), colors.has(TEAM_COLORS[2]!)]).toEqual([false, false]);
+    }
+    const shared = createHudSharedModel();
+    expect(shared.teamColors).toEqual(TEAM_COLORS);
+    shared.teamCount = 3;
+    shared.timeLeftS = 90;
+    for (let tIdx = 0; tIdx < 3; tIdx++) shared.teamColors[tIdx] = chosen[tIdx]!;
+    const list = createDrawList();
+    drawHudShared(list, fonts, shared, layoutHudScreen(1, W, H, { minTextPx: MIN_TEXT.tv }).shared);
+    const colors = new Set(drawnCommands(list).map((c) => c.color));
+    for (const c of chosen) expect(colors.has(c), c.toString(16)).toBe(true);
+    expect(colors.has(TEAM_COLORS[0]!)).toBe(false);
   });
 
   it('os títulos das colunas não se encostam', () => {

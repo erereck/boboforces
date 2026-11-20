@@ -372,6 +372,10 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
     return SOUND_RANK.enemy;
   };
 
+  /** M10 (fase 8, revisão): o último ricochete tocado (tick e atirador): os chumbos do mesmo tiro viram um som só. */
+  let ricochetTick = -1;
+  let ricochetShooter = -1;
+
   /** Cooldown por som (o próprio jogador passa sempre). `false` = ainda no cooldown. */
   const ready = (id: SoundId, nowS: number, own: boolean): boolean => {
     const k = SOUND_INDEX.get(id)!;
@@ -575,6 +579,17 @@ export function createMatchSound(deps: MatchSoundDeps): MatchSound {
             SOUND_RANK.world,
           );
           break;
+        case 'ricochet': {
+          // M10 (fase 8): o "piiiu" no ponto do quique (o impacto na parede já tocou junto). Os chumbos do mesmo tiro
+          // (mesmo atirador, mesmo tick) viram um som só; o seu não espera o cooldown dos outros (revisão). O tom varia
+          // ±12% pelo tick e pela arma (sem sorteio fora da sim, para os testes repetirem).
+          if (ev.tick === ricochetTick && ev.shooter === ricochetShooter) break;
+          ricochetTick = ev.tick;
+          ricochetShooter = ev.shooter;
+          const rate = 0.88 + unit(hash2(ev.tick, ev.weapon)) * 0.24;
+          playAt(v, 'ricochete', null, ev.x, ev.y, ev.z, nowS, rankOf(v, ev.shooter), 1, rate);
+          break;
+        }
         case 'hit': {
           const shooterLocal = localIndex(ev.shooter) >= 0;
           const targetLocal = localIndex(ev.target) >= 0;

@@ -1,15 +1,17 @@
 import { BOT_FORMAT, MATCH_RECIPE_FORMAT, type MatchRecipe, type TeamRecipe } from '@boboforces/format';
 import { BUTTON, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
+import { buildNavGrid } from '@boboforces/nav';
 import { pitchToI16, yawToU16 } from '@boboforces/shared';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { METRICS } from './config/metrics.ts';
+import { BOBO_NAV_METRICS } from './config/nav-metrics.ts';
 import { WEAPON_CODE } from './config/weapons.ts';
 import { BOT_CONTROLLER_BASE, SIM_HZ } from './constants.ts';
 import { ENTITY_FLAG, entityIndex } from './entity.ts';
 import { aimPointWorld, type AimPoint } from './hitbox.ts';
 import { createInputFrames } from './loop.ts';
-import { createSim, type Sim, type SimMap } from './sim.ts';
+import { createSim, navMainComponent, type Sim, type SimMap } from './sim.ts';
 import { buildSyntheticConstruto } from './testing/index.ts';
 
 /**
@@ -331,6 +333,63 @@ describe('M9 (fase 2): a casa dos times 2 e 3', () => {
     });
     const v = sim.view();
     expect([v.position[2 * 3], v.position[3 * 3]]).toEqual([4, 4]);
+  });
+});
+
+describe('M10 (fase 8): a casa dos times 2 e 3 no chão', () => {
+  /**
+   * Chão plano de 40 × 40 m (piso a 0,5 m) com o time 0 no sul e o 1 no norte, e um quebra-vistas de 6 × 5 m e 2,5 m de
+   * altura bem onde cai a casa do time 2 (oeste, x 6, z 20) e outro onde cai a do 3 (leste, x 34): o alto deles entra
+   * na navegação principal (dá para descer), como os muros da Base Bobo.
+   */
+  function wallMap(): SimMap {
+    const grid = createWorldGrid(80, 12, 80);
+    fillBox(grid, 0, 0, 0, 79, 0, 79, concrete);
+    fillBox(grid, 6, 1, 35, 19, 5, 44, concrete);
+    fillBox(grid, 60, 1, 35, 73, 5, 44, concrete);
+    return {
+      grid,
+      blocks,
+      spawns: [
+        { x: 20, y: 0.5, z: 34, yaw: 0, team: 0 },
+        { x: 20, y: 0.5, z: 6, yaw: Math.PI, team: 1 },
+      ],
+      nav: buildNavGrid({ grid, blocks }, BOBO_NAV_METRICS),
+    };
+  }
+
+  it('os pontos da base ficam no chão, em volta do muro (não em cima dele)', () => {
+    const map = wallMap();
+    const nav = map.nav!;
+    const main = navMainComponent(nav);
+    // O alto do muro (3 m) é da navegação principal: sem a preferência pelo chão, a cruz cairia nele.
+    for (const x of [6, 34]) {
+      const top = nav.nearestNode(x, 3, 20);
+      expect(top, `alto do muro em x ${x}`).toBeGreaterThanOrEqual(0);
+      expect(nav.component[top]).toBe(main);
+      expect(nav.floorY[top]).toBeCloseTo(3, 5);
+    }
+    const sim = createSim({ recipe: sandbox([bots(4), bots(4), bots(4), bots(4)]), map, humans: 0 });
+    const v = sim.view();
+    const homes: Record<number, { x: number; z: number }[]> = { 2: [], 3: [] };
+    for (let e = 0; e < v.count; e++) {
+      const t = v.team[e]!;
+      if (t < 2) continue;
+      expect(v.position[e * 3 + 1], `altura do bobo ${e} (time ${t})`).toBeCloseTo(0.5, 5);
+      homes[t]!.push({ x: v.position[e * 3]!, z: v.position[e * 3 + 2]! });
+    }
+    // Juntos, perto da casa de cada um (o 2 a oeste, o 3 a leste) e longe das bases do mapa.
+    for (const [t, cx] of [
+      [2, 6],
+      [3, 34],
+    ] as const) {
+      expect(homes[t]).toHaveLength(4);
+      for (const p of homes[t]!) {
+        expect(Math.hypot(p.x - cx, p.z - 20), `time ${t} em (${p.x}, ${p.z})`).toBeLessThan(6);
+        expect(Math.min(Math.hypot(p.x - 20, p.z - 34), Math.hypot(p.x - 20, p.z - 6))).toBeGreaterThan(12);
+      }
+    }
+    sim.dispose();
   });
 });
 

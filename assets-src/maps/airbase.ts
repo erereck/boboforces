@@ -283,7 +283,8 @@ const airbase: MapScript = {
     b.size(144, 48, 144);
     b.meta({
       nameKey: 'map.airbase.name',
-      modes: ['strike', 'warfare.tdm'],
+      // M10 (fase 8): o Sandbox (a casa dos times 2 e 3 fica no chão das rotas oeste e leste).
+      modes: ['strike', 'warfare.tdm', 'sandbox'],
       players: { min: 2, ideal: 10, max: 10 },
       maxSightLineM: 50,
       botCaps: {},

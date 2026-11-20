@@ -64,7 +64,16 @@ export interface TeamRecipe {
    */
   readonly hp?: number;
   readonly weapons?: readonly string[];
+  /**
+   * M10 (fase 8): a cor do time no Sandbox (índice da paleta de `TEAM_COLOR_COUNT` cores de time do `ui`, 0 a 7);
+   * ausente = a da posição (o time 0 é o Laranja…). O validador não deixa dois times com a mesma cor. Só vale com
+   * `mode: 'sandbox'`.
+   */
+  readonly color?: number;
 }
+
+/** M10 (fase 8): quantas cores de time a paleta tem (as 4 da posição e mais 4 só do Sandbox). */
+export const TEAM_COLOR_COUNT = 8;
 
 export interface MatchRules {
   readonly timeLimitS?: number;
@@ -372,6 +381,8 @@ export const RECIPE_RANGES = {
   hp: { min: 25, max: 1000 },
   // M9 (fase 2): a vida do time no Sandbox (a faixa da regra do bot).
   teamHp: { min: 1, max: 1000 },
+  // M10 (fase 8): a cor do time no Sandbox (índice da paleta).
+  teamColor: { min: 0, max: TEAM_COLOR_COUNT - 1 },
   respawnS: { min: 0, max: 15 },
   spawnProtectionS: { min: 0, max: 5 },
   gravity: { min: 0.25, max: 2 },
@@ -449,7 +460,7 @@ const WEAPON_KEYS = [
   'ladder',
 ] as const;
 const HUD_KEYS = ['killFeed', 'hitmarker', 'allyMarkers'] as const;
-const TEAM_KEYS = ['name', 'humans', 'bots', 'hp', 'weapons'] as const;
+const TEAM_KEYS = ['name', 'humans', 'bots', 'hp', 'weapons', 'color'] as const;
 const BOT_KEYS = ['ref', 'count'] as const;
 
 /** Quantos bots a receita põe em campo (soma de todos os `count`). */
@@ -922,6 +933,9 @@ function readTeam(
   if (out['hp'] !== undefined) out['hp'] = Math.round(out['hp'] as number);
   const weapons = readWeaponIds(ctx, value['weapons'], `${path}.weapons`);
   if (weapons !== undefined) out['weapons'] = weapons;
+  // M10 (fase 8): a cor (inteira; a repetida é trocada em `fixTeamColors`).
+  readRange(ctx, value, 'color', path, RECIPE_RANGES.teamColor, out);
+  if (out['color'] !== undefined) out['color'] = Math.round(out['color'] as number);
 
   let humans: 'all' | number | undefined;
   const h = value['humans'];
@@ -1035,6 +1049,33 @@ function capBots(ctx: Ctx, teams: MutableTeam[], max: number): void {
 }
 
 /**
+ * M10 (fase 8): dois times nunca ficam com a mesma cor (a escolhida ou, sem ela, a da posição). Na ordem dos times, o
+ * que repete a cor de um anterior fica com a 1ª da paleta que ninguém usa, com aviso. Determinístico.
+ */
+function fixTeamColors(ctx: Ctx, teams: MutableTeam[]): void {
+  // M10 (fase 8, revisão): duas passadas: as escolhidas primeiro (a 1ª fica), depois a cor da posição de quem não
+  // escolheu; quem repete pega a primeira livre.
+  const chosen = teams.map((t) => t.out['color'] as number | undefined);
+  const used: number[] = [];
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < teams.length; i++) {
+      const pick = chosen[i];
+      if ((pass === 0) !== (pick !== undefined)) continue;
+      const want = pick ?? i;
+      if (!used.includes(want)) {
+        used.push(want);
+        continue;
+      }
+      let free = 0;
+      while (used.includes(free)) free++;
+      warn(ctx, `teams[${i}].color`, 'recipe.duplicateTeamColor', `${want} → ${free}`);
+      used.push(free);
+      teams[i]!.out['color'] = free;
+    }
+  }
+}
+
+/**
  * Valida, limita aos tetos da plataforma (regra 19) e devolve a receita normalizada (tecnico.md §14.5):
  * - `format` com versão maior é recusado; menor passa pelas migrações;
  * - modo e mapa ausentes recusam; bot e perfil de movimento ausentes caem em fallback com aviso;
@@ -1110,6 +1151,8 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
     }
     capHumans(ctx, teams, safeLimits.maxLocalHumans);
     capBots(ctx, teams, safeLimits.maxBots);
+    // M10 (fase 8, revisão): a cor do time só vale no Sandbox (nos outros modos, ela fica e é ignorada).
+    if (out['mode'] === 'sandbox') fixTeamColors(ctx, teams);
     out['teams'] = teams.map((t) => {
       const team: Record<string, unknown> = {};
       if (t.out['name'] !== undefined) team['name'] = t.out['name'];

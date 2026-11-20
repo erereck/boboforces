@@ -47,9 +47,14 @@ export const MATCH_DEFAULTS = {
  * M9 (fase 2): a casa dos times do Bobo Sandbox sem ponto de spawn no mapa (os mapas só marcam os times 0 e 1): a base
  * são `basePoints` nós da navegação em cruz em volta da casa, a `baseSpreadM` um do outro; a casa fica a `marginM` da
  * borda da área jogável.
+ * M10 (fase 8): cada ponto prefere um nó no chão das bases do mapa (o piso a menos de `groundToleranceM` da altura
+ * dos spawns dos times que têm ponto) a até `groundReachM` (no plano) do ponto da cruz; sem nenhum, o mais perto (como
+ * antes). Na Base Bobo, a casa cai em cima dos quebra-vistas de 2,5 m das rotas, e os nós de cima deles saíam primeiro.
  */
 export const SANDBOX_SPAWN = {
   basePoints: 4,
   baseSpreadM: 2.5,
   marginM: 4,
+  groundToleranceM: 1,
+  groundReachM: 8,
 } as const;

@@ -4760,7 +4760,7 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
 - **O Cenário:** no Sandbox o botão é "Salvar Cenário" e o preset se chama "Cenário 3×3×2"; os resumos de 3 e 4 times
   são "3×3×2×2"; o resultado também diz "Salvar Cenário". Os mapas do Sandbox: Construto e Ringue (o `.bfmap` deles
   só ganhou o modo na lista). A Base Aérea fica de fora: 3 dos 4 pontos que a sim dá aos times 2 e 3 caem em cima dos
-  muros de 2,5 m (pendência: preferir nós no chão no `sandboxSpawns`).
+  muros de 2,5 m (no M10, fase 8, §21.1, ela entrou).
 - **O que supunha 2 times:** o sofá (os jogadores 2 a 4 escolhem o time contando a partir do do P1; com 3 ou 4 times o
   card mostra o nome da cor); a sala online (o lobby manda quantos times há, um campo que o cliente antigo ignora, e a
   escolha vai do "Tanto faz" ao Roxo; no empate, o "Tanto faz" cai primeiro no time de casa da receita); o HUD (os 4
@@ -4929,4 +4929,35 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
 - **Fica para depois:** a Base Aérea no Sandbox (os pontos dos times 2 e 3 em cima dos muros), as cores de time
   escolhidas, o nome e a vida do aliado assistido na eliminação, o placar do Tab opaco, as ferramentas no amigo online,
   o "criar bot" com os bots da Oficina, o som do ricochete e o encolher pelo ombro (um raio só, no centro).
+
+## 21. M10: mapas e armas novos
+
+Plano em `docs/PLANO_M10.md` (#83; pergunta AK1). As fases andam em ondas paralelas, como no M9 (§20); a ordem dos
+commits é a de chegada.
+
+### 21.1 Fase 8: as pendências do M9 (20/11/2026)
+
+- **A Base Aérea no Sandbox** (`sim/systems/sandbox.ts`, `SANDBOX_SPAWN`): cada ponto da casa dos times 2 e 3 prefere um
+  nó "no chão" (piso a menos de 1 m do pé mais baixo dos spawns de time do mapa, até 8 m do ponto); sem nenhum, o mais
+  perto, como antes. Na Base Aérea, os 8 pontos foram de cima dos muros (y 3,5) para o chão (y 1,0), a 36–37 m das
+  bases; no Construto e no Ringue, os pontos são os mesmos de antes (o golden do Sandbox não mudou). A Base Aérea entrou
+  no `MAP_MODES` do Sandbox e no `meta.modes` do mapa (só o `airbase.bfmap` foi refeito).
+- **A cor do time** (AK6): `TEAM_PALETTE` (`ui/src/tokens.ts`) com 8 cores (Laranja, Azul, Verde e Roxo, as de sempre, e
+  Vermelho #E8283C, Amarelo #FFD60A, Rosa #F03CBE e Ciano #2EE6F0), escolhidas pela distância de cor (ΔE CIELAB) às de
+  sempre, entre si e ao cenário, simulando os três daltonismos (o par novo mais difícil é Rosa × Ciano na deuteranopia;
+  o Azul × Roxo de sempre é pior); o ícone do time segue pela posição. Na receita, `TeamRecipe.color` (0 a 7, opcional,
+  só no Sandbox, sem versão nova): o validador limita e, se dois times ficam com a mesma cor (contando a da posição de
+  quem não escolheu), o de depois pega a primeira livre (`recipe.duplicateTeamColor`). Na Partida personalizada, a linha
+  "{time}: cor" depois do nome (as setas pulam as cores dos outros; a cor da posição apaga o campo). Tudo lê a tabela da
+  partida (`teamColorTable`, `game/src/team-colors.ts`): as skins, o placar de cima e o do Tab, o feed, os marcadores, a
+  tinta, o card do sofá e os chips da sala online (o estado do lobby ganhou `teamColors`, opcional; o cliente antigo
+  ignora). Sem nome digitado, o time leva o nome da cor. O Domination e o Jugg (nunca Sandbox) seguem pela posição.
+- **O som do ricochete** (`audio/src/synth-game.ts`, `synthRicochet`): um assobio descendo, sintetizado (sem MP3; os sons
+  essenciais seguem em 130,4 KB), no ponto do quique, com o tom variando ±12% e 0,06 s de intervalo (os chumbos da
+  escopeta quicando juntos viram um som só).
+- **A revisão (Opus) achou:** o validador acertava a cor também fora do Sandbox (agora só nele); a cor escolhida perdia
+  para a cor da posição de outro time sem escolha (agora as escolhidas vêm primeiro); o seu ricochete podia ser
+  engolido pelo cooldown de um bot longe (agora só os chumbos do mesmo tiro viram um som só, e o seu não espera); e o
+  lobby aceitava mais cores que times. Corrigido antes do commit. Fica: a plaquinha do congelado (#A8E6FF) perto do
+  Ciano, e o Amarelo e o Ciano perto das cores do P1 e do P2 (diferem pela forma dos marcadores).
 

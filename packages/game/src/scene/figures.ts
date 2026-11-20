@@ -140,10 +140,13 @@ export function botLookIndices(names: readonly (string | undefined)[], looks: nu
   return out;
 }
 
-/** Cores dos times da partida em RGB (`0xRRGGBB`; o `TEAM_COLORS` do ui é RGBA). */
-export function figureTeamColors(teamCount: number): number[] {
-  const n = Math.max(2, Math.min(TEAM_COLORS.length, teamCount));
-  return TEAM_COLORS.slice(0, n).map((rgba) => rgba >>> 8);
+/**
+ * Cores dos times da partida em RGB (`0xRRGGBB`; as do ui são RGBA). M10 (fase 8): `colors` = a tabela da partida
+ * (`teamColorTable`: a cor que o Sandbox escolheu); ausente, a da posição (`TEAM_COLORS`).
+ */
+export function figureTeamColors(teamCount: number, colors: readonly number[] = TEAM_COLORS): number[] {
+  const n = Math.max(2, Math.min(TEAM_COLORS.length, colors.length, teamCount));
+  return colors.slice(0, n).map((rgba) => rgba >>> 8);
 }
 
 export interface SceneFiguresInput {
@@ -152,6 +155,8 @@ export interface SceneFiguresInput {
   readonly profile: PlatformProfile;
   /** Times da partida (os coletes A e B existem mesmo no FFA da vitrine: no mínimo 2). */
   readonly teamCount: number;
+  /** M10 (fase 8): a cor (RGBA) de cada time na partida (`teamColorTable`); ausente = a da posição. */
+  readonly teamColors?: readonly number[];
   readonly mannequins: readonly MapMannequin[];
   /** Pedido de prints no loading (`BenchConfig.prints`): compõe a fila (12 looks nos times A e B). */
   readonly prints: boolean;
@@ -235,7 +240,7 @@ export interface SceneFigures {
  */
 export function createSceneFigures(input: SceneFiguresInput): SceneFigures {
   const table = input.table ?? createFigureGameTable();
-  const teamColors = figureTeamColors(input.teamCount);
+  const teamColors = figureTeamColors(input.teamCount, input.teamColors);
   // Sem time (FFA, vitrine) e cada time da partida (no mínimo A e B: os coletes da vitrine).
   const teams = [-1, ...teamColors.map((_, t) => t)];
 

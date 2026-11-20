@@ -569,7 +569,10 @@ function drawBubble(
   paintText(out, hud, text, left + pad, top + pad, px, COLORS.acao);
 }
 
-/** A cor do dono de um ponto (neutro: o texto apagado). */
+/**
+ * A cor do dono de um ponto (neutro: o texto apagado). M10 (fase 8): os pontos (Domination) e a plaquinha do Jugg
+ * nunca são do Sandbox, então a cor da posição é a da partida (a escolha de cor só existe lá).
+ */
 function pointColor(owner: number): number {
   return owner >= 0 && owner < TEAM_COLORS.length ? TEAM_COLORS[owner]! : COLORS.textoBaixo;
 }
@@ -1476,6 +1479,11 @@ export interface HudSharedModel {
   teamCount: number;
   /** Placar por time (0..3). */
   readonly teamScores: number[];
+  /**
+   * M10 (fase 8): a cor de cada time (0..3, RGBA) na partida: a do `TEAM_COLORS`, ou a que o Sandbox escolheu. O `game`
+   * preenche uma vez.
+   */
+  readonly teamColors: number[];
   /** M2 (fase 2d): morte súbita (uma plaquinha "MORTE SÚBITA" embaixo do placar). */
   suddenDeath: boolean;
   /**
@@ -1505,6 +1513,7 @@ export function createHudSharedModel(): HudSharedModel {
     timeLeftS: -1,
     teamCount: 0,
     teamScores: [0, 0, 0, 0],
+    teamColors: TEAM_COLORS.slice(0, 4),
     suddenDeath: false,
     trainingLine: '',
     modsLine: '',
@@ -1630,7 +1639,18 @@ function paintSharedLine(
   const leftTeams = hasTime ? Math.ceil(teams / 2) : teams;
   let pen = x;
   for (let i = 0; i < leftTeams; i++) {
-    pen += paintTeamScore(out, font, i, model.teamScores[i] ?? 0, pen, capTop, numberPx, icon, gap);
+    pen += paintTeamScore(
+      out,
+      font,
+      i,
+      model.teamScores[i] ?? 0,
+      model.teamColors[i] ?? COLORS.texto,
+      pen,
+      capTop,
+      numberPx,
+      icon,
+      gap,
+    );
     if (hasTime || i < teams - 1) pen += gap * 2;
   }
   if (hasTime) {
@@ -1644,7 +1664,18 @@ function paintSharedLine(
   }
   for (let i = leftTeams; i < teams; i++) {
     pen += gap * 2;
-    pen += paintTeamScore(out, font, i, model.teamScores[i] ?? 0, pen, capTop, numberPx, icon, gap);
+    pen += paintTeamScore(
+      out,
+      font,
+      i,
+      model.teamScores[i] ?? 0,
+      model.teamColors[i] ?? COLORS.texto,
+      pen,
+      capTop,
+      numberPx,
+      icon,
+      gap,
+    );
   }
   return pen - x;
 }
@@ -1655,13 +1686,13 @@ function paintTeamScore(
   font: MsdfFont | null,
   team: number,
   score: number,
+  color: number,
   x: number,
   capTop: number,
   numberPx: number,
   icon: number,
   gap: number,
 ): number {
-  const color = TEAM_COLORS[team] as number;
   const capN = capHeightPx(font, numberPx);
   paintIcon(out, team, x, capTop + (capN - icon) / 2, icon, color);
   return icon + gap / 2 + paintNumber(out, font, score, 0, x + icon + gap / 2, capTop, numberPx, color);

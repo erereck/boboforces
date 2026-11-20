@@ -564,9 +564,10 @@ Linha do futbobo (editorial escuro, sério, estilo militar), com **tokens própr
 | `ok` | `#6FCF7A` | confirmação, pronto |
 | `hud-fundo` | `#0A0D0B` a 70% | fundo das plaquinhas do HUD |
 | Times A / B / C / D | `#FF7A1A` ▲ / `#2E8BFF` ● / `#3DDC97` ■ / `#A66BFF` ◆ | sempre com o ícone |
+| Times do Sandbox (M10, AK6) | Vermelho `#E8283C` / Amarelo `#FFD60A` / Rosa `#F03CBE` / Ciano `#2EE6F0` | só por escolha; o ícone segue a posição |
 | P1 / P2 / P3 / P4 | `#FFD23F` ▲ / `#3FE0FF` ● / `#FF6FB5` ■ / `#B8F03C` ◆ | jogadores locais |
 
-Laranja contra azul é o par mais seguro para daltonismo vermelho-verde; C e D sempre aparecem com ícone e com o padrão no colete. Os modos daltônicos (ver 8) trocam esses hex sem mexer em malha: a cor do time vem de uniform e da skin composta.
+Laranja contra azul é o par mais seguro para daltonismo vermelho-verde; C e D sempre aparecem com ícone e com o padrão no colete. **M10 (fase 8, pergunta AK6):** no Bobo Sandbox cada time escolhe a cor entre 8 (as 4 de sempre e as 4 da linha acima, sem repetir; `TEAM_PALETTE` no `ui/tokens.ts`). As 4 a mais saíram da distância CIELAB às 4 de sempre, entre si e às rampas do cenário, com a simulação de daltonismo de Machado (2009): fora do cenário (que para em ~60% de saturação), o Vermelho carmim longe do tijolo, o Rosa magenta longe do Roxo; com deuteranopia, o par novo mais perto é Rosa × Ciano (ΔE 19; o Azul × Roxo de sempre fica em 5), e a luz vai de L 51 a 87 para separar quem não separa pela cor. A lima ficou de fora (igual ao amarelo para protanopia); branco e marrom somem no cenário. Os modos daltônicos (ver 8) trocam esses hex sem mexer em malha: a cor do time vem de uniform e da skin composta.
 
 **Tipografia** [DECIDIDO #54]
 - Duas fontes OFL, até 120 KB no total, aprovadas por print: **Russo One** (display: títulos e botões, só caixa alta) e **Saira Condensed SemiBold** (HUD, rótulos e textos de leitura).

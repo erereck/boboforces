@@ -177,6 +177,8 @@ export interface OnlineRoomView {
   readonly teams: boolean;
   /** M9 (fase 3): quantos times a escolha do time anda (3 ou 4 no Sandbox; ausente = 2). */
   readonly teamCount?: number;
+  /** M10 (fase 8): a cor de cada time (índices da paleta; ausente = as da posição). */
+  readonly teamColors?: readonly number[];
   readonly playing: boolean;
   readonly members: readonly OnlineRoomMember[];
 }
@@ -211,9 +213,9 @@ export interface OnlineRoom {
   setChoice(choice: OnlineRoomChoice): void;
   /**
    * Host: o resumo da partida que os amigos veem e se ela tem times. M9 (fase 3): e quantos (o Sandbox vai a 4;
-   * ausente = 2).
+   * ausente = 2). M10 (fase 8): e a cor de cada um (índices da paleta; ausente = as da posição).
    */
-  setSummary(text: string, teams: boolean, teamCount?: number): void;
+  setSummary(text: string, teams: boolean, teamCount?: number, teamColors?: readonly number[]): void;
   setLocked(on: boolean): void;
   kick(slot: number): void;
   /**

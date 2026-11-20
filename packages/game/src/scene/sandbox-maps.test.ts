@@ -20,7 +20,8 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * M9 (fase 3): os mapas do Bobo Sandbox na Partida personalizada. Cada mapa da lista (`mapsForMode('sandbox')`) monta
  * 4 times de 2 bots pelo caminho do loading: os times sem ponto no mapa (o 2 e o 3) precisam de uma casa dentro da área
  * jogável, no chão e longe das bases dos times 0 e 1, e a partida anda 20 s com todo mundo se mexendo. A Base Bobo
- * ficou de fora por isso (medido em 20/11): a casa cai em cima dos quebra-vistas de 2,5 m das rotas (y 3,5).
+ * ficou de fora do M9 por isso (a casa caía em cima dos quebra-vistas de 2,5 m das rotas, y 3,5); no M10 (fase 8) a casa
+ * prefere os nós no chão das bases e ela entrou.
  */
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -56,8 +57,8 @@ function sandboxRecipe(map: string): MatchRecipe {
 }
 
 describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
-  it('a lista: o Construto e o Ringue', () => {
-    expect(mapsForMode('sandbox')).toEqual(['construto', 'ringue']);
+  it('a lista: o Construto, o Ringue e (M10, fase 8) a Base Bobo', () => {
+    expect(mapsForMode('sandbox')).toEqual(['construto', 'ringue', 'airbase']);
   });
 
   for (const id of mapsForMode('sandbox')) {
@@ -83,7 +84,8 @@ describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
         expect(x, `${id}: x do bobo ${e}`).toBeLessThan(area.maxX);
         expect(z, `${id}: z do bobo ${e}`).toBeGreaterThan(area.minZ);
         expect(z, `${id}: z do bobo ${e}`).toBeLessThan(area.maxZ);
-        expect(Math.abs(v0.position[e * 3 + 1]! - floor), `${id}: altura do bobo ${e}`).toBeLessThan(1.5);
+        // M10 (fase 8): até 1 m acima do chão das bases (o degrau de 0,75 m do Construto; o muro de 2,5 m não).
+        expect(Math.abs(v0.position[e * 3 + 1]! - floor), `${id}: altura do bobo ${e}`).toBeLessThan(1);
         const c = center[v0.team[e]!]!;
         c[0] += x;
         c[1] += z;
@@ -105,7 +107,7 @@ describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
           gaps.push(Math.round(Math.hypot(cx - bx, cz - bz)));
         }
       }
-      // Medido (20/11): Construto 45–48 m, Ringue 20–22 m (48 m de lado).
+      // Medido (20/11): Construto 45–48 m, Ringue 20–22 m (48 m de lado), Base Bobo 36–37 m (M10, fase 8).
       expect(Math.min(...gaps), `${id}: distâncias ${gaps.join('/')}`).toBeGreaterThan(id === 'ringue' ? 15 : 30);
       for (let t = 0; t < 20 * 60; t++) match.step();
       const v = match.sim.view();

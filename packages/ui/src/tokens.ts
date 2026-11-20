@@ -46,8 +46,34 @@ export const COLORS = {
   veu: rgba(0x050706, 0.72),
 } as const;
 
-/** Times A–D (sempre com ícone: ▲ ● ■ ◆). Laranja × azul é o par mais seguro para daltonismo vermelho-verde. */
-export const TEAM_COLORS: readonly number[] = [rgba(0xff7a1a), rgba(0x2e8bff), rgba(0x3ddc97), rgba(0xa66bff)];
+/**
+ * M10 (fase 8): a paleta das cores de time (pergunta AK6; nomes em `feed.teamName.<i>`). As 4 primeiras são as de
+ * sempre, pela posição (`TEAM_COLORS`); no Bobo Sandbox cada time escolhe qualquer uma das 8, sem repetir (a receita
+ * guarda o índice, `TeamRecipe.color`). As 4 a mais saíram da distância CIELAB (ΔE) às 4 de sempre, entre si e às
+ * rampas do cenário (que param em ~60% de saturação), com a simulação de daltonismo de Machado (2009): Vermelho
+ * `#E8283C` (carmim: longe do tijolo e do laranja; contraste 4,5 no fundo do HUD), Amarelo `#FFD60A`, Rosa `#F03CBE`
+ * (magenta: longe do Roxo) e Ciano `#2EE6F0`. Com deuteranopia o par novo mais perto é Rosa × Ciano (ΔE 19), e quem não
+ * separa pela cor separa pela luz (L de 51 a 87); o Azul × Roxo de sempre fica em 5, por isso o ícone do time (▲ ● ■ ◆,
+ * pela posição) vai junto em todo lugar. A lima ficou de fora (igual ao Amarelo para protanopia), e o branco e o marrom
+ * somem no cenário.
+ */
+export const TEAM_PALETTE: readonly number[] = [
+  rgba(0xff7a1a),
+  rgba(0x2e8bff),
+  rgba(0x3ddc97),
+  rgba(0xa66bff),
+  rgba(0xe8283c),
+  rgba(0xffd60a),
+  rgba(0xf03cbe),
+  rgba(0x2ee6f0),
+];
+
+/**
+ * Times A–D pela posição (sempre com ícone: ▲ ● ■ ◆). Laranja × azul é o par mais seguro para daltonismo
+ * vermelho-verde. M10 (fase 8): a cor de um time na partida vem da tabela dela (`teamColorTable` do `game`), que só
+ * difere desta no Sandbox com cor escolhida.
+ */
+export const TEAM_COLORS: readonly number[] = TEAM_PALETTE.slice(0, 4);
 
 /** Jogadores locais P1–P4. */
 export const PLAYER_COLORS: readonly number[] = [rgba(0xffd23f), rgba(0x3fe0ff), rgba(0xff6fb5), rgba(0xb8f03c)];

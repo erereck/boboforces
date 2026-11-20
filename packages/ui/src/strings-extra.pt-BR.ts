@@ -1330,6 +1330,7 @@ export const STRINGS_EXTRA_PT_BR = {
   'issue.recipe.botsOverPlatformCap': 'Bots demais para este aparelho: a partida foi reduzida.',
   'issue.recipe.humansOverPlatformCap': 'Jogadores demais para este aparelho.',
   'issue.recipe.viewDistanceOverPlatformCap': 'Alcance de visão limitado pelo aparelho.',
+  'issue.recipe.duplicateTeamColor': 'Dois times tinham a mesma cor; um deles trocou de cor.',
   /** M2 (fase 3a): avisos do `bot@1`. */
   /** M2 (fase 4b): avisos dos documentos do jogador (ajustes, estatísticas, presets, backup). */
   'issue.save.invalidField': 'Um dado salvo estava num formato estranho e voltou para o padrão.',
@@ -1342,18 +1343,21 @@ export const STRINGS_EXTRA_PT_BR = {
   // M9 (fase 3): o Bobo Sandbox: a Partida personalizada (a aba Times e o objetivo), o Cenário, o placar e o resultado.
   'mode.sandbox': 'Bobo Sandbox',
   'custom.tab.teams': 'Times',
-  'custom.help.tab.teams': 'De 2 a 4 times, cada um com nome, bots, vida e armas.',
+  'custom.help.tab.teams': 'De 2 a 4 times, cada um com nome, cor, bots, vida e armas.',
   'custom.row.objective': 'Objetivo',
   'custom.objective.points': 'Pontos',
   'custom.objective.elimination': 'Eliminação',
   'custom.objective.none': 'Nenhum',
   'custom.help.objective': 'Pontos: a meta de abates. Eliminação: ninguém renasce. Nenhum: sem fim.',
   'custom.row.teams': 'Times',
-  'custom.help.teams': 'Quantos times jogam (de 2 a 4); a cor vem da posição.',
+  'custom.help.teams': 'Quantos times jogam (de 2 a 4); cada um escolhe a cor.',
   'custom.row.you': 'Seu time',
   'custom.help.you': 'O time em que você joga (no Assistir, um bot fica no seu lugar).',
   'custom.row.teamName': 'Time {team}',
   'custom.help.teamName': 'Confirmar abre o teclado para dar nome ao time.',
+  // M10 (fase 8): a cor do time (pergunta AK6).
+  'custom.row.teamColor': '{team}: cor',
+  'custom.help.teamColor': 'A cor do time, entre as 8 (sem repetir a de outro time).',
   'custom.row.teamBot': '{team}: bot',
   'custom.help.bot': 'Qual bot joga neste time: ele traz o nível e o jeito de jogar.',
   'custom.row.teamCount': '{team}: quantos',

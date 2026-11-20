@@ -26,11 +26,12 @@ import {
   CUSTOM_NAME_VALUE_WIDTH,
   formatDecimal,
   t,
-  TEAM_COLORS,
+  TEAM_PALETTE,
   type StringKey,
   type TextParams,
 } from '@boboforces/ui';
 import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
+import { teamColor, teamColorIndex } from './team-colors.ts';
 import { teamColorName, teamName } from './team-names.ts';
 
 /**
@@ -870,8 +871,8 @@ function choiceIndex(list: readonly string[]): number {
   return i < 0 ? 0 : i;
 }
 
-/** Troca um campo do time `team` (`undefined` tira o campo: o nome, a vida e as armas voltam ao padrão). */
-function withTeamField<K extends 'name' | 'hp' | 'weapons'>(
+/** Troca um campo do time `team` (`undefined` tira o campo: o nome, a vida, as armas e a cor voltam ao padrão). */
+function withTeamField<K extends 'name' | 'hp' | 'weapons' | 'color'>(
   r: MatchRecipe,
   team: number,
   key: K,
@@ -891,7 +892,28 @@ function withTeamField<K extends 'name' | 'hp' | 'weapons'>(
  */
 export function withTeamName(r: MatchRecipe, team: number, name: string): MatchRecipe {
   const clean = name.trim();
-  return withTeamField(r, team, 'name', clean === '' || clean === teamColorName(team) ? undefined : clean);
+  return withTeamField(r, team, 'name', clean === '' || clean === teamColorName(r, team) ? undefined : clean);
+}
+
+/** M10 (fase 8): a 1ª cor da paleta fora de `used`. */
+function freeColor(used: readonly number[]): number {
+  let c = 0;
+  while (used.includes(c)) c++;
+  return c;
+}
+
+/**
+ * M10 (fase 8): a cor do time `team` anda para a próxima (no sentido de `delta`) que nenhum outro time usa; voltar à
+ * da posição tira o campo (a receita fica como antes da escolha).
+ */
+function stepTeamColor(r: MatchRecipe, team: number, delta: number): MatchRecipe {
+  const taken = r.teams.map((_tm, k) => (k === team ? -1 : teamColorIndex(r, k)));
+  let c = teamColorIndex(r, team);
+  for (let k = 0; k < TEAM_PALETTE.length; k++) {
+    c = cycleIndex(TEAM_PALETTE.length, c, delta);
+    if (!taken.includes(c)) break;
+  }
+  return withTeamField(r, team, 'color', c === team ? undefined : c);
 }
 
 /** M9 (fase 3): a linha do nome do time é `teamName<i>`: o confirmar abre o teclado (o `game` cuida); -1 = outra. */
@@ -922,7 +944,12 @@ function stepTeams(r: MatchRecipe, delta: number, l: CustomLimits): MatchRecipe 
     const last = n - 1;
     const room = mapBotCap(r.map, l.maxBots) - r.teams.reduce((s, _tm, i) => s + botsOf(r, i), 0);
     const count = Math.max(1, Math.min(Math.max(1, botsOf(r, last)), room));
-    const team: TeamRecipe = { bots: [{ ref: refOf(r, last), count }] };
+    // M10 (fase 8): a cor da posição dele, se nenhum time a escolheu; senão, a 1ª livre.
+    const used = r.teams.map((_tm, i) => teamColorIndex(r, i));
+    const team: TeamRecipe = {
+      bots: [{ ref: refOf(r, last), count }],
+      ...(used.includes(n) ? { color: freeColor(used) } : {}),
+    };
     return syncEmbedded(fitMap({ ...r, teams: [...r.teams, team] }, l), l);
   }
   if (delta < 0 && n > 2) {
@@ -941,7 +968,10 @@ const TEAMS_ROW: RowDef = {
   step: (r, d, l) => stepTeams(r, d, l),
 };
 
-/** M9 (fase 3): a aba Times do Sandbox: quantos times, o seu e, por time, o nome, o bot, quantos, a vida e as armas. */
+/**
+ * M9 (fase 3): a aba Times do Sandbox: quantos times, o seu e, por time, o nome, a cor (M10, fase 8), o bot, quantos,
+ * a vida e as armas.
+ */
 function teamRows(r: MatchRecipe): readonly RowDef[] {
   const home = homeTeam(r);
   const rows: RowDef[] = [
@@ -949,25 +979,35 @@ function teamRows(r: MatchRecipe): readonly RowDef[] {
     {
       id: 'you',
       labelKey: 'custom.row.you',
-      swatch: TEAM_COLORS[home]! >>> 8,
+      swatch: teamColor(r, home) >>> 8,
       valueWidth: CUSTOM_NAME_VALUE_WIDTH,
       value: (rr) => teamName(rr, homeTeam(rr)),
       step: (rr, d, l) => moveHumans(rr, cycleIndex(rr.teams.length, homeTeam(rr), d), l),
     },
   ];
   for (let i = 0; i < r.teams.length; i++) {
-    const labelParams = { team: teamColorName(i) };
+    const labelParams = { team: teamColorName(r, i) };
+    const swatch = teamColor(r, i) >>> 8;
     rows.push(
       {
         id: `teamName${i}`,
         labelKey: 'custom.row.teamName',
         labelParams,
-        swatch: TEAM_COLORS[i]! >>> 8,
+        swatch,
         valueWidth: CUSTOM_NAME_VALUE_WIDTH,
         valueOnly: true,
         value: (rr) => teamName(rr, i),
         // O confirmar abre o teclado (o `game`); as setas não mudam o nome.
         step: (rr) => rr,
+      },
+      // M10 (fase 8): a cor (o quadradinho mostra a escolhida; as setas pulam as dos outros times).
+      {
+        id: `teamColor${i}`,
+        labelKey: 'custom.row.teamColor',
+        labelParams,
+        swatch,
+        value: (rr) => teamColorName(rr, i),
+        step: (rr, d) => stepTeamColor(rr, i, d),
       },
       { ...chooseRow(i, 'custom.row.teamBot'), labelParams },
       { ...countRow(i, 'custom.row.teamCount'), labelParams },

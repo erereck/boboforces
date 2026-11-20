@@ -305,6 +305,30 @@ export function synthPop(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   return finish(out, 0.9, 1.4, rate);
 }
 
+/**
+ * M10 (fase 8): o ricochete ("piiiu" de faroeste): um estalo curto na parede e o assobio da bala que sai torta, um
+ * seno que despenca de ~4,1 kHz para ~1,5 kHz com um parcial inarmônico (1,51×, o metálico) e um tremor rápido (a bala
+ * girando). Curto (0,3 s): com o Ricochete, cada tiro que bate na parede quica.
+ */
+export function synthRicochet(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.3 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x41c0);
+  let phase = 0;
+  let partial = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const f = 1500 + 2600 * Math.exp(-t / 0.09);
+    phase += (TAU * f) / rate;
+    partial += (TAU * f * 1.51) / rate;
+    const env = (t < 0.002 ? t / 0.002 : 1) * Math.exp(-t / 0.085);
+    const wobble = 1 + 0.18 * Math.sin(TAU * 34 * t);
+    out[i] = (Math.sin(phase) + 0.3 * Math.sin(partial)) * env * wobble + noise(rng) * 0.7 * Math.exp(-t / 0.0025);
+  }
+  return finish(out, 0.8, 0.6, rate);
+}
+
 /** Tom de brinquedo (seno + 3ª e 5ª harmônicas): bipe da contagem e notas das vinhetas. */
 function toyNote(out: Float32Array, startS: number, hz: number, lenS: number, level: number, rate: number): void {
   const from = Math.round(startS * rate);
@@ -615,6 +639,8 @@ export const GAME_SYNTH_SOUNDS: Readonly<Record<string, () => Float32Array>> = {
   foguete: () => synthRocket(),
   'faca-golpe': () => synthSwing(),
   ploc: () => synthPop(),
+  // M10 (fase 8): o quique do Ricochete.
+  ricochete: () => synthRicochet(),
   'contagem-bipe': () => synthCountBeep(false),
   'contagem-vai': () => synthCountBeep(true),
   vitoria: () => synthJingle(true),

@@ -329,10 +329,15 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     // Sem tempo e meta na receita, as linhas mostram os padrões do Sandbox (10 min, 75 abates).
     const bare = { ...s, match: {} };
     expect([value('match', bare, 'time'), value('match', bare, 'score')]).toEqual(['10 min', '75 abates']);
-    // Os mapas do Sandbox.
+    // Os mapas do Sandbox (M10, fase 8: a Base Bobo depois do Ringue).
     const ringue = stepCustom('match', s, 'map', 1, PC);
     expect(ringue.map).toBe('ringue');
-    expect(stepCustom('match', ringue, 'map', 1, PC).map).toBe('construto');
+    const airbase = stepCustom('match', ringue, 'map', 1, PC);
+    expect(airbase.map).toBe('airbase');
+    // A Base Bobo leva 9 bots (5 contra 5 com você).
+    expect(presetBotCounts(airbase).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(9);
+    valid(airbase);
+    expect(stepCustom('match', airbase, 'map', 1, PC).map).toBe('construto');
   });
 
   it('a aba Times: de 2 a 4 times, o seu time, e por time o nome, o bot, quantos, a vida e as armas', () => {
@@ -341,7 +346,14 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     // O time novo vem com o bot e a quantidade do último.
     expect(presetBotCounts(r)).toEqual([3, 4, 4, 4]);
     expect(stepCustom('teams', r, 'teams', 1, PC).teams).toHaveLength(4);
-    const perTeam = (i: number): string[] => [`teamName${i}`, `bot${i}`, `count${i}`, `teamHp${i}`, `teamArms${i}`];
+    const perTeam = (i: number): string[] => [
+      `teamName${i}`,
+      `teamColor${i}`,
+      `bot${i}`,
+      `count${i}`,
+      `teamHp${i}`,
+      `teamArms${i}`,
+    ];
     expect(ids('teams', r)).toEqual(['teams', 'you', ...perTeam(0), ...perTeam(1), ...perTeam(2), ...perTeam(3)]);
     // Os rótulos levam a cor do time; o nome e o seu time, o quadradinho da cor.
     const views = customRowViews('teams', r, PC);
@@ -431,6 +443,59 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     // E para o Zombies (o ciclo para trás), também sem o bloco do Sandbox.
     const z = stepCustom('match', r, 'mode', -1, PC);
     expect([z.mode, z.sandbox, z.teams.length]).toEqual(['zombies', undefined, 1]);
+  });
+
+  it('M10 (fase 8): a cor de cada time: anda entre as 8 sem repetir a de outro time; o quadradinho e o nome seguem', () => {
+    let r = withTeams(3);
+    const color = (rr: MatchRecipe, i: number): string => value('teams', rr, `teamColor${i}`);
+    expect([0, 1, 2].map((i) => color(r, i))).toEqual(['Laranja', 'Azul', 'Verde']);
+    // Para a frente, o Laranja pula o Azul e o Verde (dos outros times) e vai ao Roxo; depois, ao Vermelho.
+    r = stepCustom('teams', r, 'teamColor0', 1, PC);
+    expect([r.teams[0]!.color, color(r, 0)]).toEqual([3, 'Roxo']);
+    r = stepCustom('teams', r, 'teamColor0', 1, PC);
+    expect([r.teams[0]!.color, color(r, 0)]).toEqual([4, 'Vermelho']);
+    // Para trás, o Verde pula o Azul (do time 1) e chega ao Laranja (agora livre); mais um, dá a volta até o Ciano.
+    r = stepCustom('teams', r, 'teamColor2', -1, PC);
+    expect(r.teams[2]!.color).toBe(0);
+    expect(stepCustom('teams', r, 'teamColor2', -1, PC).teams[2]!.color).toBe(7);
+    // As linhas do time seguem a cor: o rótulo, o quadradinho, o nome sem nome e o seu time.
+    const views = customRowViews('teams', r, PC);
+    const row = (id: string) => views.find((v) => v.id === id)!;
+    expect([row('teamColor0').labelParams, row('teamColor0').swatch]).toEqual([{ team: 'Vermelho' }, 0xe8283c]);
+    expect([row('teamName0').value, row('teamName0').swatch, row('teamHp0').labelParams]).toEqual([
+      'Vermelho',
+      0xe8283c,
+      { team: 'Vermelho' },
+    ]);
+    expect([row('you').value, row('you').swatch]).toEqual(['Vermelho', 0xe8283c]);
+    expect(row('teamName2').value).toBe('Laranja');
+    // Digitar o nome da cor escolhida é o mesmo que não dar nome.
+    expect(withTeamName(r, 0, 'Vermelho').teams[0]!.name).toBeUndefined();
+    valid(r);
+    // Voltar à cor da posição tira o campo (a receita fica como sem escolha).
+    let back = r;
+    for (let i = 0; i < 8 && back.teams[1]!.color !== undefined; i++)
+      back = stepCustom('teams', back, 'teamColor1', 1, PC);
+    expect(back.teams[1]).not.toHaveProperty('color');
+    expect(stepCustom('teams', stepCustom('teams', r, 'teamColor1', 1, PC), 'teamColor1', -1, PC)).toEqual(r);
+    // O 4º time que chega: a cor da posição (o Roxo) está livre, sem campo; com o Roxo tomado, a 1ª livre.
+    const four = stepCustom('teams', r, 'teams', 1, PC);
+    expect([four.teams[3]!.color, color(four, 3)]).toEqual([undefined, 'Roxo']);
+    const purple = stepCustom('teams', stepCustom('teams', r, 'teamColor1', 2, PC), 'teams', 1, PC);
+    expect(purple.teams[1]!.color).toBe(3);
+    expect([purple.teams[3]!.color, color(purple, 3)]).toEqual([1, 'Azul']);
+    valid(purple);
+    // Com 4 times, as 4 cores nunca repetem, ande quanto andar.
+    let all = purple;
+    for (let k = 0; k < 20; k++) {
+      all = stepCustom('teams', all, `teamColor${k % 4}`, k % 3 === 0 ? -1 : 1, PC);
+      const used = [0, 1, 2, 3].map((i) => color(all, i));
+      expect(new Set(used).size, used.join()).toBe(4);
+    }
+    valid(all);
+    // Saindo do Sandbox, as cores ficam para trás.
+    const tdm = stepCustom('match', all, 'mode', 1, PC);
+    expect(tdm.teams.some((tm) => tm.color !== undefined)).toBe(false);
   });
 
   it('salvar como Cenário: a receita passa pelo validador inteira e volta igual', () => {

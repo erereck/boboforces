@@ -198,7 +198,6 @@ import {
   PLAYER_COLORS,
   pushKillFeed,
   SCOREBOARD_MAX_ROWS,
-  TEAM_COLORS,
   createDebugPanelModel,
   createDrawList,
   createHudModel,
@@ -358,6 +357,7 @@ import {
 } from './third-person.ts';
 import { createSamples } from './stats.ts';
 import { cleanTypedName } from '../names.ts';
+import { teamColorTable } from '../team-colors.ts';
 import { teamName } from '../team-names.ts';
 import { HOST_AWAY_END_S, waitsForHost, type OnlineNetStats } from '../online-api.ts';
 import { createMatchSound } from './sound.ts';
@@ -558,8 +558,7 @@ const MEMORY_LOG_EVERY_S = 60;
 const NET_LOG_EVERY_S = 30;
 /** M6 (fase 1): a letra do ponto do Domination fica a esta altura acima do anel (m). */
 const POINT_MARK_HEIGHT_M = 2.2;
-/** M6 (fase 5): as cores da tinta por time (as do placar, em 0xRRGGBB) e o tamanho das manchas (m). */
-const PAINT_COLORS = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff] as const;
+/** M6 (fase 5): o tamanho das manchas de tinta (m; a cor é a do time, M10 fase 8: da tabela da partida). */
 const PAINT_BALL_SPLAT_M = 0.45;
 const PAINT_BUCKET_SPLAT_M = 1.8;
 /** Onde procurar o bloco da superfície (o chão primeiro) e a quantos metros do ponto da tinta. */
@@ -1132,6 +1131,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M2 (fase 2d): HUD da partida (kill feed, placar do Tab, contagem inicial e marcadores dos aliados).
   const killFeed = createKillFeedModel();
   const scoreboard = createScoreboardModel();
+  // M10 (fase 8): a cor de cada time nesta partida (a do Sandbox, se escolhida): o placar do Tab, o do alto, o feed,
+  // os marcadores e a tinta leem daqui.
+  const teamColors = teamColorTable(recipe);
+  for (let i = 0; i < scoreboard.teamColors.length; i++) scoreboard.teamColors[i] = teamColors[i]!;
   scoreboard.title = t(`mode.${recipe.mode}` as StringKey);
   // M9 (fase 3): o nome de cada time no cabeçalho da tabela dele (o que o Sandbox deu, ou o da cor).
   for (let i = 0; i < recipe.teams.length && i < scoreboard.teamNames.length; i++) {
@@ -1360,6 +1363,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return slots[slots.length - 1]!;
   }
   const sharedHud = createHudSharedModel();
+  for (let i = 0; i < sharedHud.teamColors.length; i++) sharedHud.teamColors[i] = teamColors[i]!;
   // M2 (fase 5d): Bobo Training: sem placar nem relógio; a linha dos números, refeita só quando eles mudam.
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
@@ -4690,7 +4694,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return v.kind[i] === ENTITY_KIND.zombie ? deathTx.zombie : (names[v.controller[i]!] ?? deathTx.zombie);
   }
   function colorOf(v: SimView, i: number): number {
-    if (!ffa && !royaleMode && v.kind[i] !== ENTITY_KIND.zombie) return TEAM_COLORS[v.team[i]!] ?? COLORS.texto;
+    if (!ffa && !royaleMode && v.kind[i] !== ENTITY_KIND.zombie) return teamColors[v.team[i]!] ?? COLORS.texto;
     return v.controller[i] === me && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
   }
 
@@ -4732,7 +4736,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M6 (fase 5): a cor da tinta de quem atirou (a do time; sem time, a do Laranja). */
   function paintColorOf(v: SimView, owner: number): number {
     const team = owner >= 0 && owner < v.count ? v.team[owner]! : 0;
-    return PAINT_COLORS[team] ?? PAINT_COLORS[0]!;
+    return (teamColors[team] ?? teamColors[0]!) >>> 8;
   }
   /** O teto de manchas da plataforma (U6: 96 no PC, 48 no celular, 32 no Switch). */
   const paintCap = profile.family === 'switch' ? 32 : profile.family === 'mobile' ? 48 : 96;
@@ -4883,20 +4887,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M6 (fase 3): "Fulano  virou o  Jugg". */
   function feedJugg(v: SimView, j: number): void {
     if (!showKillFeed) return;
-    pushKillFeed(
-      killFeed,
-      nameOf(v, j),
-      TEAM_COLORS[1] ?? COLORS.texto,
-      juggFeed.is,
-      juggFeed.jugg,
-      COLORS.acao,
-      false,
-    );
+    pushKillFeed(killFeed, nameOf(v, j), teamColors[1] ?? COLORS.texto, juggFeed.is, juggFeed.jugg, COLORS.acao, false);
   }
   /** M6 (fase 1): um ponto do Domination mudou de dono ("Laranja  capturou  Ponto B"). */
   function feedPoint(index: number, team: number, captured: boolean): void {
     if (!showKillFeed) return;
-    const color = TEAM_COLORS[team] ?? COLORS.texto;
+    const color = teamColors[team] ?? COLORS.texto;
     pushKillFeed(
       killFeed,
       pointFeed.teams[team] ?? '',
@@ -6088,7 +6084,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.markerCount = 0;
     if (!ffa && showAllyMarkers) {
       const team = v.team[e]!;
-      m.markerColor = royaleMode ? TEAM_COLORS[0]! : (TEAM_COLORS[team] ?? COLORS.texto);
+      m.markerColor = royaleMode ? teamColors[0]! : (teamColors[team] ?? COLORS.texto);
       const c = desc.camera;
       const rect = lay.rects[s]!;
       for (let j = 0; j < v.count && m.markerCount < MAX_ALLY_MARKERS; j++) {

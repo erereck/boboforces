@@ -81,6 +81,11 @@ export interface LobbyState {
   readonly teams: boolean;
   /** M9 (fase 3): quantos times (3 ou 4 no Sandbox; ausente = 2). */
   readonly teamCount?: number;
+  /**
+   * M10 (fase 8): a cor de cada time (índice da paleta de 8; só quando o Sandbox escolheu alguma fora da posição;
+   * ausente = a da posição). O cliente antigo ignora o campo.
+   */
+  readonly teamColors?: readonly number[];
   /** M5 (fase 4c): a partida está rolando; ao voltar a `false`, quem estava nela volta ao lobby. */
   readonly playing: boolean;
   readonly members: readonly LobbyMember[];
@@ -183,12 +188,17 @@ export function parseLobbyState(v: unknown): LobbyState | null {
   if (parsed.some((m) => m === null)) return null;
   const summary = o['summary'];
   const teamCount = o['teamCount'];
+  const teamColors = o['teamColors'];
   return {
     code: o['code'].slice(0, 8),
     locked: o['locked'] === true,
     summary: typeof summary === 'string' ? summary.slice(0, MAX_SUMMARY_CHARS) : '',
     teams: o['teams'] !== false,
     ...(validTeamCount(teamCount) && teamCount !== 2 ? { teamCount } : {}),
+    // M10 (fase 8, revisão): uma cor por time da escolha (o host manda sempre a conta certa).
+    ...(validTeamColors(teamColors) && teamColors.length === (validTeamCount(teamCount) ? teamCount : 2)
+      ? { teamColors: [...teamColors] }
+      : {}),
     playing: o['playing'] === true,
     members: parsed as LobbyMember[],
   };
@@ -197,6 +207,22 @@ export function parseLobbyState(v: unknown): LobbyState | null {
 /** M9 (fase 3): de 2 a 4 times (os times da escolha vão de -1 a 3). */
 function validTeamCount(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= 4;
+}
+
+/** M10 (fase 8): as cores de time da paleta (o `TEAM_COLOR_COUNT` do `format`, que o `net` não importa). */
+const TEAM_COLORS_IN_PALETTE = 8;
+
+/** M10 (fase 8): de 2 a 4 cores, cada uma um índice da paleta (0 a 7), sem repetir. */
+function validTeamColors(v: unknown): v is readonly number[] {
+  return (
+    Array.isArray(v) &&
+    v.length >= 2 &&
+    v.length <= 4 &&
+    v.every(
+      (c, i) =>
+        typeof c === 'number' && Number.isInteger(c) && c >= 0 && c < TEAM_COLORS_IN_PALETTE && v.indexOf(c) === i,
+    )
+  );
 }
 
 /** O começo que o host mandou. */
@@ -261,8 +287,11 @@ export interface LobbyHost {
   /** Lê o lobby e manda o estado se mudou. A cada frame. */
   update(): void;
   setHostChoice(choice: LobbyChoice): void;
-  /** M9 (fase 3): `teamCount` = quantos times a escolha anda (2 a 4; ausente = 2). */
-  setSummary(text: string, teams?: boolean, teamCount?: number): void;
+  /**
+   * M9 (fase 3): `teamCount` = quantos times a escolha anda (2 a 4; ausente = 2). M10 (fase 8): `teamColors` = a cor de
+   * cada time (índices da paleta; ausente = as da posição).
+   */
+  setSummary(text: string, teams?: boolean, teamCount?: number, teamColors?: readonly number[]): void;
   setLocked(on: boolean): void;
   /** Tira um amigo da sala (ele recebe o aviso). */
   kick(slot: number): void;
@@ -311,6 +340,8 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
   let teams = true;
   /** M9 (fase 3): quantos times (2 = o de sempre, que não vai na mensagem). */
   let teamCount = 2;
+  /** M10 (fase 8): as cores dos times (`null` = as da posição, que não vão na mensagem). */
+  let teamColors: readonly number[] | null = null;
   let started = false;
   let dirty = true;
   /** M5 (fase 5b): o id do aparelho de cada lugar, quem caiu na partida em andamento (por id) e quem foi tirado. */
@@ -325,6 +356,7 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
     summary,
     teams,
     ...(teamCount !== 2 ? { teamCount } : {}),
+    ...(teamColors !== null ? { teamColors } : {}),
     playing: started,
     members,
   });
@@ -469,10 +501,12 @@ export function createLobbyHost(config: LobbyHostConfig): LobbyHost {
       members = members.map((m) => (m.slot === 0 ? host : m));
       dirty = true;
     },
-    setSummary(text, withTeams = true, count = 2): void {
+    setSummary(text, withTeams = true, count = 2, colors): void {
       summary = text.slice(0, MAX_SUMMARY_CHARS);
       teams = withTeams;
       teamCount = validTeamCount(count) ? count : 2;
+      // M10 (fase 8): só quando alguma cor sai da posição (a sala de sempre manda a mesma mensagem de antes).
+      teamColors = validTeamColors(colors) && colors.some((c, i) => c !== i) ? [...colors] : null;
       dirty = true;
     },
     setLocked(on): void {

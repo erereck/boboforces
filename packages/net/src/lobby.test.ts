@@ -62,6 +62,33 @@ describe('código da sala (M5 fase 4a)', () => {
     expect(state(3)?.teamCount).toBe(3);
     for (const bad of [2, 5, 1, 2.5, '4', undefined]) expect(state(bad), String(bad)).not.toHaveProperty('teamCount');
   });
+
+  it('M10 (fase 8): as cores dos times (índices da paleta, sem repetir) só vão quando saem da posição', () => {
+    const state = (teamColors: unknown, teamCount: unknown = Array.isArray(teamColors) ? teamColors.length : 2) =>
+      parseLobbyState({
+        code: 'ABCDE',
+        summary: 'Sandbox',
+        teams: true,
+        teamCount,
+        teamColors,
+        playing: false,
+        members: [],
+      });
+    expect(state([4, 1, 7])?.teamColors).toEqual([4, 1, 7]);
+    // M10 (fase 8, revisão): uma cor por time da escolha (3 cores com 2 times não vão).
+    expect(state([4, 1, 7], 2)).not.toHaveProperty('teamColors');
+    for (const bad of [[4], [0, 0], [0, 8], [1, 2.5], [0, 1, 2, 3, 4], '4,1', undefined])
+      expect(state(bad), JSON.stringify(bad)).not.toHaveProperty('teamColors');
+    // O host: as da posição não vão na mensagem (a sala de sempre manda o mesmo de antes).
+    const endpoint = createLoopback({ seed: 1 }).endpoint(0);
+    const host = createLobbyHost({ endpoint, code: 'ABCDE', host: choice('Erick', 0, true), hz: 60, snapshotHz: 30 });
+    host.setSummary('Sandbox', true, 3, [0, 1, 2]);
+    expect(host.state).not.toHaveProperty('teamColors');
+    host.setSummary('Sandbox', true, 3, [5, 1, 2]);
+    expect(host.state.teamColors).toEqual([5, 1, 2]);
+    host.setSummary('Sandbox', true, 3);
+    expect(host.state).not.toHaveProperty('teamColors');
+  });
 });
 
 const choice = (name: string, team: number, ready = false): LobbyChoice => ({ name, team, bobo: null, ready });

@@ -1,4 +1,10 @@
-import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import {
+  builtinBotRef,
+  MATCH_RECIPE_FORMAT,
+  recipeLimitsFor,
+  validateMatchRecipe,
+  type MatchRecipe,
+} from '@boboforces/format';
 import { BUTTON, type InputFrame } from '@boboforces/input';
 import { expandRecipe, type Sim, type SimEvent } from '@boboforces/sim';
 import { buildSyntheticConstruto } from '@boboforces/sim/testing';
@@ -10,6 +16,8 @@ import { sceneRecipe } from './scene/match.ts';
 import { createSceneDriver } from './scene/scene-driver.ts';
 import { PLATFORM_PROFILES } from '@boboforces/format';
 import type { SceneRequest } from './scene-api.ts';
+import { TEAM_PALETTE } from '@boboforces/ui';
+import { teamColorTable } from './team-colors.ts';
 
 const tdm: MatchRecipe = {
   format: MATCH_RECIPE_FORMAT,
@@ -203,6 +211,27 @@ describe('a receita da cena online (M5 fase 4b)', () => {
     );
     expect(online.recipe.teams.map((tm) => tm.humans)).toEqual([1, 1, 1, 1]);
     expect(expandRecipe(online.recipe, 4).find((s) => s.controller === online.seatControllers[0])!.team).toBe(3);
+  });
+
+  it('M10 (fase 8): a cor dos times vai na receita do começo: o amigo monta a mesma tabela (sem protocolo novo)', () => {
+    const normal = [{ ref: builtinBotRef('normal'), count: 2 }];
+    const sandbox: MatchRecipe = {
+      ...tdm,
+      mode: 'sandbox',
+      map: 'construto',
+      teams: [{ color: 5, bots: normal }, { bots: normal }, { color: 6, bots: normal }],
+    };
+    const host = onlineRecipe(sandbox, [2, 0]).recipe;
+    expect(host.teams.map((tm) => tm.color)).toEqual([5, undefined, 6]);
+    // O amigo recebe a receita como JSON (o `LobbyStart.recipe`) e passa pelo validador antes de entrar.
+    const checked = validateMatchRecipe(
+      JSON.parse(JSON.stringify(host)) as unknown,
+      recipeLimitsFor(PLATFORM_PROFILES.pc),
+    );
+    expect(checked.ok && checked.warnings).toEqual([]);
+    if (!checked.ok) return;
+    expect(teamColorTable(checked.value)).toEqual(teamColorTable(host));
+    expect(teamColorTable(host).slice(0, 3)).toEqual([TEAM_PALETTE[5], TEAM_PALETTE[1], TEAM_PALETTE[6]]);
   });
 });
 

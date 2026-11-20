@@ -213,6 +213,11 @@ export const STRINGS_PT_BR = {
   'feed.teamName.1': 'Azul',
   'feed.teamName.2': 'Verde',
   'feed.teamName.3': 'Roxo',
+  // M10 (fase 8): as 4 cores de time a mais do Sandbox (pergunta AK6).
+  'feed.teamName.4': 'Vermelho',
+  'feed.teamName.5': 'Amarelo',
+  'feed.teamName.6': 'Rosa',
+  'feed.teamName.7': 'Ciano',
 } as const satisfies Readonly<Record<string, string>>;
 
 /**

@@ -168,3 +168,60 @@ describe('M9 (fase 2): o Bobo Sandbox na receita', () => {
     expect(kept.ok && kept.value.teams[0]?.hp).toBe(50);
   });
 });
+
+describe('M10 (fase 8): a cor do time na receita', () => {
+  const teams = (colors: unknown[]): Record<string, unknown>[] =>
+    colors.map((color) => ({ bots: [{ ref: 'builtin:normal-bob', count: 1 }], ...(color !== '-' ? { color } : {}) }));
+  const colorsOf = (input: unknown[]): { colors: (number | undefined)[]; warnings: string[] } => {
+    const r = validateMatchRecipe(recipe({ mode: 'sandbox', teams: teams(input) }), LIMITS);
+    if (!r.ok) throw new Error('recusada');
+    for (const w of r.warnings) expect(ISSUE_CODES as readonly string[]).toContain(w.code);
+    return { colors: r.value.teams.map((t) => t.color), warnings: r.warnings.map((w) => `${w.path}:${w.code}`) };
+  };
+
+  it('cores diferentes (de 0 a 7) passam limpas e voltam iguais (ida e volta)', () => {
+    const r = validateMatchRecipe(recipe({ mode: 'sandbox', teams: teams([4, '-', 7, 0]) }), LIMITS);
+    expect(r.ok && r.warnings).toEqual([]);
+    if (!r.ok) return;
+    expect(r.value.teams.map((t) => t.color)).toEqual([4, undefined, 7, 0]);
+    const again = validateMatchRecipe(JSON.parse(JSON.stringify(r.value)) as unknown, LIMITS);
+    expect(again.ok && again.value).toEqual(r.value);
+    // Sem cor, nada muda (as cores da posição, sem aviso).
+    expect(colorsOf(['-', '-', '-', '-'])).toEqual({
+      colors: [undefined, undefined, undefined, undefined],
+      warnings: [],
+    });
+  });
+
+  it('fora da faixa é limitada e arredondada; tipo errado sai com aviso', () => {
+    const r = colorsOf([-3, 9, 4.6, 'vermelho']);
+    expect(r.colors).toEqual([0, 7, 5, undefined]);
+    expect(r.warnings).toEqual([
+      'teams[0].color:recipe.valueClamped',
+      'teams[1].color:recipe.valueClamped',
+      'teams[3].color:recipe.invalidField',
+    ]);
+  });
+
+  it('dois times com a mesma cor: o de depois fica com a 1ª livre, com aviso (determinístico)', () => {
+    // A escolhida repete a de outro escolhido.
+    expect(colorsOf([5, 5, '-', '-'])).toEqual({
+      colors: [5, 0, undefined, undefined],
+      warnings: ['teams[1].color:recipe.duplicateTeamColor'],
+    });
+    // M10 (fase 8, revisão): a escolhida ganha da cor da posição de um time sem cor (o Azul do time 1): ele pega a
+    // primeira livre.
+    expect(colorsOf(['-', '-', 1]).colors).toEqual([undefined, 2, 1]);
+    // A da posição de um time sem cor repete a escolhida de um anterior: ele ganha uma cor.
+    expect(colorsOf([2, '-', '-'])).toEqual({
+      colors: [2, undefined, 0],
+      warnings: ['teams[2].color:recipe.duplicateTeamColor'],
+    });
+    // A faixa limita primeiro (8 vira 7) e depois a repetida troca.
+    expect(colorsOf([7, 8]).colors).toEqual([7, 0]);
+    const once = validateMatchRecipe(recipe({ mode: 'sandbox', teams: teams([6, 6, 6, 6]) }), LIMITS);
+    expect(once.ok && once.value.teams.map((t) => t.color)).toEqual([6, 0, 1, 2]);
+    const again = validateMatchRecipe(JSON.parse(JSON.stringify(once.ok && once.value)) as unknown, LIMITS);
+    expect(again.ok && again.warnings).toEqual([]);
+  });
+});

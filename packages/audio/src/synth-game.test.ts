@@ -58,6 +58,17 @@ describe('sons sintetizados do jogo (fase 7a)', { timeout: 30_000 }, () => {
     }
   });
 
+  it('M10 (fase 8): o ricochete é curto e assobia descendo (o começo mais agudo que o fim)', () => {
+    const pcm = GAME_SYNTH_SOUNDS['ricochete']!();
+    expect(pcm.length / SYNTH_SAMPLE_RATE).toBeLessThan(0.35);
+    const third = Math.floor(pcm.length / 3);
+    // Pula os 10 ms do estalo (ruído) no começo.
+    const start = zeroCrossings(pcm.subarray(Math.round(0.01 * SYNTH_SAMPLE_RATE), third));
+    const end = zeroCrossings(pcm.subarray(2 * third));
+    expect(start).toBeGreaterThan(end * 1.4);
+    expect(end).toBeGreaterThan(2000);
+  });
+
   it('o sniper é o tiro mais longo e a SMG o mais curto', () => {
     const len = (w: GunshotName): number => synthGunshot(GUNSHOTS[w]).length;
     for (const w of Object.keys(GUNSHOTS) as GunshotName[]) {

@@ -7,8 +7,9 @@ import { t, type StringKey } from '@boboforces/ui';
 export const MENU_MAPS = ['construto', 'ringue', 'posto', 'base', 'airbase', 'island'] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
-// M9 (fase 3): o Bobo Sandbox nos mapas com casa no chão para os times 2 e 3 (o Construto e o Ringue). A Base Bobo fica
-// de fora: a casa deles cai nos quebra-vistas de 2,5 m das rotas oeste e leste (3 dos 4 pontos da base em cima deles).
+// M9 (fase 3): o Bobo Sandbox nos mapas com casa no chão para os times 2 e 3 (o Construto e o Ringue). M10 (fase 8):
+// também a Base Bobo, agora que a casa deles prefere os nós no chão das bases (antes, 3 dos 4 pontos caíam em cima dos
+// quebra-vistas de 2,5 m das rotas oeste e leste).
 export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   construto: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'zombies', 'sandbox'],
   ringue: ['warfare.tdm', 'training', 'sandbox'],
@@ -16,8 +17,8 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   posto: ['zombies'],
   // M3 (fase 5a): a Base Abandonada, o mapa do Bobo Zombies.
   base: ['zombies'],
-  // M7 (fase 1): a Base Bobo, o mapa do BoboStrike (2 sites); também joga TDM.
-  airbase: ['strike', 'warfare.tdm'],
+  // M7 (fase 1): a Base Bobo, o mapa do BoboStrike (2 sites); também joga TDM e (M10, fase 8) o Sandbox.
+  airbase: ['strike', 'warfare.tdm', 'sandbox'],
   // M7 (fase 5): a Ilha Tropical, o mapa do Bobo Royale Mini (~200 m; aberta demais para os outros modos).
   island: ['royale.mini'],
 };

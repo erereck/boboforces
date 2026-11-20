@@ -97,12 +97,25 @@ const clamp = (v: number, min: number, max: number): number => (v < min ? min : 
 
 /**
  * O nó em pé do componente principal mais perto (no plano) de (x, z), dentro da área; no empate, o mais baixo (o
- * térreo, não o telhado). -1 = nenhum.
+ * térreo, não o telhado). M10 (fase 8): o nó no chão das bases (o piso a menos de `SANDBOX_SPAWN.groundToleranceM` de
+ * `floorY`, até `groundReachM` de distância) ganha de qualquer outro mais perto (em cima de um muro ou de um caixote);
+ * sem nenhum no chão, o mais perto. -1 = nenhum.
  */
-function standingNode(nav: NavGrid, main: number, area: PlayArea, x: number, z: number, pos: Float64Array): number {
+function standingNode(
+  nav: NavGrid,
+  main: number,
+  area: PlayArea,
+  x: number,
+  z: number,
+  floorY: number,
+  pos: Float64Array,
+): number {
   let best = -1;
   let bestD = Infinity;
   let bestY = Infinity;
+  let ground = -1;
+  let groundD = SANDBOX_SPAWN.groundReachM * SANDBOX_SPAWN.groundReachM;
+  let groundY = Infinity;
   for (let n = 0; n < nav.nodeCount; n++) {
     if (nav.clearance[n] !== 1 || nav.component[n] !== main) continue;
     nav.nodePosition(n, pos, 0);
@@ -111,13 +124,33 @@ function standingNode(nav: NavGrid, main: number, area: PlayArea, x: number, z: 
     const dx = pos[0]! - x;
     const dz = pos[2]! - z;
     const d = dx * dx + dz * dz;
-    if (d < bestD || (d === bestD && pos[1]! < bestY)) {
+    const y = pos[1]!;
+    if (d < bestD || (d === bestD && y < bestY)) {
       best = n;
       bestD = d;
-      bestY = pos[1]!;
+      bestY = y;
+    }
+    if (Math.abs(y - floorY) < SANDBOX_SPAWN.groundToleranceM && (d < groundD || (d === groundD && y < groundY))) {
+      ground = n;
+      groundD = d;
+      groundY = y;
     }
   }
-  return best;
+  return ground >= 0 ? ground : best;
+}
+
+/**
+ * M10 (fase 8): a altura do chão das bases: o pé mais baixo dos spawns dos times da partida que têm ponto no mapa (sem
+ * nenhum, de todos os spawns; sem spawn, `NaN`: nenhum nó conta como chão).
+ */
+function baseFloorY(spawns: readonly SpawnPoint[], teams: number): number {
+  let own = Infinity;
+  let any = Infinity;
+  for (const sp of spawns) {
+    if (sp.team >= 0 && sp.team < teams) own = Math.min(own, sp.y);
+    any = Math.min(any, sp.y);
+  }
+  return Number.isFinite(own) ? own : Number.isFinite(any) ? any : Number.NaN;
 }
 
 /**
@@ -125,7 +158,8 @@ function standingNode(nav: NavGrid, main: number, area: PlayArea, x: number, z: 
  * direção da base, a partir do centro da área jogável). Cada time sem ponto (o 2 e o 3; o 1 num mapa que só marca o 0),
  * na ordem, ganha uma casa no meio da maior folga entre as direções já ocupadas, à distância média das bases do centro
  * (no Construto: o 2 a oeste e o 3 a leste, entre as bases do norte e do sul). Então:
- * - a base dele: `SANDBOX_SPAWN.basePoints` nós da navegação em cruz em volta da casa (sem navegação, nenhum);
+ * - a base dele: `SANDBOX_SPAWN.basePoints` nós da navegação em cruz em volta da casa, de preferência no chão das bases
+ *   do mapa (M10, fase 8: não em cima de um muro; `standingNode`) (sem navegação, nenhum);
  * - o território dele: os pontos sem time mais perto da casa dele que da de qualquer outro time viram dele (os times do
  *   mapa não renascem ali; os pontos sem time do resto continuam de todos).
  * O array começa pelas bases e pelos territórios (do ponto mais perto da casa ao mais longe), e o resto vem na ordem do
@@ -179,11 +213,12 @@ export function sandboxSpawns(map: SimMap, teams: number, navMain: number, popul
   const pos = new Float64Array(3);
   const d = SANDBOX_SPAWN.baseSpreadM;
   const cross = [0, 0, d, 0, -d, 0, 0, d, 0, -d];
+  const floorY = baseFloorY(spawns, teams);
   for (const t of homeless) {
     if (map.nav === undefined || navMain < 0) break;
     const used: number[] = [];
     for (let k = 0; k < cross.length && used.length < SANDBOX_SPAWN.basePoints; k += 2) {
-      const n = standingNode(map.nav, navMain, area, homeX[t]! + cross[k]!, homeZ[t]! + cross[k + 1]!, pos);
+      const n = standingNode(map.nav, navMain, area, homeX[t]! + cross[k]!, homeZ[t]! + cross[k + 1]!, floorY, pos);
       if (n < 0 || used.includes(n)) continue;
       used.push(n);
       map.nav.nodePosition(n, pos, 0);

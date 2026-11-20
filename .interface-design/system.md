@@ -52,6 +52,7 @@ cromo da UI.
 | `hudFundo` | `#0A0D0B` a 70% | plaquinhas do HUD |
 | `veu` | `#050706` a 72% | véu atrás de modais e da pausa |
 | Times A–D | `#FF7A1A` ▲ · `#2E8BFF` ● · `#3DDC97` ■ · `#A66BFF` ◆ | sempre com o ícone |
+| Times: as 4 a mais do Sandbox (M10) | Vermelho `#E8283C` · Amarelo `#FFD60A` · Rosa `#F03CBE` · Ciano `#2EE6F0` | só por escolha no Sandbox; o ícone segue a posição |
 | P1–P4 | `#FFD23F` · `#3FE0FF` · `#FF6FB5` · `#B8F03C` | jogadores locais |
 
 Cor é escassa: o âmbar diz "o que fazer agora"; verde, vermelho e as cores de time são semânticas. Profundidade só por
