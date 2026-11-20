@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { builtinBot } from './bot.ts';
-import {
-  BACKUP_FORMAT,
-  createBackup,
-  EMPTY_PRESET_LIBRARY,
-  LIBRARY_LIMITS,
-  validateBackup,
-  validatePresetLibrary,
-} from './backup.ts';
+import { BACKUP_FORMAT, EMPTY_PRESET_LIBRARY, LIBRARY_LIMITS, validatePresetLibrary } from './backup.ts';
+import { createBackup, validateBackup } from './backup-file.ts';
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { DEFAULT_SETTINGS, SETTINGS_FORMAT, SETTINGS_RANGES, validateSettings } from './settings.ts';
 import { EMPTY_STATS, STATS_FORMAT, validateStats, zombieRecordKey } from './stats.ts';

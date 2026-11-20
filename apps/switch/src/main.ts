@@ -7,11 +7,17 @@
 // runtime.log; o título ganha os itens de teste (presets do bench, controles, teclado, áudio) e o relatório do bench
 // vai para o log linha a linha com `[bench] `.
 import * as EDITORS from '@boboforces/game/editors';
-import { BENCH_LOG_PREFIX, startGame, type GameHandle, type RendererRoutes } from '@boboforces/game';
+import {
+  BENCH_LOG_PREFIX,
+  createNullRenderer,
+  startGame,
+  type GameHandle,
+  type RendererRoutes,
+} from '@boboforces/game';
 import { SCENE_MODULE } from '@boboforces/game/scene';
 import { createMsdfUiPass, createRenderer, type Renderer } from '@boboforces/render';
 import type { GraphicsSurface } from '@boboforces/platform-api';
-import { t } from '@boboforces/ui';
+import { registerStrings, STRINGS_SWITCH_PT_BR, t } from '@boboforces/ui';
 import { createBatteryReader } from './platform/battery.ts';
 import { readWorkshopFiles } from './platform/files.ts';
 import { createSwitchShell, describeBuild, describeError, SD_DIR, type SwitchShell } from './platform/index.ts';
@@ -25,7 +31,9 @@ declare const __PLATFORM__: string;
 declare const __ONLINE__: boolean;
 
 // Textos da casca fora da UI do jogo, pela tabela pt-BR. Sem GPU o aviso sai em Canvas 2D; com GPU (falha no boot) sai
-// pelo próprio WebGL2, numa fonte bitmap mínima (o canvas já é WebGL2 e não aceita um contexto 2D).
+// pelo próprio WebGL2, numa fonte bitmap mínima (o canvas já é WebGL2 e não aceita um contexto 2D). M9 (fase 0): eles e
+// as telas de teste estão na tabela do Switch, registrada antes de tudo (o `t0/strings.ts` também registra, no topo).
+registerStrings(STRINGS_SWITCH_PT_BR);
 const NOTICE_NO_GPU = [t('switch.needApplicationMode'), t('switch.pressPlusToExit')];
 const NOTICE_BOOT_FAILED = [t('switch.bootFailed'), t('switch.bootFailedHint')];
 
@@ -112,6 +120,7 @@ try {
   game = startGame({
     platform: shell.platform,
     createRenderer: shell.hasGpu ? createSwitchRenderer : null,
+    nullRenderer: createNullRenderer,
     testItems: createSwitchTestItems(),
     // M4 (fase 1): a LOCAL EDITION abre direto no lobby "aperte A" (GDD §3.6).
     localEdition: true,

@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
-import { COMPOSED_CHARS, parseFontPack, STRINGS_PT_BR } from '@boboforces/ui';
+import {
+  COMPOSED_CHARS,
+  parseFontPack,
+  STRINGS_EXTRA_PT_BR,
+  STRINGS_ONLINE_PT_BR,
+  STRINGS_PT_BR,
+  STRINGS_SWITCH_PT_BR,
+} from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { codepointsForRole, DISPLAY_CODEPOINTS, HUD_CODEPOINTS, isLowercaseLetter } from './charset.ts';
 import {
@@ -356,9 +363,12 @@ describe('conjuntos de glifos (decisão #54)', () => {
     const display = new Set(DISPLAY_CODEPOINTS);
     const outHud = new Set<string>();
     const outDisplay = new Set<string>();
-    for (const raw of Object.values(STRINGS_PT_BR)) {
-      // O ™ fica fora do atlas: o drawText do ui o compõe com T e M (`COMPOSED_CHARS`).
-      const text = raw.replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
+    // M9 (fase 0): as quatro tabelas (a do menu ficou só com o que o menu mostra).
+    const tables = [STRINGS_PT_BR, STRINGS_EXTRA_PT_BR, STRINGS_ONLINE_PT_BR, STRINGS_SWITCH_PT_BR];
+    for (const raw of tables.flatMap((table) => Object.values(table) as string[])) {
+      // O ™ fica fora do atlas: o drawText do ui o compõe com T e M (`COMPOSED_CHARS`). A quebra de linha separa as
+      // linhas de um parágrafo (o aviso do Online): não é glifo.
+      const text = raw.replace(/\n/g, '').replace(/./gu, (ch) => COMPOSED_CHARS[ch] ?? ch);
       for (const ch of text) if (!hud.has(ch.charCodeAt(0))) outHud.add(ch);
       for (const ch of text.toUpperCase()) if (!display.has(ch.charCodeAt(0))) outDisplay.add(ch);
     }

@@ -1,7 +1,7 @@
 /**
- * M3: as telas de edição (Partida personalizada, Laboratório e Oficina) num módulo à parte, fora do chunk do menu na
- * web (tecnico.md §16.4: menu ≤ 350 KB). Regra 15: o `import()` fica no `apps/web`; o Switch e os testes ligam direto.
- * O `game` recebe este módulo por `GameDeps.loadEditors` e o pede logo depois do menu pronto.
+ * M3: as telas de edição (Partida personalizada, Laboratório e Oficina; M9: e os Ajustes) num módulo à parte, fora do
+ * chunk do menu na web (tecnico.md §16.4: menu ≤ 350 KB). Regra 15: o `import()` fica no `apps/web`; o Switch e os
+ * testes ligam direto. O `game` recebe este módulo por `GameDeps.loadEditors` e o pede no 1º frame do menu.
  */
 import { registerStrings, STRINGS_EXTRA_PT_BR } from '@boboforces/ui';
 
@@ -33,4 +33,6 @@ export { createShareFlow, shareAvailable } from './share.ts';
 export { createWorkshopFlow } from './workshop.ts';
 // M8 (fase 3): o Surpreenda-me completo.
 export { createSurpriseFlow, surpriseTree } from './surprise.ts';
+// M9 (fase 0): os Ajustes do menu inteiros (o menu da web estava no teto de 350 KB).
+export { createSettingsFlow } from './settings-flow.ts';
 export { shareCodeFromHash } from '@boboforces/format';

@@ -177,7 +177,7 @@ describe('painel F2', () => {
 describe('tela de teste (Switch: controles, teclado, áudio)', () => {
   it('24 linhas cabem (em colunas) nas 4 resoluções, com texto acima do piso', () => {
     const m = createTestScreenModel();
-    m.titleKey = 'test.controllers.title';
+    m.titleKey = 'test.controllers';
     m.hintKey = 'test.controllers.hint';
     m.lineCount = TEST_SCREEN_MAX_LINES;
     m.lines.forEach((line, i) => {
@@ -197,7 +197,7 @@ describe('tela de teste (Switch: controles, teclado, áudio)', () => {
 
   it('selos de status coloridos, vaga P1–P4 na cor do jogador e textos da tabela', () => {
     const m = createTestScreenModel();
-    m.titleKey = 'test.controllers.title';
+    m.titleKey = 'test.controllers';
     m.hintKey = 'test.controllers.hint';
     m.lineCount = 2;
     m.lines[0]!.key = 'test.controllers.ready';

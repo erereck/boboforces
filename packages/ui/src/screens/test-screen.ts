@@ -93,6 +93,10 @@ interface TestTexts {
 
 let cachedTexts: TestTexts | null = null;
 
+/**
+ * M9 (fase 0): os selos vêm da tabela do Switch e o "P{n}" da extra; as duas já estão registradas quando uma tela de
+ * teste abre (a casca do Switch registra no boot; na web não há tela de teste).
+ */
 function testTexts(): TestTexts {
   if (cachedTexts) return cachedTexts;
   cachedTexts = {

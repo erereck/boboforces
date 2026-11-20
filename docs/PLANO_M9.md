@@ -65,6 +65,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 0. **A dieta do menu da web** (pista A): os textos que só a partida e os editores usam saem da tabela do menu, o
    `stepLevel` sai da pausa, a tabela de looks sai do boneco padrão, o renderizador nulo sai da web, o relatório e a
    prévia do título viram sob demanda, e a tela de Configurações vira um fluxo do pedaço dos editores. Meta: ≥ 15 KB.
+   - **feita em 20/11** (ARCHITECTURE §20.2): 349,6 → 332,3 KB.
 1. **Os modificadores Mini, Bots gigantes e Ricochete** (pista B): o tamanho por máscara sem estado novo (a hitbox, o
    olho, a mira dos bots, o desenho e os marcadores; a caixa de colisão e a navegação ficam, e os gigantes evitam teto
    baixo), o quique das balas e dos chumbos com o evento `ricochet` (protocolo 11), as linhas na Partida personalizada,

@@ -69,7 +69,6 @@ import {
   parseFontPack,
   shareScreen,
   STRINGS_EXTRA_PT_BR,
-  STRINGS_PT_BR,
   t as t_,
   uiScale,
   type StringKey,
@@ -293,6 +292,7 @@ async function bootToTitle(
   const game = startGame({
     platform,
     createRenderer: null,
+    nullRenderer: createNullRenderer,
     loadScene,
     loadEditors,
     ...extra,
@@ -446,6 +446,7 @@ describe('startGame (NullRenderer)', () => {
     const game = startGame({
       platform,
       createRenderer: null,
+      nullRenderer: createNullRenderer,
       loadScene,
       loadEditors,
       bench,
@@ -481,6 +482,7 @@ describe('startGame (NullRenderer)', () => {
     const game = startGame({
       platform,
       createRenderer,
+      nullRenderer: createNullRenderer,
       loadScene,
       loadEditors,
       bench,
@@ -807,7 +809,7 @@ describe('startGame (NullRenderer)', () => {
       start: () => ({
         update: () => void updates++,
         describe: (out: TestScreenModel) => {
-          out.titleKey = 'test.audio.title';
+          out.titleKey = 'test.audio';
           out.lineCount = 0;
         },
         finished: false,
@@ -842,7 +844,12 @@ describe('startGame (NullRenderer)', () => {
   it('asset quebrado: tela de erro, onError e o laço para', async () => {
     const platform = createFakePlatform({ brokenAssets: true });
     const errors: unknown[] = [];
-    const game = startGame({ platform, createRenderer: null, hooks: { onError: (e) => errors.push(e) } });
+    const game = startGame({
+      platform,
+      createRenderer: null,
+      nullRenderer: createNullRenderer,
+      hooks: { onError: (e) => errors.push(e) },
+    });
     platform.pump(2);
     await settle();
     platform.pump(2);
@@ -1295,7 +1302,7 @@ describe('textos do game com o atlas real (#54)', () => {
     for (const [i, t] of [TARGETS[5]!, TARGETS[1]!].entries()) {
       const px = Math.max(Math.round(16 * uiScale(t.w, t.h)), t.minTextPx);
       for (const key of benchTexts[i]!) {
-        const text = STRINGS_PT_BR[key];
+        const text = STRINGS_EXTRA_PT_BR[key];
         for (const ch of text) expect(glyphs.has(ch.charCodeAt(0)), `${key}: ${ch}`).toBe(true);
         expect(measureText(hud, text, px, 0.04) + px, `${t.name}: ${key}`).toBeLessThanOrEqual(t.w);
       }
@@ -1306,7 +1313,7 @@ describe('textos do game com o atlas real (#54)', () => {
       const labelPx = Math.max(13 * dpr, MIN_TEXT.phone * dpr * 0.75);
       for (let b = 0; b < DEFAULT_TOUCH_LAYOUT.buttons.length; b++) {
         const { control, radius } = placeTouchButton(DEFAULT_TOUCH_LAYOUT, b, 667 * dpr, 375 * dpr, dpr, rect);
-        const label = (STRINGS_PT_BR as Readonly<Record<string, string>>)[`touch.${control}`]!.toUpperCase();
+        const label = (STRINGS_EXTRA_PT_BR as Readonly<Record<string, string>>)[`touch.${control}`]!.toUpperCase();
         const half = (hud.capHeight * labelPx) / hud.size / 2;
         const chord = 2 * Math.sqrt(radius * radius - half * half);
         expect(measureText(hud, label, labelPx, 0.04), `DPR ${dpr}: ${label}`).toBeLessThanOrEqual(chord);
@@ -1470,7 +1477,8 @@ describe('câmera', () => {
 
 describe('textos', () => {
   it('todo código de ISSUE_CODES (format) tem texto issue.<código> na tabela pt-BR', () => {
-    const keys = Object.keys(STRINGS_PT_BR);
+    // M9 (fase 0): os avisos dos validadores moram na tabela extra (só o compartilhar, nos editores, mostra).
+    const keys = Object.keys(STRINGS_EXTRA_PT_BR);
     for (const code of ISSUE_CODES) expect(keys, code).toContain(`issue.${code}`);
   });
 });
@@ -1701,6 +1709,9 @@ describe('Novidades (M2, fase 4g)', () => {
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.save.stats.onboarding.seenNews).toBe(GAME_VERSION);
+    // M9 (fase 0): os Ajustes moram no pedaço dos editores, pedido no 1º frame do título (aqui, só depois da
+    // Novidades): no jogo os frames são tarefas separadas e a promessa anda entre eles; aqui, o teste espera.
+    await settle();
     // Refino R3b: Título → Ajustes → Sobre (a 7ª aba) → Novidades (a última linha) → volta aos Ajustes.
     titleTo(platform, 'settings');
     for (let i = 0; i < 6; i++) platform.tap('KeyE');
@@ -2436,6 +2447,7 @@ async function bootWithOnline(store: Readonly<Record<string, string>> = {}, onli
   const game = startGame({
     platform,
     createRenderer: null,
+    nullRenderer: createNullRenderer,
     loadScene,
     loadEditors,
     loadOnline: () => Promise.resolve({ module: ONLINE, rooms }),

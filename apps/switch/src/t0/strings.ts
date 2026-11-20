@@ -1,12 +1,19 @@
 // Chaves de texto das telas de teste do Switch (regra 13: texto de UI só pela tabela pt-BR). A tabela é da frente
 // ui-fontes; as chaves abaixo foram PEDIDAS pela frente switch-audio (texto sugerido ao lado) e quase todas já estão
-// nela. Contorno para a que ainda faltar: a chave só é usada se existir em `STRINGS_PT_BR`; senão o rótulo cai numa
-// chave existente e as linhas mostram só o dado técnico (literal). Quando a chave entra, o texto aparece sozinho.
+// nela. Contorno para a que ainda faltar: a chave só é usada se existir numa tabela registrada (`hasString`); senão o
+// rótulo cai numa chave existente e as linhas mostram só o dado técnico (literal). Quando a chave entra, o texto aparece
+// sozinho.
+//
+// M9 (fase 0): as chaves do Switch saíram da tabela do menu da web para a `STRINGS_SWITCH_PT_BR`, registrada AQUI, no
+// topo do módulo: os runners leem as chaves deles no próprio topo (`optionalKey` em constantes), antes do corpo do
+// `main.ts`, e este módulo é avaliado antes deles.
 //
 // Os rótulos dos itens do título usam as chaves CURTAS `test.item.*` (decisão #54: com a Russo One os rótulos longos
 // estouravam o botão e a coluna de 9 itens cobria o logo). Só `test.item.benchZombies20` passa por aqui; as outras são
 // usadas direto em `items.ts`, e o typecheck garante que existem.
-import { STRINGS_PT_BR, type StringKey } from '@boboforces/ui';
+import { hasString, registerStrings, STRINGS_SWITCH_PT_BR, type StringKey } from '@boboforces/ui';
+
+registerStrings(STRINGS_SWITCH_PT_BR);
 
 /** Chaves pedidas → texto sugerido (pt-BR). */
 export const SWITCH_TEST_STRINGS = {
@@ -41,10 +48,10 @@ export type SwitchTestStringKey = keyof typeof SWITCH_TEST_STRINGS;
 
 /** Rótulo de item do título: a chave pedida se existir, senão `fallback` (sempre uma chave válida). */
 export function labelKey(key: SwitchTestStringKey, fallback: StringKey = 'test.sceneTitle'): StringKey {
-  return key in STRINGS_PT_BR ? (key as unknown as StringKey) : fallback;
+  return hasString(key) ? (key as unknown as StringKey) : fallback;
 }
 
 /** Chave de linha/título/dica: a pedida se existir, senão `null` (a tela mostra só o literal). */
 export function optionalKey(key: SwitchTestStringKey): StringKey | null {
-  return key in STRINGS_PT_BR ? (key as unknown as StringKey) : null;
+  return hasString(key) ? (key as unknown as StringKey) : null;
 }

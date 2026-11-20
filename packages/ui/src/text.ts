@@ -8,13 +8,19 @@ import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 export type TextParams = Readonly<Record<string, string | number>>;
 
 /**
- * Refino R3a (#79): a tabela que chega depois (`STRINGS_EXTRA_PT_BR`, com a cena e as telas de edição). Registrada
- * uma vez por quem a importa; antes disso, uma chave dela volta como a própria chave (o menu não usa nenhuma).
+ * Refino R3a (#79): as tabelas que chegam depois (`STRINGS_EXTRA_PT_BR`, com a cena e as telas de edição; a do Online;
+ * M9: a do Switch). Registradas por quem as importa; antes disso, uma chave delas volta como a própria chave: o JS do
+ * menu só cita as que desenha depois do registro (o `size-check` confere, `tools/size-check/src/strings-check.ts`).
  */
 const extraStrings: Record<string, string> = {};
 
 export function registerStrings(table: Readonly<Record<string, string>>): void {
   Object.assign(extraStrings, table);
+}
+
+/** M9 (fase 0): a chave existe na tabela do menu ou numa tabela já registrada (o contorno das chaves do Switch). */
+export function hasString(key: string): boolean {
+  return key in STRINGS_PT_BR || key in extraStrings;
 }
 
 function templateOf(key: StringKey): string {

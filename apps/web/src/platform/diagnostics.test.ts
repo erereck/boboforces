@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createWebDiagnostics, formatErrorText, readGlInfo, scrubUrls } from './diagnostics.ts';
+import { createWebDiagnostics, formatErrorText, scrubUrls } from './diagnostics.ts';
+import { readGlInfo } from './diagnostics-report.ts';
 
 /** Contexto WebGL2 sintético: constantes, getParameter e getExtension contados. */
 function fakeGl(renderer: string, unmasked: string | null) {

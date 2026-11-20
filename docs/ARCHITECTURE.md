@@ -98,7 +98,7 @@ recebe os alvos por parâmetro) e `ui` não importa `sim` (o `game` monta o esta
 | Formatos | `packages/format/src/{format-id,content-ids,migrations,png}.ts` | `formatId`, `parseFormatId`, `CONTENT_IDS`, `migrateDocument`, `decodePng` |
 | UI | `packages/ui/src/{tree,draw-list,theme,strings.pt-BR,text}.ts` | `UiNode`, `Screen<S>`, `layoutTree`, `moveFocus`, `drawTree`, `DrawList`, `COLORS`, `t()` |
 | Render | `packages/render/src/types.ts`, `renderer.ts`, `data.ts`, `menu.ts` | `createRenderer(surface, opts, createUiPass?): Renderer` (com `setUiAtlas`); `@boboforces/render/data` = parte sem three; M1: `@boboforces/render/menu` = renderer só de UI |
-| Jogo | `packages/game/src/index.ts`, `scene-api.ts`, `scene/index.ts` | `startGame({ platform, createRenderer, hooks?, loadScene?, bench?, benchWarnings?, testItems? }): GameHandle`, `MatchDriver`, `createLocalDriver`, `createNullRenderer()`; M1: `@boboforces/game/scene` (`SCENE_MODULE`) |
+| Jogo | `packages/game/src/index.ts`, `scene-api.ts`, `scene/index.ts` | `startGame({ platform, createRenderer, nullRenderer?, hooks?, loadScene?, bench?, benchWarnings?, testItems? }): GameHandle` (M9: com `createRenderer: null`, o `nullRenderer` é obrigatório; falta = erro na largada), `MatchDriver`, `createLocalDriver`, `createNullRenderer()`; M1: `@boboforces/game/scene` (`SCENE_MODULE`) |
 
 **Mudar um contrato:** não edite o arquivo de contrato de outra frente. Anote o pedido na seção 8 deste documento
 (com o motivo e o contorno que você usou) e siga. A integração aplica e avisa as frentes.
@@ -1352,7 +1352,7 @@ mudanças de contrato ficam registradas aqui.
   - `pushRecent` não repete o mesmo jeito de partida (ignora nome e semente);
   - `savePreset` substitui pelo nome e respeita o teto da plataforma (`libraryCapsFor`: 200/500 na web, 50/100 no
     Switch); `setFavorite` aceita até 6;
-  - `exportBackup`, `readBackup` e `applyBackup`: juntar soma os presets salvos e os bots (renomeando os repetidos)
+  - `exportBackup`, `readBackup` e `applyBackup` (M9: em `game/save-backup.ts`, no pedaço dos editores): juntar soma os presets salvos e os bots (renomeando os repetidos)
     e mantém os ajustes daqui; substituir troca tudo.
   - Os presets guardados são validados com os tetos do motor; o corte ao aparelho é na hora de jogar.
 - **Mudança de contrato do game:** `GameHandle.save`.
@@ -1533,7 +1533,7 @@ mudanças de contrato ficam registradas aqui.
 - **Escolha (revisável):** em tela dividida, só o jogador 1 conta (o `stats@1` é do aparelho, não do jogador).
 - **`game/stats.ts`** (puro):
   - `addMatch`: soma os totais com teto de 2 × 10⁹; recorde só depois da primeira partida e só acima de zero;
-  - `statsLines` (aba Dados) e `playTimeText`;
+  - `statsLines` (aba Dados; M9: em `game/stats-lines.ts`) e `playTimeText`;
   - `newsOnBoot`: `show` quando já jogou (ou viu outra versão) e ainda não viu esta; `silent` na instalação nova (só
     marca); `markNewsSeen`;
   - `migratedCount`: os avisos `format.migrated` do carregamento do save.
@@ -4627,4 +4627,38 @@ entram no `main` uma por vez, com o portão, a revisão e o commit de cada uma; 
   com 1 de pé). Para a fase 3: o HUD ler o tempo e a meta de verdade (não os da receita), a tela de morte da eliminação
   sem contagem para renascer e o "entrar no meio" do sofá sem cair num bot morto.
 - **O menu da web:** 349,7 KB (+0,1): o validador ficou do mesmo tamanho com a junção dos leitores de bloco.
+
+### 20.2 Fase 0: a dieta do menu da web (20/11/2026)
+
+- **O número:** o menu (HTML + JS + atlas MSDF, `size-check`) foi de 349,6 para **332,3 KB** (331,7 antes da revisão) (o `index-*.js` de
+  96,1 para 78,9 KB); a primeira partida subiu de 900,1 para 902,3 KB (o código mudou de pedaço, não sumiu). A medida
+  de antes, módulo por módulo, saiu de um build com sourcemap; o `three` (130 KB) continua no menu, e só desenhar o
+  menu em WebGL2 cru chegaria na meta de 300 KB (fica como ideia, não como fase).
+- **Os textos** (`ui/src/strings*.pt-BR.ts`): a tabela do menu ficou com as 127 chaves que o pedaço do menu lê de
+  fato (achadas pelo build); 466 foram para a tabela extra (Configurações, nomes de botão, pausa, HUD, armas,
+  resultado, cards de bot, mensagens do validador), que a cena e os editores registram; 35 só do Switch foram para
+  `strings-switch.pt-BR.ts` (o Switch registra no começo do `t0/strings.ts` e do `main.ts`); 34 sem uso saíram. O
+  `hasString()` responde "existe em alguma tabela"; um teste novo reprova chave repetida entre tabelas, e os testes
+  de fonte e de largura olham as quatro.
+- **As Configurações** viraram um fluxo do pedaço dos editores (`game/src/settings-flow.ts`), como a Oficina: abrem
+  pelo `withEditors` (o pedaço já vem logo depois do título) e conferem que o jogador ainda está na tela de onde
+  abriu. O backup foi para `game/src/save-backup.ts` e `format/src/backup-file.ts`; as linhas de estatística para
+  `game/src/stats-lines.ts`; os prefixos das abas para `ui/src/screens/tabbed-ids.ts` (sem isso, o módulo das telas
+  com abas puxava as Configurações de volta para o menu).
+- **Os miúdos:** o `stepLevel` foi para `format/presets.ts` (a pausa inteira vinha junto por 3 linhas); o
+  `RECRUIT_LOOK` em `figure-recruit.ts` (o boneco padrão puxava a tabela de looks inteira); o renderizador nulo saiu
+  da web (`GameDeps.nullRenderer`, obrigatório quando `createRenderer` é `null`: o Switch e os testes passam o
+  deles); o relatório de diagnóstico e a prévia do título do Switch (`?titulo=switch`) viraram `import()` na casca
+  da web.
+- **Já estava assim antes (não mexi):** quando as Novidades abrem no boot da web, o splash fica por cima delas até o
+  jogador chegar ao título (a checagem de "menu pronto" só olha o título e o lobby).
+- **A revisão (Opus) achou:** os Ajustes podiam "não responder" logo depois do título (o pedaço dos editores só era
+  pedido no 1º frame do título, e nem isso com as Novidades no boot): agora ele é pedido no 1º frame de qualquer tela;
+  e nada impedia o próximo `t()` no código do menu de cair numa chave das outras tabelas (crua na tela, só na web de
+  produção, porque os testes registram todas): o `size-check` agora procura no JS da carga inicial as chaves que não
+  moram na tabela do menu (`tools/size-check/src/strings-check.ts`, com as exceções desenhadas só depois do registro).
+  Na primeira passada ele achou 34 que a dieta tinha tirado do menu cedo demais, entre elas o `mode.zombies` do resumo
+  do JOGAR (com o último preset do Zombies, o título mostraria a chave): elas voltaram para a tabela do menu (+0,6 KB).
+  Também: o contrato do `startGame` (o `nullRenderer`) e os lugares do backup e das linhas de estatística nesta
+  ARCHITECTURE, e o teste de largura do Laboratório que não achava os rótulos. O menu fechou em **332,3 KB**.
 

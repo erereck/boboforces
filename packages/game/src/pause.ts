@@ -249,12 +249,6 @@ export function challengeLevel(action: string | null): BotLevel | null {
   return (BOT_LEVELS as readonly string[]).includes(level) ? (level as BotLevel) : null;
 }
 
-/** Um passo no nível rápido (Mais fácil −1, Mais difícil +1), sem passar das pontas. */
-export function stepLevel(level: BotLevel, step: number): BotLevel {
-  const i = BOT_LEVELS.indexOf(level);
-  return BOT_LEVELS[Math.max(0, Math.min(BOT_LEVELS.length - 1, i + step))]!;
-}
-
 /** M2 (fase 5f): o resultado da calibração ("Sua mira passava do alvo: ×1 → ×0,85"), com OK e Desfazer. */
 export const calibratedScreen: Screen<{ readonly message: string; readonly changed: boolean }> = {
   id: 'calibrated',

@@ -24,5 +24,6 @@ export * from './figure-layout.ts';
 export * from './figure-look.ts';
 export * from './figure-paint.ts';
 export * from './figure-presets.ts';
+export * from './figure-recruit.ts';
 export * from './figure-template.ts';
 export * from './figure-table.ts';

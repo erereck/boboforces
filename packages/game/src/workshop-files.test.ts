@@ -7,6 +7,7 @@ import {
 } from '@boboforces/format';
 import type { Storage } from '@boboforces/platform-api';
 import { describe, expect, it } from 'vitest';
+import { exportBackup } from './save-backup.ts';
 import { createSaveStore, libraryCapsFor } from './save-store.ts';
 import { importWorkshopFiles, WORKSHOP_FILE_MAX_BYTES } from './workshop-files.ts';
 
@@ -104,7 +105,7 @@ describe('o backup da web na oficina/ (M4, fase 2c)', () => {
     const pc = createSaveStore(memoryStorage(), libraryCapsFor('web'));
     pc.saveBot(bot);
     pc.savePreset({ ...preset, name: 'Sexta do PC' });
-    const text = pc.exportBackup('2026-11-16T00:00:00.000Z', '0.0.1');
+    const text = exportBackup(pc, '2026-11-16T00:00:00.000Z', '0.0.1');
     const sw = createSaveStore(memoryStorage(), libraryCapsFor('switch'));
     const settingsBefore = sw.settings;
     const got = importWorkshopFiles([{ name: 'boboforces-backup.json', text }], sw, limits);

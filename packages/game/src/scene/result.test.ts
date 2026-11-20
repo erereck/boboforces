@@ -1,8 +1,8 @@
-import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
+import { builtinBotRef, MATCH_RECIPE_FORMAT, stepLevel, type MatchRecipe } from '@boboforces/format';
 import { createInputFrames, createSim, NULL_ENTITY, type SimEvent } from '@boboforces/sim';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { challengeLevel, stepLevel } from '../pause.ts';
+import { challengeLevel } from '../pause.ts';
 import {
   accuracyPct,
   createMatchStats,

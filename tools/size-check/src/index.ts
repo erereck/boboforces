@@ -14,12 +14,13 @@
 //
 // Saída 2: não há build para medir.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { BUDGETS, RETIRED_ASSETS_FAIL } from './budgets.ts';
 import { checkBudgets, formatBytes, formatReport, measureDist } from './measure.ts';
 import { checkMenuModules, formatModuleCheck, type ModuleCheck } from './modules.ts';
+import { lateKeysIn } from './strings-check.ts';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 const DEFAULT_DIST = join(REPO_ROOT, 'apps', 'web', 'dist');
@@ -91,6 +92,12 @@ if (!skipModules) {
     }
     if (modules.unmapped.length > 0) problems.push(`JS do menu sem sourcemap: ${modules.unmapped.join(', ')}`);
   }
+}
+// M9 (fase 0, revisão): texto que o menu desenharia cru (a chave mora numa tabela que só chega com a cena ou os editores).
+for (const f of report.initial) {
+  if (!f.path.endsWith('.js') && !f.path.endsWith('.mjs')) continue;
+  const late = lateKeysIn(readFileSync(join(dist, f.path), 'utf8'));
+  if (late.length > 0) problems.push(`${f.path} cita chaves de texto de fora da tabela do menu: ${late.join(', ')}`);
 }
 if (strictRetired && report.retired.files.length > 0) {
   problems.push(`assets aposentados pelo porte ainda no build: ${report.retired.files.map((f) => f.path).join(', ')}`);

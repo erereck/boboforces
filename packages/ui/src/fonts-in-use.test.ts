@@ -14,6 +14,7 @@ import { testListScreen, titleScreen, type TitleExtraItem } from './screens/titl
 import { STRINGS_PT_BR, type StringKey } from './strings.pt-BR.ts';
 import { STRINGS_EXTRA_PT_BR } from './strings-extra.pt-BR.ts';
 import { STRINGS_ONLINE_PT_BR } from './strings-online.pt-BR.ts';
+import { STRINGS_SWITCH_PT_BR } from './strings-switch.pt-BR.ts';
 import {
   ONLINE_ROOM,
   onlineHomeScreen,
@@ -93,6 +94,8 @@ describe('atlas em uso: fontes, licença e métricas', () => {
       ...Object.values(STRINGS_PT_BR),
       ...Object.values(STRINGS_EXTRA_PT_BR),
       ...Object.values(STRINGS_ONLINE_PT_BR),
+      // M9 (fase 0): e a do Switch.
+      ...Object.values(STRINGS_SWITCH_PT_BR),
     ] as string[]) {
       // O ™ não está no atlas: o drawText o compõe com T e M, que precisam estar nas duas fontes.
       // A quebra de linha separa as linhas de um parágrafo (a tela do aviso as desenha uma a uma): não é glifo.
@@ -209,10 +212,11 @@ const SETTINGS_TABS_FIXTURE = [
   'settings.tab.data',
   'settings.tab.about',
 ] as const;
+/** M9 (fase 0): as chaves da tabela do menu e da extra (os Ajustes e os nomes dos botões moram na extra). */
+const MENU_AND_EXTRA_KEYS = [...Object.keys(STRINGS_PT_BR), ...Object.keys(STRINGS_EXTRA_PT_BR)] as StringKey[];
 /** Refino R3c: a frase de ajuda mais longa (embaixo das linhas). */
 function longestHelp(): string {
-  return (Object.keys(STRINGS_PT_BR) as StringKey[])
-    .filter((k) => k.startsWith('settings.help.'))
+  return MENU_AND_EXTRA_KEYS.filter((k) => k.startsWith('settings.help.'))
     .map((k) => t(k))
     .reduce((a, b) => (b.length > a.length ? b : a));
 }
@@ -292,9 +296,7 @@ function settingsFixtures(): UiNode[] {
 
 /** Os nomes das teclas e dos botões (`bind.*`, menos as ações), o mais longo com "(segurar)" e "+1". */
 function bindNames(): string[] {
-  const keys = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter(
-    (k) => k.startsWith('bind.') && !k.startsWith('bind.action.'),
-  );
+  const keys = MENU_AND_EXTRA_KEYS.filter((k) => k.startsWith('bind.') && !k.startsWith('bind.action.'));
   return keys.map((k) => t(k));
 }
 function longestBindName(): string {
@@ -302,7 +304,7 @@ function longestBindName(): string {
 }
 /** A aba Botões com todas as ações (rótulos) e todos os nomes (valores), cada um numa linha. */
 function bindingFixtureRows(): TabbedRow[] {
-  const actions = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter((k) => k.startsWith('bind.action.'));
+  const actions = MENU_AND_EXTRA_KEYS.filter((k) => k.startsWith('bind.action.'));
   const longest = longestBindName();
   const values = [
     ...bindNames(),
@@ -819,7 +821,7 @@ describe('estouro de texto com o atlas real', () => {
 
   it('Laboratório (M2, fase 5b): as 5 abas, todos os rótulos e os valores mais longos cabem, alcançáveis', () => {
     const tabs: StringKey[] = ['lab.tab.skill', 'lab.tab.mind', 'lab.tab.persona', 'lab.tab.rules', 'lab.tab.name'];
-    const labels = (Object.keys(STRINGS_PT_BR) as StringKey[]).filter((k) => k.startsWith('lab.row.'));
+    const labels = MENU_AND_EXTRA_KEYS.filter((k) => k.startsWith('lab.row.'));
     const values = [
       'Reserva infinita',
       'Strafe e pulo',

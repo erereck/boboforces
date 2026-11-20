@@ -9,6 +9,7 @@
  * não parecer um pelotão de clones. Cores militares, longe das 4 cores de time (nenhuma peça cai na trava de cor).
  */
 import { FIGURE_FABRIC, normalizeFigureLook, type FigureLook, type FigureOutfit } from './figure-look.ts';
+import { RECRUIT_LOOK } from './figure-recruit.ts';
 
 export type FigurePresetId =
   | 'recruit'
@@ -53,18 +54,8 @@ function outfit(
 }
 
 export const FIGURE_PRESETS: Readonly<Record<FigurePresetId, FigureLook>> = {
-  // Recruta (§B15): pele FB 4, cabelo FB 2, Raspado, Sério, sobrancelha Reta, olhos FB 1, sem capacete (#56/#57).
-  // Woodland, calça oliva, colete ranger, luvas e botas pretas.
-  recruit: normalizeFigureLook({
-    skinTone: 0xcc8965,
-    hair: 0x473023,
-    eyes: 0x35251d,
-    hairStyle: 5,
-    face: 0,
-    brow: 1,
-    beard: 0,
-    outfit: outfit(F.woodland, 0x5d6b40, 0x4e5838, 0x434a31, BLACK_BOOTS, BLACK_GLOVES),
-  }),
+  // Recruta (§B15): em `figure-recruit.ts` (o `DEFAULT_BOBO` do save usa sem levar esta tabela para o menu da web).
+  recruit: RECRUIT_LOOK,
   // Mecânico: pele FB 6, cabelo FB 1, Arrepiado, bigode, Confiante, boné no laranja de hoje. Macacão liso cinza-oliva
   // manchado de graxa (jaqueta = calça), sem colete fora de time e de mão nua; botina marrom.
   mechanic: normalizeFigureLook({

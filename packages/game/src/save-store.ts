@@ -1,5 +1,4 @@
 import {
-  createBackup,
   DEFAULT_BOBO,
   DEFAULT_SETTINGS,
   EMPTY_PRESET_LIBRARY,
@@ -10,7 +9,6 @@ import {
   PLATFORM_PROFILES,
   readDocList,
   SQUAD_LIMITS,
-  validateBackup,
   validateBobo,
   validateBot,
   validatePresetLibrary,
@@ -18,7 +16,6 @@ import {
   validateSquad,
   validateStats,
   WEB_LIBRARY_CAPS,
-  type BackupDocument,
   type BoboDocument,
   type BotDocument,
   type LibraryCaps,
@@ -29,7 +26,6 @@ import {
   type SquadDocument,
   type StatsDocument,
   type ValidationIssue,
-  type ValidationResult,
 } from '@boboforces/format';
 import type { PlatformId, Storage } from '@boboforces/platform-api';
 
@@ -37,7 +33,8 @@ import type { PlatformId, Storage } from '@boboforces/platform-api';
  * M2 (fase 4b): o save do jogador sobre o `platform.storage` (tecnico.md §14.1 e §14.4): ajustes, estatísticas, a
  * biblioteca de presets e os bots da Oficina, cada um numa chave, em JSON. A leitura valida e migra (o que estiver
  * estragado cai no padrão, com aviso em `loadWarnings`); a escrita vai direto para o storage, que junta as gravações
- * (debounce) e guarda a versão anterior. Exportar e importar o `backup@1` em texto (a casca baixa e escolhe o arquivo).
+ * (debounce) e guarda a versão anterior. O `backup@1` (exportar, ler e aplicar) mora em `save-backup.ts` (M9, fase 0:
+ * fora do menu da web); aqui só a troca de todos os documentos de uma vez (`replaceAll`).
  */
 export const SAVE_KEYS = {
   settings: 'settings',
@@ -65,6 +62,16 @@ export function libraryCapsFor(platform: PlatformId): LibraryCaps {
 }
 
 export type BackupMode = 'merge' | 'replace';
+
+/** Os documentos do save, todos juntos (o backup aplicado troca todos de uma vez). */
+export interface SaveDocuments {
+  readonly settings: SettingsDocument;
+  readonly stats: StatsDocument;
+  readonly bobo: BoboDocument;
+  readonly presets: PresetLibrary;
+  readonly bots: readonly BotDocument[];
+  readonly squads: readonly SquadDocument[];
+}
 
 export interface SaveStore {
   readonly settings: SettingsDocument;
@@ -96,15 +103,10 @@ export interface SaveStore {
   deleteSquad(id: string): void;
   /** Favorito de um bot (de fábrica ou salvo); `false` se já há 6. */
   setBotFavorite(id: string, on: boolean): boolean;
-  /** O backup em texto (JSON), para baixar. `createdAt` vem de quem tem relógio (a casca). */
-  exportBackup(createdAt: string, gameVersion: string): string;
-  /** Lê um backup (texto do arquivo escolhido): validado, para o resumo antes de aplicar. */
-  readBackup(text: string): ValidationResult<BackupDocument>;
-  /**
-   * Aplica um backup lido. `replace` troca tudo; `merge` junta: os presets salvos e os bots do arquivo entram ao lado
-   * dos atuais (nome repetido ganha " (2)", bot de id repetido fica o atual), e os ajustes e as estatísticas daqui ficam.
-   */
-  applyBackup(backup: BackupDocument, mode: BackupMode): void;
+  /** Os tetos da biblioteca neste aparelho (`libraryCapsFor`). */
+  readonly caps: LibraryCaps;
+  /** M9 (fase 0): troca todos os documentos e grava todos (o backup aplicado, `save-backup.ts`). */
+  replaceAll(docs: SaveDocuments): void;
   flush(): Promise<void>;
 }
 
@@ -294,48 +296,14 @@ export function createSaveStore(storage: Storage, caps: LibraryCaps = WEB_LIBRAR
       writePresets();
       return true;
     },
-    exportBackup(createdAt, gameVersion) {
-      return JSON.stringify(
-        createBackup({ settings, stats, bobo, presets, bots, squads }, createdAt, gameVersion),
-        null,
-        2,
-      );
-    },
-    readBackup(text) {
-      let doc: unknown;
-      try {
-        doc = JSON.parse(text) as unknown;
-      } catch {
-        return { ok: false, errors: [issue('', 'doc.notObject', 'JSON inválido')] };
-      }
-      return validateBackup(doc, STORAGE_RECIPE_LIMITS, caps);
-    },
-    applyBackup(backup, mode) {
-      if (mode === 'replace') {
-        settings = backup.settings;
-        stats = backup.stats;
-        bobo = backup.bobo;
-        presets = backup.presets;
-        bots = backup.bots.slice(0, caps.bots);
-        squads = backup.squads.slice(0, caps.squads);
-      } else {
-        // Juntar: a validação da biblioteca dá nome único aos repetidos e corta no teto.
-        const merged = validatePresetLibrary(
-          {
-            recent: presets.recent,
-            saved: [...presets.saved, ...backup.presets.saved],
-            favorites: presets.favorites,
-            botFavorites: presets.botFavorites,
-          },
-          STORAGE_RECIPE_LIMITS,
-          caps,
-        );
-        if (merged.ok) presets = merged.value;
-        const ids = new Set(bots.map((b) => b.id));
-        bots = [...bots, ...backup.bots.filter((b) => !ids.has(b.id))].slice(0, caps.bots);
-        const squadIds = new Set(squads.map((q) => q.id));
-        squads = [...squads, ...backup.squads.filter((q) => !squadIds.has(q.id))].slice(0, caps.squads);
-      }
+    caps,
+    replaceAll(docs) {
+      settings = docs.settings;
+      stats = docs.stats;
+      bobo = docs.bobo;
+      presets = docs.presets;
+      bots = docs.bots;
+      squads = docs.squads;
       write(SAVE_KEYS.settings, settings);
       write(SAVE_KEYS.stats, stats);
       write(SAVE_KEYS.bobo, bobo);

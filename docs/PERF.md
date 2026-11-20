@@ -422,6 +422,17 @@ de tempo. 600 ticks de aquecimento e 3.600 medidos (60 s a 60 Hz); sonda em `loc
 - O menu da web: 349,6 KB de 350 (size-check). As ordens e a roda ficaram no pedaço da cena; o que entrou no menu foi
   pouco (os textos curtos, o validador do `director`, a lealdade e as ordens no `input`).
 
+## 1p. A dieta do menu da web (M9, fase 0; 20/11/2026)
+
+| Parte (`size-check`, gzip) | Antes | Depois |
+|---|---|---|
+| Menu interativo (HTML + JS + atlas MSDF) | 349,6 KB | 332,3 KB |
+| `index-*.js` | 96,1 KB | 78,9 KB |
+| Primeira partida no Construto (acumulado) | 900,1 KB | 902,3 KB |
+
+O que saiu do menu está na ARCHITECTURE §20.2. Os maiores pedaços que ainda ficam: o `three` (130,1 KB), o atlas das
+fontes (119,6 KB), a tabela de textos do menu, o `game.ts` e o validador da receita.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

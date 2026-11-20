@@ -19,6 +19,7 @@ export * from './bobo.ts';
 // M5 (fase 4c): o perfil do online.
 export * from './online-profile.ts';
 export * from './backup.ts';
+export * from './backup-file.ts';
 // M8 (fase 0): os códigos de compartilhar e o filtro de nomes.
 export * from './share-code.ts';
 export * from './name-filter.ts';

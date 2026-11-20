@@ -7,6 +7,7 @@ import {
   type BotDocument,
   type RecipeLimits,
 } from '@boboforces/format';
+import { readBackup } from './save-backup.ts';
 import type { SaveStore } from './save-store.ts';
 
 /**
@@ -103,7 +104,7 @@ export function importWorkshopFiles(
     else if (kind === BACKUP_KIND) {
       // O backup que a web exporta (Ajustes → Dados): os bots e os presets salvos dele, pelas mesmas regras (os
       // ajustes, as estatísticas e o Meu Bobo do Switch ficam como estão).
-      const r = save.readBackup(f.text);
+      const r = readBackup(save, f.text);
       if (!r.ok) skip(f.name, codes(r.errors));
       else {
         for (const b of r.value.bots) addBot(b, f.name);

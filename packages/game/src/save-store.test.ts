@@ -8,6 +8,7 @@ import {
 } from '@boboforces/format';
 import type { Storage } from '@boboforces/platform-api';
 import { describe, expect, it } from 'vitest';
+import { applyBackup, exportBackup, readBackup } from './save-backup.ts';
 import { createSaveStore, libraryCapsFor, SAVE_KEYS } from './save-store.ts';
 
 /** M2, fase 4b: o save do jogador sobre o storage da plataforma. */
@@ -134,20 +135,20 @@ describe('save do jogador', () => {
     const a = createSaveStore(memoryStorage());
     a.setSettings({ ...DEFAULT_SETTINGS, accessibility: { ...DEFAULT_SETTINGS.accessibility, tips: false } });
     a.savePreset(preset('Sexta'));
-    const text = a.exportBackup('2026-11-09T05:00:00Z', '0.0.1');
+    const text = exportBackup(a, '2026-11-09T05:00:00Z', '0.0.1');
 
     const b = createSaveStore(memoryStorage());
     b.savePreset(preset('Sexta', 5));
-    const read = b.readBackup(text);
+    const read = readBackup(b, text);
     expect(read.ok).toBe(true);
     if (!read.ok) return;
-    b.applyBackup(read.value, 'merge');
+    applyBackup(b, read.value, 'merge');
     expect(b.presets.saved.map((p) => p.name)).toEqual(['Sexta', 'Sexta (2)']);
     expect(b.settings.accessibility.tips).toBe(true);
-    b.applyBackup(read.value, 'replace');
+    applyBackup(b, read.value, 'replace');
     expect(b.presets.saved.map((p) => p.name)).toEqual(['Sexta']);
     expect(b.settings.accessibility.tips).toBe(false);
-    expect(b.readBackup('não é json').ok).toBe(false);
-    expect(b.readBackup(JSON.stringify(DEFAULT_SETTINGS)).ok).toBe(false);
+    expect(readBackup(b, 'não é json').ok).toBe(false);
+    expect(readBackup(b, JSON.stringify(DEFAULT_SETTINGS)).ok).toBe(false);
   });
 });

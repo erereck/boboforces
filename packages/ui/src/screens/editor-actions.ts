@@ -1,4 +1,4 @@
-import { TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from './tabbed.ts';
+import { TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from './tabbed-ids.ts';
 
 /**
  * M6 (fase 2): as ações das telas de edição (a Partida personalizada, o Laboratório e a Oficina) num módulo só delas.

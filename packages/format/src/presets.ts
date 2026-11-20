@@ -1,4 +1,5 @@
 import {
+  BOT_LEVELS,
   botLevelFromRef,
   builtinBotRef,
   MATCH_RECIPE_FORMAT,
@@ -61,6 +62,15 @@ export function withPresetLevel(recipe: MatchRecipe, level: BotLevel): MatchReci
       bots: team.bots.map((b) => (botLevelFromRef(b.ref) !== null ? { ...b, ref } : b)),
     })),
   };
+}
+
+/**
+ * Um passo no nível rápido (Mais fácil −1, Mais difícil +1), sem passar das pontas. M9 (fase 0): saiu da pausa para
+ * cá, ao lado do `withPresetLevel` (o `game` usa os dois na volta do resultado; a pausa fica fora do menu da web).
+ */
+export function stepLevel(level: BotLevel, step: number): BotLevel {
+  const i = BOT_LEVELS.indexOf(level);
+  return BOT_LEVELS[Math.max(0, Math.min(BOT_LEVELS.length - 1, i + step))]!;
 }
 
 /** Quantos bots o preset tem em cada time (para o resumo do título e do sorteio). */

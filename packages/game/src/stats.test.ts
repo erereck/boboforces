@@ -1,17 +1,8 @@
 import { EMPTY_STATS, issue, STATS_RANGES } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import type { MatchRecord } from './scene-api.ts';
-import {
-  addMatch,
-  bestZombieWave,
-  markNewsSeen,
-  markTipSeen,
-  migratedCount,
-  newsOnBoot,
-  playTimeText,
-  statsLines,
-  zombieRecord,
-} from './stats.ts';
+import { bestZombieWave, playTimeText, statsLines } from './stats-lines.ts';
+import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, zombieRecord } from './stats.ts';
 
 /** M2, fase 4g: estatísticas e recordes do aparelho, e quando a Novidades aparece. */
 

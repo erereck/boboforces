@@ -2,7 +2,7 @@ import { DocReader } from './doc-read.ts';
 import { formatId, type FormatId } from './format-id.ts';
 import { migrateDocument } from './migrations.ts';
 import { normalizeFigureLook, type FigureLook } from './model/figure-look.ts';
-import { FIGURE_PRESETS } from './model/figure-presets.ts';
+import { RECRUIT_LOOK } from './model/figure-recruit.ts';
 import type { ValidationResult } from './validation.ts';
 
 /**
@@ -22,7 +22,7 @@ export interface BoboDocument {
 export const BOBO_RANGES = { presetLength: 32 } as const;
 
 /** Sem nada salvo: o recruta, o visual que o jogador 1 já usava (o 1º da fila dos bots). */
-export const DEFAULT_BOBO: BoboDocument = { format: BOBO_FORMAT, look: FIGURE_PRESETS.recruit, preset: 'recruit' };
+export const DEFAULT_BOBO: BoboDocument = { format: BOBO_FORMAT, look: RECRUIT_LOOK, preset: 'recruit' };
 
 /** O look do jogador, normalizado e nunca zumbi. */
 export function normalizeBoboLook(raw: unknown): FigureLook {

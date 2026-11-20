@@ -145,9 +145,14 @@ export const MENU_FORBIDDEN_MODULES: readonly { readonly label: string; readonly
  * Código JS/CSS fora do fecho inicial que NÃO entra na primeira partida (integração do M1): a casca do bench
  * (`?bench`, `src/bench/shell.ts`) e a rede de verdade do Online (M5 fase 4c: `@boboforces/net/rtc`, o Trystero, pedido
  * ao abrir "Online"; o núcleo do `net` vai com a cena). O resto do código preguiçoso — o chunk da cena (`src/scene.ts`:
- * mundo, IA, renderer completo) e os que ele divide — conta na primeira partida.
+ * mundo, IA, renderer completo) e os que ele divide — conta na primeira partida. M9 (fase 0): a prévia do título do
+ * Switch (`?titulo=switch`, só para os prints; `src/title-preview.ts`) também é sob demanda.
  */
-export const ON_DEMAND_CODE: readonly RegExp[] = [/^assets\/shell-[^/]+\.js$/, /^assets\/(?:net|rtc)-[^/]+\.js$/];
+export const ON_DEMAND_CODE: readonly RegExp[] = [
+  /^assets\/shell-[^/]+\.js$/,
+  /^assets\/(?:net|rtc)-[^/]+\.js$/,
+  /^assets\/title-preview-[^/]+\.js$/,
+];
 
 /**
  * Assets do jogo baixados SÓ sob demanda (fora da primeira partida; contam no build inteiro): os sons do teste de

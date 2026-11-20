@@ -1,6 +1,7 @@
 import type { StringKey } from '../strings.pt-BR.ts';
 import { COLORS } from '../tokens.ts';
 import type { ButtonVariant, UiNode } from '../tree.ts';
+import { TABBED_ROW_PREFIX, TABBED_TAB_PREFIX } from './tabbed-ids.ts';
 
 /**
  * M2 (fases 4e e 4f): o esqueleto das telas de abas com linhas (Partida personalizada, Ajustes): o título, uma linha
@@ -11,8 +12,8 @@ import type { ButtonVariant, UiNode } from '../tree.ts';
  * - `action`: botão de largura inteira (ação `row:<id>`), com o rótulo literal ou pela tabela;
  * - `text`: uma linha de texto (`Sobre`, avisos), sem foco.
  */
-export const TABBED_TAB_PREFIX = 'tab:';
-export const TABBED_ROW_PREFIX = 'row:';
+// M9 (fase 0): os prefixos moram em `tabbed-ids.ts` (o menu da web usa só eles).
+export { TABBED_ROW_PREFIX, TABBED_TAB_PREFIX };
 
 export type TabbedRow =
   | {

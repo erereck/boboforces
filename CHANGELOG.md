@@ -11,6 +11,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Plano** em `docs/PLANO_M9.md` (#82): a dieta do menu da web, os modificadores Mini, Bots gigantes e Ricochete, o
   Bobo Sandbox completo e as Ferramentas do Dono. As frentes independentes andam ao mesmo tempo, cada uma num agente
   com a sua cópia do repositório. Perguntas AH1–AH8 no padrão.
+- **A dieta do menu da web (fase 0):** o menu que abre o jogo ficou 18 KB menor (de 349,6 para 332,3 KB): os textos
+  que só a partida e os editores usam, a tela de Configurações e o backup passaram a chegar junto com os editores,
+  logo depois do título. Nada muda para quem joga.
 - **O Sandbox na receita e na sim (fase 2):** cada time pode ter o próprio HP e as próprias armas, e o Sandbox tem o
   objetivo: Pontos (como o TDM), Eliminação (ninguém renasce; vence o último time de pé) ou Nenhum (o "brinquedo", que
   só termina pelo menu). Com 3 ou 4 times, os times sem base no mapa ganham uma casa longe das outras. Ainda sem tela:

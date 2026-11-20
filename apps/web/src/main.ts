@@ -12,7 +12,8 @@
 //   o adaptador não devolve o F2 ao navegador).
 // - `window.__bfDebug` (`debug-hook.ts`) expõe o estado, o gancho dos prints (`print` = `GameHandle.debug`) e o
 //   relatório do bench para o smoke, os prints e o bench do PC.
-// - `?titulo=switch` abre a prévia do título do Switch (`title-preview.ts`), só para o print do título.
+// - `?titulo=switch` abre a prévia do título do Switch (`title-preview.ts`), só para o print do título. M9 (fase 0): a
+//   prévia vem por `import()` só nesse caso (as chaves da URL ficam em `title-preview-url.ts`).
 import { startGame } from '@boboforces/game';
 import { createMenuRenderer, createMsdfUiPass } from '@boboforces/render/menu';
 import { createLogger } from '@boboforces/shared';
@@ -22,12 +23,8 @@ import type { BenchShell } from './bench/shell.ts';
 import { bootWeb, type WebBoot } from './boot.ts';
 import { createDebugHook } from './debug-hook.ts';
 import { BUILD_INFO, type WebPlatform } from './platform/index.ts';
-import {
-  asSwitchTitlePlatform,
-  SWITCH_TITLE_ITEMS,
-  urlAsksForLocalEdition,
-  urlAsksForSwitchTitle,
-} from './title-preview.ts';
+import type * as TitlePreview from './title-preview.ts';
+import { urlAsksForLocalEdition, urlAsksForSwitchTitle } from './title-preview-url.ts';
 
 /** Resultado do relatório no título da aba (sem UI em DOM, decisão #3). */
 const TITLE_SUFFIX: Readonly<Record<ReportDelivery, string>> = {
@@ -86,12 +83,17 @@ function onlineVisible(search: URLSearchParams, roomLink: boolean): boolean {
   }
 }
 
-function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): void {
+function start(
+  platform: WebPlatform,
+  boot: WebBoot,
+  bench: BenchShell | null,
+  preview: typeof TitlePreview | null,
+): void {
   const webInput = platform.webInput;
   const options = rendererOptionsFor(platform.graphics, bench?.config ?? null);
   // Prévia do título do Switch (`?titulo=switch`, prints da decisão #54): a plataforma com a cara do Switch e os 9
   // itens de teste dele, sem cena (`title-preview.ts`).
-  const switchTitle = !bench && urlAsksForSwitchTitle(window.location.search);
+  const switchTitle = preview !== null;
   // M5 (fase 4d): o link da sala (`#sala=XXXXX`; o hash não vai a servidor nenhum). Lido uma vez e tirado da barra:
   // quem recarrega (ou o jogo, ao aplicar uma versão nova no título) não cai de novo na mesma sala.
   const hash = window.location.hash;
@@ -104,13 +106,13 @@ function start(platform: WebPlatform, boot: WebBoot, bench: BenchShell | null): 
   }
   const online = onlineVisible(new URLSearchParams(window.location.search), onlineLink !== undefined);
   const game = startGame({
-    platform: switchTitle ? asSwitchTitlePlatform(platform) : platform,
+    platform: preview ? preview.asSwitchTitlePlatform(platform) : platform,
     // O menu desenha com o renderer só de UI; o completo (mundo, atores, VFX) chega com a cena (`loadScene`), por
     // `import()`, fora da carga inicial (tecnico.md §16.4: menu ≤ 350 KB).
     createRenderer: (surface, routes) =>
       createMenuRenderer(surface, { ...options, ...(routes ?? {}) }, (three) => createMsdfUiPass(three)),
-    ...(switchTitle
-      ? { testItems: SWITCH_TITLE_ITEMS }
+    ...(preview
+      ? { testItems: preview.SWITCH_TITLE_ITEMS }
       : { loadScene: () => import('./scene.ts').then((m) => m.sceneBundle(options)) }),
     // M3: as telas de edição num chunk à parte (o jogo pede logo depois do menu pronto).
     loadEditors: () => import('@boboforces/game/editors'),
@@ -174,7 +176,9 @@ async function main(): Promise<void> {
   });
   if (!boot) return;
   try {
-    start(boot.platform, boot, await loadBenchShell(boot.platform));
+    const bench = await loadBenchShell(boot.platform);
+    const preview = !bench && urlAsksForSwitchTitle(search) ? await import('./title-preview.ts') : null;
+    start(boot.platform, boot, bench, preview);
   } catch (error) {
     boot.fail(error);
   }

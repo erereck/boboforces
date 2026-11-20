@@ -6,23 +6,12 @@
 //
 // Os itens aqui não fazem nada (sem `bench` e sem `start`) e a prévia não carrega a cena: JOGAR só registra no log.
 // É ferramenta de print; nada disso aparece sem a chave na URL.
+//
+// M9 (fase 0): este módulo chega por `import()` só com a chave na URL (as chaves moram em `title-preview-url.ts`).
 import type { TestItem } from '@boboforces/game';
 import type { Platform, PlatformFeatures } from '@boboforces/platform-api';
 
-/** Chave da URL (`?titulo=switch`); o roteiro dos prints usa a mesma (`SWITCH_TITLE_QUERY`). */
-export const TITLE_PREVIEW_PARAM = 'titulo';
-
-/** A URL pede a prévia do título do Switch? */
-export function urlAsksForSwitchTitle(search: string): boolean {
-  const query = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  return query.get(TITLE_PREVIEW_PARAM)?.trim().toLowerCase() === 'switch';
-}
-
-/** M4 (fase 1): `?edicao=local` ensaia a LOCAL EDITION do Switch (o lobby como casa) no navegador. */
-export function urlAsksForLocalEdition(search: string): boolean {
-  const query = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  return query.get('edicao')?.trim().toLowerCase() === 'local';
-}
+export { TITLE_PREVIEW_PARAM, urlAsksForLocalEdition, urlAsksForSwitchTitle } from './title-preview-url.ts';
 
 /** Os 9 itens do título do Switch, na ordem do foco: só id e rótulo (`createSwitchTestItems` do apps/switch). */
 export const SWITCH_TITLE_ITEMS: readonly TestItem[] = [

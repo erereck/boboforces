@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createDrawList, DRAW_FLOATS_PER_COMMAND, DRAW_OP, pushGlyph, pushRect, resetDrawList } from './draw-list.ts';
+import { STRINGS_EXTRA_PT_BR } from './strings-extra.pt-BR.ts';
+import { STRINGS_ONLINE_PT_BR } from './strings-online.pt-BR.ts';
+import { STRINGS_SWITCH_PT_BR } from './strings-switch.pt-BR.ts';
 import { STRINGS_PT_BR } from './strings.pt-BR.ts';
-import { formatDecimal, formatInt, pad2, t } from './text.ts';
+import { formatDecimal, formatInt, hasString, pad2, t } from './text.ts';
 import { COLORS, rgba, uiScale } from './tokens.ts';
 
 describe('textos', () => {
@@ -11,8 +14,20 @@ describe('textos', () => {
     expect(t('hud.timeLeft', { minutes: 9, seconds: pad2(5) })).toBe('9:05');
   });
 
-  it('nenhum valor vazio na tabela', () => {
-    for (const value of Object.values(STRINGS_PT_BR)) expect(value.trim().length).toBeGreaterThan(0);
+  it('nenhum valor vazio nas tabelas, nem chave repetida entre elas', () => {
+    const tables = [STRINGS_PT_BR, STRINGS_EXTRA_PT_BR, STRINGS_ONLINE_PT_BR, STRINGS_SWITCH_PT_BR];
+    for (const table of tables)
+      for (const value of Object.values(table)) expect(value.trim().length).toBeGreaterThan(0);
+    // M9 (fase 0): uma chave mora numa tabela só (a do menu ganharia de uma registrada depois).
+    const keys = tables.flatMap((table) => Object.keys(table));
+    expect(keys.length).toBe(new Set(keys).size);
+  });
+
+  it('hasString: a tabela do menu e as registradas (o setup dos testes registra a extra e a do Switch)', () => {
+    expect(hasString('menu.play')).toBe(true);
+    expect(hasString('settings.tab.video')).toBe(true);
+    expect(hasString('test.line.pressA')).toBe(true);
+    expect(hasString('nao.existe')).toBe(false);
   });
 
   it('formatação própria (sem Intl)', () => {

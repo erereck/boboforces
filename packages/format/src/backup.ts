@@ -1,12 +1,11 @@
-import { validateBot, type BotDocument } from './bot.ts';
+import type { BotDocument } from './bot.ts';
 import { DocReader } from './doc-read.ts';
 import { formatId, type FormatId } from './format-id.ts';
 import { validateMatchRecipe, type MatchRecipe } from './match-recipe.ts';
-import { migrateDocument } from './migrations.ts';
-import { DEFAULT_SETTINGS, validateSettings, type SettingsDocument } from './settings.ts';
-import { EMPTY_STATS, validateStats, type StatsDocument } from './stats.ts';
-import { DEFAULT_BOBO, validateBobo, type BoboDocument } from './bobo.ts';
-import { SQUAD_LIMITS, validateSquad, type SquadDocument } from './squad.ts';
+import type { SettingsDocument } from './settings.ts';
+import type { StatsDocument } from './stats.ts';
+import type { BoboDocument } from './bobo.ts';
+import { SQUAD_LIMITS, type SquadDocument } from './squad.ts';
 import { isPlainObject, type RecipeLimits, type ValidationIssue, type ValidationResult } from './validation.ts';
 
 /**
@@ -15,6 +14,8 @@ import { isPlainObject, type RecipeLimits, type ValidationIssue, type Validation
  *   Switch) e até 6 favoritos (nomes de salvos), que viram atalhos na Partida Rápida.
  * - **Backup:** tudo num arquivo só (ajustes, estatísticas, presets e bots da Oficina), para exportar e importar.
  * Cada parte é validada sozinha: o que não passa sai com o aviso `save.droppedEntry` (o resto do backup fica).
+ * M9 (fase 0): montar e validar o arquivo (`createBackup`, `validateBackup`) mora em `backup-file.ts`: o save do menu
+ * da web só lê a biblioteca, e o backup chega com os Ajustes, no pedaço dos editores.
  */
 export const BACKUP_FORMAT: FormatId = formatId('backup');
 
@@ -160,79 +161,4 @@ export function validatePresetLibrary(
     .strings(src, 'botFavorites', 'botFavorites', LIBRARY_LIMITS.favorites, LIBRARY_LIMITS.nameLength)
     .filter((n, i, all) => all.indexOf(n) === i);
   return { ok: true, value: { recent, saved, favorites, botFavorites }, warnings: r.warnings };
-}
-
-/** Monta o backup com o que o jogo tem agora. */
-export function createBackup(
-  parts: {
-    settings: SettingsDocument;
-    stats: StatsDocument;
-    bobo: BoboDocument;
-    presets: PresetLibrary;
-    bots: readonly BotDocument[];
-    squads: readonly SquadDocument[];
-  },
-  createdAt: string,
-  gameVersion: string,
-): BackupDocument {
-  return { format: BACKUP_FORMAT, createdAt, gameVersion, ...parts };
-}
-
-/**
- * Valida um `backup@1` (o arquivo importado): recusa o que não é backup (ou é de versão mais nova); cada parte vale
- * sozinha, e a que não passa cai no padrão com aviso.
- */
-export function validateBackup(
-  input: unknown,
-  limits: RecipeLimits,
-  caps: LibraryCaps = WEB_LIBRARY_CAPS,
-): ValidationResult<BackupDocument> {
-  const migrated = migrateDocument(input, 'backup');
-  if (!migrated.ok) return migrated;
-  const doc = migrated.value;
-  const r = new DocReader('save.invalidField', 'save.valueClamped');
-  r.warnings.push(...migrated.warnings);
-  let settings = DEFAULT_SETTINGS;
-  if (doc['settings'] !== undefined) {
-    const s = validateSettings(doc['settings']);
-    if (s.ok) {
-      settings = s.value;
-      r.warnings.push(...s.warnings);
-    } else r.warn('settings', 'save.droppedEntry', s.errors.map((e) => e.code).join(', '));
-  }
-  let stats = EMPTY_STATS;
-  if (doc['stats'] !== undefined) {
-    const s = validateStats(doc['stats']);
-    if (s.ok) {
-      stats = s.value;
-      r.warnings.push(...s.warnings);
-    } else r.warn('stats', 'save.droppedEntry', s.errors.map((e) => e.code).join(', '));
-  }
-  let bobo = DEFAULT_BOBO;
-  if (doc['bobo'] !== undefined) {
-    const b = validateBobo(doc['bobo']);
-    if (b.ok) {
-      bobo = b.value;
-      r.warnings.push(...b.warnings);
-    } else r.warn('bobo', 'save.droppedEntry', b.errors.map((e) => e.code).join(', '));
-  }
-  const lib = validatePresetLibrary(doc['presets'], limits, caps);
-  if (lib.ok) r.warnings.push(...lib.warnings);
-  const bots = readDocList(doc['bots'], 'bots', caps.bots, validateBot, r.warnings);
-  const squads = readDocList(doc['squads'], 'squads', caps.squads, validateSquad, r.warnings);
-  return {
-    ok: true,
-    value: {
-      format: BACKUP_FORMAT,
-      createdAt: r.str(doc, 'createdAt', 'createdAt', '', 40),
-      gameVersion: r.str(doc, 'gameVersion', 'gameVersion', '', 32),
-      settings,
-      stats,
-      bobo,
-      presets: lib.ok ? lib.value : EMPTY_PRESET_LIBRARY,
-      bots,
-      squads,
-    },
-    warnings: r.warnings,
-  };
 }

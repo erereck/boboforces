@@ -29,9 +29,10 @@ import { t, type StringKey, type TabbedRow } from '@boboforces/ui';
 
 /**
  * M2 (fase 4f): os Ajustes (gameplay.md §10.5), lógica pura sobre o `settings@1`. As abas Controles (por dispositivo),
- * Vídeo e Acessibilidade são linhas de opção com passo; Dados e Sobre são montadas pelo `game` (precisam da
- * plataforma). A pausa mostra as 4 primeiras. `applyControls` leva os controles salvos para o perfil do input.
- * Botões (parte 2): uma linha por ação remapeável; confirmar abre a captura (`createBindingCapture`, no `game`).
+ * Vídeo e Acessibilidade são linhas de opção com passo; Dados e Sobre são montadas pela tela (`settings-flow.ts`, M9:
+ * no pedaço dos editores; precisam da plataforma). A pausa mostra as 4 primeiras. `applyControls` leva os controles
+ * salvos para o perfil do input. Botões (parte 2): uma linha por ação remapeável; confirmar abre a captura
+ * (`createBindingCapture`, na tela dos Ajustes e na pausa).
  */
 
 /**

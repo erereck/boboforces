@@ -6,6 +6,8 @@ export * from './strings.pt-BR.ts';
 export * from './strings-extra.pt-BR.ts';
 // M5 (fase 4c): a tabela das telas do Online (só o pedaço do Online a importa).
 export * from './strings-online.pt-BR.ts';
+// M9 (fase 0): a tabela do Switch (os avisos da casca e as telas de teste; só o Switch e a prévia do título dele).
+export * from './strings-switch.pt-BR.ts';
 export * from './text.ts';
 export * from './tokens.ts';
 export * from './draw-list.ts';

@@ -11,36 +11,31 @@ import {
   qualityKnobs,
   recipeLimitsFor,
   selectPlatformProfile,
+  stepLevel,
   withPresetLevel,
-  type BackupDocument,
   type BotDocument,
   type BotLevel,
   type CouchPlayerSettings,
-  type ControlDevice,
   type MatchRecipe,
   type QualityLevel,
   type SettingsDocument,
   parseLoopManifest,
   validateMatchRecipe,
 } from '@boboforces/format';
-import { stepLevel } from './pause.ts';
 import type { WorkshopFile } from './workshop-files.ts';
 import {
   confirmConventionFor,
-  createBindingCapture,
   createLocalPlayers,
   createMenuInput,
   createRawInputState,
   PAD_BUTTON,
-  type CaptureResult,
   type DeviceBinding,
   type MenuConfirmConvention,
   type RawInputState,
-  type RemapAction,
 } from '@boboforces/input';
 import type { Platform, TextInputSession } from '@boboforces/platform-api';
 import type { Renderer, ViewDesc } from '@boboforces/render/data';
-import { createRng, decodeUtf8, type Disposable, type Unsubscribe } from '@boboforces/shared';
+import { createRng, type Disposable, type Unsubscribe } from '@boboforces/shared';
 import {
   createDrawList,
   formatDecimal,
@@ -73,10 +68,8 @@ import {
   MIN_TOUCH_TARGET,
   resetDrawList,
   rotateScreen,
-  settingsScreen,
-  SETTINGS_ACTION,
-  SETTINGS_ROW_PREFIX,
-  SETTINGS_TAB_PREFIX,
+  TABBED_ROW_PREFIX,
+  TABBED_TAB_PREFIX,
   TITLE_ACTION,
   TITLE_ACTION_TEST_PREFIX,
   t,
@@ -87,7 +80,6 @@ import {
   type LayoutOptions,
   type MenuNavigation,
   type StringKey,
-  type TabbedRow,
   type TitleExtraItem,
   type UiAtlasImage,
   type UiFonts,
@@ -97,17 +89,7 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { SceneDriver } from './scene/scene-driver.ts';
 import type { LocalSeat } from './scene/seats.ts';
 import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
-import { createNullRenderer } from './null-renderer.ts';
-import {
-  actionLabel,
-  bindRowAction,
-  rebindSettings,
-  SETTINGS_TAB_LABELS,
-  SETTINGS_TABS,
-  settingsHelp,
-  settingsRows,
-  stepSettings,
-} from './settings-menu.ts';
+import type { SettingsFlow } from './settings-flow.ts';
 import { presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import type { ShareFlow } from './share.ts';
 import type { WorkshopFlow } from './workshop.ts';
@@ -128,7 +110,7 @@ import {
   type QuickSettings,
 } from './quick-match.ts';
 import { createSaveStore, libraryCapsFor, STORAGE_RECIPE_LIMITS, type SaveStore } from './save-store.ts';
-import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot, statsLines } from './stats.ts';
+import { addMatch, markNewsSeen, markTipSeen, migratedCount, newsOnBoot } from './stats.ts';
 import { skipCappedFrame } from './frame-cap.ts';
 import {
   applyAudioSettings,
@@ -187,6 +169,11 @@ export interface GameDeps {
    * ausente = as do bench pedido na criação ou o padrão); o jogo recria o renderer quando um bench pede outra rota.
    */
   readonly createRenderer: RendererFactory | null;
+  /**
+   * M9 (fase 0): o renderer que não desenha (`createNullRenderer`, exportado deste pacote), obrigatório com
+   * `createRenderer: null` (o Switch sem GPU e os testes passam). A web nunca usa, e assim ele fica fora do menu dela.
+   */
+  readonly nullRenderer?: () => Renderer;
   readonly hooks?: GameHooks;
   /**
    * M1: começar direto no bench com esta configuração (web: `?bench&…`, lida pela casca com `parseBenchParams`;
@@ -216,7 +203,8 @@ export interface GameDeps {
   readonly loadScene?: () => Promise<SceneBundle>;
   /**
    * M3: as telas de edição (`@boboforces/game/editors`): web por `import()` (fora do menu), Switch e testes direto. O
-   * jogo pede logo depois do menu pronto. Ausente = Laboratório, Oficina e Partida personalizada não abrem.
+   * jogo pede logo depois do menu pronto. Ausente = Laboratório, Oficina e Partida personalizada (M9: e os Ajustes)
+   * não abrem.
    */
   readonly loadEditors?: () => Promise<Editors>;
   /**
@@ -418,9 +406,12 @@ export function startGame(deps: GameDeps): GameHandle {
     if (want && mixer.music !== MENU_MUSIC_ID) mixer.playMusic(MENU_MUSIC_ID);
     else if (!want && mixer.music !== null) mixer.stopMusic();
   }
-  let renderer: Renderer = deps.createRenderer
-    ? deps.createRenderer(platform.graphics, routesOf(deps.bench))
-    : createNullRenderer();
+  function firstRenderer(): Renderer {
+    if (deps.createRenderer) return deps.createRenderer(platform.graphics, routesOf(deps.bench));
+    if (!deps.nullRenderer) throw new Error('startGame: createRenderer null pede o nullRenderer (createNullRenderer)');
+    return deps.nullRenderer();
+  }
+  let renderer: Renderer = firstRenderer();
   /** Fábrica do renderer completo, quando a casca entrega outra junto com a cena (web). */
   let sceneFactory: RendererFactory | null = deps.createRenderer;
   let sceneRendererReady = false;
@@ -429,7 +420,6 @@ export function startGame(deps: GameDeps): GameHandle {
   const menuInput = createMenuInput(convention);
   const list = createDrawList(4096);
   const titleMenu = createMenuController();
-  const settingsMenu = createMenuController();
   const testItems = deps.testItems ?? [];
   const localEdition = deps.localEdition === true;
   const extraItems: TitleExtraItem[] = [
@@ -647,11 +637,11 @@ export function startGame(deps: GameDeps): GameHandle {
         return;
       }
       labNote = t('workshop.full', { n: save.bots.length });
-    } else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
-      labTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
+    } else if (a !== null && a.startsWith(TABBED_TAB_PREFIX)) {
+      labTab = Number(a.slice(TABBED_TAB_PREFIX.length));
       labNote = '';
-    } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
-      const id = a.slice(SETTINGS_ROW_PREFIX.length);
+    } else if (a !== null && a.startsWith(TABBED_ROW_PREFIX)) {
+      const id = a.slice(TABBED_ROW_PREFIX.length);
       const tab = editors!.LAB_TABS[labTab]!;
       labNote = '';
       labDiscard = false;
@@ -925,158 +915,24 @@ export function startGame(deps: GameDeps): GameHandle {
     quickMenu.focus('start');
     screen = 'quick';
   }
-  // M2 (fase 4f): Ajustes.
-  let settingsTab = 0;
-  let settingsDevice: ControlDevice = platform.id === 'switch' ? 'gamepad' : 'keyboardMouse';
-  let settingsNote = '';
-  /** O backup lido do arquivo, esperando "Juntar" ou "Substituir". */
-  let pendingBackup: BackupDocument | null = null;
-  function dataRows(): TabbedRow[] {
-    // M2 (fase 4g): as estatísticas e os recordes do aparelho em cima.
-    const stats: TabbedRow[] = statsLines(save.stats).map((text, i) => ({ kind: 'text', id: `stats${i}`, text }));
-    if (platform.files === null) {
-      return [...stats, { kind: 'text', id: 'none', text: t('settings.data.none'), dim: true }];
-    }
-    const rows: TabbedRow[] = [
-      ...stats,
-      { kind: 'text', id: 'warning', text: t('settings.data.warning'), dim: true },
-      { kind: 'text', id: 'warning2', text: t('settings.data.warning2'), dim: true },
-      { kind: 'action', id: 'export', label: { key: 'settings.data.export' } },
-      { kind: 'action', id: 'import', label: { key: 'settings.data.import' } },
-    ];
-    if (pendingBackup !== null) {
-      rows.push(
-        {
-          kind: 'text',
-          id: 'found',
-          text: t('settings.data.found', {
-            presets: pendingBackup.presets.saved.length,
-            bots: pendingBackup.bots.length,
-          }),
-        },
-        { kind: 'action', id: 'merge', label: { key: 'settings.data.merge' } },
-        { kind: 'action', id: 'replace', label: { key: 'settings.data.replace' }, variant: 'danger' },
-        { kind: 'action', id: 'cancel', label: { key: 'settings.data.cancel' } },
-      );
-    }
-    return rows;
-  }
-  function aboutRows(): TabbedRow[] {
-    return [
-      { kind: 'text', id: 'version', text: t('title.version', { version: GAME_VERSION, codename: GAME_CODENAME }) },
-      { kind: 'text', id: 'credit', text: t('title.credit') },
-      { kind: 'text', id: 'fonts', text: t('settings.about.fonts'), dim: true },
-      { kind: 'text', id: 'fonts2', text: t('settings.about.fonts2'), dim: true },
-      { kind: 'text', id: 'three', text: t('settings.about.three'), dim: true },
-      { kind: 'action', id: 'copy', label: { key: 'settings.about.copy' } },
-      // Refino R3b (#79): a Novidades mora aqui (saiu do menu principal).
-      { kind: 'action', id: 'news', label: { key: 'menu.news' } },
-    ];
-  }
-  /** Refino R3c: o foco com que a tela foi montada (a frase de ajuda é dele). */
-  let settingsHelpFocus: string | null = null;
-  function rebuildSettings(): void {
-    const tab = SETTINGS_TABS[settingsTab]!;
-    settingsHelpFocus = settingsMenu.focusedId;
-    settingsMenu.setRoot(
-      settingsScreen.build({
-        tabs: SETTINGS_TABS.map((id) => SETTINGS_TAB_LABELS[id]),
-        tab: settingsTab,
-        rows:
-          tab === 'data'
-            ? dataRows()
-            : tab === 'about'
-              ? aboutRows()
-              : tab === 'controls'
-                ? [
-                    ...settingsRows(tab, save.settings, settingsDevice, capturing, platform.features.keyboardMouse),
-                    // M2 (fase 5f): abre o Bobo Training já calibrando a mira.
-                    { kind: 'action', id: 'calibrate', label: { key: 'settings.row.calibrate' } },
-                  ]
-                : settingsRows(tab, save.settings, settingsDevice, capturing, platform.features.keyboardMouse),
-        note: settingsNote,
-        help: settingsHelp(SETTINGS_TABS, tab, settingsHelpFocus, settingsDevice),
-      }),
-    );
-  }
-  /** M2 (fase 4f, parte 2): a captura do novo botão de uma ação (aba Botões). */
-  const capture = createBindingCapture();
-  let capturing: RemapAction | null = null;
-  /** Fim da captura: liga a fonte nova (com o aviso de troca, se houver) ou cancela. */
-  function finishCapture(result: CaptureResult): void {
-    if (capturing === null || result === 'none') return;
-    if (result === 'cancel') settingsNote = '';
-    else {
-      const next = rebindSettings(save.settings, settingsDevice, capturing, result, platform.features.keyboardMouse);
-      if (next.doc !== save.settings) save.setSettings(next.doc);
-      settingsNote = next.note;
-    }
-    capturing = null;
-    rebuildSettings();
-  }
+  // M2 (fase 4f): Ajustes. M9 (fase 0): a tela inteira mora no pedaço dos editores (`settings-flow.ts`, como a Oficina);
+  // aqui só abre, desenha e segue o que ela pede. Na web o pedaço já veio logo depois do título; se ainda não chegou,
+  // abre quando chegar (com o jogador ainda na tela de onde pediu).
+  let settingsFlow: SettingsFlow | null = null;
   function openSettings(): void {
-    settingsTab = 0;
-    capture.stop();
-    capturing = null;
-    settingsNote = '';
-    pendingBackup = null;
-    const last = menuInput.lastDevice;
-    if (last !== null) settingsDevice = last;
-    rebuildSettings();
-    screen = 'settings';
-  }
-  /** Texto do relatório (#42): versão, plataforma, render e as últimas linhas do registro. */
-  function reportText(): string {
-    const stats = renderer.stats;
-    return [
-      `BoboForces ${GAME_VERSION} (${GAME_CODENAME})`,
-      `plataforma: ${platform.id} · perfil: ${platform.features.profileHint}`,
-      `render: ${renderer.info.textureMode} · programas ${stats.programs} · draw calls ${stats.drawCalls}`,
-      'registro:',
-      ...(platform.diagnostics.recentLog?.(40) ?? []),
-    ].join('\n');
-  }
-  function settingsAction(id: string): void {
-    const note = (text: string): void => {
-      settingsNote = text;
-      rebuildSettings();
-    };
-    if (id === 'export' && platform.files !== null) {
-      const date = new Date().toISOString();
-      const name = `boboforces-backup-${date.slice(0, 10)}.json`;
-      void platform.files
-        .save(name, save.exportBackup(date, GAME_VERSION), 'application/json')
-        .then((ok) => note(ok ? t('settings.data.exported', { name }) : t('settings.data.exportFailed')));
-    } else if (id === 'import' && platform.files !== null) {
-      void platform.files.pick(['.json']).then((file) => {
-        if (file === null) return;
-        const read = save.readBackup(decodeUtf8(file.bytes));
-        pendingBackup = read.ok ? read.value : null;
-        note(read.ok ? '' : t('settings.data.invalid'));
+    const from = screen;
+    withEditors(() => {
+      if (screen !== from) return;
+      settingsFlow ??= editors!.createSettingsFlow({
+        platform,
+        save,
+        renderer: () => renderer,
+        log,
+        imported: refreshTitle,
       });
-    } else if ((id === 'merge' || id === 'replace') && pendingBackup !== null) {
-      save.applyBackup(pendingBackup, id);
-      pendingBackup = null;
-      refreshTitle();
-      note(t('settings.data.imported'));
-    } else if (id === 'cancel') {
-      pendingBackup = null;
-      note('');
-    } else if (id === 'news') {
-      openNews('settings');
-    } else if (id === 'copy') {
-      const text = reportText();
-      const clip = platform.clipboard;
-      if (clip === undefined) {
-        log(text);
-        note(t('settings.about.copyFailed'));
-      } else {
-        void clip.writeText(text).then((ok) => {
-          if (!ok) log(text);
-          note(t(ok ? 'settings.about.copied' : 'settings.about.copyFailed'));
-        });
-      }
-    }
+      settingsFlow.open(menuInput.lastDevice);
+      screen = 'settings';
+    });
   }
   function openSurprise(): void {
     const from = screen;
@@ -1659,6 +1515,9 @@ export function startGame(deps: GameDeps): GameHandle {
       log('[game] versão nova: aplicando no título');
       platform.updates.apply();
     }
+    // M9 (fase 0, revisão): o pedaço dos editores (onde moram os Ajustes) é pedido no 1º frame de qualquer tela, não
+    // só do título: com as Novidades no boot, ou um clique rápido em Ajustes, ele já está a caminho.
+    if (frames > 0 && screen !== 'loading' && screen !== 'error') loadEditors();
     // M3: a tela de edição pedida antes de o módulo chegar abre agora.
     if (editors !== null && editorsAfter !== null) {
       const then = editorsAfter;
@@ -1960,48 +1819,11 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
       }
       case 'settings': {
-        // Capturando um botão (e esperando soltar tudo depois): o menu não anda.
-        if (capture.active) {
-          finishCapture(capture.update(raw));
-          settingsMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
-          break;
-        }
-        const nav = settingsMenu.update(menuInput, raw, u);
-        const a = nav.activated;
-        if (nav.tab !== 0) {
-          settingsTab = (settingsTab + nav.tab + SETTINGS_TABS.length) % SETTINGS_TABS.length;
-          followTab(settingsMenu, settingsTab);
-          settingsNote = '';
-          rebuildSettings();
-        } else if (nav.back || a === SETTINGS_ACTION.back) screen = 'title';
-        else if (a !== null && a.startsWith(SETTINGS_TAB_PREFIX)) {
-          settingsTab = Number(a.slice(SETTINGS_TAB_PREFIX.length));
-          settingsNote = '';
-          rebuildSettings();
-        } else if (a !== null && a.startsWith(SETTINGS_ROW_PREFIX)) {
-          const id = a.slice(SETTINGS_ROW_PREFIX.length);
-          const tab = SETTINGS_TABS[settingsTab]!;
-          const bind = tab === 'buttons' ? bindRowAction(id, settingsDevice) : null;
-          if (tab === 'data' || tab === 'about') settingsAction(id);
-          else if (tab === 'controls' && id === 'calibrate') playTraining(trainingPreset(), true);
-          else if (bind !== null) {
-            capturing = bind;
-            capture.start(raw, settingsDevice === 'gamepad' ? 'gamepad' : 'keyboardMouse');
-            settingsNote = t('settings.bind.press', { action: t(actionLabel(bind)) });
-            rebuildSettings();
-          } else {
-            const next = stepSettings(tab, save.settings, settingsDevice, id, nav.delta);
-            settingsDevice = next.device;
-            if (next.doc !== save.settings) save.setSettings(next.doc);
-            settingsNote = tab === 'buttons' && id === 'reset' ? t('settings.bind.resetDone') : '';
-            rebuildSettings();
-          }
-        }
-        // Refino R3c: a frase de ajuda segue o foco.
-        if (screen === 'settings' && settingsMenu.focusedId !== settingsHelpFocus) rebuildSettings();
-        settingsMenu.draw(list, u);
+        // M9 (fase 0): a tela mora no pedaço dos editores; o frame que sai ainda desenha os Ajustes (como antes).
+        const r = settingsFlow!.frame(menuInput, raw, u, list);
+        if (r === 'back') screen = 'title';
+        else if (r === 'news') openNews('settings');
+        else if (r === 'calibrate') playTraining(trainingPreset(), true);
         renderer.renderViews(NO_VIEWS);
         renderer.drawUi(list);
         break;
