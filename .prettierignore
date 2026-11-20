@@ -9,3 +9,4 @@ romfs/
 package-lock.json
 *.md
 *.generated.*
+.claude/
