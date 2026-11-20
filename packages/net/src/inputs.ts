@@ -1,4 +1,13 @@
-import { copyInputFrame, createInputFrame, readInputFrame, writeInputFrame, type InputFrame } from '@boboforces/input';
+import {
+  copyInputFrame,
+  createInputFrame,
+  frameOrder,
+  ORDER_MASK,
+  readInputFrame,
+  withOrder,
+  writeInputFrame,
+  type InputFrame,
+} from '@boboforces/input';
 import type { BitReader, BitWriter } from '@boboforces/shared';
 import { MSG, NO_TICK, seqDiff } from './protocol.ts';
 
@@ -78,6 +87,8 @@ export class RemoteInputBuffer {
   private newest = -1;
   private lastSeq = -1;
   private carry = 0;
+  /** M8 (fase 6, revisão): a última ordem não zero dos quadros pulados. */
+  private carryOrder = 0;
   private starvedRun = 0;
   /** O snapshot completo mais novo que o cliente disse ter. */
   ackTick = NO_TICK;
@@ -148,7 +159,12 @@ export class RemoteInputBuffer {
       const target = (this.newest - KEEP_WAITING) & 0xffff;
       while (this.next !== target) {
         const k = this.next & (BUFFER - 1);
-        if (this.seqs[k] === this.next) this.carry |= this.ring[k]!.buttons;
+        if (this.seqs[k] === this.next) {
+          // M8 (fase 6, revisão): a ordem é um valor (não bandeiras): fica a última não zero dos pulados.
+          const b = this.ring[k]!.buttons;
+          this.carry |= b & ~ORDER_MASK;
+          if (frameOrder(b) !== 0) this.carryOrder = frameOrder(b);
+        }
         this.stats.skipped++;
         this.next = (this.next + 1) & 0xffff;
       }
@@ -159,7 +175,11 @@ export class RemoteInputBuffer {
         copyInputFrame(this.last, this.ring[k]!);
         this.lastView = this.views[k]!;
         this.last.buttons |= this.carry;
+        if (this.carryOrder !== 0 && frameOrder(this.last.buttons) === 0) {
+          this.last.buttons = withOrder(this.last.buttons, this.carryOrder);
+        }
         this.carry = 0;
+        this.carryOrder = 0;
         this.lastSeq = this.next;
         this.next = (this.next + 1) & 0xffff;
         this.starvedRun = 0;

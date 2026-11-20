@@ -78,8 +78,8 @@ describe('layout de toque (arte-ux.md §7.3)', () => {
         expect(Math.min(r.x - r.radius, w - r.x - r.radius, r.y - r.radius, h - r.y - r.radius)).toBeGreaterThanOrEqual(
           24 * pr,
         );
-        // A pausa e a Vista (fase 6e) são alternadores pequenos no alto; o resto tem 64 px ou mais.
-        const small = r.control === 'pause' || r.control === 'camera';
+        // A pausa, a Vista (fase 6e) e as Ordens (M8, fase 6) são pequenas no alto; o resto tem 64 px ou mais.
+        const small = r.control === 'pause' || r.control === 'camera' || r.control === 'orders';
         expect(r.radius * 2).toBeGreaterThanOrEqual((small ? 44 : 64) * pr);
       }
       for (let i = 0; i < rects.length; i++) {

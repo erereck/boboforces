@@ -522,3 +522,26 @@ describe('determinismo', () => {
     expect(frameOf(m, 65536 + 5).seq).toBe(5);
   });
 });
+
+describe('M8 (fase 6): o aviso e a roda das ordens no mesmo botão', () => {
+  it('o toque curto do meio dá o aviso ao soltar; segurando, a roda abre e o aviso não sai', () => {
+    const raw = createRawInputState();
+    const m = kbm();
+    // Toque curto: nada enquanto aperta; o aviso no quadro depois de soltar.
+    raw.mouseButtons = MOUSE_BUTTON.middle;
+    m.update(raw, DT);
+    expect(frameOf(m, 1).buttons & BUTTON.ping).toBe(0);
+    raw.mouseButtons = 0;
+    m.update(raw, DT);
+    expect(frameOf(m, 2).buttons & BUTTON.ping).toBe(BUTTON.ping);
+    expect(m.isDown('orders')).toBe(false);
+    // Segurando além do `holdS`: a roda (as ordens) abaixa; soltando, nada de aviso.
+    raw.mouseButtons = MOUSE_BUTTON.middle;
+    for (let i = 0; i < 30; i++) m.update(raw, DT);
+    expect(m.isDown('orders')).toBe(true);
+    raw.mouseButtons = 0;
+    m.update(raw, DT);
+    expect(m.isDown('orders')).toBe(false);
+    expect(frameOf(m, 3).buttons & BUTTON.ping).toBe(0);
+  });
+});

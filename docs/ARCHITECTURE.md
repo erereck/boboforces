@@ -4473,3 +4473,54 @@ Plano em `docs/PLANO_M8.md` (P-004, no padrão do #81; pergunta Z1).
 - **Fica para depois** (gameplay.md §6.8): o modo Personalizado do Diretor (sliders), a agressividade, o número de
   bots ativos e o ritmo e a distância de spawn, e o Zombies (ritmo da horda, especiais e drops); trocar o objetivo na
   pausa (a pausa só mostra).
+
+### 19.7 Fase 6: as ordens aos bots aliados (19/11/2026)
+
+- **No quadro** (`input/actions.ts`): a ordem vai nos bits 12 a 14 do campo de botões do `InputFrame`, fora da
+  `BUTTON` (não tem tecla: sai da roda): `ORDER` (1 Vem comigo, 2 Segura aqui, 3 Ataca ali, 4 Me cobre), com
+  `frameOrder`/`withOrder`. O tamanho do quadro não muda; o protocolo sobe para 9 (`PROTOCOL_VERSION` e o
+  `net.json`), para um host e um cliente de versões diferentes não se misturarem. O `game` segura a ordem no quadro
+  por 6 ticks (a rede pode perder um); a sim e a IA agem na borda (o valor mudou para uma ordem).
+- **A roda** (`game/scene/match.ts`, `updateOrders`): a ação local `orders` é o aviso segurado (`holdSources`: o
+  mouse do meio, o N sem mouse, o D-pad de cima), e o aviso desse botão passou a valer no toque curto (`tapSources`:
+  ao soltar antes de 0,3 s, um pulso do mapeador), para abrir a roda não soltar um aviso antes; remapear o aviso leva
+  os dois junto. No toque, um botão Ordens novo (ao lado da Vista). Segurando, a roda abre: o giro move o cursor e o
+  quadro leva a mira da abertura enquanto a roda está aberta e a ordem sai (o boneco não treme para os outros, o tiro
+  não sai torto e o Ataca ali cai onde a mira estava); soltando com uma ordem apontada, ela vai. No toque, o botão abre e fecha e tocar numa ordem manda. Desenhada pelo anel da compra
+  do BoboStrike (`buyTitle`, `primaryNames`, `primarySelected` e o acerto do toque por `primaryHit`): no alto Vem
+  comigo, à direita Segura aqui, embaixo Me cobre (no Zombies e no Royale em grupo, Me revive), à esquerda Ataca ali.
+  Fechada fora dos times (FFA, Juggernaut), morto, na compra do BoboStrike e na pausa.
+- **Na sim** (`systems/signals.ts`): na borda da ordem, um balão em cima de quem mandou (os tipos 5 a 8 do evento
+  `signal`, sem mudar o formato) e, no Ataca ali, o ping onde a mira bate; a espera das ordens é à parte da do aviso
+  (o aviso apertado ao segurar o botão não segura a ordem). O `game` mostra o balão da ordem só ao time de quem
+  mandou.
+- **Na IA** (`ai/orders.ts`, `director.ts`, `soldier.ts`): o diretor dos bots lê a ordem de cada humano de agora na
+  borda e passa aos até 4 bots aliados mais perto (em 50 m) da receita que ninguém pilota; do N2 para cima, cada um
+  sorteia pela lealdade (o fluxo `fork('orders')`, à parte dos cérebros). Obedecendo: Vem comigo e Me cobre andam até
+  ficar atrás de quem mandou (3 m e 2 m; voltam passando de 6 m e 4 m); Segura aqui fica a 2,5 m do ponto; Ataca ali
+  vai até o ponto (chegando, a ordem acaba e ele caça dali); no Zombies e no Royale em grupo, o Me cobre levanta quem
+  mandou antes do caído mais perto. A ordem entra no passeio antes da caça (com inimigo à vista, o bot briga antes)
+  e cai quando vence (60, 45, 40 e 60 s), quando o bot morre ou (Vem comigo, Me cobre) quando quem mandou morre.
+  Parado pela ordem, o bot não pede rota nem conta como empacado (sem o Destravar). A resposta (quantos ouviram e
+  quantos obedeceram) vai para a plaquinha da dica de quem mandou ("Vem comigo: 2 de 3 bots").
+- **O aviso dos humanos** também vale para os bots: entra no quadro do time como o aviso de um bot N3 (quem ouve
+  avisos vai conferir o ponto), marcado como do humano para não virar um segundo marcador na tela.
+- **A lealdade** (`bot@1`, `personality.loyalty`, 0..1): o documento sem ela ganha a do preset (sem mudar a versão).
+  Pergunta Z6: Suporte 100%, Estrategista 90%, Equilibrado, Covarde e Camper 70% (com os cortes do Covarde no Ataca
+  ali, 50%, e do Camper no Vem comigo, 30%), Rusher, Kamikaze, Caçador e Palhaço 40%, Lunático 20%; o boneco de
+  treino não obedece. O Laboratório ganhou a linha Lealdade.
+- **Online:** o cliente manda a ordem no quadro dele; o host lê e os bots (que só rodam lá) obedecem. O balão e o
+  ping vêm pelos eventos de sempre; a resposta "2 de 3 bots" é só de quem joga no host (o cliente, sem o diretor, vê
+  "Vem comigo: ordem dada"). Pulando quadros atrasados, o host guarda a última ordem dos pulados (é um valor, não
+  bandeiras: somar 2 e 4 daria 6).
+- **A revisão (Opus) achou, corrigido antes do commit:** o ponto atrás de quem mandou caía do outro lado da parede
+  (agora um raio para trás o prende do lado de cá, dentro do raio de parar, e "parado" exige o mesmo andar); o Ataca
+  ali para o céu ou o vazio virava um laço de Destravar (agora o ponto cai no chão embaixo da mira, sem chão a ordem
+  não vale e a tela pede para mirar no chão; sem rota, o Segura aqui e o Ataca ali caem e o Vem comigo espera);
+  reenviar a ordem vencia a lealdade (quem recusou não sorteia de novo a mesma ordem do mesmo humano por 15 s, e quem
+  já cumpre só renova); abrir a roda soltava um aviso; a mira do quadro mexia com a roda aberta; o Me revive mandado
+  caído não mostrava balão (a sim agora deixa a ordem passar caído; a IA ignora o que a sim ignora: a contagem, fora
+  da rodada valendo e o aviso de quem está caído); as ordens atravessavam as rodadas do BoboStrike (a rodada nova
+  tira todas); e a rede somava ordens dos quadros pulados.
+- **Fica para depois:** a resposta para o cliente online (uma mensagem curta do host) e o filtro do Me cobre pelos
+  inimigos que atacam quem mandou (hoje ele só cola e levanta).

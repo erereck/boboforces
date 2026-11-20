@@ -27,6 +27,8 @@ export const TOUCH_CONTROLS = [
   'pause',
   'melee',
   'camera',
+  // M8 (fase 6): a roda das ordens aos bots aliados.
+  'orders',
 ] as const;
 
 export type TouchControlId = (typeof TOUCH_CONTROLS)[number];
@@ -41,7 +43,8 @@ export type TouchControlId = (typeof TOUCH_CONTROLS)[number];
  * - `touchControl`: controle de toque desenhado pelo jogo, por id de `TOUCH_CONTROLS`.
  *
  * `hold: true` = só vale depois de segurar por `ControlProfile.holdS` (ex.: no controle, o botão da esquerda recarrega
- * no toque e interage segurando).
+ * no toque e interage segurando). M8 (fase 6): `tap: true` = vale um toque ao SOLTAR antes de `holdS` (o aviso que
+ * divide o botão com a roda das ordens: segurar abre a roda sem soltar o aviso).
  */
 export type BindingSource = (
   | { readonly device: 'key'; readonly key: number }
@@ -50,7 +53,7 @@ export type BindingSource = (
   | { readonly device: 'padButton'; readonly button: number }
   | { readonly device: 'padAxis'; readonly axis: number; readonly direction: 1 | -1 }
   | { readonly device: 'touchControl'; readonly control: string }
-) & { readonly hold?: boolean };
+) & { readonly hold?: boolean; readonly tap?: boolean };
 
 // Construtores curtos para os perfis (e para o remapeamento no M2).
 
@@ -78,6 +81,21 @@ export function padAxis(axis: keyof typeof PAD_AXIS, direction: 1 | -1): Binding
 
 export function touch(control: TouchControlId): BindingSource {
   return { device: 'touchControl', control };
+}
+
+/**
+ * M8 (fase 6): as mesmas fontes valendo só segurando (a roda das ordens é o aviso segurado). A roda do mouse e o toque
+ * não seguram: ficam de fora.
+ */
+export function holdSources(sources: readonly BindingSource[]): BindingSource[] {
+  const out: BindingSource[] = [];
+  for (const s of sources) if (s.device !== 'wheel' && s.device !== 'touchControl') out.push({ ...s, hold: true });
+  return out;
+}
+
+/** M8 (fase 6, revisão): as mesmas fontes valendo no toque curto (a roda e o toque ficam como estão). */
+export function tapSources(sources: readonly BindingSource[]): BindingSource[] {
+  return sources.map((s) => (s.device !== 'wheel' && s.device !== 'touchControl' && !s.hold ? { ...s, tap: true } : s));
 }
 
 /** Teclas Ctrl: o navegador reserva Ctrl+W/T/N, então o jogo avisa quando o jogador liga uma ação ao Ctrl. */

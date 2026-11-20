@@ -22,6 +22,8 @@ export class TeamBoard {
   readonly pingZ = new Float64Array(AI_TEAM.pingCapacity);
   readonly pingTick = new Int32Array(AI_TEAM.pingCapacity).fill(-1_000_000);
   readonly pingTeam = new Uint8Array(AI_TEAM.pingCapacity);
+  /** M8 (fase 6): 1 = o aviso veio de um humano (o jogo já mostra o dele: fica fora dos `pings` do diretor). */
+  readonly pingHuman = new Uint8Array(AI_TEAM.pingCapacity);
   private pingHead = 0;
   /** Objetivo de passeio por entidade (m) e o tick em que foi escolhido. */
   readonly goalX = new Float64Array(MAX_ENTITIES);
@@ -110,8 +112,9 @@ export class TeamBoard {
   }
 
   /** Avisa o time (N3): um inimigo em (x, y, z) agora. */
-  post(team: number, x: number, y: number, z: number, tick: number): void {
+  post(team: number, x: number, y: number, z: number, tick: number, human = false): void {
     const k = this.pingHead;
+    this.pingHuman[k] = human ? 1 : 0;
     this.pingHead = (k + 1) % AI_TEAM.pingCapacity;
     this.pingX[k] = x;
     this.pingY[k] = y;

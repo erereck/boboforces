@@ -25,7 +25,30 @@ export const BUTTON = {
    * pausa; a IA, depois de 8 s sem progresso na rota.
    */
   unstuck: 1 << 11,
+  // Os bits 12 a 14 são da ordem aos bots (`ORDER_SHIFT`); o próximo botão entra no 15.
 } as const;
+
+/**
+ * M8 (fase 6): a ordem aos bots aliados (gameplay.md §6.10) viaja nos bits 12 a 14 do campo de botões, fora da
+ * `BUTTON` (não tem tecla: sai da roda das ordens): 0 = nenhuma, 1 a 4 = as de `ORDER`. A sim e a IA agem na borda
+ * (quando o valor muda para uma ordem), como no aviso; o `game` segura o valor alguns ticks (a rede pode perder um).
+ */
+export const ORDER = { none: 0, follow: 1, hold: 2, attack: 3, cover: 4 } as const;
+export type OrderKind = (typeof ORDER)[keyof typeof ORDER];
+export const ORDER_SHIFT = 12;
+export const ORDER_MASK = 0b111 << ORDER_SHIFT;
+/** As 4 ordens na ordem da roda (no alto e no sentido horário): Vem comigo, Segura aqui, Me cobre, Ataca ali. */
+export const ORDER_WHEEL: readonly OrderKind[] = [ORDER.follow, ORDER.hold, ORDER.cover, ORDER.attack];
+
+/** A ordem do campo de botões (0 = nenhuma). */
+export function frameOrder(buttons: number): number {
+  return (buttons & ORDER_MASK) >> ORDER_SHIFT;
+}
+
+/** O campo de botões com a ordem `order` (0 tira). */
+export function withOrder(buttons: number, order: number): number {
+  return (buttons & ~ORDER_MASK) | ((order & 0b111) << ORDER_SHIFT);
+}
 
 export type FrameButton = keyof typeof BUTTON;
 
@@ -58,6 +81,8 @@ export const LOCAL_GAME_ACTIONS = [
   'lastWeapon',
   'camera',
   'shoulder',
+  // M8 (fase 6): segurar o aviso abre a roda das ordens aos bots aliados (no toque, um botão).
+  'orders',
 ] as const;
 
 export type LocalGameAction = (typeof LOCAL_GAME_ACTIONS)[number];

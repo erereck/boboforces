@@ -9,3 +9,4 @@ export * from './director.ts';
 export * from './headless.ts';
 export * from './weapons.ts';
 export * from './match-director.ts';
+export * from './orders.ts';

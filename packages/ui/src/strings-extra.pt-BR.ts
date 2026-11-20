@@ -412,6 +412,24 @@ export const STRINGS_EXTRA_PT_BR = {
   'emote.2': 'Valeu!',
   'emote.3': 'Bora!',
   'emote.4': 'Ops!',
+  // M8 (fase 6): as ordens aos bots aliados (a roda, os balões e a resposta a quem mandou).
+  'orders.title': 'Ordens',
+  'order.1': 'Vem comigo',
+  'order.2': 'Segura aqui',
+  'order.3': 'Ataca ali',
+  'order.4': 'Me cobre',
+  'order.4.revive': 'Me revive',
+  'order.hint.1': 'atrás de você',
+  'order.hint.2': 'fica neste ponto',
+  'order.hint.3': 'onde você mira',
+  'order.hint.4': 'colado em você',
+  'order.hint.4.revive': 'te levanta',
+  'order.balloon': '{order}!',
+  'order.answer': '{order}: {n} de {asked} bots',
+  'order.answer.none': '{order}: nenhum bot aliado por perto',
+  'order.answer.ignored': '{order}: nenhum bot obedeceu',
+  'order.answer.nowhere': '{order}: mire num lugar do chão',
+  'order.sent': '{order}: ordem dada',
   // M5 (fase 5a): o host online foi para segundo plano (a faixa da dica, no cliente).
   'match.hostAway': 'O host saiu do jogo por um instante.',
   // M6 (fase 1): as letras dos pontos do Domination (uma por ponto, na ordem do mapa).
@@ -744,6 +762,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'lab.row.patience': 'Paciência',
   'lab.row.range': 'Distância',
   'lab.row.silliness': 'Bobeira',
+  // M8 (fase 6): a chance de obedecer as ordens do humano aliado (do N2 para cima).
+  'lab.row.loyalty': 'Lealdade',
   'lab.row.hp': 'Vida',
   'lab.row.damage': 'Dano',
   'lab.row.speed': 'Velocidade',

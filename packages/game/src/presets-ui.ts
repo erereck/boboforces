@@ -87,6 +87,8 @@ export function presetLines(recipe: MatchRecipe): string[] {
     levelName(recipe),
     sides(recipe),
     duration(recipe),
+    // M8 (fase 6): o Diretor ligado também no card (a partida recebida por link, o sorteio).
+    recipe.director !== undefined ? t('summary.director') : '',
   ].filter((l) => l !== '');
 }
 

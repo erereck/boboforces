@@ -60,6 +60,8 @@ export const DEFAULT_TOUCH_LAYOUT: TouchLayout = {
     // lado da pausa, pequena como ela.
     { control: 'melee', anchor: 'bottomRight', x: 300, y: 132, radius: 32, aims: false },
     { control: 'camera', anchor: 'topRight', x: 128, y: 56, radius: 24, aims: false },
+    // M8 (fase 6): as ordens aos bots aliados ao lado da câmera, pequenas como ela.
+    { control: 'orders', anchor: 'topRight', x: 200, y: 56, radius: 24, aims: false },
   ],
 };
 

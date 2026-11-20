@@ -23,6 +23,7 @@ const TOUCH_LABELS: Readonly<Record<string, StringKey>> = {
   pause: 'touch.pause',
   melee: 'touch.melee',
   camera: 'touch.camera',
+  orders: 'touch.orders',
 };
 
 /** Onde desenhar (a superfície inteira: o toque só existe com 1 vista). */

@@ -1,4 +1,4 @@
-import { BUTTON, createInputFrame, type InputFrame } from '@boboforces/input';
+import { BUTTON, createInputFrame, frameOrder, ORDER, withOrder, type InputFrame } from '@boboforces/input';
 import { BitReader, BitWriter } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
 import { InputHistory, RemoteInputBuffer } from './inputs.ts';
@@ -66,6 +66,26 @@ describe('entradas do cliente (M5 fase 1)', () => {
     buf.consume(out);
     expect([out.yaw, out.buttons]).toEqual([10, 0]);
     expect(buf.stats.skipped).toBeGreaterThan(0);
+  });
+
+  it('M8 (fase 6): pulando quadros, a ordem não se mistura (fica a última, e só se o quadro não tiver uma)', () => {
+    const history = new InputHistory();
+    const buf = new RemoteInputBuffer();
+    const out = createInputFrame();
+    history.push(frameOf(1));
+    buf.receive(message(history));
+    buf.consume(out);
+    // Segura aqui (2) no 3 e Me cobre (4) no 5, pulados: somados como bandeiras dariam 6 (nenhuma ordem).
+    for (let seq = 2; seq <= 11; seq++) {
+      const b = seq === 3 ? withOrder(0, ORDER.hold) : seq === 5 ? withOrder(BUTTON.jump, ORDER.cover) : 0;
+      history.push(frameOf(seq, b));
+      buf.receive(message(history));
+    }
+    buf.consume(out);
+    expect(frameOrder(out.buttons)).toBe(ORDER.cover);
+    expect(out.buttons & BUTTON.jump).toBe(BUTTON.jump);
+    buf.consume(out);
+    expect(frameOrder(out.buttons)).toBe(0);
   });
 
   it('o seq dá a volta em 16 bits', () => {

@@ -1,5 +1,5 @@
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { BUTTON } from '@boboforces/input';
+import { BUTTON, ORDER, withOrder } from '@boboforces/input';
 import { pitchToI16 } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
 import type { SignalEvent, SimEvent } from './events.ts';
@@ -71,6 +71,39 @@ describe('ping e emotes (M5 fase 5d)', () => {
       expect(emote!.y).toBeGreaterThan(feetY + 1.5);
     }
     expect(kinds).toEqual([1, 2, 3, 4, 1]);
+    sim.dispose();
+  });
+
+  it('M8 (fase 6): a ordem da roda sai na borda: o balão em cima de quem mandou e, no Ataca ali, o ping onde a mira bate', () => {
+    const { map } = buildSyntheticConstruto();
+    const sim = createSim({ recipe, map, humans: 1, countdownS: 0 });
+    const frames = createInputFrames();
+    const f = frames[0]!;
+    const out: SimEvent[] = [];
+    const step = (buttons: number, n = 1): SignalEvent[] => {
+      const got: SignalEvent[] = [];
+      for (let i = 0; i < n; i++) {
+        f.buttons = buttons;
+        sim.step(frames);
+        out.length = 0;
+        sim.drainEvents(out);
+        for (const ev of out) if (ev.type === 'signal') got.push({ ...ev });
+      }
+      return got;
+    };
+    step(0, 5);
+    const feetY = sim.view().position[(sim.controllerEntity(0) & 0xffff) * 3 + 1]!;
+    // O aviso apertado logo antes não segura a ordem (a espera dela é à parte).
+    expect(step(BUTTON.ping).map((s) => s.kind)).toEqual([SIGNAL_KIND.ping]);
+    // Segurada por vários ticks (o jogo segura o valor), sai uma vez só.
+    const follow = step(withOrder(0, ORDER.follow), 6);
+    expect(follow.map((s) => s.kind)).toEqual([SIGNAL_KIND.firstOrder]);
+    expect(follow[0]!.y).toBeGreaterThan(feetY + 1.5);
+    step(0, Math.round(SIGNAL_COOLDOWN_S * sim.hz) + 1);
+    f.pitch = pitchToI16(-1.2);
+    const attack = step(withOrder(0, ORDER.attack));
+    expect(attack.map((s) => s.kind)).toEqual([SIGNAL_KIND.ping, SIGNAL_KIND.firstOrder + ORDER.attack - 1]);
+    expect(Math.abs(attack[0]!.y - feetY)).toBeLessThan(0.6);
     sim.dispose();
   });
 });

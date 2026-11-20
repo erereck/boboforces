@@ -9,7 +9,7 @@ import {
   type BotPersonality,
   type BotRules,
 } from '@boboforces/format';
-import { BUTTON, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
+import { BUTTON, ORDER, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, pitchToI16, wrapAngle, yawToU16, type Rng } from '@boboforces/shared';
 import {
   aimPointWorld,
@@ -34,6 +34,7 @@ import { CELLS_PER_METER, isCellSolid } from '@boboforces/world';
 import {
   AI_KNIFE,
   AI_LOD,
+  AI_ORDERS,
   AI_COVER,
   AI_FLANK,
   AI_GRENADE,
@@ -51,6 +52,7 @@ import {
   type AiWeaponUse,
 } from './config.ts';
 import type { AiContext } from './context.ts';
+import { dropOrder, ORDER_GOAL, orderGoal, orderOwnerAlive, type OrderPoint } from './orders.ts';
 import { STRIKE_ACT, strikeBuy, strikeGoal, strikeObjective, strikeWander } from './strike.ts';
 import {
   ROYALE_ACT,
@@ -308,6 +310,23 @@ export class SoldierBrain {
   hasGoal = false;
   /** M3 (fase 3a): o colega caído que este bot vai levantar (índice), ou -1. */
   reviveTarget = -1;
+  /**
+   * M8 (fase 6): a ordem do humano aliado que este bot obedece (`ORDER`; 0 = nenhuma), quem mandou (entidade e
+   * geração), o ponto (Segura aqui, Ataca ali), até quando vale e se está andando até quem mandou (Vem comigo).
+   */
+  order = 0;
+  orderOwner = -1;
+  orderOwnerGen = 0;
+  orderX = 0;
+  orderY = 0;
+  orderZ = 0;
+  orderUntil = 0;
+  orderMoving = false;
+  /** M8 (fase 6, revisão): a última recusa (a ordem, de quem e até quando vale): reenviar não sorteia de novo. */
+  refusedOrder = 0;
+  refusedOwner = -1;
+  refusedOwnerGen = 0;
+  refusedUntil = 0;
   /** M3 (fase 3d): a janela que este bot vai consertar (índice), ou -1. */
   repairWindow = -1;
   /** M7 (fase 3): o objetivo do BoboStrike (`STRIKE_ACT`: plantar, desarmar, pegar a bomba) e o ponto dele. */
@@ -507,6 +526,9 @@ export function moveToward(current: number, goal: number, step: number): number 
 /** M8 (fase 5): o rascunho dos multiplicadores do Diretor. */
 const shiftScratch: SkillShift = { reaction: 1, aimError: 1, acquire: 1, turn: 1 };
 const roomScratch: SkillRoom = { up: 0, down: 0 };
+
+/** M8 (fase 6): o objetivo da ordem (rascunho). */
+const orderAt: OrderPoint = { x: 0, y: 0, z: 0 };
 
 /** Rascunhos do módulo (o `think` não aloca). */
 const local = { x: 0, y: 0 };
@@ -1250,6 +1272,7 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   let gx: number;
   let gy: number;
   let gz: number;
+  let orderMode: number = ORDER_GOAL.none;
   // M2 (fase 3e): sem pista, o N3 vai atrás do aviso mais novo do time (cada aviso uma vez).
   const board = c.board;
   if (!b.hasLastKnown && board !== null && b.intelligence.callouts) {
@@ -1295,6 +1318,12 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     const fdx = gx - x;
     const fdz = gz - z;
     if (fdx * fdx + fdz * fdz < GOAL_REACHED * GOAL_REACHED || f.failed) b.flankUntil = 0;
+  } else if ((orderMode = orderGoal(view, b, tick, x, y, z, orderAt)) !== ORDER_GOAL.none) {
+    // M8 (fase 6): a ordem do humano aliado (Vem comigo, Segura aqui, Ataca ali, Me cobre) vem antes da caça e do
+    // passeio; com inimigo à vista, o bot briga antes (o combate vem antes do passeio).
+    gx = orderAt.x;
+    gy = orderAt.y;
+    gz = orderAt.z;
   } else if (b.hasLastKnown && tick - b.lastSeenTick < t.chase) {
     gx = b.lastKnownX;
     gy = b.lastKnownY;
@@ -1319,7 +1348,31 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   }
 
   const paths = c.paths;
-  if (view.nav !== null) {
+  // M8 (fase 6, revisão): sem rota até o ponto da ordem, o Segura aqui e o Ataca ali caem; o Vem comigo e o Me cobre
+  // esperam parados (quem mandou pode voltar para onde dá para chegar). Sem isso, o bot empacava até o Destravar.
+  if (orderMode === ORDER_GOAL.go && view.nav !== null) {
+    paths.want(f, x, y, z, gx, gy, gz, tick, b.lodA ? t.replanA : b.lodC ? t.replanC : t.replanB);
+    if (f.failed) {
+      if (b.order === ORDER.hold || b.order === ORDER.attack) dropOrder(b);
+      orderMode = ORDER_GOAL.stay;
+    }
+  }
+  if (orderMode === ORDER_GOAL.stay) {
+    // M8 (fase 6): parado pela ordem (colado em quem mandou ou no ponto do Segura aqui): sem rota, e ficar parado
+    // não conta como empacar (nem o Destravar nem o pulo).
+    steer.x = 0;
+    steer.z = 0;
+    steer.remaining = 0;
+    steer.jump = false;
+    steer.crouch = false;
+    b.progressTick = tick;
+    b.progressX = x;
+    b.progressZ = z;
+    b.progressBest = Infinity;
+    b.stuckTick = tick;
+    b.stuckX = x;
+    b.stuckZ = z;
+  } else if (view.nav !== null) {
     paths.want(f, x, y, z, gx, gy, gz, tick, b.lodA ? t.replanA : b.lodC ? t.replanC : t.replanB);
     if (!paths.steer(f, x, y, z, onGround, steer)) {
       // Sem rota ainda (na fila), ou chegou: vai reto até o objetivo.
@@ -1477,6 +1530,16 @@ function holdCover(view: SimView, b: SoldierBrain, e: number): number {
 }
 
 /** Um tick de um soldado: escreve o frame do controlador dele. */
+/** M8 (fase 6): no Me cobre, quem mandou caído (até `AI_ORDERS.reviveSeekM`) vem antes do caído mais perto. */
+function orderRevive(view: SimView, b: SoldierBrain, e: number): number | null {
+  if (b.order !== ORDER.cover || !orderOwnerAlive(view, b)) return null;
+  const o = b.orderOwner;
+  if ((view.flags[o]! & F.downed) === 0) return null;
+  const dx = view.position[o * 3]! - view.position[e * 3]!;
+  const dz = view.position[o * 3 + 2]! - view.position[e * 3 + 2]!;
+  return dx * dx + dz * dz <= AI_ORDERS.reviveSeekM * AI_ORDERS.reviveSeekM ? o : null;
+}
+
 /** M3 (fase 3a): o colega do mesmo time caído (e não levantando sozinho) mais perto, até `reviveSeekM`; senão -1. */
 function downedAlly(c: AiContext, e: number): number {
   const view = c.view!;
@@ -1676,6 +1739,9 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
   if ((fl & F.dead) !== 0) {
     if (!b.wasDead) b.follower.clear();
     b.wasDead = true;
+    // M8 (fase 6): morreu, a ordem cai.
+    b.order = 0;
+    b.orderOwner = -1;
     b.target = -1;
     b.targetVisible = false;
     b.wantSlot = WEAPON_SLOT.primary;
@@ -1753,7 +1819,7 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     (c.zombiesMode || (c.royaleMode && view.royale !== null && view.royale.squad > 1 && !closeFight)) &&
     (view.flags[e]! & F.downed) === 0 &&
     !zombieClose(c, view, b, e)
-      ? downedAlly(c, e)
+      ? (orderRevive(view, b, e) ?? downedAlly(c, e))
       : -1;
   // M7 (fase 3): o objetivo do BoboStrike (plantar, desarmar, pegar a bomba); com inimigo perto à vista, briga antes.
   const prevAct = b.strikeAct;

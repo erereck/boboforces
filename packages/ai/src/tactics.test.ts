@@ -91,6 +91,7 @@ const recipe: MatchRecipe = {
         patience: 0.6,
         preferredRangeM: 35,
         silliness: 0,
+        loyalty: 0.7,
       },
       rules: {
         hp: 1000,

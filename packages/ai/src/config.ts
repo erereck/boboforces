@@ -432,3 +432,41 @@ export const AI_DIRECTOR = {
     challenge: { min: 0.7, max: 1 },
   },
 } as const;
+
+/**
+ * M8 (fase 6): as ordens aos bots aliados (gameplay.md §6.10). Ouvem os bots aliados mais perto de quem mandou (até
+ * `maxBots`, dentro de `rangeM`); do N2 para cima, obedecem pela lealdade (com os cortes da pergunta Z6). A ordem vale
+ * um tempo e cai quando o bot morre; o Vem comigo e o Me cobre caem também quando quem mandou morre.
+ */
+export const AI_ORDERS = {
+  rangeM: 50,
+  maxBots: 4,
+  /** N0 e N1 ignoram. */
+  minIntelligence: 2,
+  /** Quanto tempo cada ordem vale (s). */
+  followS: 60,
+  holdS: 45,
+  attackS: 40,
+  coverS: 60,
+  /** Vem comigo: passando de `followFarM`, volta para `followNearM` atrás de quem mandou. Me cobre: mais colado. */
+  followNearM: 3,
+  followFarM: 6,
+  coverNearM: 2,
+  coverFarM: 4,
+  /** Segura aqui: fora de `holdM` do ponto, volta para ele. */
+  holdM: 2.5,
+  /** Ataca ali: chegando a `attackReachM` do ponto, a ordem acaba (caça dali); o "ali" vai até `attackRangeM`. */
+  attackReachM: 4,
+  attackRangeM: 80,
+  /** Me revive: vai levantar quem mandou até esta distância (m). */
+  reviveSeekM: 40,
+  /** Quem recusou não sorteia de novo a mesma ordem do mesmo humano por este tempo (s): reenviar não vence a lealdade. */
+  refuseS: 15,
+  /** Mais longe que isto na altura (m), quem mandou está em outro andar: o Vem comigo não para ainda. */
+  sameFloorM: 1.5,
+  /** O Ataca ali cai no chão embaixo do ponto da mira até esta altura (m); sem chão, a ordem não vale. */
+  groundDropM: 20,
+  /** Os cortes da lealdade (pergunta Z6): o Covarde no Ataca ali (70% → 50%) e o Camper no Vem comigo (70% → 30%). */
+  cowardAttackMul: 5 / 7,
+  camperFollowMul: 3 / 7,
+} as const;

@@ -649,6 +649,7 @@ export const STRINGS_PT_BR = {
   'touch.pause': 'II',
   'touch.melee': 'Faca',
   'touch.camera': 'Vista',
+  'touch.orders': 'Ordens',
   /** M2 (fase 6e): o fantasma dos dedos nas primeiras partidas no celular. */
   'touch.ghost.move': 'Arraste para andar',
   'touch.ghost.look': 'Arraste para mirar',

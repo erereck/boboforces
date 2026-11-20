@@ -30,6 +30,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **O Diretor de Partida (fase 5):** na aba Bots da Partida personalizada, Relax, Equilibrado ou Desafio. A cada 30 s ele
   olha como você está indo nos últimos 3 min e mexe só na mira dos bots, 1/4 de nível por vez e até 1 nível; o placar
   mostra o ajuste ("Diretor: bots –½"). Desligado por padrão.
+- **As ordens aos bots aliados (fase 6):** segure o aviso (o botão do meio do mouse, o D-pad de cima; no celular, o
+  botão Ordens) e escolha na roda: Vem comigo, Segura aqui, Ataca ali ou Me cobre (Me revive no Zombies). Os bots
+  N2 ou mais espertos obedecem conforme a lealdade, que o Laboratório agora mostra; a tela diz quantos obedeceram. O
+  seu aviso também chama os bots espertos do time.
 
 ### M7: BoboStrike e Bobo Royale Mini (fechado em 19/11/2026)
 

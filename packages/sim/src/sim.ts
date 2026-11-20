@@ -8,7 +8,7 @@ import {
   ZOMBIES_DEFAULTS,
   royaleSquadSize,
 } from '@boboforces/format';
-import { BUTTON, dequantizeAxis, type InputFrame } from '@boboforces/input';
+import { BUTTON, dequantizeAxis, ORDER_MASK, type InputFrame } from '@boboforces/input';
 import {
   assert,
   createRng,
@@ -923,7 +923,8 @@ export function createSim(config: SimConfig): Sim {
     if (!frozen) s.inWeapon[e] = f.weapon & 0xff;
     if ((s.flags[e]! & ENTITY_FLAG.downed) !== 0) {
       s.inWeapon[e] = DOWNED_SLOT;
-      s.inButtons[e] = (s.inButtons[e]! & DOWNED_BUTTONS) | BUTTON.crouch;
+      // M8 (fase 6, revisão): a ordem da roda vale caído (o Me revive é para isso).
+      s.inButtons[e] = (s.inButtons[e]! & (DOWNED_BUTTONS | ORDER_MASK)) | BUTTON.crouch;
     }
     // M7 (fase 2): no BoboStrike, o `primary` a partir de `STRIKE_BUY_BASE` é um pedido de compra (a sim consome).
     // A compra é na borda (o `primary` persiste no quadro e a rede repete o último): só quando o valor muda.

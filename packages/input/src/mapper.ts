@@ -179,7 +179,9 @@ interface CompiledBindings {
   readonly code: Int16Array;
   readonly dir: Int8Array;
   readonly hold: Uint8Array;
-  /** Segundos segurando (fontes com `hold`). */
+  /** M8 (fase 6, revisão): 1 = a fonte vale o toque curto (ao soltar antes de `holdS`). */
+  readonly tap: Uint8Array;
+  /** Segundos segurando (fontes com `hold` ou `tap`). */
   readonly held: Float32Array;
 }
 
@@ -198,6 +200,7 @@ function compile(profile: ControlProfile): CompiledBindings {
     code: new Int16Array(n),
     dir: new Int8Array(n),
     hold: new Uint8Array(n),
+    tap: new Uint8Array(n),
     held: new Float32Array(n),
   };
   rows.forEach(([target, index, s], r) => {
@@ -208,6 +211,7 @@ function compile(profile: ControlProfile): CompiledBindings {
     c.code[r] = code;
     c.dir[r] = dir;
     c.hold[r] = s.hold === true ? 1 : 0;
+    c.tap[r] = s.tap === true ? 1 : 0;
   });
   return c;
 }
@@ -409,6 +413,20 @@ class Mapper implements InputMapper {
         } else {
           b.held[r] = 0;
           v = 0;
+        }
+      } else if (b.tap[r]) {
+        // O toque curto: segurando, nada; soltando antes de `holdS`, um pulso (passou disso, era a roda).
+        if (v >= threshold) {
+          b.held[r]! += dt;
+          v = 0;
+        } else {
+          const held = b.held[r]!;
+          b.held[r] = 0;
+          v = 0;
+          if (held > 0 && held < this.profile.holdS) {
+            v = 1;
+            pulse = true;
+          }
         }
       }
       const idx = b.index[r]!;

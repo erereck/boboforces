@@ -300,6 +300,15 @@ const PERSONA_ROWS: readonly LabRow[] = [
     (d, v) => withPersona(d, { silliness: v }),
     pct,
   ),
+  // M8 (fase 6): a lealdade (as ordens do humano aliado; o N0 e o N1 ignoram).
+  numeric(
+    'loyalty',
+    'lab.row.loyalty',
+    UNIT,
+    (d) => d.personality.loyalty,
+    (d, v) => withPersona(d, { loyalty: v }),
+    pct,
+  ),
 ];
 
 function allowedIndex(d: BotDocument): number {

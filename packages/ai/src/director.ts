@@ -7,13 +7,16 @@ import {
   type BotLevel,
   type MatchRecipe,
 } from '@boboforces/format';
-import type { InputFrame } from '@boboforces/input';
-import { assert, createRng, type Disposable } from '@boboforces/shared';
+import { BUTTON, frameOrder, ORDER, type InputFrame } from '@boboforces/input';
+import { assert, createRng, i16ToPitch, u16ToYaw, type Disposable } from '@boboforces/shared';
 import {
+  ENTITY_FLAG,
   expandRecipe,
   isFfaMode,
   MATCH_DEFAULTS,
   MAX_ZOMBIES,
+  ROUND,
+  ROUND_PHASE,
   SIM_HZ,
   ZOMBIE_CONTROLLER_BASE,
   type SimView,
@@ -21,8 +24,18 @@ import {
 import { AiContext } from './context.ts';
 import { strikeRoundTick } from './strike.ts';
 import { RoyaleClaims } from './royale.ts';
-import { AI_BUDGET, AI_DIRECTOR, type AiBudget } from './config.ts';
+import { AI_BUDGET, AI_DIRECTOR, AI_ORDERS, type AiBudget } from './config.ts';
 import { MatchDirector } from './match-director.ts';
+import {
+  createOrderAnswer,
+  dropOrder,
+  obeys,
+  orderPoint,
+  orderTicks,
+  takeOrder,
+  type OrderAnswer,
+  type OrderPoint,
+} from './orders.ts';
 import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
 import { SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
@@ -58,6 +71,11 @@ export interface BotDirector extends Disposable {
    * (sem o bloco `director`, no Bobo Zombies ou sem humanos). O `game` mostra no placar ("Diretor: bots −½").
    */
   directorShift(): number | null;
+  /**
+   * M8 (fase 6): a resposta da última ordem do humano no controlador (quantos bots aliados ouviram e quantos
+   * obedeceram), ou `null` sem ordem ainda. O `game` mostra a quem mandou.
+   */
+  orderAnswer(controller: number): Readonly<OrderAnswer> | null;
 }
 
 export interface BotDirectorConfig {
@@ -268,6 +286,102 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   function applyDirectorShift(shift: number): void {
     for (let i = 0; i < recipeBots; i++) soldiers[i]!.setShift(shifted[i] === 1 ? shift : 0, soldierTiming);
   }
+  // M8 (fase 6): as ordens aos bots aliados. A última ordem de cada controlador humano (a borda), a resposta de cada
+  // um e o fluxo de RNG da obediência (à parte dos cérebros: sem ordem, nada muda).
+  const lastOrder = new Uint8Array(isHuman.length);
+  const lastPing = new Uint8Array(isHuman.length);
+  const answers: OrderAnswer[] = [];
+  for (let c = 0; c < isHuman.length; c++) answers.push(createOrderAnswer());
+  const orderRng = root.fork('orders');
+  const orderAt: OrderPoint = { x: 0, y: 0, z: 0 };
+  const pickIdx = new Int32Array(AI_ORDERS.maxBots);
+  const pickD2 = new Float64Array(AI_ORDERS.maxBots);
+  /** Lê a ordem de cada humano na borda (o valor mudou para uma ordem) e passa aos aliados. */
+  function readOrders(view: SimView, frames: InputFrame[]): void {
+    // M8 (fase 6, revisão): o que a sim ignora a IA também ignora: tudo na contagem e fora da rodada valendo (a sim
+    // zera os botões), e o aviso de quem está caído (a ordem vale: o Me revive é para isso).
+    const frozen =
+      view.match.phase === 'warmup' || (view.rounds !== null && view.rounds.data[ROUND.phase] !== ROUND_PHASE.live);
+    for (let c = 0; c < isHuman.length && c < frames.length; c++) {
+      const f = frames[c]!;
+      const buttons = isHuman[c] === 1 && !frozen ? f.buttons : 0;
+      const o = frameOrder(buttons);
+      if (o !== 0 && o !== lastOrder[c]) dispatchOrder(view, c, o, f);
+      lastOrder[c] = o;
+      // O aviso do humano também vale para os bots do time (como o de um bot N3: quem ouve avisos vai conferir).
+      const e = ctx.ctrlToEntity[c]!;
+      const downed = e >= 0 && (view.flags[e]! & ENTITY_FLAG.downed) !== 0;
+      const ping = (buttons & BUTTON.ping) !== 0 && !downed ? 1 : 0;
+      if (ping === 1 && lastPing[c] === 0) humanPing(view, c, f);
+      lastPing[c] = ping;
+    }
+  }
+  function humanPing(view: SimView, c: number, f: InputFrame): void {
+    const e = ctx.ctrlToEntity[c]!;
+    if (ctx.ffa || ctx.board === null || e < 0 || !ctx.living(e)) return;
+    if (!orderPoint(view, e, ORDER.attack, u16ToYaw(f.yaw), i16ToPitch(f.pitch), orderAt)) return;
+    ctx.board.post(view.team[e]!, orderAt.x, orderAt.y, orderAt.z, view.tick, true);
+  }
+  /** M8 (fase 6, revisão): no BoboStrike, a rodada nova tira as ordens (o lado pode ter trocado). */
+  let orderRound = -1;
+  function dropOrdersOnNewRound(view: SimView): void {
+    if (view.rounds === null) return;
+    const r = view.rounds.data[ROUND.round]!;
+    if (r === orderRound) return;
+    orderRound = r;
+    for (let i = 0; i < recipeBots; i++) dropOrder(soldiers[i]!);
+  }
+  /**
+   * Os bots aliados de quem mandou (os da receita que ninguém pilota, vivos), até `maxBots` dos mais perto dentro de
+   * `rangeM`: cada um sorteia se obedece (N0 e N1 ignoram).
+   */
+  function dispatchOrder(view: SimView, c: number, order: number, f: InputFrame): void {
+    const answer = answers[c]!;
+    answer.tick = view.tick;
+    answer.order = order;
+    answer.asked = 0;
+    answer.obeyed = 0;
+    answer.nowhere = false;
+    const e = ctx.ctrlToEntity[c]!;
+    if (order > ORDER.cover || e < 0 || !ctx.living(e)) return;
+    // A mira do próprio quadro da ordem (a da `SimView` é a do tick anterior; o ping da sim usa a do quadro).
+    if (!orderPoint(view, e, order, u16ToYaw(f.yaw), i16ToPitch(f.pitch), orderAt)) {
+      answer.nowhere = true;
+      return;
+    }
+    const x = view.position[e * 3]!;
+    const z = view.position[e * 3 + 2]!;
+    const range2 = AI_ORDERS.rangeM * AI_ORDERS.rangeM;
+    let n = 0;
+    for (let i = 0; i < recipeBots; i++) {
+      if (piloted[i] === 1) continue;
+      const be = ctx.ctrlToEntity[soldiers[i]!.controller]!;
+      if (be < 0 || !ctx.living(be) || ctx.hostile(e, be)) continue;
+      const dx = view.position[be * 3]! - x;
+      const dz = view.position[be * 3 + 2]! - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > range2) continue;
+      // Os mais perto primeiro (inserção numa lista curta).
+      let k = Math.min(n, AI_ORDERS.maxBots - 1);
+      if (n === AI_ORDERS.maxBots && d2 >= pickD2[k]!) continue;
+      while (k > 0 && pickD2[k - 1]! > d2) {
+        pickD2[k] = pickD2[k - 1]!;
+        pickIdx[k] = pickIdx[k - 1]!;
+        k--;
+      }
+      pickD2[k] = d2;
+      pickIdx[k] = i;
+      if (n < AI_ORDERS.maxBots) n++;
+    }
+    const until = view.tick + orderTicks(order, hz);
+    for (let k = 0; k < n; k++) {
+      const b = soldiers[pickIdx[k]!]!;
+      answer.asked++;
+      if (!obeys(orderRng, b, order, e, view.generation[e]!, view.tick, hz)) continue;
+      takeOrder(b, order, e, view.generation[e]!, orderAt, until);
+      answer.obeyed++;
+    }
+  }
   function directorTick(md: MatchDirector, view: SimView): void {
     let changed = false;
     if (directorRebuild) {
@@ -298,6 +412,8 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       flow?.update(ctx);
       fortFlow?.update(ctx);
       if (matchDirector !== null) directorTick(matchDirector, view);
+      dropOrdersOnNewRound(view);
+      readOrders(view, frames);
       if (total === 0) return;
       // M2 (fases 3e e 3f): o quadro do time (criado no 1º tick, com o tamanho do mapa).
       // M7 (fase 6): no Royale os esquadrões passam do teto de times do quadro: o calor e o perigo num quadro só, como
@@ -326,6 +442,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       const tick = ctx.tick;
       for (let k = 0; k < board.pingTick.length && (n + 1) * 3 <= out.length; k++) {
         if (board.pingTeam[k] !== (ctx.ffa ? 0 : team) || tick - board.pingTick[k]! > maxAgeTicks) continue;
+        if (board.pingHuman[k] === 1) continue;
         out[n * 3] = board.pingX[k]!;
         out[n * 3 + 1] = board.pingY[k]!;
         out[n * 3 + 2] = board.pingZ[k]!;
@@ -353,6 +470,10 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     },
     directorShift(): number | null {
       return matchDirector?.shift ?? null;
+    },
+    orderAnswer(controller): Readonly<OrderAnswer> | null {
+      const a = controller >= 0 && controller < answers.length ? answers[controller]! : null;
+      return a !== null && a.tick >= 0 ? a : null;
     },
     stats(): BotDirectorStats {
       return {

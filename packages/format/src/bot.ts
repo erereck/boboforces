@@ -82,6 +82,11 @@ export interface BotPersonality {
   readonly patience: number;
   readonly preferredRangeM: number;
   readonly silliness: number;
+  /**
+   * M8 (fase 6): a lealdade (0..1, gameplay.md §6.4 e §6.10): a chance de obedecer uma ordem do humano aliado (do N2
+   * para cima). O documento sem ela ganha a do preset (pergunta Z6), sem mudar a versão.
+   */
+  readonly loyalty: number;
 }
 
 /** Regras e vantagens (§6.5); toda regra ativa aparece no card, no placar e na tela de morte. */
@@ -188,18 +193,21 @@ export function intelligenceForLevel(level: number): BotIntelligence {
 }
 
 /** Pesos de cada personalidade (§6.4; a distância -1 = aleatória). */
+// M8 (fase 6): a lealdade de cada preset (pergunta Z6): Suporte 100%, Estrategista 90%, Equilibrado, Covarde e Camper
+// 70% (a IA ainda corta o "Ataca ali" do Covarde para 50% e o "Vem comigo" do Camper para 30%), Rusher, Kamikaze,
+// Caçador e Palhaço 40%, Lunático 20%; o boneco de treino não obedece.
 export const PERSONALITY_PRESETS: Readonly<Record<PersonalityId, BotPersonality>> = {
-  balanced: personality('balanced', 0.5, 0.5, 0.5, 20, 0.05),
-  rusher: personality('rusher', 0.9, 0.1, 0.2, 6, 0.1),
-  lunatic: personality('lunatic', 0.8, 0, 0, -1, 0.6),
-  coward: personality('coward', 0.2, 0.9, 0.6, 35, 0.1),
-  camper: personality('camper', 0.3, 0.7, 0.95, 40, 0.05),
-  strategist: personality('strategist', 0.5, 0.6, 0.7, 25, 0.05),
-  kamikaze: personality('kamikaze', 1, 0, 0, 0, 0.3),
-  hunter: personality('hunter', 0.8, 0.3, 0.4, 15, 0.05),
-  support: personality('support', 0.4, 0.6, 0.6, 15, 0.05),
-  clown: personality('clown', 0.5, 0.3, 0.3, 15, 0.5),
-  dummy: personality('dummy', 0, 0, 1, -1, 0),
+  balanced: personality('balanced', 0.5, 0.5, 0.5, 20, 0.05, 0.7),
+  rusher: personality('rusher', 0.9, 0.1, 0.2, 6, 0.1, 0.4),
+  lunatic: personality('lunatic', 0.8, 0, 0, -1, 0.6, 0.2),
+  coward: personality('coward', 0.2, 0.9, 0.6, 35, 0.1, 0.7),
+  camper: personality('camper', 0.3, 0.7, 0.95, 40, 0.05, 0.7),
+  strategist: personality('strategist', 0.5, 0.6, 0.7, 25, 0.05, 0.9),
+  kamikaze: personality('kamikaze', 1, 0, 0, 0, 0.3, 0.4),
+  hunter: personality('hunter', 0.8, 0.3, 0.4, 15, 0.05, 0.4),
+  support: personality('support', 0.4, 0.6, 0.6, 15, 0.05, 1),
+  clown: personality('clown', 0.5, 0.3, 0.3, 15, 0.5, 0.4),
+  dummy: personality('dummy', 0, 0, 1, -1, 0, 0),
 };
 
 function personality(
@@ -209,8 +217,9 @@ function personality(
   patience: number,
   preferredRangeM: number,
   silliness: number,
+  loyalty: number,
 ): BotPersonality {
-  return { preset, aggression, caution, patience, preferredRangeM, silliness };
+  return { preset, aggression, caution, patience, preferredRangeM, silliness, loyalty };
 }
 
 /** Regras sem vantagem nenhuma (os níveis rápidos, §6.6). */
@@ -451,6 +460,7 @@ export function validateBot(doc: unknown): ValidationResult<BotDocument> {
     patience: num(ctx, p, 'patience', 'personality', pp.patience, R.unit),
     preferredRangeM: num(ctx, p, 'preferredRangeM', 'personality', pp.preferredRangeM, R.preferredRangeM),
     silliness: num(ctx, p, 'silliness', 'personality', pp.silliness, R.unit),
+    loyalty: num(ctx, p, 'loyalty', 'personality', pp.loyalty, R.unit),
   };
   const r = obj(ctx, doc, 'rules');
   const dr = DEFAULT_BOT_RULES;

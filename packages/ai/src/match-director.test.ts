@@ -164,16 +164,16 @@ describe('M8 (fase 5): o ajuste da mira entre dois níveis', () => {
 const blocks = createTestBlocks();
 const concrete = makeCell(blocks.byKey('concrete')!.id);
 
-/** Uma arena aberta de 32 × 32 m: o humano parado ao sul, os bots ao norte. */
+/** Uma arena aberta de 32 × 32 m (64 células de 0,5 m): o humano parado ao sul, os bots ao norte. */
 function arena(): SimMap {
-  const grid = createWorldGrid(32, 8, 32);
-  fillBox(grid, 0, 0, 0, 31, 0, 31, concrete);
+  const grid = createWorldGrid(64, 8, 64);
+  fillBox(grid, 0, 0, 0, 63, 0, 63, concrete);
   return {
     grid,
     blocks,
     spawns: [
-      { x: cellCenter(16), y: 0.5, z: 26, yaw: 0, team: 0 },
-      { x: cellCenter(16), y: 0.5, z: 6, yaw: Math.PI, team: 1 },
+      { x: cellCenter(32), y: 0.5, z: 26, yaw: 0, team: 0 },
+      { x: cellCenter(32), y: 0.5, z: 6, yaw: Math.PI, team: 1 },
     ],
     nav: buildTestNav({ grid, blocks }, BOBO_NAV_METRICS),
   };

@@ -1,5 +1,5 @@
 import { MOVE_DIRECTIONS, type GameAction, type MoveDirection } from './actions.ts';
-import { TOUCH_CONTROLS, type BindingSource, type DeviceKind } from './bindings.ts';
+import { holdSources, tapSources, TOUCH_CONTROLS, type BindingSource, type DeviceKind } from './bindings.ts';
 import { KEY_CODES, KEY_COUNT, keyIndex } from './keys.ts';
 import type { ControlProfile } from './profiles.ts';
 import { GAMEPAD_BUTTONS, MAX_GAMEPADS, MOUSE_BUTTON, PAD_AXIS, PAD_BUTTON, type RawInputState } from './raw.ts';
@@ -150,6 +150,8 @@ export function applyBindings(
     changed = true;
     if (isMove(action)) move = { ...move, [action]: sources };
     else game = { ...game, [action]: sources };
+    // M8 (fase 6): a roda das ordens é o aviso segurado: vai junto quando o aviso muda de botão.
+    if (action === 'ping') game = { ...game, ping: tapSources(sources), orders: holdSources(sources) };
   }
   return changed ? { ...base, game, move } : base;
 }

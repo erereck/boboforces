@@ -18,6 +18,8 @@ import {
   wheel,
   type BindingSource,
   type DeviceKind,
+  holdSources,
+  tapSources,
 } from './bindings.ts';
 import { DEFAULT_TOUCH_LAYOUT, type TouchLayout } from './touch.ts';
 
@@ -119,7 +121,8 @@ export function createKeyboardMouseProfile(options: KeyboardProfileOptions = {})
       fire: [key('ControlRight'), key('KeyF')],
       ads: [key('ShiftRight'), key('KeyZ')],
       sprint: [key('ShiftLeft')],
-      ping: [key('KeyN')],
+      ping: tapSources([key('KeyN')]),
+      orders: holdSources([key('KeyN')]),
       nextWeapon: [key('Period')],
       prevWeapon: [key('Comma')],
     },
@@ -147,7 +150,9 @@ function keyboardMouseProfile(): ControlProfile {
       use: [key('KeyE')],
       melee: [key('KeyV')],
       grenade: [key('KeyG')],
-      ping: [mouse('middle')],
+      // M8 (fase 6): segurar o aviso abre a roda das ordens (o aviso vale no toque curto).
+      ping: tapSources([mouse('middle')]),
+      orders: holdSources([mouse('middle')]),
       emote: [key('KeyB')],
       slot1: [key('Digit1')],
       slot2: [key('Digit2')],
@@ -210,7 +215,8 @@ export function createGamepadProfile(convention: MenuConfirmConvention = 'bottom
       melee: [pad('bumperLeft')],
       grenade: [pad('bumperRight')],
       nextWeapon: [pad('faceUp')],
-      ping: [pad('dpadUp')],
+      ping: tapSources([pad('dpadUp')]),
+      orders: [pad('dpadUp', true)],
       emote: [pad('dpadDown')],
       // M2 (fase 6b): o direcional dos lados (o de cima e o de baixo são aviso e emote).
       camera: [pad('dpadRight')],
@@ -260,6 +266,8 @@ export function createTouchProfile(layout: TouchLayout = DEFAULT_TOUCH_LAYOUT): 
       // M2 (fase 6e).
       melee: [touch('melee')],
       camera: [touch('camera')],
+      // M8 (fase 6): o botão das ordens abre a roda.
+      orders: [touch('orders')],
     },
     menu: {},
     moveStick: null,

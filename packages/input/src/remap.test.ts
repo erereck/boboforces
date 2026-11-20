@@ -123,3 +123,16 @@ describe('remapeamento', () => {
     expect(cap.update(raw)).toBe('cancel');
   });
 });
+
+describe('M8 (fase 6): a roda das ordens segue o aviso', () => {
+  it('remapear o aviso leva a roda junto: o aviso no toque curto e a roda segurando a mesma tecla', () => {
+    const p = applyBindings(createKeyboardMouseProfile(), { ping: ['key:KeyF'] });
+    expect(p.game.ping).toEqual([{ ...key('KeyF'), tap: true }]);
+    expect(p.game.orders).toEqual([{ ...key('KeyF'), hold: true }]);
+    // No controle também (o D-pad que vira a roda).
+    const g = applyBindings(createGamepadProfile(), { ping: ['pad:dpadLeft'] });
+    expect(g.game.orders).toEqual([pad('dpadLeft', true)]);
+    // O texto do save não guarda o toque curto (ele vem de ser o aviso).
+    expect(encodeBinding(p.game.ping![0]!)).toBe('key:KeyF');
+  });
+});

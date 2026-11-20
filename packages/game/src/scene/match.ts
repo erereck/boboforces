@@ -59,10 +59,13 @@ import {
   type ControlProfile,
   type DeviceBinding,
   type DeviceKind,
+  type InputFrame,
   type InputMapper,
   type MenuInput,
   type RawInputState,
   type RemapAction,
+  ORDER_WHEEL,
+  withOrder,
 } from '@boboforces/input';
 import {
   ACTOR_KIND,
@@ -803,6 +806,18 @@ interface ViewSlot {
   tapOpt: number;
   tapNow: number;
   /**
+   * M8 (fase 6): a roda das ordens (o aviso segurado): aberta, o cursor (o giro da mira move, como no anel da compra),
+   * a ordem apontada (-1 = nenhuma), a mira guardada na abertura e o aviso da resposta ("Vem comigo: 2 de 3 bots").
+   */
+  orderOpen: boolean;
+  readonly order: DeathState;
+  orderPick: number;
+  orderYaw: number;
+  orderPitch: number;
+  orderNotice: string;
+  orderNoticeS: number;
+  orderAnswerTick: number;
+  /**
    * M2 (fase 6b): 3ª pessoa nesta vista no último frame, a câmera de ombro e onde ela ficou em relação ao olho (o
    * quadro do humano mira pelo raio da câmera).
    */
@@ -1261,6 +1276,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       tapId: -1,
       tapOpt: -1,
       tapNow: -1,
+      orderOpen: false,
+      order: createDeathState(),
+      orderPick: -1,
+      orderYaw: 0,
+      orderPitch: 0,
+      orderNotice: '',
+      orderNoticeS: 0,
+      orderAnswerTick: -1,
       third: false,
       shoulder: createShoulderPose(),
       camOffX: 0,
@@ -1764,7 +1787,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const emoteBy = new Float64Array(MAX_EMOTE_BUBBLES).fill(-1);
   const emoteKind = new Uint8Array(MAX_EMOTE_BUBBLES);
   const emoteUntil = new Float64Array(MAX_EMOTE_BUBBLES);
-  const emoteTexts = [1, 2, 3, 4].map((k) => t(`emote.${k}` as StringKey));
+  // M8 (fase 6): as ordens (o nome muda no Zombies e no Royale em grupo, onde o "Me cobre" levanta quem mandou) e os
+  // balões delas depois dos 4 emotes (os tipos 5 a 8 do aviso da sim).
+  const reviveOrders = zombiesMode || (royaleMode && (recipe.royale?.squad ?? 'solo') !== 'solo');
+  const orderName = (o: number): string => t((o === 4 && reviveOrders ? 'order.4.revive' : `order.${o}`) as StringKey);
+  const ORDER_BALLOON_KIND = 5;
+  const emoteTexts = [
+    ...[1, 2, 3, 4].map((k) => t(`emote.${k}` as StringKey)),
+    ...[1, 2, 3, 4].map((o) => t('order.balloon', { order: orderName(o) })),
+  ];
   /** Um sinal da sim: o ping vai para a lista do time; o emote troca o balão de quem mandou (ou ocupa um vago). */
   function onSignal(v: SimView, by: number, kind: number, x: number, y: number, z: number): void {
     const i = entityIndex(by);
@@ -2160,7 +2191,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         const seat = seatOf(slot);
         if (seat !== 0) {
           // Sofá: os jogadores 2..4 só pelo dispositivo de cada um (sem 3ª pessoa, toque nem Destravar).
-          if (seat > 0) extras[seat - 1]!.writeFrame(out, seq);
+          if (seat > 0) {
+            extras[seat - 1]!.writeFrame(out, seq);
+            writeOrder(seat, out);
+          }
           return;
         }
         player.writeFrame(out, seq);
@@ -2182,6 +2216,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           out.buttons |= BUTTON.unstuck;
           unstuckPending = false;
         }
+        writeOrder(0, out);
       },
       onEvents,
       ...(bench ? { hz: bench.simHz, zombies: bench.zombies } : {}),
@@ -4815,6 +4850,153 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     sharedHud.modsLine = t(key as StringKey, { alive, stage: stage + 1, stages: rv.zone.length }).toUpperCase();
   }
 
+  // --- M8 (fase 6): as ordens aos bots aliados (gameplay.md §6.10) ---
+  /** A ordem que vai no quadro de cada assento e por quantos ticks ainda (a sim e a IA agem na borda). */
+  const seatOrder = new Uint8Array(4);
+  const seatOrderTicks = new Uint8Array(4);
+  /** Os ticks com a ordem no quadro (a rede pode perder um; a borda só conta uma vez). */
+  const ORDER_HOLD_TICKS = 6;
+  /** Quanto tempo o aviso da resposta fica na tela (s). */
+  const ORDER_NOTICE_S = 2.5;
+  const ordersTitle = t('orders.title').toUpperCase();
+  const orderNames = ORDER_WHEEL.map(orderName);
+  const orderHints = ORDER_WHEEL.map((o) =>
+    t((o === 4 && reviveOrders ? 'order.hint.4.revive' : `order.hint.${o}`) as StringKey),
+  );
+  /**
+   * M8 (fase 6, revisão): com a roda aberta e enquanto a ordem sai, o quadro leva a mira da abertura (o giro do quadro
+   * move só o cursor: o boneco não treme para os outros, o tiro não sai torto e o Ataca ali cai onde a mira estava).
+   */
+  const seatLock = new Uint8Array(4);
+  const seatLockYaw = new Float64Array(4);
+  const seatLockPitch = new Float64Array(4);
+  function writeOrder(seat: number, out: InputFrame): void {
+    const sending = seatOrderTicks[seat]! > 0;
+    if (seatLock[seat] === 1 || sending) {
+      out.yaw = yawToU16(seatLockYaw[seat]!);
+      out.pitch = pitchToI16(seatLockPitch[seat]!);
+    }
+    if (!sending) return;
+    out.buttons = withOrder(out.buttons, seatOrder[seat]!);
+    seatOrderTicks[seat] = seatOrderTicks[seat]! - 1;
+  }
+  function closeOrders(slot: ViewSlot): void {
+    slot.orderOpen = false;
+    slot.orderPick = -1;
+    slot.tapId = -1;
+    const seat = seatOf(slot.controller);
+    if (seat >= 0) seatLock[seat] = 0;
+  }
+  function sendOrder(slot: ViewSlot, seat: number, pick: number): void {
+    const o = ORDER_WHEEL[pick]!;
+    seatOrder[seat] = o;
+    seatOrderTicks[seat] = ORDER_HOLD_TICKS;
+    host.log(`[partida] ordem do P${seat + 1}: ${orderName(o)}`);
+    // No cliente online os bots são do host: a resposta não chega, então o aviso só confirma a ordem.
+    if (driver.director === null) {
+      slot.orderNotice = t('order.sent', { order: orderName(o) });
+      slot.orderNoticeS = ORDER_NOTICE_S;
+    }
+  }
+  /** A resposta da última ordem (o diretor dos bots conta quem ouviu e quem obedeceu; no cliente online, nada). */
+  function pollOrderAnswer(slot: ViewSlot): void {
+    const a = driver.director?.orderAnswer(slot.controller) ?? null;
+    if (a === null || a.tick === slot.orderAnswerTick) return;
+    slot.orderAnswerTick = a.tick;
+    const order = orderName(a.order);
+    slot.orderNotice = a.nowhere
+      ? t('order.answer.nowhere', { order })
+      : a.asked === 0
+        ? t('order.answer.none', { order })
+        : a.obeyed === 0
+          ? t('order.answer.ignored', { order })
+          : t('order.answer', { order, n: a.obeyed, asked: a.asked });
+    slot.orderNoticeS = ORDER_NOTICE_S;
+  }
+  /**
+   * A roda de cada humano vivo. Segurando o aviso, ela abre: a câmera fica na mira da abertura e o giro move o cursor
+   * (como no anel da compra); soltando com uma ordem apontada, a ordem vai no quadro. No toque, o botão Ordens abre e
+   * fecha, e tocar numa ordem manda. Fora dos times (FFA, Juggernaut), na compra do BoboStrike e na pausa, fechada.
+   */
+  function updateOrders(raw: RawInputState, dt: number): void {
+    const v = sim.view();
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const slot = slots[sIdx]!;
+      if (slot.orderNoticeS > 0) slot.orderNoticeS = Math.max(0, slot.orderNoticeS - dt);
+      const seat = seatOf(slot.controller);
+      if (seat < 0) continue;
+      pollOrderAnswer(slot);
+      const m = seat === 0 ? player : extras[seat - 1]!;
+      const e = entityIndex(sim.controllerEntity(slot.controller));
+      const alive = e >= 0 && e < v.count && (v.flags[e]! & ENTITY_FLAG.dead) === 0;
+      const touchSeat = seat === 0 && device === 'touch';
+      if (solo || !alive || slot.buyOpen || paused) {
+        if (slot.orderOpen) closeOrders(slot);
+        continue;
+      }
+      if (!slot.orderOpen) {
+        if (!(touchSeat ? m.wasPressed('orders') : m.isDown('orders'))) continue;
+        slot.orderOpen = true;
+        slot.orderYaw = m.yaw;
+        slot.orderPitch = m.pitch;
+        seatLock[seat] = 1;
+        seatLockYaw[seat] = m.yaw;
+        seatLockPitch[seat] = m.pitch;
+        slot.order.cursorX = 0;
+        slot.order.cursorY = 0;
+        slot.orderPick = -1;
+        slot.tapId = -1;
+        continue;
+      }
+      if (touchSeat) {
+        if (m.wasPressed('orders')) {
+          closeOrders(slot);
+          continue;
+        }
+        // Só o toque curto que começa e termina na mesma ordem (arrastar o dedo não manda).
+        const hit = slot.model.primaryHit;
+        let still = false;
+        let pick = -1;
+        for (let k = 0; k < raw.touches.length; k++) {
+          const touch = raw.touches[k]!;
+          if (!touch.active) continue;
+          if (slot.tapId < 0) {
+            const at = hitPrimaryOption(hit, touch.startX, touch.startY);
+            if (at >= 0) {
+              slot.tapId = touch.id;
+              slot.tapOpt = at;
+            }
+          }
+          if (touch.id === slot.tapId) {
+            still = true;
+            slot.tapNow = hitPrimaryOption(hit, touch.x, touch.y);
+          }
+        }
+        if (slot.tapId >= 0 && !still) {
+          if (slot.tapNow === slot.tapOpt) pick = slot.tapOpt;
+          slot.tapId = -1;
+        }
+        if (pick >= 0) {
+          sendOrder(slot, seat, pick);
+          closeOrders(slot);
+        }
+        continue;
+      }
+      const dyaw = wrapAngle(m.yaw - slot.orderYaw);
+      const dpitch = m.pitch - slot.orderPitch;
+      m.setAngles(slot.orderYaw, slot.orderPitch);
+      if (dyaw !== 0 || dpitch !== 0) {
+        moveRadialCursor(slot.order, dyaw, dpitch);
+        const aimed = radialIndex(slot.order.cursorX, slot.order.cursorY, ORDER_WHEEL.length);
+        if (aimed >= 0) slot.orderPick = aimed;
+      }
+      if (!m.isDown('orders')) {
+        if (slot.orderPick >= 0) sendOrder(slot, seat, slot.orderPick);
+        closeOrders(slot);
+      }
+    }
+  }
+
   /**
    * M7 (fase 4): o anel da compra de cada humano vivo, na compra: o giro de mira move o cursor (como o radial da morte),
    * o tiro compra a opção apontada (no toque, tocar nela compra). O pedido vai no `InputFrame.primary` e a sim compra
@@ -5399,6 +5581,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (i >= v.count || v.alive[i] !== 1 || (v.flags[i]! & ENTITY_FLAG.dead) !== 0) continue;
       // M6 (fase 4b): o balão não entrega o invisível.
       if (hiddenNow[i] === 1) continue;
+      // M8 (fase 6): o balão da ordem é só do time de quem mandou.
+      if (emoteKind[b]! >= ORDER_BALLOON_KIND && (ffa || e < 0 || v.team[i] !== v.team[e])) continue;
       const o = i * 3;
       if (
         !projectToView(
@@ -5567,6 +5751,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.primaryNames = strikeItems;
       m.primaryCategories = strikePrices;
       m.primarySelected = slot.buyPick;
+    } else if (slot.orderOpen && !m.dead) {
+      // M8 (fase 6): a roda das ordens usa o mesmo anel (a compra fecha a roda).
+      m.buyTitle = ordersTitle;
+      m.primaryNames = orderNames;
+      m.primaryCategories = orderHints;
+      m.primarySelected = slot.orderPick;
     }
     m.playerSlot = slot.seat;
     m.team = ffa ? 255 : v.team[e]!;
@@ -5617,6 +5807,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.tipAlpha = Math.min(1, batteryNoticeS);
       m.tipKey = '!';
       m.tipText = batteryNotice;
+      m.tipGlyph = -1;
+    } else if (slot.orderNoticeS > 0) {
+      // M8 (fase 6): a resposta da ordem na plaquinha da dica.
+      m.tipAlpha = Math.min(1, slot.orderNoticeS);
+      m.tipKey = '!';
+      m.tipText = slot.orderNotice;
       m.tipGlyph = -1;
     }
     drawHud(slot.hud, fonts, m, lay.views[s]!);
@@ -6437,6 +6633,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const lay = syncLayout(ui);
       updateDeaths(running ? dt : 0, raw, lay);
       updateBuys(raw);
+      updateOrders(raw, dt);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
       // M2 (fase 7b): cada vista ouve da própria câmera; passos, coração e contagem andam com a partida.
       matchSound.setListenerCount(slots.length);

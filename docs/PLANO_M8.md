@@ -84,6 +84,8 @@ Uma de cada vez; cada fase termina verde, revisada (um revisor Opus), commitada 
 6. **As ordens aos bots aliados:** a roda (Vem comigo, Segura aqui, Ataca ali, Me cobre / Me revive) num botão; o N0 e o
    N1 ignoram, do N2 para cima obedecem pela **lealdade** (um campo novo da personalidade, com o padrão de cada preset);
    o ping dos humanos também passa a valer para os bots. A ordem viaja na rede (`PROTOCOL_VERSION`).
+   - **feita em 19/11** (ARCHITECTURE §19.7): a ordem nos bits 12 a 14 do quadro (protocolo 9), a roda pelo anel da
+     compra, o balão e o ping na sim, a obediência e o comportamento na IA, a lealdade no `bot@1` e no Laboratório.
 7. **O perfil Arcade:** a tabela do GDD §4.2.2 (andar 5,5 e correr 8,0 m/s, pulo 1,3 m com pulo duplo, bunny hop de
    +5% por pulo até 12 m/s, wall jump uma vez por parede, slide que mantém o momento, mantle até 2 m, sem dano de
    queda, atira correndo com o espalhamento "no ar"); o modificador Arcade; os bots não fazem bunny hop nem wall jump
