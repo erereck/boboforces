@@ -7,9 +7,10 @@ import { createHeadlessMatch } from './headless.ts';
 import { NavLevels, strongComponents } from './levels.ts';
 
 /**
- * M10 (fase 1c): o passeio que sobe. O índice de andares (`NavLevels`) só guarda o grupo principal (o maior componente
- * fortemente conexo) de cada componente, e o soldado às vezes sorteia o andar antes do nó: o deque pequeno no alto da
- * escada recebe gente, e o topo de onde só se cai (o A* não chega) nunca é sorteado.
+ * M10 (fase 1c): o passeio que sobe. O índice (`NavLevels`) só guarda o grupo principal (o maior componente fortemente
+ * conexo) de cada componente, e o soldado às vezes sorteia o lugar alto antes do nó (M11, fase 2: o lugar é um piso
+ * plano; era o andar, uma faixa de 3 m): o deque pequeno no alto da escada recebe gente, mesmo ao lado de um mezanino
+ * grande, e o topo de onde só se cai (o A* não chega) nunca é sorteado.
  */
 
 const blocks = createTestBlocks();
@@ -55,8 +56,47 @@ function towerMap(): { map: SimMap; deckY: number; perchY: number } {
   return { map, deckY: 4.5, perchY: 7 };
 }
 
-describe('índice de andares', () => {
-  it('o deque entra no andar 1 do grupo principal; o poleiro (só se cai dele) fica de fora', () => {
+/** Os lugares do componente `comp` (piso e nós), do mais baixo ao mais alto. */
+function placesOf(levels: NavLevels, comp: number): { y: number; nodes: number[] }[] {
+  const out: { y: number; nodes: number[] }[] = [];
+  for (let k = levels.compStart[comp]!; k < levels.compStart[comp + 1]!; k++) {
+    out.push({
+      y: levels.floorY[k]!,
+      nodes: Array.from(levels.order.subarray(levels.start[k]!, levels.start[k + 1]!)),
+    });
+  }
+  return out;
+}
+
+/**
+ * M11 (fase 2): o deque da antena da Lua em miniatura. Térreo de 24 × 32 m (piso a 0,5 m), um mezanino de 8 × 8 m a
+ * 4,5 m (escada de 2 m de largura) e, do outro lado, um deque de 2 × 3 m a 3,5 m (escada da mesma largura): os dois na
+ * mesma faixa de 3 m do índice por andar da fase 1c, onde o deque (8 nós) dividia o sorteio com o mezanino (66).
+ */
+function deckAndMezzanineMap(): { map: SimMap; deckY: number; mezzanineY: number } {
+  const grid = createWorldGrid(48, 24, 64);
+  fillBox(grid, 0, 0, 0, 47, 0, 63, concrete);
+  // O mezanino (x 4..19, z 40..55) no alto da escada (x 4..7, z 32..39).
+  for (let t = 0; t < 8; t++) fillBox(grid, 4, 1, 32 + t, 7, 1 + t, 32 + t, concrete);
+  fillBox(grid, 4, 1, 40, 19, 8, 55, concrete);
+  // O deque (x 32..35, z 44..49) no alto da escada (x 32..35, z 38..43).
+  for (let t = 0; t < 6; t++) fillBox(grid, 32, 1, 38 + t, 35, 1 + t, 38 + t, concrete);
+  fillBox(grid, 32, 1, 44, 35, 6, 49, concrete);
+  const map: SimMap = {
+    grid,
+    blocks,
+    spawns: [
+      { x: 6.5, y: 0.5, z: 6.5, yaw: Math.PI, team: 0 },
+      { x: 17.5, y: 0.5, z: 6.5, yaw: Math.PI, team: 0 },
+      { x: 6.5, y: 0.5, z: 26.5, yaw: 0, team: 1 },
+    ],
+    nav: buildNavGrid({ grid, blocks }, BOBO_NAV_METRICS),
+  };
+  return { map, deckY: 3.5, mezzanineY: 4.5 };
+}
+
+describe('índice de lugares', () => {
+  it('o deque é um lugar do grupo principal; o poleiro (só se cai dele) fica de fora', () => {
     const { map, deckY, perchY } = towerMap();
     const nav = map.nav!;
     const levels = new NavLevels();
@@ -72,13 +112,31 @@ describe('índice de andares', () => {
     expect(levels.group[ground]).toBe(levels.mainGroup[comp]);
     expect(levels.group[deck]).toBe(levels.mainGroup[comp]);
     expect(levels.group[perch]).not.toBe(levels.mainGroup[comp]);
-    expect(levels.baseY).toBe(0.5);
-    expect(levels.levelOf(deckY)).toBe(1);
-    const bucket = comp * levels.count + 1;
-    const inLevel1 = Array.from(levels.order.subarray(levels.start[bucket]!, levels.start[bucket + 1]!));
-    expect(inLevel1).toContain(deck);
-    expect(inLevel1).not.toContain(perch);
+    // Dois lugares: o térreo e o deque (a escada, degrau de 0,5 m a cada nó, não junta os dois).
+    const places = placesOf(levels, comp);
+    expect(places.map((p) => p.y)).toEqual([0.5, deckY]);
+    expect(places[0]!.nodes).toContain(ground);
+    expect(places[1]!.nodes).toContain(deck);
+    expect(places[1]!.nodes.length).toBeGreaterThanOrEqual(6);
     expect(Array.from(levels.order)).not.toContain(perch);
+  });
+
+  it('o deque pequeno e o mezanino grande na mesma faixa de 3 m são lugares separados', () => {
+    const { map, deckY, mezzanineY } = deckAndMezzanineMap();
+    const nav = map.nav!;
+    const levels = new NavLevels();
+    levels.bind(nav);
+    const comp = nav.component[nav.nearestNode(6.5, 0.5, 6.5)]!;
+    const deck = nav.nearestNode(17, deckY, 23.5);
+    const mezzanine = nav.nearestNode(6, mezzanineY, 24);
+    expect(nav.floorY[deck]).toBe(deckY);
+    expect(nav.floorY[mezzanine]).toBe(mezzanineY);
+    const places = placesOf(levels, comp);
+    expect(places.map((p) => p.y)).toEqual([0.5, deckY, mezzanineY]);
+    expect(places[1]!.nodes).toContain(deck);
+    expect(places[2]!.nodes).toContain(mezzanine);
+    // O mezanino tem 66 nós e o deque, 8; o sorteio por lugar dá a mesma vez aos dois.
+    expect(places[2]!.nodes.length).toBeGreaterThan(places[1]!.nodes.length * 5);
   });
 
   it('o passeio dos bots sobe ao deque pequeno (3 bots, sem inimigo, 2 min) e nunca vai ao poleiro', () => {
@@ -109,5 +167,36 @@ describe('índice de andares', () => {
     // Amostras de 0,5 s com alguém no deque: 17 nesta semente; sem o passeio que sobe (`upperChance` 0), 1.
     expect(onDeck).toBeGreaterThanOrEqual(8);
     expect(onPerch).toBe(0);
+  }, 60_000);
+
+  it('o passeio dos bots sobe ao deque pequeno ao lado do mezanino grande (3 bots, sem inimigo, 2 min)', () => {
+    const { map, deckY, mezzanineY } = deckAndMezzanineMap();
+    const recipe: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'test',
+      seed: 3,
+      match: { timeLimitS: 0 },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 3 }] }, { bots: [] }],
+    };
+    const match = createHeadlessMatch({ recipe, map, humans: 0 });
+    let onDeck = 0;
+    let onMezzanine = 0;
+    for (let t = 0; t < 120 * SIM_HZ; t++) {
+      match.step();
+      if (t % 30 !== 0) continue;
+      const v = match.sim.view();
+      for (let e = 0; e < v.count; e++) {
+        if (v.kind[e] !== ENTITY_KIND.bobo || (v.flags[e]! & ENTITY_FLAG.dead) !== 0) continue;
+        const y = v.position[e * 3 + 1]!;
+        if (Math.abs(y - deckY) < 0.1 && v.position[e * 3]! > 15) onDeck++;
+        if (Math.abs(y - mezzanineY) < 0.1 && v.position[e * 3]! < 10) onMezzanine++;
+      }
+    }
+    match.dispose();
+    // Amostras de 0,5 s no deque: 8 nesta semente (5 a 25 nas sementes 1 a 8); com o sorteio por andar da fase 1c, 2
+    // (2 a 4).
+    expect(onDeck).toBeGreaterThanOrEqual(5);
+    expect(onMezzanine).toBeGreaterThan(0);
   }, 60_000);
 });

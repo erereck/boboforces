@@ -319,14 +319,22 @@ export const AI_SOLDIER = {
   wanderPaceMps: 3,
   wanderMaxS: 45,
   /**
-   * M10 (fase 1c): o passeio às vezes sobe. Com a chance `upperChance`, sorteia um dos andares acima do bot (faixas de
-   * 3 m, `NavLevels`) e até `upperSamples` nós dele; vale o primeiro alcançável a pelo menos `upperRiseM` acima dos pés
-   * do bot (o andar de cima, a torre); senão, o passeio de sempre. Sem isso, o sorteio uniforme por nó quase nunca caía
-   * no andar de cima (o térreo tem muito mais nós).
+   * M10 (fase 1c): o passeio às vezes sobe. Com a chance `upperChance`, sorteia um dos lugares com o piso a pelo menos
+   * `upperRiseM` acima dos pés do bot (M11, fase 2: o lugar é um piso plano, `NavLevels`; era o andar, uma faixa de
+   * 3 m) e até `upperSamples` nós dele; vale o primeiro na área jogável (o andar de cima, a torre, o deque, a
+   * passarela); senão, o passeio de sempre. Sem isso, o sorteio uniforme por nó quase nunca caía no alto (o térreo tem
+   * muito mais nós).
    */
   upperChance: 0.3,
   upperSamples: 8,
   upperRiseM: 2.5,
+  /**
+   * M11 (fase 2): o lugar (`NavLevels`): nós em pé ligados com degrau de no máximo `upperPlaceStepM` (o piso de 3,75 e
+   * 4 m do Construto é um lugar só; o degrau de 0,5 m da escada separa), com pelo menos `upperPlaceMinNodes` nós, 2
+   * colunas em X e 2 em Z e `upperPlaceMinNodes` nós na área jogável (revisão da fase 2).
+   */
+  upperPlaceStepM: 0.25,
+  upperPlaceMinNodes: 4,
   /**
    * M6 (fase 1): no Domination, 1 bot em cada tantos defende um ponto do time. M10: contados dentro de cada time (com
    * 3: o 2º, o 5º…; `markPointDefenders`), não pelo controlador global.

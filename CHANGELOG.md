@@ -14,6 +14,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **O Fortress na Fazenda (fase 3):** o card da Fortaleza agora começa na Fazenda à noite, o mapa dele no GDD, com o
   gerador na sala da casa. O Posto Avançado continua na Partida personalizada (a linha Mapa troca de mapa sem perder o
   gerador), e o Surpreenda-me sorteia a Fortaleza nos dois mapas. Um golden novo acompanha o Fortress na Fazenda.
+- **Os bots sobem aonde o mapa pede (fase 2):** o passeio dos bots escolhe um lugar alto (o deque, a passarela, o
+  jirau, o 1º andar) em vez de um andar inteiro, e eles agora vão ao deque da antena da Estação Lunar (7 de 8
+  sementes, antes 2) e à passarela do Galpão (8 de 8, antes 3). Os três testes em espera voltaram; nove goldens foram
+  re-gravados.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 

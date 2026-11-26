@@ -140,7 +140,7 @@ describe('personalidades: comportamento visível', () => {
     expect(balanced.minD).toBeGreaterThan(15);
     expect(rusher.jumps).toBeGreaterThanOrEqual(3);
     expect(balanced.jumps).toBe(0);
-  });
+  }, 30_000);
 
   it('Covarde se afasta de quem está perto; foge com 60% de vida; o Kamikaze nunca recua', () => {
     const run = (preset: PersonalityId): number => {

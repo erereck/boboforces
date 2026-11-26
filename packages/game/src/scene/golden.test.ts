@@ -12,7 +12,7 @@ import {
 } from '@boboforces/format';
 import { hashToHex } from '@boboforces/shared';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
-import { ENTITY_FLAG, ENTITY_KIND, NULL_ENTITY, WEAPON_CODE, WEAPON_NONE } from '@boboforces/sim';
+import { ENTITY_FLAG, ENTITY_KIND, entityIndex, NULL_ENTITY, WEAPON_CODE, WEAPON_NONE } from '@boboforces/sim';
 import { parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
@@ -68,11 +68,13 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * arremesso rápido da granada entra no estado e no hash; a partida é a mesma). M10 fase 1c (26/11/2026): os bots sobem
  * escada reta: `293f84c7` (13 abates, 127 tiros, 7×6, 10 caixinhas, 6 granadas) — o seguidor de rota não larga mais a
  * rota no pé dos lances de 3 e 5 m (Prédios de Teste 1 e 3, torre), o passeio às vezes sobe um andar e o prazo dele
- * cresce com a rota. O hash MUDA, de propósito, quando o mapa, os blocos, as props,
+ * cresce com a rota. M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar:
+ * `0feaeddd` (15 abates, 1 deles um foguete no próprio pé, que não pontua; 122 tiros, 5×9, 5 caixinhas, 6 granadas).
+ * O hash MUDA, de propósito, quando o mapa, os blocos, as props,
  * a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
  * Mudança sem querer é bug de determinismo. O CI no Linux confere o mesmo valor.
  */
-const GOLDEN_HASH = '293f84c7';
+const GOLDEN_HASH = '0feaeddd';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -110,6 +112,8 @@ function loadWorld(id = 'construto') {
 interface GoldenRun {
   hash: string;
   kills: number;
+  /** M11 (fase 2): as mortes sem matador inimigo (o foguete no próprio pé, a queda): não pontuam (`life.ts`). */
+  selfKills: number;
   shots: number;
   /** M2 (fase 2b): caixinhas pegas e Destravar dos bots (só para a mensagem). */
   boxes: number;
@@ -122,6 +126,7 @@ interface GoldenRun {
 
 function runGolden(): GoldenRun {
   let kills = 0;
+  let selfKills = 0;
   let shots = 0;
   let boxes = 0;
   let unstucks = 0;
@@ -133,8 +138,10 @@ function runGolden(): GoldenRun {
     humans: 0,
     onEvents: (events) => {
       for (const ev of events) {
-        if (ev.type === 'kill') kills++;
-        else if (ev.type === 'shot') shots++;
+        if (ev.type === 'kill') {
+          kills++;
+          if (ev.killer === NULL_ENTITY || entityIndex(ev.killer) === entityIndex(ev.victim)) selfKills++;
+        } else if (ev.type === 'shot') shots++;
         else if (ev.type === 'pickup' && ev.action === 'take') boxes++;
         else if (ev.type === 'unstuck') unstucks++;
         else if (ev.type === 'projectile' && ev.action === 'launch' && ev.weapon === WEAPON_CODE.grenade) grenades++;
@@ -146,7 +153,7 @@ function runGolden(): GoldenRun {
   const teamScore = Array.from(match.sim.view().match.teamScore);
   match.dispose();
   const missing = world.missingBlocks.length + world.missingModels.length;
-  return { hash, kills, shots, boxes, unstucks, grenades, teamScore, missing };
+  return { hash, kills, selfKills, shots, boxes, unstucks, grenades, teamScore, missing };
 }
 
 describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.600 ticks', () => {
@@ -158,8 +165,12 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
     // A partida precisa ter combate de verdade, senão o golden não prova nada.
     expect(a.shots).toBeGreaterThan(60);
     expect(a.kills).toBeGreaterThan(4);
-    expect(a.teamScore[0]! + a.teamScore[1]!).toBe(a.kills);
-    const summary = `abates ${a.kills}, tiros ${a.shots}, placar ${a.teamScore.slice(0, 2).join('×')}`;
+    // M11 (fase 2): o placar conta só o abate de inimigo; o suicídio (o foguete no próprio pé) não pontua.
+    expect(a.teamScore[0]! + a.teamScore[1]!).toBe(a.kills - a.selfKills);
+    // Revisão da fase 2: o suicídio é raro (o foguete numa cobertura colada); mais de 1 é a IA errando a mira.
+    expect(a.selfKills).toBeLessThanOrEqual(1);
+    const score = a.teamScore.slice(0, 2).join('×');
+    const summary = `abates ${a.kills} (${a.selfKills} sem matador inimigo), tiros ${a.shots}, placar ${score}`;
     expect(a.hash, `${summary}, caixinhas ${a.boxes}, destravar ${a.unstucks}, granadas ${a.grenades}`).toBe(
       GOLDEN_HASH,
     );
@@ -181,8 +192,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * abates, 3 quedas). Refino R1: `b4b81b30` (atirar andando arcade: onda 3, 37 abates, 3 quedas). Refino R2:
  * `edc93590` (o campo do arremesso rápido no hash; a partida é a mesma). M10 fase 1c (26/11/2026): os bots sobem
  * escada reta (e os zumbis no A* de reserva também): `07976714` (onda 3, 43 abates, 7 quedas, ainda jogando nos 2 min).
+ * M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `17ab056d` (onda 3, 39
+ * abates, 7 quedas, ainda jogando nos 2 min).
  */
-const GOLDEN_ZOMBIES_HASH = '07976714';
+const GOLDEN_ZOMBIES_HASH = '17ab056d';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -378,11 +391,13 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
  * jogam (sobem a escada; os infectados pegam gente) e o hash entre execuções. Gravados na fase 2 (19/11/2026): Gun Game
  * `6595bdd9` (um bot fecha a escada em 3.707 ticks), Infection `ffb3e5cb` (os 8 infectados em 7.648 ticks). M10 fase
  * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: Gun Game `5f4a962e` (um bot fecha em 7.741
- * ticks; níveis 7, 6, 6, 5, 5, 5, 4, 4), Infection `274706cf` (os 8 infectados em 5.966 ticks).
+ * ticks; níveis 7, 6, 6, 5, 5, 5, 4, 4), Infection `274706cf` (os 8 infectados em 5.966 ticks). M11 fase 2
+ * (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: Gun Game `d6c258a7` (um bot fecha em
+ * 5.569 ticks; níveis 7, 6, 6, 4, 4, 4, 3, 2), Infection `b3d188b9` (os 8 infectados em 6.363 ticks).
  * MUDAM com a sim, a IA, o mapa ou as regras dos modos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_GUNGAME_HASH = '5f4a962e';
-const GOLDEN_INFECTION_HASH = '274706cf';
+const GOLDEN_GUNGAME_HASH = 'd6c258a7';
+const GOLDEN_INFECTION_HASH = 'b3d188b9';
 const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
 
 function runPartyGolden(kind: 'gunGame' | 'infection'): {
@@ -466,10 +481,11 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
  * M6 (fase 3): o Juggernaut (Rodízio) com 8 bots Normal no Construto, semente 42, 3 min. Confere que os bots caçam o
  * Jugg (ele troca de mãos várias vezes), que alguém pontua como Jugg e o hash entre execuções. Gravado na fase 3
  * (19/11/2026): `f7c0ff3a` (4 Juggs em 3 min; o melhor fez 71 pontos). M10 fase 1c (26/11/2026): os bots sobem escada
- * reta e o passeio às vezes sobe: `d8fc313c` (4 Juggs em 3 min; pontos 96, 69 e 14). MUDA com a sim, a IA, o mapa ou
- * as regras.
+ * reta e o passeio às vezes sobe: `d8fc313c` (4 Juggs em 3 min; pontos 96, 69 e 14). M11 fase 2 (26/11/2026): o
+ * passeio que sobe sorteia por lugar (piso plano), não por andar: `3cc792a8` (4 Juggs em 3 min; pontos 70, 54, 46 e
+ * 8). MUDA com a sim, a IA, o mapa ou as regras.
  */
-const GOLDEN_JUGGERNAUT_HASH = 'd8fc313c';
+const GOLDEN_JUGGERNAUT_HASH = '3cc792a8';
 
 function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -534,9 +550,11 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * sai o Ricochete e entra a pesada). Na fase 1b o gigante encolhe debaixo de teto baixo (a escala de cada corpo sai
  * no fim do tick e as hitboxes usam a do tick anterior): `566e5be9` (as mesmas trocas; 24 × 22 nos 10.800 ticks, sem
  * morte súbita). M10 fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `bcdb24cc` (as mesmas
- * trocas e mais uma na prorrogação; 28 × 27 em 10.885 ticks). MUDA com a sim, a IA, o mapa ou os modificadores.
+ * trocas e mais uma na prorrogação; 28 × 27 em 10.885 ticks). M11 fase 2 (26/11/2026): o passeio que sobe sorteia
+ * por lugar (piso plano), não por andar: `30c55d7b` (as mesmas trocas, sem prorrogação; 27 × 25 em 10.800 ticks). MUDA
+ * com a sim, a IA, o mapa ou os modificadores.
  */
-const GOLDEN_CHAOS_HASH = 'bcdb24cc';
+const GOLDEN_CHAOS_HASH = '30c55d7b';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();
@@ -587,10 +605,11 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
  * M6 (fase 5): o Bobo Paintball (4 contra 4, 1 acerto derruba, renasce em 1 s) com 8 bots Normal no Construto, semente
  * 42, até 50 abates ou 3 min. Confere que os bots acertam a bola de tinta (adiantando o voo e a queda), que o placar
  * anda e o hash entre execuções. Gravado na fase 5 (19/11/2026): `855196e7` (43 × 35 em 3 min, com o balde). M10 fase
- * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `eb58a2e1` (32 × 42 em 3 min). MUDA com a sim,
- * a IA, o mapa ou as armas de tinta.
+ * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `eb58a2e1` (32 × 42 em 3 min). M11 fase 2
+ * (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `1417c604` (33 × 39 em 3 min). MUDA
+ * com a sim, a IA, o mapa ou as armas de tinta.
  */
-const GOLDEN_PAINTBALL_HASH = 'eb58a2e1';
+const GOLDEN_PAINTBALL_HASH = '1417c604';
 
 function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -691,9 +710,12 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
  * de apoio, semente 42, até o fim da Curta (10 ondas; teto de 15 min de jogo). Confere que os zumbis vão no gerador da
  * sala, que a partida acaba e o hash entre execuções (as quedas e os levantados vão na mensagem). Gravado na fase 3 do
  * M11 (26/11/2026): `02c04767` (onda 5; o gerador cai para 1.011; 11 quedas, 2 levantadas pelo colega; os 4 bots caem
- * e a partida acaba em 13.441 ticks, 224 s). MUDA com a sim, a IA, a Fazenda ou o gerador.
+ * e a partida acaba em 13.441 ticks, 224 s). M11 fase 2 (o passeio que sobe sorteia por lugar): `dad48f9e` (onda 5;
+ * o gerador cai para 2.616; 11 quedas, 4 levantadas; a partida acaba em 11.390 ticks). MUDA com a sim, a IA, a Fazenda
+ * ou o gerador.
+ * M11 fase 2, revisão (o lugar precisa de 2 colunas em X e em Z e de nós dentro da área jogável): `30d56a36`.
  */
-const GOLDEN_FORTRESS_FARM_HASH = '02c04767';
+const GOLDEN_FORTRESS_FARM_HASH = '30d56a36';
 const GOLDEN_FORTRESS_FARM_TICKS = 60 * 60 * 15;
 
 function runFortressFarmGolden(): {
@@ -832,9 +854,10 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
  * Confere que cada bot é o Jugg numa rodada (pela ordem), que a partida acaba com um vencedor e o hash entre execuções.
  * Gravado na fase 0 (19/11/2026): `9074d33b` (pontos 105, 180, 180 e 109, com o desempate pelos abates; 36.227 ticks). M10
  * fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `727af431` (pontos 128, 151, 180 e 180;
- * 40.091 ticks). MUDA com a sim, a IA, o mapa ou as regras.
+ * 40.091 ticks). M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar:
+ * `a685af0d` (pontos 180, 142, 180 e 172; 42.188 ticks). MUDA com a sim, a IA, o mapa ou as regras.
  */
-const GOLDEN_JUGG_FIXED_HASH = '727af431';
+const GOLDEN_JUGG_FIXED_HASH = 'a685af0d';
 
 function runJuggFixedGolden(): {
   hash: string;
@@ -1061,10 +1084,11 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
  * fazem bunny hop nem wall jump (a marca de quadro de jogador), mas andam e pulam no perfil Arcade (o pulo duplo, o
  * deslize, o tiro correndo). Confere que houve luta e o hash entre execuções. Gravado no fechamento do M8 (20/11/2026):
  * `3e7df5b3` (15 × 18). M10 fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `030ef885`
- * (16 × 18).
+ * (16 × 18). M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `83c6e9fc`
+ * (15 × 21).
  * MUDA com a sim, a IA, o mapa ou o perfil Arcade.
  */
-const GOLDEN_ARCADE_HASH = '030ef885';
+const GOLDEN_ARCADE_HASH = '83c6e9fc';
 
 function runArcadeGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld();

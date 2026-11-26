@@ -5298,3 +5298,42 @@ de chegada.
 - **Os textos:** nenhum novo (a frase do card não cita mapa). O menu da web segue em 334,1 KB.
 - **Fica:** a Fortaleza da Fazenda e a do Posto aparecem com o mesmo nome nos recentes (só o resumo do JOGAR mostra o
   mapa); a sala online não oferece a Fortaleza em mapa nenhum (seria um card novo).
+
+### 22.2 Fase 2: os bots sobem — o deque, o jirau e a passarela (26/11/2026)
+
+- **As causas:** o jirau da Fazenda (escada de 3 m) e a passarela do Galpão (2,75 m) esperavam a correção do seguidor
+  de escada, que chegou na fase 1c do M10 (`AI_PATH.fellM`); os testes só tinham ficado desligados (o seguidor sobe do
+  chão do celeiro ao jirau em 7,4 s). Mas a passarela passava por sorte: no sorteio por ANDAR (faixas de 3 m acima do
+  piso mais baixo), ela (piso a 3,75 m, 2,75 m acima do chão) caía na faixa do chão e só o sorteio uniforme por nó a
+  escolhia (3 de 8 sementes em 3 min de TDM). O deque da antena da Lua (16 nós, a 3 m) dividia a faixa com o anel da
+  estação (a 4 m; 623 nós na faixa) e quase nunca saía (2 de 8 sementes em 90 s). O mapa só resolveria mudando alturas
+  que outras regras seguram (o pulo lunar e os tanques de 6,5 m; a cobertura e a visada da passarela), então a
+  correção é na IA.
+- **Os lugares** (`ai/src/levels.ts`, `NavLevels`): o índice guarda LUGARES, pisos planos: os nós em pé do grupo
+  principal ligados com degrau de no máximo `AI_SOLDIER.upperPlaceStepM` (0,25 m: o piso de 3,75 e 4 m é um lugar só;
+  o degrau de 0,5 m da escada e a rampa separam), com pelo menos `upperPlaceMinNodes` nós (4, 2×2 m), por componente,
+  do mais baixo ao mais alto; a revisão (Opus) pediu também 2 colunas em X e 2 em Z (a fila de 1 nó em cima dos fardos
+  do jirau ou de uma viga não é lugar) e `upperPlaceMinNodes` nós dentro da área jogável (na Lua, 37 dos 41 lugares
+  altos vistos do fundo da cratera eram beiradas de fora do mapa e gastavam o sorteio). O passeio que sobe (`pickUpperGoal`) sorteia, com a mesma chance de 0,3, um dos lugares
+  com o piso a pelo menos 2,5 m acima dos pés do bot e um nó nele; cada lugar tem a mesma vez. Montado uma vez por mapa
+  (1,7 a 9 ms; a Ilha, com 39.686 nós, é o mais caro; o por andar custava de 0,9 a 6,4 ms), sem alocar depois.
+- **Medido** (TDM 4×4 Normal, sementes 42 e 1 a 7): o deque em 90 s foi de 0, 0, 0, 0, 218, 0, 146 e 0 amostras para
+  88 (a 1ª aos 57 s), 199, 87, 11, 254, 0, 25 e 245 (7 de 8 sementes); a passarela em 3 min, de 7, 0, 32, 0, 0, 51, 0
+  e 0 para 84 (a 1ª aos 5 s), 47, 10, 31, 41, 268, 149 e 41 (8 de 8). Bot-segundos no alto em 3 min (média de 6
+  sementes): Construto 73 → 53 (agora são 5 lugares altos, os 4 primeiros andares e o topo da torre, em vez da faixa
+  da torre), Lua 78 → 68, Galpão 4 → 25, Canteiro 210 → 232, Porto 59 → 48; os abates, iguais. Robô das ondas:
+  Construto 4,6 → 4,6 (16 sementes), Fazenda 4,4 → 4,8 (12). O `npm run balance` não mudou (arena plana).
+- **Os testes:** os três voltaram (`moonbase.test.ts`, `farm.test.ts`, `paint-hall.test.ts`) sem mudar o que conferem.
+  O `ai/src/levels.test.ts` ganhou o deque de 8 nós ao lado de um mezanino de 66 na mesma faixa: 8 amostras de deque
+  em 2 min, contra 2 no sorteio por andar (5 a 25 contra 2 a 4 nas sementes 1 a 8). O golden do TDM conferia placar =
+  abates e quebrou com um foguete no próprio pé (o suicídio não pontua, `life.ts`); agora confere placar = abates −
+  mortes sem matador inimigo, e no máximo 1 delas (o suicídio é o foguete numa cobertura colada; o `canFire` só olha
+  a distância até o alvo).
+- **Os goldens** mudaram (o passeio sorteia por lugar): TDM `293f84c7` → `0feaeddd`, Zombies `07976714` → `17ab056d`,
+  Gun Game `5f4a962e` → `d6c258a7`, Infection `274706cf` → `b3d188b9`, Juggernaut `d8fc313c` → `3cc792a8`, Chaos
+  `bcdb24cc` → `30c55d7b`, Paintball `eb58a2e1` → `1417c604`, Jugg Fixo `727af431` → `a685af0d` e Arcade `030ef885` →
+  `83c6e9fc`; e o Fortress na Fazenda da fase 3, `02c04767` → `30d56a36`. O Posto, o Domination, o Fortress no Posto,
+  a Horda, a Base Bobo, o BoboStrike, o Royale e o Sandbox não mudaram (sem lugar alto alcançável, ou o modo escolhe
+  o destino antes do passeio que sobe). Cada um tem a nota "M11 fase 2". O teste das personalidades (Rusher e
+  Equilibrado) ganhou prazo de 30 s (estourava os 5 s com as frentes em paralelo).
+- **Fica:** na semente 5 da Lua ninguém chega ao deque em 90 s (o teste usa a 42, com folga).

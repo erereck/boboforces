@@ -147,8 +147,10 @@ describe('a Estação Lunar (M10, fase 4)', () => {
   // Revisão da fase 4: as rampas de 4 m da estação e a de 3 m da antena estão na navegação, mas a IA não subia escada
   // comprida (0 tick de bot no andar de cima em 3 min de TDM). M10 (fase 1c): com o seguidor de rota consertado
   // (`packages/ai/src/paths.ts`) e o passeio que às vezes sobe, o andar de cima tem bot (367 amostras de tick nesta
-  // semente, o 1º aos 17 s). O deque da antena (16 nós) ainda não em 90 s nesta semente (nas sementes 1, 2 e 3: 38, 0 e
-  // 0 amostras; o seguidor sobe até ele em 12,6 s do spawn do time 0): fica no `skip` até a integração decidir.
+  // semente, o 1º aos 17 s). O deque da antena (16 nós) ainda não: no sorteio por andar ele dividia a faixa de 3 m com
+  // o anel da estação (623 nós) e quase nunca saía (0 amostras em 90 s nesta semente; 2 de 8 sementes). M11 (fase 2):
+  // o passeio sorteia por lugar (piso plano) e o deque tem a mesma vez que o anel: 88 amostras nesta semente, a 1ª aos
+  // 57 s (7 de 8 sementes); o andar de cima segue com bot (465, o 1º aos 34 s).
   const upperAndDeck = (): { upper: number; deck: number } => {
     const map = loadMap('moonbase');
     const match = createHeadlessMatch({ recipe: RECIPES['Times (TDM)']!, map, humans: 0 });
@@ -174,7 +176,7 @@ describe('a Estação Lunar (M10, fase 4)', () => {
   it('os bots sobem para o andar de cima da estação', () => {
     expect(upperAndDeck().upper).toBeGreaterThan(0);
   }, 120_000);
-  it.skip('os bots sobem para o deque da antena (o passeio quase não sorteia os 16 nós dele)', () => {
+  it('os bots sobem para o deque da antena', () => {
     expect(upperAndDeck().deck).toBeGreaterThan(0);
   }, 120_000);
 

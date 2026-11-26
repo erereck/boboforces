@@ -307,9 +307,12 @@ describe('Galpão de Paintball (M10, fase 3)', () => {
     }, 120_000);
   });
 
-  // A IA ainda não sobe a escada reta de 2,75 m da passarela (o seguidor de caminho perde o degrau; correção da IA
-  // a caminho). Quando ela chegar, este teste passa a valer.
-  it.skip('os bots sobem na passarela (pendente: a correção do seguidor de escada da IA)', () => {
+  // A escada reta de 2,75 m da passarela: o seguidor de caminho perdia o degrau até o M10 (fase 1c). Depois dela o bot
+  // subia, mas o passeio quase não ia lá: a passarela (piso a 3,75 m, 2,75 m acima do chão) caía na mesma faixa de 3 m
+  // do chão no sorteio por andar e só o sorteio uniforme por nó a escolhia (nesta semente, 7 amostras, a 1ª aos 76 s; 3
+  // de 8 sementes). M11 (fase 2): o passeio sorteia por lugar (piso plano), e as duas metades da passarela são lugares
+  // altos: 84 amostras nesta semente, a 1ª aos 5 s (8 de 8 sementes).
+  it('os bots sobem na passarela', () => {
     const recipe: MatchRecipe = {
       format: MATCH_RECIPE_FORMAT,
       mode: 'warfare.tdm',
@@ -333,6 +336,7 @@ describe('Galpão de Paintball (M10, fase 3)', () => {
       }
     }
     match.dispose();
+    console.log(`[galpão] passarela: ${onCatwalk} amostras`);
     expect(onCatwalk).toBeGreaterThan(0);
   }, 120_000);
 

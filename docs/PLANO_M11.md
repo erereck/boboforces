@@ -47,6 +47,7 @@ conferidos de novo depois de cada junção.
 1. **Os poleiros e o poço do Construto, os poleiros da Base Bobo** (`construto.ts`, `airbase.ts`): fechar os degraus do
    pulo correndo (como no Canteiro, §21.11) e o poço da escada da torre; tirar as duas marcas `jumpSightTodo`.
 2. **Os bots sobem:** o deque da antena da Lua, o jirau da Fazenda e a passarela do Galpão (mapa ou IA).
+   - **feita em 26/11** (ARCHITECTURE §22.2): o passeio sorteia por lugar; os 3 testes voltaram; 10 goldens re-gravados.
 3. **O Fortress na Fazenda:** o card, a Partida personalizada, o Surpreenda-me e a sala, como o Zombies escolhe o
    mapa; golden novo.
    - **feita em 26/11** (ARCHITECTURE §22.3): o card começa na Fazenda; o Posto na Personalizada e no Surpreenda-me;

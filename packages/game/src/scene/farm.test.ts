@@ -476,10 +476,11 @@ describe('a Fazenda (M10, fase 5, revisão): sem poleiro', () => {
 });
 
 describe('a Fazenda (M10, fase 5, revisão): a IA sobe ao jirau', () => {
-  // A escada reta de 3 m do jirau esbarra no erro conhecido do seguidor de rota dos bots (o apoio perto do pé da escada
-  // não sobe para seguir ou levantar o colega; a correção da IA vem em separado). Desligado até ela chegar: a escada
-  // fica como está.
-  it.skip('o seguidor de rota dos bots sobe do chão do celeiro ao jirau em até 30 s', () => {
+  // A escada reta de 3 m do jirau esbarrava no erro do seguidor de rota dos bots (o apoio perto do pé da escada não
+  // subia para seguir ou levantar o colega): a suavização junta o lance num segmento só (pé → topo) e o bot, no pé,
+  // ficava mais de 2,5 m abaixo do ponto de chegada, "caía" e pedia a mesma rota para sempre. Consertado no M10 (fase
+  // 1c: `AI_PATH.fellM` contra a ponta de baixo do segmento); o teste ficou desligado até o M11 (fase 2).
+  it('o seguidor de rota dos bots sobe do chão do celeiro ao jirau em até 30 s', () => {
     const map = loadFarm();
     const spawns: SpawnPoint[] = [
       { x: 60, y: G_FARM, z: 48, yaw: 0, team: 0 },
@@ -527,6 +528,7 @@ describe('a Fazenda (M10, fase 5, revisão): a IA sobe ao jirau', () => {
     });
     for (let t = 0; t < 30 * match.sim.hz && reached === Infinity; t++) match.step();
     match.dispose();
+    console.log(`[farm] o seguidor chega ao jirau em ${reached.toFixed(1)} s`);
     expect(reached).toBeLessThan(30);
   }, 60_000);
 });

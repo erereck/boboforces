@@ -1,11 +1,18 @@
 import type { NavGrid, NavGridImpl } from '@boboforces/nav';
-import { METRICS } from '@boboforces/sim';
+import { AI_SOLDIER } from './config.ts';
 
 /**
- * M10 (fase 1c): os nós da navegação por ANDAR, para o passeio que sobe (`pickUpperGoal` do soldado). Andar = faixa de
- * `METRICS.storyHeight` (3 m) acima do piso mais baixo; só os nós em pé. O sorteio uniforme por nó quase nunca caía no
- * andar de cima (o térreo tem muito mais nós que o topo da torre): sorteando primeiro o andar e depois o nó dentro dele,
- * o andar pequeno tem a mesma vez que o grande.
+ * Os LUGARES da navegação, para o passeio que sobe (`pickUpperGoal` do soldado). Lugar = piso plano: os nós em pé
+ * ligados entre si sem degrau maior que `AI_SOLDIER.upperPlaceStepM` (o lance de escada e a rampa ficam de fora: cada
+ * degrau de 0,5 m separa), com pelo menos `upperPlaceMinNodes` nós, 2 colunas em X e 2 em Z (a fila de 1 nó em cima
+ * de um fardo ou de uma viga não é lugar) e pelo menos `upperPlaceMinNodes` nós dentro da área jogável (a beirada de
+ * fora do mapa não gasta o sorteio). O soldado sorteia primeiro o lugar e depois o nó dentro dele: o lugar pequeno
+ * tem a mesma vez que o grande.
+ *
+ * M10 (fase 1c) sorteava por ANDAR (faixas de 3 m acima do piso mais baixo). M11 (fase 2): a faixa não separa o que
+ * importa. Na Estação Lunar, o deque da antena (16 nós, a 3 m do chão) cai na mesma faixa do anel da estação (a 4 m;
+ * 623 nós na faixa) e quase nunca era sorteado; no Galpão, a passarela e, no Construto, o 1º andar dos Prédios de Teste
+ * (2,75 m acima do chão) caem na faixa do chão e nunca eram sorteados como lugar alto.
  *
  * O `component` da navegação conta as quedas nos dois sentidos: o teto da cabine da torre do Construto (de onde só se
  * cai) é do mesmo componente que o chão, e o A* sem caminho varre a área toda antes de desistir. Por isso o índice só
@@ -13,61 +20,123 @@ import { METRICS } from '@boboforces/sim';
  * volta pelas ligações no sentido certo; Tarjan iterativo). Navegação sem as ligações à vista (outra implementação do
  * contrato, como a de teste da sim): índice vazio, e o passeio é o de sempre.
  *
- * Montado uma vez por navegação (`bind`, no 1º tick, como o `NavPath` da busca); ordem estável pelo índice do nó
- * (determinístico). Nada é alocado depois.
+ * Montado uma vez por navegação (`bind`, no 1º tick, como o `NavPath` da busca); ordem estável (componente, piso e
+ * menor índice de nó; determinístico). Nada é alocado depois.
  */
+/** A área jogável (a da `SimView.playArea`), para o índice não contar os lugares de fora. */
+export interface PlaceArea {
+  readonly minX: number;
+  readonly maxX: number;
+  readonly minZ: number;
+  readonly maxZ: number;
+}
+
 export class NavLevels {
   nav: NavGrid | null = null;
-  /** Andares (0 = nenhum nó no índice). */
+  /** Lugares no índice (0 = nenhum). */
   count = 0;
-  /** Piso do andar 0 (m). */
-  baseY = 0;
   /** Grupo de cada nó (componente fortemente conexo) e o grupo principal de cada componente (-1 = nenhum). */
   group: Int32Array = new Int32Array(0);
   mainGroup: Int32Array = new Int32Array(0);
-  /** Os nós do índice por componente e andar: os de (c, l) vão de `start[c * count + l]` a `start[c * count + l + 1]`. */
-  order: Int32Array = new Int32Array(0);
+  /** Os lugares do componente c vão de `compStart[c]` a `compStart[c + 1] - 1`, do piso mais baixo ao mais alto. */
+  compStart: Int32Array = new Int32Array(1);
+  /** O piso mais baixo de cada lugar (m). */
+  floorY: Float32Array = new Float32Array(0);
+  /** Os nós do lugar k: `order[start[k]]` a `order[start[k + 1] - 1]`. */
   start: Int32Array = new Int32Array(1);
+  order: Int32Array = new Int32Array(0);
 
-  bind(nav: NavGrid | null): void {
+  bind(nav: NavGrid | null, area: PlaceArea | null = null): void {
     if (nav === this.nav) return;
     this.nav = nav;
     this.count = 0;
+    this.compStart = new Int32Array(1);
     if (nav === null) return;
     const n = nav.nodeCount;
     const keep = this.groups(nav);
     const components = this.mainGroup.length;
-    let lo = Infinity;
-    let hi = -Infinity;
-    let kept = 0;
+    this.compStart = new Int32Array(components + 1);
+    const csr = nav as Partial<Pick<NavGridImpl, 'linkStart' | 'linkTarget'>>;
+    if (csr.linkStart === undefined || csr.linkTarget === undefined) return;
+    const linkStart = csr.linkStart;
+    const linkTarget = csr.linkTarget;
+    // Os pisos planos: união dos nós do índice ligados sem degrau (as duas pontas no índice).
+    const root = new Int32Array(n);
+    for (let i = 0; i < n; i++) root[i] = i;
+    const find = (a: number): number => {
+      while (root[a] !== a) {
+        root[a] = root[root[a]!]!;
+        a = root[a]!;
+      }
+      return a;
+    };
+    const step = AI_SOLDIER.upperPlaceStepM + 1e-3;
+    for (let a = 0; a < n; a++) {
+      if (keep[a] === 0) continue;
+      for (let l = linkStart[a]!; l < linkStart[a + 1]!; l++) {
+        const b = linkTarget[l]!;
+        if (keep[b] === 0 || Math.abs(nav.floorY[a]! - nav.floorY[b]!) > step) continue;
+        const ra = find(a);
+        const rb = find(b);
+        // A raiz é sempre o menor índice do lugar (a ordem não depende da ordem das ligações).
+        if (ra < rb) root[rb] = ra;
+        else if (rb < ra) root[ra] = rb;
+      }
+    }
+    const size = new Int32Array(n);
+    const low = new Float32Array(n).fill(Infinity);
+    // A caixa de cada lugar (para exigir 2 colunas em X e em Z) e quantos nós dele caem na área jogável.
+    const minX = new Float32Array(n).fill(Infinity);
+    const maxX = new Float32Array(n).fill(-Infinity);
+    const minZ = new Float32Array(n).fill(Infinity);
+    const maxZ = new Float32Array(n).fill(-Infinity);
+    const inside = new Int32Array(n);
+    const pos = new Float32Array(3);
     for (let i = 0; i < n; i++) {
       if (keep[i] === 0) continue;
-      const y = nav.floorY[i]!;
-      if (y < lo) lo = y;
-      if (y > hi) hi = y;
-      kept++;
+      const r = find(i);
+      size[r]!++;
+      if (nav.floorY[i]! < low[r]!) low[r] = nav.floorY[i]!;
+      nav.nodePosition(i, pos, 0);
+      const x = pos[0]!;
+      const z = pos[2]!;
+      if (x < minX[r]!) minX[r] = x;
+      if (x > maxX[r]!) maxX[r] = x;
+      if (z < minZ[r]!) minZ[r] = z;
+      if (z > maxZ[r]!) maxZ[r] = z;
+      if (area === null || (x >= area.minX && x <= area.maxX && z >= area.minZ && z <= area.maxZ)) inside[r]!++;
     }
-    if (kept === 0) return;
-    this.baseY = lo;
-    this.count = Math.floor((hi - lo) / METRICS.storyHeight) + 1;
-    const levels = this.count;
-    const start = new Int32Array(components * levels + 1);
-    for (let i = 0; i < n; i++)
-      if (keep[i] !== 0) start[nav.component[i]! * levels + this.levelOf(nav.floorY[i]!) + 1]!++;
-    for (let k = 0; k < components * levels; k++) start[k + 1]! += start[k]!;
-    const fill = start.slice(0, components * levels);
-    const order = new Int32Array(kept);
+    const min = AI_SOLDIER.upperPlaceMinNodes;
+    const places: number[] = [];
     for (let i = 0; i < n; i++) {
-      if (keep[i] !== 0) order[fill[nav.component[i]! * levels + this.levelOf(nav.floorY[i]!)]!++] = i;
+      if (keep[i] === 0 || root[i] !== i || size[i]! < min || inside[i]! < min) continue;
+      if (maxX[i]! - minX[i]! < 0.01 || maxZ[i]! - minZ[i]! < 0.01) continue;
+      places.push(i);
     }
+    places.sort((a, b) => nav.component[a]! - nav.component[b]! || low[a]! - low[b]! || a - b);
+    const count = places.length;
+    const slot = new Int32Array(n).fill(-1);
+    const floorY = new Float32Array(count);
+    const start = new Int32Array(count + 1);
+    for (let k = 0; k < count; k++) {
+      const r = places[k]!;
+      slot[r] = k;
+      floorY[k] = low[r]!;
+      start[k + 1] = start[k]! + size[r]!;
+      this.compStart[nav.component[r]! + 1]!++;
+    }
+    for (let c = 0; c < components; c++) this.compStart[c + 1]! += this.compStart[c]!;
+    const fill = start.slice(0, count);
+    const order = new Int32Array(start[count]!);
+    for (let i = 0; i < n; i++) {
+      if (keep[i] === 0) continue;
+      const k = slot[find(i)]!;
+      if (k >= 0) order[fill[k]!++] = i;
+    }
+    this.count = count;
+    this.floorY = floorY;
     this.start = start;
     this.order = order;
-  }
-
-  /** Andar de uma altura dos pés (m), limitado aos andares do índice. */
-  levelOf(y: number): number {
-    const l = Math.floor((y - this.baseY) / METRICS.storyHeight);
-    return l < 0 ? 0 : l >= this.count ? this.count - 1 : l;
   }
 
   /**

@@ -61,7 +61,7 @@ export class AiContext {
   strikeRng: Rng | null = null;
   readonly viewDistance: number;
   readonly paths: PathService;
-  /** M10 (fase 1c): os nós em pé por andar (o passeio que sobe), montados junto com a navegação. */
+  /** M10 (fase 1c): os lugares altos (o passeio que sobe; M11, fase 2: por piso plano), montados com a navegação. */
   readonly levels = new NavLevels();
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */
   flow: ZombieFlow | null = null;
@@ -123,7 +123,7 @@ export class AiContext {
       }
     }
     this.paths.bind(view.nav);
-    this.levels.bind(view.nav);
+    this.levels.bind(view.nav, view.playArea);
   }
 
   /** Mesma regra da sim: zumbi é inimigo de todo bobo e de nenhum zumbi; entre bobos, FFA ou times diferentes. */

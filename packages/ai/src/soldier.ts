@@ -833,11 +833,12 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
 }
 
 /**
- * M10 (fase 1c): o passeio que sobe. Só quando há andar acima do bot no grupo principal do componente dele (vai e volta
- * pela navegação; o bot num topo de onde só se cai fica fora) e com a chance `upperChance` (sem andar acima, nem sorteia:
- * no mapa térreo o passeio é o de sempre, número a número): sorteia um desses andares (`NavLevels`, a mesma vez para o
- * pequeno e o grande) e, nele, até `upperSamples` nós; fica com o primeiro a pelo menos `upperRiseM` acima dos pés do
- * bot, na área jogável e, no N4, fora de onde o time morreu. `false` = o passeio de sempre.
+ * M10 (fase 1c): o passeio que sobe. Só quando há lugar alto (piso a pelo menos `upperRiseM` acima dos pés do bot) no
+ * grupo principal do componente dele (vai e volta pela navegação; o bot num topo de onde só se cai fica fora) e com a
+ * chance `upperChance` (sem lugar alto, nem sorteia: no mapa térreo o passeio é o de sempre, número a número): sorteia
+ * um desses lugares (`NavLevels`, a mesma vez para o pequeno e o grande; M11, fase 2: era o andar, uma faixa de 3 m)
+ * e, nele, até `upperSamples` nós; fica com o primeiro na área jogável e, no N4, fora de onde o time morreu. `false` =
+ * o passeio de sempre.
  */
 function pickUpperGoal(c: AiContext, b: SoldierBrain, e: number, team: number, y: number, from: number): boolean {
   const view = c.view!;
@@ -846,25 +847,19 @@ function pickUpperGoal(c: AiContext, b: SoldierBrain, e: number, team: number, y
   if (from < 0 || levels.count === 0) return false;
   const comp = nav.component[from]!;
   if (levels.group[from] !== levels.mainGroup[comp]) return false;
-  const base = comp * levels.count;
-  const mine = levels.levelOf(y);
-  let above = 0;
-  for (let l = mine + 1; l < levels.count; l++) if (levels.start[base + l + 1]! > levels.start[base + l]!) above++;
-  if (above === 0 || !b.rng.chance(AI_SOLDIER.upperChance)) return false;
-  // O k-ésimo andar não vazio acima do bot.
-  let pick = b.rng.int(0, above);
-  let bucket = base + mine + 1;
-  for (; ; bucket++) {
-    if (levels.start[bucket + 1]! > levels.start[bucket]! && pick-- === 0) break;
-  }
-  const first = levels.start[bucket]!;
-  const size = levels.start[bucket + 1]! - first;
+  // Os lugares do componente vêm do piso mais baixo ao mais alto: os altos são o fim da lista.
+  const minY = y + AI_SOLDIER.upperRiseM;
+  const end = levels.compStart[comp + 1]!;
+  let high = levels.compStart[comp]!;
+  while (high < end && levels.floorY[high]! < minY) high++;
+  if (high === end || !b.rng.chance(AI_SOLDIER.upperChance)) return false;
+  const place = high + b.rng.int(0, end - high);
+  const first = levels.start[place]!;
+  const size = levels.start[place + 1]! - first;
   const board = c.board;
   const area = view.playArea;
-  const minY = y + AI_SOLDIER.upperRiseM;
   for (let k = 0; k < AI_SOLDIER.upperSamples; k++) {
     const n = levels.order[first + b.rng.int(0, size)]!;
-    if (nav.floorY[n]! < minY) continue;
     nav.nodePosition(n, nodePos, 0);
     if (
       area &&
