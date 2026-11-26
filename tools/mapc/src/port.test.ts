@@ -135,7 +135,10 @@ describe('mapc: Porto de Contêineres', () => {
 
   it('compila sem erro nem aviso, com as regras de layout do GDD, e o .bfmap gravado está em dia', () => {
     expect(r.errors).toEqual([]);
-    expect(r.warnings).toEqual([]);
+    // M10 (fase 1c): os topos do pulo correndo do `mapc` (`jump-reach.ts`, com o alcance da sim: ~6 m de vão no mesmo
+    // nível e a escalada de 1,5 m) são aviso à parte; dali a vista fica em 48,7 m, dentro dos 50 m.
+    expect(r.warnings.filter((w) => !w.startsWith('topo alcançável só com pulo correndo'))).toEqual([]);
+    expect(r.checks.jumpReach.sight?.distance ?? 0).toBeLessThanOrEqual(50);
     expect(r.bytes.length).toBeLessThanOrEqual(MAX_BFMAP_BYTES);
     expect(r.doc.meta.maxSightLineM).toBe(50);
     const sight = r.checks.sight.max!.distance;

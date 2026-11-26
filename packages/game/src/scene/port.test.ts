@@ -378,14 +378,13 @@ describe('Porto de Contêineres (M10, fase 1)', () => {
     }, 60_000);
   }
 
-  // O mezanino do armazém tem um lance reto de 3 m, e o seguidor de rota de hoje se perde em lance acima de 2,5 m (o
-  // topo do contêiner passa por sorte de arredondamento). O conserto é da IA (packages/ai/src/paths.ts, outra frente):
-  // não mudei a escada; a integração tira o `skip` quando ele entrar.
+  // O mezanino do armazém tem um lance reto de 3 m: o seguidor de rota se perdia em lance acima de 2,5 m (consertado no
+  // M10, fase 1c: "caiu" compara com a ponta mais baixa do segmento, `packages/ai/src/paths.ts`).
   for (const [name, team, x] of [
     ['oeste', 0, 33],
     ['leste', 1, 63],
   ] as const) {
-    it.skip(`o seguidor de rota sobe até o mezanino ${name} do armazém (espera o conserto do seguidor na IA)`, () => {
+    it(`o seguidor de rota sobe até o mezanino ${name} do armazém`, () => {
       const r = climb(team, x, LOFT_FLOOR_Y, 83);
       expect(r.reached, JSON.stringify(r)).toBeLessThan(45);
     }, 60_000);

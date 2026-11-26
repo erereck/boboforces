@@ -80,6 +80,12 @@ export class PathFollower {
   stuckCount = 0;
   /** M9 (fase 1): o bot gigante: o A* dos pedidos dele foge do teto baixo (`AI_PATH.giantHeadroomM`). */
   giant = false;
+  /**
+   * M10 (fase 1c): comprimento da última rota recebida (m: no plano, mais o desnível de cada segmento) e um contador
+   * de rotas recebidas (o soldado estica o prazo do passeio uma vez por rota nova).
+   */
+  routeM = 0;
+  routeSerial = 0;
 
   constructor(id: number) {
     this.id = id;
@@ -222,6 +228,14 @@ export class PathService {
         const n = Math.min(search.pointCount, AI_PATH.pathCapacity);
         for (let k = 0; k < n * 3; k++) f.points[k] = search.points[k]!;
         for (let k = 0; k < n; k++) f.links[k] = search.pointLinks[k]!;
+        let routeM = 0;
+        for (let k = 3; k < n * 3; k += 3) {
+          const sx = f.points[k]! - f.points[k - 3]!;
+          const sz = f.points[k + 2]! - f.points[k - 1]!;
+          routeM += Math.sqrt(sx * sx + sz * sz) + Math.abs(f.points[k + 1]! - f.points[k - 2]!);
+        }
+        f.routeM = routeM;
+        f.routeSerial++;
         f.count = n;
         f.index = n > 1 ? 1 : 0;
         f.hasRoute = true;
@@ -274,11 +288,17 @@ export class PathService {
       d = Math.sqrt(dx * dx + dz * dz);
     }
     f.index = i;
-    // Fora da rota: longe do segmento anterior → atual, ou caiu bem abaixo do ponto.
+    // Fora da rota: longe do segmento anterior → atual, ou caiu bem abaixo da ponta MAIS BAIXA dele. M10 (fase 1c): o
+    // suavizador junta um lance reto de escada num segmento só (pé → topo); comparar com o ponto de chegada (o topo)
+    // dava "caiu" no pé de todo lance mais alto que `fellM`, e o bot pedia a mesma rota para sempre (a torre de 5 m do
+    // Construto). A altura interpolada no segmento também erraria: um trecho plano seguido do lance fica abaixo da reta.
     let off = d;
+    let lowY = py;
     if (i > 0) {
       const ax = pts[(i - 1) * 3]!;
+      const ay = pts[(i - 1) * 3 + 1]!;
       const az = pts[(i - 1) * 3 + 2]!;
+      if (ay < lowY) lowY = ay;
       const sx = px - ax;
       const sz = pz - az;
       const len2 = sx * sx + sz * sz;
@@ -287,7 +307,7 @@ export class PathService {
       const qz = az + sz * t - z;
       off = Math.sqrt(qx * qx + qz * qz);
     }
-    if (off > AI_PATH.offPathM || y < py - 2.5) {
+    if (off > AI_PATH.offPathM || y < lowY - AI_PATH.fellM) {
       f.invalidate();
       return false;
     }

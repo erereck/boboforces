@@ -84,6 +84,9 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 8. **As pendências do M9:** a Base Aérea no Sandbox (os pontos dos times 2 e 3 no chão), a cor de cada time no
    Sandbox (uma paleta de cores de time, sem repetir) e o som do ricochete.
    - **feita em 20/11** (ARCHITECTURE §21.1): a Base Aérea no Sandbox, as 8 cores e o assobio sintetizado.
+1c. **Os bots sobem escada e o mapc vê os pulos** (achado das revisões dos mapas): o seguidor de caminho com lance reto
+    alto, os andares de cima no passeio dos bots e os topos aonde só o pulo correndo leva na medida de visada do mapc.
+   - **feita em 26/11** (ARCHITECTURE §21.9): os goldens com bots no Construto e na Base Bobo mudaram (pergunta AK7).
 9. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
@@ -96,3 +99,4 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 | AK4 | **Os mapas novos no Switch:** todos com a maior linha de visão de até 50 m, para rodar no Switch 3–4P. | Sim |
 | AK5 | **O revólver** é uma secundária (escolhida como a pistola, no Laboratório e nas regras); o DMR, a escopeta automática, a besta e o lança-granadas são primárias novas no radial da morte. | Assim |
 | AK6 | **A cor do time no Sandbox:** uma paleta de 8 cores de time (as 4 de hoje e mais 4 que não se confundem com o cenário), sem dois times da mesma cor. | Assim |
+| AK7 | **Os poleiros de pulo:** o compilador de mapas agora acha os topos aonde só o pulo correndo leva; em 5 mapas (o Construto, a Base Bobo, o Canteiro, a Lua e a Fazenda) a visada de lá passa dos 50 m do Switch. Fechar cada um muda o mapa (e, no Construto e na Base Bobo, os goldens). | Fechar nos mapas novos; o Construto e a Base Bobo ficam marcados |

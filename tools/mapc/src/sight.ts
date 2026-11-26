@@ -214,3 +214,49 @@ export function measureMaxSightLine(
   const top = longest.slice(0, keep);
   return { max: top[0] ?? null, longest: top, nodes: count, rays };
 }
+
+/**
+ * M10 (fase 1c): a maior linha de visão que sai de algum nó de `from` (os poleiros do pulo, `jump-reach.ts`) até
+ * qualquer nó aceito por `accept`, com o mesmo olho de `measureMaxSightLine`. Por nó de saída, os alvos mais longe que
+ * a melhor já achada, do mais longe para o mais perto: o primeiro visível é a maior dele (o resto nem lança raio).
+ */
+export function longestSightFrom(
+  nav: NavGridImpl,
+  sight: SightGrid,
+  from: readonly number[],
+  accept: (node: number) => boolean,
+  eye: number,
+  crouchEye: number,
+): { readonly max: SightLine | null; readonly rays: number } {
+  const tmp = new Float64Array(3);
+  const eyeOf = (n: number): [number, number, number] => {
+    nav.nodePosition(n, tmp);
+    return [tmp[0]!, tmp[1]! + (nav.clearance[n] === 1 ? eye : crouchEye), tmp[2]!];
+  };
+  const targets: [number, number, number][] = [];
+  for (let n = 0; n < nav.nodeCount; n++) if (accept(n)) targets.push(eyeOf(n));
+  const dist = new Float64Array(targets.length);
+  const order: number[] = [];
+  let max: SightLine | null = null;
+  let best = 0;
+  let rays = 0;
+  for (const s of from) {
+    const a = eyeOf(s);
+    order.length = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const b = targets[i]!;
+      dist[i] = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      if (dist[i]! > best) order.push(i);
+    }
+    order.sort((p, q) => dist[q]! - dist[p]! || p - q);
+    for (const i of order) {
+      rays++;
+      const b = targets[i]!;
+      if (!lineOfSight(sight, a[0], a[1], a[2], b[0], b[1], b[2])) continue;
+      best = dist[i]!;
+      max = { distance: best, a, b };
+      break;
+    }
+  }
+  return { max, rays };
+}

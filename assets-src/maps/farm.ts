@@ -689,6 +689,10 @@ function cameras(b: MapBuilder): void {
 
 const farm: MapScript = {
   id: 'farm',
+  // TODO (M10, fase 1c): o passe de pulos do mapc acha um topo de ~4,5 m alcançável só com o pulo correndo perto de
+  // (19,5; 40,5), de onde a visada chega a 106 m (e que pode ser um lugar aonde o zumbi não chega). A correção vem
+  // no ajuste da Fazenda.
+  analysis: { jumpSightTodo: 'topo de ~4,5 m perto de (19,5; 40,5) pelo pulo correndo (106 m)' },
   build(b) {
     b.size(c(SIZE), 40, c(SIZE));
     b.meta({

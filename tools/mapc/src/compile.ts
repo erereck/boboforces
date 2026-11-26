@@ -202,6 +202,7 @@ export function compileMap(script: MapScript, options: CompileOptions): CompileR
     colliderModel: models,
     maxSightLimitM: options.maxSightLimitM ?? 50,
     ...(options.limbProbes !== undefined ? { limbProbes: options.limbProbes } : {}),
+    ...(script.analysis?.jumpSightTodo !== undefined ? { jumpSightTodo: script.analysis.jumpSightTodo } : {}),
   });
   const sightMs = performance.now() - tSight;
   errors.push(...checks.errors);

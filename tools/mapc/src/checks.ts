@@ -20,7 +20,15 @@ import {
 } from '@boboforces/world';
 import type { DoorRecord } from './api.ts';
 import { figureLimbProbes, type LimbProbe, type LimbProbes, type LimbTip } from './limb-probe.ts';
-import { lineOfSight, measureMaxSightLine, type SightGrid, type SightMeasure } from './sight.ts';
+import { findJumpReach, jumpProfile, type JumpTop } from './jump-reach.ts';
+import {
+  lineOfSight,
+  longestSightFrom,
+  measureMaxSightLine,
+  type SightGrid,
+  type SightLine,
+  type SightMeasure,
+} from './sight.ts';
 
 /**
  * Validações do `mapc` que precisam do mundo e da navegação (tecnico.md §15.3, GDD §4.6.3): spawns alcançáveis e
@@ -42,6 +50,11 @@ export interface CheckInput {
   readonly maxSightLimitM: number;
   /** Sondas da medida de membro através de barreira; sem elas, as da tabela de jogo real (`figureLimbProbes`). */
   readonly limbProbes?: LimbProbes;
+  /**
+   * M10 (fase 1c): o mapa sabe que a linha de visão de um topo do pulo passa da declarada e ainda não consertou: vira
+   * aviso com este TODO (`MapScript.analysis.jumpSightTodo`), não erro.
+   */
+  readonly jumpSightTodo?: string;
 }
 
 export interface SpawnStats {
@@ -64,6 +77,16 @@ export interface CheckReport {
   readonly warnings: string[];
   readonly spawns: SpawnStats;
   readonly sight: SightMeasure;
+  /**
+   * M10 (fase 1c): os topos aonde só o pulo correndo chega (`jump-reach.ts`): nós, lugares e a maior linha de visão que
+   * sai de um deles (até um nó jogável ou outro topo do pulo).
+   */
+  readonly jumpReach: {
+    readonly nodes: number;
+    readonly tops: readonly JumpTop[];
+    readonly sight: SightLine | null;
+    readonly rays: number;
+  };
   readonly mainComponent: number;
   /** Nós alcançáveis a partir dos spawns e dentro da área jogável. */
   readonly playableNodes: number;
@@ -326,6 +349,34 @@ export function runChecks(input: CheckInput): CheckReport {
   };
   for (let n = 0; n < nav.nodeCount; n++) if (accept(n)) playableNodes++;
   const sight = measureMaxSightLine(nav, input.sight, accept, eye, METRICS.crouchEyeHeight);
+  // M10 (fase 1c): os poleiros do pulo correndo (topos sem ligação na navegação aonde o humano chega pulando) entram na
+  // medida: a maior linha que sai de um deles, até qualquer nó jogável ou outro poleiro.
+  const nodeInArea = (n: number): boolean => {
+    nav.nodePosition(n, pos);
+    return inArea(pos[0]!, pos[2]!);
+  };
+  const profile = jumpProfile(MOVEMENT_BOBO, doc.meta.gravity ?? 1);
+  const jump = findJumpReach({ nav, reachable, inArea: nodeInArea, collides, profile });
+  const jumpNodes: number[] = [];
+  for (let n = 0; n < nav.nodeCount; n++) if (jump.mark[n] === 1 && nodeInArea(n)) jumpNodes.push(n);
+  const jumpSight =
+    jumpNodes.length > 0
+      ? longestSightFrom(
+          nav,
+          input.sight,
+          jumpNodes,
+          (n) => accept(n) || (jump.mark[n] === 1 && nodeInArea(n)),
+          eye,
+          METRICS.crouchEyeHeight,
+        )
+      : { max: null, rays: 0 };
+  if (jump.tops.length > 0) {
+    const where = jump.tops.map((t) => `${at(...t.at)} de ${at(...t.from)} (${t.nodes} nós)`);
+    warnings.push(
+      `topo alcançável só com pulo correndo (sem ligação na navegação; entra na linha de visão): ${jump.count} nó(s) ` +
+        `em ${jump.tops.length} lugar(es), pouso de decolagem: ${sample(where, 8)}`,
+    );
+  }
   const declared = doc.meta.maxSightLineM;
   if (declared > input.maxSightLimitM) {
     errors.push(`maior linha de visão declarada (${declared} m) passa do teto do mapa (${input.maxSightLimitM} m)`);
@@ -338,6 +389,14 @@ export function runChecks(input: CheckInput): CheckReport {
     );
   } else if (sight.max && declared - sight.max.distance > 5) {
     warnings.push(`linha de visão declarada (${declared} m) bem acima da medida (${fmt(sight.max.distance)} m)`);
+  }
+  if (jumpSight.max && jumpSight.max.distance > declared + 1e-6) {
+    const m = jumpSight.max;
+    const msg =
+      `maior linha de visão MEDIDA de um topo do pulo (${fmt(m.distance)} m) passa da declarada (${declared} m): ` +
+      `${at(...m.a)} → ${at(...m.b)}`;
+    if (input.jumpSightTodo === undefined) errors.push(msg);
+    else warnings.push(`${msg} (TODO do mapa: ${input.jumpSightTodo})`);
   }
 
   // --- Portas ---
@@ -658,7 +717,7 @@ export function runChecks(input: CheckInput): CheckReport {
     const below = Math.floor((c.boxes[o + 1]! - 0.05) / BLOCK_SIZE);
     const mx = Math.floor((c.boxes[o]! + c.boxes[o + 3]!) / 2 / BLOCK_SIZE);
     const mz = Math.floor((c.boxes[o + 2]! + c.boxes[o + 5]!) / 2 / BLOCK_SIZE);
-    if (!collides(mx, below, mz) && c.boxes[o + 1]! > 0.01)
+    if (!collides(mx, below, mz) && c.boxes[o + 1]! > 0.01 && !restsOnCollider(c, i))
       floating.push(`${name}${at(mx * BLOCK_SIZE, c.boxes[o + 1]!, mz * BLOCK_SIZE)}`);
   }
   if (inWall.length > 0) warnings.push(`prop atravessando bloco: ${sample(inWall)}`);
@@ -678,6 +737,7 @@ export function runChecks(input: CheckInput): CheckReport {
     mainComponent,
     playableNodes,
     sight,
+    jumpReach: { nodes: jumpNodes.length, tops: jump.tops, sight: jumpSight.max, rays: jumpSight.rays },
     spawns: {
       count: spawns.length,
       tdmA: teamA.length,
@@ -691,6 +751,24 @@ export function runChecks(input: CheckInput): CheckReport {
       tdmTravelS,
     },
   };
+}
+
+/**
+ * M10 (fase 1c): a caixa `i` de prop se apoia em OUTRA caixa de prop (o banco do trator na carroceria, a parte de cima
+ * da cunha inflável na de baixo): algum colisor tem o centro da base dela dentro de si, logo abaixo (5 cm). Sem isso,
+ * o aviso "prop sem chão" só olhava a grade de blocos e acusava toda prop de caixas empilhadas.
+ */
+function restsOnCollider(c: StaticColliders, i: number): boolean {
+  const o = i * COLLIDER_STRIDE;
+  const x = (c.boxes[o]! + c.boxes[o + 3]!) / 2;
+  const y = c.boxes[o + 1]! - 0.05;
+  const z = (c.boxes[o + 2]! + c.boxes[o + 5]!) / 2;
+  let found = false;
+  c.query(x, y, z, x, y, z, (j) => {
+    if (j !== i) found = true;
+    return !found;
+  });
+  return found;
 }
 
 /** Bits de `obstacleAt` em `measureLimbThrough`. */

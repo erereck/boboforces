@@ -141,6 +141,8 @@ export class SoldierTiming {
   readonly chase: number;
   readonly alert: number;
   readonly wander: number;
+  /** M10 (fase 1c): o teto do prazo do passeio esticado pela rota. */
+  readonly wanderMax: number;
   readonly detour: number;
   readonly stuck: number;
   readonly unstuck: number;
@@ -203,6 +205,7 @@ export class SoldierTiming {
     this.chase = secondsToTicks(AI_SENSES.chaseS, hz);
     this.alert = secondsToTicks(AI_SENSES.alertS, hz);
     this.wander = secondsToTicks(AI_SOLDIER.wanderS, hz);
+    this.wanderMax = secondsToTicks(AI_SOLDIER.wanderMaxS, hz);
     this.detour = secondsToTicks(0.5, hz);
     this.stuck = Math.max(1, secondsToTicks(AI_PATH.stuckS, hz));
     this.unstuck = secondsToTicks(AI_PATH.unstuckS, hz);
@@ -363,6 +366,13 @@ export class SoldierBrain {
   goalY = 0;
   goalZ = 0;
   goalUntil = 0;
+  /**
+   * M10 (fase 1c): quando o passeio foi escolhido, a última rota (`routeSerial`) que esticou o prazo dele e se ele é o
+   * passeio sorteado (o nó qualquer ou o andar de cima: só esse estica; o objetivo dos modos segue o prazo de sempre).
+   */
+  wanderFrom = 0;
+  wanderRoute = 0;
+  wanderStretch = false;
   detourHeading = 0;
   detourUntil = 0;
   detourSign = 1;
@@ -728,6 +738,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   const nav = view.nav;
   b.hasGoal = false;
   b.goalUntil = c.tick + t.wander;
+  b.wanderFrom = c.tick;
+  b.wanderStretch = false;
   const board = c.board;
   const e = c.ctrlToEntity[b.controller]!;
   const team = e >= 0 ? view.team[e]! : 0;
@@ -776,6 +788,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
         }
       }
     }
+    // M10 (fase 1c): às vezes o passeio sobe (o andar de cima, a torre).
+    if (pickUpperGoal(c, b, e, team, y, from)) return;
     for (let k = 0; k < AI_SOLDIER.wanderTries; k++) {
       const n = b.rng.int(0, nav.nodeCount);
       if (from >= 0 && nav.component[n] !== nav.component[from]) continue;
@@ -796,6 +810,7 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
       )
         continue;
       setWanderGoal(c, b, e);
+      b.wanderStretch = true;
       return;
     }
     return;
@@ -810,6 +825,72 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   b.goalY = y;
   b.goalZ = b.rng.range(minZ + 2, Math.max(minZ + 2.5, maxZ - 2));
   b.hasGoal = true;
+}
+
+/**
+ * M10 (fase 1c): o passeio que sobe. Só quando há andar acima do bot no grupo principal do componente dele (vai e volta
+ * pela navegação; o bot num topo de onde só se cai fica fora) e com a chance `upperChance` (sem andar acima, nem sorteia:
+ * no mapa térreo o passeio é o de sempre, número a número): sorteia um desses andares (`NavLevels`, a mesma vez para o
+ * pequeno e o grande) e, nele, até `upperSamples` nós; fica com o primeiro a pelo menos `upperRiseM` acima dos pés do
+ * bot, na área jogável e, no N4, fora de onde o time morreu. `false` = o passeio de sempre.
+ */
+function pickUpperGoal(c: AiContext, b: SoldierBrain, e: number, team: number, y: number, from: number): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  const levels = c.levels;
+  if (from < 0 || levels.count === 0) return false;
+  const comp = nav.component[from]!;
+  if (levels.group[from] !== levels.mainGroup[comp]) return false;
+  const base = comp * levels.count;
+  const mine = levels.levelOf(y);
+  let above = 0;
+  for (let l = mine + 1; l < levels.count; l++) if (levels.start[base + l + 1]! > levels.start[base + l]!) above++;
+  if (above === 0 || !b.rng.chance(AI_SOLDIER.upperChance)) return false;
+  // O k-ésimo andar não vazio acima do bot.
+  let pick = b.rng.int(0, above);
+  let bucket = base + mine + 1;
+  for (; ; bucket++) {
+    if (levels.start[bucket + 1]! > levels.start[bucket]! && pick-- === 0) break;
+  }
+  const first = levels.start[bucket]!;
+  const size = levels.start[bucket + 1]! - first;
+  const board = c.board;
+  const area = view.playArea;
+  const minY = y + AI_SOLDIER.upperRiseM;
+  for (let k = 0; k < AI_SOLDIER.upperSamples; k++) {
+    const n = levels.order[first + b.rng.int(0, size)]!;
+    if (nav.floorY[n]! < minY) continue;
+    nav.nodePosition(n, nodePos, 0);
+    if (
+      area &&
+      (nodePos[0]! < area.minX || nodePos[0]! > area.maxX || nodePos[2]! < area.minZ || nodePos[2]! > area.maxZ)
+    ) {
+      continue;
+    }
+    if (
+      board !== null &&
+      b.intelligence.learn &&
+      board.dangerAt(team, nodePos[0]!, nodePos[2]!) >= AI_TEAM.dangerAvoid
+    ) {
+      continue;
+    }
+    setWanderGoal(c, b, e);
+    b.wanderStretch = true;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * M10 (fase 1c): estica o prazo do passeio sorteado quando chega a rota dele (uma vez por rota): rota ÷
+ * `wanderPaceMps` a partir de agora, até `wanderMax` desde a escolha. Nunca encurta: o prazo mínimo continua `wander`.
+ */
+function stretchWander(b: SoldierBrain, f: PathFollower, tick: number, t: SoldierTiming): void {
+  if (!b.wanderStretch || !f.hasRoute || f.routeSerial === b.wanderRoute) return;
+  if (f.goalX !== b.goalX || f.goalZ !== b.goalZ) return;
+  b.wanderRoute = f.routeSerial;
+  const until = Math.min(b.wanderFrom + t.wanderMax, tick + Math.round((f.routeM / AI_SOLDIER.wanderPaceMps) * t.hz));
+  if (until > b.goalUntil) b.goalUntil = until;
 }
 
 /**
@@ -1420,9 +1501,12 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     b.hasLastKnown = false;
     // M2 (fase 3g): o objetivo da personalidade (ponto do Camper, presa, humano do Suporte) vem antes do passeio.
     if (!personaGoal(c, b, e, t, x, y, z)) {
+      if (b.hasGoal) stretchWander(b, f, tick, t);
       const ddx = b.goalX - x;
       const ddz = b.goalZ - z;
-      if (!b.hasGoal || tick >= b.goalUntil || ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED || f.failed) {
+      // M10 (fase 1c): chegou é no mesmo andar; embaixo do objetivo (o patamar da torre visto do térreo) não conta.
+      const reached = ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED && Math.abs(b.goalY - y) < AI_PATH.arriveDy;
+      if (!b.hasGoal || tick >= b.goalUntil || reached || f.failed) {
         if (f.failed) f.clear();
         pickWanderGoal(c, b, x, y, z, t);
       }

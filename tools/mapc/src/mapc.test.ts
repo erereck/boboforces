@@ -590,6 +590,25 @@ describe('mapc: validações com o mundo', () => {
     expect(lineOfSight(s, 1, 1, 1, 7, 1, 1)).toBe(true);
     expect(lineOfSight(s, -5, 1, 1, 1, 1, 1)).toBe(true);
   });
+
+  it('M10 (fase 1c): prop de caixas empilhadas (trator, cunha inflável) tem chão; a solta no ar, não', () => {
+    const floating = (r: ReturnType<typeof compileMap>): boolean =>
+      r.warnings.some((w) => w.startsWith('prop sem chão'));
+    const stacked = compileMap(
+      arena((b) => {
+        b.prop('tractor', 5, 0.5, 8, 0);
+        b.prop('inflatable-wedge', 11, 0.5, 4, Math.PI / 2);
+      }),
+      OPTIONS,
+    );
+    expect(stacked.errors).toEqual([]);
+    expect(floating(stacked)).toBe(false);
+    const loose = compileMap(
+      arena((b) => b.prop('barrel', 11, 2.5, 11, 0)),
+      OPTIONS,
+    );
+    expect(floating(loose)).toBe(true);
+  }, 60_000);
 });
 
 describe('mapc: Construto', () => {

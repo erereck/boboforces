@@ -65,12 +65,14 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * média de 8 sementes é 14,8 abates e 238 tiros, contra 15,4 e 256 sem personalidade), então o piso de tiros caiu de
  * 100 para 60. Refino R1 (16/11/2026): `34edbf41` (11 abates, 91 tiros, 4×7, 9 granadas) — atirar andando ficou
  * arcade no perfil Bobo (a mira quase não abre andando, o gatilho corta a corrida). Refino R2: `b36eb8e1` (o campo do
- * arremesso rápido da granada entra no estado e no hash; a partida é a mesma). O hash MUDA, de propósito, quando o
- * mapa, os blocos, as props,
+ * arremesso rápido da granada entra no estado e no hash; a partida é a mesma). M10 fase 1c (26/11/2026): os bots sobem
+ * escada reta: `293f84c7` (13 abates, 127 tiros, 7×6, 10 caixinhas, 6 granadas) — o seguidor de rota não larga mais a
+ * rota no pé dos lances de 3 e 5 m (Prédios de Teste 1 e 3, torre), o passeio às vezes sobe um andar e o prazo dele
+ * cresce com a rota. O hash MUDA, de propósito, quando o mapa, os blocos, as props,
  * a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
  * Mudança sem querer é bug de determinismo. O CI no Linux confere o mesmo valor.
  */
-const GOLDEN_HASH = 'b36eb8e1';
+const GOLDEN_HASH = '293f84c7';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -177,9 +179,10 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * (as vantagens entram no hash; a partida é a mesma). Fase 4d: `8feb69fb` (o sorteio dos drops usa o RNG dos zumbis e
  * os drops ajudam: onda 3, 38 abates, 1 queda). Fase 7c: `dd27cd5e` (o bot de apoio não gasta a reserva: onda 3, 37
  * abates, 3 quedas). Refino R1: `b4b81b30` (atirar andando arcade: onda 3, 37 abates, 3 quedas). Refino R2:
- * `edc93590` (o campo do arremesso rápido no hash; a partida é a mesma).
+ * `edc93590` (o campo do arremesso rápido no hash; a partida é a mesma). M10 fase 1c (26/11/2026): os bots sobem
+ * escada reta (e os zumbis no A* de reserva também): `07976714` (onda 3, 43 abates, 7 quedas, ainda jogando nos 2 min).
  */
-const GOLDEN_ZOMBIES_HASH = 'edc93590';
+const GOLDEN_ZOMBIES_HASH = '07976714';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -306,10 +309,11 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
 /**
  * M6 (fase 1): o golden do Domination: 4 contra 4 bots Normal no Construto (os 3 pontos do mapa), semente 42, até
  * 3 min. Confere que os bots jogam o objetivo (os dois times capturam pontos e marcam), e o hash entre execuções.
- * Gravado na fase 1 (19/11/2026): `97f2f078` (capturas 2/3, o time 1 fecha 200 a 101).
+ * Gravado na fase 1 (19/11/2026): `97f2f078` (capturas 2/3, o time 1 fecha 200 a 101). M10 fase 1c (26/11/2026): os
+ * bots sobem escada reta e o passeio às vezes sobe: `b68b0dee` (capturas 1/2, o time 1 fecha 200 a 151).
  * MUDA com a sim, a IA, o mapa ou as regras dos pontos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_DOMINATION_HASH = '97f2f078';
+const GOLDEN_DOMINATION_HASH = 'b68b0dee';
 const GOLDEN_DOMINATION_TICKS = 10_800;
 
 function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {
@@ -367,11 +371,13 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
  * M6 (fase 2): o Gun Game e o Infection com bots no Construto, semente 42. O Gun Game: 8 bots Normal na escada de 7
  * armas (a faca por último), até alguém fechar ou 4 min. O Infection: 8 bots sobreviventes, 3 min. Conferem que os bots
  * jogam (sobem a escada; os infectados pegam gente) e o hash entre execuções. Gravados na fase 2 (19/11/2026): Gun Game
- * `6595bdd9` (um bot fecha a escada em 3.707 ticks), Infection `ffb3e5cb` (os 8 infectados em 7.648 ticks).
+ * `6595bdd9` (um bot fecha a escada em 3.707 ticks), Infection `ffb3e5cb` (os 8 infectados em 7.648 ticks). M10 fase
+ * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: Gun Game `5f4a962e` (um bot fecha em 7.741
+ * ticks; níveis 7, 6, 6, 5, 5, 5, 4, 4), Infection `274706cf` (os 8 infectados em 5.966 ticks).
  * MUDAM com a sim, a IA, o mapa ou as regras dos modos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_GUNGAME_HASH = '6595bdd9';
-const GOLDEN_INFECTION_HASH = 'ffb3e5cb';
+const GOLDEN_GUNGAME_HASH = '5f4a962e';
+const GOLDEN_INFECTION_HASH = '274706cf';
 const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
 
 function runPartyGolden(kind: 'gunGame' | 'infection'): {
@@ -454,9 +460,11 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
 /**
  * M6 (fase 3): o Juggernaut (Rodízio) com 8 bots Normal no Construto, semente 42, 3 min. Confere que os bots caçam o
  * Jugg (ele troca de mãos várias vezes), que alguém pontua como Jugg e o hash entre execuções. Gravado na fase 3
- * (19/11/2026): `f7c0ff3a` (4 Juggs em 3 min; o melhor fez 71 pontos). MUDA com a sim, a IA, o mapa ou as regras.
+ * (19/11/2026): `f7c0ff3a` (4 Juggs em 3 min; o melhor fez 71 pontos). M10 fase 1c (26/11/2026): os bots sobem escada
+ * reta e o passeio às vezes sobe: `d8fc313c` (4 Juggs em 3 min; pontos 96, 69 e 14). MUDA com a sim, a IA, o mapa ou
+ * as regras.
  */
-const GOLDEN_JUGGERNAUT_HASH = 'f7c0ff3a';
+const GOLDEN_JUGGERNAUT_HASH = 'd8fc313c';
 
 function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -520,9 +528,10 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * teto passou a ficar abaixo dele: `ae3a48fd` (as mesmas trocas; 24 × 25, com morte súbita até o tick 10.832, onde
  * sai o Ricochete e entra a pesada). Na fase 1b o gigante encolhe debaixo de teto baixo (a escala de cada corpo sai
  * no fim do tick e as hitboxes usam a do tick anterior): `566e5be9` (as mesmas trocas; 24 × 22 nos 10.800 ticks, sem
- * morte súbita). MUDA com a sim, a IA, o mapa ou os modificadores.
+ * morte súbita). M10 fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `bcdb24cc` (as mesmas
+ * trocas e mais uma na prorrogação; 28 × 27 em 10.885 ticks). MUDA com a sim, a IA, o mapa ou os modificadores.
  */
-const GOLDEN_CHAOS_HASH = '566e5be9';
+const GOLDEN_CHAOS_HASH = 'bcdb24cc';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();
@@ -572,10 +581,11 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
 /**
  * M6 (fase 5): o Bobo Paintball (4 contra 4, 1 acerto derruba, renasce em 1 s) com 8 bots Normal no Construto, semente
  * 42, até 50 abates ou 3 min. Confere que os bots acertam a bola de tinta (adiantando o voo e a queda), que o placar
- * anda e o hash entre execuções. Gravado na fase 5 (19/11/2026): `855196e7` (43 × 35 em 3 min, com o balde). MUDA com a sim, a IA, o
- * mapa ou as armas de tinta.
+ * anda e o hash entre execuções. Gravado na fase 5 (19/11/2026): `855196e7` (43 × 35 em 3 min, com o balde). M10 fase
+ * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `eb58a2e1` (32 × 42 em 3 min). MUDA com a sim,
+ * a IA, o mapa ou as armas de tinta.
  */
-const GOLDEN_PAINTBALL_HASH = '855196e7';
+const GOLDEN_PAINTBALL_HASH = 'eb58a2e1';
 
 function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -674,9 +684,11 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
 /**
  * M6 (fase 6b): a Horda armada na Base Abandonada: 4 bots Normal de apoio contra a horda de 12 bots Normal (o time 1),
  * semente 42, até 7.200 ticks. Confere que a horda entra (o apoio abate soldados) e o hash entre
- * execuções. Gravado na fase 6b (19/11/2026): `0bc0e8ca` (o apoio derruba 4 dos 5 soldados da 1ª onda, 2 em jogo por vez). MUDA com a sim, a IA ou o mapa.
+ * execuções. Gravado na fase 6b (19/11/2026): `0bc0e8ca` (o apoio derruba 4 dos 5 soldados da 1ª onda, 2 em jogo por vez). M10
+ * fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `72bfc919` (o apoio abate 4 soldados da
+ * 1ª onda e a partida acaba). MUDA com a sim, a IA ou o mapa.
  */
-const GOLDEN_HORDE_HASH = '0bc0e8ca';
+const GOLDEN_HORDE_HASH = '72bfc919';
 
 function runHordeGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
   const { map } = loadWorld('base');
@@ -732,10 +744,11 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
 /**
  * M7 (fase 0): o Juggernaut Fixo (as rodadas) com 4 bots Normal no Construto, semente 42, até 4 rodadas de 3 min.
  * Confere que cada bot é o Jugg numa rodada (pela ordem), que a partida acaba com um vencedor e o hash entre execuções.
- * Gravado na fase 0 (19/11/2026): `9074d33b` (pontos 105, 180, 180 e 109, com o desempate pelos abates; 36.227 ticks). MUDA com a
- * sim, a IA, o mapa ou as regras.
+ * Gravado na fase 0 (19/11/2026): `9074d33b` (pontos 105, 180, 180 e 109, com o desempate pelos abates; 36.227 ticks). M10
+ * fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `727af431` (pontos 128, 151, 180 e 180;
+ * 40.091 ticks). MUDA com a sim, a IA, o mapa ou as regras.
  */
-const GOLDEN_JUGG_FIXED_HASH = '9074d33b';
+const GOLDEN_JUGG_FIXED_HASH = '727af431';
 
 function runJuggFixedGolden(): {
   hash: string;
@@ -798,9 +811,10 @@ describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
 /**
  * M7 (fase 1): o TDM 4 contra 4 na Base Bobo (o mapa do BoboStrike), semente 42, 2 min. Confere que os bots andam pelas
  * rotas e brigam no mapa novo (abates dos dois lados) e o hash entre execuções. Gravado na fase 1 (19/11/2026):
- * `e3158452` (17 × 18). MUDA com a sim, a IA ou o mapa.
+ * `e3158452` (17 × 18). M10 fase 1c (26/11/2026): o "chegou" do passeio é no mesmo andar e o prazo do passeio cresce
+ * com a rota: `3a5f0053` (18 × 24). MUDA com a sim, a IA ou o mapa.
  */
-const GOLDEN_AIRBASE_HASH = 'e3158452';
+const GOLDEN_AIRBASE_HASH = '3a5f0053';
 
 function runAirbaseGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld('airbase');
@@ -899,9 +913,11 @@ describe('golden do BoboStrike (M7, fase 3) com bots na Base Bobo', () => {
 /**
  * M7 (fase 7): o Bobo Royale solo com 24 bots Normal na Ilha Tropical, semente 42, a partida inteira. Confere que os
  * bots looteiam (a maioria acaba com uma primária), que a partida acaba com um vencedor e o hash entre execuções.
- * Gravado na fase 7 (19/11/2026): `38d57bd4` (100 s, 22 com primária). MUDA com a sim, a IA ou o mapa.
+ * Gravado na fase 7 (19/11/2026): `38d57bd4` (100 s, 22 com primária). M10 fase 1c (26/11/2026): os bots sobem escada
+ * reta (o seguidor de rota é o mesmo do loot e da zona) e o passeio às vezes sobe: `5d105b0b` (81 s, 22 com primária).
+ * MUDA com a sim, a IA ou o mapa.
  */
-const GOLDEN_ROYALE_HASH = '38d57bd4';
+const GOLDEN_ROYALE_HASH = '5d105b0b';
 
 function runRoyaleGolden(): { hash: string; seconds: number; winner: number; armed: number; phase: string } {
   const { map } = loadWorld('island');
@@ -958,10 +974,11 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
  * M8 (fase 8): o TDM 4 contra 4 de bots Normal no Construto com o modificador Arcade, semente 42, 2 min. Os bots não
  * fazem bunny hop nem wall jump (a marca de quadro de jogador), mas andam e pulam no perfil Arcade (o pulo duplo, o
  * deslize, o tiro correndo). Confere que houve luta e o hash entre execuções. Gravado no fechamento do M8 (20/11/2026):
- * `3e7df5b3` (15 × 18).
+ * `3e7df5b3` (15 × 18). M10 fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `030ef885`
+ * (16 × 18).
  * MUDA com a sim, a IA, o mapa ou o perfil Arcade.
  */
-const GOLDEN_ARCADE_HASH = '3e7df5b3';
+const GOLDEN_ARCADE_HASH = '030ef885';
 
 function runArcadeGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld();

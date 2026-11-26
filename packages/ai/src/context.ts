@@ -15,6 +15,7 @@ import type { TeamBoard } from './team.ts';
 import type { RoyaleClaims } from './royale.ts';
 import { AI_BUDGET, AI_LOD, AI_PATH, AI_SOLDIER } from './config.ts';
 import type { ZombieFlow } from './flow.ts';
+import { NavLevels } from './levels.ts';
 import type { PathService } from './paths.ts';
 
 const F = ENTITY_FLAG;
@@ -60,6 +61,8 @@ export class AiContext {
   strikeRng: Rng | null = null;
   readonly viewDistance: number;
   readonly paths: PathService;
+  /** M10 (fase 1c): os nós em pé por andar (o passeio que sobe), montados junto com a navegação. */
+  readonly levels = new NavLevels();
   /** M3 (fase 3c): o flow field dos zumbis (null = sem zumbis ou sem `createFlowField`). */
   flow: ZombieFlow | null = null;
   /** M6 (fase 6a): o campo até o gerador do Fortress (`null` fora dele). */
@@ -120,6 +123,7 @@ export class AiContext {
       }
     }
     this.paths.bind(view.nav);
+    this.levels.bind(view.nav);
   }
 
   /** Mesma regra da sim: zumbi é inimigo de todo bobo e de nenhum zumbi; entre bobos, FFA ou times diferentes. */

@@ -5168,3 +5168,33 @@ commits é a de chegada.
   (ondas de 40 a 76 s); a falta da cena de bench; e o Fortress que nenhum card oferece na Fazenda (fica para o Erick).
   Corrigido antes do commit. Fica: 7.103 nós de navegação fora da área ou em telhados e sebes (memória, não tempo de
   campo de fluxo).
+
+### 21.9 Fase 1c: os bots sobem escada reta e o mapc vê os pulos (26/11/2026)
+
+- **A escada** (`ai/src/paths.ts`): a suavização da rota junta um lance reto num segmento só, e o seguidor de caminho
+  achava que o bot tinha caído (a regra `y < py - 2,5`) assim que ele chegava ao pé da escada, pedia a mesma rota e
+  ficava em laço. Agora a queda se mede contra a ponta de BAIXO do segmento de agora (`AI_PATH.fellM`, 2,5 m). No
+  Construto, o topo da torre (lance de 5 m) e o 1º andar dos Prédios de Teste 1 e 3 viraram alcançáveis em 8 a 20 s
+  (antes, 55 a 80 rotas largadas e nunca chegavam); os mezaninos do Porto e o andar de cima da Estação Lunar também (os
+  testes que esperavam esta fase voltaram; o deque da antena da Lua segue em espera numa semente). Testes:
+  `ai/src/stairs.test.ts` (lances sintéticos de 3, 4 e 5 m) e `game/scene/climb.test.ts` (o Construto de verdade).
+- **Os andares de cima** (`ai/src/soldier.ts`, `ai/src/levels.ts`): o passeio sorteia, com chance de 0,3, um andar acima
+  do bot e um nó nele, só entre os lugares de onde dá para ir e voltar (calculado uma vez por mapa); o prazo do passeio
+  cresce com o tamanho da rota (rota ÷ 3 m/s, até 45 s); e o destino do passeio só conta no mesmo andar. No Canteiro, o
+  2º andar passou de nunca visitado para visitado em 4 de 5 sementes; no Construto, as amostras no 1º andar foram de 73
+  para 199.
+- **Os goldens** mudaram (os bots sobem): TDM `293f84c7`, Zombies no Construto `07976714`, Domination `b68b0dee`, Gun
+  Game `5f4a962e`, Infection `274706cf`, Juggernaut `d8fc313c`, Chaos `bcdb24cc`, Paintball `eb58a2e1`, Horda `72bfc919`,
+  Jugg Fixo `727af431`, Base Bobo `3a5f0053`, Royale `5d105b0b` e Arcade `030ef885`; o Posto, o Fortress, o BoboStrike e
+  o Sandbox não mudaram. Cada um tem a nota "M10 fase 1c: os bots sobem escada reta".
+- **Os pulos no mapc** (`tools/mapc/src/jump-reach.ts`): os topos aonde só o pulo correndo leva (pelo perfil de
+  movimento de verdade: a corrida de 6,8 m/s, o pulo, a gravidade do mapa, o coyote de 0,1 s e o mantle de 0,5 m no ar;
+  conferido contra a sim: 6 m de vão no plano, 5,5 m subindo 0,5 m, 12 m na Lua) entram como aviso, com as coordenadas,
+  e na medida da maior linha de visão; passar da declarada é erro, a não ser que o mapa marque
+  `analysis.jumpSightTodo` (vira aviso). Cinco mapas passam hoje e ficam marcados (decisão do Erick, pergunta AK7): o
+  Construto (66 m, os telhados do Bloco Leste pelo pulo da escada da torre), a Base Bobo (61 m), o Canteiro (85 m, os
+  contêineres das bases), a Estação Lunar (76 m, os topos de 4–5 m no pulo lunar) e a Fazenda (106 m, um topo de
+  ~4,5 m perto de (19,5; 40,5), que pode ser lugar aonde o zumbi não chega: a corrigir no ajuste da Fazenda). O aviso de
+  "peça sem chão" deixou de acusar a caixa de colisão apoiada noutra caixa da mesma peça (o banco do trator, a cunha).
+- **Achado:** no Construto, um poço fechado ao lado da escada da torre (x 42–44, z 39–44; a escada não tem guarda do
+  lado oeste) prende o bot que cai até o Destravar (fechar muda o mapa e os goldens).

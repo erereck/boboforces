@@ -11,7 +11,9 @@
 // ver" (parede entre o olho e o topo da hitbox em pé, 1,81 m), cobertura rente ao agachado (topo em [0,95; 0,98)) e
 // alta abaixo da cabeça (topo em [1,75; 1,81)), rota de câmera atravessando bloco e prop dentro de parede. Medidas no
 // relatório: braço armado e corpo no deslize através de barreira (J-M4), com o alcance da tabela de jogo, no visual e
-// na hitbox da sim (braço cortado a `ARM_HIT_CUT_M`, decisão 1 da §I do PLANO do porte).
+// na hitbox da sim (braço cortado a `ARM_HIT_CUT_M`, decisão 1 da §I do PLANO do porte). M10 (fase 1c): os topos aonde só
+// o pulo correndo chega (`jump-reach.ts`) são aviso e entram na linha de visão (passar da declarada é erro, ou aviso com
+// o `analysis.jumpSightTodo` do mapa).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';

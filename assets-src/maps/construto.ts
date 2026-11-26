@@ -948,6 +948,10 @@ function benchRoutes(k: Kit): void {
 
 const construto: MapScript = {
   id: 'construto',
+  // TODO (M10, fase 1c): do lance da escada da torre (8,75 m), um pulo correndo de ~5,6 m alcança o telhado do Bloco
+  // Leste (7 m) e, de lá, os telhados vizinhos; a maior linha de visão de lá dá 66 m (o teto do Switch é 50 m).
+  // Fechar (corrimão no lance, telhado fora do alcance) muda o mapa e os goldens: decisão do Erick.
+  analysis: { jumpSightTodo: 'telhados do Bloco Leste pelo pulo da escada da torre (66 m)' },
   build(b) {
     const k = new Kit(b);
     b.size(160, 48, 160);

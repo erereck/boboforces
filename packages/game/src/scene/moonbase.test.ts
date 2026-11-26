@@ -144,10 +144,12 @@ describe('a Estação Lunar (M10, fase 4)', () => {
     expect(lunar.air).toBeGreaterThan(earth.air * 2.5);
   }, 60_000);
 
-  // Revisão da fase 4: as rampas de 4 m da estação e a de 3 m da antena estão na navegação, mas a IA de hoje não sobe
-  // escada comprida (o defeito do caminho em `packages/ai/src/paths.ts`, consertado em outra frente): 0 tick de bot no
-  // andar de cima em 3 min de TDM. A integração tira o `skip` junto com o conserto.
-  it.skip('os bots sobem para o andar de cima da estação e para o deque da antena (espera o conserto da IA)', () => {
+  // Revisão da fase 4: as rampas de 4 m da estação e a de 3 m da antena estão na navegação, mas a IA não subia escada
+  // comprida (0 tick de bot no andar de cima em 3 min de TDM). M10 (fase 1c): com o seguidor de rota consertado
+  // (`packages/ai/src/paths.ts`) e o passeio que às vezes sobe, o andar de cima tem bot (367 amostras de tick nesta
+  // semente, o 1º aos 17 s). O deque da antena (16 nós) ainda não em 90 s nesta semente (nas sementes 1, 2 e 3: 38, 0 e
+  // 0 amostras; o seguidor sobe até ele em 12,6 s do spawn do time 0): fica no `skip` até a integração decidir.
+  const upperAndDeck = (): { upper: number; deck: number } => {
     const map = loadMap('moonbase');
     const match = createHeadlessMatch({ recipe: RECIPES['Times (TDM)']!, map, humans: 0 });
     let upper = 0;
@@ -167,8 +169,13 @@ describe('a Estação Lunar (M10, fase 4)', () => {
       }
     }
     match.dispose();
-    expect(upper).toBeGreaterThan(0);
-    expect(deck).toBeGreaterThan(0);
+    return { upper, deck };
+  };
+  it('os bots sobem para o andar de cima da estação', () => {
+    expect(upperAndDeck().upper).toBeGreaterThan(0);
+  }, 120_000);
+  it.skip('os bots sobem para o deque da antena (o passeio quase não sorteia os 16 nós dele)', () => {
+    expect(upperAndDeck().deck).toBeGreaterThan(0);
   }, 120_000);
 
   for (const [name, recipe] of Object.entries(RECIPES)) {

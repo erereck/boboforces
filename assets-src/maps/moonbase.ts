@@ -521,6 +521,10 @@ function cameras(b: MapBuilder): void {
 
 const moonbase: MapScript = {
   id: 'moonbase',
+  // TODO (M10, fase 1c): o pulo lunar correndo vai longe no plano (≈12 m de vão no mesmo nível, conferido contra a sim
+  // no `jump-reach.test.ts` do mapc): topos de 4–5 m (como o de (4,5; 4,5), a 4 m de um nó do chão a 2 m) e, encadeados,
+  // outros; a maior linha de visão de lá dá 76 m (o teto do Switch é 50 m). Fechar muda o mapa: decisão do Erick.
+  analysis: { jumpSightTodo: 'topos de 4–5 m pelo pulo lunar correndo (76 m)' },
   build(b) {
     b.size(c(SIZE), 48, c(SIZE));
     b.meta({

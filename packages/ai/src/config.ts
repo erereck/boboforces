@@ -77,6 +77,11 @@ export const AI_PATH = {
   replanGoalM: 2.5,
   /** Longe do próximo ponto mais que isto (m) ou caiu: pede caminho de novo. */
   offPathM: 4,
+  /**
+   * Caiu: os pés mais que isto (m) abaixo da ponta mais baixa do segmento que o bot segue. M10 (fase 1c): era a ponta
+   * de chegada, e a rota caía no pé de todo lance reto de escada mais alto que isto.
+   */
+  fellM: 2.5,
   /** Pula para o ponto da ligação de pulo a esta distância (m) se ele estiver mais alto que um degrau. */
   jumpTriggerM: 1.3,
   /** Sem andar `stuckMoveM` em `stuckS`: pula; 2 vezes seguidas: pede caminho; 4: desiste do objetivo. */
@@ -306,6 +311,22 @@ export const AI_SOLDIER = {
   /** Passeio: novo objetivo depois deste tempo (s) e tentativas de achar um nó alcançável. */
   wanderS: 15,
   wanderTries: 4,
+  /**
+   * M10 (fase 1c): o prazo do passeio cresce com a rota recebida: rota ÷ `wanderPaceMps` (ritmo folgado: curva, escada
+   * e briga no caminho), contado de quando a rota chega, nunca menos que `wanderS` nem mais que `wanderMaxS` desde a
+   * escolha. Com 15 s fixos, o andar de cima do outro lado do mapa vencia antes de o bot chegar.
+   */
+  wanderPaceMps: 3,
+  wanderMaxS: 45,
+  /**
+   * M10 (fase 1c): o passeio às vezes sobe. Com a chance `upperChance`, sorteia um dos andares acima do bot (faixas de
+   * 3 m, `NavLevels`) e até `upperSamples` nós dele; vale o primeiro alcançável a pelo menos `upperRiseM` acima dos pés
+   * do bot (o andar de cima, a torre); senão, o passeio de sempre. Sem isso, o sorteio uniforme por nó quase nunca caía
+   * no andar de cima (o térreo tem muito mais nós).
+   */
+  upperChance: 0.3,
+  upperSamples: 8,
+  upperRiseM: 2.5,
   /** M6 (fase 1): no Domination, 1 bot em cada tantos (pelo controlador) defende um ponto do time. */
   pointDefenderEvery: 3,
   /** M6 (fase 1): quem ataca escolhe outro ponto (não o mais perto) com esta chance, para o time se espalhar. */

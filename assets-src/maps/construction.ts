@@ -632,6 +632,10 @@ function cameras(k: Kit): void {
 
 const construction: MapScript = {
   id: 'construction',
+  // TODO (M10, fase 1c): do 2º andar do prédio e dos andaimes, pulos correndo de 4–6 m levam aos topos de 6 m (o núcleo,
+  // os quebra-vistas e as fileiras de contêineres das bases) e, encadeados, ao mapa todo por cima; a maior linha de
+  // visão de lá dá 85 m (o teto do Switch é 50 m). Fechar muda o mapa e os goldens: decisão do Erick.
+  analysis: { jumpSightTodo: 'topos de 6 m (contêineres das bases) pelos pulos do prédio e dos andaimes (85 m)' },
   build(b) {
     b.size(160, 48, 176);
     b.meta({

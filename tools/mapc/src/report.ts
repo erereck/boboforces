@@ -69,10 +69,15 @@ export function formatReport(r: CompileResult): string {
     `  maior linha de visão: medida ${max ? m(max.distance) : '—'} (declarada ${r.doc.meta.maxSightLineM} m); ` +
       `${c.sight.nodes} nós, ${c.sight.rays} raios, ${ms(s.sightMs)}`,
   );
-  for (const line of c.sight.longest.slice(0, 5)) {
-    const p = (v: readonly number[]): string => `(${v.map((x) => x.toFixed(1)).join(', ')})`;
-    lines.push(`    ${m(line.distance)}: ${p(line.a)} → ${p(line.b)}`);
-  }
+  const p = (v: readonly number[]): string => `(${v.map((x) => x.toFixed(1)).join(', ')})`;
+  for (const line of c.sight.longest.slice(0, 5)) lines.push(`    ${m(line.distance)}: ${p(line.a)} → ${p(line.b)}`);
+  // M10 (fase 1c): os topos do pulo correndo (fora da navegação) e a maior linha de visão que sai deles.
+  const jr = c.jumpReach;
+  const js = jr.sight;
+  lines.push(
+    `  topos do pulo correndo (fora da navegação): ${jr.nodes} nós em ${jr.tops.length} lugares; maior linha de ` +
+      `visão de um deles: ${js ? `${m(js.distance)}: ${p(js.a)} → ${p(js.b)}` : '—'} (${jr.rays} raios)`,
+  );
   lines.push(
     `  cobertura rente à hitbox: ${c.lowCover} nós com cobertura de topo rente ao agachado, ${c.highCover} com ` +
       `cobertura alta abaixo da cabeça em pé; visto sem ver ${c.seenWithoutSeeing}`,

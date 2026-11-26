@@ -33,6 +33,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A Fazenda à noite (fase 5):** o 2º mapa do Bobo Zombies (e do Fortress): a casa, o terreiro, o galpão, o celeiro com
   o jirau e o pátio dos silos, com 18 janelas, 6 portas pagas, armas na parede, a Caixa Misteriosa e 3 vantagens; os
   zumbis chegam no ritmo da Base Abandonada e não há lugar alto onde eles não alcancem.
+- **Os bots sobem escada (fase 1c):** os bots passaram a subir escadas retas altas (antes, um lance de mais de 2,5 m os
+  fazia desistir da rota: a torre do Construto, os mezaninos do Porto, o andar de cima da Lua) e sobem aos andares de
+  cima de vez em quando. Os goldens com bots no Construto e na Base Bobo mudaram por isso. O compilador de mapas agora
+  mede também os lugares aonde só um pulo correndo leva.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

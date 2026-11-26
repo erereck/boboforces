@@ -279,6 +279,10 @@ function cameras(b: MapBuilder): void {
 
 const airbase: MapScript = {
   id: 'airbase',
+  // TODO (M10, fase 1c): a escalada de 1,5 m e pulos curtos levam a topos de 2,5–3,5 m sem ligação na navegação (perto
+  // de (6,5; 16,5) e dos cantos); a maior linha de visão de lá dá 61 m (o teto do Switch é 50 m). Fechar muda o mapa e
+  // os goldens: decisão do Erick.
+  analysis: { jumpSightTodo: 'topos de 2,5–3,5 m pela escalada e pelo pulo (61 m)' },
   build(b) {
     b.size(144, 48, 144);
     b.meta({
