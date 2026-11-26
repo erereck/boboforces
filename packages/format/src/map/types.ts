@@ -50,6 +50,14 @@ export interface MapMeta {
   readonly maxSightLineM: number;
   /** Teto de bots por perfil de plataforma (abaixo do teto do perfil; ausente = o do perfil). */
   readonly botCaps: Readonly<Partial<Record<PlatformProfileId, number>>>;
+  /**
+   * M10 (fase 4): a gravidade de série do mapa, multiplicando a do perfil em todo modo jogado nele (ausente = 1;
+   * `MAP_GRAVITY_RANGE`). A Estação Lunar usa 0,35, a do modificador Lua (pergunta AK3); a sim aplica como o
+   * modificador (o pulo mantém a velocidade e sobe mais; abaixo de 1, sem dano de queda). Opcional no JSON da seção
+   * META: um mapa sem ela tem os mesmos bytes de antes. Host e amigo online carregam o mesmo mapa, então a predição usa
+   * a mesma gravidade.
+   */
+  readonly gravity?: number;
 }
 
 /** Grade estática: mesmo desenho do `ChunkData` do world (x mais rápido, depois z, depois y). */

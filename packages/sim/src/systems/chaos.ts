@@ -1,4 +1,11 @@
-import { CHAOS_DEFAULTS, MODIFIERS, modifiersConflict, type MatchRecipe, type ModifierId } from '@boboforces/format';
+import {
+  CHAOS_DEFAULTS,
+  MAP_GRAVITY_RANGE,
+  MODIFIERS,
+  modifiersConflict,
+  type MatchRecipe,
+  type ModifierId,
+} from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import type { MovementProfile } from '../config/movement.ts';
 import { WEAPON_SLOT, WEAPONS, weaponDef, weaponMaskBit } from '../config/weapons.ts';
@@ -22,6 +29,9 @@ import { CHAOS_SCALE_BITS, chaosScale, squeezedScaleAt } from '../hitbox.ts';
  *   hora (`modOn`): munição infinita (armas), vampiro (dano), tudo explode e troca de arma por abate (morte) e, no M9,
  *   o Ricochete (armas). O Mini e os Bots gigantes viram a escala de cada corpo no fim do tick
  *   (`updateChaosScales`, apertada debaixo de teto), que as hitboxes, o olho, a IA e o desenho leem.
+ * - **M10 (fase 4): a gravidade do mapa** (`SimMap.gravity`, a Estação Lunar com a da Lua de série) é a base dos 6
+ *   perfis (`mapGravityLevels`): lá a Lua não muda nada (e a Roleta não a sorteia: `excluded`) e a pesada multiplica a
+ *   do mapa. Sem a Roleta, o perfil da partida já sai com ela (`mapGravityProfile`, no `createSim`).
  */
 export const MOD = Object.fromEntries(MODIFIERS.map((id, i) => [id, 1 << i])) as Readonly<Record<ModifierId, number>>;
 
@@ -64,13 +74,23 @@ export class ChaosState {
   readonly profiles: readonly MovementProfile[];
   /** Os bits que a regra de arma da receita já liga (só na cabeça, um tiro mata): a Roleta não sorteia o que conflita. */
   readonly baseBits: number;
+  /**
+   * M10 (fase 4): os bits que a Roleta nunca sorteia neste mapa: a Lua num mapa que já é lunar (`mapGravityLevels`).
+   * Zero nos outros mapas (o sorteio de sempre). Revisão: a Pressa fica na Roleta da Estação Lunar: ela só alonga o
+   * pulo na horizontal (a altura é a mesma), e o mapa deixa todo telhado mais de 2,9 m acima de onde se pisa, também
+   * com o pulo da Pressa (medido com o alcance lunar de local/m10/mapc-moon.ts). O Arcade nem chega aqui
+   * (`resolveMapMovementProfile` e o construtor tiram o bit).
+   */
+  readonly excluded: number;
   /** As regras de arma da partida (sem modificador) e a cópia que a máscara liga (`ctx.mods` aponta para ela). */
   readonly baseMods: MatchMods;
   readonly mods: MutableMods;
 
-  constructor(recipe: MatchRecipe, base: MovementProfile, mods: MatchMods, hz: number) {
+  /** `base` é o perfil da receita, sem a gravidade do mapa; `mapGravity` é a gravidade de série do mapa (padrão 1). */
+  constructor(recipe: MatchRecipe, base: MovementProfile, mods: MatchMods, hz: number, mapGravity = 1) {
     let fixed = 0;
-    for (const id of recipe.modifiers ?? []) fixed |= MOD[id];
+    // M10 (fase 4, revisão): num mapa de gravidade baixa o Arcade não vale (`resolveMapMovementProfile`): o bit sai.
+    for (const id of recipe.modifiers ?? []) if (id !== 'arcade' || mapGravity >= 1) fixed |= MOD[id];
     this.fixed = fixed;
     this.count = recipe.chaos === undefined ? 0 : (recipe.chaos.count ?? CHAOS_DEFAULTS.count);
     this.everyTicks = secondsToTicks(recipe.chaos?.everyS ?? CHAOS_DEFAULTS.everyS, hz);
@@ -79,14 +99,53 @@ export class ChaosState {
     this.masks[1] = fixed;
     this.masks[2] = -1;
     const profiles: MovementProfile[] = [];
-    for (const g of [1, CHAOS_MODS.lowGravity, CHAOS_MODS.heavyGravity]) {
+    const floor = mapGravityFloor(mapGravity, recipe.players?.gravity ?? 1);
+    for (const g of mapGravityLevels(mapGravity, floor)) {
       for (const v of [1, CHAOS_MODS.speed]) profiles.push(scaleProfile(base, g, v));
     }
     this.profiles = profiles;
     this.baseMods = mods;
     this.mods = { ...mods };
     this.baseBits = (mods.headshotOnly ? MOD.headshotOnly : 0) | (mods.oneShot ? MOD.oneShot : 0);
+    this.excluded = mapGravity <= CHAOS_MODS.lowGravity ? MOD.lowGravity : 0;
   }
+}
+
+/**
+ * M10 (fase 4): as 3 gravidades da partida (sem modificador, com a Lua, com a pesada) num mapa com gravidade de série
+ * `g` (`MapMeta.gravity`; 1 nos mapas de sempre, que dá exatamente 1, 0,35 e 1,8). Escolha (revisável): a PESADA
+ * multiplica a do mapa ("mais pesado do que aqui": na Estação Lunar, 0,35 × 1,8 = 0,63, o pulo baixa de 2,9 m para
+ * 1,6 m e ainda sem dano de queda); a LUA é absoluta ("você está na Lua": 0,35, ou a do mapa se ela já for mais leve),
+ * então num mapa lunar ela não muda nada (e a Roleta não a sorteia: `ChaosState.excluded`) e num mapa pesado ela leva
+ * à Lua de sempre. Nenhuma fica abaixo de `floor` (`mapGravityFloor`).
+ */
+export function mapGravityLevels(g: number, floor = 0): readonly [normal: number, low: number, heavy: number] {
+  return [
+    Math.max(g, floor),
+    Math.max(Math.min(g, CHAOS_MODS.lowGravity), floor),
+    Math.max(g * CHAOS_MODS.heavyGravity, floor),
+  ];
+}
+
+/**
+ * M10 (fase 4, revisão): o piso da gravidade do mapa (multiplicador) para a gravidade TOTAL (a da receita, `players.
+ * gravity`, vezes a do mapa) não passar de `MAP_GRAVITY_RANGE.min` (0,25, a mesma faixa da regra): a regra de 0,25 na
+ * Lua daria 0,0875 (pulo de 11 m, 34 m com o pulo 3× do Personalizado, acima da grade). Nos mapas de sempre (1) não há
+ * piso: as contas de antes ficam iguais.
+ */
+export function mapGravityFloor(mapGravity: number, recipeGravity: number): number {
+  return mapGravity === 1 ? 0 : MAP_GRAVITY_RANGE.min / recipeGravity;
+}
+
+/**
+ * M10 (fase 4): o perfil da partida com a gravidade de série do mapa (`SimMap.gravity`), as mesmas contas do modificador
+ * Lua (`scaleProfile`), com o piso de `mapGravityFloor`; com 1, o próprio perfil (os goldens dos outros mapas não
+ * mudam). Vale só para os bobos: os perfis dos zumbis (o andando, o que corre, o caído) e a gravidade dos projéteis
+ * (`WeaponDef.projectileGravity`) ficam os de sempre, como no modificador Lua (nenhum mapa lunar tem zumbi; a granada
+ * com outra gravidade desmontaria a mira da IA e o arco da HUD).
+ */
+export function mapGravityProfile(base: MovementProfile, g: number, floor = 0): MovementProfile {
+  return scaleProfile(base, Math.max(g, floor), 1);
 }
 
 /** A partida tem modificadores (fixos ou a Roleta)? */
@@ -214,7 +273,7 @@ export function chaosSystem(ctx: SimContext): void {
       // A largada: os primeiros sorteados. M9 (fase 4, revisão): em cima da máscara ativa (sem o dono, ela é a dos
       // fixos; com ele, o que o dono ligou ou desligou antes da largada fica).
       let mask = m[0]!;
-      for (let i = 0; i < c.count; i++) mask |= pickBit(ctx, poolFor(mask | c.baseBits) & ~c.baseBits);
+      for (let i = 0; i < c.count; i++) mask |= pickBit(ctx, poolFor(mask | c.baseBits) & ~c.baseBits & ~c.excluded);
       m[0] = mask;
       m[1] = mask;
       m[2] = c.everyTicks;
@@ -224,7 +283,7 @@ export function chaosSystem(ctx: SimContext): void {
       if (m[2] === c.warnTicks) {
         const out = pickBit(ctx, m[0]! & ~c.fixed);
         const keep = m[0]! & ~out;
-        const add = pickBit(ctx, poolFor(keep | c.baseBits) & ~out & ~c.baseBits);
+        const add = pickBit(ctx, poolFor(keep | c.baseBits) & ~out & ~c.baseBits & ~c.excluded);
         m[1] = add !== 0 ? keep | add : m[0]!;
       }
       if (m[2]! <= 0) {

@@ -5093,3 +5093,30 @@ commits é a de chegada.
   do mezanino que os bots não sobem (o defeito do seguidor de caminho; os testes desse trecho estão marcados para
   voltar com a fase 1c); o Domination com um time zerado em duas sementes; e a altura das grades. Corrigido antes do
   commit (os caminhões e a fileira da rua com 2 de altura, a caixa a 5 m da trilha).
+
+### 21.6 Fase 4: a Estação Lunar (26/11/2026)
+
+- **O mapa** (`assets-src/maps/moonbase.ts`, `moonbase`, "Estação Lunar"): área de 72 × 72 m numa grade de
+  80 × 24 × 80 m, espelhado norte-sul, à noite (o céu escuro com estrelas faz o espaço). Três rotas: o regolito a oeste
+  (a cratera de 1,5 m, rochas e o módulo de pouso), a estação no meio (24 × 28 m e 8 m de pé-direito, com eclusas,
+  vestíbulos de portas desencontradas, o átrio com o reator, sacadas e passarelas a 4 m com 4 rampas, neon e janelas) e
+  a antena a leste (o deque a 3 m com a sala do rádio embaixo, os painéis solares, o radiador, os tanques e a carga). A
+  maior linha de visão 47,9 m (declarada 50; dos poleiros que só o pulo lunar alcança, no máximo 41 m); 8 spawns por
+  time nos hangares (as saídas só pelos lados, com anteparo) e 17 no FFA; a travessia de 12,7 s; 7,6 KB. Modos: TDM, FFA
+  e Sandbox, e o card do Bobo Chaos agora joga aqui (o GDD lista a Estação como o mapa do Chaos; decisão menor). A cena
+  de bench `scene=moonbase`.
+- **A gravidade do mapa** (AK3): o campo opcional `gravity` no META do mapa (`MapMeta`/`SimMap`, de 0,25 a 2; aqui
+  0,35), lido pela sim com as contas do modificador Lua (o pulo sobe 2,9 m, sem dano de queda); sem o campo, nada muda
+  (os outros mapas e os goldens). O amigo online monta a sim pelo mesmo mapa, então a predição usa a mesma gravidade
+  (o Chaos online na Lua: 0,7% de predições erradas, no padrão). Com as regras: a Lua é absoluta (sem efeito num mapa
+  lunar, e a Roleta não a sorteia aqui); a pesada multiplica (0,35 × 1,8 = 0,63); a gravidade total nunca fica abaixo
+  de 0,25 (`mapGravityFloor`); o Arcade desliga em mapa de gravidade baixa (o perfil e o bit do modificador,
+  `resolveMapMovementProfile`), e o Surpreenda-me não sorteia o Arcade nem a Lua aqui; a Pressa fica (a geometria
+  segura os telhados com ela). A HUD mostra "LUA" fixo, e a Partida personalizada mostra a gravidade que vale ("×1
+  (×0,35)"). Zumbis e granadas ficam com a gravidade de sempre (este mapa não tem Zombies).
+- **A revisão (Opus) achou:** o holofote em cima da mureta como escada para o telhado do hangar (visada de 76 m); o topo
+  dos tanques olhando para dentro do spawn inimigo; o Arcade, a Pressa e a regra de gravidade abrindo o mapa inteiro
+  junto com a gravidade lunar; a travessia de 10,5 s; e os contratos sem registro. Corrigido antes do commit (os
+  holofotes no chão, os tanques a 6,5 m, a pilha de carga a 2,5 m, o hangar fechado na frente). Fica: a regra de
+  gravidade da Partida personalizada em 0,25 ainda alcança telhados (escolha de quem monta a partida); as rampas da
+  estação esperam a correção do seguidor de caminho (fase 1c) para os bots subirem.

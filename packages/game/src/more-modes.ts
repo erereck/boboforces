@@ -105,13 +105,13 @@ export function moreModePreset(id: string): MatchRecipe | null {
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 7 }] }, { bots: [] }],
       };
     case 'chaos':
-      // Os Times de sempre (4 contra 4 no Construto) com a Roleta: 3 modificadores, 1 troca por minuto; 50 abates ou
-      // 10 min.
+      // Os Times de sempre (4 contra 4) com a Roleta: 3 modificadores, 1 troca por minuto; 50 abates ou 10 min. M10
+      // (fase 4): na Estação Lunar, o mapa do Chaos no GDD (§4.6.4), com a gravidade da Lua de série.
       return {
         format: MATCH_RECIPE_FORMAT,
         name: 'Bobo Chaos',
         mode: 'warfare.tdm',
-        map: 'construto',
+        map: 'moonbase',
         seed: 0,
         match: { timeLimitS: 600, scoreLimit: 50 },
         chaos: {},

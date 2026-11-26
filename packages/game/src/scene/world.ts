@@ -148,5 +148,7 @@ export function buildSimMap(world: MapWorld, nav: NavGrid | null): SimMap {
     markers: world.map.markers,
     colliders: world.colliders,
     nav,
+    // M10 (fase 4): a gravidade de série do mapa (o host e o amigo online montam a sim daqui: a predição usa a mesma).
+    ...(world.map.meta.gravity !== undefined ? { gravity: world.map.meta.gravity } : {}),
   });
 }

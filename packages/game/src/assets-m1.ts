@@ -37,6 +37,8 @@ export const GAME_ASSETS_M1 = {
   construction: 'maps/construction.bfmap',
   /** M10 (fase 1): o Porto de Contêineres (TDM, FFA, Domination e Sandbox). */
   port: 'maps/port.bfmap',
+  /** M10 (fase 4): a Estação Lunar, o mapa do Bobo Chaos (a gravidade da Lua de série). */
+  moonbase: 'maps/moonbase.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -63,4 +65,5 @@ export const MAP_ASSETS: Readonly<Record<string, string>> = {
   island: GAME_ASSETS_M1.island,
   construction: GAME_ASSETS_M1.construction,
   port: GAME_ASSETS_M1.port,
+  moonbase: GAME_ASSETS_M1.moonbase,
 };

@@ -4,7 +4,17 @@ import { t, type StringKey } from '@boboforces/ui';
  * M2 (fase 5c): os mapas dos menus e os modos de cada um (os mesmos do `meta.modes` do `.bfmap`, conferidos no teste:
  * o menu não carrega mapa). O Ringue é pequeno: TDM até 4 contra 4 (X1, 2v2) e o Bobo Training; FFA não.
  */
-export const MENU_MAPS = ['construto', 'ringue', 'posto', 'base', 'airbase', 'island', 'construction', 'port'] as const;
+export const MENU_MAPS = [
+  'construto',
+  'ringue',
+  'posto',
+  'base',
+  'airbase',
+  'island',
+  'construction',
+  'port',
+  'moonbase',
+] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
 // M9 (fase 3): o Bobo Sandbox nos mapas com casa no chão para os times 2 e 3 (o Construto e o Ringue). M10 (fase 8):
@@ -25,7 +35,20 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   construction: ['warfare.tdm', 'warfare.ffa', 'sandbox'],
   // M10 (fase 1): o Porto de Contêineres (médio, espelhado; 3 pontos e casa no chão para os times 2 e 3 do Sandbox).
   port: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'sandbox'],
+  // M10 (fase 4): a Estação Lunar (a gravidade da Lua em todo modo); o Bobo Chaos é o card dos Times com a Roleta nela.
+  moonbase: ['warfare.tdm', 'warfare.ffa', 'sandbox'],
 };
+
+/**
+ * M10 (fase 4, revisão): a gravidade de série dos mapas que têm uma (o `meta.gravity` do `.bfmap`, conferido no teste:
+ * o menu não carrega mapa). A Partida personalizada mostra a gravidade que vale e o Surpreenda-me não sorteia lá a Lua
+ * (não muda nada) nem o Arcade (a sim desliga num mapa de gravidade baixa, `resolveMapMovementProfile`).
+ */
+export const MAP_GRAVITY: Readonly<Partial<Record<MenuMap, number>>> = { moonbase: 0.35 };
+
+export function mapGravity(map: string): number {
+  return MAP_GRAVITY[map as MenuMap] ?? 1;
+}
 
 /** Teto de bots do mapa (o do aparelho vale por cima): o Ringue cabe 8 bobos; a Base Bobo, 10 (5 contra 5). */
 const MAP_BOT_CAP: Readonly<Partial<Record<MenuMap, number>>> = { ringue: 7, airbase: 9 };

@@ -25,6 +25,8 @@ export interface SimMapSource {
   };
   readonly colliders?: StaticColliders | null;
   readonly nav?: NavGrid | null;
+  /** M10 (fase 4): a gravidade de série do mapa (`MapMeta.gravity`; ausente = 1). */
+  readonly gravity?: number;
 }
 
 /** Spawns da sim a partir dos marcadores do mapa (metros nos pés, yaw em rad, `team` -1 = qualquer time). */
@@ -58,6 +60,8 @@ export function simMapFromMarkers(source: SimMapSource): SimMap {
     killPlaneY: area.killPlaneY,
     ...(source.colliders ? { colliders: source.colliders } : {}),
     ...(source.nav ? { nav: source.nav } : {}),
+    // M10 (fase 4): a gravidade de série (a Estação Lunar); os outros mapas não têm o campo.
+    ...(source.gravity !== undefined ? { gravity: source.gravity } : {}),
     // M7 (fase 2): os sites do BoboStrike (a sim só usa no modo dele).
     ...(source.markers.bombSites?.length
       ? { bombSites: source.markers.bombSites.map((d) => ({ x: d.x, y: d.y, z: d.z, radius: d.radius })) }

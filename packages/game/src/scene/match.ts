@@ -129,7 +129,7 @@ import {
   PERK_IDS,
   PICKUP_KIND,
   predictThrow,
-  resolveMovementProfile,
+  resolveMapMovementProfile,
   type Sim,
   type SimEvent,
   type SimView,
@@ -744,10 +744,13 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       recipe = {
         format: MATCH_RECIPE_FORMAT,
         mode: 'warfare.tdm',
-        // M7 (fase 1): o TDM na Base Bobo (`scene=airbase`). M10: no Canteiro (`scene=construction`) e no Porto
-        // (`scene=port`).
+        // M7 (fase 1): o TDM na Base Bobo (`scene=airbase`). M10: no Canteiro (`scene=construction`), no Porto
+        // (`scene=port`) e na Estação Lunar (`scene=moonbase`).
         map:
-          bench.scene === 'airbase' || bench.scene === 'construction' || bench.scene === 'port'
+          bench.scene === 'airbase' ||
+          bench.scene === 'construction' ||
+          bench.scene === 'port' ||
+          bench.scene === 'moonbase'
             ? bench.scene
             : 'construto',
         seed: bench.seed >>> 0,
@@ -1430,7 +1433,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** A figura do infectado (a do bobo-zumbi comum). */
   const infectedFigure = figures.zombieFigureOf(ZOMBIE_TYPE.walker);
   // Refino R1 (#79): quanto o perfil da partida abre a mira andando e no ar (a retícula da HUD segue).
-  const moveProfile = resolveMovementProfile(recipe.players, recipe.modifiers ?? []);
+  // M10 (fase 4, revisão): o mesmo perfil da sim (num mapa de gravidade baixa, sem o Arcade).
+  const moveProfile = resolveMapMovementProfile(recipe.players, recipe.modifiers ?? [], loaded.simMap.gravity ?? 1);
   const moveSpreadMul = moveProfile.moveSpreadMul ?? 1;
   // M8 (fase 7): no Arcade, correndo a mira abre como no ar (atira correndo).
   const sprintSpread = moveProfile.fireWhileSprinting === true;
@@ -4982,6 +4986,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   /** M6 (fase 4): os nomes dos modificadores (pelo bit) e a chave da última linha montada. */
   const modNames = MODIFIERS.map((id) => t(`mod.${id}` as StringKey).toUpperCase());
+  /**
+   * M10 (fase 4): no mapa com a gravidade da Lua de série (a Estação Lunar), "LUA" fica fixa na linha dos modificadores
+   * em todo modo (é assim que o jogador sabe por que pula tão alto); a Roleta nunca a sorteia lá.
+   */
+  const lunarMap = (loaded.simMap.gravity ?? 1) <= CHAOS_MODS.lowGravity;
+  const lunarName = modNames[MODIFIERS.indexOf('lowGravity')]!;
+  if (lunarMap) sharedHud.modsLine = lunarName;
   let modsKey = -1;
   /** Remonta a linha dos modificadores só quando a máscara (ou o aviso) muda. */
   function refreshModsLine(masks: Int32Array): void {
@@ -5003,6 +5014,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return;
     }
     const names: string[] = [];
+    if (lunarMap && (active & MOD.lowGravity) === 0) names.push(lunarName);
     for (let i = 0; i < modNames.length; i++) if ((active & (1 << i)) !== 0) names.push(modNames[i]!);
     sharedHud.modsLine = names.join(' · ');
     sharedHud.modsWarn = false;

@@ -4,6 +4,7 @@ import {
   builtinBotRef,
   FRIENDLY_FIRE_LEVELS,
   ENGINE_MAX_TEAMS,
+  MAP_GRAVITY_RANGE,
   MODIFIERS,
   modifiersConflict,
   REGEN_RULES,
@@ -30,7 +31,7 @@ import {
   type StringKey,
   type TextParams,
 } from '@boboforces/ui';
-import { mapBotCap, mapForMode, mapName, mapsForMode, type MenuMap } from './maps.ts';
+import { mapBotCap, mapForMode, mapGravity, mapName, mapsForMode, type MenuMap } from './maps.ts';
 import { teamColor, teamColorIndex } from './team-colors.ts';
 import { teamColorName, teamName } from './team-names.ts';
 
@@ -696,7 +697,11 @@ const SUPPORT_ROWS: readonly RowDef[] = [
 const MOVEMENT_ROW: RowDef = {
   id: 'movement',
   labelKey: 'custom.row.movement',
-  value: (r) => t(`movement.${movementOf(r)}` as StringKey),
+  // M10 (fase 4, revisão): num mapa de gravidade baixa o Arcade vira o Bobo (a sim desliga).
+  value: (r) => {
+    const m = movementOf(r);
+    return t(`movement.${m === 'arcade' && mapGravity(r.map) < 1 ? 'bobo' : m}` as StringKey);
+  },
   step: (r, d) => {
     const i = cycleIndex(MOVEMENTS.length, MOVEMENTS.indexOf(movementOf(r)), d);
     // Mexer no perfil tira o modificador Arcade (senão a linha mostraria um perfil que a sim não joga).
@@ -1088,12 +1093,15 @@ const ammoOf = (r: MatchRecipe): (typeof AMMO_MODES)[number] =>
   hasModifier(r, 'infiniteAmmo') ? 'infiniteClip' : (weapons(r).ammo ?? 'normal');
 
 function modifierFlag(id: ModifierId, rowId: string, labelKey: StringKey): RowDef {
-  return flag(
+  const row = flag(
     rowId,
     labelKey,
     (r) => (r.modifiers ?? []).includes(id),
     (r, v) => withModifier(r, id, v),
   );
+  if (id !== 'lowGravity' && id !== 'arcade') return row;
+  // M10 (fase 4, revisão): num mapa de gravidade baixa a Lua já vale (é a do mapa) e o Arcade não (a sim desliga).
+  return { ...row, value: (r) => (mapGravity(r.map) < 1 ? on(id === 'lowGravity') : row.value(r)) };
 }
 
 /** M6 (fase 4): a Roleta do Bobo Chaos (ligada com os padrões: 3 modificadores, troca a cada 60 s). */
@@ -1155,7 +1163,13 @@ const MOD_ROWS: readonly RowDef[] = [
   {
     id: 'gravity',
     labelKey: 'custom.row.gravity',
-    value: (r) => mult(players(r).gravity ?? 1),
+    // M10 (fase 4, revisão): num mapa com gravidade de série, a que vale de verdade entre parênteses (a regra vezes a
+    // do mapa, nunca abaixo de 0,25: `mapGravityFloor` da sim).
+    value: (r) => {
+      const g = players(r).gravity ?? 1;
+      const m = mapGravity(r.map);
+      return m === 1 ? mult(g) : `${mult(g)} (${mult(Math.max(MAP_GRAVITY_RANGE.min, g * m))})`;
+    },
     step: (r, d) => withPlayers(r, { gravity: stepList(GRAVITIES, players(r).gravity ?? 1, d) }),
   },
   // M6 (fase 4): os modificadores de festa (GDD §4.5.3) e a Roleta, em qualquer modo.

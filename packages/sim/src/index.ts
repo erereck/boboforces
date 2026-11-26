@@ -63,7 +63,7 @@ export {
   ZONE,
   zoneDps,
 } from './systems/royale.ts';
-export { CHAOS_MODS, MOD } from './systems/chaos.ts';
+export { CHAOS_MODS, mapGravityLevels, MOD } from './systems/chaos.ts';
 export { FORTRESS } from './systems/fortress.ts';
 export {
   aimPointLocal,

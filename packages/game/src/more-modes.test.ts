@@ -21,6 +21,13 @@ describe('os cards da página Mais modos', () => {
     }
   });
 
+  it('M10 (fase 4): o Bobo Chaos nos Times da Estação Lunar, com a Roleta', () => {
+    const r = moreModePreset('chaos')!;
+    expect(r.map).toBe('moonbase');
+    expect(r.chaos).toEqual({});
+    expect(MAP_MODES[r.map as MenuMap]).toContain(r.mode);
+  });
+
   it('o Bobo Royale: solo na Ilha Tropical, 24 participantes', () => {
     const r = moreModePreset('royale')!;
     expect(r.mode).toBe('royale.mini');

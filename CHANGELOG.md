@@ -24,6 +24,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   dá. O online foi para o protocolo 13.
 - **O Porto de Contêineres (fase 1):** um porto espelhado com pilhas de contêineres, o cais, o navio, o guindaste e o
   armazém, para TDM, FFA, Domination (3 pontos) e Sandbox; três rotas e a trilha por cima dos contêineres.
+- **A Estação Lunar (fase 4):** uma base na Lua com a gravidade baixa em todo modo jogado nela (pulos de quase 3 m e
+  sem dano de queda): o regolito com a cratera, a estação com o átrio e as passarelas, e a antena. TDM, FFA, Sandbox e o
+  Bobo Chaos, que agora joga lá.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

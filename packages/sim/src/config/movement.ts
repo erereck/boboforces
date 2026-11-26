@@ -204,3 +204,22 @@ export function resolveMovementProfile(
     fallDamage: fall ?? base.fallDamage,
   };
 }
+
+/**
+ * M10 (fase 4, revisão): o perfil da receita num mapa com gravidade de série (`SimMap.gravity`). Num mapa de gravidade
+ * baixa (a Estação Lunar) o Arcade não vale, nem como perfil nem como modificador: com a gravidade da Lua o pulo dele
+ * (1,3 m / 0,35 = 3,7 m) mais o pulo duplo passa de 6,7 m e alcança os telhados, que o mapa deixa fora do pulo lunar
+ * do Bobo (2,9 m). Fica o Bobo, com o resto das regras dos jogadores. Nos outros mapas, o `resolveMovementProfile`.
+ */
+export function resolveMapMovementProfile(
+  players: PlayerRules | undefined,
+  modifiers: readonly ModifierId[],
+  mapGravity: number,
+): MovementProfile {
+  if (mapGravity >= 1) return resolveMovementProfile(players, modifiers);
+  const rules = players?.movement === 'arcade' ? { ...players, movement: 'bobo' as const } : players;
+  return resolveMovementProfile(
+    rules,
+    modifiers.filter((m) => m !== 'arcade'),
+  );
+}

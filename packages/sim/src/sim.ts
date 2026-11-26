@@ -3,6 +3,7 @@ import {
   createFigureGameTable,
   DEFAULT_BOT_RULES,
   type FigureGameTable,
+  MAP_GRAVITY_RANGE,
   type MatchRecipe,
   PAINTBALL_DEFAULTS,
   resolveBot,
@@ -24,7 +25,7 @@ import {
 import type { NavGrid } from '@boboforces/nav';
 import { BLOCK_SIZE, type BlockRegistry, type StaticColliders, type WorldGrid } from '@boboforces/world';
 import { BASE_HP, METRICS } from './config/metrics.ts';
-import { resolveMovementProfile, type MovementProfile } from './config/movement.ts';
+import { resolveMapMovementProfile, type MovementProfile } from './config/movement.ts';
 import { MATCH_DEFAULTS } from './config/rules.ts';
 import { DEFAULT_PRIMARY, isPrimaryWeapon, weaponCodeOf, weaponMaskBit } from './config/weapons.ts';
 import {
@@ -71,7 +72,15 @@ import { damageSystem, finishMatch, respawn, rulesSystem, spawnSystem } from './
 import { createSignalState, signalSystem } from './systems/signals.ts';
 import { ControlPoints, dominationSystem, type ControlPointDef } from './systems/domination.ts';
 import { createPartyState, partySystem, syncJuggRules } from './systems/party.ts';
-import { applyChaos, ChaosState, chaosOf, chaosSystem, updateChaosScales } from './systems/chaos.ts';
+import {
+  applyChaos,
+  ChaosState,
+  chaosOf,
+  chaosSystem,
+  mapGravityFloor,
+  mapGravityProfile,
+  updateChaosScales,
+} from './systems/chaos.ts';
 import { createFortress } from './systems/fortress.ts';
 import { createRoundState, ROUND_PHASE, roundFrozen, roundsSystem } from './systems/rounds.ts';
 import { createStrikeState, STRIKE, STRIKE_BUY_BASE, STRIKE_SHOP, strikeSystem } from './systems/strike.ts';
@@ -160,6 +169,11 @@ export interface SimMap {
     readonly z: number;
     readonly radius: number;
   }[];
+  /**
+   * M10 (fase 4): a gravidade de série do mapa (`MapMeta.gravity`, multiplicador; ausente = 1). Vale para os bobos em
+   * todo modo, com as contas do modificador Lua; os modificadores de gravidade partem dela (`mapGravityLevels`).
+   */
+  readonly gravity?: number;
 }
 
 export interface SimConfig {
@@ -588,11 +602,26 @@ export function createSim(config: SimConfig): Sim {
       ? new ControlPoints(map.controlPoints!)
       : null;
   // M6 (fase 4): os modificadores (o perfil e as regras de arma da partida são a base deles).
-  const baseProfile = resolveMovementProfile(recipe.players, recipe.modifiers ?? []);
+  // M10 (fase 4): a gravidade de série do mapa (a Estação Lunar joga todo modo com a da Lua; os zumbis e os projéteis
+  // ficam com a de sempre, `mapGravityProfile`); 1 = o próprio perfil. Revisão: num mapa de gravidade baixa o Arcade
+  // não vale (`resolveMapMovementProfile`) e a gravidade total não passa de 0,25 (`mapGravityFloor`).
+  const mapGravity = map.gravity ?? 1;
+  assert(
+    Number.isFinite(mapGravity) && mapGravity >= MAP_GRAVITY_RANGE.min && mapGravity <= MAP_GRAVITY_RANGE.max,
+    `sim: gravidade do mapa inválida (${mapGravity})`,
+  );
+  const recipeProfile = resolveMapMovementProfile(recipe.players, recipe.modifiers ?? [], mapGravity);
+  const baseProfile = mapGravityProfile(
+    recipeProfile,
+    mapGravity,
+    mapGravityFloor(mapGravity, recipe.players?.gravity ?? 1),
+  );
   const baseMods = matchModsOf(recipe);
   // M9 (fase 4): com as Ferramentas do Dono, o estado dos modificadores existe desde o tick 0 (o dono liga um ao vivo).
   const chaos =
-    chaosOf(recipe) || config.owner !== undefined ? new ChaosState(recipe, baseProfile, baseMods, hz) : null;
+    chaosOf(recipe) || config.owner !== undefined
+      ? new ChaosState(recipe, recipeProfile, baseMods, hz, mapGravity)
+      : null;
   const rules = createEntityRules(recipe.players?.hp ?? BASE_HP);
   const reserveSlots = config.owner !== undefined ? ownerReserveSlots(recipe, humans, config.owner.reserve) : [];
   const owner =

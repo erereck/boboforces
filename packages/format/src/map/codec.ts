@@ -101,6 +101,8 @@ function normalizeMeta(id: string, meta: MapMeta): unknown {
       players: { min: meta.players.min, ideal: meta.players.ideal, max: meta.players.max },
       maxSightLineM: meta.maxSightLineM,
       botCaps,
+      // M10 (fase 4): só quando o mapa declara (os outros mapas ficam com os mesmos bytes).
+      ...(meta.gravity !== undefined ? { gravity: meta.gravity } : {}),
     },
   };
 }
@@ -410,6 +412,7 @@ function parseMeta(json: Json): { id: string; meta: MapMeta } {
       },
       maxSightLineM: num(m['maxSightLineM'], 'meta.maxSightLineM'),
       botCaps,
+      ...(m['gravity'] !== undefined ? { gravity: num(m['gravity'], 'meta.gravity') } : {}),
     },
   };
 }

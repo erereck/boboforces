@@ -24,7 +24,7 @@ import {
   type UiNode,
 } from '@boboforces/ui';
 import { createMenuController, type UiFrame } from './menu.ts';
-import { mapBotCap, mapsForMode } from './maps.ts';
+import { mapBotCap, mapGravity, mapsForMode } from './maps.ts';
 import { GUN_GAME_LADDER, moreModePreset } from './more-modes.ts';
 
 /**
@@ -219,7 +219,11 @@ export function rollSurprise(seed: number, prev: SurpriseRoll | null, locks: Rea
     const want = rng.int(0, 4);
     for (let tries = 0; tries < 20 && mods.length < want; tries++) {
       const m = ROLL_MODS[rng.int(0, ROLL_MODS.length)]!;
-      const useless = (weapon !== '' && m === 'swapOnKill') || (weapon === 'knife' && m === 'infiniteAmmo');
+      // M10 (fase 4, revisão): num mapa de gravidade baixa a Lua não muda nada e a sim desliga o Arcade.
+      const useless =
+        (weapon !== '' && m === 'swapOnKill') ||
+        (weapon === 'knife' && m === 'infiniteAmmo') ||
+        (mapGravity(map) < 1 && (m === 'lowGravity' || m === 'arcade'));
       if (!useless && !mods.includes(m) && !mods.some((x) => modifiersConflict(x, m))) mods.push(m);
     }
   }

@@ -57,8 +57,8 @@ function sandboxRecipe(map: string): MatchRecipe {
 }
 
 describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
-  it('a lista: o Construto, o Ringue, a Base Bobo (M10, fase 8), o Canteiro (fase 2) e o Porto (fase 1)', () => {
-    expect(mapsForMode('sandbox')).toEqual(['construto', 'ringue', 'airbase', 'construction', 'port']);
+  it('a lista: o Construto, o Ringue, a Base Bobo (M10, fase 8), o Canteiro (fase 2), o Porto (fase 1) e a Estação Lunar (fase 4)', () => {
+    expect(mapsForMode('sandbox')).toEqual(['construto', 'ringue', 'airbase', 'construction', 'port', 'moonbase']);
   });
 
   for (const id of mapsForMode('sandbox')) {

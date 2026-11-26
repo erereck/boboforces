@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { DEBUT_PRESET, decodeMap } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import { customRows, stepCustom } from './custom-match.ts';
-import { MAP_MODES, mapBotCap, mapForMode, mapsForMode, MENU_MAPS } from './maps.ts';
+import { MAP_MODES, mapBotCap, mapForMode, mapGravity, mapsForMode, MENU_MAPS } from './maps.ts';
 import { quickFromPreset, quickToPreset, quickValue, stepQuick } from './quick-match.ts';
 
 /** M2, fase 5c: os mapas dos menus (Construto e Ringue) e os modos de cada um. */
@@ -17,13 +17,30 @@ describe('mapas dos menus', () => {
       const bytes = new Uint8Array(readFileSync(join(ROOT, 'assets-src', 'maps', 'generated', `${id}.bfmap`)));
       const map = decodeMap(bytes);
       expect([...map.meta.modes].sort(), id).toEqual([...MAP_MODES[id]].sort());
+      // M10 (fase 4, revisão): a gravidade de série também.
+      expect(map.meta.gravity ?? 1, id).toBe(mapGravity(id));
     }
-    expect(mapsForMode('warfare.ffa')).toEqual(['construto', 'construction', 'port']);
+    expect(mapsForMode('warfare.ffa')).toEqual(['construto', 'construction', 'port', 'moonbase']);
     expect(mapsForMode('royale.mini')).toEqual(['island']);
     expect(mapForMode('ringue', 'warfare.ffa')).toBe('construto');
     expect(mapBotCap('ringue', 40)).toBe(7);
     expect(mapBotCap('airbase', 40)).toBe(9);
     expect(mapBotCap('construto', 12)).toBe(12);
+  });
+
+  it('M10 (fase 4, revisão): na Estação Lunar a Partida personalizada mostra a gravidade que vale, a Lua ligada e o Arcade desligado', () => {
+    const value = (tab: 'mods' | 'players', r: typeof DEBUT_PRESET, id: string): string =>
+      customRows(tab, r)
+        .find((x) => x.id === id)!
+        .value(r);
+    const moon = { ...DEBUT_PRESET, map: 'moonbase' };
+    expect(value('mods', moon, 'gravity')).toBe('×1 (×0,35)');
+    expect(value('mods', { ...moon, players: { gravity: 0.5 } }, 'gravity')).toBe('×0,5 (×0,25)');
+    expect(value('mods', DEBUT_PRESET, 'gravity')).toBe('×1');
+    const arcade = { ...moon, modifiers: ['arcade' as const] };
+    expect(value('mods', arcade, 'arcade')).toBe(value('mods', DEBUT_PRESET, 'arcade'));
+    expect(value('mods', moon, 'lowGravity')).not.toBe(value('mods', DEBUT_PRESET, 'lowGravity'));
+    expect(value('players', arcade, 'movement')).toBe(value('players', DEBUT_PRESET, 'movement'));
   });
 
   it('a Ilha Tropical (M7, fases 5 e 6): 200 m, pontos de loot e as largadas sem time', () => {

@@ -46,6 +46,12 @@ export const MAX_DECLARED_SIGHT_LINE_M = 200;
  */
 export const MIN_ROYALE_LOOT_SPOTS = 24;
 export const MAX_LOOT_SPOTS = 64;
+/**
+ * M10 (fase 4): a faixa da gravidade de série do mapa (`MapMeta.gravity`), a mesma da regra de gravidade da receita
+ * (`RECIPE_RANGES.gravity`, o perfil Personalizado). As duas se multiplicam na sim, que não deixa o produto passar
+ * do piso desta faixa (`mapGravityFloor`; revisão da fase 4).
+ */
+export const MAP_GRAVITY_RANGE = { min: 0.25, max: 2 } as const;
 /** Teto de um nome de câmera, rota ou manequim. */
 const MAX_MARKER_NAME = 64;
 /**
@@ -140,6 +146,12 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     if (!(PLATFORM_PROFILE_IDS as readonly string[]).includes(p)) err(`meta.botCaps: perfil desconhecido "${p}"`);
     if (cap === undefined || !Number.isInteger(cap) || cap < 0 || cap > ENGINE_MAX_BOTS) {
       err(`meta.botCaps.${p} fora de 0..${ENGINE_MAX_BOTS}`);
+    }
+  }
+  if (meta.gravity !== undefined) {
+    const g = meta.gravity;
+    if (!(Number.isFinite(g) && g >= MAP_GRAVITY_RANGE.min && g <= MAP_GRAVITY_RANGE.max)) {
+      err(`meta.gravity fora de ${MAP_GRAVITY_RANGE.min}..${MAP_GRAVITY_RANGE.max}: ${g}`);
     }
   }
 

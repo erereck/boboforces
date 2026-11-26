@@ -22,6 +22,7 @@ export {
   type BfmapSection,
 } from './codec.ts';
 export {
+  MAP_GRAVITY_RANGE,
   MAX_DECLARED_SIGHT_LINE_M,
   MAX_LOOT_SPOTS,
   MIN_DOMINATION_POINTS,

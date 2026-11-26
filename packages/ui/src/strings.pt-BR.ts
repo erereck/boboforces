@@ -165,6 +165,8 @@ export const STRINGS_PT_BR = {
   'map.construction': 'Canteiro',
   // M10 (fase 1): o Porto de Contêineres (nome provisório, pergunta AK2).
   'map.port': 'Porto',
+  // M10 (fase 4): o mapa do Bobo Chaos (nome provisório, pergunta AK2).
+  'map.moonbase': 'Estação Lunar',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
   'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',

@@ -9,6 +9,7 @@ import {
   MAP_CHUNK_VOLUME,
   isPlayableProp,
   MAP_FORMAT,
+  MAP_GRAVITY_RANGE,
   OPTIONAL_MANNEQUINS,
   OPTIONAL_PRINT_CAMERAS,
   PLAYABLE_PROP_DOSE,
@@ -572,5 +573,31 @@ describe('map@1: os pontos de loot do Royale (M7, fase 5)', () => {
     expect(issues).toContain('ponto de loot repetido: x');
     expect(issues).toContain('ponto de loot x inválido');
     expect(issues).toContain('ponto de loot x fora da playArea');
+  });
+});
+
+describe('map@1: a gravidade de série do mapa (M10, fase 4)', () => {
+  const withGravity = (gravity: number): MapDocument => {
+    const doc = syntheticMap();
+    return { ...doc, meta: { ...doc.meta, gravity } };
+  };
+
+  it('ida e volta; sem gravidade, o campo não aparece no arquivo', () => {
+    const doc = withGravity(0.35);
+    expect(decodeMap(encodeMap(doc)).meta).toEqual(doc.meta);
+    const plain = encodeMap(syntheticMap());
+    expect(decodeMap(plain).meta.gravity).toBeUndefined();
+    expect(strFromU8(inflateSync(plain))).not.toContain('gravity');
+    expect(strFromU8(inflateSync(encodeMap(doc)))).toContain('"gravity":0.35');
+  });
+
+  it('o validador aceita a faixa da regra de gravidade (0,25..2) e recusa fora dela', () => {
+    const gravityIssues = (g: number): string[] => validateMap(withGravity(g)).filter((i) => i.includes('gravity'));
+    expect(gravityIssues(0.35)).toEqual([]);
+    expect(gravityIssues(MAP_GRAVITY_RANGE.min)).toEqual([]);
+    expect(gravityIssues(MAP_GRAVITY_RANGE.max)).toEqual([]);
+    expect(gravityIssues(0.1)).toEqual(['meta.gravity fora de 0.25..2: 0.1']);
+    expect(gravityIssues(3)).toEqual(['meta.gravity fora de 0.25..2: 3']);
+    expect(gravityIssues(Number.NaN)).toHaveLength(1);
   });
 });
