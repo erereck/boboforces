@@ -6,6 +6,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M11: as pendências do M10 (planejado em 26/11/2026)
+
+- **Plano** em `docs/PLANO_M11.md` (#84): os poleiros de pulo e o poço do Construto, os poleiros da Base Bobo, os
+  bots que sobem aonde os 3 testes em espera pedem, o Fortress na Fazenda, os pickups de arma no mapa e o Bobo Royale
+  Grande, em frentes paralelas. Perguntas AL1–AL3 no padrão.
+
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 
 - **Plano** em `docs/PLANO_M10.md` (#83): os 5 mapas que faltam da lista do GDD (Porto de Contêineres, Canteiro de
