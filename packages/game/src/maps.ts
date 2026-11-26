@@ -15,6 +15,7 @@ export const MENU_MAPS = [
   'port',
   'moonbase',
   'paint-hall',
+  'farm',
 ] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
@@ -41,6 +42,9 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   // M10 (fase 3): o Galpão de Paintball, o mapa do Bobo Paintball; também joga TDM e o Sandbox (a casa dos times 2 e 3
   // cai no chão dos lados do meio-campo).
   'paint-hall': ['paintball', 'warfare.tdm', 'sandbox'],
+  // M10 (fase 5): a Fazenda à noite, o 2º mapa do Bobo Zombies (e do Fortress). Sem Sandbox: as janelas e as portas
+  // pagas valem em todo modo no mapa que as tem, e os times ficariam presos na casa.
+  farm: ['zombies'],
 };
 
 /**

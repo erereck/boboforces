@@ -169,6 +169,8 @@ export const STRINGS_PT_BR = {
   'map.moonbase': 'Estação Lunar',
   // M10 (fase 3): o Galpão de Paintball (nome provisório, pergunta AK2).
   'map.paint-hall': 'Galpão',
+  // M10 (fase 5): o 2º mapa do Bobo Zombies (nome provisório, pergunta AK2).
+  'map.farm': 'Fazenda',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
   'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',

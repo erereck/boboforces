@@ -5142,3 +5142,29 @@ commits é a de chegada.
   74 m; os infláveis em 32 grupos (o Switch 3–4P desenha 8 e escondia cobertura que ainda segura a tinta); o teto
   alcançável com a gravidade baixa e o Arcade; e as passarelas que os bots não sobem. Corrigido antes do commit. Fica: a
   câmera de cima do Aquário (24 m) mostra o teto.
+
+### 21.8 Fase 5: a Fazenda à noite (26/11/2026)
+
+- **O mapa** (`assets-src/maps/farm.ts`, `farm`, "Fazenda"): o 2º mapa do Bobo Zombies (e do Fortress), à noite, com área
+  de 100 × 100 m numa grade de 120 × 20 × 120 m. A casa (onde se nasce: sala, cozinha, 3 janelas), o terreiro (o poço,
+  o galinheiro), o galpão de máquinas (o trator atrás de uma tela até o teto), o celeiro (o jirau a 3 m, as baias e o
+  paiol até o teto) e o pátio dos silos (uma ilha de blocos para rodar os zumbis em volta); por fora, os campos com
+  sebes de 2,5 m, o milharal, o moinho, o pomar e a estrada. 18 janelas de 6 tábuas, 6 portas pagas (750 a 1.250, em
+  dois laços), 6 armas na parede, 3 lugares da Caixa Misteriosa e 3 vantagens; o gerador do Fortress na sala. A maior
+  linha de visão 49,73 m (as sebes e o feno na frente das janelas seguram); 8,7 KB. Sem Sandbox: as janelas e as portas
+  pagas valem em todo modo num mapa que as tem, e os times ficariam presos na casa. A cena de bench `scene=farm`.
+- **O ritmo:** 10 pontos de zumbi, todos nos campos do sul e do leste (perto da casa); a rota até a casa com as portas
+  fechadas tem 30,9 m em média (a Base Abandonada tem uns 33; um teste reprova acima de 40). Com 4 bots de apoio, as
+  ondas 1 a 4 levam de 20 a 37 s (a Base: 21 a 38 s); o robô das ondas chega em média à onda 4,8 no clássico e 4,3 no
+  Fortress, e todo Fortress vai até o fim.
+- **Nada de lugar seguro:** o jogador sobe beiradas de até 1,55 m, mas o zumbi planeja subidas de até 1 m e bate até 1 m
+  de altura; o mapa não deixa nenhum degrau perto de pilha de 2 m, as pilhas de 2 m ficam a 3 m das cercas de 3 m, e
+  as peças de 1 m ficam na grade de 1 m da navegação, para o zumbi subir. Um teste anda, sobe e pula por tudo o que se
+  alcança (2.444 nós) e não acha nenhum poleiro; quem fica parado no jirau, num fardo de 1 m, no poço ou no banco da
+  cozinha apanha em 20 a 46 s.
+- **A revisão (Opus) achou:** jogadores parados em pilhas de feno e caixas onde os zumbis nunca chegam, nas quatro áreas
+  de fora (a horda nunca os pegava, e o Destravar dos zumbis disparava 30 vezes por minuto); a escada do jirau que os
+  bots de apoio não sobem (o defeito do seguidor de caminho; o teste espera a fase 1c); os zumbis nascendo longe demais
+  (ondas de 40 a 76 s); a falta da cena de bench; e o Fortress que nenhum card oferece na Fazenda (fica para o Erick).
+  Corrigido antes do commit. Fica: 7.103 nós de navegação fora da área ou em telhados e sebes (memória, não tempo de
+  campo de fluxo).

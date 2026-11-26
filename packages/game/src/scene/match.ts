@@ -711,13 +711,14 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       warnings.push(`bots limitado a ${bots} (${bench.views} jogadores locais também são bots)`);
     }
     if (!bench.armed) warnings.push('armed=0 ainda não existe no M1: os bots estão armados');
-    if (bench.scene === 'zombies') {
+    if (bench.scene === 'zombies' || bench.scene === 'farm') {
       // M3 (fase 7b): o Bobo Zombies na Base, sem fim: as vistas são bots de apoio (o `bots=` não vale aqui) com 1000 de
-      // vida (a horda se acumula sem derrubar o time), zumbis 3× mais numerosos e com 5× a vida (o pool enche).
+      // vida (a horda se acumula sem derrubar o time), zumbis 3× mais numerosos e com 5× a vida (o pool enche). M10
+      // (fase 5): o mesmo na Fazenda (`scene=farm`).
       recipe = {
         format: MATCH_RECIPE_FORMAT,
         mode: 'zombies',
-        map: 'base',
+        map: bench.scene === 'farm' ? 'farm' : 'base',
         seed: bench.seed >>> 0,
         match: { timeLimitS: 0, scoreLimit: 0, viewDistanceM: bench.viewDistanceM },
         players: { hp: 1000 },
@@ -1641,8 +1642,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let ghostDone = humans === 0 || host.stats.current.totals.matches >= GHOST.matches;
   let ghostAlpha = 0;
   const env = createEnvironment();
-  // M3 (fase 7b): o bench do Zombies fica com a luz do mapa (a Base é à noite).
-  env.timeOfDay = bench && bench.scene !== 'zombies' ? bench.timeOfDay : doc.light.timeOfDay;
+  // M3 (fase 7b): o bench do Zombies fica com a luz do mapa (a Base é à noite; M10, fase 5: a Fazenda também).
+  env.timeOfDay = bench && bench.scene !== 'zombies' && bench.scene !== 'farm' ? bench.timeOfDay : doc.light.timeOfDay;
   const sun = doc.light.sunDir;
   const sunLen = Math.hypot(sun[0], sun[1], sun[2]) || 1;
   env.sunDirX = sun[0] / sunLen;

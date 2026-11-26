@@ -69,6 +69,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:moonbase',
   // M10 (fase 3): o Galpão de Paintball, o mapa do Bobo Paintball (só acrescentado, regra 20)
   'map:paint-hall',
+  // M10 (fase 5): a Fazenda à noite, o 2º mapa do Bobo Zombies (só acrescentado, regra 20)
+  'map:farm',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

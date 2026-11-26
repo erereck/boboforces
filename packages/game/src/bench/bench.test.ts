@@ -46,6 +46,8 @@ describe('bench: parâmetros', () => {
     expect(parseBenchParams({ route: 'bench:volta', views: '4' }).config.views).toBe(1);
     // M3 (fase 7b): o Bobo Zombies na Base.
     expect(parseBenchParams({ scene: 'zombies' }).config.scene).toBe('zombies');
+    // M10 (fase 5): o Bobo Zombies na Fazenda.
+    expect(parseBenchParams({ scene: 'farm' }).config.scene).toBe('farm');
   });
 });
 

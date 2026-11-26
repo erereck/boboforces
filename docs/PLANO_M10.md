@@ -77,6 +77,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    - **feita em 26/11** (ARCHITECTURE §21.6): a gravidade do mapa no META; o Chaos joga lá.
 5. **Fazenda à noite** (grande): o Bobo Zombies (janelas, portas pagas, armas na parede, caixa, vantagens) e o
    Fortress.
+   - **feita em 26/11** (ARCHITECTURE §21.8): 18 janelas, 6 portas, ritmo da Base Abandonada, nenhum poleiro.
 6. **As armas convencionais:** o DMR, o revólver e a escopeta automática.
 7. **As armas de projétil:** a besta (o virote preso no bloco por alguns segundos, cosmético) e o lança-granadas.
    - **6 e 7 feitas em 20/11** (ARCHITECTURE §21.4): as cinco com modelos, o radial de 10 e o protocolo 13.

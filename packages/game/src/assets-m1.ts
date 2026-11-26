@@ -41,6 +41,8 @@ export const GAME_ASSETS_M1 = {
   moonbase: 'maps/moonbase.bfmap',
   /** M10 (fase 3): o Galpão de Paintball, o mapa do Bobo Paintball (também joga TDM e o Sandbox). */
   paintHall: 'maps/paint-hall.bfmap',
+  /** M10 (fase 5): a Fazenda à noite, o 2º mapa do Bobo Zombies (e do Fortress), grande. */
+  farm: 'maps/farm.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -69,4 +71,5 @@ export const MAP_ASSETS: Readonly<Record<string, string>> = {
   port: GAME_ASSETS_M1.port,
   moonbase: GAME_ASSETS_M1.moonbase,
   'paint-hall': GAME_ASSETS_M1.paintHall,
+  farm: GAME_ASSETS_M1.farm,
 };
