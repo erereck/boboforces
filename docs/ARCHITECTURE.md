@@ -5267,3 +5267,34 @@ Construto (66 m) e a Base Bobo (61 m) seguem marcados com `analysis.jumpSightTod
   e da Base Bobo (61 m), que mudam os goldens (AK7); o poço ao lado da escada da torre do Construto (§21.9); o deque
   da antena da Lua em espera numa semente; o Fortress, que nenhum card oferece na Fazenda; e gerar os mips no
   carregamento (uns 34 KB da primeira partida), quando o teto apertar.
+
+## 22. M11: as pendências do M10
+
+Plano em `docs/PLANO_M11.md` (#84). As 5 frentes rodam em paralelo, como no M10 (§21); a ordem dos commits é a
+de chegada.
+
+### 22.3 Fase 3: o Fortress na Fazenda (26/11/2026)
+
+- **A escolha** (decisão menor, pergunta AL3): o card da Fortaleza (Mais modos) começa na Fazenda à noite, o mapa do
+  Fortress no GDD (§4.6.4), com o gerador na sala. É o que o card do Bobo Zombies já faz: começa direto no mapa dele
+  (a Base Abandonada), porque os cards não têm linha de opção. O Posto Avançado (o mapa do M6) segue alcançável pela
+  Partida personalizada (a linha Mapa troca sem tirar a variante), pelos recentes e pelo Surpreenda-me. A lista
+  `FORTRESS_MAPS` (`game/src/maps.ts`: a Fazenda, depois o Posto) é a fonte: o card usa a primeira e o Surpreenda-me
+  sorteia entre as duas. Os códigos `BFR1-` de antes, com o Posto, continuam valendo, sem subir a versão da tabela.
+  Na Partida personalizada, com a variante, a linha Mapa passa pelos 4 mapas do Bobo Zombies (o gerador nasce ao lado
+  dos spawns dos bobos em qualquer um; só a Fazenda e o Posto foram medidos). A sala online não tem card da Fortaleza
+  e o Surpreenda-me dela é o antigo (Times e FFA); nada mudou lá.
+- **A sim na Fazenda** (`game/scene/farm-fortress.test.ts`, com o mapa de verdade): o gerador nasce na sala, em
+  (58,5; 77), com 4.000; o conserto (segurar o usar a até 2,2 m) devolve 60 por segundo. 4 bots de apoio vencem uma
+  partida de 2 ondas em 54 a 66 s (sementes 1 a 3). Com um bobo parado que levanta sozinho sem limite, a horda
+  derruba o gerador na onda 1 (69 s) e a partida acaba em derrota. Na Curta inteira, os bots caem entre a onda 4 e a
+  5 (149 a 192 s), levantam o colega, e a partida acaba pelos bobos, com o gerador entre 1.862 e 3.043. O
+  `game.test.ts` abre o card pelo menu e confere a cena carregando a Fazenda com o gerador na sala;
+  `game/src/fortress-maps.test.ts` confere o card, a Personalizada e o sorteio.
+- **O golden novo**, Fortress na Fazenda (`golden.test.ts`, 4 bots Normal de apoio, semente 42, até o fim):
+  `02c04767` (onda 5, o gerador cai para 1.011, 11 quedas e 2 levantadas pelo colega, 13.441 ticks). Os outros goldens
+  não mudaram (o do Fortress no Posto segue `cfb8db3d`); o teste online do Fortress
+  (`apps/web/src/online-modes.test.ts`) fixa o Posto.
+- **Os textos:** nenhum novo (a frase do card não cita mapa). O menu da web segue em 334,1 KB.
+- **Fica:** a Fortaleza da Fazenda e a do Posto aparecem com o mesmo nome nos recentes (só o resumo do JOGAR mostra o
+  mapa); a sala online não oferece a Fortaleza em mapa nenhum (seria um card novo).

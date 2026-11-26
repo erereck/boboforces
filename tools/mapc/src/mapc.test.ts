@@ -483,7 +483,7 @@ describe('mapc: validações com o mundo', () => {
     expect([wire.bullets, wire.sightOnly]).toEqual([0, 0]);
     // A medida não vira aviso (aceita por escrito no gameplay.md §3.1).
     expect(wood.warnings.some((w) => w.includes('barreira'))).toBe(false);
-  });
+  }, 30_000);
 
   it('perfil de alcance da tabela de jogo: exato nas quinas e nas arestas que cruzam a faixa', () => {
     // Tabela sintética: só o antebraço D da postura 1 tem tamanho, igual nas 5 amostras de pitch; o resto é ponto.

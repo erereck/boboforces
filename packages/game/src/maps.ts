@@ -48,6 +48,14 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
 };
 
 /**
+ * M11 (fase 3): os mapas do Bobo Zombies Fortress, o do GDD primeiro (§4.6.4: a Fazenda à noite, com o gerador na sala)
+ * e depois o Posto Avançado (o do M6). O card da Fortaleza começa no primeiro, como o do Bobo Zombies começa na Base, e
+ * o Surpreenda-me sorteia entre os dois; a Partida personalizada aceita qualquer mapa do Bobo Zombies (o gerador nasce
+ * ao lado dos spawns dos bobos, sem marcador no mapa).
+ */
+export const FORTRESS_MAPS = ['farm', 'posto'] as const satisfies readonly MenuMap[];
+
+/**
  * M10 (fase 4, revisão): a gravidade de série dos mapas que têm uma (o `meta.gravity` do `.bfmap`, conferido no teste:
  * o menu não carrega mapa). A Partida personalizada mostra a gravidade que vale e o Surpreenda-me não sorteia lá a Lua
  * (não muda nada) nem o Arcade (a sim desliga num mapa de gravidade baixa, `resolveMapMovementProfile`).

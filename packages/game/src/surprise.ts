@@ -24,7 +24,7 @@ import {
   type UiNode,
 } from '@boboforces/ui';
 import { createMenuController, type UiFrame } from './menu.ts';
-import { mapBotCap, mapGravity, mapsForMode } from './maps.ts';
+import { FORTRESS_MAPS, mapBotCap, mapGravity, mapsForMode } from './maps.ts';
 import { GUN_GAME_LADDER, moreModePreset } from './more-modes.ts';
 
 /**
@@ -77,12 +77,13 @@ const POOL_IDS: readonly string[] = POOL.map(([id]) => id);
 /** Os modos que aceitam a arma fixa e os modificadores sorteados (os outros têm regra de arma própria). */
 const FREE_RULES = new Set(['warfare.tdm', 'warfare.ffa', 'warfare.domination']);
 /**
- * Os modos com o mapa sorteado (os outros dependem do mapa deles: os pontos do Domination, o gerador da Fortaleza, os
- * sites do BoboStrike, a ilha do Royale).
+ * Os modos com o mapa sorteado (os outros dependem do mapa deles: os pontos do Domination, os sites do BoboStrike, a
+ * ilha do Royale). M11 (fase 3): a Fortaleza sorteia entre os mapas dela (a Fazenda e o Posto, `FORTRESS_MAPS`).
  */
 const MAP_ROLL = new Set(['warfare.tdm', 'warfare.ffa', 'zombies']);
 /** Os mapas que valem para o card. */
 function mapsOf(mode: string): readonly string[] {
+  if (mode === 'zombiesFortress') return FORTRESS_MAPS;
   const base = baseRecipe({ ...EMPTY_ROLL, mode });
   return MAP_ROLL.has(mode) ? (mapsForMode(base.mode) as readonly string[]) : [base.map];
 }

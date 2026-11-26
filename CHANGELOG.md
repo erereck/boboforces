@@ -11,6 +11,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Plano** em `docs/PLANO_M11.md` (#84): os poleiros de pulo e o poço do Construto, os poleiros da Base Bobo, os
   bots que sobem aonde os 3 testes em espera pedem, o Fortress na Fazenda, os pickups de arma no mapa e o Bobo Royale
   Grande, em frentes paralelas. Perguntas AL1–AL3 no padrão.
+- **O Fortress na Fazenda (fase 3):** o card da Fortaleza agora começa na Fazenda à noite, o mapa dele no GDD, com o
+  gerador na sala da casa. O Posto Avançado continua na Partida personalizada (a linha Mapa troca de mapa sem perder o
+  gerador), e o Surpreenda-me sorteia a Fortaleza nos dois mapas. Um golden novo acompanha o Fortress na Fazenda.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 

@@ -2000,6 +2000,30 @@ describe('Bobo Training (M2, fase 5d)', () => {
     game.dispose();
   }, 60_000);
 
+  it('M11 (fase 3): Mais modos → Fortaleza: a cena carrega a Fazenda à noite com o gerador na sala', async () => {
+    const { platform, game } = await bootToTitle();
+    titleTo(platform, 'modes');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('more');
+    // A Fortaleza: o 2º card da 3ª linha (Paintball, Fortaleza, Horda Armada).
+    platform.tap('ArrowDown');
+    platform.tap('ArrowDown');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] farm (play)'))).toBe(true);
+    expect(game.save.presets.recent[0]).toMatchObject({ map: 'farm', zombies: { variant: 'fortress' } });
+    const f = game.match!.sim.view().fortress!;
+    // A sala da casa (x 50..68, z 74..88), onde os bobos nascem.
+    expect(f.x > 50.5 && f.x < 68 && f.z > 74.5 && f.z < 88, `gerador em (${f.x}, ${f.z})`).toBe(true);
+    expect(f.hp[0]).toBe(f.maxHp);
+    game.dispose();
+  }, 120_000);
+
   it('Modos → Bobo Training: Ringue sem placar, alvos espalhados que não atacam e a linha dos números', async () => {
     const { platform, game } = await bootToTitle();
     // Refino R3b: Título → Modos; M6 (fase 0): o 4º card (2ª linha, à direita) é o Mais modos, e o Bobo Training é o

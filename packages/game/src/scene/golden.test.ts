@@ -687,6 +687,87 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
 });
 
 /**
+ * M11 (fase 3): o Bobo Zombies Fortress na Fazenda à noite (o mapa do card da Fortaleza desde o M11) com 4 bots Normal
+ * de apoio, semente 42, até o fim da Curta (10 ondas; teto de 15 min de jogo). Confere que os zumbis vão no gerador da
+ * sala, que a partida acaba e o hash entre execuções (as quedas e os levantados vão na mensagem). Gravado na fase 3 do
+ * M11 (26/11/2026): `02c04767` (onda 5; o gerador cai para 1.011; 11 quedas, 2 levantadas pelo colega; os 4 bots caem
+ * e a partida acaba em 13.441 ticks, 224 s). MUDA com a sim, a IA, a Fazenda ou o gerador.
+ */
+const GOLDEN_FORTRESS_FARM_HASH = '02c04767';
+const GOLDEN_FORTRESS_FARM_TICKS = 60 * 60 * 15;
+
+function runFortressFarmGolden(): {
+  hash: string;
+  wave: number;
+  hp: number;
+  low: number;
+  downs: number;
+  revives: number;
+  phase: string;
+  winner: number;
+  ticks: number;
+} {
+  const { map } = loadWorld('farm');
+  let downs = 0;
+  let revives = 0;
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'zombies',
+      map: 'farm',
+      seed: 42,
+      zombies: { variant: 'fortress' },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 4 }] }],
+    },
+    map,
+    humans: 0,
+    zombies: 24,
+    onEvents: (events) => {
+      for (const ev of events) {
+        if (ev.type === 'down' && ev.action === 'down') downs++;
+        else if (ev.type === 'down' && ev.action === 'revive') revives++;
+      }
+    },
+  });
+  let low = Infinity;
+  let t = 0;
+  for (; t < GOLDEN_FORTRESS_FARM_TICKS && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    low = Math.min(low, match.sim.view().fortress!.hp[0]!);
+  }
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    wave: v.match.zombieWave,
+    hp: Math.round(v.fortress!.hp[0]!),
+    low: Math.round(low),
+    downs,
+    revives,
+    phase: v.match.phase,
+    winner: v.match.winnerTeam,
+    ticks: t,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Zombies Fortress (M11, fase 3) na Fazenda à noite', () => {
+  it('os zumbis atacam o gerador da sala e a partida vai até o fim; hash estável', () => {
+    const a = runFortressFarmGolden();
+    const b = runFortressFarmGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg =
+      `onda ${a.wave}, gerador ${a.hp} (o mínimo ${a.low}), ${a.downs} caídos e ${a.revives} levantados, ` +
+      `fase ${a.phase} (vencedor ${a.winner}) em ${a.ticks} ticks`;
+    console.log(`[fortress fazenda] ${msg} · hash ${a.hash}`);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.low, msg).toBeLessThan(4000);
+    expect(a.wave, msg).toBeGreaterThanOrEqual(2);
+    expect(a.hash, msg).toBe(GOLDEN_FORTRESS_FARM_HASH);
+  }, 240_000);
+});
+
+/**
  * M6 (fase 6b): a Horda armada na Base Abandonada: 4 bots Normal de apoio contra a horda de 12 bots Normal (o time 1),
  * semente 42, até 7.200 ticks. Confere que a horda entra (o apoio abate soldados) e o hash entre
  * execuções. Gravado na fase 6b (19/11/2026): `0bc0e8ca` (o apoio derruba 4 dos 5 soldados da 1ª onda, 2 em jogo por vez). M10

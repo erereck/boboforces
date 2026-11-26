@@ -1,5 +1,6 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { modesScreen, type ModeCard, type UiNode } from '@boboforces/ui';
+import { FORTRESS_MAPS } from './maps.ts';
 
 /**
  * M6 (fase 0): a página "Mais modos" (o card dos Modos que entrou no lugar do Bobo Training). Mora no pedaço dos
@@ -133,12 +134,14 @@ export function moreModePreset(id: string): MatchRecipe | null {
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
       };
     case 'zombiesFortress':
-      // GDD §4.1.5: o Bobo Zombies com o gerador a defender, no Posto Avançado (a Curta, 10 ondas).
+      // GDD §4.1.5: o Bobo Zombies com o gerador a defender (a Curta, 10 ondas). M11 (fase 3): na Fazenda à noite, o
+      // mapa dele no GDD (§4.6.4), com o gerador na sala; o Posto Avançado (o do M6) segue na Partida personalizada, nos
+      // recentes e no Surpreenda-me, como o Posto e o Construto do card do Bobo Zombies.
       return {
         format: MATCH_RECIPE_FORMAT,
         name: 'Bobo Zombies: Fortaleza',
         mode: 'zombies',
-        map: 'posto',
+        map: FORTRESS_MAPS[0],
         seed: 0,
         match: { timeLimitS: 0, scoreLimit: 0 },
         zombies: { variant: 'fortress' },

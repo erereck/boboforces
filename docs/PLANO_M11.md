@@ -49,6 +49,8 @@ conferidos de novo depois de cada junção.
 2. **Os bots sobem:** o deque da antena da Lua, o jirau da Fazenda e a passarela do Galpão (mapa ou IA).
 3. **O Fortress na Fazenda:** o card, a Partida personalizada, o Surpreenda-me e a sala, como o Zombies escolhe o
    mapa; golden novo.
+   - **feita em 26/11** (ARCHITECTURE §22.3): o card começa na Fazenda; o Posto na Personalizada e no Surpreenda-me;
+     golden `02c04767`.
 4. **Os pickups de arma:** a regra na receita, o marcador de pontos no map@1 e nos mapas de TDM/FFA/Domination/Sandbox,
    o sistema na sim (pegar, trocar, voltar em 20 s), a IA que busca, o render, a opção na Personalizada; golden novo.
 5. **O Royale Grande:** medir 48 participantes no PC; o mapa de ~400 m gerado por código; o modo (só PC, online só com
