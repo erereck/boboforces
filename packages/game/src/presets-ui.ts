@@ -10,6 +10,7 @@ import {
 } from '@boboforces/format';
 import type { Rng } from '@boboforces/shared';
 import { t, type StringKey } from '@boboforces/ui';
+import { mapWeaponsInEffect } from './maps.ts';
 
 /**
  * M2 (fase 4c): o preset em texto (o resumo do JOGAR no título e as linhas do card do Surpreenda-me) e o sorteio do
@@ -102,6 +103,8 @@ export function presetSummary(recipe: MatchRecipe): string {
     t(`map.${recipe.map}` as StringKey),
     // M8 (fase 5): o Diretor de Partida ligado (também no lobby online, pergunta Z4).
     recipe.director !== undefined ? t('summary.director') : '',
+    // M11 (fase 4): as armas no mapa (revisão: só quando valem de verdade, como a sim joga).
+    mapWeaponsInEffect(recipe) ? t('summary.mapWeapons') : '',
   ].filter((p) => p !== '');
   return parts.join(t('summary.separator'));
 }
@@ -117,6 +120,8 @@ export function presetLines(recipe: MatchRecipe): string[] {
     duration(recipe),
     // M8 (fase 6): o Diretor ligado também no card (a partida recebida por link, o sorteio).
     recipe.director !== undefined ? t('summary.director') : '',
+    // M11 (fase 4): as armas no mapa (revisão: só quando valem de verdade, como a sim joga).
+    mapWeaponsInEffect(recipe) ? t('summary.mapWeapons') : '',
   ].filter((l) => l !== '');
 }
 

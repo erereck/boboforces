@@ -162,6 +162,26 @@ export interface SimView {
   readonly mods: MatchMods;
   /** M9 (fase 4): as Ferramentas do Dono (a reserva e quem está congelado), ou `null` sem elas. */
   readonly owner: OwnerView | null;
+  /**
+   * M11 (fase 4): as armas no mapa (`null` sem a regra, ou sem ponto no mapa: o loadout de sempre). Os pontos e a
+   * espera da volta são fixos da partida; o estado ao vivo (a arma ou o ponto vazio) está nos `pickups`.
+   */
+  readonly mapWeapons: MapWeaponsView | null;
+  /**
+   * M11 (fase 4): as armas que cada entidade pode ter (o bit de `weaponMaskBit`; 0 = todas): a regra do bot, a do time
+   * e as permitidas da partida. A IA não corre atrás da arma do mapa que o bot não pode pegar. Revisão: viaja na rede
+   * (o grupo `rules`, protocolo 14): as Ferramentas do Dono mudam a máscara no host, e a dica da troca e o radial do
+   * amigo leem daqui.
+   */
+  readonly weaponMask: Uint16Array;
+}
+
+/** M11 (fase 4): os pontos das armas no mapa (metros nos pés; o código da arma) e os ticks até a arma pega voltar. */
+export interface MapWeaponsView {
+  readonly spots: readonly { readonly x: number; readonly y: number; readonly z: number; readonly weapon: number }[];
+  readonly respawnTicks: number;
+  /** Revisão: as armas dos pontos (bits de `weaponMaskBit`): quem nasce sem a primária (`mapWeaponsDropPrimary`). */
+  readonly spotMask: number;
 }
 
 /**
@@ -192,7 +212,16 @@ export const PICKUP_KIND = {
   armor100: 7,
   heal: 8,
   weaponBase: 32,
+  /**
+   * M11 (fase 4): o ponto vazio de uma arma no mapa (`spotBase` + código da arma que volta), com o `ticksLeft` até ela
+   * voltar. A arma no ponto é a do Royale (`weaponBase` + código).
+   */
+  spotBase: 64,
 } as const;
+/** M11 (fase 4): a arma que volta a um ponto vazio de arma no mapa (255, o `WEAPON_NONE`, se o pickup não for um). */
+export function spotWeapon(kind: number): number {
+  return kind >= PICKUP_KIND.spotBase && kind < PICKUP_KIND.spotBase + 32 ? kind - PICKUP_KIND.spotBase : 255;
+}
 /** M3 (fase 4d): quantos tipos de drop do Bobo Zombies (de `maxAmmo` a `carpenter`). */
 export const DROP_KINDS = 5;
 

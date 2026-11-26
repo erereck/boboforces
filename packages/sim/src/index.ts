@@ -64,6 +64,10 @@ export {
   zoneDps,
 } from './systems/royale.ts';
 export { CHAOS_MODS, mapGravityLevels, MOD } from './systems/chaos.ts';
+// M11 (fase 4): as armas no mapa.
+export { mapWeaponsDropPrimary, type MapWeaponSpotDef } from './systems/map-weapons.ts';
+// M11 (fase 4, revisão): a casa dos times 2 e 3 do Sandbox (o `mapc` confere as armas no mapa longe dela).
+export { sandboxSpawns } from './systems/sandbox.ts';
 export { FORTRESS } from './systems/fortress.ts';
 export {
   aimPointLocal,

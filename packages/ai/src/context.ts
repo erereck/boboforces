@@ -58,6 +58,9 @@ export class AiContext {
   /** M11 (fase 5): o Royale Grande (o mapa de 380 m: vai para a zona nova mais cedo). */
   royaleGrande = false;
   royaleClaims: RoyaleClaims | null = null;
+  /** M11 (fase 4): as armas no mapa (`weapons.pickups`) e quem mira cada arma do chão (a marca do Royale). */
+  mapWeapons = false;
+  weaponClaims: RoyaleClaims | null = null;
   strikeRound = 0;
   strikeSite = 0;
   strikeRng: Rng | null = null;

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MATCH_RECIPE_FORMAT, validateMatchRecipe } from './match-recipe.ts';
+import {
+  MATCH_RECIPE_FORMAT,
+  recipeWeaponPickups,
+  validateMatchRecipe,
+  WEAPON_PICKUP_MODES,
+  weaponPickupsFit,
+} from './match-recipe.ts';
 import { ISSUE_CODES, type RecipeLimits } from './validation.ts';
 
 /** M2, fase 4e: os blocos de regras da receita (players ampliado, weapons e hud). */
@@ -223,5 +229,32 @@ describe('M10 (fase 8): a cor do time na receita', () => {
     expect(once.ok && once.value.teams.map((t) => t.color)).toEqual([6, 0, 1, 2]);
     const again = validateMatchRecipe(JSON.parse(JSON.stringify(once.ok && once.value)) as unknown, LIMITS);
     expect(again.ok && again.warnings).toEqual([]);
+  });
+});
+
+describe('M11 (fase 4): as armas no mapa (`weapons.pickups`)', () => {
+  it('vale nos modos de loadout livre; o validador tira com aviso fora deles, com a escada e no Infection', () => {
+    for (const mode of WEAPON_PICKUP_MODES) {
+      const r = validateMatchRecipe(recipe({ mode, weapons: { pickups: true } }), LIMITS);
+      expect(r.ok && r.value.weapons?.pickups, mode).toBe(true);
+      expect(r.ok && recipeWeaponPickups(r.value), mode).toBe(true);
+    }
+    const off = validateMatchRecipe(recipe({ mode: 'royale.mini', weapons: { pickups: true, damageMul: 2 } }), LIMITS);
+    expect(off.ok && off.value.weapons).toEqual({ damageMul: 2 });
+    expect(off.ok && off.warnings.map((w) => `${w.path}:${w.code}`)).toEqual(['weapons.pickups:recipe.invalidField']);
+    expect(weaponPickupsFit('warfare.tdm', true, false)).toBe(false);
+    expect(weaponPickupsFit('warfare.tdm', false, true)).toBe(false);
+    expect(weaponPickupsFit('zombies', false, false)).toBe(false);
+    // A receita montada à mão (sem o validador) também não liga a regra onde ela não vale.
+    expect(
+      recipeWeaponPickups({
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'warfare.ffa',
+        map: 'construto',
+        seed: 1,
+        weapons: { pickups: true, ladder: ['rifle', 'knife'] },
+        teams: [{ bots: [] }],
+      }),
+    ).toBe(false);
   });
 });

@@ -784,6 +784,13 @@ export const STRINGS_EXTRA_PT_BR = {
   'custom.allowed.crossbow': 'Só besta',
   'custom.allowed.grenadeLauncher': 'Só lança-granadas',
   'custom.allowed.revolver': 'Só revólver',
+  // M11 (fase 4): as armas no mapa (a primária escolhida na tela de morte ou pega no chão).
+  'custom.row.pickups': 'Primária',
+  'custom.pickups.free': 'Livre',
+  'custom.pickups.map': 'No mapa',
+  'custom.pickups.idle': 'No mapa (sem efeito)',
+  'custom.help.pickups': 'Livre: escolhida ao morrer. No mapa: nasce de pistola e pega as armas do chão.',
+  'surprise.weaponsMap': 'No mapa',
   'workshop.title': 'Oficina',
   'workshop.favorites': 'Favoritos',
   'workshop.mine': 'Seus bots',

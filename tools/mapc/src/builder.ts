@@ -11,6 +11,7 @@ import {
   type MapPaidDoorMarker,
   type MapPerkMachineMarker,
   type MapWallBuyMarker,
+  type MapWeaponSpotMarker,
   type MapPointMarker,
   type MapProp,
   type MapSpawnMarker,
@@ -68,6 +69,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
   const domination: MapPointMarker[] = [];
   const bombSites: MapPointMarker[] = [];
   const lootSpots: MapPointMarker[] = [];
+  const weaponSpots: MapWeaponSpotMarker[] = [];
   const cameras: MapCamera[] = [];
   const routes: MapCameraRoute[] = [];
   const mannequins: MapMannequin[] = [];
@@ -232,6 +234,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
     domination: (p) => void domination.push(p),
     bombSite: (p) => void bombSites.push(p),
     lootSpot: (p) => void lootSpots.push(p),
+    weaponSpot: (p) => void weaponSpots.push(p),
     camera: (c) => void cameras.push(c),
     route: (r) => void routes.push(r),
     mannequin: (q) => void mannequins.push(q),
@@ -296,6 +299,7 @@ export function createMapBuilder(id: string): MapBuilderHandle {
           domination,
           ...(bombSites.length > 0 ? { bombSites } : {}),
           ...(lootSpots.length > 0 ? { lootSpots } : {}),
+          ...(weaponSpots.length > 0 ? { weaponSpots } : {}),
           cameras,
           routes,
           mannequins,

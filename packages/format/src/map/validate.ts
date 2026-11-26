@@ -51,6 +51,11 @@ export const MAX_DECLARED_SIGHT_LINE_M = 600;
 export const MIN_ROYALE_LOOT_SPOTS = 24;
 export const MAX_LOOT_SPOTS = 112;
 /**
+ * M11 (fase 4): o teto das armas no mapa (cada uma fica com um pickup da sim a partida toda; com as caixinhas de quem
+ * morre, cabe com folga no pool de 256).
+ */
+export const MAX_WEAPON_SPOTS = 24;
+/**
  * M10 (fase 4): a faixa da gravidade de série do mapa (`MapMeta.gravity`), a mesma da regra de gravidade da receita
  * (`RECIPE_RANGES.gravity`, o perfil Personalizado). As duas se multiplicam na sim, que não deixa o produto passar
  * do piso desta faixa (`mapGravityFloor`; revisão da fase 4).
@@ -334,6 +339,18 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
   loot.forEach((d) => {
     if (!finite(d.x, d.y, d.z, d.radius) || d.radius <= 0) err(`ponto de loot ${d.id} inválido`);
     else if (!inArea(d.x, d.z)) err(`ponto de loot ${d.id} fora da playArea`);
+  });
+  // M11 (fase 4): as armas no mapa (dentro da área, nome único, arma registrada; que seja primária, o `mapc` confere).
+  const weaponSpots = mk.weaponSpots ?? [];
+  if (weaponSpots.length > MAX_WEAPON_SPOTS) err(`${weaponSpots.length} armas no mapa (máximo ${MAX_WEAPON_SPOTS})`);
+  unique(
+    'arma no mapa',
+    weaponSpots.map((d) => d.id),
+  );
+  weaponSpots.forEach((d) => {
+    if (!finite(d.x, d.y, d.z)) err(`arma no mapa ${d.id} inválida`);
+    else if (!inArea(d.x, d.z)) err(`arma no mapa ${d.id} fora da playArea`);
+    if (!isKnownContentId(`weapon:${d.weapon}`)) err(`arma no mapa ${d.id}: arma não registrada: weapon:${d.weapon}`);
   });
   if (modes.has('warfare.domination') && mk.domination.length < MIN_DOMINATION_POINTS) {
     err(`Domination: ${mk.domination.length} pontos (mínimo ${MIN_DOMINATION_POINTS})`);

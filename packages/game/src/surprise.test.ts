@@ -96,6 +96,40 @@ describe('M8 (fase 3): o sorteio do Surpreenda-me', () => {
   });
 });
 
+describe('M11 (fase 4): as armas no mapa no Surpreenda-me', () => {
+  it('sai às vezes (só com as armas livres), vira a regra da receita e a linha "No mapa"; tira a troca por abate', () => {
+    let seen = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const roll = rollSurprise(seed, null, none);
+      if (roll.pickups !== true) continue;
+      seen++;
+      expect(roll.weapon).toBe('');
+      const recipe = surpriseRecipe(roll);
+      expect(recipe.weapons?.pickups).toBe(true);
+      expect(recipe.modifiers ?? []).not.toContain('swapOnKill');
+      const r = validateMatchRecipe(recipe, STORAGE_RECIPE_LIMITS);
+      expect(r.ok && r.value.weapons?.pickups).toBe(true);
+      expect(surpriseLineText(roll, 'weapons')).toBe('No mapa');
+    }
+    expect(seen).toBeGreaterThan(10);
+  });
+
+  it('o código: o de antes (sem o campo) joga com as armas livres; o novo guarda a regra; o cadeado das armas a mantém', () => {
+    let roll = rollSurprise(1, null, none);
+    for (let seed = 2; roll.pickups !== true; seed++) roll = rollSurprise(seed, null, none);
+    const doc = JSON.parse(JSON.stringify(surpriseCodeDoc(roll))) as Record<string, unknown>;
+    expect(surpriseFromCode(doc)).toEqual(roll);
+    const { pickups: _gone, ...old } = doc;
+    const before = surpriseFromCode(old)!;
+    expect(before.pickups).toBeUndefined();
+    expect(surpriseRecipe(before).weapons?.pickups).toBeUndefined();
+    // Com uma arma fixa no código, a regra não vale.
+    expect(surpriseFromCode({ ...doc, weapon: 'sniper' })?.pickups).toBeUndefined();
+    const locks = new Set<SurpriseLine>(['weapons']);
+    for (let seed = 1; seed <= 20; seed++) expect(rollSurprise(seed, roll, locks).pickups).toBe(true);
+  });
+});
+
 describe('M8 (fase 3): a tela do Surpreenda-me', () => {
   const platform = { id: 'web', clipboard: { writeText: async () => true } } as unknown as Platform;
 

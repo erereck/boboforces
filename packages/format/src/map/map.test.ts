@@ -10,6 +10,7 @@ import {
   isPlayableProp,
   MAP_FORMAT,
   MAP_GRAVITY_RANGE,
+  MAX_WEAPON_SPOTS,
   OPTIONAL_MANNEQUINS,
   OPTIONAL_PRINT_CAMERAS,
   PLAYABLE_PROP_DOSE,
@@ -575,6 +576,48 @@ describe('map@1: os pontos de loot do Royale (M7, fase 5)', () => {
     expect(issues).toContain('ponto de loot repetido: x');
     expect(issues).toContain('ponto de loot x inválido');
     expect(issues).toContain('ponto de loot x fora da playArea');
+  });
+});
+
+describe('map@1: as armas no mapa (M11, fase 4)', () => {
+  const withSpots = (spots: NonNullable<MapDocument['markers']['weaponSpots']>): MapDocument => {
+    const doc = syntheticMap();
+    return { ...doc, markers: { ...doc.markers, weaponSpots: spots } };
+  };
+
+  it('ida e volta; sem armas, o campo não aparece no arquivo (os mapas de antes ficam com os mesmos bytes)', () => {
+    const doc = withSpots([
+      { id: 'c1', x: 4, y: 0.5, z: 4, weapon: 'rocket' },
+      { id: 'a1', x: 6, y: 0.5, z: 8, weapon: 'rocket.grenade-launcher' },
+    ]);
+    expect(decodeMap(encodeMap(doc)).markers).toEqual(doc.markers);
+    const plain = encodeMap(syntheticMap());
+    expect(decodeMap(plain).markers.weaponSpots).toBeUndefined();
+    expect(strFromU8(inflateSync(plain))).not.toContain('weaponSpots');
+    expect(encodeMap(withSpots([]))).toEqual(plain);
+  });
+
+  it('nome único, dentro da área, arma registrada e o teto do pool', () => {
+    expect(validateMap(withSpots([{ id: 'ok', x: 4, y: 0.5, z: 4, weapon: 'sniper' }]))).toEqual([]);
+    const issues = validateMap(
+      withSpots([
+        { id: 'x', x: 4, y: 0.5, z: 4, weapon: 'laser' },
+        { id: 'x', x: 999, y: 0.5, z: 4, weapon: 'smg' },
+      ]),
+    );
+    expect(issues).toContain('arma no mapa repetido: x');
+    expect(issues).toContain('arma no mapa x: arma não registrada: weapon:laser');
+    expect(issues).toContain('arma no mapa x fora da playArea');
+    const many = Array.from({ length: MAX_WEAPON_SPOTS + 1 }, (_, i) => ({
+      id: `w${i}`,
+      x: 2 + (i % 8),
+      y: 0.5,
+      z: 2 + Math.floor(i / 8),
+      weapon: 'rifle',
+    }));
+    expect(validateMap(withSpots(many))).toContain(
+      `${MAX_WEAPON_SPOTS + 1} armas no mapa (máximo ${MAX_WEAPON_SPOTS})`,
+    );
   });
 });
 

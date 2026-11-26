@@ -1,7 +1,16 @@
 import { performance } from 'node:perf_hooks';
 import { FIGURE_CROUCH_TOP_M, FIGURE_MAX_TOP_M, type MapDocument } from '@boboforces/format';
 import { createNavPath, findPath, NO_NAV_NODE, type NavGridImpl } from '@boboforces/nav';
-import { METRICS, MOVEMENT_BOBO } from '@boboforces/sim';
+import {
+  isPrimaryWeapon,
+  METRICS,
+  MOVEMENT_BOBO,
+  navMainComponent,
+  sandboxSpawns,
+  spawnPointsFromMarkers,
+  weaponCodeOf,
+  type SimMap,
+} from '@boboforces/sim';
 import {
   BLOCK_FLAG,
   BLOCK_SIZE,
@@ -173,6 +182,92 @@ function sample(list: readonly string[], n = 6): string {
   return list.length <= n ? list.join(' ') : `${list.slice(0, n).join(' ')} … (+${list.length - n})`;
 }
 
+/**
+ * M11 (fase 4): as distâncias das armas no mapa: longe das largadas (quem renasce não sai armado do spawn) e uma da
+ * outra (a troca no usar pega a mais perto, a até 1,2 m: duas coladas confundiriam).
+ */
+export const WEAPON_SPOT_RULES = { minSpawnM: 5, minApartM: 2.5 } as const;
+
+/**
+ * M11 (fase 4, revisão): os pontos de renascer do Sandbox com 4 times, com a MESMA conta da sim (`sandboxSpawns`): os do
+ * mapa e a casa dos times sem ponto (o 2 e o 3), que só existe em tempo de execução. Fora do Sandbox, os do mapa.
+ */
+function weaponSpotSpawns(
+  doc: MapDocument,
+  grid: WorldGrid,
+  registry: BlockRegistry,
+  nav: NavGridImpl,
+): readonly { readonly x: number; readonly y: number; readonly z: number; readonly team: number }[] {
+  const spawns = doc.markers.spawns;
+  if (!doc.meta.modes.includes('sandbox') || (doc.markers.weaponSpots ?? []).length === 0) return spawns;
+  const a = doc.markers.playArea;
+  const map: SimMap = {
+    grid,
+    blocks: registry,
+    spawns: spawnPointsFromMarkers(doc.markers),
+    nav,
+    playArea: { minX: a.minX, minZ: a.minZ, maxX: a.maxX, maxZ: a.maxZ },
+  };
+  return sandboxSpawns(map, 4, navMainComponent(nav), 0b1111);
+}
+
+/**
+ * M11 (fase 4): cada arma no mapa é uma primária do arsenal, no chão (fora de bloco, com um nó da navegação principal
+ * a menos de 1 m e 0,6 m de altura), longe das largadas e das outras armas. Revisão: longe também da casa dos times 2 e
+ * 3 do Sandbox (`weaponSpotSpawns`).
+ */
+function checkWeaponSpots(
+  doc: MapDocument,
+  grid: WorldGrid,
+  registry: BlockRegistry,
+  nav: NavGridImpl,
+  mainComponent: number,
+  collides: (x: number, y: number, z: number) => boolean,
+  errors: string[],
+): void {
+  const spots = doc.markers.weaponSpots ?? [];
+  const spawns = weaponSpotSpawns(doc, grid, registry, nav);
+  const pos = new Float64Array(3);
+  spots.forEach((p, i) => {
+    const where = `arma no mapa ${p.id} ${at(p.x, p.y, p.z)}`;
+    if (!isPrimaryWeapon(weaponCodeOf(p.weapon))) errors.push(`${where}: ${p.weapon} não é uma primária do arsenal`);
+    const cx = Math.floor(p.x * 2);
+    const cy = Math.floor(p.y * 2 + 0.01);
+    const cz = Math.floor(p.z * 2);
+    if (collides(cx, cy, cz) || collides(cx, cy + 1, cz)) {
+      errors.push(`${where} dentro de bloco`);
+      return;
+    }
+    // O chão é o do nó da navegação (a arma cai até ele na largada da partida).
+    const n = nav.nearestNode(p.x, p.y, p.z);
+    if (n === NO_NAV_NODE) {
+      errors.push(`${where} sem nó de navegação a menos de 2 m`);
+      return;
+    }
+    nav.nodePosition(n, pos);
+    if (Math.abs(pos[1]! - p.y) > 0.6 || Math.hypot(pos[0]! - p.x, pos[2]! - p.z) > 1.0) {
+      errors.push(`${where} longe do nó mais próximo ${at(pos[0]!, pos[1]!, pos[2]!)}`);
+    } else if (nav.component[n] !== mainComponent) {
+      errors.push(`${where} fora da área navegável principal`);
+    }
+    for (const s of spawns) {
+      const d = Math.hypot(s.x - p.x, s.y - p.y, s.z - p.z);
+      if (d < WEAPON_SPOT_RULES.minSpawnM) {
+        // A casa nova (fora dos pontos do mapa; os pontos sem time do território dela continuam "largada").
+        const home = s.team >= 2 && !doc.markers.spawns.some((m) => m.x === s.x && m.y === s.y && m.z === s.z);
+        const what = home ? `da casa do time ${s.team} do Sandbox` : 'da largada';
+        errors.push(`${where} a ${br(d)} m ${what} ${at(s.x, s.y, s.z)} (mínimo ${WEAPON_SPOT_RULES.minSpawnM})`);
+        break;
+      }
+    }
+    for (let j = 0; j < i; j++) {
+      const o = spots[j]!;
+      const d = Math.hypot(o.x - p.x, o.y - p.y, o.z - p.z);
+      if (d < WEAPON_SPOT_RULES.minApartM) errors.push(`${where} a ${br(d)} m da arma ${o.id}`);
+    }
+  });
+}
+
 export function runChecks(input: CheckInput): CheckReport {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -254,6 +349,7 @@ export function runChecks(input: CheckInput): CheckReport {
       errors.push(`ponto de loot ${p.id} ${at(p.x, p.y, p.z)} fora da área navegável principal`);
     }
   }
+  checkWeaponSpots(doc, grid, registry, nav, mainComponent, collides, errors);
 
   const path = createNavPath(nav, 1024);
   const times: number[] = [];

@@ -58,3 +58,13 @@ export const SANDBOX_SPAWN = {
   groundToleranceM: 1,
   groundReachM: 8,
 } as const;
+
+/**
+ * M11 (fase 4): as armas no mapa (a regra `weapons.pickups`, GDD §4.3.2 e §4.4): a arma pega volta ao ponto `respawnS`
+ * depois (GDD: 20 s); a troca pela primária de agora é no usar, a até `swapReachM` dos pés (a mesma do Royale, que a IA
+ * e a dica do HUD já medem).
+ */
+export const MAP_WEAPONS = {
+  respawnS: 20,
+  swapReachM: 1.2,
+} as const;

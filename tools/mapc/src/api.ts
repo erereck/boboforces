@@ -7,6 +7,7 @@ import type {
   MapPaidDoorMarker,
   MapPerkMachineMarker,
   MapWallBuyMarker,
+  MapWeaponSpotMarker,
   MapMeta,
   MapPointMarker,
   MapSpawnMarker,
@@ -111,6 +112,8 @@ export interface MapBuilder {
   bombSite(site: MapPointMarker): void;
   /** M7 (fase 5): ponto de loot do Bobo Royale (id, o chão onde o item aparece e um raio, em metros). */
   lootSpot(spot: MapPointMarker): void;
+  /** M11 (fase 4): arma no mapa (id, o chão onde ela aparece, em metros, e a arma: uma primária do arsenal). */
+  weaponSpot(spot: MapWeaponSpotMarker): void;
   camera(camera: MapCamera): void;
   route(route: MapCameraRoute): void;
   mannequin(mannequin: MapMannequin): void;
@@ -145,6 +148,11 @@ export interface MapScript {
     readonly jumpSightTodo?: string;
     readonly openSight?: boolean;
   };
+  /**
+   * M11 (fase 4): as armas no mapa (a regra `weapons.pickups`), num campo do script e não no `build`: um bloco só, que
+   * não esbarra na geometria. O `mapc` acrescenta depois do `build` (como `weaponSpot`) e confere cada uma.
+   */
+  readonly weaponSpots?: readonly MapWeaponSpotMarker[];
 }
 
 /** Formas que cada operação exige do bloco (conferidas contra o registro real no `mapc`). */

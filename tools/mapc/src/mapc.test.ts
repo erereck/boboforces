@@ -33,7 +33,7 @@ import {
   type MapCamera,
   type MapMannequin,
 } from '@boboforces/format';
-import { ARM_HIT_CUT_M, METRICS } from '@boboforces/sim';
+import { ARM_HIT_CUT_M, METRICS, navMainComponent, sandboxSpawns, spawnPointsFromMarkers } from '@boboforces/sim';
 import {
   BLOCK_SIZE,
   cellBlock,
@@ -306,6 +306,98 @@ describe('mapc: validações com o mundo', () => {
     expect(loot.some((e) => e.includes('ok'))).toBe(false);
     expect(loot.some((e) => e.startsWith('ponto de loot bloco'))).toBe(true);
     expect(loot.some((e) => e.startsWith('ponto de loot ilha') && e.includes('principal'))).toBe(true);
+  });
+
+  it('M11 (fase 4): as armas no mapa: primária, no chão, na área principal, longe das largadas e uma da outra', () => {
+    const script = arena((b) => {
+      b.box(1, 1, 20, 30, 6, 20, 'concrete'); // parede alta sem porta: o sul fica ilhado
+      b.box(10, 1, 10, 11, 2, 11, 'concrete'); // um bloco de 1 m no meio do norte
+      b.spawn({ x: 6.5, y: 0.5, z: 2.5, yaw: 0, team: -1 }); // o norte é a área principal
+    });
+    const r = compileMap(
+      {
+        ...script,
+        // O campo do script entra depois do `build` (como `weaponSpot`).
+        weaponSpots: [
+          { id: 'ok', x: 8.5, y: 0.5, z: 8.5, weapon: 'rocket.grenade-launcher' },
+          { id: 'bloco', x: 5.5, y: 0.5, z: 5.5, weapon: 'smg' },
+          { id: 'perto', x: 3.5, y: 0.5, z: 4.5, weapon: 'smg' },
+          { id: 'pistola', x: 12.5, y: 0.5, z: 4.5, weapon: 'pistol' },
+          { id: 'colada', x: 9.5, y: 0.5, z: 9.5, weapon: 'rifle' },
+          { id: 'ilha', x: 5.5, y: 0.5, z: 13.5, weapon: 'sniper' },
+        ],
+      },
+      OPTIONS,
+    );
+    expect(r.doc.markers.weaponSpots?.map((w) => w.id)).toEqual(['ok', 'bloco', 'perto', 'pistola', 'colada', 'ilha']);
+    const spots = r.errors.filter((e) => e.startsWith('arma no mapa'));
+    const of = (id: string): string[] => spots.filter((e) => e.startsWith(`arma no mapa ${id} `));
+    expect(of('ok')).toEqual([]);
+    expect(of('bloco').some((e) => e.includes('dentro de bloco'))).toBe(true);
+    expect(of('perto').some((e) => e.includes('da largada'))).toBe(true);
+    expect(of('pistola').some((e) => e.includes('não é uma primária'))).toBe(true);
+    expect(of('colada').some((e) => e.includes('da arma ok'))).toBe(true);
+    expect(of('ilha').some((e) => e.includes('principal'))).toBe(true);
+  });
+
+  it('M11 (fase 4, revisão): no mapa do Sandbox, as armas ficam longe também da casa dos times 2 e 3', () => {
+    // Arena de 16 × 16 m com o time 0 no oeste e o 1 no leste: a casa do 2 e a do 3 caem no norte e no sul (a conta da
+    // sim, `sandboxSpawns`, que só existe em tempo de execução).
+    const build = (spots: MapScript['weaponSpots']): ReturnType<typeof compileMap> => {
+      const base = arena((b) => {
+        b.spawn({ x: 2.5, y: 0.5, z: 8, yaw: 0, team: 0 });
+        b.spawn({ x: 13.5, y: 0.5, z: 8, yaw: 0, team: 1 });
+      });
+      return compileMap(
+        {
+          ...base,
+          build(b) {
+            base.build(b);
+            b.meta({
+              nameKey: 'map.teste.name',
+              modes: ['training', 'sandbox'],
+              players: { min: 1, ideal: 2, max: 4 },
+              maxSightLineM: 25,
+              botCaps: {},
+            });
+          },
+          ...(spots !== undefined ? { weaponSpots: spots } : {}),
+        },
+        OPTIONS,
+      );
+    };
+    const clean = build(undefined);
+    const a = clean.doc.markers.playArea;
+    const homes = sandboxSpawns(
+      {
+        grid: clean.grid,
+        blocks: clean.registry,
+        spawns: spawnPointsFromMarkers(clean.doc.markers),
+        nav: clean.nav,
+        playArea: { minX: a.minX, minZ: a.minZ, maxX: a.maxX, maxZ: a.maxZ },
+      },
+      4,
+      navMainComponent(clean.nav),
+      0b1111,
+    ).filter((p) => p.team >= 2 && !clean.doc.markers.spawns.some((s) => s.x === p.x && s.z === p.z));
+    expect(homes.length).toBeGreaterThan(0);
+    const home = homes[0]!;
+    const r = build([{ id: 'casa', x: home.x, y: home.y, z: home.z, weapon: 'smg' }]);
+    expect(r.errors.some((e) => e.startsWith('arma no mapa casa') && e.includes(`casa do time ${home.team}`))).toBe(
+      true,
+    );
+    // Fora do Sandbox, a casa não existe: a mesma arma passa (está longe das largadas do mapa).
+    const plain = compileMap(
+      {
+        ...arena((b) => {
+          b.spawn({ x: 2.5, y: 0.5, z: 8, yaw: 0, team: 0 });
+          b.spawn({ x: 13.5, y: 0.5, z: 8, yaw: 0, team: 1 });
+        }),
+        weaponSpots: [{ id: 'casa', x: home.x, y: home.y, z: home.z, weapon: 'smg' }],
+      },
+      OPTIONS,
+    );
+    expect(plain.errors.some((e) => e.includes('casa do time'))).toBe(false);
   });
 
   it('prop do dobro (dose 2) é do jogo: colisor, buraco na navegação e fonte de luz (decisão #52)', () => {
@@ -654,6 +746,8 @@ describe('mapc: Construto', () => {
     // luz das props calculada igual.
     const again = createMapBuilder('construto');
     construto.build(again.builder);
+    // M11 (fase 4): as armas no mapa vêm do campo do script, depois do `build` (como no `compileMap`).
+    for (const spot of construto.weaponSpots ?? []) again.builder.weaponSpot(spot);
     const doc = { ...again.finish().doc, light: a.doc.light };
     expect(Buffer.from(encodeMap(doc)).equals(Buffer.from(a.bytes))).toBe(true);
     // Ida e volta do arquivo e a vista de cima.

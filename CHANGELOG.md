@@ -23,6 +23,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   6 fases (~12 min). Está no botão "Grande" do card do Bobo Royale (Mais modos) e na sala online com o host no PC (em
   duplas); o Aquário assiste. No celular e no Switch o botão não aparece, e um link ou um recente dele é recusado com
   aviso.
+- **As armas no mapa (fase 4):** a regra "Primária: No mapa" (Partida personalizada, Surpreenda-me e presets): todo
+  mundo nasce de pistola, faca e granadas e pega as armas espalhadas pelo mapa (passando por cima; a mesma arma enche a
+  munição, outra se troca no Usar); a arma pega volta ao lugar 20 s depois, e o lugar vazio fica marcado com giz. Vale
+  nos Times, no FFA, no Domination, no Sandbox e no Juggernaut; 61 armas em 7 mapas (o foguete, a sniper e o
+  lança-granadas no meio). Os bots vão buscar as armas pesando o perigo. De quebra, a mão não vai mais para a granada
+  depois de pegar uma arma do chão (também no Royale e no BoboStrike). O online foi para o protocolo 14.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 

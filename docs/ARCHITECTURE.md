@@ -5418,3 +5418,49 @@ de chegada.
   da IA (`NavLevels`) custa ~50 ms no 1º tick (dá para montar no loading); o `.bfmap` do Arquipélago vai no romfs do
   Switch sem uso (77 KB); o Royale só com bots acaba em 2,5 a 7 min (como o Y7 do Mini); o Surpreenda-me não sorteia o
   Grande; o amigo no celular que entra na sala do Grande carrega o Arquipélago inteiro (não medido).
+
+### 22.4 Fase 4: as armas no mapa (26/11/2026)
+
+- **A regra** (`weapons.pickups`, GDD §4.3.2 e §4.4, perguntas AK1 e AL2): campo opcional do bloco `weapons` do
+  `preset@1` (sem versão nova). Vale nos modos de `WEAPON_PICKUP_MODES` (Times, FFA, Domination, Sandbox e
+  Juggernaut, onde só os caçadores pegam); fora deles, com a escada do Gun Game ou no Infection (o sobrevivente aguenta
+  com o que tem), o validador tira com aviso. `recipeWeaponPickups` é a conta da sim, da IA e das telas. Com
+  `weapons.allowed`, a arma não permitida de um ponto vira uma permitida, em rodízio; sem primária permitida ou num
+  mapa sem ponto, a regra não vale (o loadout de sempre).
+- **O mapa:** o marcador opcional `weaponSpots` do `map@1` (id, o chão e a arma; teto 24; os mapas sem nenhum ficam
+  com os mesmos bytes), no campo `weaponSpots` do script (um bloco só, fora do `build`). O `mapc` confere: primária do
+  arsenal, fora de bloco, um nó da navegação principal a menos de 1 m, a 5 m ou mais de toda largada (e, nos mapas do
+  Sandbox, das casas dos times 2 e 3, com a mesma conta da sim, `sandboxSpawns` com 4 times) e a 2,5 m ou mais das
+  outras armas; a vista de cima marca cada uma. 61 armas: Construto 9, Ringue 5, Base Bobo 9, Canteiro 9, Porto 9,
+  Estação Lunar 9 e Galpão 11; as fortes (foguete, sniper, lança-granadas) no meio ou em lugar exposto, os pares à
+  mesma distância das duas bases (espelhados onde o mapa é espelhado).
+- **A sim** (`systems/map-weapons.ts`; `MAP_WEAPONS` em `config/rules.ts`): cada arma é um pickup da partida toda: com
+  a arma, o tipo é o da arma do Royale (`weaponBase` + código); pega, o mesmo pickup vira o ponto vazio
+  (`PICKUP_KIND.spotBase` 64 + código) com o `ticksLeft` até a volta (20 s). Nasce-se sem a primária só quando a regra
+  de armas da pessoa permite pegar alguma arma dos pontos e tem uma arma de mão (`mapWeaponsDropPrimary(mask,
+  spotMask)`); senão, o loadout de sempre (o "Só fuzil", o Camper Carl, o Jorge, o "Só X" do time no Sandbox), e o
+  radial da morte usa a mesma conta. Passar por cima com a primária vazia põe a arma na mão (pente e reserva cheios);
+  com a mesma arma, enche a munição; outra arma se troca no usar (a de agora some). O Jugg não pega. A troca e a busca
+  valem em toda fase viva (`isLivePhase`, a morte súbita também). Determinístico e sem alocação no passo.
+- **A rede:** o estado das armas mora no pool de pickups (snapshot, hash e rede; o `kind` de 8 bits cabe 64 + 31), e a
+  máscara das armas de cada bobo passou a viajar no grupo frio `rules` (o dono online muda a máscara no host com o
+  `setTeam`, o `spawnBot` e o `givePrimary`): **`PROTOCOL_VERSION` 14**, com o `net.json`; o snapshot da sim segue no
+  20. `MAP_WEAPONS` entrou no hash de conteúdo. A rede de mentira termina igual no host e nos 3 amigos.
+- **A IA** (`ai/src/map-weapons.ts`): o bot só de pistola (ou com a primária quase vazia) vai à arma que mais vale por
+  perto (a nota cai pela metade a cada 12 m, até 40 m), pesando o perigo como o loot do Royale; ferido há pouco
+  (`alertUntil`), briga com o inimigo à vista até 40 m antes de seguir. O ponto vazio não é arma: quem chega tarde vai
+  à seguinte ou volta a lutar; o bot com regra de armas restrita não corre atrás.
+- **O desenho e as telas:** a arma do chão é a do loot do Royale; o ponto vazio é o contorno de giz deitado no chão, que
+  pisca nos 3 s antes da volta; a dica "Usar: trocar por X"; sem o radial da morte. "Primária: Livre / No mapa" no topo
+  da aba Armas ("No mapa (sem efeito)" quando a regra não vale ali); o Surpreenda-me sorteia "No mapa" (25% com as
+  armas livres, por último), com o campo opcional `pickups` no código `BFR1-` (o de antes joga com as armas livres);
+  "Armas no mapa" no resumo e no card do preset só quando vale (`mapWeaponsInEffect`, a mesma conta da sim).
+- **A revisão (Opus) achou**, e foi corrigido antes do commit: a mão ia para a faca ou a granada logo depois de pegar
+  a arma (um laço antigo da cena mandava o CÓDIGO da arma do evento `weapon`/`switch` como slot ao mapeador; só o
+  fuzil, código 0, caía certo; valia também no loot do Royale, na loja do BoboStrike e na troca por abate; agora o slot
+  sai da arma do evento, `scene/switch-slot.ts`); gente que nascia sem arma nenhuma (a máscara restrita sem arma de
+  mão); armas em cima da casa dos times 2 e 3 do Sandbox (7 pontos mudaram); a troca e a busca paradas na morte
+  súbita; a máscara do amigo online desatualizada com o dono; "Armas no mapa" no resumo quando a sim usava o loadout;
+  e o bot de pistola que não revidava indo buscar arma.
+- **Os números:** o golden novo (FFA de 8 bots Normal no Porto, semente 42) `6df27838` (220 s, 86 abates, 51 armas pegas, 43 depois da volta); os goldens de antes iguais. O
+  menu da web em 335,0 KB de 350; a primeira partida em 963,0 KB de 1 MB.

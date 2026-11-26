@@ -31,7 +31,7 @@ import {
   type StringKey,
   type TextParams,
 } from '@boboforces/ui';
-import { mapBotCap, mapForMode, mapGravity, mapName, mapsForMode, type MenuMap } from './maps.ts';
+import { mapBotCap, mapForMode, mapGravity, mapName, mapsForMode, mapWeaponsInEffect, type MenuMap } from './maps.ts';
 import { teamColor, teamColorIndex } from './team-colors.ts';
 import { teamColorName, teamName } from './team-names.ts';
 
@@ -178,6 +178,13 @@ const withWeapons = (r: MatchRecipe, w: Partial<WeaponRules>): MatchRecipe => ({
   weapons: { ...weapons(r), ...w },
 });
 const withHud = (r: MatchRecipe, h: Partial<HudRules>): MatchRecipe => ({ ...r, hud: { ...hud(r), ...h } });
+/** M11 (fase 4): liga as armas no mapa, ou tira a regra (a receita volta a ser a de antes, sem o campo). */
+function withPickups(r: MatchRecipe, on: boolean): MatchRecipe {
+  if (on) return withWeapons(r, { pickups: true });
+  if (r.weapons?.pickups === undefined) return r;
+  const { pickups: _gone, ...rest } = r.weapons;
+  return { ...r, weapons: rest };
+}
 
 function flag(
   id: string,
@@ -384,8 +391,8 @@ function toZombies(r: MatchRecipe, l: CustomLimits): MatchRecipe {
   const map = mapsForMode('zombies').includes(r.map as MenuMap) && r.map !== 'construto' ? r.map : ZOMBIES_MAP;
   const { viewDistanceM } = r.match ?? {};
   // M6 (fase 4): o Bobo Zombies não tem a aba Modificadores: os modificadores e a Roleta não vão junto; nem o Diretor
-  // de Partida (M8, fase 5: não vale no Zombies).
-  const { modifiers: _mods, chaos: _chaos, director: _director, ...rest } = r;
+  // de Partida (M8, fase 5: não vale no Zombies); nem as armas no mapa (M11, fase 4: o Zombies tem as dele).
+  const { modifiers: _mods, chaos: _chaos, director: _director, ...rest } = withPickups(r, false);
   return {
     ...rest,
     mode: 'zombies',
@@ -777,6 +784,21 @@ const PLAYER_ROWS: readonly RowDef[] = [
 ];
 
 const WEAPON_ROWS: readonly RowDef[] = [
+  // M11 (fase 4): a primária livre (o radial da tela de morte) ou pega no mapa (todos nascem de pistola).
+  {
+    id: 'pickups',
+    labelKey: 'custom.row.pickups',
+    // Revisão: ligada mas sem valer (as armas permitidas sem primária, ou um mapa sem pontos), diz que não vale.
+    value: (r) =>
+      t(
+        weapons(r).pickups !== true
+          ? 'custom.pickups.free'
+          : mapWeaponsInEffect(r)
+            ? 'custom.pickups.map'
+            : 'custom.pickups.idle',
+      ),
+    step: (r) => withPickups(r, weapons(r).pickups !== true),
+  },
   {
     id: 'allowed',
     labelKey: 'custom.row.allowed',

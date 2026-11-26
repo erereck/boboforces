@@ -4,6 +4,7 @@ import {
   LEVEL_ORDER,
   PERSONALITY_PRESETS,
   personalityForRoll,
+  recipeWeaponPickups,
   resolveBot,
   type BotLevel,
   type MatchRecipe,
@@ -234,6 +235,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   ctx.royaleGrande = recipe.mode === 'royale.grande';
   ctx.sandboxHunt = recipe.mode === 'sandbox' && recipe.sandbox?.objective === 'elimination';
   ctx.royaleClaims = ctx.royaleMode ? new RoyaleClaims() : null;
+  // M11 (fase 4): as armas no mapa (a sim só liga num mapa com pontos: o soldado ainda confere a `view.mapWeapons`).
+  ctx.mapWeapons = recipeWeaponPickups(recipe);
+  ctx.weaponClaims = ctx.mapWeapons ? new RoyaleClaims() : null;
   ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';
   // M7 (fase 3): o BoboStrike (o sorteio do site de cada rodada).
   ctx.strikeMode = recipe.mode === 'strike';

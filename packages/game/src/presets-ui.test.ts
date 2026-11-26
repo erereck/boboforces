@@ -30,6 +30,14 @@ describe('preset em texto', () => {
       'Todos contra todos · 8 bobos · Construto · Diretor ligado',
     );
     expect(presetLines(ffa).at(-1)).toBe('10 min');
+    // M11 (fase 4): as armas no mapa também (só num modo que aceita a regra).
+    const pickups = { ...ffa, weapons: { pickups: true } };
+    expect(presetSummary(pickups)).toBe('Todos contra todos · 8 bobos · Construto · Armas no mapa');
+    expect(presetLines(pickups).at(-1)).toBe('Armas no mapa');
+    expect(presetSummary({ ...pickups, infection: {} })).not.toContain('Armas no mapa');
+    // Revisão: só quando valem de verdade (sem primária permitida, ou num mapa sem pontos, a sim usa o loadout).
+    expect(presetSummary({ ...pickups, weapons: { pickups: true, allowed: ['pistol'] } })).not.toContain('Armas');
+    expect(presetLines({ ...pickups, map: 'island' })).not.toContain('Armas no mapa');
   });
 
   it('M9 (fase 3): o Cenário do Sandbox com 3 e 4 times: "3×3×2×2", e a duração pelo objetivo', () => {

@@ -572,6 +572,21 @@ const moonbase: MapScript = {
     spawns(b);
     cameras(b);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`), espelhadas em z = 40. As fortes no eixo: o foguete e a
+  // sniper nas passarelas de grade da estação (leste e oeste) e o lança-granadas no fundo da cratera (revisão: do lado
+  // de dentro, longe da casa do time 2 do Sandbox); os pares: a escopeta no átrio, a SMG na rota leste e a besta na
+  // rota oeste (o virote cai devagar na Lua).
+  weaponSpots: [
+    { id: 'c1', x: 50.5, y: 6, z: 40.5, weapon: 'rocket' },
+    { id: 'c2', x: 29.5, y: 6, z: 39.5, weapon: 'sniper' },
+    { id: 'c3', x: 17.5, y: 0.5, z: 39.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'a1', x: 40.5, y: 2, z: 46.5, weapon: 'shotgun' },
+    { id: 'b1', x: 40.5, y: 2, z: 33.5, weapon: 'shotgun' },
+    { id: 'a2', x: 71.5, y: 2, z: 49.5, weapon: 'smg' },
+    { id: 'b2', x: 71.5, y: 2, z: 30.5, weapon: 'smg' },
+    { id: 'a3', x: 12.5, y: 2, z: 59.5, weapon: 'sniper.crossbow' },
+    { id: 'b3', x: 12.5, y: 2, z: 20.5, weapon: 'sniper.crossbow' },
+  ],
 };
 
 export default moonbase;

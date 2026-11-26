@@ -54,6 +54,7 @@ conferidos de novo depois de cada junção.
      golden `02c04767`.
 4. **Os pickups de arma:** a regra na receita, o marcador de pontos no map@1 e nos mapas de TDM/FFA/Domination/Sandbox,
    o sistema na sim (pegar, trocar, voltar em 20 s), a IA que busca, o render, a opção na Personalizada; golden novo.
+   - **feita em 26/11** (ARCHITECTURE §22.4): 61 armas em 7 mapas, volta em 20 s; protocolo 14; golden `6df27838`.
 5. **O Royale Grande:** medir 48 participantes no PC; o mapa de ~400 m gerado por código; o modo (só PC, online só com
    host PC); a zona escalada; a IA; golden novo.
    - **feita em 26/11** (ARCHITECTURE §22.5, PERF §1s): 48 participantes no Arquipélago, só no PC; golden `64065dca`.

@@ -188,6 +188,45 @@ describe('Partida personalizada', () => {
   });
 });
 
+describe('M11 (fase 4): as armas no mapa na Partida personalizada', () => {
+  const LIMITS = { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 };
+
+  it('a 1ª linha da aba Armas: Livre ↔ No mapa (desligar tira o campo); vale nos Times, no FFA, no Domination e no Sandbox', () => {
+    expect(customRows('weapons', DEBUT_PRESET)[0]!.id).toBe('pickups');
+    expect(value('weapons', DEBUT_PRESET, 'pickups')).toBe('Livre');
+    const on = stepCustom('weapons', DEBUT_PRESET, 'pickups', 0, PC);
+    expect(on.weapons?.pickups).toBe(true);
+    expect(value('weapons', on, 'pickups')).toBe('No mapa');
+    const off = stepCustom('weapons', on, 'pickups', 1, PC);
+    expect(off.weapons).toEqual(DEBUT_PRESET.weapons ?? {});
+    // Revisão: ligada com "Só pistola" (nenhuma primária), a sim joga com o loadout: a linha diz que não vale.
+    const idle = stepCustom('weapons', on, 'allowed', -3, PC);
+    expect(value('weapons', idle, 'allowed')).toBe('Só pistola');
+    expect(idle.weapons?.pickups).toBe(true);
+    expect(value('weapons', idle, 'pickups')).toBe('No mapa (sem efeito)');
+    expect(value('weapons', stepCustom('weapons', idle, 'allowed', -1, PC), 'pickups')).toBe('No mapa');
+    // Em cada modo da Partida personalizada (menos o Zombies), a receita com a regra passa limpa no validador.
+    let r = on;
+    for (let i = 0; i < 5; i++) {
+      if (r.mode !== 'zombies') {
+        expect(
+          customRows('weapons', r).some((x) => x.id === 'pickups'),
+          r.mode,
+        ).toBe(true);
+        const checked = validateMatchRecipe(r, LIMITS);
+        expect(checked.ok && checked.value.weapons?.pickups, r.mode).toBe(true);
+        expect(checked.ok && checked.warnings, r.mode).toEqual([]);
+      } else {
+        // O Zombies tem as armas dele: a linha some e a regra sai da receita.
+        expect(customRows('weapons', r).some((x) => x.id === 'pickups')).toBe(false);
+        expect(r.weapons?.pickups).toBeUndefined();
+      }
+      r = stepCustom('match', r, 'mode', 1, PC);
+      if (r.mode !== 'zombies' && r.weapons?.pickups !== true) r = stepCustom('weapons', r, 'pickups', 0, PC);
+    }
+  });
+});
+
 describe('M3 (fase 6b): o Bobo Zombies na Partida personalizada', () => {
   const LIMITS = { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 };
   const toZombies = (r: MatchRecipe): MatchRecipe => {

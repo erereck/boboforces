@@ -193,6 +193,9 @@ export const ENTITY_GROUPS: readonly FieldGroup<SimView>[] = [
     name: 'royale',
     fields: [int('heals', 1, u(2), (v) => v.heals), int('healTicks', 1, u(10), (v) => v.healTicks)],
   },
+  // M11 (fase 4, revisão): as armas que cada um pode ter (a regra do bot e do time; as Ferramentas do Dono mudam no
+  // host): a dica da troca das armas no mapa e o radial da morte do amigo leem daqui.
+  { name: 'rules', fields: [int('weaponMask', 1, u(16), (v) => v.weaponMask)] },
 ];
 
 /** Quantos grupos de entidade são "quentes" (um bit cada, sempre). */

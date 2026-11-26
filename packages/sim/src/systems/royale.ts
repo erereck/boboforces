@@ -153,13 +153,13 @@ export function isRoyaleItem(kind: number): boolean {
     kind === PICKUP_KIND.armor50 ||
     kind === PICKUP_KIND.armor100 ||
     kind === PICKUP_KIND.heal ||
-    kind >= PICKUP_KIND.weaponBase
+    (kind >= PICKUP_KIND.weaponBase && kind < PICKUP_KIND.spotBase)
   );
 }
 
-/** A arma de um pickup do Royale (`WEAPON_NONE` se não for arma). */
+/** A arma de um pickup do Royale (`WEAPON_NONE` se não for arma). M11 (fase 4): o ponto vazio do mapa não é arma. */
 export function pickupWeapon(kind: number): number {
-  return kind >= PICKUP_KIND.weaponBase ? kind - PICKUP_KIND.weaponBase : WEAPON_NONE;
+  return kind >= PICKUP_KIND.weaponBase && kind < PICKUP_KIND.spotBase ? kind - PICKUP_KIND.weaponBase : WEAPON_NONE;
 }
 
 function living(ctx: SimContext, e: number): boolean {

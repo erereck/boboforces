@@ -112,6 +112,7 @@ import { meleeSystem } from './systems/melee.ts';
 import { projectileSystem } from './systems/projectiles.ts';
 import { movementSystem, moveOne } from './systems/movement.ts';
 import { pickupSystem } from './systems/pickups.ts';
+import { createMapWeapons, mapWeaponSystem, spawnMapWeapons, type MapWeaponSpotDef } from './systems/map-weapons.ts';
 import { unstuckSystem } from './systems/unstuck.ts';
 import { weaponSystem } from './systems/weapons.ts';
 import type { MatchPhase, MatchView, PickupView, ProjectileView, SimView } from './view.ts';
@@ -163,6 +164,8 @@ export interface SimMap {
   readonly controlPoints?: readonly ControlPointDef[];
   /** M7 (fase 6): os pontos de loot do Bobo Royale (o chão onde o item aparece). */
   readonly lootSpots?: readonly { readonly x: number; readonly y: number; readonly z: number }[];
+  /** M11 (fase 4): as armas no mapa (o chão e a arma pelo id do arsenal; a sim só usa com `weapons.pickups`). */
+  readonly weaponSpots?: readonly MapWeaponSpotDef[];
   /** M7 (fase 2): os sites do BoboStrike (o centro dos pés e o raio). */
   readonly bombSites?: readonly {
     readonly x: number;
@@ -680,6 +683,8 @@ export function createSim(config: SimConfig): Sim {
             teamsMask,
           }
         : null,
+    // M11 (fase 4): as armas no mapa (a regra ligada num modo que aceita e um mapa com pontos).
+    mapWeapons: createMapWeapons(recipe, map.weaponSpots ?? [], hz),
     rounds: strikeMode
       ? createRoundState({
           buyTicks: secondsToTicks(STRIKE.buyS, hz),
@@ -880,6 +885,8 @@ export function createSim(config: SimConfig): Sim {
     spawnRoyaleLoot(ctx);
     planZone(ctx);
   }
+  // M11 (fase 4): as armas no mapa já estão nos pontos no tick 0.
+  spawnMapWeapons(ctx);
   // M9 (fase 1b): a escala de cada corpo (os fixos da receita valem desde o tick 0).
   updateChaosScales(ctx);
   events.matchPhase(0, match.phase);
@@ -1003,6 +1010,15 @@ export function createSim(config: SimConfig): Sim {
     playArea: map.playArea ?? null,
     mods: ctx.mods,
     owner,
+    mapWeapons:
+      ctx.mapWeapons === null
+        ? null
+        : {
+            spots: ctx.mapWeapons.spots,
+            respawnTicks: ctx.mapWeapons.respawnTicks,
+            spotMask: ctx.mapWeapons.spotMask,
+          },
+    weaponMask: rules.weaponMask,
   };
   const syncView = (): void => {
     view.tick = ctx.tick;
@@ -1311,6 +1327,8 @@ export function createSim(config: SimConfig): Sim {
       signalSystem(ctx);
       projectileSystem(ctx);
       pickupSystem(ctx);
+      // M11 (fase 4): a troca pela arma do mapa no usar.
+      mapWeaponSystem(ctx);
       // M7 (fase 6): a zona do Royale (o dano dela vale neste tick).
       royaleZoneSystem(ctx);
       damageSystem(ctx);

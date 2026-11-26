@@ -53,6 +53,11 @@ export interface SurpriseRoll {
   /** Times e FFA: quantos por lado (ou bots no FFA) e a partida longa (10 min) ou curta (5). */
   readonly size: number;
   readonly long: boolean;
+  /**
+   * M11 (fase 4): as armas no mapa (só com as armas livres). Opcional: os códigos de antes não têm o campo (e o jogo de
+   * antes ignora o campo dos códigos novos, jogando com as armas livres).
+   */
+  readonly pickups?: boolean;
 }
 
 /** Os modos do sorteio, com o peso (os de festa aparecem menos que os Times). */
@@ -181,8 +186,11 @@ export function surpriseSize(roll: SurpriseRoll): number {
 /** Os modificadores que valem com a arma sorteada (com uma arma só, o "troca a arma no abate" não faz nada). */
 function activeMods(roll: SurpriseRoll): readonly ModifierId[] {
   if (!FREE_RULES.has(roll.mode)) return [];
+  // M11 (fase 4): com as armas no mapa, a troca por abate também não (a primária vem do chão).
   return roll.mods.filter(
-    (m) => !(roll.weapon !== '' && m === 'swapOnKill') && !(roll.weapon === 'knife' && m === 'infiniteAmmo'),
+    (m) =>
+      !((roll.weapon !== '' || roll.pickups === true) && m === 'swapOnKill') &&
+      !(roll.weapon === 'knife' && m === 'infiniteAmmo'),
   );
 }
 
@@ -193,6 +201,7 @@ export function surpriseRecipe(roll: SurpriseRoll): MatchRecipe {
   if (mapsOf(roll.mode).includes(roll.map)) recipe = { ...recipe, map: roll.map };
   if (FREE_RULES.has(roll.mode)) {
     if (roll.weapon !== '') recipe = { ...recipe, weapons: { ...recipe.weapons, allowed: [roll.weapon] } };
+    else if (roll.pickups === true) recipe = { ...recipe, weapons: { ...recipe.weapons, pickups: true } };
     const mods = activeMods(roll);
     if (mods.length > 0) recipe = { ...recipe, modifiers: [...mods] };
   }
@@ -241,7 +250,10 @@ export function rollSurprise(seed: number, prev: SurpriseRoll | null, locks: Rea
   // O tamanho e a duração andam com o modo (Times: 3 a 6 por lado; FFA: 5 a 9 bots).
   const size = keep('mode') ? prev!.size : mode === 'warfare.ffa' ? rng.int(5, 10) : rng.int(3, 7);
   const long = keep('mode') ? prev!.long : rng.chance(0.5);
-  return { mode, map, weapon, mods, level, stars, size, long };
+  // M11 (fase 4): as armas no mapa, só com as armas livres; sorteadas por último (as outras linhas de uma semente
+  // ficam como antes).
+  const pickups = keep('weapons') ? prev!.pickups === true : free && weapon === '' && rng.chance(0.25);
+  return { mode, map, weapon, mods, level, stars, size, long, ...(pickups ? { pickups } : {}) };
 }
 
 const EMPTY_ROLL: SurpriseRoll = {
@@ -283,7 +295,7 @@ export function surpriseLineText(roll: SurpriseRoll, line: SurpriseLine): string
     case 'weapons':
       return FREE_RULES.has(roll.mode)
         ? roll.weapon === ''
-          ? t('surprise.weaponsFree')
+          ? t(roll.pickups === true ? 'surprise.weaponsMap' : 'surprise.weaponsFree')
           : t('surprise.weaponOnly', { name: t(`weapon.${roll.weapon}` as StringKey) })
         : t('surprise.weaponsMode');
     case 'mods': {
@@ -355,7 +367,9 @@ export function surpriseFromCode(doc: unknown): SurpriseRoll | null {
     .slice(0, 2);
   const sizeRaw = typeof d['size'] === 'number' && Number.isFinite(d['size']) ? Math.round(d['size']) : 4;
   const size = mode === 'warfare.ffa' ? Math.min(9, Math.max(5, sizeRaw)) : Math.min(6, Math.max(3, sizeRaw));
-  return { mode, map, weapon, mods, level, stars, size, long: d['long'] === true };
+  // M11 (fase 4): as armas no mapa (os códigos de antes não têm o campo: as armas livres).
+  const pickups = d['pickups'] === true && weapon === '';
+  return { mode, map, weapon, mods, level, stars, size, long: d['long'] === true, ...(pickups ? { pickups } : {}) };
 }
 
 // --- a tela (no pedaço dos editores; o `game` só abre e recebe o "Jogar") ---

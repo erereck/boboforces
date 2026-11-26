@@ -305,6 +305,22 @@ const airbase: MapScript = {
     objectives(b);
     cameras(b);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`; só no TDM e no Sandbox). No chão das rotas (fora dos
+  // topos que a revisão dos poleiros mexe). As fortes no meio: o foguete ao lado da torre de controle, a sniper na rota
+  // oeste (do lado dos defensores) e o lança-granadas na leste (do lado dos atacantes), invertidos pelo meio do mapa e
+  // a 5 m ou mais da casa dos times 2 e 3 do Sandbox (no meio dessas rotas); os pares, também invertidos: a escopeta e o
+  // fuzil nas pontas das rotas (o hangar e o pátio de carga do lado dos defensores) e a SMG na rota do meio.
+  weaponSpots: [
+    { id: 'c1', x: 32.5, y: 1, z: 34.5, weapon: 'rocket' },
+    { id: 'c2', x: 7.5, y: 1, z: 26.5, weapon: 'sniper' },
+    { id: 'c3', x: 64.5, y: 1, z: 42.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'a1', x: 12.5, y: 1, z: 58.5, weapon: 'shotgun' },
+    { id: 'b1', x: 59.5, y: 1, z: 10.5, weapon: 'shotgun' },
+    { id: 'a2', x: 59.5, y: 1, z: 58.5, weapon: 'rifle' },
+    { id: 'b2', x: 12.5, y: 1, z: 10.5, weapon: 'rifle' },
+    { id: 'a3', x: 36.5, y: 1, z: 48.5, weapon: 'smg' },
+    { id: 'b3', x: 35.5, y: 1, z: 20.5, weapon: 'smg' },
+  ],
 };
 
 export default airbase;

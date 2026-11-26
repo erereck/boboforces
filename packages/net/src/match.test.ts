@@ -2,7 +2,15 @@ import { botPrimaries, createBotDirectorWithPaths } from '@boboforces/ai';
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
 import { BUTTON, FRAME_HUMAN, quantizeAxis, type InputFrame } from '@boboforces/input';
 import { yawToU16 } from '@boboforces/shared';
-import { createInputFrames, createSim, createSimLoop, ENTITY_FLAG, type Sim, type SimEvent } from '@boboforces/sim';
+import {
+  createInputFrames,
+  createSim,
+  createSimLoop,
+  ENTITY_FLAG,
+  PICKUP_KIND,
+  type Sim,
+  type SimEvent,
+} from '@boboforces/sim';
 import { buildSyntheticConstruto, TEST_NAV_PATHS } from '@boboforces/sim/testing';
 import { describe, expect, it } from 'vitest';
 import { createClientDriver, type ClientDriver } from './client.ts';
@@ -30,6 +38,23 @@ const recipe: MatchRecipe = {
 const arcadeRecipe: MatchRecipe = { ...recipe, modifiers: ['arcade'] };
 
 /**
+ * M11 (fase 4): a mesma partida com as armas no mapa (todo mundo nasce de pistola; os bots e os humanos do host e dos
+ * amigos pegam pelo host). O estado mora no pool de pickups: a arma, o ponto vazio e a volta chegam pelo snapshot.
+ */
+const pickupsRecipe: MatchRecipe = { ...recipe, weapons: { pickups: true } };
+const pickupsMap = {
+  ...map,
+  weaponSpots: [
+    { x: 20.25, y: 0.5, z: 40.25, weapon: 'shotgun' },
+    { x: 60.25, y: 0.5, z: 40.25, weapon: 'smg' },
+    { x: 40.25, y: 0.5, z: 22.25, weapon: 'rifle' },
+    { x: 40.25, y: 0.5, z: 58.25, weapon: 'rifle' },
+    { x: 30.25, y: 0.5, z: 30.25, weapon: 'rocket' },
+    { x: 50.25, y: 0.5, z: 50.25, weapon: 'sniper' },
+  ],
+};
+
+/**
  * Humano `slot` andando e atirando, igual em qualquer aparelho (depende só do seq). No Arcade, com a marca de quadro
  * de jogador (o mapeador liga) e um 2º toque no pulo no ar (o pulo duplo).
  */
@@ -47,8 +72,9 @@ function hostInner(
   recipe: MatchRecipe,
   writeHuman: (slot: number, out: InputFrame, seq: number) => void,
   onEvents: (events: readonly SimEvent[], sim: Sim) => void,
+  simMap: typeof map = map,
 ): NetMatchDriver & { sim: Sim } {
-  const sim = createSim({ recipe, map, humans: HUMANS, primaries: botPrimaries(recipe, HUMANS) });
+  const sim = createSim({ recipe, map: simMap, humans: HUMANS, primaries: botPrimaries(recipe, HUMANS) });
   const director = createBotDirectorWithPaths({ recipe, humans: HUMANS, hz: sim.hz }, TEST_NAV_PATHS);
   let seq = 0;
   const loop = createSimLoop({
@@ -83,13 +109,19 @@ const RATES = [
   { hz: 20, p99: 0.08, arcade: false },
   // M8 (fecho): o Arcade a 30 Hz (o estado dele no privado do snapshot e na predição).
   { hz: 30, p99: 0.05, arcade: true },
+  // M11 (fase 4): as armas no mapa a 30 Hz.
+  { hz: 30, p99: 0.05, arcade: false, pickups: true },
 ] as const;
 
 describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
   it.each(RATES)(
-    'host + 3 clientes com 80 ms, variação e 5% de perda, snapshots a $hz Hz (Arcade: $arcade): termina igual em todos',
-    ({ hz, p99: p99Max, arcade }) => {
-      const r = arcade ? arcadeRecipe : recipe;
+    'host + 3 clientes com 80 ms, variação e 5% de perda, snapshots a $hz Hz (Arcade: $arcade, armas no mapa: $pickups): termina igual em todos',
+    (rate) => {
+      const { hz, p99: p99Max, arcade } = rate;
+      const pickups = 'pickups' in rate && rate.pickups;
+      const r = arcade ? arcadeRecipe : pickups ? pickupsRecipe : recipe;
+      const simMap = pickups ? pickupsMap : map;
+      let taken = 0;
       const net = createLoopback({ seed: 9, latencyMs: 80, jitterMs: 25, loss: 0.05, duplicate: 0.01 });
       // O host é o peer 0 e joga no slot 0; os clientes 1..3 nos slots 1..3.
       let netHost: ReturnType<typeof createNetHost> | null = null;
@@ -106,7 +138,11 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
           else netHost!.writeRemoteFrame(slot, out);
         },
         (events, s) => {
-          for (const ev of events) if (ev.type === 'kill') hostKills.push(ev.victim);
+          for (const ev of events) {
+            if (ev.type === 'kill') hostKills.push(ev.victim);
+            // M11 (fase 4): as armas pegas no mapa (o ponto fica vazio).
+            if (ev.type === 'pickup' && ev.action === 'take' && ev.kind >= PICKUP_KIND.weaponBase) taken++;
+          }
           netHost!.recordEvents(events);
           // O histórico do host (a régua da interpolação): posição e "vivo e em pé" de cada boneco em cada tick.
           const v = s.view();
@@ -116,6 +152,7 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
             hostOk[s.tick * MAX_E + e] = v.alive[e] === 1 && (v.flags[e]! & ENTITY_FLAG.dead) === 0 ? 1 : 0;
           }
         },
+        simMap,
       );
       netHost = createNetHost({ sim: inner.sim, endpoint: net.endpoint(0), snapshotHz: hz });
       /** Os snapshots e as reconciliações de 30 s (a partida tem 40 s). */
@@ -130,7 +167,7 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
         clientKills.push(kills);
         clients.push(
           createClientDriver({
-            sim: createSim({ recipe: r, map, humans: HUMANS, primaries: botPrimaries(r, HUMANS) }),
+            sim: createSim({ recipe: r, map: simMap, humans: HUMANS, primaries: botPrimaries(r, HUMANS) }),
             endpoint: net.endpoint(slot),
             host: 0,
             writeLocalFrame: (out, seq) => play(slot, out, seq, arcade),
@@ -191,6 +228,8 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
       let kills = 0;
       for (let e = 0; e < h.count; e++) kills += h.kills[e]!;
       expect(kills).toBeGreaterThan(3);
+      // M11 (fase 4): pegaram armas do mapa (bots e humanos, pelo host).
+      if (pickups) expect(taken).toBeGreaterThan(3);
       for (const c of clients) {
         expect(c.state).toBe('playing');
         const v = c.sim.view();
@@ -199,6 +238,17 @@ describe('partida pelo loopback (M5 fase 1, critério 1 do plano)', () => {
         expect([...v.match.teamScore]).toEqual([...h.match.teamScore]);
         for (let e = 0; e < h.count; e++)
           expect([v.kills[e], v.deaths[e]], `entidade ${e}`).toEqual([h.kills[e], h.deaths[e]]);
+        // M11 (fase 4): o amigo vê as armas do mapa como o host (a arma, o ponto vazio e a volta) e as mesmas mãos.
+        if (pickups) {
+          expect(v.mapWeapons).not.toBeNull();
+          expect(v.pickups.count).toBe(h.pickups.count);
+          expect([...v.pickups.kind.subarray(0, h.pickups.count)]).toEqual([
+            ...h.pickups.kind.subarray(0, h.pickups.count),
+          ]);
+          expect([...v.loadout.subarray(0, h.count * 4)]).toEqual([...h.loadout.subarray(0, h.count * 4)]);
+          // Revisão: a máscara das armas também viaja (o grupo `rules`, protocolo 14).
+          expect([...v.weaponMask.subarray(0, h.count)]).toEqual([...h.weaponMask.subarray(0, h.count)]);
+        }
         // O último snapshot montado é, inteiro a inteiro, o que o host guardou.
         const mine = c.assembler.newest!;
         expect(framesEqual(mine, netHost.history.get(mine.tick)!)).toBe(true);

@@ -137,6 +137,12 @@ export function renderTopView(result: CompileResult): Uint8Array {
   for (const d of doc.markers.domination) disc(px(d.x), px(d.z), px(d.radius), 60, 230, 90, true);
   for (const d of doc.markers.bombSites ?? []) disc(px(d.x), px(d.z), px(d.radius), 240, 70, 60, true);
   for (const d of doc.markers.lootSpots ?? []) disc(px(d.x), px(d.z), 2, 250, 220, 60, false);
+  // M11 (fase 4): as armas no mapa (quadrado ciano com miolo preto).
+  for (const d of doc.markers.weaponSpots ?? []) {
+    rect(px(d.x) - 3, px(d.z) - 3, px(d.x) + 3, px(d.z) + 3, 0, 255, 255);
+    rect(px(d.x) - 2, px(d.z) - 2, px(d.x) + 2, px(d.z) + 2, 0, 255, 255);
+    disc(px(d.x), px(d.z), 1, 0, 0, 0);
+  }
   for (const s of doc.markers.spawns) {
     const col: [number, number, number] =
       s.team === 0 ? [255, 140, 0] : s.team === 1 ? [40, 120, 255] : [255, 255, 255];

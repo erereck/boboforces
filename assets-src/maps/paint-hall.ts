@@ -484,6 +484,23 @@ const paintHall: MapScript = {
     center(b);
     cameras(b);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`; no TDM e no Sandbox), espelhadas em z = 62 (mundo). As
+  // fortes na linha do meio: o foguete do lado oeste da torre do juiz, a escopeta automática do lado leste (revisão:
+  // saiu da casa do compressor, onde cai a casa do time 2 do Sandbox) e o lança-granadas em cima do contêiner do
+  // leste; os pares: a sniper na passarela oeste, a metralhadora e a SMG no campo e o fuzil na parede leste.
+  weaponSpots: [
+    { id: 'c1', x: 31.5, y: 1, z: 61.5, weapon: 'rocket' },
+    { id: 'c2', x: 56.5, y: 4, z: 61.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'c3', x: 43.5, y: 1, z: 61.5, weapon: 'shotgun.auto' },
+    { id: 'a1', x: 5.5, y: 4, z: 45.5, weapon: 'sniper' },
+    { id: 'b1', x: 5.5, y: 4, z: 78.5, weapon: 'sniper' },
+    { id: 'a2', x: 24.5, y: 1, z: 43.5, weapon: 'lmg' },
+    { id: 'b2', x: 24.5, y: 1, z: 80.5, weapon: 'lmg' },
+    { id: 'a3', x: 44.5, y: 1, z: 45.5, weapon: 'smg' },
+    { id: 'b3', x: 44.5, y: 1, z: 78.5, weapon: 'smg' },
+    { id: 'a4', x: 66.5, y: 1, z: 38.5, weapon: 'rifle' },
+    { id: 'b4', x: 66.5, y: 1, z: 85.5, weapon: 'rifle' },
+  ],
 };
 
 export default paintHall;

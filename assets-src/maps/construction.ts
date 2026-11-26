@@ -667,6 +667,21 @@ const construction: MapScript = {
     for (const k of [north, north.mirror()]) spawns(k);
     cameras(north);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`), espelhadas em z (a do time A no sul). As fortes no eixo:
+  // o foguete no 1º andar do prédio, a sniper no 2º e o lança-granadas na rota oeste (revisão: fora da beira, onde cai
+  // a casa do time 2 do Sandbox); os pares: o fuzil na rota oeste, a escopeta automática na leste e a SMG no pátio da
+  // frente do prédio.
+  weaponSpots: [
+    { id: 'c1', x: 37.5, y: 4, z: 43.5, weapon: 'rocket' },
+    { id: 'c2', x: 47.5, y: 7, z: 43.5, weapon: 'sniper' },
+    { id: 'c3', x: 19.5, y: 1, z: 44.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'a1', x: 8.5, y: 1, z: 70.5, weapon: 'rifle' },
+    { id: 'b1', x: 8.5, y: 1, z: 17.5, weapon: 'rifle' },
+    { id: 'a2', x: 71.5, y: 1, z: 69.5, weapon: 'shotgun.auto' },
+    { id: 'b2', x: 71.5, y: 1, z: 18.5, weapon: 'shotgun.auto' },
+    { id: 'a3', x: 40.5, y: 1, z: 58.5, weapon: 'smg' },
+    { id: 'b3', x: 40.5, y: 1, z: 29.5, weapon: 'smg' },
+  ],
 };
 
 export default construction;

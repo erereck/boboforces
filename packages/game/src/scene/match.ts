@@ -166,6 +166,8 @@ import {
   CIRCLE,
   ZONE,
   pickupWeapon,
+  mapWeaponsDropPrimary,
+  weaponMaskBit,
   ZOMBIE_BARRICADES,
   ZOMBIE_BOX,
   ZOMBIE_PERKS,
@@ -243,6 +245,7 @@ import { CELLS_PER_METER, isCellSolid, sampleLightGrid } from '@boboforces/world
 import { soloViewMode } from '../maps.ts';
 import { seatRecipe, type LocalSeat } from './seats.ts';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
+import { switchedSlot } from './switch-slot.ts';
 import { approachScale, cameraInsideBody } from './body-scale.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
 import {
@@ -2240,12 +2243,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         case 'weapon': {
           const i = entityIndex(ev.entity);
           if (i >= reloadStart.length) break;
-          // A sim trocou de slot sozinha (acabou a granada): o mapeador do humano passa a pedir o slot da mão.
+          // A sim pôs uma arma na mão (acabou a granada, a arma do mapa, o loot, a compra): o mapeador do humano passa a
+          // pedir o slot dela. M11 (fase 4, revisão): o evento traz o código da arma, não o slot (`switchedSlot`); um
+          // 2º laço mandava o código direto ao mapeador e a mão ia para a faca ou a granada.
           if (ev.action === 'switch') {
+            const slot = switchedSlot(ev.weapon, v.slot[i]!);
             for (let k = 0; k < seatCtrl.length; k++) {
               const h = seatCtrl[k]!;
               const m = mapperOf(h);
-              if (m !== null && ev.entity === s.controllerEntity(h) && m.weapon !== v.slot[i]) m.setWeapon(v.slot[i]!);
+              if (m !== null && ev.entity === s.controllerEntity(h) && m.weapon !== slot) m.setWeapon(slot);
             }
           }
           if (ev.action === 'reloadStart') {
@@ -2254,12 +2260,6 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             reloadDur[i] = def ? (def.reloadPerRoundS > 0 ? def.reloadPerRoundS : def.reloadS) : 2;
           } else if (ev.action === 'reloadEnd') {
             reloadStart[i] = -1;
-          } else if (ev.action === 'switch') {
-            for (let k = 0; k < seatCtrl.length; k++) {
-              const h = seatCtrl[k]!;
-              const m = mapperOf(h);
-              if (m !== null && ev.entity === s.controllerEntity(h)) m.setWeapon(ev.weapon);
-            }
           }
           break;
         }
@@ -2468,6 +2468,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     request.online ?? null,
   );
   const sim = driver.sim;
+  /**
+   * M11 (fase 4): as armas no mapa (a regra ligada e o mapa com pontos; a mesma conta no amigo online): sem o radial
+   * da morte (todo mundo nasce sem a primária) e com a dica da troca.
+   */
+  const mapWeapons = sim.view().mapWeapons !== null;
   {
     const v = sim.view();
     ensureCapacity(v.capacity);
@@ -4665,6 +4670,23 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const z = pv.position[o + 2]!;
       // M3 (fase 4d): os drops do Zombies flutuam, giram mais rápido e brilham (o modelo pelo tipo).
       const kind = pv.kind[i]!;
+      // M11 (fase 4): o ponto vazio da arma no mapa: o contorno de giz deitado no chão (pisca nos 3 s antes da volta).
+      if (kind >= PICKUP_KIND.spotBase) {
+        if (chalkModel === NO_MODEL) continue;
+        projectiles.model[n] = chalkModel;
+        projectiles.position[n * 3] = x;
+        projectiles.position[n * 3 + 1] = y + 0.03;
+        projectiles.position[n * 3 + 2] = z;
+        projectiles.yaw[n] = i * 1.7;
+        projectiles.pitch[n] = -Math.PI / 2;
+        projectiles.roll[n] = 0;
+        sampleLightGrid(loaded.lightGrid, x, y + 0.3, z, lightScratch, 0);
+        projectiles.light[n * 3] = Math.min(1.4, lightScratch[0]! * 1.3 + 0.3);
+        projectiles.light[n * 3 + 1] = Math.min(1.4, lightScratch[1]! * 1.3 + 0.3);
+        projectiles.light[n * 3 + 2] = Math.min(1.4, lightScratch[2]! * 1.3 + 0.3);
+        n++;
+        continue;
+      }
       const drop = kind !== PICKUP_KIND.ammoBox;
       // M7 (fase 8): os itens do Royale (a arma pelo modelo dela, o colete, o kit); a arma rara e a épica brilham mais.
       const royaleItem = kind >= PICKUP_KIND.armor50;
@@ -5320,6 +5342,24 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.interactName = slot.royaleSwapText;
       }
     }
+  }
+
+  /**
+   * M11 (fase 4): a dica da troca das armas no mapa: a arma do chão ao alcance, outra que a primária de agora (a igual
+   * entra passando por cima) e que ele pode ter (a regra de armas; o Jugg não pega), como a troca do Royale.
+   */
+  function fillMapWeaponHud(m: HudModel, v: SimView, e: number, slot: ViewSlot): void {
+    const primary = v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.primary]!;
+    if (primary === WEAPON_NONE || v.cookTicks[e]! >= 0 || (juggernaut && v.team[e] === 1)) return;
+    const code = swapWeaponNear(v, e);
+    const mask = v.weaponMask[e]!;
+    if (code === WEAPON_NONE || code === primary || (mask !== 0 && (mask & weaponMaskBit(code)) === 0)) return;
+    if (code !== slot.royaleSwapCode) {
+      slot.royaleSwapCode = code;
+      slot.royaleSwapText = t('hud.royale.swap' as StringKey, { name: weaponNames[code] ?? '' }).toUpperCase();
+    }
+    m.interact = HUD_INTERACT.text;
+    m.interactName = slot.royaleSwapText;
   }
 
   /** M7 (fase 8): a arma do chão que a sim trocaria agora pelo usar de `e` (a mais perto ao alcance), ou nenhuma. */
@@ -6006,6 +6046,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     m.buyTitle = '';
     if (strikeMode) fillStrikeHud(m, v, e, slot);
     if (royaleMode) fillRoyaleHud(m, v, e, slot);
+    if (mapWeapons && !m.dead) fillMapWeaponHud(m, v, e, slot);
     const mo = v.mapObjects;
     if (zombiesMode && mo !== null && !m.dead && m.downed === HUD_DOWNED.none) {
       const x = v.position[e * 3]!;
@@ -6319,8 +6360,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       // M7 (fase 4): no BoboStrike a arma se compra (sem o radial da morte).
       // M9 (fase 3b): na eliminação do Sandbox também não (ninguém volta); e só as armas que o time pode pegar.
       const ct = choicesOf(v.team[e]!);
+      // M11 (fase 4): com as armas no mapa também não (a primária está no chão). Revisão: a não ser para quem a regra de
+      // armas deixa com o loadout de sempre (a mesma conta da sim).
       const radial =
-        human && !fixedLoadout && !strikeMode && !royaleMode && !sandboxElimination && teamChoices[ct]!.length > 1;
+        human &&
+        !fixedLoadout &&
+        !(mapWeapons && mapWeaponsDropPrimary(v.weaponMask[e]!, v.mapWeapons!.spotMask)) &&
+        !strikeMode &&
+        !royaleMode &&
+        !sandboxElimination &&
+        teamChoices[ct]!.length > 1;
       m.primaryNames = radial ? teamChoiceNames[ct]! : NO_PRIMARIES;
       m.primaryCategories = radial ? teamChoiceCategories[ct]! : NO_PRIMARIES;
       m.primarySelected = radial ? Math.max(0, teamChoices[ct]!.indexOf(seatPrimary[seatNum[seat]!]!)) : 0;

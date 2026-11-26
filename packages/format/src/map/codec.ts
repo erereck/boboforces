@@ -23,6 +23,7 @@ import {
   type MapMarkers,
   type MapMeta,
   type MapPointMarker,
+  type MapWeaponSpotMarker,
   type MapProp,
   type MapRoutePoint,
   type MapSpawnMarker,
@@ -116,6 +117,10 @@ function normalizeMarkers(m: MapMarkers): MapMarkers {
       : {}),
     ...(m.lootSpots && m.lootSpots.length > 0
       ? { lootSpots: m.lootSpots.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, radius: d.radius })) }
+      : {}),
+    // M11 (fase 4): as armas no mapa (opcional: os mapas sem nenhuma ficam com os mesmos bytes).
+    ...(m.weaponSpots && m.weaponSpots.length > 0
+      ? { weaponSpots: m.weaponSpots.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, weapon: d.weapon })) }
       : {}),
     cameras: m.cameras.map((c) => ({
       name: c.name,
@@ -705,12 +710,28 @@ function parseMarkers(json: Json): MapMarkers {
             radius: num(d['radius'], p),
           };
         });
+  // M11 (fase 4): as armas no mapa (opcional).
+  const weaponSpots =
+    m['weaponSpots'] === undefined
+      ? []
+      : arr(m['weaponSpots'], 'weaponSpots').map((v, i): MapWeaponSpotMarker => {
+          const d = obj(v, `weaponSpots[${i}]`);
+          const p = `weaponSpots[${i}]`;
+          return {
+            id: str(d['id'], p),
+            x: num(d['x'], p),
+            y: num(d['y'], p),
+            z: num(d['z'], p),
+            weapon: str(d['weapon'], p),
+          };
+        });
   const a = obj(m['playArea'], 'playArea');
   return {
     spawns,
     domination,
     ...(bombSites.length > 0 ? { bombSites } : {}),
     ...(lootSpots.length > 0 ? { lootSpots } : {}),
+    ...(weaponSpots.length > 0 ? { weaponSpots } : {}),
     cameras,
     routes,
     mannequins,

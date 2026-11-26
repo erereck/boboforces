@@ -16,6 +16,7 @@ import {
   HORDE,
   JUGG_FIXED,
   JUGGERNAUT,
+  MAP_WEAPONS,
   MATCH_DEFAULTS,
   METRICS,
   MOVEMENT_BOBO,
@@ -55,8 +56,9 @@ import {
  * Protocolo do online (M5, tecnico.md §13). Sobe 1 a cada mudança no formato das mensagens; o handshake recusa
  * versões diferentes (quem está na mais antiga atualiza). M9 (fase 5): 12, o começo leva a opção do dono (`owner`).
  * M10 (fase 7): 13, o evento `projectile` ganhou a ação `stick` (o virote da besta cravado; o campo passa a 2 bits).
+ * M11 (fase 4, revisão): 14, o grupo de entidade `rules` (a máscara das armas de cada um, que o dono muda no host).
  */
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 14;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;
@@ -150,6 +152,9 @@ export const SIM_CONTENT_TABLES: readonly unknown[] = [
   ROYALE_WEAPONS,
   // M10 (fases 6 e 7): as armas novas (DMR, revólver, escopeta automática, besta e lança-granadas).
   WEAPONS_M10,
+  // M11 (fase 4): as armas no mapa (a volta da arma e o alcance da troca; o jogo de antes não sabe desenhar o ponto
+  // vazio nem tira o radial: o hash recusa a mistura, sem mexer no formato da rede).
+  MAP_WEAPONS,
 ];
 
 /** Hash do conteúdo que mexe na sim (FNV-1a do JSON das tabelas, na ordem fixa). Uma vez por partida. */

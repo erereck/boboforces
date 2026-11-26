@@ -149,6 +149,18 @@ export interface MapPointMarker {
 }
 
 /**
+ * M11 (fase 4): ponto de arma no mapa (a regra `weapons.pickups`, GDD §4.4): id, o chão onde a arma aparece (metros) e
+ * a arma (id do arsenal sem prefixo, uma primária: `sniper`, `rocket.grenade-launcher`…).
+ */
+export interface MapWeaponSpotMarker {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly weapon: string;
+}
+
+/**
  * Câmera NOMEADA (prints, bench, Aquário). Posição do olho em metros, yaw/pitch em radianos, FOV vertical em graus
  * (`fovYDeg` 0 = o padrão do jogo).
  */
@@ -280,6 +292,8 @@ export interface MapMarkers {
   readonly bombSites?: readonly MapPointMarker[];
   /** M7 (fase 5): os pontos de loot do Bobo Royale (id, o chão onde o item aparece e um raio; opcional). */
   readonly lootSpots?: readonly MapPointMarker[];
+  /** M11 (fase 4): os pontos das armas no mapa (opcional: os mapas sem nenhum têm os mesmos bytes de antes). */
+  readonly weaponSpots?: readonly MapWeaponSpotMarker[];
   /** Área jogável (metros): fora dela, em X/Z, é parede invisível; abaixo de `killPlaneY` morre. */
   readonly playArea: {
     readonly minX: number;

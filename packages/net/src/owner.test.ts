@@ -44,8 +44,8 @@ const tdm: MatchRecipe = {
 };
 
 describe('as Ferramentas do Dono e o online (a opção no começo)', () => {
-  it('o protocolo é o 13 (M10) e o começo leva a reserva (fora da faixa, conta como ausente)', () => {
-    expect(PROTOCOL_VERSION).toBe(13);
+  it('o protocolo é o 14 (M11) e o começo leva a reserva (fora da faixa, conta como ausente)', () => {
+    expect(PROTOCOL_VERSION).toBe(14);
     const start = { recipe: tdm, seed: 3, members: [{ slot: 0, name: 'Erick', team: 0, ready: true, controller: 0 }] };
     const round = (owner: unknown) =>
       parseLobbyStart(decodeLobbyPayload(encodeLobbyMessage(LOBBY_MSG.start, { ...start, owner })));
@@ -257,6 +257,9 @@ describe('as Ferramentas do Dono pela rede de mentira (M9 fase 5)', () => {
     expect(reserve).toEqual([false, false, true, true]);
     expect([h.team[e(BOT(6))], h.team[e(BOT(7))]]).toEqual([2, 0]);
     expect(h.chaos!.masks[0]! & (MOD.mini | MOD.lowGravity)).toBe(MOD.lowGravity);
+    // M11 (fase 4, revisão): o `setTeam` levou o bot para o time 2 (só escopeta, pistola e faca): a máscara das armas
+    // mudou no host, depois da criação.
+    expect(h.weaponMask[e(BOT(2))]).not.toBe(0);
     for (const c of clients) {
       expect(c.state).toBe('playing');
       const mine = c.assembler.newest!;
@@ -273,6 +276,9 @@ describe('as Ferramentas do Dono pela rede de mentira (M9 fase 5)', () => {
       }
       expect(v.chaos!.masks[0]).toBe(h.chaos!.masks[0]);
       expect([...v.match.teamScore]).toEqual([...h.match.teamScore]);
+      // M11 (fase 4, revisão): e a máscara das armas (o grupo `rules`, protocolo 14): a dica da troca e o radial leem
+      // daqui.
+      expect([...v.weaponMask.subarray(0, h.count)]).toEqual([...h.weaponMask.subarray(0, h.count)]);
     }
     host.dispose();
     for (const c of clients) c.dispose();

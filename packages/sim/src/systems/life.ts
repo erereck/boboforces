@@ -5,6 +5,7 @@ import { paintDamage, paintLoadout } from './paintball.ts';
 import { strikeArmor, strikeKill } from './strike.ts';
 import { ROYALE, ROYALE_UNDECIDED, royaleDrops, royaleLoadout, ZONE } from './royale.ts';
 import { SANDBOX_UNDECIDED, sandboxLeader, sandboxSurvivor } from './sandbox.ts';
+import { mapWeaponLoadout } from './map-weapons.ts';
 import type { FigurePart } from '@boboforces/format';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { METRICS } from '../config/metrics.ts';
@@ -958,6 +959,8 @@ export function respawn(ctx: SimContext, e: number, index: number): void {
   if (ctx.paintHits > 0 && !partyActive(ctx.party)) paintLoadout(ctx, e);
   // M7 (fase 6): o Royale começa só com a pistola.
   if (ctx.royale !== null && !zombie) royaleLoadout(ctx, e);
+  // M11 (fase 4): com as armas no mapa, sem a primária (ela está no chão).
+  if (ctx.mapWeapons !== null && !zombie) mapWeaponLoadout(ctx, e);
   s.cookTicks[e] = -1;
   s.quickNade[e] = 0;
   s.adsAmount[e] = 0;

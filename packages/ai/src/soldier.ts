@@ -66,6 +66,7 @@ import {
   royaleWander,
   weaponForSwap,
 } from './royale.ts';
+import { mapWeaponObjective } from './map-weapons.ts';
 import { createSteer, PathFollower } from './paths.ts';
 import {
   CAMP_PHASE,
@@ -2066,6 +2067,26 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
         b.objZ = royaleGoal.z;
         b.objReach = royaleGoal.reach;
       }
+    }
+  }
+  // M11 (fase 4): as armas no mapa: só com a pistola (ou quase sem munição), vai à arma que mais vale por perto (com
+  // inimigo perto à vista, briga antes); anda e troca pelo passo do Royale. A rota que falhou larga a arma um tempo.
+  if (c.mapWeapons && view.mapWeapons !== null && b.royaleAct === ROYALE_ACT.none && b.reviveTarget < 0) {
+    if ((prevRoyale === ROYALE_ACT.loot || prevRoyale === ROYALE_ACT.swap) && b.follower.failed) {
+      b.royaleBlockUntil = tick + t.wander;
+    }
+    const enemy = b.targetVisible ? b.target : -1;
+    const enemyM = enemy >= 0 ? targetDistance(view, e, enemy) : Infinity;
+    // Revisão: ferido agora há pouco (`alertUntil`), revida em vez de seguir andando (como o `royaleEngage`).
+    const hurt = tick < b.alertUntil;
+    if (tick >= b.royaleBlockUntil && mapWeaponObjective(c, e, c.weaponClaims!, prevItem, enemy, enemyM, hurt)) {
+      b.royaleAct = royaleGoal.act;
+      b.royaleItem = royaleGoal.item;
+      royaleClaim(c, c.weaponClaims!, e, royaleGoal.item);
+      b.objX = royaleGoal.x;
+      b.objY = royaleGoal.y;
+      b.objZ = royaleGoal.z;
+      b.objReach = royaleGoal.reach;
     }
   }
   if (b.royaleAct === ROYALE_ACT.none) b.royaleItem = -1;

@@ -11,6 +11,7 @@ import { NULL_ENTITY } from '../entity.ts';
 import { isHorde, PART_TORSO, WEAPON_NUKE } from '../context.ts';
 import { FIGURE_BONE } from '@boboforces/format';
 import { isRoyaleItem, royaleTake } from './royale.ts';
+import { mapWeaponCountdown, mapWeaponTouch } from './map-weapons.ts';
 
 /**
  * M2 (fase 2b): a caixinha de munição do Bobo Warfare (gameplay.md §4.1). Quem morre deixa uma nos pés; ela salta um
@@ -83,6 +84,11 @@ export function pickupSystem(ctx: SimContext): void {
     s.pickPrevPosition[i3] = s.pickPosition[i3]!;
     s.pickPrevPosition[i3 + 1] = s.pickPosition[i3 + 1]!;
     s.pickPrevPosition[i3 + 2] = s.pickPosition[i3 + 2]!;
+    // M11 (fase 4): o ponto vazio da arma no mapa só conta a volta (não cai nem se pega).
+    if (s.pickKind[i]! >= PICKUP_KIND.spotBase) {
+      mapWeaponCountdown(ctx, i);
+      continue;
+    }
     // M7 (fase 6): os itens do Royale não somem (o `pickTicks` deles guarda a munição da arma).
     if (!isRoyaleItem(s.pickKind[i]!)) {
       s.pickTicks[i] = s.pickTicks[i]! - 1;
@@ -125,6 +131,11 @@ export function pickupSystem(ctx: SimContext): void {
         if (ctx.royale !== null && (s.flags[e]! & F.downed) !== 0) continue;
         if (!refill(ctx, e)) continue;
       } else if (isRoyaleItem(kind)) {
+        // M11 (fase 4): a arma no mapa: pegou, o ponto fica vazio (o mesmo pickup, contando a volta).
+        if (ctx.mapWeapons !== null) {
+          if (mapWeaponTouch(ctx, e, i, kind)) break;
+          continue;
+        }
         // M7 (fase 6): o item do Royale: quem pega precisa estar de pé (e querer: o colete melhor, o kit até o teto, a
         // arma com a primária vazia).
         if ((s.flags[e]! & F.downed) !== 0 || !royaleTake(ctx, e, i, kind)) continue;

@@ -601,6 +601,21 @@ const port: MapScript = {
     points(b);
     cameras(b);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`), espelhadas em x = 48. As fortes no eixo: o lança-
+  // granadas na praça do guindaste (revisão: saiu do canal do ponto A, onde cai a casa do time 3 do Sandbox), o foguete
+  // na plataforma do ponto B e a sniper no alto do bloco CS (a rua); os pares: o fuzil no cais, a metralhadora na
+  // passarela da trilha de cima e a SMG na rua.
+  weaponSpots: [
+    { id: 'c1', x: 47.5, y: 7, z: 47.5, weapon: 'rocket' },
+    { id: 'c2', x: 47.5, y: 7, z: 69.5, weapon: 'sniper' },
+    { id: 'c3', x: 48.5, y: 4.5, z: 41.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'a1', x: 23.5, y: 4.5, z: 16.5, weapon: 'rifle' },
+    { id: 'b1', x: 72.5, y: 4.5, z: 16.5, weapon: 'rifle' },
+    { id: 'a2', x: 28.5, y: 7, z: 47.5, weapon: 'lmg' },
+    { id: 'b2', x: 67.5, y: 7, z: 47.5, weapon: 'lmg' },
+    { id: 'a3', x: 27.5, y: 4.5, z: 61.5, weapon: 'smg' },
+    { id: 'b3', x: 68.5, y: 4.5, z: 61.5, weapon: 'smg' },
+  ],
 };
 
 export default port;

@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { DEBUT_PRESET, decodeMap } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import { customRows, stepCustom } from './custom-match.ts';
-import { MAP_MODES, mapBotCap, mapForMode, mapGravity, mapsForMode, MENU_MAPS } from './maps.ts';
+import { ARSENAL, createSim, isPrimaryWeapon } from '@boboforces/sim';
+import { buildSyntheticConstruto } from '@boboforces/sim/testing';
+import {
+  MAP_MODES,
+  MAP_WEAPON_SPOTS,
+  mapBotCap,
+  mapForMode,
+  mapGravity,
+  mapsForMode,
+  mapWeaponsInEffect,
+  MENU_MAPS,
+} from './maps.ts';
 import { quickFromPreset, quickToPreset, quickValue, stepQuick } from './quick-match.ts';
 
 /** M2, fase 5c: os mapas dos menus (Construto e Ringue) e os modos de cada um. */
@@ -19,6 +30,8 @@ describe('mapas dos menus', () => {
       expect([...map.meta.modes].sort(), id).toEqual([...MAP_MODES[id]].sort());
       // M10 (fase 4, revisão): a gravidade de série também.
       expect(map.meta.gravity ?? 1, id).toBe(mapGravity(id));
+      // M11 (fase 4, revisão): e se o mapa tem armas no mapa.
+      expect((map.markers.weaponSpots ?? []).length > 0, id).toBe(MAP_WEAPON_SPOTS.has(id));
     }
     expect(mapsForMode('warfare.ffa')).toEqual(['construto', 'construction', 'port', 'moonbase']);
     expect(mapsForMode('royale.mini')).toEqual(['island']);
@@ -41,6 +54,32 @@ describe('mapas dos menus', () => {
     expect(value('mods', arcade, 'arcade')).toBe(value('mods', DEBUT_PRESET, 'arcade'));
     expect(value('mods', moon, 'lowGravity')).not.toBe(value('mods', DEBUT_PRESET, 'lowGravity'));
     expect(value('players', arcade, 'movement')).toBe(value('players', DEBUT_PRESET, 'movement'));
+  });
+
+  it('M11 (fase 4, revisão): as armas no mapa valem de verdade com a mesma conta da sim', () => {
+    const base = { ...DEBUT_PRESET, mode: 'warfare.tdm', map: 'port', weapons: { pickups: true } } as const;
+    expect(mapWeaponsInEffect(base)).toBe(true);
+    // Um mapa sem pontos, ou só armas permitidas que não são primária: a sim joga com o loadout de sempre.
+    expect(mapWeaponsInEffect({ ...base, map: 'island' })).toBe(false);
+    for (const only of ['pistol', 'pistol.revolver', 'knife', 'grenade']) {
+      expect(mapWeaponsInEffect({ ...base, weapons: { pickups: true, allowed: [only] } }), only).toBe(false);
+    }
+    // A conta da categoria (o prefixo do id) bate com a da sim em todo o arsenal.
+    for (const w of ARSENAL) {
+      expect(mapWeaponsInEffect({ ...base, weapons: { pickups: true, allowed: [w.id] } }), w.id).toBe(
+        isPrimaryWeapon(w.code),
+      );
+      const sim = createSim({
+        recipe: { ...base, weapons: { pickups: true, allowed: [w.id] } },
+        map: {
+          ...buildSyntheticConstruto().map,
+          weaponSpots: [{ x: 40, y: 0.5, z: 40, weapon: 'rifle' }],
+        },
+        humans: 0,
+      });
+      expect(sim.view().mapWeapons !== null, w.id).toBe(isPrimaryWeapon(w.code));
+      sim.dispose();
+    }
   });
 
   it('a Ilha Tropical (M7, fases 5 e 6): 200 m, pontos de loot e as largadas sem time', () => {

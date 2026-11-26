@@ -1,4 +1,4 @@
-import { selectPlatformProfile, type MatchRecipe, type PlatformFamily } from '@boboforces/format';
+import { recipeWeaponPickups, selectPlatformProfile, type MatchRecipe, type PlatformFamily } from '@boboforces/format';
 import { t, type StringKey } from '@boboforces/ui';
 
 /**
@@ -83,6 +83,34 @@ export const MAP_GRAVITY: Readonly<Partial<Record<MenuMap, number>>> = { moonbas
 
 export function mapGravity(map: string): number {
   return MAP_GRAVITY[map as MenuMap] ?? 1;
+}
+
+/**
+ * M11 (fase 4, revisão): os mapas com armas no mapa (os `weaponSpots` do `.bfmap`, conferidos no teste: o menu não
+ * carrega mapa).
+ */
+export const MAP_WEAPON_SPOTS: ReadonlySet<string> = new Set<MenuMap>([
+  'construto',
+  'ringue',
+  'airbase',
+  'construction',
+  'port',
+  'moonbase',
+  'paint-hall',
+]);
+
+/** As categorias de arma que não são primária (o prefixo do id antes do ponto; conferido contra o arsenal no teste). */
+const NOT_PRIMARY: readonly string[] = ['pistol', 'knife', 'grenade'];
+
+/**
+ * M11 (fase 4, revisão): as armas no mapa valem de verdade na receita? A regra ligada num modo que aceita, num mapa com
+ * pontos e com alguma primária entre as armas permitidas da partida: a mesma conta da sim, que senão joga com o
+ * loadout de sempre (o resumo, o card e a linha "Primária" mostram o que vale).
+ */
+export function mapWeaponsInEffect(recipe: MatchRecipe): boolean {
+  if (!recipeWeaponPickups(recipe) || !MAP_WEAPON_SPOTS.has(recipe.map)) return false;
+  const allowed = recipe.weapons?.allowed ?? [];
+  return allowed.length === 0 || allowed.some((id) => !NOT_PRIMARY.includes(id.split('.')[0]!));
 }
 
 /**

@@ -141,6 +141,38 @@ export interface WeaponRules {
    * escada.
    */
   readonly ladder?: readonly string[];
+  /**
+   * M11 (fase 4): as armas no mapa (GDD §4.3.2 e §4.4, estilo arena): todo mundo nasce sem a primária (pistola, faca e
+   * granadas) e pega as armas nos `weaponSpots` do mapa; a arma pega volta ao ponto 20 s depois. Só nos modos de
+   * `WEAPON_PICKUP_MODES`, sem a escada e sem o Infection (fora disso, o validador tira com aviso). Ausente = o loadout.
+   */
+  readonly pickups?: boolean;
+}
+
+/**
+ * M11 (fase 4): os modos que aceitam as armas no mapa: os de loadout livre e respawn (os Times, o FFA, o Domination, o
+ * Sandbox e o Juggernaut, onde só os caçadores pegam). O Bobo Zombies, o Royale, o BoboStrike e o Paintball têm as
+ * armas deles; o Gun Game (a escada) e o Infection (o sobrevivente aguenta com o que tem) também ficam de fora.
+ */
+export const WEAPON_PICKUP_MODES: readonly string[] = [
+  'warfare.tdm',
+  'warfare.ffa',
+  'warfare.domination',
+  'sandbox',
+  'juggernaut',
+];
+
+/** M11 (fase 4): a regra das armas no mapa cabe no modo da receita (sem a escada e sem o Infection)? */
+export function weaponPickupsFit(mode: string, ladder: boolean, infection: boolean): boolean {
+  return WEAPON_PICKUP_MODES.includes(mode) && !ladder && !infection;
+}
+
+/** M11 (fase 4): a receita joga com as armas no mapa (a regra ligada e num modo que aceita)? */
+export function recipeWeaponPickups(recipe: MatchRecipe): boolean {
+  const w = recipe.weapons;
+  return (
+    w?.pickups === true && weaponPickupsFit(recipe.mode, (w.ladder?.length ?? 0) > 0, recipe.infection !== undefined)
+  );
 }
 
 /**
@@ -470,6 +502,7 @@ const WEAPON_KEYS = [
   'allowed',
   'aimAssist',
   'ladder',
+  'pickups',
 ] as const;
 const HUD_KEYS = ['killFeed', 'hitmarker', 'allyMarkers'] as const;
 const TEAM_KEYS = ['name', 'humans', 'bots', 'hp', 'weapons', 'color'] as const;
@@ -850,6 +883,8 @@ function readWeapons(ctx: Ctx, value: unknown): Record<string, unknown> | undefi
     'selfDamage',
     'sniperBodyKill',
     'aimAssist',
+    // M11 (fase 4): as armas no mapa (o modo é conferido no `validateMatchRecipe`, que já sabe o modo).
+    'pickups',
   ]) {
     readFlag(ctx, value, key, 'weapons', out);
   }
@@ -1142,6 +1177,14 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   if (zombies !== undefined) out['zombies'] = zombies;
   const infection = readInfection(ctx, doc['infection']);
   if (infection !== undefined) out['infection'] = infection;
+  // M11 (fase 4): as armas no mapa fora dos modos que aceitam (ou com a escada, ou no Infection) saem com aviso.
+  if (
+    weapons?.['pickups'] === true &&
+    !weaponPickupsFit(String(out['mode']), weapons['ladder'] !== undefined, infection !== undefined)
+  ) {
+    warn(ctx, 'weapons.pickups', 'recipe.invalidField', String(out['mode']));
+    delete weapons['pickups'];
+  }
   const modifiers = readModifiers(ctx, doc['modifiers']);
   if (modifiers !== undefined) {
     // O "um tiro mata" da regra de arma conta como o modificador nos conflitos.

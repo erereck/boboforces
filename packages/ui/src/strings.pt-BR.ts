@@ -65,6 +65,8 @@ export const STRINGS_PT_BR = {
   'summary.separator': ' · ',
   /** M8 (fase 5): no resumo (e no lobby online, pergunta Z4), o Diretor de Partida ligado. */
   'summary.director': 'Diretor ligado',
+  /** M11 (fase 4): no resumo (e no lobby online), as armas no mapa. */
+  'summary.mapWeapons': 'Armas no mapa',
   'summary.teams': '{a} contra {b}',
   'summary.teamsShort': '{a}×{b}',
   'summary.ffa': '{n} bobos',

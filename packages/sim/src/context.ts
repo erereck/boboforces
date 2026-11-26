@@ -4,6 +4,7 @@ import type { RoundState } from './systems/rounds.ts';
 import type { StrikeState } from './systems/strike.ts';
 import type { RoyaleState } from './systems/royale.ts';
 import type { SandboxState } from './systems/sandbox.ts';
+import type { MapWeaponsState } from './systems/map-weapons.ts';
 import type { SignalState } from './systems/signals.ts';
 import type { PartyState } from './systems/party.ts';
 import type { ControlPoints } from './systems/domination.ts';
@@ -232,6 +233,8 @@ export interface SimContext {
   readonly rngRoyale: Rng;
   /** M9 (fase 2): o Bobo Sandbox (`null` fora dele). */
   readonly sandbox: SandboxState | null;
+  /** M11 (fase 4): as armas no mapa (`null` sem a regra ou sem ponto no mapa). */
+  readonly mapWeapons: MapWeaponsState | null;
   /** M2 (fase 5d): Bobo Training (os bots nascem espalhados pelos pontos sem time). */
   readonly training: boolean;
   readonly hz: number;

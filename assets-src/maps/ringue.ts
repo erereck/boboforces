@@ -221,6 +221,16 @@ const ringue: MapScript = {
     spawns(b);
     cameras(b);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`). Arena pequena, 5 armas: o foguete em cima do ringue e,
+  // saindo de cada base, a escopeta (norte) e o fuzil (sul). Revisão: as do norte e do sul da linha do meio saíram (a
+  // casa dos times 2 e 3 do Sandbox cai lá).
+  weaponSpots: [
+    { id: 'c1', x: 24.5, y: 1.5, z: 23.5, weapon: 'rocket' },
+    { id: 'a1', x: 14.5, y: 1, z: 30.5, weapon: 'rifle' },
+    { id: 'b1', x: 33.5, y: 1, z: 30.5, weapon: 'rifle' },
+    { id: 'a2', x: 14.5, y: 1, z: 17.5, weapon: 'shotgun' },
+    { id: 'b2', x: 33.5, y: 1, z: 17.5, weapon: 'shotgun' },
+  ],
 };
 
 export default ringue;

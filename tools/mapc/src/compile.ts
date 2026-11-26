@@ -171,6 +171,8 @@ export function compileMap(script: MapScript, options: CompileOptions): CompileR
   const warnings: string[] = [...options.blocks.warnings, ...options.models.warnings];
   const handle = createMapBuilder(script.id);
   script.build(handle.builder);
+  // M11 (fase 4): as armas no mapa do campo do script.
+  for (const spot of script.weaponSpots ?? []) handle.builder.weaponSpot(spot);
   const built = handle.finish();
   errors.push(...built.errors);
 

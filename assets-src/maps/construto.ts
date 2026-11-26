@@ -990,6 +990,22 @@ const construto: MapScript = {
     lineup(k);
     benchRoutes(k);
   },
+  // M11 (fase 4): as armas no mapa (a regra `weapons.pickups`). No chão (fora dos telhados que a revisão dos poleiros
+  // mexe). As fortes no meio: o foguete ao lado da torre, a sniper no 1º andar do Bloco Leste e o lança-granadas no
+  // setor oeste, perto do ponto C; os pares (um perto de cada base, à mesma distância): a escopeta no galpão do sul e
+  // no Prédio 1, o DMR nas beiras leste e a SMG nos setores oeste e leste. Revisão: a 5 m ou mais da casa dos times 2
+  // e 3 do Sandbox (nas beiras oeste e leste).
+  weaponSpots: [
+    { id: 'c1', x: 46.5, y: 1, z: 40.5, weapon: 'rocket' },
+    { id: 'c2', x: 64.5, y: 4, z: 36.5, weapon: 'sniper' },
+    { id: 'c3', x: 16.5, y: 1, z: 41.5, weapon: 'rocket.grenade-launcher' },
+    { id: 'a1', x: 15.5, y: 1, z: 68.5, weapon: 'shotgun' },
+    { id: 'b1', x: 15.5, y: 1, z: 22.5, weapon: 'shotgun' },
+    { id: 'a2', x: 74.5, y: 1, z: 65.5, weapon: 'rifle.dmr' },
+    { id: 'b2', x: 74.5, y: 1, z: 18.5, weapon: 'rifle.dmr' },
+    { id: 'a3', x: 24.5, y: 2, z: 50.5, weapon: 'smg' },
+    { id: 'b3', x: 55.5, y: 1, z: 29.5, weapon: 'smg' },
+  ],
 };
 
 export default construto;

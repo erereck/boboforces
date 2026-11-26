@@ -1298,3 +1298,103 @@ describe('golden do Arcade (M8, fechamento) com bots no Construto', () => {
     expect(a.hash, msg).toBe(GOLDEN_ARCADE_HASH);
   }, 240_000);
 });
+
+/**
+ * M11 (fase 4): as armas no mapa (`weapons.pickups`): o FFA de 8 bots Normal no Porto, semente 42, até alguém chegar a
+ * 15 abates (ou 4 min). Confere que todo mundo nasce sem a primária, que os bots buscam e pegam as armas do chão (e as
+ * pegam de novo depois da volta de 20 s), que a partida acaba e o hash entre execuções. Gravado na fase 4 (26/11/2026):
+ * `9805916d` (195 s, 73 abates, o 1º com 15; 46 armas pegas, 38 depois da volta). Revisão (26/11/2026): `1ec165d3`
+ * (152 s, 59 abates, o 1º com 15; 33 armas pegas, 25 depois da volta) — o lança-granadas saiu do canal do ponto A (a
+ * casa do time 3 do Sandbox) para a praça do guindaste, e o bot de pistola revida quem atira nele. MUDA com a sim, a
+ * IA ou o mapa.
+ * Na integração, sobre a IA da fase 2 (o passeio que sobe por lugar): `6df27838` (220 s, 86 abates, 51 armas pegas,
+ * 43 depois da volta).
+ */
+const GOLDEN_PICKUPS_HASH = '6df27838';
+
+interface PickupsGoldenRun {
+  hash: string;
+  phase: string;
+  seconds: number;
+  kills: number;
+  taken: number;
+  /** Pegas de um ponto que já tinha ficado vazio (a arma voltou). */
+  again: number;
+  /** Primárias na largada (tem de ser 0). */
+  armedAtStart: number;
+  /** As armas pegas, por código. */
+  byWeapon: string;
+  winnerKills: number;
+}
+
+function runPickupsGolden(): PickupsGoldenRun {
+  const { map } = loadWorld('port');
+  let kills = 0;
+  let taken = 0;
+  let again = 0;
+  const seen = new Set<number>();
+  const byWeapon = new Map<number, number>();
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.ffa',
+      map: 'port',
+      seed: 42,
+      match: { timeLimitS: 240, scoreLimit: 15 },
+      weapons: { pickups: true },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 8 }] }],
+    },
+    map,
+    humans: 0,
+    onEvents: (events) => {
+      for (const ev of events) {
+        if (ev.type === 'kill') kills++;
+        else if (ev.type === 'pickup' && ev.action === 'take' && ev.kind >= 32 && ev.kind < 64) {
+          taken++;
+          if (seen.has(ev.index)) again++;
+          seen.add(ev.index);
+          byWeapon.set(ev.kind - 32, (byWeapon.get(ev.kind - 32) ?? 0) + 1);
+        }
+      }
+    },
+  });
+  const v0 = match.sim.view();
+  let armedAtStart = 0;
+  for (let e = 0; e < v0.count; e++) if (v0.loadout[e * WEAPON_SLOT_COUNT] !== WEAPON_NONE) armedAtStart++;
+  let t = 0;
+  for (; t < 240 * 60 + 5 && match.sim.view().match.phase !== 'ended'; t++) match.step();
+  const v = match.sim.view();
+  let winnerKills = 0;
+  for (let e = 0; e < v.count; e++) winnerKills = Math.max(winnerKills, v.kills[e]!);
+  const out: PickupsGoldenRun = {
+    hash: hashToHex(match.sim.stateHash()),
+    phase: v.match.phase,
+    seconds: Math.round(t / 60),
+    kills,
+    taken,
+    again,
+    armedAtStart,
+    byWeapon: [...byWeapon].map(([c, n]) => `${c}:${n}`).join(' '),
+    winnerKills,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden das armas no mapa (M11, fase 4): FFA de 8 bots no Porto', () => {
+  it('ninguém nasce armado; os bots pegam as armas do chão (e de novo depois da volta); a partida acaba; hash estável', () => {
+    const a = runPickupsGolden();
+    const b = runPickupsGolden();
+    expect(b.hash).toBe(a.hash);
+    const msg =
+      `${a.seconds} s, fase ${a.phase}, abates ${a.kills} (o 1º com ${a.winnerKills}), armas pegas ${a.taken} ` +
+      `(${a.again} depois da volta; ${a.byWeapon})`;
+    console.log(`[pickups] ${msg} · hash ${a.hash}`);
+    expect(a.armedAtStart, msg).toBe(0);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.taken, msg).toBeGreaterThan(8);
+    expect(a.again, msg).toBeGreaterThan(0);
+    expect(a.kills, msg).toBeGreaterThan(10);
+    expect(a.hash, msg).toBe(GOLDEN_PICKUPS_HASH);
+  }, 300_000);
+});
