@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M10: mapas e armas novos (planejado em 20/11/2026)
+### M10: mapas e armas novos (fechado em 26/11/2026)
 
 - **Plano** em `docs/PLANO_M10.md` (#83): os 5 mapas que faltam da lista do GDD (Porto de Contêineres, Canteiro de
   Obras, Galpão de Paintball, Estação Lunar e Fazenda à noite), 5 armas do arsenal futuro (DMR, revólver, escopeta
@@ -45,6 +45,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   correndo levava (de onde se via o mapa todo, e na Fazenda onde o zumbi não chegava) foram fechados: um pilar mais
   alto e uma tela na escada do andaime no Canteiro, muros e rochas mais altos na Lua, e o trator e os rolos de feno
   saíram dos campos da Fazenda.
+- **Fechamento do M10 (fase 9):** o portão verde, a rodada de prints 34 (os 5 mapas e as 5 armas) e o custo de cada
+  mapa novo medido (no ruído do Construto). Dos goldens de antes, só mudaram os que têm bots no Construto e na Base
+  Bobo (os bots passaram a subir escada) e o do Domination (os defensores por time).
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

@@ -452,6 +452,30 @@ testes na mesma máquina (o máximo da referência, 5 ms, é um GC/JIT do aqueci
   raio a mais por tiro que bate na parede, e os 8 bots dormentes da reserva não pensam nem andam (a IA só os guarda).
 - O menu da web: 332,9 KB de 350 (size-check), depois da dieta da fase 0 (§1p).
 
+## 1r. Os mapas novos do M10 (fechamento; 26/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node com JIT), semente 42, sem limite de tempo, 600 ticks de aquecimento e 3.600
+medidos (60 s a 60 Hz); sonda em `local/m10/medir-m10.ts`. O TDM é 4 contra 4 bots Normal; o Domination, 5 contra
+5; o Zombies, 4 bots de apoio.
+
+| Caso | Média (ms) | p50 | p99 | Máx |
+|---|---|---|---|---|
+| TDM no Construto (referência) | 0,044 | 0,030 | 0,261 | 0,86 |
+| TDM no Canteiro de Obras | 0,028 | 0,022 | 0,140 | 0,95 |
+| TDM no Porto de Contêineres | 0,030 | 0,022 | 0,182 | 1,22 |
+| Domination 5 contra 5 no Porto | 0,036 | 0,029 | 0,147 | 6,44 |
+| TDM na Estação Lunar | 0,032 | 0,025 | 0,181 | 0,65 |
+| Bobo Chaos na Estação Lunar | 0,029 | 0,023 | 0,166 | 0,68 |
+| Bobo Paintball no Galpão | 0,033 | 0,024 | 0,202 | 0,76 |
+| TDM no Galpão de Paintball | 0,029 | 0,022 | 0,190 | 0,70 |
+| Bobo Zombies na Fazenda (4 de apoio) | 0,038 | 0,031 | 0,123 | 1,11 |
+
+- Todo mapa novo fica no ruído do Construto, ou abaixo dele. O máximo de 6,44 ms do Domination é um pico só (GC ou
+  JIT): o p99 dele (0,147 ms) é dos mais baixos da tabela.
+- A gravidade da Lua e a Roleta do Chaos não aparecem no custo; o Zombies na Fazenda (18 janelas, 6 portas, as ondas)
+  custa o mesmo que o TDM.
+- O menu da web: 334,1 KB de 350; a primeira partida no Construto: 958,7 KB de 1 MB (size-check).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

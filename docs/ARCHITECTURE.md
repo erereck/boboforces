@@ -5238,3 +5238,32 @@ Construto (66 m) e a Base Bobo (61 m) seguem marcados com `analysis.jumpSightTod
   somar o passe de pulos do mapc aos lugares que o bobo alcança (os poleiros contam com ele) e confere, a partir de
   todos os spawns e com as janelas abertas (a Horda armada abre), que nenhum topo fica só para o pulo.
 - **Os goldens** não mudaram (nenhum joga nesses três mapas).
+
+### 21.12 Fechamento do M10 (26/11/2026)
+
+- **O que entrou:** os 5 mapas que faltavam da lista do GDD (o Porto de Contêineres, o Canteiro de Obras, o Galpão
+  de Paintball, a Estação Lunar com a gravidade do mapa e a Fazenda à noite, o 2º mapa do Bobo Zombies), as 5 armas
+  do arsenal futuro (o DMR com luneta, o revólver secundário, a escopeta automática, a besta com o virote cravado e
+  o lança-granadas), o kit de blocos e peças deles, as pendências do M9 (a Base Bobo no Sandbox, as 8 cores de time
+  e o som do ricochete), os bots que sobem escada reta alta, o passe de pulos do mapc e os poleiros de pulo fechados
+  nos mapas novos. Com isso, a lista de mapas do GDD (§4.6.4) está toda feita.
+- **Como andou (#82):** as frentes em ondas, até 6 agentes ao mesmo tempo, cada um no seu worktree; cada fase entrou
+  no `main` com o portão inteiro, uma revisão do Opus e os achados corrigidos antes de publicar. As listas de
+  registro (os mapas, os ids de conteúdo, os textos, o `runtime-assets.json`, o bench) conflitam a cada mapa: guardar
+  todas as entradas, na ordem de chegada. Os mapas também foram jogados no site publicado, num Edge de verdade numa
+  tela virtual (com a aba no mudo), o que achou o nome cru dos modos no link de preset (§21.10).
+- **As versões:** `PROTOCOL_VERSION` 13 (a ação `stick` do virote) com o `net.json`; o snapshot da sim segue no 20;
+  o campo opcional `gravity` no META do mapa (0,25 a 2) sem mudar a versão do `.bfmap`; os ids de conteúdo dos 5
+  mapas e das 5 armas (códigos 27 a 31) só acrescentados.
+- **Os goldens:** as armas e os mapas novos não mexeram em nenhum (as armas ficam fora dos sorteios de propósito).
+  Mudaram pela IA: os 13 com bots no Construto e na Base Bobo, na fase 1c (os bots sobem escada reta; a lista na
+  §21.9), e o do Domination de novo nos consertos (`5ceddb7e`, os defensores por time). O Posto, o Fortress, o
+  BoboStrike e o Sandbox não mudaram.
+- **O custo:** `PERF.md` §1r (sim + IA por tick em cada mapa novo). O menu da web: 334,1 KB de 350; a primeira
+  partida: 958,7 KB de 1 MB (o kit e os modelos das armas).
+- **Os prints:** a rodada 34 (seções 135 a 141: os 5 mapas e as 5 armas, capturados depois da fase 10), com as
+  perguntas AK1 a AK7.
+- **Fica para depois:** os pickups de arma no mapa e o Royale Grande (AK1); os poleiros de pulo do Construto (66 m)
+  e da Base Bobo (61 m), que mudam os goldens (AK7); o poço ao lado da escada da torre do Construto (§21.9); o deque
+  da antena da Lua em espera numa semente; o Fortress, que nenhum card oferece na Fazenda; e gerar os mips no
+  carregamento (uns 34 KB da primeira partida), quando o teto apertar.

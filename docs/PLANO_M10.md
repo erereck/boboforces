@@ -95,6 +95,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    - **feita em 26/11** (ARCHITECTURE §21.11): o Canteiro e a Fazenda sem nenhum; na Lua, a visada de lá abaixo de
      50 m.
 9. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
+   - **feita em 26/11** (ARCHITECTURE §21.12): a rodada de prints 34 (seções 135 a 141), o `PERF` §1r.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
