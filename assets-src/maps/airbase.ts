@@ -117,12 +117,14 @@ function hangar(b: MapBuilder): void {
   // A faixa de piso do site A (para ver de onde se planta).
   box(b, 11, 0.5, 9, 19, G, 9.5, 'concrete-stripe');
   box(b, 11, 0.5, 17, 19, G, 17.5, 'concrete-stripe');
-  // Dentro: caixotes de cobertura, o jipe e barris.
+  // Dentro: caixotes de cobertura, o jipe e barris. M11 (fase 1): as pilhas de 1,5 m viraram de 2 m (a escalada no ar
+  // vence 1,5 m e a navegação só 1,0: o topo delas era poleiro só de humano e o começo dos pulos para as outras); o jipe
+  // andou 0,5 m para leste, com as pontas na grade de 1 m da navegação (o capô, a 0,94 m, liga ao chão pelo pulo).
   crates(b, 6, 15, 2, 2, 2);
-  crates(b, 22, 6, 2, 3, 1.5);
+  crates(b, 22, 6, 2, 3, 2);
   crates(b, 20, 20, 3, 2, 1);
-  crates(b, 9, 21, 1.5, 1.5, 1.5);
-  b.prop('jeep', 15, G, 6.5, Math.PI / 2, 1, 1);
+  crates(b, 9, 21, 1.5, 1.5, 2);
+  b.prop('jeep', 15.5, G, 6.5, Math.PI / 2, 1, 1);
   b.prop('barrel', 25, G, 23, 0, 1, 1);
   b.prop('barrel', 26, G, 22, 0, 1, 1);
 }
@@ -138,7 +140,7 @@ function cargo(b: MapBuilder): void {
   container(b, 49, 5, false);
   container(b, 61, 21, true);
   container(b, 61, 18.5, true);
-  crates(b, 54, 12, 2, 2, 1.5);
+  crates(b, 54, 12, 2, 2, 2); // M11 (fase 1): 2 m (era 1,5; ver o hangar)
   crates(b, 59, 7, 1.5, 3, 2);
   crates(b, 50, 20, 2, 1.5, 1);
   b.prop('water-tank', 65, G, 7, 0, 1, 1);
@@ -191,9 +193,10 @@ function middle(b: MapBuilder): void {
   box(b, 41.5, G, 26, 43.5, G + 2.5, 28, 'crate');
   // No pátio dos defensores: o holofote.
   b.prop('floodlight', 31, G, 5, Math.PI * 0.75, 1, 1);
-  // Na rota oeste e na leste: barris e caixotes.
-  crates(b, 11, 50, 1.5, 1.5, 1);
-  crates(b, 64, 44, 2, 2, 1.5);
+  // Na rota oeste e na leste: barris e caixotes. M11 (fase 1): a pilha da rota oeste tem 2 m (era 1; do topo, um pulo
+  // de 1,5 m de subida chegava ao quebra-vista vizinho e dali ao outro), como a da rota leste.
+  crates(b, 11, 50, 1.5, 1.5, 2);
+  crates(b, 64, 44, 2, 2, 2); // M11 (fase 1): 2 m (era 1,5; ver o hangar)
   b.prop('barrel', 7, G, 31, 0, 1, 1);
   b.prop('barrel', 66, G, 52, 0, 1, 1);
   // Quebra-vistas (2,5 m) em zigue-zague nas 3 rotas e na pista: nenhuma linha reta corre o mapa inteiro (teto de
@@ -279,10 +282,9 @@ function cameras(b: MapBuilder): void {
 
 const airbase: MapScript = {
   id: 'airbase',
-  // TODO (M10, fase 1c): a escalada de 1,5 m e pulos curtos levam a topos de 2,5–3,5 m sem ligação na navegação (perto
-  // de (6,5; 16,5) e dos cantos); a maior linha de visão de lá dá 61 m (o teto do Switch é 50 m). Fechar muda o mapa e
-  // os goldens: decisão do Erick.
-  analysis: { jumpSightTodo: 'topos de 2,5–3,5 m pela escalada e pelo pulo (61 m)' },
+  // M11 (fase 1): nenhum topo só do pulo correndo (o passe de `tools/mapc/src/jump-reach.ts`). A escalada de 1,5 m e
+  // pulos curtos levavam a topos de 2,5–3,5 m (visada de 61 m): as pilhas de caixote subiram para 2 m e o jipe do hangar
+  // encaixou na grade da navegação.
   build(b) {
     b.size(144, 48, 144);
     b.meta({

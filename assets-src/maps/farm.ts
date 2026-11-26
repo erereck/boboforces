@@ -34,9 +34,8 @@ import { barnDoor } from './kit.ts';
  * (múltiplos de 0,5); o builder recebe células. Caixas semiabertas [a, b). Paredes de 0,5 m na "linha" (de a a a + 0,5).
  * Vãos de 1 m começam em metro inteiro (a grade de navegação é de 1 m).
  *
- * A FAZER: o Fortress roda aqui (a receita com `zombies.variant: 'fortress'` e `map: 'farm'`; o gerador sai dos spawns
- * da casa), mas nenhum card o oferece na Fazenda: o card Fortaleza é fixo no Posto (more-modes.ts) e o Surpreenda-me
- * não sorteia mapa para ele. Oferecer pede decidir o card (pergunta para o Erick), não só dado.
+ * O Fortress roda aqui (a receita com `zombies.variant: 'fortress'` e `map: 'farm'`; o gerador sai dos spawns da casa):
+ * desde o M11 (fase 3) o card Fortaleza começa na Fazenda (`FORTRESS_MAPS` em game/src/maps.ts).
  */
 
 const c = (m: number): number => Math.round(m * 2);

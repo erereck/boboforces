@@ -432,8 +432,46 @@ function tower(k: Kit): void {
   k.box(45.5, G, 37, 46, top - 0.5, 37.5, 'concrete');
   k.fence(42, 37, 46, 37, top, 'railing');
   k.fence(45.5, 37.5, 45.5, 39, top, 'railing');
-  k.fence(42, 44, 42, 46, F2, 'railing');
-  k.b.prop('column', 42.75, G, 37.75, 0, 1, 0);
+  // M11 (fase 1): o corrimão oeste do patamar A começa 1 m mais ao sul (era em z = 44): o 1º metro dá passagem para o
+  // topo do maciço do poço, abaixo.
+  k.fence(42, 45, 42, 46, F2, 'railing');
+  // M11 (fase 1): o vão entre a torre e a escada (x 42–44, z 39–44) era um poço fechado de 3 m (a escada não tinha
+  // guarda do lado oeste e o patamar A não tem corrimão do lado norte): quem caía ficava preso até o Destravar. Agora é
+  // maciço até o patamar A. A coluna de 3 m sob o canto do patamar C (que ficava a 0,75 m do topo novo, um poleiro de
+  // pulo) saiu: o patamar já se apoia na parede da torre.
+  k.box(42, G, 39, 44, F2, 44, 'concrete');
+  stairScreens(k);
+}
+
+/** M11 (fase 1): o topo das telas do lance da torre (m). */
+export const TOWER_SCREEN_TOP = 11;
+
+/**
+ * M11 (fase 1): tela de arame dos dois lados do lance da torre, com o topo reto a 11 m. Do lance, um pulo correndo
+ * alcançava o telhado do Bloco Leste (7 m, a ~6 m de vão descendo 1,75 m) e dali as paredes em zigue-zague, com uma
+ * linha de visão de 66 m; do outro lado, o topo do contraforte (6 m). A tela não tapa a visão nem a bala (como a da
+ * vitrine), só o corpo, e não é degrau nem se escala (painel); mas dá pé por CIMA: o pulo leva os pés a 1,0 m acima do
+ * piso de onde sai, e o lance desce 1 m a cada metro, então uma tela que acompanhasse os degraus (2 m acima de cada um)
+ * ficava abaixo dos pés de quem pula do degrau de cima para baixo (a revisão subiu nela e dali ao telhado do Bloco Leste e
+ * ao teto da cabine). O topo reto fica 1 m acima do pulo mais alto dali (do patamar C, a 9 m: os pés chegam a 10,0).
+ * A do leste sai de cada degrau (no 1º, de cima do corrimão da passarela, que encosta nele); a do oeste fica em cima do
+ * maciço do poço. Conferido na sim: packages/game/src/scene/perch-jumps.test.ts.
+ */
+function stairScreens(k: Kit): void {
+  const steps = 10; // o lance de 5 m (4,0 → 9,0) em degraus de 0,5 m, subindo para -Z a partir de z = 44
+  const top = c(TOWER_SCREEN_TOP) - 1; // a última célula da tela
+  for (let t = 0; t < steps; t++) {
+    const z = c(44) - 1 - t;
+    const step = c(F2) + t; // a célula do degrau t
+    for (let y = c(F2); y <= top; y++) k.b.set(c(43.5), y, z, 'fence-wire', 1);
+    // No 1º degrau, a tela começa em cima do corrimão da passarela (do lance se pousava no topo dele, a 5 m).
+    for (let y = t === 0 ? c(F2 + 1) : step; y <= top; y++) k.b.set(c(46), y, z, 'fence-wire', 1);
+  }
+  // A travessa de tela entre a quina sudeste da torre e a tela oeste, de 6 m (o topo do contraforte) até o topo: quem
+  // pulava do patamar C para o sul, rente à parede da torre, passava da quina por cima do maciço e virava para oeste no
+  // ar até o topo do contraforte. Embaixo dela fica o vão de 2 m do topo do maciço (a passagem a pé continua).
+  for (let x = c(42); x < c(43.5); x++)
+    for (let y = c(SECTOR_WALL_TOP); y <= top; y++) k.b.set(x, y, c(41.5), 'fence-wire');
 }
 
 /** Galpão (SO, cena-vitrine): fechado, 6 m de pé-direito, mezanino de grade, portão leste e porta norte. */
@@ -461,6 +499,11 @@ function shed(k: Kit): void {
   k.stairs(10, 66, 13, 68, G, '-x');
   // Divisória de caixotes no fundo (esconde quem nasce debaixo do mezanino).
   k.crates(10, 69, 1, 6.5, 2);
+  // M11 (fase 1): degraus de 1 m na divisória (a leste do pé dela, na parede sul) e na pilha de 2 m do meio (16; 64),
+  // do lado oeste, como o da pilha do fundo: o topo delas (3 m) só se alcançava pulando da escada do mezanino ou da
+  // outra pilha, e o zumbi não chegava lá.
+  k.crates(11, 73.5, 1, 2, 1);
+  k.crates(15, 64, 1, 2, 1);
   // Luminárias no teto e painéis luminosos nas paredes (emissivos do interior).
   for (const z of [56, 62, 68, 74]) k.box(15, top - 0.5, z, 15.5, top, z + 0.5, 'lamp');
   for (const z of [55, 66, 73]) k.box(21.5, G + 2, z, 22, G + 3, z + 1, 'light-panel');
@@ -584,9 +627,12 @@ function westSector(k: Kit): void {
   k.fence(6, 38, 14, 38, G + 1, 'railing');
   // Caixotes e coberturas.
   k.crates(6, 30, 2, 2, 2);
-  k.crates(8, 30, 1, 2, 1);
+  // M11 (fase 1): o degrau de 1 m subia à pilha de 2 m, e dela um pulo correndo de ~4 m levava ao topo da cobertura
+  // de concreto (12; 32). Agora a pilha é toda de 2 m (ninguém sobe).
+  k.crates(8, 30, 1, 2, 2);
   k.crates(20, 40, 2, 1, 1);
-  k.cover(12, 32, 1, 3, 2);
+  // M11 (fase 1): 2,5 m (era 2): da plataforma de 1 m, um pulo correndo por cima do corrimão chegava ao topo.
+  k.cover(12, 32, 1, 3, 2.5);
   k.b.prop('barrel', 24.5, G, 31.5, 0.5, 1, 1);
   k.b.prop('sandbags', 22, G, 41.5, 0, 1, 1);
   k.b.prop('floodlight', 5.5, G, 28.5, yawTo(5.5, 28.5, 20, 40), 1, 1);
@@ -663,7 +709,8 @@ function southSector(k: Kit): void {
   for (const x of [40, 49.5]) k.box(x, G, 70.5, x + 0.5, G + 3, 71, 'concrete');
   k.cover(38, 56, 1, 4, 2);
   k.crates(46, 58, 2, 1, 1);
-  k.cover(42, 64, 4, 1, 2, 'test-wall');
+  // M11 (fase 1): 3 m (era 2): dos sacos de areia logo atrás (topo a 2 m) um pulo de 1 m de subida chegava ao topo.
+  k.cover(42, 64, 4, 1, 3, 'test-wall');
   k.b.prop('sandbags', 47, G, 66.5, 0, 1, 1);
   k.b.prop('floodlight', 51, G, 74.5, yawTo(51, 74.5, 40, 60), 1, 1);
 }
@@ -948,10 +995,8 @@ function benchRoutes(k: Kit): void {
 
 const construto: MapScript = {
   id: 'construto',
-  // TODO (M10, fase 1c): do lance da escada da torre (8,75 m), um pulo correndo de ~5,6 m alcança o telhado do Bloco
-  // Leste (7 m) e, de lá, os telhados vizinhos; a maior linha de visão de lá dá 66 m (o teto do Switch é 50 m).
-  // Fechar (corrimão no lance, telhado fora do alcance) muda o mapa e os goldens: decisão do Erick.
-  analysis: { jumpSightTodo: 'telhados do Bloco Leste pelo pulo da escada da torre (66 m)' },
+  // M11 (fase 1): nenhum topo só do pulo correndo (o passe de `tools/mapc/src/jump-reach.ts`). O lance da torre
+  // levava ao telhado do Bloco Leste (visada de 66 m): agora tem tela dos dois lados (`stairScreens`).
   build(b) {
     const k = new Kit(b);
     b.size(160, 48, 160);

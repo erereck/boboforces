@@ -73,8 +73,10 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * O hash MUDA, de propósito, quando o mapa, os blocos, as props,
  * a colisão, a navegação, a sim ou a IA mudam: atualize no mesmo commit e diga no CHANGELOG o motivo.
  * Mudança sem querer é bug de determinismo. O CI no Linux confere o mesmo valor.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `f46d8eb9`.
+ * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `1efd48f4`.
  */
-const GOLDEN_HASH = '0feaeddd';
+const GOLDEN_HASH = '1efd48f4';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -194,8 +196,9 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * escada reta (e os zumbis no A* de reserva também): `07976714` (onda 3, 43 abates, 7 quedas, ainda jogando nos 2 min).
  * M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `17ab056d` (onda 3, 39
  * abates, 7 quedas, ainda jogando nos 2 min).
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `e247f81d`.
  */
-const GOLDEN_ZOMBIES_HASH = '17ab056d';
+const GOLDEN_ZOMBIES_HASH = 'e247f81d';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -328,10 +331,11 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
  * vantagem do time 0 era ruído de 8 sementes, mas o defensor de ponto saía do controlador global (`controller % 3`, o
  * 5 contra 5 dava 1 defensor ao time 0 e 2 ao time 1, que vencia 57% no Porto): agora é o terço de cada time, pela
  * ordem dentro dele (`markPointDefenders`). No 4 contra 4 o número de defensores não muda (1 por time); muda QUAL bot
- * do time 0 defende (o 2º, antes o 3º).
+ * do time 0 defende (o 2º, antes o 3º). M11 fase 1 (26/11/2026): os poleiros e o poço do Construto: `f723261d`
+ * (capturas 1/2, o time 1 fecha 200 a 161).
  * MUDA com a sim, a IA, o mapa ou as regras dos pontos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_DOMINATION_HASH = '5ceddb7e';
+const GOLDEN_DOMINATION_HASH = 'f723261d';
 const GOLDEN_DOMINATION_TICKS = 10_800;
 
 function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {
@@ -395,9 +399,12 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
  * (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: Gun Game `d6c258a7` (um bot fecha em
  * 5.569 ticks; níveis 7, 6, 6, 4, 4, 4, 3, 2), Infection `b3d188b9` (os 8 infectados em 6.363 ticks).
  * MUDAM com a sim, a IA, o mapa ou as regras dos modos: atualize no mesmo commit e diga o motivo no CHANGELOG.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: Gun Game `1d861d5b`,
+ * Infection `8d512cae`. M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4):
+ * Infection `0f81a8cf`.
  */
-const GOLDEN_GUNGAME_HASH = 'd6c258a7';
-const GOLDEN_INFECTION_HASH = 'b3d188b9';
+const GOLDEN_GUNGAME_HASH = '1d861d5b';
+const GOLDEN_INFECTION_HASH = '0f81a8cf';
 const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
 
 function runPartyGolden(kind: 'gunGame' | 'infection'): {
@@ -484,8 +491,9 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
  * reta e o passeio às vezes sobe: `d8fc313c` (4 Juggs em 3 min; pontos 96, 69 e 14). M11 fase 2 (26/11/2026): o
  * passeio que sobe sorteia por lugar (piso plano), não por andar: `3cc792a8` (4 Juggs em 3 min; pontos 70, 54, 46 e
  * 8). MUDA com a sim, a IA, o mapa ou as regras.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `d7a3fab5`.
  */
-const GOLDEN_JUGGERNAUT_HASH = '3cc792a8';
+const GOLDEN_JUGGERNAUT_HASH = 'd7a3fab5';
 
 function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -553,8 +561,10 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * trocas e mais uma na prorrogação; 28 × 27 em 10.885 ticks). M11 fase 2 (26/11/2026): o passeio que sobe sorteia
  * por lugar (piso plano), não por andar: `30c55d7b` (as mesmas trocas, sem prorrogação; 27 × 25 em 10.800 ticks). MUDA
  * com a sim, a IA, o mapa ou os modificadores.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `1bf255d5`.
+ * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `a43b1644`.
  */
-const GOLDEN_CHAOS_HASH = '30c55d7b';
+const GOLDEN_CHAOS_HASH = 'a43b1644';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();
@@ -608,8 +618,10 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
  * 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `eb58a2e1` (32 × 42 em 3 min). M11 fase 2
  * (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `1417c604` (33 × 39 em 3 min). MUDA
  * com a sim, a IA, o mapa ou as armas de tinta.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `ff749be7`.
+ * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `cdeef769`.
  */
-const GOLDEN_PAINTBALL_HASH = '1417c604';
+const GOLDEN_PAINTBALL_HASH = 'cdeef769';
 
 function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -856,8 +868,9 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
  * fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `727af431` (pontos 128, 151, 180 e 180;
  * 40.091 ticks). M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar:
  * `a685af0d` (pontos 180, 142, 180 e 172; 42.188 ticks). MUDA com a sim, a IA, o mapa ou as regras.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `2572d1aa`.
  */
-const GOLDEN_JUGG_FIXED_HASH = 'a685af0d';
+const GOLDEN_JUGG_FIXED_HASH = '2572d1aa';
 
 function runJuggFixedGolden(): {
   hash: string;
@@ -921,9 +934,10 @@ describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
  * M7 (fase 1): o TDM 4 contra 4 na Base Bobo (o mapa do BoboStrike), semente 42, 2 min. Confere que os bots andam pelas
  * rotas e brigam no mapa novo (abates dos dois lados) e o hash entre execuções. Gravado na fase 1 (19/11/2026):
  * `e3158452` (17 × 18). M10 fase 1c (26/11/2026): o "chegou" do passeio é no mesmo andar e o prazo do passeio cresce
- * com a rota: `3a5f0053` (18 × 24). MUDA com a sim, a IA ou o mapa.
+ * com a rota: `3a5f0053` (18 × 24). M11 fase 1 (26/11/2026): os poleiros da Base Bobo (as pilhas de 1 e 1,5 m viraram de
+ * 2 m e o jipe do hangar andou 0,5 m): `b61757db` (15 × 24). MUDA com a sim, a IA ou o mapa.
  */
-const GOLDEN_AIRBASE_HASH = '3a5f0053';
+const GOLDEN_AIRBASE_HASH = 'b61757db';
 
 function runAirbaseGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld('airbase');
@@ -967,9 +981,10 @@ describe('golden do TDM na Base Bobo (M7, fase 1)', () => {
 /**
  * M7 (fase 3): o BoboStrike 5 contra 5 de bots Normal na Base Bobo, semente 42, a partida inteira. Confere que os bots
  * jogam o objetivo (plantam a Boom Box), que a partida acaba nas rodadas e o hash entre execuções. Gravado na fase 3
- * (19/11/2026): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). MUDA com a sim, a IA ou o mapa.
+ * (19/11/2026): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). M11 fase 1 (26/11/2026): os poleiros da Base Bobo:
+ * `6fd11dc0` (12 rodadas, 6 × 6, 4 plantas). MUDA com a sim, a IA ou o mapa.
  */
-const GOLDEN_STRIKE_HASH = '9bf9f851';
+const GOLDEN_STRIKE_HASH = '6fd11dc0';
 
 function runStrikeGolden(): { hash: string; rounds: number; wins: string; plants: number; phase: string } {
   const { map } = loadWorld('airbase');
@@ -1164,8 +1179,10 @@ describe('golden do Bobo Royale Grande (M11, fase 5) com bots no Arquipélago', 
  * (16 × 18). M11 fase 2 (26/11/2026): o passeio que sobe sorteia por lugar (piso plano), não por andar: `83c6e9fc`
  * (15 × 21).
  * MUDA com a sim, a IA, o mapa ou o perfil Arcade.
+ * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `7e341112`.
+ * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `0693e3d1`.
  */
-const GOLDEN_ARCADE_HASH = '83c6e9fc';
+const GOLDEN_ARCADE_HASH = '0693e3d1';
 
 function runArcadeGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld();
@@ -1200,9 +1217,12 @@ function runArcadeGolden(): { hash: string; score: [number, number] } {
  * armas, semente 42, até acabar (teto de 10 min). Os times 2 e 3 não têm ponto no mapa: nascem na casa que a sim dá a
  * eles (a oeste e a leste, longe das bases do norte e do sul). Confere a casa, que ninguém volta, que a partida acaba
  * com um vencedor e o hash entre execuções. Gravado na fase 2 do M9 (20/11/2026): `35764306` (38 s; o Verde vence
- * com 1 de pé; abatidos 3/3/2/3; a casa dos times 2 e 3 a 39,1 m das bases). MUDA com a sim, a IA ou o mapa.
+ * com 1 de pé; abatidos 3/3/2/3; a casa dos times 2 e 3 a 39,1 m das bases). M11 fase 1 (26/11/2026): os poleiros e o
+ * poço do Construto: `ce51be61` (40 s; o Laranja vence com 2 de pé; abatidos 1/3/3/3; a casa no mesmo lugar). MUDA
+ * com a sim, a IA ou o mapa.
+ * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `aca32899`.
  */
-const GOLDEN_SANDBOX_HASH = '35764306';
+const GOLDEN_SANDBOX_HASH = 'aca32899';
 
 function runSandboxGolden(): {
   hash: string;

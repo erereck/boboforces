@@ -727,7 +727,9 @@ describe('mapc: Construto', () => {
     expect(a.doc.markers.domination.length).toBeGreaterThanOrEqual(3);
     // Navegação do CP1 do porte (passo 1, altura B): os marcadores do boneco (fila, close, deslize) não colidem e a
     // régua, 1 m mais a leste, troca 2 nós dela fora da área jogável sem mudar a conta. Mapa novo = conta nova.
-    expect([a.stats.navNodes, a.checks.playableNodes, a.stats.navComponents]).toEqual([7161, 4599, 25]);
+    // M11 (fase 1): os poleiros de pulo e o poço da torre (era [7161, 4599, 25]): o fundo do poço (10 nós) virou o topo
+    // do maciço, a coluna sob o patamar C saiu, as pilhas ganharam degrau e as que subiram de altura perderam o topo.
+    expect([a.stats.navNodes, a.checks.playableNodes, a.stats.navComponents]).toEqual([7159, 4602, 24]);
     // A mão armada sai pela cerca de tábua do canteiro (6,25 cm) com qualquer alcance da tabela; o resto (paredes de
     // bloco, painéis) depende do alcance de hoje e vai para o relatório. Medida, nunca aviso.
     expect(a.checks.armThrough.by['fence-wood']).toBeGreaterThan(0);

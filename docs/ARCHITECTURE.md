@@ -5464,3 +5464,56 @@ de chegada.
   e o bot de pistola que não revidava indo buscar arma.
 - **Os números:** o golden novo (FFA de 8 bots Normal no Porto, semente 42) `6df27838` (220 s, 86 abates, 51 armas pegas, 43 depois da volta); os goldens de antes iguais. O
   menu da web em 335,0 KB de 350; a primeira partida em 963,0 KB de 1 MB.
+
+### 22.1 Fase 1: os poleiros de pulo do Construto e da Base Bobo e o poço da torre (26/11/2026)
+
+A pergunta AK7 ("fechar também no Construto e na Base Bobo", #84): os dois mapas saem do `analysis.jumpSightTodo` e,
+como o Canteiro, compilam sem nenhum topo só do pulo correndo (o passe de `jump-reach.ts`, §21.9) e sem nó alcançável
+que não volte aos spawns. Nenhum mapa fica marcado.
+
+- **A escada da torre do Construto** (`assets-src/maps/construto.ts`, `tower` e `stairScreens`): do lance (x 44–46,
+  z 39–44, de 4 a 9 m) um pulo correndo de ~6 m descendo 1,75 m chegava ao telhado do Bloco Leste (64 nós) e dali às
+  paredes em zigue-zague (31), com visada de 66 m; do outro lado, ao topo do contraforte (6 m). O lance ganhou tela de
+  arame (`fence-wire`) dos dois lados, com o topo reto a 11 m (1 m acima do pulo mais alto dali: do patamar C os pés
+  chegam a 10,0 m): a oeste em x 43,5–44 (z 39–44, em cima do maciço), a leste em x 46–46,5 (z 39–43,5, cobrindo
+  também o 1º degrau, de cima do corrimão da passarela). Uma travessa de tela de 6 a 11 m (x 42–43,5, z 41,5–42)
+  fecha o vão entre a quina sudeste da torre e a tela oeste (do patamar C, pulando rente à parede, virava-se no ar até
+  o topo do contraforte); embaixo dela, o topo do maciço segue passagem. A tela não tapa visão nem bala (as linhas da
+  escada continuam), só o corpo.
+- **O poço** (x 42–44, z 39–44, §21.9): virou maciço de concreto até o patamar A (4 m), e os 10 nós presos no fundo
+  saíram. O topo é uma faixa de 1 m entre a parede da torre e a tela, que liga ao patamar A (o corrimão oeste do
+  patamar começa em z = 45, era 44) e cai para o chão sob o patamar C. A coluna de 3 m sob o canto do patamar C
+  (42,75; 37,75) saiu: ficava a 0,75 m do topo novo (um poleiro de pulo), e o patamar já se apoia na parede da torre.
+- **O resto do Construto:** no setor oeste, o degrau de 1 m da pilha de caixotes (8; 30) subiu para 2 m (a pilha
+  6–9 × 30–32 não se sobe mais), e a cobertura de concreto (12; 32) foi de 2 para 2,5 m (da plataforma de 1 m, um pulo
+  por cima do corrimão chegava a ela). No galpão, a divisória (10–11 × 69–75,5) e a pilha (16–18 × 64–66), de 2 m,
+  ganharam degrau de 1 m (11–12 × 73,5–75,5 e 15–16 × 64–66), como a pilha do fundo: viraram chão da navegação (o
+  zumbi sobe). O degrau da pilha fica a oeste porque a leste caía na frente da câmera de um caso sorteado do "criar
+  bot". No sul, a parede de teste (42–46 × 64–65) foi de 2 para 3 m (os sacos de areia logo atrás, com o topo a 2 m,
+  davam o pulo).
+- **A Base Bobo** (`airbase.ts`): as 4 pilhas de 1,5 m — (22; 6) e (9; 21) no hangar (site A), (54; 12) no site B e
+  (64; 44) na rota leste — e a de 1 m da rota oeste (11; 50) foram para 2 m. A escalada no ar vence 1,5 m e a
+  navegação só 1,0: o topo delas era poleiro só de humano e o começo dos pulos para os quebra-vistas e os contêineres
+  (visada de 61 m). O jipe do hangar andou 0,5 m para leste (x = 15,5), com as pontas na grade de 1 m da navegação: o
+  capô (0,94 m) liga ao chão pelo pulo da navegação. Os sites, as rotas e a maior linha de visão (49,04 m) não mudaram.
+- **Os números:** no Construto, de 123 nós de pulo em 12 lugares (visada 66,1 m) para 0; a maior linha medida foi de
+  47,75 para 46,32 m (a de 47,75 saía do topo da pilha do setor oeste); a navegação foi de 7161 nós (4599 jogáveis,
+  25 componentes) para 7159 (4602, 24); o `.bfmap` foi de 10.381 para 10.434 bytes (já com as armas da fase 4; a Base Bobo, de 3.683 para 3.676). Na Base Bobo, de 156 nós em 12
+  lugares (61,1 m) para 0; a navegação foi de 4880 (2648, 7) para 4884 (2653, 6). Teste:
+  `tools/mapc/src/perches.test.ts`.
+- **A revisão (Opus) achou** que a 1ª versão das telas (2 m acima de cada degrau) dava pé: o lance desce 1 m por metro
+  e o pulo leva os pés a 1,0 m acima do piso, então quem pulava de um degrau para baixo pousava em cima da tela (o
+  painel não é degrau nem se escala, mas dá pé por cima) e dali chegava ao telhado do Bloco Leste (os 66 m de volta) e
+  ao teto da cabine (um poleiro novo, só de humano). Daí o topo reto a 11 m e a travessa. O passe de pulos do `mapc`
+  não vê topo sem nó de navegação (tela, corrimão, poste, prop), então a conferência é na sim:
+  `game/scene/perch-jumps.test.ts` roda os roteiros da revisão e varreduras de 16 direções × 2 tempos de pulo × 3
+  passos de lado (4.512 roteiros em volta da torre, 3.840 em volta das pilhas e do jipe da Base Bobo): ninguém fica no
+  telhado do Bloco Leste, no teto da cabine, no contraforte, em cima das telas nem acima do patamar C. Ensinar o passe
+  a contar pouso em painel acusaria ~100 corrimãos e topos de muro só no Construto: fica para uma fase própria.
+- **Os goldens** mudaram nos 13 com bots nos dois mapas (nota "M11 fase 1", re-gravados por cima das fases 2 e 4):
+  TDM `1efd48f4`, Zombies `e247f81d`, Domination `f723261d`, Gun Game `1d861d5b`, Infection `0f81a8cf`, Juggernaut
+  `d7a3fab5`, Chaos `a43b1644`, Paintball `cdeef769`, Jugg Fixo `2572d1aa`, Arcade `0693e3d1`, Sandbox `aca32899`, TDM na
+  Base Bobo `b61757db` e BoboStrike `6fd11dc0`. O Posto, o Fortress, a Horda e o Royale não mudaram.
+- **Fica:** a classe inteira (topo de painel e de poste que dá pé em todos os mapas: uma regra na sim fecharia de uma
+  vez, mas muda os goldens); entre o patamar C (9 m) e o telhado do Bloco Leste, a única barreira é o corrimão leste de 1 m (o passe o
+  conta como bloqueio; pular por cima e voar ~6 m fica no limite da física).

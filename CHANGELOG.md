@@ -29,6 +29,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   nos Times, no FFA, no Domination, no Sandbox e no Juggernaut; 61 armas em 7 mapas (o foguete, a sniper e o
   lança-granadas no meio). Os bots vão buscar as armas pesando o perigo. De quebra, a mão não vai mais para a granada
   depois de pegar uma arma do chão (também no Royale e no BoboStrike). O online foi para o protocolo 14.
+- **Os poleiros de pulo do Construto e da Base Bobo (fase 1):** os lugares altos aonde só um pulo correndo levava (e
+  aonde os bots e os zumbis não chegavam) foram fechados nos dois mapas. No Construto, a escada da torre ganhou tela
+  dos dois lados (do alto dela se pulava para o telhado do Bloco Leste, com vista de 66 m), o poço ao lado dela, que
+  prendia quem caía, virou maciço, e algumas pilhas de caixote e coberturas mudaram de altura ou ganharam degrau. Na
+  Base Bobo, as pilhas de caixote que se escalavam foram para 2 m. Nenhum mapa fica mais marcado; os goldens com bots
+  nos dois mapas mudaram.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 
