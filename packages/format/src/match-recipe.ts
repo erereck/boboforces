@@ -234,6 +234,18 @@ export interface JuggernautRules {
   readonly variant?: JuggernautVariant;
 }
 
+/**
+ * M11 (fase 5): os modos do Bobo Royale: o Mini (M7) e o Grande (só no PC, 48 participantes no Arquipélago). Os dois
+ * têm a mesma sim (os esquadrões, o loot, a zona) e a mesma IA; o Grande muda só a zona (mais fases, mais longas) e o
+ * teto de participantes (`RecipeLimits.maxRoyaleGrandeParticipants`).
+ */
+export const ROYALE_MODES = ['royale.mini', 'royale.grande'] as const;
+/** M11 (fase 5, revisão): os modos onde a escada do Gun Game (`weapons.ladder`) vale; nos outros, ela sai. */
+export const LADDER_MODES: readonly string[] = ['warfare.ffa', 'warfare.tdm'];
+export function isRoyaleMode(mode: string): boolean {
+  return mode === 'royale.mini' || mode === 'royale.grande';
+}
+
 /** M7 (fase 6): o Bobo Royale Mini (`mode: 'royale.mini'`): solo (padrão), duplas ou quartetos (em grupo, o reviver). */
 export const ROYALE_SQUADS = ['solo', 'duo', 'quad'] as const;
 export type RoyaleSquad = (typeof ROYALE_SQUADS)[number];
@@ -1117,6 +1129,12 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
   const players = readPlayers(ctx, doc['players']);
   if (players !== undefined) out['players'] = players;
   const weapons = readWeapons(ctx, doc['weapons']);
+  // M11 (fase 5, revisão): a escada é do Gun Game (o card joga sobre o FFA; o TDM também aceita). Nos outros modos ela
+  // daria uma primária a cada abate (no Royale, uma arma a mais no chão a cada morte, além do pool): sai com aviso.
+  if (weapons !== undefined && weapons['ladder'] !== undefined && !LADDER_MODES.includes(String(out['mode']))) {
+    warn(ctx, 'weapons.ladder', 'recipe.invalidField', String(out['mode']));
+    delete weapons['ladder'];
+  }
   if (weapons !== undefined) out['weapons'] = weapons;
   const hud = readHud(ctx, doc['hud']);
   if (hud !== undefined) out['hud'] = hud;
@@ -1162,7 +1180,18 @@ export function validateMatchRecipe(input: unknown, limits: RecipeLimits): Valid
       teams.push(readTeam(ctx, teamsIn[i], i, safeLimits, embedded, seenAll));
     }
     capHumans(ctx, teams, safeLimits.maxLocalHumans);
-    capBots(ctx, teams, safeLimits.maxBots);
+    // M11 (fase 5): o Royale Grande usa o teto de participantes dele (humanos + bots) no lugar do de bots; 0 = o
+    // modo não roda neste aparelho. Os humanos "todos" contam 1 (o jogador da tela; na sala, já viram número).
+    let botCap = safeLimits.maxBots;
+    const grandeCap = limits.maxRoyaleGrandeParticipants;
+    if (out['mode'] === 'royale.grande' && grandeCap !== undefined) {
+      const cap = Math.max(0, Math.min(ENGINE_MAX_BOTS + ENGINE_MAX_LOCAL_HUMANS, Math.floor(grandeCap)));
+      let humans = 0;
+      for (const t of teams) humans += t.humans === 'all' ? 1 : (t.humans ?? 0);
+      if (cap === 0) ctx.errors.push(issue('mode', 'recipe.modeNotOnPlatform', 'royale.grande'));
+      else botCap = Math.min(ENGINE_MAX_BOTS, Math.max(0, cap - humans));
+    }
+    capBots(ctx, teams, botCap);
     // M10 (fase 8, revisão): a cor do time só vale no Sandbox (nos outros modos, ela fica e é ignorada).
     if (out['mode'] === 'sandbox') fixTeamColors(ctx, teams);
     out['teams'] = teams.map((t) => {

@@ -27,6 +27,18 @@ export const ROYALE = {
     { waitS: 40, shrinkS: 35, radiusM: 12, dps: 20 },
     { waitS: 30, shrinkS: 30, radiusM: 0, dps: 40 },
   ],
+  /**
+   * M11 (fase 5): a zona do Royale Grande (`royale.grande`, o Arquipélago de 380 m de área): 6 fases, os raios no
+   * dobro dos do Mini nas primeiras e os tempos ~1,4× (12,4 min até fechar; o GDD pede uns 12–15). Minha, revisável.
+   */
+  zoneGrande: [
+    { waitS: 120, shrinkS: 90, radiusM: 170, dps: 2 },
+    { waitS: 90, shrinkS: 70, radiusM: 110, dps: 4 },
+    { waitS: 75, shrinkS: 55, radiusM: 65, dps: 8 },
+    { waitS: 60, shrinkS: 45, radiusM: 35, dps: 12 },
+    { waitS: 45, shrinkS: 35, radiusM: 15, dps: 20 },
+    { waitS: 30, shrinkS: 30, radiusM: 0, dps: 40 },
+  ],
   /** A zona fere em pulsos (o dano de `zonePulseS` de uma vez): um acerto por pulso, não um por tick (minha). */
   zonePulseS: 0.5,
   /** Os pentes de reserva da pistola na largada (minha). */
@@ -79,6 +91,14 @@ export interface RoyaleSpot {
   readonly z: number;
 }
 
+/** Uma fase da zona (`ROYALE.zone`, `ROYALE.zoneGrande`). */
+export interface RoyaleZoneStage {
+  readonly waitS: number;
+  readonly shrinkS: number;
+  readonly radiusM: number;
+  readonly dps: number;
+}
+
 export interface RoyaleState {
   /** Participantes por esquadrão (1, 2 ou 4) e quantos esquadrões. */
   readonly squad: number;
@@ -91,6 +111,8 @@ export interface RoyaleState {
   readonly waitTicks: Int32Array;
   readonly shrinkTicks: Int32Array;
   readonly loot: readonly RoyaleSpot[];
+  /** M11 (fase 5): as fases da zona do modo (`ROYALE.zone` no Mini, `ROYALE.zoneGrande` no Grande). */
+  readonly zone: readonly RoyaleZoneStage[];
 }
 
 export function createRoyaleState(
@@ -99,6 +121,7 @@ export function createRoyaleState(
   hz: number,
   loot: readonly RoyaleSpot[],
   area: { readonly minX: number; readonly minZ: number; readonly maxX: number; readonly maxZ: number },
+  zone: readonly RoyaleZoneStage[] = ROYALE.zone,
 ): RoyaleState {
   const squads = Math.max(1, Math.ceil(participants / squad));
   const data = new Int32Array(ZONE_FIELDS);
@@ -112,16 +135,16 @@ export function createRoyaleState(
   circle[CIRCLE.cx] = cx;
   circle[CIRCLE.cz] = cz;
   circle[CIRCLE.r] = r;
-  const waitTicks = new Int32Array(ROYALE.zone.length);
-  const shrinkTicks = new Int32Array(ROYALE.zone.length);
-  ROYALE.zone.forEach((z, i) => {
+  const waitTicks = new Int32Array(zone.length);
+  const shrinkTicks = new Int32Array(zone.length);
+  zone.forEach((z, i) => {
     waitTicks[i] = Math.max(1, secondsToTicks(z.waitS, hz));
     shrinkTicks[i] = Math.max(1, secondsToTicks(z.shrinkS, hz));
   });
   data[ZONE.ticks] = waitTicks[0]!;
   data[ZONE.squadsAlive] = squads;
   data[ZONE.winner] = ROYALE_UNDECIDED;
-  return { squad, squads, data, circle, place: new Uint8Array(squads), waitTicks, shrinkTicks, loot };
+  return { squad, squads, data, circle, place: new Uint8Array(squads), waitTicks, shrinkTicks, loot, zone };
 }
 
 /** O pickup é um item do Royale (não some; o `pickTicks` guarda a munição). */
@@ -312,9 +335,9 @@ export function planZone(ctx: SimContext): void {
   c[CIRCLE.toCx] = c[CIRCLE.cx]!;
   c[CIRCLE.toCz] = c[CIRCLE.cz]!;
   c[CIRCLE.toR] = c[CIRCLE.r]!;
-  if (stage >= ROYALE.zone.length) return;
+  if (stage >= st.zone.length) return;
   // O círculo novo nunca é maior que o de agora (num mapa pequeno, as primeiras fases só esperam).
-  const r = Math.min(ROYALE.zone[stage]!.radiusM, c[CIRCLE.r]!);
+  const r = Math.min(st.zone[stage]!.radiusM, c[CIRCLE.r]!);
   const room = c[CIRCLE.r]! - r;
   let n = 0;
   for (const spot of st.loot) if (fits(spot, c, room)) n++;
@@ -334,14 +357,14 @@ export function planZone(ctx: SimContext): void {
 
 /** O dano da zona por segundo agora (o da fase; fechada, o da última). */
 export function zoneDps(st: RoyaleState): number {
-  return ROYALE.zone[Math.min(st.data[ZONE.stage]!, ROYALE.zone.length - 1)]!.dps;
+  return st.zone[Math.min(st.data[ZONE.stage]!, st.zone.length - 1)]!.dps;
 }
 
 function updateZone(ctx: SimContext, st: RoyaleState): void {
   const d = st.data;
   const c = st.circle;
   const stage = d[ZONE.stage]!;
-  if (stage >= ROYALE.zone.length) return;
+  if (stage >= st.zone.length) return;
   d[ZONE.ticks] = d[ZONE.ticks]! - 1;
   if (d[ZONE.shrinking] === 0) {
     if (d[ZONE.ticks]! > 0) return;
@@ -356,7 +379,7 @@ function updateZone(ctx: SimContext, st: RoyaleState): void {
   if (d[ZONE.ticks]! > 0) return;
   d[ZONE.stage] = stage + 1;
   d[ZONE.shrinking] = 0;
-  d[ZONE.ticks] = stage + 1 < ROYALE.zone.length ? st.waitTicks[stage + 1]! : 0;
+  d[ZONE.ticks] = stage + 1 < st.zone.length ? st.waitTicks[stage + 1]! : 0;
   planZone(ctx);
 }
 

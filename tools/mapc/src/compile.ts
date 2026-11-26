@@ -79,24 +79,88 @@ export interface CompileResult {
   readonly colliders: StaticColliders;
 }
 
-/** Colisores simples (busca linear): o `mapc` só usa para navegação e validação, no build. */
+/** Lado (m) dos baldes no plano da busca dos colisores do `mapc`. */
+const COLLIDER_BUCKET_M = 8;
+
+/**
+ * Colisores simples: o `mapc` só usa para navegação e validação, no build. M11 (fase 5): com muitos colisores (o
+ * Arquipélago tem ~500 props e 160 mil nós), a busca linear dominava o tempo das checagens; agora os colisores ficam em
+ * baldes de 8 m no plano, e a busca visita os candidatos na ordem dos índices (o mesmo resultado da busca linear).
+ */
 function simpleColliders(boxes: number[], flags: number[], owner: number[]): StaticColliders {
   const b = Float32Array.from(boxes);
   const f = Uint8Array.from(flags);
   const o = Int32Array.from(owner);
   const count = f.length;
+  const linear = (
+    minX: number,
+    minY: number,
+    minZ: number,
+    maxX: number,
+    maxY: number,
+    maxZ: number,
+    visit: (i: number) => boolean,
+  ): void => {
+    for (let i = 0; i < count; i++) {
+      const s = i * COLLIDER_STRIDE;
+      if (b[s + 3]! < minX || b[s]! > maxX || b[s + 4]! < minY || b[s + 1]! > maxY) continue;
+      if (b[s + 5]! < minZ || b[s + 2]! > maxZ) continue;
+      if (!visit(i)) return;
+    }
+  };
+  // Poucos colisores (os mapas de sempre): a busca linear, como antes.
+  if (count < 64) return { count, boxes: b, flags: f, owner: o, query: linear };
+  let x0 = Infinity;
+  let z0 = Infinity;
+  let x1 = -Infinity;
+  let z1 = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const s = i * COLLIDER_STRIDE;
+    x0 = Math.min(x0, b[s]!);
+    z0 = Math.min(z0, b[s + 2]!);
+    x1 = Math.max(x1, b[s + 3]!);
+    z1 = Math.max(z1, b[s + 5]!);
+  }
+  const cols = Math.floor((x1 - x0) / COLLIDER_BUCKET_M) + 1;
+  const rows = Math.floor((z1 - z0) / COLLIDER_BUCKET_M) + 1;
+  const col = (x: number): number => Math.max(0, Math.min(cols - 1, Math.floor((x - x0) / COLLIDER_BUCKET_M)));
+  const row = (z: number): number => Math.max(0, Math.min(rows - 1, Math.floor((z - z0) / COLLIDER_BUCKET_M)));
+  const buckets: number[][] = Array.from({ length: cols * rows }, () => []);
+  for (let i = 0; i < count; i++) {
+    const s = i * COLLIDER_STRIDE;
+    for (let r = row(b[s + 2]!); r <= row(b[s + 5]!); r++) {
+      for (let k = col(b[s]!); k <= col(b[s + 3]!); k++) buckets[k + r * cols]!.push(i);
+    }
+  }
+  const seen = new Int32Array(count);
+  let stamp = 0;
+  const found: number[] = [];
   return {
     count,
     boxes: b,
     flags: f,
     owner: o,
     query(minX, minY, minZ, maxX, maxY, maxZ, visit) {
-      for (let i = 0; i < count; i++) {
-        const s = i * COLLIDER_STRIDE;
-        if (b[s + 3]! < minX || b[s]! > maxX || b[s + 4]! < minY || b[s + 1]! > maxY) continue;
-        if (b[s + 5]! < minZ || b[s + 2]! > maxZ) continue;
-        if (!visit(i)) return;
+      // Fora da faixa de todos os colisores: nada a visitar.
+      if (maxX < x0 || minX > x1 || maxZ < z0 || minZ > z1) return;
+      stamp++;
+      found.length = 0;
+      for (let r = row(minZ); r <= row(maxZ); r++) {
+        for (let k = col(minX); k <= col(maxX); k++) {
+          for (const i of buckets[k + r * cols]!) {
+            if (seen[i] === stamp) continue;
+            seen[i] = stamp;
+            const s = i * COLLIDER_STRIDE;
+            if (b[s + 3]! < minX || b[s]! > maxX || b[s + 4]! < minY || b[s + 1]! > maxY) continue;
+            if (b[s + 5]! < minZ || b[s + 2]! > maxZ) continue;
+            found.push(i);
+          }
+        }
       }
+      if (found.length > 1) found.sort((p, q) => p - q);
+      // Copia antes de visitar: o visitante pode fazer outra busca (a lista é reaproveitada).
+      const list = found.length > 0 ? found.slice() : found;
+      for (const i of list) if (!visit(i)) return;
     },
   };
 }
@@ -203,6 +267,7 @@ export function compileMap(script: MapScript, options: CompileOptions): CompileR
     maxSightLimitM: options.maxSightLimitM ?? 50,
     ...(options.limbProbes !== undefined ? { limbProbes: options.limbProbes } : {}),
     ...(script.analysis?.jumpSightTodo !== undefined ? { jumpSightTodo: script.analysis.jumpSightTodo } : {}),
+    ...(script.analysis?.openSight === true ? { openSight: true } : {}),
   });
   const sightMs = performance.now() - tSight;
   errors.push(...checks.errors);

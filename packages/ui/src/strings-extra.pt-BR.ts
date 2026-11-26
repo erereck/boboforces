@@ -316,6 +316,8 @@ export const STRINGS_EXTRA_PT_BR = {
   // M7 (fase 8): o Bobo Royale.
   'mode.name.royale': 'Bobo Royale',
   'mode.desc.royale': 'O último de pé vence.',
+  // M11 (fase 5): o botão do Bobo Royale Grande no card do Royale (só no PC).
+  'mode.extra.royaleGrande': 'Grande',
   'weapon.rarity.rare': '{name} rara',
   'weapon.rarity.epic': '{name} épica',
   'hud.royale.wait': '{alive} vivos · zona {stage} de {stages}',
@@ -1349,6 +1351,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'issue.recipe.humansOverPlatformCap': 'Jogadores demais para este aparelho.',
   'issue.recipe.viewDistanceOverPlatformCap': 'Alcance de visão limitado pelo aparelho.',
   'issue.recipe.duplicateTeamColor': 'Dois times tinham a mesma cor; um deles trocou de cor.',
+  // M11 (fase 5): o Bobo Royale Grande fora do PC.
+  'issue.recipe.modeNotOnPlatform': 'Este modo só roda no PC.',
   /** M2 (fase 3a): avisos do `bot@1`. */
   /** M2 (fase 4b): avisos dos documentos do jogador (ajustes, estatísticas, presets, backup). */
   'issue.save.invalidField': 'Um dado salvo estava num formato estranho e voltou para o padrão.',

@@ -238,6 +238,16 @@ describe('mapc: validações com o mundo', () => {
     // Duas compilações com as sondas do braço e do deslize (#56): passa de 5 s com a máquina carregada.
   }, 120_000); // M10: com vários agentes rodando testes juntos, os do Construto passaram de 30 s.
 
+  it('M11 (fase 5): o mapa aberto que declara a diagonal da área não mede a visada par a par', () => {
+    // A arena: 15 × 15 m de área e 8 m de grade, então nenhuma linha passa de 22,7 m.
+    const open = (sight: number): MapScript => ({ ...arena(() => {}, sight), analysis: { openSight: true } });
+    const r = compileMap(open(25), OPTIONS);
+    expect(r.errors).toEqual([]);
+    expect(r.checks.sight.max).toBeNull();
+    expect(r.checks.sight.rays).toBe(0);
+    expect(compileMap(open(20), OPTIONS).errors.some((e) => e.includes('mapa aberto'))).toBe(true);
+  }, 120_000);
+
   it('acusa porta desalinhada, fresta de 0,5 m e spawn inimigo visível', () => {
     const r = compileMap(
       arena((b) => {

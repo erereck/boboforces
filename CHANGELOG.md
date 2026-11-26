@@ -18,6 +18,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   jirau, o 1º andar) em vez de um andar inteiro, e eles agora vão ao deque da antena da Estação Lunar (7 de 8
   sementes, antes 2) e à passarela do Galpão (8 de 8, antes 3). Os três testes em espera voltaram; nove goldens foram
   re-gravados.
+- **O Bobo Royale Grande (fase 5):** o Royale de 48 participantes, só no PC, no Arquipélago (um mapa novo de 400 m: a
+  ilha grande com a vila e 4 ilhas ligadas por baixios, com o farol, o porto, a fazenda e o acampamento), com a zona de
+  6 fases (~12 min). Está no botão "Grande" do card do Bobo Royale (Mais modos) e na sala online com o host no PC (em
+  duplas); o Aquário assiste. No celular e no Switch o botão não aparece, e um link ou um recente dele é recusado com
+  aviso.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 

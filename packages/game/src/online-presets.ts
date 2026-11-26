@@ -14,8 +14,20 @@ import {
  * Online).
  */
 
-/** Os cards, na ordem da tela. */
-export const ROOM_MODES = ['warfare.tdm', 'warfare.ffa', 'x1', 'zombies', 'royale', 'surprise', 'custom'] as const;
+/**
+ * Os cards, na ordem da tela. M11 (fase 5): o `royaleGrande` é o 2º botão do card do Bobo Royale, só com o host no PC
+ * (GDD §4.1.3: o Royale Grande online "só com host PC").
+ */
+export const ROOM_MODES = [
+  'warfare.tdm',
+  'warfare.ffa',
+  'x1',
+  'zombies',
+  'royale',
+  'surprise',
+  'custom',
+  'royaleGrande',
+] as const;
 export type RoomMode = (typeof ROOM_MODES)[number];
 /** Os cards que já são uma receita (o Surpreenda-me sorteia; a personalizada abre a tela de sempre). */
 export type RoomPresetMode = Exclude<RoomMode, 'surprise' | 'custom'>;
@@ -76,6 +88,17 @@ export function roomPreset(mode: RoomPresetMode): MatchRecipe {
         royale: { squad: 'duo' },
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 23 }] }],
       };
+    case 'royaleGrande':
+      // M11 (fase 5): o Bobo Royale Grande em duplas no Arquipélago (o host e o 1º amigo juntos), 48 participantes:
+      // cada amigo toma o lugar de um bot; o teto da sala (`roomLimits` com o modo) corta com celular.
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        mode: 'royale.grande',
+        map: 'archipelago',
+        seed: 0,
+        royale: { squad: 'duo' },
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 47 }] }],
+      };
   }
 }
 
@@ -86,6 +109,16 @@ export function roomPreset(mode: RoomPresetMode): MatchRecipe {
 /** Os snapshots do host (tecnico.md §13.3 e §13.4): 30 Hz no PC, 20 Hz no celular. */
 export function hostSnapshotHz(mobile: boolean): number {
   return mobile ? 20 : 30;
+}
+
+/**
+ * M11 (fase 5, revisão): a partida que a sala pode jogar com este host: o Royale Grande só com o host no PC (GDD
+ * §4.1.3); fora dele, a sala troca pelo Times (o 1º card). As outras receitas passam como estão.
+ */
+export function roomRecipeFor(recipe: MatchRecipe, hostFamily: PlatformFamily): MatchRecipe {
+  const refused =
+    recipe.mode === 'royale.grande' && selectPlatformProfile(hostFamily, 1).royaleGrandeMaxParticipants === 0;
+  return refused ? roomPreset('warfare.tdm') : recipe;
 }
 
 export interface RoomLimits {
@@ -100,9 +133,11 @@ export interface RoomLimits {
  * o do celular também (GDD §2: "no online vale o menor teto entre os participantes"), para o amigo no celular não
  * desenhar mais bobos do que o aparelho dele aguenta.
  */
-export function roomLimits(hostFamily: PlatformFamily, mobileFriend: boolean): RoomLimits {
+export function roomLimits(hostFamily: PlatformFamily, mobileFriend: boolean, mode = ''): RoomLimits {
   const host = selectPlatformProfile(hostFamily, 1);
-  const out = { maxBots: host.hostMaxBots, maxZombies: host.hostMaxZombies, maxViewM: host.maxViewDistanceM };
+  // M11 (fase 5): o Royale Grande tem o teto de participantes dele (o host conta 1; os amigos tomam lugar de bots).
+  const bots = mode === 'royale.grande' ? Math.max(0, host.royaleGrandeMaxParticipants - 1) : host.hostMaxBots;
+  const out = { maxBots: bots, maxZombies: host.hostMaxZombies, maxViewM: host.maxViewDistanceM };
   if (!mobileFriend) return out;
   const phone = PLATFORM_PROFILES.mobile;
   return {

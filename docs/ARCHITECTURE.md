@@ -5337,3 +5337,84 @@ de chegada.
   o destino antes do passeio que sobe). Cada um tem a nota "M11 fase 2". O teste das personalidades (Rusher e
   Equilibrado) ganhou prazo de 30 s (estourava os 5 s com as frentes em paralelo).
 - **Fica:** na semente 5 da Lua ninguém chega ao deque em 90 s (o teste usa a 42, com folga).
+
+### 22.5 Fase 5: o Bobo Royale Grande (26/11/2026)
+
+- **Medir primeiro** (`local/m11/medir-grande.ts`, Node com JIT, i5-12450H, máquina dividida com outras frentes): com
+  48 participantes no Arquipélago, a sim + IA custa 0,16–0,27 ms por passo em média (p99 1,3–1,8 ms; sim p99 ≤ 0,54,
+  IA p99 ≤ 1,34), contra o orçamento de 2 + 2 ms do PC (tecnico.md §16.2); o Mini com 24 custa 0,06–0,13 (p99
+  0,4–0,9). Com 64 (o teto do motor), 0,28–0,35 ms (p99 2,2–2,4). No Edge headless com a RTX 2050, 60 fps com 48
+  (quadro p99 17,4–18,0 ms, CPU p50 3,0–4,6 ms, 102 draws e 102 mil triângulos por vista). **O número é 48** (o alvo do
+  GDD; pergunta AL1): cabe com folga; 64 caberia na CPU, mas o mapa tem 59 largadas e o render e a memória não foram
+  medidos lá. Números no `PERF.md` §1s.
+- **O mapa** (`assets-src/maps/archipelago.ts`, `map:archipelago`, "Arquipélago", nome provisório): grade de
+  400 × 32 × 400 m (800 × 64 × 800 células), área jogável de 380 × 380 m, de dia, gerado por código como a Ilha (o
+  relevo é um ruído de valor da semente do mapa, em degraus de meio bloco; o mar é raso e andável). A ilha grande no
+  meio (a vila com a praça, 16 casas e o galpão de 14 × 10 m; o morro do norte com a caixa d'água; as estradas de
+  terra) e 4 ilhas ligadas a ela por baixios de areia: a do Farol, a do Porto (o pátio de contêineres, o depósito e o
+  píer), a da Fazenda (o celeiro, a casa, o silo, o feno e a roça de milho) e a do Acampamento (6 barracas em roda, a
+  cabana e a torre de rádio de 14 m). 6 ilhotas com um coqueiro, 480 árvores, mato. Modo só `royale.grande`;
+  `meta.botCaps` 0 fora do PC.
+  - **104 pontos de loot** (as casas, o galpão, o porto, o celeiro, as barracas e caixotes no campo) e **59 largadas
+    sem time** (uma grade de 24 m em quincunce sobre a terra e 4 na praça; com 48 solo, o Royale escolhe as mais
+    afastadas).
+  - **O `mapc`:** 158.850 nós de navegação (142.047 jogáveis, 25 componentes), `.bfmap` de 77,3 KB (294,5 KB cru),
+    629 chunks densos (39,3 MB na memória); 3 avisos que ficam (a grade, a cobertura do campo aberto até 15,8 m e 10
+    nós de topo de pulo em 4 lugares: caixotes do galpão, o feno, a torre). Compila em 60–100 s.
+  - **A visada:** declarada 560 m. Nenhum mapa aberto de 380 m cabe nos 200 m de antes (sobre a água a vista vai de
+    ponta a ponta), e a medida par a par é quadrática nos nós (horas aqui). `MAX_DECLARED_SIGHT_LINE_M` foi para 600;
+    o mapa se declara aberto (`analysis.openSight`) e o `mapc` pula a medida quando a declarada cobre a diagonal da
+    área com a altura da grade (aqui 538,4 m); o aberto com a declarada abaixo da diagonal é erro. O que se vê continua
+    limitado pela distância de visão da partida (140 m no PC). Os outros mapas medem como sempre.
+  - **O mapc mais rápido:** os colisores das props em baldes de 8 m no plano, visitados na ordem dos índices: o mesmo
+    resultado (os 12 `.bfmap` de antes iguais byte a byte).
+  - **O loot:** `MAX_LOOT_SPOTS` foi de 64 para 112. O chão nunca passa da largada (quem morre só solta o que pegou do
+    chão, a troca de arma solta uma e pega outra, o colete trocado some): 112 × 2 = 224, dentro do pool de 256. A
+    escada de armas, que dava uma primária a mais por abate, agora só vale no FFA e no TDM (`LADDER_MODES`; fora deles
+    o validador a tira com aviso).
+- **O modo** (`mode:royale.grande`, "Bobo Royale Grande", só acrescentado): um id novo e não uma variante do Mini,
+  porque o `royale.mini` diz "Mini" no id (que nunca muda) e o build antigo recusa o modo desconhecido (não roda a zona
+  do Mini num mapa de 400 m). `ROYALE_MODES` e `isRoyaleMode` (`format`) no lugar das comparações com `royale.mini`
+  (a sim, a IA, a cena, o dono; o validador do mapa pede o loot nos dois). A mesma sim e a mesma IA do Mini, com:
+  - **A zona** (`ROYALE.zoneGrande`): 6 fases, 120+90, 90+70, 75+55, 60+45, 45+35 e 30+30 s (12,4 min até fechar),
+    até 170, 110, 65, 35, 15 e 0 m, com 2, 4, 8, 12, 20 e 40 HP/s. O HUD lê "ZONA 1 DE 6".
+  - **O teto:** `PlatformProfile.royaleGrandeMaxParticipants` (48 no PC; 0 no PC em 3–4 vistas, no celular e no
+    Switch), à parte do `maxBots` (os 40 do PC seguem em todo o resto). No Grande, os bots são cortados em 48 − humanos;
+    0 recusa a receita (`recipe.modeNotOnPlatform`, "Este modo só roda no PC.").
+  - **Onde aparece:** o botão "Grande" ao lado do Bobo Royale, no mesmo card da página Mais modos, só no PC; você e
+    47 bots, solo. O Aquário assiste (48 bots). Na sala online, o mesmo botão no card do Royale, só com o host no PC,
+    em duplas (os amigos tomam lugar de bots; com um celular na sala, o menor teto: 12 bots). A cena de bench
+    `scene=archipelago`.
+- **A revisão (Opus) achou**, e foi corrigido antes do commit:
+  - **o jogo caía em vez de recusar o Grande** fora do PC (o sofá com 3 controles depois de jogar o Grande, ou um
+    backup do PC com ele nos recentes, no celular): o menu agora confere se o aparelho roda a receita antes de abrir a
+    cena (`playableOn` em `game/src/maps.ts`). O JOGAR, os recentes e os favoritos e a receita inicial da sala pulam
+    o Grande fora do PC, e o sofá nunca o oferece; se algum caminho ainda chegar com ele, o `requestScene` volta ao
+    título com "Este modo só roda no PC." no lugar do resumo do JOGAR (`TitleState.note`). O save guarda o preset (o
+    backup que volta ao PC não o perde). A cena abre o Grande sempre com 1 vista (`sceneViews`, perfil `pc`);
+  - **alguém entrava no meio do Grande pelo sofá:** quem decide é o `couchJoinAllowed` (`scene/match.ts`), que nega
+    no Grande (o GDD: "local web não");
+  - **a sala com host no celular não recusava o Grande:** o `roomRecipeFor` (`online-presets.ts`) troca o Grande
+    pelos Times quando o host não é PC;
+  - **a escada de armas no Royale** podia estourar o pool de pickups (acima).
+  Testes: `game.test.ts` (os dois cenários pelo jogo), `royale-grande.test.ts`, `share-import.test.ts`,
+  `match-recipe.test.ts` e `ui/screens/title-note.test.ts`.
+- **A IA:** o LOD C do Mini (60 m) vale igual. No Grande, o bot vai para o círculo novo 40 s antes de encolher (20 s no
+  Mini; `AI_ROYALE.zoneHurryGrandeS`). O `bestItem` olha o valor (barato) antes da disputa (que olha todos os bobos):
+  o mesmo resultado, mais barato com 48. A rota longa fica no orçamento de A* de sempre (800 nós por tick; ~3.300
+  pedidos por partida).
+- **O loading:** a cena guardava o `doc` do mapa a partida toda com os chunks decodificados, que já foram copiados para
+  a grade do world; agora saem dele (39 MB a menos no Arquipélago, 11 MB na Ilha). No Edge: 5,0 s (a Ilha 1,5 s); heap
+  máximo 320 MB (a Ilha 152; o tecnico.md §16.3 pede menos de 200 MB; o limite do PC é 4,4 GB); malhas 8,1 MB.
+- **O golden** do Royale Grande (`game/scene/golden.test.ts`): 48 bots Normal no Arquipélago, semente 42, a partida
+  inteira: `64065dca` (140 s, 45 com primária), mais o teste das duplas (24 esquadrões, o caído e o reviver: acaba com um esquadrão de pé). Os
+  de antes não mudaram.
+- **A rede:** sem versão nova (`PROTOCOL_VERSION` 13, snapshot 20); o hash de conteúdo da sala muda (a `ROYALE` ganhou
+  a `zoneGrande`), então o build antigo pede atualização. No `npm run bench:rede` (o caso novo `royale-grande`: host
+  no PC, 4 humanos + 44 bots em duplas, 30 Hz): 12,4 KB/s do host para cada amigo (o TDM do PC com 4 + 40: 18,6 KB/s).
+- **O custo do download:** o mapa só carrega quando é jogado. A primeira partida foi de 958,7 para 959,8 KB (o código
+  do modo); o menu da web, de 334,1 para 334,7 KB de 350.
+- **Fica:** o heap de 320 MB no Edge (a grade, a luz, a navegação de 159 mil nós e o pool do A*); o índice de lugares
+  da IA (`NavLevels`) custa ~50 ms no 1º tick (dá para montar no loading); o `.bfmap` do Arquipélago vai no romfs do
+  Switch sem uso (77 KB); o Royale só com bots acaba em 2,5 a 7 min (como o Y7 do Mini); o Surpreenda-me não sorteia o
+  Grande; o amigo no celular que entra na sala do Grande carrega o Arquipélago inteiro (não medido).

@@ -1,4 +1,20 @@
+import { selectPlatformProfile, type MatchRecipe, type PlatformFamily } from '@boboforces/format';
 import { t, type StringKey } from '@boboforces/ui';
+
+/**
+ * M11 (fase 5, revisão): o aparelho roda esta receita? O Bobo Royale Grande só no PC (`royaleGrandeMaxParticipants`
+ * do perfil de 1 vista; 0 no celular e no Switch). Os outros modos rodam em todo aparelho (o validador corta os bots).
+ * O menu confere antes de abrir a partida: o JOGAR, os recentes, os favoritos, o sofá e a sala pulam o que não roda, e o
+ * resto recusa com o aviso no título, em vez de deixar a cena recusar a receita (o erro fatal).
+ */
+export function playableOn(recipe: MatchRecipe, family: PlatformFamily): boolean {
+  return recipe.mode !== 'royale.grande' || selectPlatformProfile(family, 1).royaleGrandeMaxParticipants > 0;
+}
+
+/** M11 (fase 5, revisão): o modo é de 1 vista só (o Royale Grande: sem sofá, ninguém entra no meio). */
+export function soloViewMode(mode: string): boolean {
+  return mode === 'royale.grande';
+}
 
 /**
  * M2 (fase 5c): os mapas dos menus e os modos de cada um (os mesmos do `meta.modes` do `.bfmap`, conferidos no teste:
@@ -16,6 +32,7 @@ export const MENU_MAPS = [
   'moonbase',
   'paint-hall',
   'farm',
+  'archipelago',
 ] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
@@ -45,6 +62,8 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   // M10 (fase 5): a Fazenda à noite, o 2º mapa do Bobo Zombies (e do Fortress). Sem Sandbox: as janelas e as portas
   // pagas valem em todo modo no mapa que as tem, e os times ficariam presos na casa.
   farm: ['zombies'],
+  // M11 (fase 5): o Arquipélago, o mapa do Bobo Royale Grande (~400 m, 48 participantes, só PC).
+  archipelago: ['royale.grande'],
 };
 
 /**

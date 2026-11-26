@@ -476,6 +476,46 @@ medidos (60 s a 60 Hz); sonda em `local/m10/medir-m10.ts`. O TDM é 4 contra 4 b
   custa o mesmo que o TDM.
 - O menu da web: 334,1 KB de 350; a primeira partida no Construto: 958,7 KB de 1 MB (size-check).
 
+## 1s. O Bobo Royale Grande (M11, fase 5; 26/11/2026, 0.0.1 local, i5-12450H)
+
+O Royale Grande (`royale.grande`) no Arquipélago (`archipelago`, 400 × 400 m), solo. Sim + IA headless (Node com JIT),
+cada partida até o fim; sonda em `local/m11/medir-grande.ts` (`node --expose-gc local/m11/medir-grande.ts 48 900
+1,2,3`; o Mini com `MODO=royale.mini MAPA=island … 24`), medida com outras frentes rodando testes na mesma máquina. O
+humano das linhas "1 +" fica parado (liga o LOD C).
+
+| Caso | Duração | Média (ms) | p50 | p99 | Máx | Sim média / p99 | IA média / p99 |
+|---|---|---|---|---|---|---|---|
+| Mini, 24 bots na Ilha (ref., sementes 1–2) | 94–127 s | 0,064–0,126 | 0,035–0,052 | 0,39–0,93 | 15–45 | 0,026–0,045 / 0,12–0,32 | 0,039–0,081 / 0,30–0,64 |
+| Grande, 48 bots (sementes 1–3) | 167–289 s | 0,207–0,266 | 0,088–0,145 | 1,48–1,77 | 57–110 | 0,083–0,099 / 0,41–0,54 | 0,124–0,167 / 1,05–1,34 |
+| Grande, 1 humano + 47 bots (sementes 1–3) | 186–402 s | 0,164–0,258 | 0,073–0,130 | 1,30–1,80 | 44–62 | 0,079–0,107 / 0,41–0,49 | 0,085–0,151 / 0,94–1,29 |
+| Grande, 64 bots (o teto do motor, semente 1) | 177 s | 0,349 | 0,200 | 2,44 | 62 | 0,126 / 0,77 | 0,223 / 1,76 |
+| Grande, 1 humano + 63 bots (semente 1) | 210 s | 0,278 | 0,109 | 2,19 | 80 | 0,113 / 0,62 | 0,165 / 1,62 |
+
+- O máximo é o 1º tick: o índice de lugares da IA (`NavLevels`, Tarjan nos 159 mil nós), uma vez por partida (no
+  Mini, 15–45 ms). Fora dele, os picos ficam abaixo de 5 ms (64 ticks acima de 2 ms em 14 mil;
+  `local/m11/picos-grande.ts`).
+- Com 48, a média é ~2,5× a do Mini com 24 e o p99 fica abaixo de 2 ms, dentro do orçamento do PC (sim 2 + IA 2 ms,
+  tecnico.md §16.2). Com 64, ainda cabe (p99 2,2–2,4 ms), mas o mapa tem 59 largadas: o número é o do GDD, 48.
+- A partida só com bots acaba em 2,5 a 7 min: os bots brigam cedo e ninguém morre pela zona (como o Y7 do Mini).
+
+| Medida | Arquipélago (Royale Grande, 48) | Ilha Tropical (Royale Mini, 24) |
+|---|---|---|
+| `.bfmap` | 77,3 KB (294,5 KB cru) | 27,5 KB |
+| Grade em memória | 629 chunks densos = 39,3 MB | 171 = 10,7 MB |
+| Navegação | 158.850 nós (142.047 jogáveis) | 39.686 (33.086) |
+| Montar no Node (decode / grade e props / navegação) | 50 / 170 / 593–623 ms | 34 / 66 / 262 ms |
+| `mapc` (compilar o mapa, máquina dividida) | 60–100 s (a visada não é medida: a declarada cobre a diagonal) | 31 s (30,7 na visada) |
+| Edge headless, RTX 2050 (`--gpu-alto`), 1 vista, visão 140, 60 s | loading 5.019 ms (malha 1.837, luz 1.266, nav 832); 60,0 fps, quadro p99 17,4 / máx 19,7 ms; cpu p50 4,6 / p99 9,8 ms; 102 draws e 102 mil triângulos; heap máx 320 MB (351 antes de tirar os chunks do `doc`); malhas 8,1 MB | loading 1.507 ms; 60,0 fps, p99 17,9; cpu 1,8 / 5,0; 57,8 draws e 51,6 mil triângulos; heap máx 152 MB; malhas 2,9 MB |
+
+- O bench do Edge: `npm run build && npm run bench -- --scene archipelago --vistas 1 --bots 47 --visao 140
+  --duration 60 --gpu-alto` (todos com 1.000 de vida: a partida dura o bench todo).
+- **O heap passa do orçamento** do tecnico.md §16.3 (menos de 200 MB; o limite do heap no PC é 4,4 GB): a grade (39
+  MB), a luz, a navegação de 159 mil nós e o pool do A* (8 áreas × 24 B × 159 mil = 30 MB). Sem efeito no quadro; fica
+  como pendência.
+- **A rede** (`npm run bench:rede -- --caso royale-grande`, host no PC, 4 humanos + 44 bots em duplas, 30 Hz, 60 s):
+  12,4 KB/s do host para cada amigo e 3,6 KB/s de volta, a maior mensagem no teto (1.100 B, o snapshot vai em partes);
+  no host, por quadro a 30 fps: sim 0,69, IA 1,48 e rede 0,56 ms. O TDM do PC (4 + 40) no mesmo dia: 18,6 KB/s.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |
@@ -593,3 +633,4 @@ Valores iniciais em tecnico.md §16.1 (conservadores). Registre só as mudanças
 | 03/11/2026 | `pc`, `pcSplit` | `aiRaysPerTick` / `aiPathNodesPerTick`: — → 16 / 800 [PROPOSTA] | campos novos do M1 (orçamento da IA por perfil, sim-ia + integração); bench do PC: IA média 0,21 ms por tick com 28 bots (verificação) |
 | 03/11/2026 | `mobile`, `switch1p`, `switch2p`, `switch34p` | `aiRaysPerTick` / `aiPathNodesPerTick`: — → 12 / 600 [PROPOSTA] | campos novos do M1; Eden: IA ~0 de mediana (relógio em ms inteiros), picos de 2–3 ms nas linhas `[bench] pico`. O console decide |
 | 03/11/2026 | todos | `maxBots`, visão e `maxDebris` **mantidos** até o Teste Zero no console | o Eden não aprova nada (tecnico.md §24.3); a RTX 2050 passa com 24 + 4 bobos em 4 vistas. O `maxDebris` só passou a valer no render na verificação (antes todo perfil rodava com 200) |
+| 26/11/2026 | todos | `royaleGrandeMaxParticipants` (campo novo, M11 fase 5): — → 48 no `pc`; 0 no `pcSplit`, no celular e no Switch (o Royale Grande só roda no PC; o `maxBots` 40 do PC não mudou) | §1s: com 48 no Arquipélago, sim + IA 0,16–0,27 ms por passo (p99 1,3–1,8) e 60 fps no Edge com a RTX 2050 |

@@ -9,7 +9,7 @@ import type { ViewDesc } from '@boboforces/render/data';
 import { teamColorTable } from '../team-colors.ts';
 import { createSceneFigures, type SceneFigures } from './figures.ts';
 import { createConstrutoLoader, type LoadingTimes } from './load.ts';
-import { createConstrutoMatch, profileFor, sceneRecipe, type ConstrutoMatch } from './match.ts';
+import { createConstrutoMatch, profileFor, sceneRecipe, sceneViews, type ConstrutoMatch } from './match.ts';
 import { wardrobeMap } from './wardrobe.ts';
 
 export {
@@ -21,7 +21,7 @@ export {
   type MapWorldInput,
 } from './world.ts';
 export { createConstrutoLoader, type ConstrutoLoader, type LoadedConstruto, type LoadingTimes } from './load.ts';
-export { aiBudgetFor, profileFor, sceneRecipe, type SceneRecipe } from './match.ts';
+export { aiBudgetFor, couchJoinAllowed, profileFor, sceneRecipe, sceneViews, type SceneRecipe } from './match.ts';
 export {
   createSceneFigures,
   figureSetKey,
@@ -51,10 +51,8 @@ const NO_VIEWS: readonly ViewDesc[] = [];
  */
 export function createConstrutoScene(host: SceneHost, request: SceneRequest): Scene {
   const { platform, renderer } = host;
-  const views =
-    request.kind === 'bench' && request.bench
-      ? request.bench.views
-      : Math.max(1, Math.min(4, request.kind === 'play' ? (request.seats?.length ?? 0) : 0));
+  // M11 (fase 5, revisão): o Royale Grande é sempre 1 vista (o perfil de 1 vista; o do sofá recusaria o modo).
+  const views = sceneViews(request);
   const profile = profileFor(platform.features.profileHint, views, request.bench);
   const recipe = sceneRecipe(request, profile);
   // M2 (fase 5c): o mapa da receita (Construto ou Ringue).

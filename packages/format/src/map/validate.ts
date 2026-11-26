@@ -38,14 +38,18 @@ export const MIN_DOMINATION_POINTS = 3;
 /**
  * Maior linha de visão que um mapa pode declarar (teto do PC; Switch 3–4P pede ≤ 50 m, mas isso é do mapa). M7 (fase
  * 5): 200 m, a ilha do Royale Mini (~200 m de lado, decisão #35); a distância de visão da partida limita o que se vê.
+ * M11 (fase 5): 600 m, o Arquipélago do Royale Grande (380 m de área aberta, só PC): a declarada cobre a diagonal da
+ * área, e o que se vê continua limitado pela distância de visão da partida (140 m no PC).
  */
-export const MAX_DECLARED_SIGHT_LINE_M = 200;
+export const MAX_DECLARED_SIGHT_LINE_M = 600;
 /**
- * M7 (fase 5): o Royale pede pontos de loot (um item por ponto, às vezes dois). O teto cabe no pool da sim (256) com as
- * quedas de quem morre (64 × 2 + 24 × 5 = 248; revisão da fase 6).
+ * M7 (fase 5): o Royale pede pontos de loot (um item por ponto, às vezes dois). M11 (fase 5): o teto foi de 64 para 112
+ * (o Arquipélago do Royale Grande, 48 participantes): os itens do chão nunca se multiplicam (quem morre só solta o que
+ * pegou do chão, a troca de arma solta uma e pega outra, o colete trocado some), então o chão nunca passa da largada,
+ * 112 × 2 = 224, dentro do pool da sim (256).
  */
 export const MIN_ROYALE_LOOT_SPOTS = 24;
-export const MAX_LOOT_SPOTS = 64;
+export const MAX_LOOT_SPOTS = 112;
 /**
  * M10 (fase 4): a faixa da gravidade de série do mapa (`MapMeta.gravity`), a mesma da regra de gravidade da receita
  * (`RECIPE_RANGES.gravity`, o perfil Personalizado). As duas se multiplicam na sim, que não deixa o produto passar
@@ -317,9 +321,9 @@ export function validateMapImpl(doc: MapDocument, options: MapValidationOptionsI
     if (!finite(d.x, d.y, d.z, d.radius) || d.radius <= 0) err(`site ${d.id} inválido`);
     else if (!inArea(d.x, d.z)) err(`site ${d.id} fora da playArea`);
   });
-  // M7 (fase 5): o Royale pede pontos de loot (dentro da área, com nome único).
+  // M7 (fase 5): o Royale pede pontos de loot (dentro da área, com nome único). M11 (fase 5): o Grande também.
   const loot = mk.lootSpots ?? [];
-  if (modes.has('royale.mini') && loot.length < MIN_ROYALE_LOOT_SPOTS) {
+  if ((modes.has('royale.mini') || modes.has('royale.grande')) && loot.length < MIN_ROYALE_LOOT_SPOTS) {
     err(`Royale: ${loot.length} pontos de loot (mínimo ${MIN_ROYALE_LOOT_SPOTS})`);
   }
   if (loot.length > MAX_LOOT_SPOTS) err(`${loot.length} pontos de loot (máximo ${MAX_LOOT_SPOTS})`);

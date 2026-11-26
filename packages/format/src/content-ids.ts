@@ -50,6 +50,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'mode:juggernaut',
   'mode:chaos',
   'mode:training',
+  // M11 (fase 5): o Bobo Royale Grande, só no PC (GDD §4.1.3; só acrescentado, regra 20)
+  'mode:royale.grande',
   // Mapas
   'map:construto',
   'map:ringue',
@@ -71,6 +73,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:paint-hall',
   // M10 (fase 5): a Fazenda à noite, o 2º mapa do Bobo Zombies (só acrescentado, regra 20)
   'map:farm',
+  // M11 (fase 5): o Arquipélago, o mapa do Bobo Royale Grande (só acrescentado, regra 20)
+  'map:archipelago',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

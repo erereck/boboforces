@@ -58,6 +58,12 @@ export interface PlatformProfile {
   readonly figureHalfRate: boolean;
   /** Quantos looks de `FIGURE_BOT_ROTATION` os bots usam (§B15): cada look custa uma skin por time no loading. */
   readonly figureBotLooks: number;
+  /**
+   * M11 (fase 5): o teto de participantes (humanos + bots) do Bobo Royale Grande (`royale.grande`, GDD §4.1.3: "só PC,
+   * alvo de 48"), à parte do `maxBots` (os 40 do PC continuam valendo nos outros modos). 0 = o modo não roda aqui (o
+   * celular, o Switch e o PC em 3–4 vistas: o GDD não põe o Grande no sofá).
+   */
+  readonly royaleGrandeMaxParticipants: number;
 }
 
 export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfile>> = {
@@ -83,6 +89,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 40,
     figureHalfRate: false,
     figureBotLooks: 6,
+    royaleGrandeMaxParticipants: 48,
   },
   pcSplit: {
     id: 'pcSplit',
@@ -106,6 +113,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 40,
     figureHalfRate: false,
     figureBotLooks: 6,
+    royaleGrandeMaxParticipants: 0,
   },
   mobile: {
     id: 'mobile',
@@ -129,6 +137,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 20,
     figureHalfRate: true,
     figureBotLooks: 3,
+    royaleGrandeMaxParticipants: 0,
   },
   switch1p: {
     id: 'switch1p',
@@ -152,6 +161,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 20,
     figureHalfRate: true,
     figureBotLooks: 3,
+    royaleGrandeMaxParticipants: 0,
   },
   switch2p: {
     id: 'switch2p',
@@ -175,6 +185,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 20,
     figureHalfRate: true,
     figureBotLooks: 3,
+    royaleGrandeMaxParticipants: 0,
   },
   switch34p: {
     id: 'switch34p',
@@ -198,6 +209,7 @@ export const PLATFORM_PROFILES: Readonly<Record<PlatformProfileId, PlatformProfi
     figureNearM: 20,
     figureHalfRate: true,
     figureBotLooks: 3,
+    royaleGrandeMaxParticipants: 0,
   },
 };
 
@@ -227,6 +239,8 @@ export function recipeLimitsFor(profile: PlatformProfile, options: RecipeLimitsO
     maxBots: Math.min(ENGINE_MAX_BOTS, bots),
     maxLocalHumans: profile.family === 'mobile' ? 1 : ENGINE_MAX_LOCAL_HUMANS,
     maxViewDistanceM: profile.maxViewDistanceM,
+    // M11 (fase 5): o Royale Grande tem o teto dele (o mesmo como host: o GDD só o põe online com host PC).
+    maxRoyaleGrandeParticipants: profile.royaleGrandeMaxParticipants,
   };
 }
 
@@ -259,5 +273,7 @@ export function validatePlatformProfile(profile: PlatformProfile): readonly stri
   if (typeof p.figureHalfRate !== 'boolean') out.push(`${p.id}: figureHalfRate precisa ser booleano`);
   if (!int(p.figureBotLooks, 1, MAX_FIGURE_BOT_LOOKS))
     out.push(`${p.id}: figureBotLooks fora de 1..${MAX_FIGURE_BOT_LOOKS}`);
+  if (!int(p.royaleGrandeMaxParticipants, 0, ENGINE_MAX_BOTS + ENGINE_MAX_LOCAL_HUMANS))
+    out.push(`${p.id}: royaleGrandeMaxParticipants fora de 0..${ENGINE_MAX_BOTS + ENGINE_MAX_LOCAL_HUMANS}`);
   return out;
 }

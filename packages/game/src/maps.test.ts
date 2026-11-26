@@ -52,6 +52,24 @@ describe('mapas dos menus', () => {
     expect(map.markers.spawns.every((sp) => sp.team === -1)).toBe(true);
   });
 
+  it('M11 (fase 5): o Arquipélago, só do Royale Grande: 400 m, loot e largadas para 48, só no PC', () => {
+    const map = decodeMap(
+      new Uint8Array(readFileSync(join(ROOT, 'assets-src', 'maps', 'generated', 'archipelago.bfmap'))),
+    );
+    expect(map.grid.sizeX / 2).toBe(400);
+    expect(map.grid.sizeZ / 2).toBe(400);
+    expect(mapsForMode('royale.grande')).toEqual(['archipelago']);
+    expect(map.meta.players.max).toBe(48);
+    // Loot para 48 (a Ilha tem 52 para 24) e uma largada por esquadrão solo, todas sem time.
+    expect(map.markers.lootSpots!.length).toBeGreaterThanOrEqual(96);
+    expect(map.markers.spawns.length).toBeGreaterThanOrEqual(48);
+    expect(map.markers.spawns.every((sp) => sp.team === -1)).toBe(true);
+    // Fora do PC, o mapa não tem bots (o modo nem abre lá: o `royaleGrandeMaxParticipants` do perfil é 0).
+    for (const p of ['pcSplit', 'mobile', 'switch1p', 'switch2p', 'switch34p'] as const) {
+      expect(map.meta.botCaps[p], p).toBe(0);
+    }
+  });
+
   it('Partida Rápida: o Ringue só no TDM, até 4 contra 4; trocar para FFA volta ao Construto', () => {
     let q = quickFromPreset(DEBUT_PRESET, 40);
     q = stepQuick(q, 'map', 1, 40);

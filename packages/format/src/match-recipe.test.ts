@@ -3,6 +3,7 @@ import { formatId } from './format-id.ts';
 import {
   builtinBotRef,
   FALLBACK_BOT_REF,
+  isRoyaleMode,
   MATCH_RECIPE_FORMAT,
   MAX_MODIFIERS,
   MODIFIERS,
@@ -389,5 +390,66 @@ describe('Bobo Zombies (M3, fase 2a)', () => {
     expect(modifiersConflict('giantBots', 'bigHead')).toBe(true);
     expect(modifiersConflict('ricochet', 'oneShot')).toBe(true);
     expect(modifiersConflict('mini', 'ricochet')).toBe(false);
+  });
+});
+
+describe('Bobo Royale Grande (M11, fase 5)', () => {
+  const grande = (humans: 'all' | number, bots: number): Record<string, unknown> => ({
+    format: 'boboforces/preset@1',
+    mode: 'royale.grande',
+    map: 'archipelago',
+    seed: 1,
+    royale: { squad: 'solo' },
+    teams: [{ humans, bots: [{ ref: 'builtin:normal-bob', count: bots }] }],
+  });
+  const total = (r: MatchRecipe): number => r.teams.reduce((s, t) => s + t.bots.reduce((a, b) => a + b.count, 0), 0);
+
+  it('no PC, o teto é de 48 participantes (não os 40 bots do perfil); o Aquário cabe com 48 bots', () => {
+    expect(isRoyaleMode('royale.grande') && isRoyaleMode('royale.mini') && !isRoyaleMode('warfare.ffa')).toBe(true);
+    const r = ok(validateMatchRecipe(grande('all', 47), PC));
+    expect(total(r.value)).toBe(47);
+    expect(r.codes).not.toContain('recipe.botsOverPlatformCap');
+    expect(total(ok(validateMatchRecipe(grande(0, 48), PC)).value)).toBe(48);
+    const cut = ok(validateMatchRecipe(grande(2, 60), PC));
+    expect(total(cut.value)).toBe(46);
+    expect(cut.codes).toContain('recipe.botsOverPlatformCap');
+    // Os outros modos seguem com o teto de bots do perfil.
+    const mini = { ...grande('all', 47), mode: 'royale.mini', map: 'island' };
+    expect(total(ok(validateMatchRecipe(mini, PC)).value)).toBe(40);
+  });
+
+  it('fora do PC, a receita é recusada; sem o teto (as gravações, o cliente online), vale o de bots', () => {
+    expect(errors(validateMatchRecipe(grande('all', 47), MOBILE))).toContain('recipe.modeNotOnPlatform');
+    const switch1 = recipeLimitsFor(PLATFORM_PROFILES.switch1p);
+    expect(errors(validateMatchRecipe(grande('all', 47), switch1))).toContain('recipe.modeNotOnPlatform');
+    const storage: RecipeLimits = { maxBots: 64, maxLocalHumans: 4, maxViewDistanceM: 140 };
+    expect(total(ok(validateMatchRecipe(grande('all', 47), storage)).value)).toBe(47);
+    expect(ISSUE_CODES).toContain('recipe.modeNotOnPlatform');
+  });
+
+  it('revisão: a escada do Gun Game só vale no FFA e no TDM; no Royale (e nos outros) sai com aviso', () => {
+    const ladder = ['rifle', 'smg', 'knife'];
+    const withLadder = (mode: string, map: string): Record<string, unknown> => ({
+      ...grande('all', 3),
+      mode,
+      map,
+      weapons: { ladder, ammo: 'infiniteReserve' },
+    });
+    for (const [mode, map] of [
+      ['royale.grande', 'archipelago'],
+      ['royale.mini', 'island'],
+      ['zombies', 'base'],
+      ['strike', 'airbase'],
+    ] as const) {
+      const r = ok(validateMatchRecipe(withLadder(mode, map), PC));
+      expect(r.value.weapons?.ladder, mode).toBeUndefined();
+      expect(r.value.weapons?.ammo, mode).toBe('infiniteReserve');
+      expect(r.codes, mode).toContain('recipe.invalidField');
+    }
+    for (const mode of ['warfare.ffa', 'warfare.tdm']) {
+      const r = ok(validateMatchRecipe(withLadder(mode, 'construto'), PC));
+      expect(r.value.weapons?.ladder, mode).toEqual(ladder);
+      expect(r.codes, mode).not.toContain('recipe.invalidField');
+    }
   });
 });

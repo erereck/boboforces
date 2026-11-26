@@ -56,6 +56,7 @@ import {
   hostSnapshotHz,
   ROOM_MODES,
   roomLimits,
+  roomRecipeFor,
   roomPreset,
   type RoomLimits,
   type RoomMode,
@@ -254,6 +255,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     return roomLimits(
       platform.features.profileHint,
       friends.some((m) => m.slot !== 0 && m.mobile === true),
+      recipe.mode,
     );
   }
 
@@ -434,7 +436,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
 
   /** M5 (fase 6a): a partida nova da sala (os amigos veem o resumo). */
   function useRecipe(r: OnlineRoom, picked: MatchRecipe, card: RoomMode): void {
-    recipe = picked;
+    // M11 (fase 5, revisão): o Royale Grande só com o host no PC (fora dele, a sala troca pelo Times).
+    recipe = roomRecipeFor(picked, platform.features.profileHint);
     lastCard = card;
     sentSummary = '';
     publishSummary(r);
@@ -442,7 +445,7 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
   }
 
   function createRoom(): void {
-    recipe = deps.initialRecipe();
+    recipe = roomRecipeFor(deps.initialRecipe(), platform.features.profileHint);
     lastCard = ROOM_MODES[0];
     team = -1;
     ready = true;
@@ -615,7 +618,8 @@ export function createOnlineFlow(deps: OnlineFlowDeps): OnlineFlow {
     builtView = view;
     if (page === 'privacy') menu.setRoot(onlinePrivacyScreen.build({}));
     else if (page === 'home') menu.setRoot(onlineHomeScreen.build({ name: nameDraft ?? profile.name, note }));
-    else if (page === 'match') menu.setRoot(onlineMatchScreen.build(null));
+    else if (page === 'match')
+      menu.setRoot(onlineMatchScreen.build({ pcHost: platform.features.profileHint === 'pc' }));
     else if (page === 'join') {
       menu.setRoot(onlineJoinScreen.build({ code, length: rooms.codeLength, ready: codeReady(), note }));
     } else if (page === 'status') {

@@ -1,5 +1,6 @@
 import {
   botLevelFromRef,
+  isRoyaleMode,
   LEVEL_ORDER,
   PERSONALITY_PRESETS,
   personalityForRoll,
@@ -228,8 +229,9 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
   ctx.zombiesMode = recipe.mode === 'zombies';
   ctx.juggernaut = recipe.mode === 'juggernaut';
   // M7 (fase 7): no Royale a vida também não volta (só o kit cura).
-  ctx.noRegen = recipe.mode === 'paintball' || recipe.mode === 'royale.mini';
-  ctx.royaleMode = recipe.mode === 'royale.mini';
+  ctx.noRegen = recipe.mode === 'paintball' || isRoyaleMode(recipe.mode);
+  ctx.royaleMode = isRoyaleMode(recipe.mode);
+  ctx.royaleGrande = recipe.mode === 'royale.grande';
   ctx.sandboxHunt = recipe.mode === 'sandbox' && recipe.sandbox?.objective === 'elimination';
   ctx.royaleClaims = ctx.royaleMode ? new RoyaleClaims() : null;
   ctx.hordeArmed = ctx.zombiesMode && recipe.zombies?.variant === 'armed';

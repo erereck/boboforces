@@ -1,4 +1,4 @@
-import { SANDBOX_DEFAULTS, type BotRef, type MatchRecipe } from '@boboforces/format';
+import { isRoyaleMode, SANDBOX_DEFAULTS, type BotRef, type MatchRecipe } from '@boboforces/format';
 import { assert } from '@boboforces/shared';
 import { BOT_CONTROLLER_BASE, MAX_BOTS, MAX_HUMANS, MAX_TEAMS } from './constants.ts';
 
@@ -81,7 +81,7 @@ export interface MatchLimits {
  */
 export function matchLimits(recipe: MatchRecipe): MatchLimits {
   const rounds = recipe.mode === 'strike' || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
-  if (rounds || recipe.mode === 'royale.mini') return { timeLimitS: 0, scoreLimit: 0 };
+  if (rounds || isRoyaleMode(recipe.mode)) return { timeLimitS: 0, scoreLimit: 0 };
   const time = recipe.match?.timeLimitS;
   const score = recipe.match?.scoreLimit;
   if (recipe.mode !== 'sandbox') return { timeLimitS: time ?? 0, scoreLimit: score ?? 0 };

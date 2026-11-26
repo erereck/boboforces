@@ -268,7 +268,11 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     for (const k of world.missingBlocks) warnings.push(`bloco sem definição: ${k}`);
     for (const k of world.missingLayers) warnings.push(`camada sem textura: ${k}`);
     for (const k of world.missingModels) warnings.push(`modelo ausente no pacote: ${k}`);
-    const [sx, sy, sz] = doc!.light.sunDir;
+    // M11 (fase 5): a grade decodificada já foi copiada para a do world, e a cena guarda o `doc` (os marcadores e a
+    // luz) a partida toda: os chunks saem dele (no Arquipélago do Royale Grande, 39 MB a menos; na Ilha, 11 MB).
+    doc = { ...doc!, grid: { ...doc!.grid, chunks: [] } };
+    world = { ...world, map: doc };
+    const [sx, sy, sz] = doc.light.sunDir;
     lightJob = createLightJob(world.grid, world.registry, {
       sunDirX: sx,
       sunDirY: sy,

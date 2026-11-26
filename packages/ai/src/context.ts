@@ -55,6 +55,8 @@ export class AiContext {
   sandboxHunt = false;
   /** M7 (fase 7): o Bobo Royale (o loot, a zona e o LOD C) e quem mira cada item do chão. */
   royaleMode = false;
+  /** M11 (fase 5): o Royale Grande (o mapa de 380 m: vai para a zona nova mais cedo). */
+  royaleGrande = false;
   royaleClaims: RoyaleClaims | null = null;
   strikeRound = 0;
   strikeSite = 0;

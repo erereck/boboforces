@@ -20,6 +20,12 @@ export interface RecipeLimits {
   readonly maxBots: number;
   readonly maxLocalHumans: number;
   readonly maxViewDistanceM: number;
+  /**
+   * M11 (fase 5): o teto de participantes (humanos + bots) do Bobo Royale Grande neste aparelho, no lugar do `maxBots`
+   * (`PlatformProfile.royaleGrandeMaxParticipants`). 0 = o modo não roda aqui (a receita é recusada); ausente = sem teto
+   * próprio (o do motor: as gravações, o bench, o cliente online, que não corta a receita do host).
+   */
+  readonly maxRoyaleGrandeParticipants?: number;
 }
 
 /**
@@ -60,6 +66,8 @@ export const ISSUE_CODES = [
   'recipe.viewDistanceOverPlatformCap',
   // M10 (fase 8): dois times com a mesma cor (o de depois troca)
   'recipe.duplicateTeamColor',
+  // M11 (fase 5): o modo não roda neste aparelho (o Bobo Royale Grande fora do PC)
+  'recipe.modeNotOnPlatform',
   // Bot (M2, fase 3a): campo de tipo errado (ignorado) e valor fora da faixa (limitado)
   'bot.invalidField',
   'bot.valueClamped',

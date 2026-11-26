@@ -2928,11 +2928,21 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.tap('Escape');
     expect(game.screen).toBe('online');
     expect(summaries().length).toBe(before);
-    // O Surpreenda-me (em cima, à direita do Royale): uma partida sorteada, TDM ou FFA no Construto.
+    // M11 (fase 5): com o host no PC, o card do Royale tem o "Grande" do lado (o Royale Grande no Arquipélago).
     platform.tap('ArrowUp');
     platform.tap('ArrowRight');
     platform.tap('Enter');
     expect(summaries().length).toBe(before + 1);
+    expect(summaries().at(-1)).toMatch(/^summary:Royale Grande · .*Arquipélago:false$/);
+    expect(
+      platform.logLines.some((l) => l.includes('partida da sala: royaleGrande (royale.grande, archipelago)')),
+    ).toBe(true);
+    // De novo (o foco volta no Grande): o Surpreenda-me, à direita dele, sorteia TDM ou FFA no Construto.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('ArrowRight');
+    platform.tap('Enter');
+    expect(summaries().length).toBe(before + 2);
     expect(summaries().at(-1)).toMatch(/^summary:(Times|Todos).*Construto:(true|false)$/);
     game.dispose();
   }, 60_000);
@@ -3174,4 +3184,70 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     expect(game.screen).toBe('couch');
     game.dispose();
   });
+});
+
+describe('M11 (fase 5, revisão): o Royale Grande nunca abre fora do PC nem com mais de uma vista', () => {
+  const grande: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    name: 'Bobo Royale Grande',
+    mode: 'royale.grande',
+    map: 'archipelago',
+    seed: 0,
+    royale: { squad: 'solo' },
+    teams: [{ humans: 'all', bots: [{ ref: builtinBotRef('normal'), count: 47 }] }],
+  };
+  /** O save de quem jogou o Grande por último (no PC, ou num backup do PC restaurado). */
+  const store = { presets: JSON.stringify({ recent: [grande], saved: [], favorites: [], botFavorites: [] }) };
+
+  it('no PC, o sofá com 3 controles não abre o Grande (o último jogado): joga a partida do sofá, sem erro', async () => {
+    const { platform, game, events } = await bootToTitle('web', {}, store);
+    expect(game.save.presets.recent[0]!.mode).toBe('royale.grande');
+    titleTo(platform, 'couch');
+    expect(game.screen).toBe('couch');
+    for (const k of [1, 2]) {
+      const pad = platform.rawNext.gamepads[k]!;
+      pad.connected = true;
+      pad.id = `controle ${k + 1}`;
+      pad.buttons[PAD_BUTTON.faceDown] = 1;
+      platform.pump(1);
+      pad.buttons[PAD_BUTTON.faceDown] = 0;
+      platform.pump(1);
+    }
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    expect(platform.logLines.some((l) => l.includes('sofá: 3 jogadores'))).toBe(true);
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] archipelago'))).toBe(false);
+    expect(platform.logLines.some((l) => l.includes('perfil=pcSplit vistas=3'))).toBe(true);
+    expect(events.filter((e) => e.startsWith('error'))).toEqual([]);
+    game.dispose();
+  }, 120_000);
+
+  it('no celular, com o Grande de um backup do PC nos recentes, o JOGAR joga o que o aparelho roda, sem erro', async () => {
+    const platform = createFakePlatform({ store });
+    (platform.features as { profileHint: string }).profileHint = 'mobile';
+    const events: string[] = [];
+    const game = startGame({
+      platform,
+      createRenderer: null,
+      nullRenderer: createNullRenderer,
+      loadScene,
+      loadEditors,
+      hooks: { onError: (e) => events.push(`error ${String(e)}`) },
+    });
+    platform.pump(2);
+    await settle();
+    platform.pump(2);
+    expect(game.screen).toBe('title');
+    // O JOGAR (o foco abre nele) pula o Grande: a partida de estreia.
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
+    await untilRunning(platform, game);
+    expect(platform.logLines.some((l) => l.includes('[cena] archipelago'))).toBe(false);
+    expect(platform.logLines.some((l) => l.includes(`[cena] ${DEBUT_PRESET.map} (play) perfil=mobile`))).toBe(true);
+    expect(events).toEqual([]);
+    // O preset continua no save (o backup de volta ao PC ainda tem o Grande).
+    expect(game.save.presets.recent.some((p) => p.mode === 'royale.grande')).toBe(true);
+    game.dispose();
+  }, 120_000);
 });

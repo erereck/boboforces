@@ -381,6 +381,42 @@ describe('Bobo Royale na sim (M7 fase 6)', () => {
     sim.dispose();
   });
 
+  it('M11 (fase 5): o Royale Grande tem a zona dele (6 fases, ~12 min) e acaba com um vencedor', () => {
+    const grande: MatchRecipe = { ...recipe('solo', 5), mode: 'royale.grande' };
+    const sim = createSim({ recipe: grande, map: flatMap(), humans: 2 });
+    const v = sim.view();
+    const ro = v.royale!;
+    expect(ro.zone).toBe(ROYALE.zoneGrande);
+    expect(ro.zone.length).toBe(6);
+    let total = 0;
+    for (const z of ROYALE.zoneGrande) total += z.waitS + z.shrinkS;
+    expect(total).toBeGreaterThanOrEqual(12 * 60);
+    expect(total).toBeLessThanOrEqual(15 * 60);
+    expect(ro.data[ZONE.ticks]).toBe(ROYALE.zoneGrande[0]!.waitS * SIM_HZ);
+    // Sem tempo nem meta (como o Mini): quem acaba é o último esquadrão.
+    expect(v.match.ticksLeft).toBe(-1);
+    const f = createInputFrames();
+    const a = entity(sim, 0);
+    const b = entity(sim, 1);
+    // O 1 fica no meio do próximo círculo; o 0 fica de fora e a zona o derruba: o 1 vence.
+    let stages = 0;
+    for (let t = 0; t < (total + 10) * SIM_HZ && v.match.phase !== 'ended'; t++) {
+      v.health[b] = 100;
+      put(sim, b, ro.circle[CIRCLE.toCx]!, ro.circle[CIRCLE.toCz]!);
+      put(sim, a, 1, 1);
+      const before = ro.data[ZONE.stage]!;
+      sim.step(f);
+      if (ro.data[ZONE.stage] !== before) stages++;
+    }
+    expect(v.match.phase).toBe('ended');
+    expect(v.flags[a]! & DEAD).not.toBe(0);
+    expect(v.flags[b]! & DEAD).toBe(0);
+    expect(ro.data[ZONE.winner]).toBe(v.team[b]);
+    expect(v.match.winnerTeam).toBe(v.team[b]);
+    expect(stages).toBeGreaterThan(0);
+    sim.dispose();
+  });
+
   it('determinístico: a mesma semente, o mesmo loot e o mesmo hash', () => {
     const run = (): string => {
       const sim = createSim({ recipe: recipe('solo', 21), map: flatMap(), humans: 4 });

@@ -44,6 +44,8 @@ interface Case {
   readonly snapshotHz: number;
   /** O pool de zumbis do host (0 fora do Bobo Zombies). */
   readonly zombies: number;
+  /** M11 (fase 5): o time escolhido por cada humano (padrão 0, 1, 0, 1; -1 = tanto faz, como no Royale). */
+  readonly teams?: readonly number[];
 }
 
 const normal = builtinBotRef('normal');
@@ -100,6 +102,22 @@ const CASES: readonly Case[] = [
     snapshotHz: 30,
     zombies: 60,
   },
+  // M11 (fase 5): o Royale Grande da sala (em duplas no Arquipélago), host no PC: 4 humanos + 44 bots.
+  {
+    id: 'royale-grande',
+    title: 'Royale Grande, host no PC: 4 humanos + 44 bots em duplas, 30 Hz',
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'royale.grande',
+      map: 'archipelago',
+      seed: 0,
+      royale: { squad: 'duo' },
+      teams: [{ humans: 'all', bots: [{ ref: normal, count: 47 }] }],
+    },
+    snapshotHz: 30,
+    zombies: 0,
+    teams: [-1, -1, -1, -1],
+  },
 ];
 
 /** Cada humano anda, vira e atira, igual em qualquer aparelho (depende só do seq). */
@@ -132,7 +150,7 @@ interface CaseResult {
 function runCase(c: Case): CaseResult {
   const map = loadRealMap(c.recipe.map);
   const loop = net.createLoopback({ seed: 5, latencyMs: 40, jitterMs: 10, loss: 0.01 });
-  const teams = [0, 1, 0, 1];
+  const teams = c.teams ?? [0, 1, 0, 1];
   const placed = onlineRecipe(c.recipe, teams);
   const start: net.LobbyStart = {
     recipe: placed.recipe,
@@ -140,7 +158,7 @@ function runCase(c: Case): CaseResult {
     members: teams.map((team, i) => ({
       slot: i,
       name: `J${i}`,
-      team,
+      team: Math.max(0, team),
       bobo: null,
       ready: true,
       controller: placed.controllers[i]!,

@@ -35,12 +35,23 @@ export const MORE_MODE_CARDS: readonly ModeCard[] = [
 export const MORE_WATCH_ACTION = 'more:watch';
 
 /**
- * M7 (fase 9): a página com o liga/desliga do Aquário: ligado, o card escolhido começa só com bots, para assistir (o
- * Bobo Training continua sendo jogado).
+ * M11 (fase 5): os cards do aparelho: no PC, o card do Bobo Royale ganha o botão "Grande" (o Royale Grande, 48 no
+ * Arquipélago; GDD §4.1.3: só PC). No celular e no Switch ele não aparece.
  */
-export function moreModesRoot(watch: boolean): UiNode {
+export function moreModeCards(pc: boolean): readonly ModeCard[] {
+  if (!pc) return MORE_MODE_CARDS;
+  return MORE_MODE_CARDS.map((c) =>
+    c.id === 'royale' ? { ...c, extra: { id: 'royaleGrande', textKey: 'mode.extra.royaleGrande' } } : c,
+  );
+}
+
+/**
+ * M7 (fase 9): a página com o liga/desliga do Aquário: ligado, o card escolhido começa só com bots, para assistir (o
+ * Bobo Training continua sendo jogado). M11 (fase 5): `pc` = o aparelho é um PC (o botão do Royale Grande).
+ */
+export function moreModesRoot(watch: boolean, pc = false): UiNode {
   return modesScreen.build({
-    modes: MORE_MODE_CARDS,
+    modes: moreModeCards(pc),
     titleKey: 'modes.more.title',
     headingExtra: {
       kind: 'button',
@@ -168,6 +179,18 @@ export function moreModePreset(id: string): MatchRecipe | null {
         seed: 0,
         royale: { squad: 'solo' },
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 23 }] }],
+      };
+    case 'royaleGrande':
+      // M11 (fase 5): o Bobo Royale Grande solo no Arquipélago, 48 participantes (você e 47 bots; só no PC, onde o
+      // `royaleGrandeMaxParticipants` do perfil vale 48: nos outros aparelhos a receita é recusada).
+      return {
+        format: MATCH_RECIPE_FORMAT,
+        name: 'Bobo Royale Grande',
+        mode: 'royale.grande',
+        map: 'archipelago',
+        seed: 0,
+        royale: { squad: 'solo' },
+        teams: [{ humans: 'all', bots: [{ ref: normal, count: 47 }] }],
       };
     case 'juggernautFixed':
       // GDD §4.1.2: a variante Fixo (rodadas de 3 min com rodízio, o "1 contra 3" do sofá) no Construto; com os 3 bots,

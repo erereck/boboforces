@@ -172,6 +172,11 @@ export const STRINGS_PT_BR = {
   'mode.juggernaut': 'Bobo Juggernaut',
   'mode.chaos': 'Bobo Chaos',
   'mode.training': 'Bobo Training',
+  // M11 (fase 5): o Bobo Royale Grande (só PC).
+  'mode.short.royale.grande': 'Royale Grande',
+  'mode.royale.grande': 'Bobo Royale Grande',
+  // M11 (fase 5, revisão): o aviso do título quando o aparelho recusa a partida (o Grande fora do PC).
+  'title.pcOnly': 'Este modo só roda no PC.',
   'map.construto': 'Construto',
   'map.ringue': 'Ringue',
   // M3 (fase 3d): o mapa pequeno do Bobo Zombies (nome provisório).
@@ -190,6 +195,8 @@ export const STRINGS_PT_BR = {
   'map.paint-hall': 'Galpão',
   // M10 (fase 5): o 2º mapa do Bobo Zombies (nome provisório, pergunta AK2).
   'map.farm': 'Fazenda',
+  // M11 (fase 5): o mapa do Bobo Royale Grande (nome provisório).
+  'map.archipelago': 'Arquipélago',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
   'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',

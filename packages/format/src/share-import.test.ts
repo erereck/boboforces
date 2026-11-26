@@ -3,6 +3,7 @@ import { builtinBot, levelBot, type BotDocument } from './bot.ts';
 import { MATCH_RECIPE_FORMAT, type MatchRecipe } from './match-recipe.ts';
 import { encodeShareCode } from './share-code.ts';
 import { importShareCode, SHARE_MAX_EMBEDDED_BOTS } from './share-import.ts';
+import { PLATFORM_PROFILES, recipeLimitsFor } from './platform-profiles.ts';
 import type { RecipeLimits } from './validation.ts';
 
 const limits: RecipeLimits = { maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 150 };
@@ -129,5 +130,26 @@ describe('M8 (fase 1, revisão): os nomes de fora só com o que a fonte desenha'
     expect(empty.ok && empty.kind === 'bot' && empty.bot.name).toBe('');
     const p = importShareCode(code('preset', { ...preset([jorge], 'Festa\u0000 do Bob') }), limits);
     expect(p.ok && p.kind === 'preset' && p.preset.name).toBe('Festa do Bob');
+  });
+});
+
+describe('M11 (fase 5, revisão): o link do Royale Grande', () => {
+  const grande: MatchRecipe = {
+    format: MATCH_RECIPE_FORMAT,
+    mode: 'royale.grande',
+    map: 'archipelago',
+    seed: 0,
+    royale: { squad: 'solo' },
+    teams: [{ humans: 'all', bots: [{ ref: 'builtin:normal-bob', count: 47 }] }],
+  };
+
+  it('abre no PC e é recusado no celular e no Switch, com o motivo (não chega na cena)', () => {
+    const pc = importShareCode(code('preset', grande), recipeLimitsFor(PLATFORM_PROFILES.pc));
+    expect(pc.ok && pc.kind === 'preset' && pc.preset.mode).toBe('royale.grande');
+    for (const id of ['mobile', 'switch1p'] as const) {
+      const r = importShareCode(code('preset', grande), recipeLimitsFor(PLATFORM_PROFILES[id]));
+      expect(r.ok, id).toBe(false);
+      expect(!r.ok && r.issues.map((i) => i.code), id).toContain('recipe.modeNotOnPlatform');
+    }
   });
 });

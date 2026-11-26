@@ -99,6 +99,7 @@ import type * as EditorsModule from './editors.ts';
 import type * as OnlineModule from './online-screens.ts';
 import type { OnlineRoom, OnlineRooms, OnlineSession } from './online-api.ts';
 import { trainingPreset } from './training.ts';
+import { playableOn, soloViewMode } from './maps.ts';
 import { colorName, teamColorIndex } from './team-colors.ts';
 import {
   factoryPresets,
@@ -437,7 +438,12 @@ export function startGame(deps: GameDeps): GameHandle {
    * M2 (fase 4c): o que o JOGAR joga: o último preset (o save guarda os 5 últimos) ou, na primeira vez, a partida de
    * estreia (gameplay.md §2.5).
    */
-  const currentPreset = (): MatchRecipe => save.presets.recent[0] ?? DEBUT_PRESET;
+  /** M11 (fase 5, revisão): o aparelho roda a receita (o Royale Grande só no PC; `playableOn`). */
+  const playableHere = (r: MatchRecipe): boolean => playableOn(r, platform.features.profileHint);
+  /** M11 (fase 5, revisão): o aviso no lugar do resumo do JOGAR ("Este modo só roda no PC."), até a próxima partida. */
+  let titleNote = '';
+  // M11 (fase 5, revisão): o recente que este aparelho não roda (o Grande de um backup do PC) fica para trás.
+  const currentPreset = (): MatchRecipe => save.presets.recent.find(playableHere) ?? DEBUT_PRESET;
   /** O preset da partida em andamento (para De novo, Mais fácil, Mais difícil, Mudar regras e Salvar preset). */
   let playingPreset: MatchRecipe | null = null;
   /** M7 (fase 9): a última partida pedida foi um Aquário (o "De novo" repete assim) e o liga/desliga do Mais modos. */
@@ -453,6 +459,7 @@ export function startGame(deps: GameDeps): GameHandle {
         codename: GAME_CODENAME,
         canExit: platform.features.canExit,
         playSummary: presetSummary(currentPreset()),
+        ...(titleNote !== '' ? { note: titleNote } : {}),
         ...(extraItems.length > 0 ? { extraItems } : {}),
         ...(deps.loadOnline ? { online: true } : {}),
       }),
@@ -724,11 +731,12 @@ export function startGame(deps: GameDeps): GameHandle {
   /** Os atalhos na tela, por grupo, para achar o preset do botão apertado. */
   const quickGroups = new Map<string, readonly MatchRecipe[]>();
   function rebuildQuick(): void {
+    // M11 (fase 5, revisão): só o que este aparelho roda (o Royale Grande de um backup do PC some no celular).
     const favorites = save.presets.favorites
       .map((name) => save.presets.saved.find((p) => p.name === name))
-      .filter((p): p is MatchRecipe => p !== undefined);
+      .filter((p): p is MatchRecipe => p !== undefined && playableHere(p));
     const groups = [
-      { id: 'recent', titleKey: 'quick.recent' as const, presets: save.presets.recent },
+      { id: 'recent', titleKey: 'quick.recent' as const, presets: save.presets.recent.filter(playableHere) },
       { id: 'favorites', titleKey: 'quick.favorites' as const, presets: favorites },
       { id: 'factory', titleKey: 'quick.factory' as const, presets: factoryPresets() },
     ];
@@ -831,6 +839,7 @@ export function startGame(deps: GameDeps): GameHandle {
           platform,
           rooms: bundle.rooms,
           log,
+          // M11 (fase 5, revisão): o `currentPreset` já pula o que o aparelho não roda (o Grande no celular).
           initialRecipe: () => (currentPreset().mode === 'training' ? DEBUT_PRESET : currentPreset()),
           summary: presetSummary,
           pickMatch: (recipe, done) => openCustom(recipe, 'online', done),
@@ -1183,7 +1192,8 @@ export function startGame(deps: GameDeps): GameHandle {
 
   /** A partida da tela: o último preset (o do JOGAR) e os de fábrica. */
   function refreshCouchPresets(): void {
-    const current = currentPreset();
+    // M11 (fase 5, revisão): o Royale Grande não tem sofá (1 vista só): o último jogado fica fora da lista.
+    const current = save.presets.recent.find((p) => playableHere(p) && !soloViewMode(p.mode)) ?? DEBUT_PRESET;
     couchPresets = [current, ...factoryPresets().filter((p) => p.name !== current.name)];
     couchPreset = 0;
   }
@@ -1302,11 +1312,23 @@ export function startGame(deps: GameDeps): GameHandle {
       log('[game] cena indisponível nesta casca (sem loadScene)');
       return;
     }
+    // M11 (fase 5, revisão): a receita que este aparelho não roda (o Royale Grande fora do PC) não abre a cena (ela
+    // recusaria com o erro fatal): volta ao título com o aviso. A sala online traz a receita do host (ele é o PC).
+    if (kind === 'play' && online === null && recipe !== null && !playableHere(recipe)) {
+      log(`[game] ${recipe.mode} recusado: este aparelho não roda o modo`);
+      titleNote = t('title.pcOnly');
+      screen = 'title';
+      refreshTitle();
+      titleMenu.focus(TITLE_ACTION.play);
+      return;
+    }
+    titleNote = '';
     matches++;
     // M3 (fase 1b): os assentos da tela do sofá. O Bobo Training (e a calibração) é de 1 jogador: o treino lê só o
-    // humano 0.
-    const seats =
+    // humano 0. M11 (fase 5, revisão): o Royale Grande também (1 vista só): do sofá, vai só o P1 (o dispositivo dele).
+    const couchSeatsNow =
       kind === 'play' && couchActive && !calibrate && !spectate && recipe?.mode !== 'training' ? couchSeats() : [];
+    const seats = recipe !== null && soloViewMode(recipe.mode) ? couchSeatsNow.slice(0, 1) : couchSeatsNow;
     lastSpectate = spectate;
     if (seats.length >= 2) {
       log(
@@ -1474,8 +1496,9 @@ export function startGame(deps: GameDeps): GameHandle {
   /** M2 (fase 4c): joga um preset: ele vira o último (o do JOGAR) e a partida começa com semente nova. */
   function playPreset(preset: MatchRecipe, spectate = false): void {
     playingPreset = preset;
-    // M7 (fase 9): o Aquário não vira o último preset (o JOGAR continua sendo a última partida jogada).
-    if (!spectate) save.pushRecent({ ...preset, seed: 0 });
+    // M7 (fase 9): o Aquário não vira o último preset (o JOGAR continua sendo a última partida jogada). M11 (fase 5,
+    // revisão): nem o que o aparelho recusa (o `requestScene` volta ao título com o aviso).
+    if (!spectate && playableHere(preset)) save.pushRecent({ ...preset, seed: 0 });
     requestScene('play', null, preset, false, null, spectate);
   }
 
@@ -1814,7 +1837,7 @@ export function startGame(deps: GameDeps): GameHandle {
           else if (id === 'more') {
             withEditors(() => {
               moreWatch = false;
-              moreMenu.setRoot(editors!.moreModesRoot(false));
+              moreMenu.setRoot(editors!.moreModesRoot(false, platform.features.profileHint === 'pc'));
               screen = 'more';
             });
           } else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
@@ -1838,7 +1861,7 @@ export function startGame(deps: GameDeps): GameHandle {
         } else if (a === editors!.MORE_WATCH_ACTION) {
           // M7 (fase 9): o Aquário liga e desliga (o foco fica no botão).
           moreWatch = !moreWatch;
-          moreMenu.setRoot(editors!.moreModesRoot(moreWatch));
+          moreMenu.setRoot(editors!.moreModesRoot(moreWatch, platform.features.profileHint === 'pc'));
         } else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           const preset = editors!.moreModePreset(id);

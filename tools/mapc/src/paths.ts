@@ -21,4 +21,5 @@ export const MAP_IDS = [
   'moonbase',
   'paint-hall',
   'farm',
+  'archipelago',
 ] as const;

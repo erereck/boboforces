@@ -97,6 +97,8 @@ export const STRINGS_ONLINE_PT_BR = {
   'online.mode.zombies.desc': 'Juntos contra as ondas de zumbis.',
   'online.mode.royale': 'Bobo Royale',
   'online.mode.royale.desc': 'Em dupla na Ilha; o último de pé vence.',
+  // M11 (fase 5): o 2º botão do card do Royale com o host no PC (o Royale Grande em duplas, no Arquipélago).
+  'online.mode.royaleGrande': 'Grande',
   'online.mode.surprise.desc': 'Sorteia a partida; de novo, sorteia outra.',
   'online.mode.custom.desc': 'Todas as regras, como no jogo sozinho.',
   // M5 (fase 6b): o host no celular e o menor teto da sala (tecnico.md §13.4; GDD §2).

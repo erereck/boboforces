@@ -10,6 +10,7 @@ import {
   SANDBOX_DEFAULTS,
   ZOMBIES_DEFAULTS,
   royaleSquadSize,
+  isRoyaleMode,
 } from '@boboforces/format';
 import { BUTTON, dequantizeAxis, ORDER_MASK, type InputFrame } from '@boboforces/input';
 import {
@@ -564,7 +565,8 @@ export function createSim(config: SimConfig): Sim {
   const strikeMode = recipe.mode === 'strike';
   const roundsMode = strikeMode || (recipe.mode === 'juggernaut' && recipe.juggernaut?.variant === 'fixed');
   // M7 (fase 6): no Royale, quem acaba a partida é o último esquadrão (a zona fecha em ~8 min): sem tempo nem meta.
-  const royaleMode = recipe.mode === 'royale.mini';
+  // M11 (fase 5): o Royale Grande é a mesma sim, com a zona dele (`ROYALE.zoneGrande`, ~12 min).
+  const royaleMode = isRoyaleMode(recipe.mode);
   // M9 (fase 2): no Sandbox, o objetivo decide o fim (fase 3: `matchLimits`, a mesma conta que o HUD lê; a eliminação
   // sempre tem tempo).
   const objective = recipe.mode === 'sandbox' ? (recipe.sandbox?.objective ?? SANDBOX_DEFAULTS.objective) : null;
@@ -667,6 +669,7 @@ export function createSim(config: SimConfig): Sim {
           hz,
           map.lootSpots ?? [],
           map.playArea ?? { minX: 0, minZ: 0, maxX: map.grid.sizeX / 2, maxZ: map.grid.sizeZ / 2 },
+          recipe.mode === 'royale.grande' ? ROYALE.zoneGrande : ROYALE.zone,
         )
       : null,
     rngRoyale: root.fork('royale'),
@@ -982,7 +985,7 @@ export function createSim(config: SimConfig): Sim {
             circle: ctx.royale.circle,
             place: ctx.royale.place,
             loot: ctx.royale.loot,
-            zone: ROYALE.zone,
+            zone: ctx.royale.zone,
           },
     rounds:
       ctx.rounds === null

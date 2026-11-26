@@ -29,6 +29,11 @@ export interface TitleState {
   readonly extraItems?: readonly TitleExtraItem[];
   /** M5 (fase 4c): a casca tem online (só a web): o botão Online ao lado de Modos (O4). */
   readonly online?: boolean;
+  /**
+   * M11 (fase 5, revisão): um aviso no lugar do resumo do JOGAR, em destaque (a partida que este aparelho recusou: "Este
+   * modo só roda no PC."). Texto já montado pelo `game`; a mesma linha, então o título não muda de altura.
+   */
+  readonly note?: string;
 }
 
 /** M1: item extra do título (o `game` recebe da casca por `GameDeps.testItems`). */
@@ -210,14 +215,14 @@ export const titleScreen: Screen<TitleState> = {
                   variant: 'primary',
                   autofocus: true,
                 },
-                ...(state.playSummary
+                ...(state.note || state.playSummary
                   ? [
                       {
                         kind: 'text',
                         id: 'playSummary',
-                        text: { literal: state.playSummary },
+                        text: { literal: state.note || state.playSummary || '' },
                         style: 'caption',
-                        color: COLORS.textoBaixo,
+                        color: state.note ? COLORS.perigo : COLORS.textoBaixo,
                       } as const,
                     ]
                   : []),

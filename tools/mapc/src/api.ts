@@ -137,9 +137,14 @@ export interface MapScript {
   /**
    * M7 (fase 5): opções da análise do `mapc` (o teto da maior linha de visão; padrão 50 m, o do Switch 3–4P). M10 (fase
    * 1c): `jumpSightTodo` = a linha de visão de um topo aonde só o pulo correndo chega passa da declarada e o mapa ainda
-   * não foi consertado: vira aviso com este TODO, não erro.
+   * não foi consertado: vira aviso com este TODO, não erro. M11 (fase 5): `openSight` = o mapa é aberto (a vista vai
+   * de ponta a ponta) e declara a diagonal da área: a medida par a par da linha de visão fica de fora (o Arquipélago).
    */
-  readonly analysis?: { readonly sightLimitM?: number; readonly jumpSightTodo?: string };
+  readonly analysis?: {
+    readonly sightLimitM?: number;
+    readonly jumpSightTodo?: string;
+    readonly openSight?: boolean;
+  };
 }
 
 /** Formas que cada operação exige do bloco (conferidas contra o registro real no `mapc`). */

@@ -16,7 +16,15 @@ export interface ModeCard {
   readonly id: string;
   readonly nameKey: StringKey;
   readonly descKey: StringKey;
+  /**
+   * M11 (fase 5): um 2º botão no card, ao lado do principal (o "Grande" no card do Bobo Royale, só no PC): a ação é
+   * `mode:<extra.id>`. O card fica da mesma altura (os dois botões dividem a linha).
+   */
+  readonly extra?: { readonly id: string; readonly textKey: StringKey };
 }
+
+/** M11 (fase 5): a parte da linha do botão principal que vai para o 2º botão do card (`ModeCard.extra`). */
+const EXTRA_BUTTON_SHARE = 0.4;
 
 export interface ModesState {
   readonly modes: readonly ModeCard[];
@@ -41,32 +49,53 @@ export const modesScreen: Screen<ModesState> = {
     const tight = state.modes.length > 9 || (state.wide === true && state.modes.length > 6);
     const perRow = dense ? 3 : 2;
     const cardWidth = dense ? MODES_CARD_WIDTH_DENSE : MODES_CARD_WIDTH;
-    const cards: UiNode[] = state.modes.map((m, i) => ({
-      kind: 'box',
-      id: `card:${m.id}`,
-      color: COLORS.chapa,
-      chamfer: true,
-      padding: tight ? 6 : 10,
-      width: cardWidth,
-      children: [
-        {
-          kind: 'column',
-          gap: tight ? 4 : 8,
-          children: [
-            {
-              kind: 'button',
-              id: `${MODES_PREFIX}${m.id}`,
-              text: { key: m.nameKey },
-              action: `${MODES_PREFIX}${m.id}`,
-              variant: i === 0 ? 'primary' : 'secondary',
-              width: cardWidth - (tight ? 12 : 20),
-              ...(i === 0 ? { autofocus: true } : {}),
-            },
-            { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo },
-          ],
-        },
-      ],
-    }));
+    const cards: UiNode[] = state.modes.map((m, i) => {
+      const lineWidth = cardWidth - (tight ? 12 : 20);
+      const extraGap = 6;
+      const extraWidth = m.extra !== undefined ? Math.round(lineWidth * EXTRA_BUTTON_SHARE) : 0;
+      const main: UiNode = {
+        kind: 'button',
+        id: `${MODES_PREFIX}${m.id}`,
+        text: { key: m.nameKey },
+        action: `${MODES_PREFIX}${m.id}`,
+        variant: i === 0 ? 'primary' : 'secondary',
+        width: m.extra !== undefined ? lineWidth - extraWidth - extraGap : lineWidth,
+        ...(i === 0 ? { autofocus: true } : {}),
+      };
+      const line: UiNode =
+        m.extra === undefined
+          ? main
+          : {
+              kind: 'row',
+              gap: extraGap,
+              children: [
+                main,
+                {
+                  kind: 'button',
+                  id: `${MODES_PREFIX}${m.extra.id}`,
+                  text: { key: m.extra.textKey },
+                  action: `${MODES_PREFIX}${m.extra.id}`,
+                  variant: 'secondary',
+                  width: extraWidth,
+                },
+              ],
+            };
+      return {
+        kind: 'box',
+        id: `card:${m.id}`,
+        color: COLORS.chapa,
+        chamfer: true,
+        padding: tight ? 6 : 10,
+        width: cardWidth,
+        children: [
+          {
+            kind: 'column',
+            gap: tight ? 4 : 8,
+            children: [line, { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo }],
+          },
+        ],
+      };
+    });
     const back: UiNode = {
       kind: 'button',
       id: 'back',

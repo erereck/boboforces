@@ -56,6 +56,7 @@ conferidos de novo depois de cada junção.
    o sistema na sim (pegar, trocar, voltar em 20 s), a IA que busca, o render, a opção na Personalizada; golden novo.
 5. **O Royale Grande:** medir 48 participantes no PC; o mapa de ~400 m gerado por código; o modo (só PC, online só com
    host PC); a zona escalada; a IA; golden novo.
+   - **feita em 26/11** (ARCHITECTURE §22.5, PERF §1s): 48 participantes no Arquipélago, só no PC; golden `64065dca`.
 6. **Fechamento:** o portão, a rodada de prints 35, o `CHANGELOG`, a `ARCHITECTURE` (§22) e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

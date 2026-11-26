@@ -55,6 +55,11 @@ export interface CheckInput {
    * aviso com este TODO (`MapScript.analysis.jumpSightTodo`), não erro.
    */
   readonly jumpSightTodo?: string;
+  /**
+   * M11 (fase 5): o mapa é aberto (`MapScript.analysis.openSight`, o Arquipélago do Royale Grande): com a declarada
+   * cobrindo a diagonal da área, a medida par a par da linha de visão fica de fora.
+   */
+  readonly openSight?: boolean;
 }
 
 export interface SpawnStats {
@@ -348,7 +353,17 @@ export function runChecks(input: CheckInput): CheckReport {
     return inArea(pos[0]!, pos[2]!);
   };
   for (let n = 0; n < nav.nodeCount; n++) if (accept(n)) playableNodes++;
-  const sight = measureMaxSightLine(nav, input.sight, accept, eye, METRICS.crouchEyeHeight);
+  // M11 (fase 5): nenhuma linha entre dois olhos dentro da área passa da diagonal dela (com a altura da grade). No mapa
+  // aberto (`openSight`: o Arquipélago do Royale Grande, 380 m de área) com a declarada cobrindo esse teto, a medida par
+  // a par (quadrática nos nós: horas num mapa desses) não pode reprovar nada e fica de fora; os outros medem sempre.
+  const areaBound = Math.hypot(area.maxX - area.minX, area.maxZ - area.minZ, grid.sizeY * BLOCK_SIZE);
+  if (input.openSight === true && doc.meta.maxSightLineM < areaBound) {
+    errors.push(`mapa aberto com a visada declarada abaixo da diagonal da área (${fmt(areaBound)} m)`);
+  }
+  const skipSight = input.openSight === true && doc.meta.maxSightLineM >= areaBound;
+  const sight: SightMeasure = skipSight
+    ? { max: null, longest: [], nodes: playableNodes, rays: 0 }
+    : measureMaxSightLine(nav, input.sight, accept, eye, METRICS.crouchEyeHeight);
   // M10 (fase 1c): os poleiros do pulo correndo (topos sem ligação na navegação aonde o humano chega pulando) entram na
   // medida: a maior linha que sai de um deles, até qualquer nó jogável ou outro poleiro.
   const nodeInArea = (n: number): boolean => {
@@ -360,7 +375,7 @@ export function runChecks(input: CheckInput): CheckReport {
   const jumpNodes: number[] = [];
   for (let n = 0; n < nav.nodeCount; n++) if (jump.mark[n] === 1 && nodeInArea(n)) jumpNodes.push(n);
   const jumpSight =
-    jumpNodes.length > 0
+    jumpNodes.length > 0 && !skipSight
       ? longestSightFrom(
           nav,
           input.sight,

@@ -28,6 +28,7 @@ const LOCKED_IDS = [
   'mode:juggernaut',
   'mode:chaos',
   'mode:training',
+  'mode:royale.grande',
   'map:construto',
   'map:ringue',
   'map:posto',
@@ -39,6 +40,7 @@ const LOCKED_IDS = [
   'map:moonbase',
   'map:paint-hall',
   'map:farm',
+  'map:archipelago',
   'weapon:pistol',
   'weapon:smg',
   'weapon:rifle',
@@ -285,6 +287,7 @@ describe('registro de IDs de conteúdo', () => {
       'moonbase',
       'paint-hall',
       'farm',
+      'archipelago',
     ]);
     expect(contentIdsOfKind('bot')[0]).toBe('vibe-bob');
     expect(contentIdsOfKind('prop')).toEqual([]);

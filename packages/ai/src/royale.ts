@@ -35,6 +35,8 @@ export const AI_ROYALE = {
   /** A folga dentro do círculo (m) e quanto antes do encolher ele já vai para o círculo novo (s). */
   zoneMarginM: 5,
   zoneHurryS: 20,
+  /** M11 (fase 5): no Royale Grande (o Arquipélago tem 380 m), vai para o círculo novo mais cedo (minha). */
+  zoneHurryGrandeS: 40,
   /** Cura abaixo disto da vida máxima, sem inimigo à vista a menos de `healSafeM` (m). */
   healBelow: 0.65,
   healSafeM: 35,
@@ -277,9 +279,10 @@ function bestItem(
       const ez = p.position[i * 3 + 2]! - view.position[enemy * 3 + 2]!;
       if (ex * ex + ez * ez < d2) continue;
     }
-    if (contested(c, e, i, d2)) continue;
+    // M11 (fase 5): o valor (barato) antes da disputa (que olha todos os bobos): o mesmo resultado, mais barato com 48.
     const value = itemValue(view, e, p.kind[i]!, maxHp);
     if (value <= 0) continue;
+    if (contested(c, e, i, d2)) continue;
     const score = value / (1 + Math.sqrt(d2) / AI_ROYALE.lootHalfM) + (i === keep ? 0.3 : 0);
     if (score > bestScore) {
       bestScore = score;
@@ -312,7 +315,8 @@ export function royaleObjective(
   const d = rv.data;
   // A zona: fora do círculo de agora, ou fora do próximo com ele já encolhendo (ou perto de encolher).
   const outsideNow = !inside(view, e, circle[CIRCLE.cx]!, circle[CIRCLE.cz]!, circle[CIRCLE.r]!, 1);
-  const hurry = d[ZONE.shrinking] === 1 || d[ZONE.ticks]! < AI_ROYALE.zoneHurryS * c.hz;
+  const hurryS = c.royaleGrande ? AI_ROYALE.zoneHurryGrandeS : AI_ROYALE.zoneHurryS;
+  const hurry = d[ZONE.shrinking] === 1 || d[ZONE.ticks]! < hurryS * c.hz;
   const outsideNext = !inside(
     view,
     e,

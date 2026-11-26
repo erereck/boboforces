@@ -1,4 +1,11 @@
-import { builtinBotRef, MODIFIERS, modifiersConflict, type MatchRecipe, type ModifierId } from '@boboforces/format';
+import {
+  builtinBotRef,
+  isRoyaleMode,
+  MODIFIERS,
+  modifiersConflict,
+  type MatchRecipe,
+  type ModifierId,
+} from '@boboforces/format';
 import { WEAPON_SLOT_COUNT } from '@boboforces/input';
 import type { NavGrid } from '@boboforces/nav';
 import { u16ToYaw, yawToU16 } from '@boboforces/shared';
@@ -177,7 +184,7 @@ export function isOwnerDormant(view: Pick<SimView, 'flags' | 'respawnTicks'>, e:
  */
 export function ownerAllowed(recipe: MatchRecipe): boolean {
   const mode = recipe.mode;
-  return mode !== 'zombies' && mode !== 'strike' && mode !== 'royale.mini' && !partyActive(createPartyState(recipe));
+  return mode !== 'zombies' && mode !== 'strike' && !isRoyaleMode(mode) && !partyActive(createPartyState(recipe));
 }
 
 /** O estado do dono (o que vai no hash e no snapshot está em `fields`) e a fila de comandos. */

@@ -66,7 +66,8 @@ export function formatReport(r: CompileResult): string {
   );
   const max = c.sight.max;
   lines.push(
-    `  maior linha de visão: medida ${max ? m(max.distance) : '—'} (declarada ${r.doc.meta.maxSightLineM} m); ` +
+    // M11 (fase 5): sem raio e com nós, a medida ficou de fora (a declarada cobre a diagonal da área).
+    `  maior linha de visão: medida ${max ? m(max.distance) : c.sight.rays === 0 && c.sight.nodes > 0 ? '— (a declarada cobre a diagonal da área)' : '—'} (declarada ${r.doc.meta.maxSightLineM} m); ` +
       `${c.sight.nodes} nós, ${c.sight.rays} raios, ${ms(s.sightMs)}`,
   );
   const p = (v: readonly number[]): string => `(${v.map((x) => x.toFixed(1)).join(', ')})`;

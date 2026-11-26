@@ -1080,6 +1080,83 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
 });
 
 /**
+ * M11 (fase 5): o Bobo Royale Grande solo com 48 bots Normal no Arquipélago (o mapa de ~400 m, a zona de 6 fases),
+ * semente 42, a partida inteira, no molde do golden do Royale: a maioria looteia, a partida acaba com um vencedor e o
+ * hash é o mesmo entre execuções. Gravado na fase 5 do M11 (26/11/2026): `64065dca` (140 s, 45 com primária). MUDA
+ * com a sim, a IA ou o mapa.
+ */
+const GOLDEN_ROYALE_GRANDE_HASH = '64065dca';
+
+function runRoyaleGrandeGolden(squad: 'solo' | 'duo'): {
+  hash: string;
+  seconds: number;
+  winner: number;
+  armed: number;
+  phase: string;
+  squadsLeft: number;
+} {
+  const { map } = loadWorld('archipelago');
+  const match = createHeadlessMatch({
+    recipe: {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'royale.grande',
+      map: 'archipelago',
+      seed: 42,
+      royale: { squad },
+      teams: [{ bots: [{ ref: builtinBotRef('normal'), count: 48 }] }],
+    },
+    map,
+    humans: 0,
+  });
+  let armedMax = 0;
+  let t = 0;
+  for (; t < 16 * 60 * 60 && match.sim.view().match.phase !== 'ended'; t++) {
+    match.step();
+    if (t % 60 === 0) {
+      const v = match.sim.view();
+      let armed = 0;
+      for (let e = 0; e < v.count; e++) if (v.loadout[e * WEAPON_SLOT_COUNT] !== WEAPON_NONE) armed++;
+      armedMax = Math.max(armedMax, armed);
+    }
+  }
+  const v = match.sim.view();
+  const out = {
+    hash: hashToHex(match.sim.stateHash()),
+    seconds: Math.round(t / 60),
+    winner: v.match.winnerTeam,
+    armed: armedMax,
+    phase: v.match.phase,
+    squadsLeft: v.royale!.data[3]!,
+  };
+  match.dispose();
+  return out;
+}
+
+describe('golden do Bobo Royale Grande (M11, fase 5) com bots no Arquipélago', () => {
+  it('48 bots looteiam e a partida acaba com um vencedor; hash estável', () => {
+    const a = runRoyaleGrandeGolden('solo');
+    const b = runRoyaleGrandeGolden('solo');
+    expect(b.hash).toBe(a.hash);
+    const msg = `${a.seconds} s, vencedor ${a.winner}, ${a.armed} com primária no máximo, fase ${a.phase}`;
+    console.log(`[royale grande] ${msg} · hash ${a.hash}`);
+    expect(a.armed, msg).toBeGreaterThanOrEqual(24);
+    expect(a.phase, msg).toBe('ended');
+    expect(a.winner, msg).toBeGreaterThanOrEqual(0);
+    expect(a.hash, msg).toBe(GOLDEN_ROYALE_GRANDE_HASH);
+  }, 240_000);
+
+  it('em duplas (24 esquadrões, o caído e o reviver), a partida acaba com um esquadrão vencedor', () => {
+    const r = runRoyaleGrandeGolden('duo');
+    const msg = `${r.seconds} s, vencedor ${r.winner}, ${r.squadsLeft} esquadrão de pé, fase ${r.phase}`;
+    console.log(`[royale grande duplas] ${msg}`);
+    expect(r.phase, msg).toBe('ended');
+    expect(r.winner, msg).toBeGreaterThanOrEqual(0);
+    expect(r.winner, msg).toBeLessThan(24);
+    expect(r.squadsLeft, msg).toBe(1);
+  }, 240_000);
+});
+
+/**
  * M8 (fase 8): o TDM 4 contra 4 de bots Normal no Construto com o modificador Arcade, semente 42, 2 min. Os bots não
  * fazem bunny hop nem wall jump (a marca de quadro de jogador), mas andam e pulam no perfil Arcade (o pulo duplo, o
  * deslize, o tiro correndo). Confere que houve luta e o hash entre execuções. Gravado no fechamento do M8 (20/11/2026):

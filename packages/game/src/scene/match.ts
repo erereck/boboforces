@@ -40,6 +40,7 @@ import {
   shouldLowerQuality,
   ZOMBIES_DEFAULTS,
   zombieRecordKey,
+  isRoyaleMode,
 } from '@boboforces/format';
 import {
   AIM_ASSIST_LEVELS,
@@ -239,6 +240,7 @@ import {
   type UiFonts,
 } from '@boboforces/ui';
 import { CELLS_PER_METER, isCellSolid, sampleLightGrid } from '@boboforces/world';
+import { soloViewMode } from '../maps.ts';
 import { seatRecipe, type LocalSeat } from './seats.ts';
 import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
 import { approachScale, cameraInsideBody } from './body-scale.ts';
@@ -673,6 +675,24 @@ export function aiBudgetFor(profile: PlatformProfile): AiBudget {
 }
 
 /** Perfil efetivo: o do bench (se não for `auto`) ou o da plataforma com N vistas locais. */
+/**
+ * As vistas locais do pedido (o bench pede as dele; a partida, uma por assento do sofá). M11 (fase 5, revisão): o
+ * Royale Grande é sempre 1 vista (sem sofá): o perfil fica o de 1 vista (o `pc`, não o `pcSplit`, que recusa o modo).
+ */
+export function sceneViews(request: SceneRequest): number {
+  if (request.kind === 'bench' && request.bench) return request.bench.views;
+  if (request.kind !== 'play' || (request.recipe !== undefined && soloViewMode(request.recipe.mode))) return 1;
+  return Math.max(1, Math.min(4, request.seats?.length ?? 0));
+}
+
+/**
+ * M3 (fase 1c): a partida veio da tela do sofá (com 1 jogador, também), e quem segura A num controle livre entra no
+ * meio. M11 (fase 5, revisão): no Royale Grande, não (1 vista só).
+ */
+export function couchJoinAllowed(request: SceneRequest, recipe: MatchRecipe, humans: number): boolean {
+  return request.kind === 'play' && (request.seats?.length ?? 0) >= 1 && humans > 0 && !soloViewMode(recipe.mode);
+}
+
 export function profileFor(
   family: PlatformProfile['family'],
   views: number,
@@ -725,12 +745,14 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
         zombies: { waves: 0, quantity: 3, hpMul: 5, selfRevives: -1 },
         teams: [{ bots: [{ ref, count: bench.views }] }],
       };
-    } else if (bench.scene === 'island') {
+    } else if (bench.scene === 'island' || bench.scene === 'archipelago') {
       // M7 (fase 5): a Ilha Tropical. Fase 8: o Royale solo (as vistas e os bots; a partida acaba no último vivo).
+      // M11 (fase 5): o Arquipélago, com o Royale Grande.
+      const grande = bench.scene === 'archipelago';
       recipe = {
         format: MATCH_RECIPE_FORMAT,
-        mode: 'royale.mini',
-        map: 'island',
+        mode: grande ? 'royale.grande' : 'royale.mini',
+        map: grande ? 'archipelago' : 'island',
         seed: bench.seed >>> 0,
         match: { viewDistanceM: bench.viewDistanceM },
         // Muita vida para todos (como o bench do Zombies): a partida dura o bench todo e as vistas não morrem.
@@ -808,17 +830,30 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
     };
   }
   // O bench mede além do perfil (é a ferramenta que acha o teto): limites do motor e visão do PC.
+  // M11 (fase 5): o bench e o cliente online sem o teto do Royale Grande do aparelho (o do motor).
+  const engineGrande = ENGINE_MAX_BOTS + 4;
   const limits =
     request.kind === 'bench'
-      ? { maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4, maxViewDistanceM: PLATFORM_PROFILES.pc.maxViewDistanceM }
+      ? {
+          maxBots: ENGINE_MAX_BOTS,
+          maxLocalHumans: 4,
+          maxViewDistanceM: PLATFORM_PROFILES.pc.maxViewDistanceM,
+          maxRoyaleGrandeParticipants: engineGrande,
+        }
       : request.online
         ? // M5: online, só os limites do motor nos bots: o cliente não pode cortar a receita do host (a sim mudaria);
           // a distância de visão é só do render (a sim usa a dela), então corta pelo aparelho.
-          { ...recipeLimitsFor(profile), maxBots: ENGINE_MAX_BOTS, maxLocalHumans: 4 }
+          {
+            ...recipeLimitsFor(profile),
+            maxBots: ENGINE_MAX_BOTS,
+            maxLocalHumans: 4,
+            maxRoyaleGrandeParticipants: engineGrande,
+          }
         : recipeLimitsFor(profile);
-  // M3 (fase 1a): o sofá, até o teto de humanos locais do aparelho.
+  // M3 (fase 1a): o sofá, até o teto de humanos locais do aparelho. M11 (fase 5): o Royale Grande não tem sofá (GDD
+  // §4.1.3: "local web não"); a partida começa com 1 jogador e ninguém entra no meio.
   const seats =
-    request.kind === 'play' && !request.online && humans > 0
+    request.kind === 'play' && !request.online && humans > 0 && !soloViewMode(recipe.mode)
       ? (request.seats ?? []).slice(0, limits.maxLocalHumans)
       : [];
   if (seats.length >= 2) {
@@ -965,7 +1000,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M7 (fase 4): o BoboStrike (o dinheiro, a compra, a Boom Box e quem morre assiste um aliado). */
   const strikeMode = recipe.mode === 'strike';
   /** M7 (fase 8): o Bobo Royale (o `team` é o esquadrão: sem colete de time; a zona, o loot e a colocação). */
-  const royaleMode = recipe.mode === 'royale.mini';
+  const royaleMode = isRoyaleMode(recipe.mode);
   /** M9 (fase 3): o Bobo Sandbox (até 4 times; na eliminação, quem morre fica fora até o fim). */
   const sandboxMode = recipe.mode === 'sandbox';
   const sandboxElimination = sandboxMode && recipe.sandbox?.objective === 'elimination';
@@ -1010,8 +1045,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // com 1 jogador, para os outros poderem entrar no meio.
   const seats: readonly LocalSeat[] =
     request.kind === 'play' && (request.seats?.length ?? 0) >= 1 ? request.seats!.slice(0, Math.max(1, humans)) : [];
-  /** A partida veio da tela do sofá: quem segura A num controle livre entra no meio (fase 1c). */
-  const couch = seats.length >= 1 && humans > 0;
+  /** A partida veio da tela do sofá: quem segura A num controle livre entra no meio (fase 1c; nunca no Grande). */
+  const couch = seats.length >= 1 && couchJoinAllowed(request, recipe, humans);
   const p1Seat = seats[0];
   let device: DeviceKind = p1Seat ? p1Seat.device.kind : (request.device ?? fallbackDevice);
   let padIndex = p1Seat?.device.kind === 'gamepad' ? p1Seat.device.index : Math.max(0, request.gamepad);

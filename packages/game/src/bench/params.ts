@@ -84,7 +84,18 @@ export function parseBenchParams(params: Readonly<Record<string, string>>): Pars
   const config: BenchConfig = {
     scene: oneOf<BenchScene>(
       'scene',
-      ['construto', 'vitrine', 'zombies', 'airbase', 'island', 'construction', 'port', 'moonbase', 'farm'],
+      [
+        'construto',
+        'vitrine',
+        'zombies',
+        'airbase',
+        'island',
+        'construction',
+        'port',
+        'moonbase',
+        'farm',
+        'archipelago',
+      ],
       BENCH_DEFAULTS.scene,
     ),
     views,

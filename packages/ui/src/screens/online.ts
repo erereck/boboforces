@@ -304,9 +304,25 @@ export const ONLINE_MATCH_CARDS: readonly ModeCard[] = [
   { id: 'custom', nameKey: 'mode.name.custom', descKey: 'online.mode.custom.desc' },
 ];
 
-export const onlineMatchScreen: Screen<null> = {
+/**
+ * M11 (fase 5): os cards com o host no PC: o card do Bobo Royale ganha o botão "Grande" (o Royale Grande em duplas no
+ * Arquipélago; GDD §4.1.3: online só com host PC).
+ */
+export function onlineMatchCards(pcHost: boolean): readonly ModeCard[] {
+  if (!pcHost) return ONLINE_MATCH_CARDS;
+  return ONLINE_MATCH_CARDS.map((c) =>
+    c.id === 'royale' ? { ...c, extra: { id: 'royaleGrande', textKey: 'online.mode.royaleGrande' } } : c,
+  );
+}
+
+export const onlineMatchScreen: Screen<{ readonly pcHost?: boolean } | null> = {
   id: 'onlineMatch',
-  build: () => modesScreen.build({ modes: ONLINE_MATCH_CARDS, titleKey: 'online.match.title', wide: true }),
+  build: (state) =>
+    modesScreen.build({
+      modes: onlineMatchCards(state?.pcHost === true),
+      titleKey: 'online.match.title',
+      wide: true,
+    }),
 };
 
 // --- a sala ---

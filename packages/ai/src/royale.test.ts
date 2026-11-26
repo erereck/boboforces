@@ -162,4 +162,40 @@ describe('IA do Bobo Royale (M7 fase 7)', () => {
     expect(v.heals[e]).toBeLessThan(2);
     m.dispose();
   });
+
+  it('M11 (fase 5): no Royale Grande, vai para o círculo novo 40 s antes de encolher (no Mini, 20 s)', () => {
+    /**
+     * Dentro do círculo de agora, fora do próximo (no canto oposto), com um colete a 24 m ao longo da borda e `waitS`
+     * até o encolher: em 2 s, o bot já saiu na diagonal, para a zona nova (e não pela borda, para o colete)?
+     */
+    const leaves = (mode: string, waitS: number): boolean => {
+      const m = createHeadlessMatch({ recipe: { ...recipe, mode }, map: flatMap(), humans: 0 });
+      const v = m.sim.view();
+      const ro = v.royale!;
+      const e = bot(m, 0);
+      const o = bot(m, 1);
+      m.step();
+      v.armor[e] = 0;
+      const bx = v.position[e * 3]!;
+      const bz = v.position[e * 3 + 2]!;
+      const low = bx < 40;
+      onlyItem(m, PICKUP_KIND.armor100, bx, low ? bz + 24 : bz - 24);
+      // O círculo de agora cobre tudo; o próximo, de 8 m, no ponto de loot do canto oposto ao do bot.
+      const c = ro.circle;
+      for (const k of [CIRCLE.cx, CIRCLE.cz, CIRCLE.fromCx, CIRCLE.fromCz]) c[k] = 40;
+      for (const k of [CIRCLE.r, CIRCLE.fromR]) c[k] = 200;
+      for (const k of [CIRCLE.toCx, CIRCLE.toCz]) c[k] = low ? 68 : 12;
+      c[CIRCLE.toR] = 8;
+      for (let t = 0; t < 2 * SIM_HZ; t++) {
+        ro.data[ZONE.ticks] = waitS * SIM_HZ;
+        steps(m, 1, o);
+      }
+      const across = Math.abs(v.position[e * 3]! - bx);
+      m.dispose();
+      return across > 3;
+    };
+    expect(leaves('royale.grande', 30)).toBe(true);
+    expect(leaves('royale.mini', 30)).toBe(false);
+    expect(leaves('royale.mini', 15)).toBe(true);
+  });
 });

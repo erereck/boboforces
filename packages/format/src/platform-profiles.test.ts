@@ -79,8 +79,22 @@ describe('perfis de plataforma (tecnico.md §16.1)', () => {
   });
 
   it('tetos da receita por perfil (host no celular tem teto menor)', () => {
-    expect(recipeLimitsFor(PLATFORM_PROFILES.pc)).toEqual({ maxBots: 40, maxLocalHumans: 4, maxViewDistanceM: 140 });
-    expect(recipeLimitsFor(PLATFORM_PROFILES.mobile)).toEqual({ maxBots: 12, maxLocalHumans: 1, maxViewDistanceM: 90 });
+    // M11 (fase 5): o teto do Royale Grande (48 no PC; 0 = o modo não roda no aparelho).
+    expect(recipeLimitsFor(PLATFORM_PROFILES.pc)).toEqual({
+      maxBots: 40,
+      maxLocalHumans: 4,
+      maxViewDistanceM: 140,
+      maxRoyaleGrandeParticipants: 48,
+    });
+    expect(recipeLimitsFor(PLATFORM_PROFILES.mobile)).toEqual({
+      maxBots: 12,
+      maxLocalHumans: 1,
+      maxViewDistanceM: 90,
+      maxRoyaleGrandeParticipants: 0,
+    });
+    for (const id of ['pcSplit', 'switch1p', 'switch2p', 'switch34p'] as const) {
+      expect(recipeLimitsFor(PLATFORM_PROFILES[id]).maxRoyaleGrandeParticipants).toBe(0);
+    }
     expect(recipeLimitsFor(PLATFORM_PROFILES.mobile, { onlineHost: true }).maxBots).toBe(8);
     expect(recipeLimitsFor(PLATFORM_PROFILES.switch34p).maxBots).toBe(12);
   });

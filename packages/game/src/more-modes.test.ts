@@ -1,8 +1,8 @@
-import { validateMatchRecipe } from '@boboforces/format';
+import { PLATFORM_PROFILES, recipeLimitsFor, validateMatchRecipe } from '@boboforces/format';
 import type { UiNode } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { MAP_MODES, type MenuMap } from './maps.ts';
-import { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } from './more-modes.ts';
+import { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModeCards, moreModePreset, moreModesRoot } from './more-modes.ts';
 import { STORAGE_RECIPE_LIMITS } from './save-store.ts';
 
 /**
@@ -60,5 +60,42 @@ describe('M7 (fase 9): o Aquário na página Mais modos', () => {
     expect(button(moreModesRoot(true), 'watch')).toMatchObject({ variant: 'primary', text: { key: 'modes.watch.on' } });
     // Os 12 cards continuam lá.
     expect(button(moreModesRoot(true), 'mode:royale')).not.toBeNull();
+  });
+});
+
+describe('M11 (fase 5): o Bobo Royale Grande no card do Royale', () => {
+  const find = (node: UiNode, id: string): UiNode | null => {
+    if (node.id === id) return node;
+    const kids = 'children' in node && node.children ? node.children : [];
+    for (const k of kids) {
+      const hit = find(k, id);
+      if (hit) return hit;
+    }
+    return null;
+  };
+
+  it('o botão "Grande" só aparece no PC, ao lado do Bobo Royale (os 12 cards seguem 12)', () => {
+    expect(find(moreModesRoot(false, true), 'mode:royaleGrande')).toMatchObject({
+      action: 'mode:royaleGrande',
+      text: { key: 'mode.extra.royaleGrande' },
+    });
+    expect(find(moreModesRoot(false, false), 'mode:royaleGrande')).toBeNull();
+    expect(find(moreModesRoot(true, true), 'mode:royale')).not.toBeNull();
+    expect(moreModeCards(true).length).toBe(MORE_MODE_CARDS.length);
+  });
+
+  it('a receita: solo no Arquipélago, 48 participantes; o PC joga inteira, o celular e o Switch recusam', () => {
+    const r = moreModePreset('royaleGrande')!;
+    expect(r.mode).toBe('royale.grande');
+    expect(r.map).toBe('archipelago');
+    expect(r.royale).toEqual({ squad: 'solo' });
+    expect(r.teams[0]!.bots[0]!.count + 1).toBe(48);
+    expect(MAP_MODES[r.map as MenuMap]).toContain(r.mode);
+    const pc = validateMatchRecipe(r, recipeLimitsFor(PLATFORM_PROFILES.pc));
+    expect(pc.ok && pc.value.teams[0]!.bots[0]!.count).toBe(47);
+    for (const id of ['mobile', 'switch1p'] as const) {
+      const v = validateMatchRecipe(r, recipeLimitsFor(PLATFORM_PROFILES[id]));
+      expect(v.ok, id).toBe(false);
+    }
   });
 });
