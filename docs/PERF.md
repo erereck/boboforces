@@ -516,6 +516,27 @@ humano das linhas "1 +" fica parado (liga o LOD C).
   12,4 KB/s do host para cada amigo e 3,6 KB/s de volta, a maior mensagem no teto (1.100 B, o snapshot vai em partes);
   no host, por quadro a 30 fps: sim 0,69, IA 1,48 e rede 0,56 ms. O TDM do PC (4 + 40) no mesmo dia: 18,6 KB/s.
 
+## 1t. O que o M11 pôs na partida (fechamento; 26/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node com JIT), semente 42, 600 ticks de aquecimento e 3.600 medidos, com outras tarefas
+rodando na máquina (o ruído é grande: os números absolutos ficaram acima dos do §1r). Por isso a comparação com o M10 é
+pareada: o mesmo caso (TDM 4 contra 4 bots Normal) rodado aqui e numa cópia do código do M10 (`723695d`), alternando,
+nas mesmas condições (`local/m11/medir-ab.ts`).
+
+| Caso (TDM 4×4) | M11 média / p99 (ms) | M10 média / p99 (ms) |
+|---|---|---|
+| Estação Lunar | 0,058 / 0,360 · 0,070 / 0,405 | 0,062 / 0,387 · 0,057 / 0,326 |
+| Galpão | 0,056 / 0,364 · 0,052 / 0,324 | 0,059 / 0,346 · 0,065 / 0,388 |
+| Construto | 0,059 / 0,341 · 0,050 / 0,267 | 0,059 / 0,346 · 0,054 / 0,312 |
+
+- O passeio por lugar (fase 2) e os mapas sem poleiro (fase 1) não mudam o custo: as diferenças trocam de lado entre
+  as rodadas.
+- **As armas no mapa** (`local/m11/medir-m11.ts`, a mesma rodada): TDM no Construto 0,067 / 0,420 sem e 0,057 / 0,420
+  com a regra; FFA de 8 no Porto 0,049 / 0,324 sem e 0,054 / 0,353 com. O sistema das armas e a busca da IA ficam no
+  ruído.
+- **O Fortress na Fazenda** (4 bots de apoio): 0,096 / 0,566, na faixa do Zombies na Fazenda do §1r.
+- **O Royale Grande:** §1s.
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

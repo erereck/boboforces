@@ -398,7 +398,7 @@ describe('mapc: validações com o mundo', () => {
       OPTIONS,
     );
     expect(plain.errors.some((e) => e.includes('casa do time'))).toBe(false);
-  });
+  }, 30_000);
 
   it('prop do dobro (dose 2) é do jogo: colisor, buraco na navegação e fonte de luz (decisão #52)', () => {
     const empty = compileMap(

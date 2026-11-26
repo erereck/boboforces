@@ -75,6 +75,8 @@ const SHADOW_ALPHA = 0.42;
 const SHADOW_MAX_HEIGHT = 3;
 /** Atores que o rig dos bonecos acompanha por índice do `ActorBuffer` (o estado por entidade é dele). */
 const FIGURE_RIG_CAPACITY = 256;
+/** Instâncias de cada prop no buffer dos projéteis (o gerador do Fortress é uma só). */
+const DYNAMIC_PROP_CAPACITY = 4;
 
 /**
  * O que o passe mede além do contrato (`ActorPass`), para a integração ligar no `RenderStats` (pedido do passo 3):
@@ -233,14 +235,18 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     weapons = bindings.map((binding, i) => {
       const vertex = modelVertex[i];
       // Armas, projéteis (modelo `weapon`) e pickups (M2, fase 2b: a caixinha) dividem o mesmo desenho instanciado.
-      if (!binding || !vertex || (binding.kind !== 'weapon' && binding.kind !== 'pickup')) return null;
+      // M11 (consertos dos prints): a prop que a sim põe no mundo (o gerador do Fortress, M6) também vem no buffer
+      // dos projéteis; sem conjunto próprio ela era pulada e só a plaquinha aparecia. Conjunto pequeno: as props do
+      // mapa vão pelos grupos, e no buffer só cabe uma ou outra.
+      if (!binding || !vertex || binding.kind === 'accessory') return null;
       if (vertex.vertexCount === 0) return null;
-      const set = createInstanceSet(shadows.capacity);
+      const prop = binding.kind === 'prop';
+      const set = createInstanceSet(prop ? DYNAMIC_PROP_CAPACITY : shadows.capacity);
       const mesh = instancedMesh(
         instancedGeometry(vertex, set.dataBuffer),
         material,
         set.matrixAttribute,
-        `arma-${binding.id}`,
+        `${prop ? 'prop' : 'arma'}-${binding.id}`,
       );
       root.add(mesh);
       return { set, mesh, handR: binding.sockets.get('hand_r') ?? null, count: 0 };
@@ -505,7 +511,8 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
           writeShadow(shadowCount++, a, i, frame, FIGURE_SHADOW_SIZE);
         }
       }
-      // M2: projéteis em voo nos conjuntos instanciados das armas (o modelo do projétil é `kind: 'weapon'`).
+      // M2: projéteis em voo nos conjuntos instanciados das armas (o modelo do projétil é `kind: 'weapon'`); depois
+      // deles, as caixinhas e as props da sim (cada modelo no seu conjunto).
       const pj = projectiles;
       for (let i = 0; pj !== null && i < pj.count; i++) {
         const model = pj.model[i]!;

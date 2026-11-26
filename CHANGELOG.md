@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M11: as pendências do M10 (planejado em 26/11/2026)
+### M11: as pendências do M10 (fechado em 26/11/2026)
 
 - **Plano** em `docs/PLANO_M11.md` (#84): os poleiros de pulo e o poço do Construto, os poleiros da Base Bobo, os
   bots que sobem aonde os 3 testes em espera pedem, o Fortress na Fazenda, os pickups de arma no mapa e o Bobo Royale
@@ -35,6 +35,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   prendia quem caía, virou maciço, e algumas pilhas de caixote e coberturas mudaram de altura ou ganharam degrau. Na
   Base Bobo, as pilhas de caixote que se escalavam foram para 2 m. Nenhum mapa fica mais marcado; os goldens com bots
   nos dois mapas mudaram.
+- **Os consertos achados nos prints:** o gerador do Fortress aparece no chão (desde o M6, só a plaquinha aparecia); o
+  botão "Grande" do Bobo Royale não cobre mais o nome do card; a vista geral do Arquipélago não sai mais cinza.
+- **Fechamento do M11 (fase 6):** o portão verde, a rodada de prints 35 (os poleiros, as armas no mapa, o Royale
+  Grande e o Fortress na Fazenda) e o custo medido (o Royale Grande no PERF §1s; o resto no ruído do M10). Os goldens
+  com bots no Construto e na Base Bobo mudaram (os poleiros e o passeio por lugar); entraram três novos.
 
 ### M10: mapas e armas novos (fechado em 26/11/2026)
 

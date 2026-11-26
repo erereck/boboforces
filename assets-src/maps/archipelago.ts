@@ -553,7 +553,9 @@ const archipelago: MapScript = {
         pitch: Math.atan2(ty - y, Math.hypot(tx - x, tz - z)),
         fovYDeg: 0,
       });
-    camera('print:archipelago', 200, 150, 440, 200, 0, 195);
+    // A vista geral: do canto sudeste da vila, a praia da ilha grande, o baixio até a ilha do Acampamento e uma ilhota,
+    // dentro dos 140 m de visão do PC. A de antes, a 290 m do alvo, ficava além da neblina e saía cinza.
+    camera('print:archipelago', 235, 45, 240, 290, 4, 295);
     camera('print:vila-grande', 200, 14, 262, 200, 4, 212);
     camera('print:porto', 290, 16, 120, 318, 4, 82);
     camera('print:fazenda', 118, 12, 352, 80, 4, 318);

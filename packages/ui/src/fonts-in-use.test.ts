@@ -28,7 +28,7 @@ import { registerStrings } from './text.ts';
 import { t } from './text.ts';
 import { TEAM_COLORS, COLORS } from './tokens.ts';
 import { drawnCommands } from './test-fixtures.ts';
-import { modesScreen } from './screens/modes.ts';
+import { modesScreen, type ModeCard } from './screens/modes.ts';
 import { NEWS_ITEMS, newsScreen } from './screens/news.ts';
 import { rotateScreen } from './screens/rotate.ts';
 import { workshopScreen } from './screens/workshop.ts';
@@ -359,7 +359,7 @@ function reachable(layout: LayoutResult, start: string): Set<string> {
  */
 function expectCardsFit(layout: LayoutResult, t: Target): void {
   const inside = (node: UiNode, out: UiNode[]): UiNode[] => {
-    if (node.kind === 'text') out.push(node);
+    if (node.kind === 'text' || node.kind === 'button') out.push(node);
     for (const child of 'children' in node ? (node.children ?? []) : []) inside(child, out);
     return out;
   };
@@ -367,10 +367,11 @@ function expectCardsFit(layout: LayoutResult, t: Target): void {
     if (node.kind !== 'box' || !node.id?.startsWith('card:')) continue;
     const card = layout.rects.get(node) as Rect;
     const pad = (node.padding ?? 0) * layout.scale;
-    for (const child of inside(node, [])) {
+    const leaves = inside(node, []);
+    for (const child of leaves) {
       const text = layout.texts.get(child);
       const r = layout.rects.get(child) as Rect | undefined;
-      if (!text || !r) continue;
+      if (!text || !r || child.kind !== 'text') continue;
       expect(r.x + text.width, `${t.name}: "${text.text}" no ${node.id}`).toBeLessThanOrEqual(
         card.x + card.w - pad + 0.5,
       );
@@ -379,7 +380,74 @@ function expectCardsFit(layout: LayoutResult, t: Target): void {
         card.y + card.h - pad + 1,
       );
     }
+    // M11 (consertos dos prints): nada do card se sobrepõe. O nome do botão é desenhado centrado e pode vazar dos dois
+    // lados: no PC, o "BOBO ROYALE" passava por baixo do botão "Grande" ao lado (lia-se "BOBO ROYALEGRANDE").
+    const ink = leaves.flatMap((child): { name: string; rect: Rect }[] => {
+      const r = layout.rects.get(child) as Rect | undefined;
+      const text = layout.texts.get(child);
+      if (!r || !text) return [];
+      if (child.kind === 'text') return [{ name: text.text, rect: { x: r.x, y: r.y, w: text.width, h: text.height } }];
+      const left = Math.min(r.x, r.x + (r.w - text.width) / 2);
+      const right = Math.max(r.x + r.w, r.x + (r.w + text.width) / 2);
+      return [{ name: text.text, rect: { x: left, y: r.y, w: right - left, h: r.h } }];
+    });
+    for (let a = 0; a < ink.length; a++) {
+      for (let b = a + 1; b < ink.length; b++) {
+        const shrink = (r: Rect): Rect => ({ x: r.x + 0.5, y: r.y + 0.5, w: r.w - 1, h: r.h - 1 });
+        expect(
+          overlaps(shrink(ink[a]!.rect), shrink(ink[b]!.rect)),
+          `${t.name}: "${ink[a]!.name}" × "${ink[b]!.name}" no ${node.id}`,
+        ).toBe(false);
+      }
+    }
   }
+}
+
+/** Os 12 cards da página Mais modos (M6 e M7), na ordem do `game`. */
+const MORE_MODES_CARDS: readonly ModeCard[] = [
+  { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+  { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+  { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
+  { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
+  { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
+  { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
+  { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
+  { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
+  { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
+  { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
+  { id: 'strike', nameKey: 'mode.name.strike', descKey: 'mode.desc.strike' },
+  { id: 'royale', nameKey: 'mode.name.royale', descKey: 'mode.desc.royale' },
+];
+
+/**
+ * M11 (consertos dos prints): os alvos em que o PC desenha a página Mais modos com o botão "Grande" (o `game` só o põe
+ * com `profileHint === 'pc'`): a web sem toque (16:9 nas 3 escalas, o 640×360 e o 4:3) e o notebook com tela de toque
+ * (que continua PC). O celular e o Switch não têm o botão: lá o card fica como antes (os testes acima).
+ */
+const PC_TARGETS: readonly Target[] = [
+  ...WEB_TARGETS.filter((t) => t.minTarget === 0),
+  web('notebook de toque 1366×768 (DPR 1)', 1366, 768, 1, true),
+  web('notebook de toque 1920×1080 (DPR 1,5)', 1920, 1080, 1.5, true),
+];
+
+/**
+ * M11 (fase 5): a página Mais modos como o PC a monta (`moreModesRoot` do `game`): o botão "Grande" no card do Bobo
+ * Royale e o Aquário na linha do título.
+ */
+function morePcScreen(): UiNode {
+  return modesScreen.build({
+    modes: MORE_MODES_CARDS.map((c) =>
+      c.id === 'royale' ? { ...c, extra: { id: 'royaleGrande', textKey: 'mode.extra.royaleGrande' } } : c,
+    ),
+    titleKey: 'modes.more.title',
+    headingExtra: {
+      kind: 'button',
+      id: 'watch',
+      text: { key: 'modes.watch.off' },
+      action: 'more:watch',
+      variant: 'secondary',
+    },
+  });
 }
 
 /**
@@ -772,6 +840,38 @@ describe('estouro de texto com o atlas real', () => {
         titleKey: 'modes.more.title',
       });
       for (const tree of [modes, more, onlineMatchScreen.build(null)]) expectCardsFit(layoutFor(tree, t), t);
+    }
+  });
+
+  it('M11 (consertos dos prints): o card do Bobo Royale do PC cabe inteiro, sem tocar o nome, e o D-pad chega nele', () => {
+    registerStrings(STRINGS_ONLINE_PT_BR);
+    // A página Mais modos (cards estreitos: o "Grande" na linha da descrição) e a Partida da sala com o host no PC
+    // (cards largos: na linha do nome, à direita).
+    const pages = [
+      { name: 'Mais modos', tree: morePcScreen(), toGrande: 'down', back: 'up' },
+      { name: 'Partida da sala', tree: onlineMatchScreen.build({ pcHost: true }), toGrande: 'right', back: 'left' },
+    ] as const;
+    for (const page of pages) {
+      for (const t of PC_TARGETS) {
+        const where = `${page.name}, ${t.name}`;
+        const layout = layoutFor(page.tree, t);
+        expectNoOverflow(layout, t);
+        expectCardsFit(layout, t);
+        const rectOf = (id: string): Rect => layout.rects.get(layout.byId.get(id)!)!;
+        const card = rectOf('card:royale');
+        const grande = rectOf('mode:royaleGrande');
+        // O "Grande" mora dentro do card, com o alvo de toque mínimo.
+        expect(grande.x, where).toBeGreaterThanOrEqual(card.x);
+        expect(grande.x + grande.w, where).toBeLessThanOrEqual(card.x + card.w);
+        expect(grande.y + grande.h, where).toBeLessThanOrEqual(card.y + card.h);
+        expect(Math.min(grande.w, grande.h), where).toBeGreaterThanOrEqual(t.minTarget);
+        // O card não passa da área útil (na Mais modos ele ficou mais alto).
+        expect(card.y + card.h, where).toBeLessThanOrEqual(layout.content.y + layout.content.h + 1);
+        // Pelo D-pad: do Bobo Royale para o Grande e de volta.
+        expect(moveFocus(layout, 'mode:royale', page.toGrande), where).toBe('mode:royaleGrande');
+        expect(moveFocus(layout, 'mode:royaleGrande', page.back), where).toBe('mode:royale');
+        expect(reachable(layout, layout.focusable[0]!.id!).size, where).toBe(layout.focusable.length);
+      }
     }
   });
 

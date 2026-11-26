@@ -1,5 +1,5 @@
 import type { StringKey } from '../strings.pt-BR.ts';
-import { COLORS } from '../tokens.ts';
+import { BUTTON, COLORS } from '../tokens.ts';
 import type { Screen, UiNode } from '../tree.ts';
 
 /**
@@ -17,14 +17,21 @@ export interface ModeCard {
   readonly nameKey: StringKey;
   readonly descKey: StringKey;
   /**
-   * M11 (fase 5): um 2º botão no card, ao lado do principal (o "Grande" no card do Bobo Royale, só no PC): a ação é
-   * `mode:<extra.id>`. O card fica da mesma altura (os dois botões dividem a linha).
+   * M11 (fase 5): um 2º botão no card, compacto (o "Grande" no card do Bobo Royale, só no PC): a ação é
+   * `mode:<extra.id>`. No card largo ele divide a linha do nome (o card fica da mesma altura); no estreito, a da
+   * descrição.
    */
   readonly extra?: { readonly id: string; readonly textKey: StringKey };
 }
 
-/** M11 (fase 5): a parte da linha do botão principal que vai para o 2º botão do card (`ModeCard.extra`). */
-const EXTRA_BUTTON_SHARE = 0.4;
+/**
+ * M11 (fase 5): a parte da linha que vai para o 2º botão do card (`ModeCard.extra`), compacto. No card largo, na linha
+ * do nome: 0,32 deixa o "Bobo Royale" inteiro no principal e o "Grande" no piso de 13 px do 640×360. No estreito, na
+ * linha da descrição: 0,42 cabe o "Grande" no 640×360 e a descrição do Bobo Royale no resto.
+ */
+const EXTRA_SHARE_NAME_LINE = 0.32;
+const EXTRA_SHARE_DESC_LINE = 0.42;
+const EXTRA_BUTTON_GAP = 6;
 
 export interface ModesState {
   readonly modes: readonly ModeCard[];
@@ -51,35 +58,52 @@ export const modesScreen: Screen<ModesState> = {
     const cardWidth = dense ? MODES_CARD_WIDTH_DENSE : MODES_CARD_WIDTH;
     const cards: UiNode[] = state.modes.map((m, i) => {
       const lineWidth = cardWidth - (tight ? 12 : 20);
-      const extraGap = 6;
-      const extraWidth = m.extra !== undefined ? Math.round(lineWidth * EXTRA_BUTTON_SHARE) : 0;
+      // M11 (consertos dos prints): o 2º botão é compacto (texto menor). Antes, com 40% da linha do nome e o texto
+      // grande, o nome centrado do principal passava por baixo dele ("BOBO ROYALEGRANDE" a 1280×720). No card largo ele
+      // fica na linha do nome, da altura do principal; no estreito (a página Mais modos), o nome e o "Grande" não cabem
+      // juntos no piso de 13 px do 640×360, e ele desce para a linha da descrição, à direita.
+      const onNameLine = m.extra !== undefined && !dense;
+      const extraWidth =
+        m.extra === undefined
+          ? 0
+          : Math.round(lineWidth * (onNameLine ? EXTRA_SHARE_NAME_LINE : EXTRA_SHARE_DESC_LINE));
       const main: UiNode = {
         kind: 'button',
         id: `${MODES_PREFIX}${m.id}`,
         text: { key: m.nameKey },
         action: `${MODES_PREFIX}${m.id}`,
         variant: i === 0 ? 'primary' : 'secondary',
-        width: m.extra !== undefined ? lineWidth - extraWidth - extraGap : lineWidth,
+        width: onNameLine ? lineWidth - extraWidth - EXTRA_BUTTON_GAP : lineWidth,
         ...(i === 0 ? { autofocus: true } : {}),
       };
-      const line: UiNode =
+      const desc: UiNode = { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo };
+      const extra: UiNode | null =
         m.extra === undefined
-          ? main
+          ? null
           : {
-              kind: 'row',
-              gap: extraGap,
-              children: [
+              kind: 'button',
+              id: `${MODES_PREFIX}${m.extra.id}`,
+              text: { key: m.extra.textKey },
+              action: `${MODES_PREFIX}${m.extra.id}`,
+              variant: 'secondary',
+              compact: true,
+              width: extraWidth,
+              ...(onNameLine ? { height: BUTTON.height } : {}),
+            };
+      const lines: UiNode[] =
+        extra === null
+          ? [main, desc]
+          : onNameLine
+            ? [{ kind: 'row', gap: EXTRA_BUTTON_GAP, children: [main, extra] }, desc]
+            : [
                 main,
                 {
-                  kind: 'button',
-                  id: `${MODES_PREFIX}${m.extra.id}`,
-                  text: { key: m.extra.textKey },
-                  action: `${MODES_PREFIX}${m.extra.id}`,
-                  variant: 'secondary',
-                  width: extraWidth,
+                  kind: 'row',
+                  gap: EXTRA_BUTTON_GAP,
+                  align: 'center',
+                  children: [{ ...desc, width: lineWidth - extraWidth - EXTRA_BUTTON_GAP }, extra],
                 },
-              ],
-            };
+              ];
       return {
         kind: 'box',
         id: `card:${m.id}`,
@@ -87,13 +111,7 @@ export const modesScreen: Screen<ModesState> = {
         chamfer: true,
         padding: tight ? 6 : 10,
         width: cardWidth,
-        children: [
-          {
-            kind: 'column',
-            gap: tight ? 4 : 8,
-            children: [line, { kind: 'text', text: { key: m.descKey }, style: 'body', color: COLORS.textoBaixo }],
-          },
-        ],
+        children: [{ kind: 'column', gap: tight ? 4 : 8, children: lines }],
       };
     });
     const back: UiNode = {

@@ -59,6 +59,7 @@ import {
   type ViewDesc,
 } from '../types.ts';
 import { createActorPass } from './index.ts';
+import { INST } from './layout.ts';
 import { linkFor } from './link.ts';
 
 function fakeContext(): { ctx: PassContext; calls: string[] } {
@@ -256,11 +257,9 @@ describe('passe dos atores (three sem GPU)', () => {
     const pass = createActorPass(ctx);
     pass.setModels([rifle, barrel]);
     const projectiles = createProjectileBuffer(4);
-    projectiles.count = 3;
+    projectiles.count = 2;
     projectiles.model[0] = 0;
     projectiles.model[1] = 0;
-    // Prop não tem conjunto de arma: não desenha.
-    projectiles.model[2] = 1;
     projectiles.position.set([0, 1, -3, 2, 1, -3], 0);
     projectiles.yaw[1] = Math.PI / 2;
     projectiles.pitch[1] = 0.3;
@@ -289,8 +288,43 @@ describe('passe dos atores (three sem GPU)', () => {
     pass.update(frame(0));
     expect(mesh(ctx.scene, 'arma-ammo-box').count).toBe(2);
     expect(mesh(ctx.scene, 'arma-rifle').count).toBe(0);
-    expect(ctx.scene.getObjectByName('arma-barrel')).toBeUndefined();
+    expect(mesh(ctx.scene, 'prop-barrel').count).toBe(0);
     pass.dispose();
+  });
+
+  it('M11: a prop que a sim põe no mundo (o gerador do Fortress) desenha no buffer dos projéteis', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    const generator: ModelDocument = { ...barrel, id: 'generator' };
+    pass.setModels([rifle, generator, ammoBox]);
+    // Como o `game` monta: os projéteis, as caixinhas e por último o gerador.
+    const buffer = createProjectileBuffer(8);
+    buffer.count = 3;
+    buffer.model[0] = 0;
+    buffer.model[1] = 2;
+    buffer.model[2] = 1;
+    buffer.position.set([58.5, 1, 77], 6);
+    buffer.light.set([0.8, 0.6, 0.1], 6);
+    pass.setProjectiles(buffer);
+    pass.update(frame(0));
+    const prop = mesh(ctx.scene, 'prop-generator');
+    expect(prop.count).toBe(1);
+    expect(prop.visible).toBe(true);
+    expect(prop.material).toBe(mesh(ctx.scene, 'arma-rifle').material);
+    const m = prop.instanceMatrix.array;
+    expect([m[12], m[13], m[14]]).toEqual([58.5, 1, 77]);
+    // A luz amostrada pelo `game` vai para os dados da instância.
+    const data = (prop.geometry.getAttribute('iLight') as InterleavedBufferAttribute).data.array as Float32Array;
+    expect(data[INST.sky]).toBeCloseTo(0.8, 6);
+    expect(mesh(ctx.scene, 'arma-rifle').count).toBe(1);
+    expect(mesh(ctx.scene, 'arma-ammo-box').count).toBe(1);
+    // Fora do Fortress o gerador some.
+    buffer.count = 1;
+    pass.update(frame(1 / 60));
+    expect(prop.count).toBe(0);
+    expect(prop.visible).toBe(false);
+    pass.dispose();
+    expect(ctx.scene.getObjectByName('prop-generator')).toBeUndefined();
   });
 });
 

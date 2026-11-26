@@ -5517,3 +5517,62 @@ que não volte aos spawns. Nenhum mapa fica marcado.
 - **Fica:** a classe inteira (topo de painel e de poste que dá pé em todos os mapas: uma regra na sim fecharia de uma
   vez, mas muda os goldens); entre o patamar C (9 m) e o telhado do Bloco Leste, a única barreira é o corrimão leste de 1 m (o passe o
   conta como bloqueio; pular por cima e voar ~6 m fica no limite da física).
+
+### 22.6 Os consertos achados nos prints (26/11/2026)
+
+As capturas da rodada 35, num Edge headless de verdade, acharam três defeitos visíveis:
+
+- **O gerador do Fortress não aparecia** (era assim desde o M6: só a plaquinha "GERADOR" flutuava). O passo dos atores
+  (`render/src/actors/actor-pass.ts`, `buildWeapons`) só montava desenho instanciado para modelos `weapon` e `pickup`;
+  o gerador é `prop`, e o `fillFortress` o punha no buffer dos projéteis, onde o passo pulava a entrada. Agora os
+  modelos `prop` também ganham um conjunto instanciado pequeno (4 instâncias, `prop-<id>`): ~19 malhas a mais,
+  invisíveis quando vazias, e até ~216 KB de vértices a mais na GPU no aquecimento. Teste em `passes.test.ts` (o
+  gerador desenha em (58,5; 1; 77) e some quando sai do buffer).
+- **O nome do card do Bobo Royale passava por baixo do botão "Grande"** ("BOBO ROYALEGRANDE" a 1280×720; na Partida
+  da sala do PC também estourava). O "Grande" virou um botão compacto que depende da largura do card
+  (`ui/src/screens/modes.ts`): no card largo (a Partida da sala) fica na linha do nome; no estreito (o Mais modos), na
+  linha da descrição, à direita; fora do PC o card é o de antes. O `expectCardsFit` passou a pegar sobreposição dentro
+  do card (o texto centrado que vaza do botão), em todos os cards e alvos; um teste novo passa pelo Mais modos e pela
+  Partida da sala do PC (inclusive 640×360, 4:3 e notebooks com toque, alvos de 44 px) e pelo D-pad até o Grande (no
+  Mais modos, ↓ a partir do Bobo Royale).
+- **A câmera `print:archipelago` saía cinza** (a 290 m do alvo, além da visão): foi para (235; 45; 240) mirando
+  (290; 4; 295), do canto sudeste da vila, com o baixio e a ilha do Acampamento. O card do Royale Grande joga com a
+  visão padrão da partida (100 m); a vista geral da rodada 35 foi tirada com 140 m (o teto do PC).
+
+### 22.7 Fechamento do M11 (26/11/2026)
+
+- **O que entrou:** tudo o que o M10 deixou para depois (#84): os poleiros de pulo e o poço do Construto e os poleiros
+  da Base Bobo (nenhum mapa fica mais marcado com `jumpSightTodo`), os bots que sobem aonde o mapa pede (os 3 testes em
+  espera voltaram), o Fortress na Fazenda, as armas no mapa (a regra `weapons.pickups`, 61 armas em 7 mapas) e o Bobo
+  Royale Grande (48 participantes, só no PC, no Arquipélago de 400 m). De quebra, dois defeitos antigos: a mão que ia
+  para a faca ou a granada depois de pegar uma arma do chão (o código da arma ia como slot; também no Royale e no
+  BoboStrike) e o gerador do Fortress que nunca aparecia.
+- **Como andou (#82):** as 5 frentes ao mesmo tempo, cada uma num agente com o próprio worktree; uma revisão do Opus
+  por frente, com os achados de volta à própria frente; a junção na ordem de chegada (3, 2, 5, 4, 1), com o portão
+  inteiro a cada fase e os goldens re-gravados por cima do que já tinha entrado (o script de re-gravação lê o par
+  esperado/recebido do vitest e anota cada constante). A revisão achou um defeito alto em três das cinco frentes (as
+  telas da torre davam pé, a mão ia para a granada, o jogo caía ao abrir o Grande fora do PC). Depois, os prints acharam
+  mais três (§22.6).
+- **As versões:** `PROTOCOL_VERSION` 14 (a máscara das armas no grupo frio `rules` da rede), com o `net.json`; o
+  snapshot da sim segue no 20. Só acrescentados: o modo `mode:royale.grande` e o mapa `map:archipelago`; o marcador
+  opcional `weaponSpots` do `map@1` (os mapas sem ele ficam com os mesmos bytes) e o `analysis.openSight` do script; o
+  campo opcional `weapons.pickups` do `preset@1` e o `pickups` do código `BFR1-`; o campo
+  `royaleGrandeMaxParticipants` do perfil. O `mapc` aceita visada declarada de até 600 m e 112 pontos de loot.
+- **Os goldens:** 21 no fim. Novos: o Fortress na Fazenda `30d56a36`, o Royale Grande `64065dca` e as armas no mapa
+  `6df27838`. Mudaram (os poleiros e o passeio por lugar): TDM `1efd48f4`, Zombies `e247f81d`, Domination `f723261d`,
+  Gun Game `1d861d5b`, Infection `0f81a8cf`, Juggernaut `d7a3fab5`, Chaos `a43b1644`, Paintball `cdeef769`, Jugg Fixo
+  `2572d1aa`, Arcade `0693e3d1`, Sandbox `aca32899`, TDM na Base Bobo `b61757db` e BoboStrike `6fd11dc0`. Não mudaram: o
+  Posto, o Fortress no Posto, a Horda e o Royale Mini.
+- **O custo:** `PERF.md` §1s (o Royale Grande) e §1t (o resto: pareado com o código do M10, no ruído). O menu da web:
+  335,0 KB de 350; a primeira partida: 963,1 KB de 1 MB.
+- **Os prints:** a rodada 35 (seções 142 a 145: os poleiros, as armas no mapa, o Royale Grande e o Fortress na
+  Fazenda), com as perguntas AL1 a AL5, na versão 39 da página das rodadas.
+- **Fica para depois:**
+  - o topo de tela, de corrimão e de poste que dá pé em todos os mapas (pergunta AL4; o passe de pulos do `mapc` não
+    os vê; uma regra na sim fecharia todos, mudando os goldens);
+  - o Royale Grande: o heap de 320 MB no Edge (pergunta AL5), o índice de lugares da IA (~50 ms no 1º tick, dá para
+    montar no loading), o `.bfmap` do Arquipélago no romfs do Switch sem uso, o Surpreenda-me que não o sorteia, o
+    amigo no celular carregando o Arquipélago (não medido);
+  - a Fortaleza da Fazenda e a do Posto com o mesmo nome nos recentes; a sala online sem a Fortaleza;
+  - a semente 5 da Lua, em que ninguém chega ao deque da antena em 90 s;
+  - gerar os mips no carregamento (uns 34 KB da primeira partida), quando o teto apertar.

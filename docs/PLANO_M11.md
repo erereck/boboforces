@@ -60,6 +60,8 @@ conferidos de novo depois de cada junção.
    host PC); a zona escalada; a IA; golden novo.
    - **feita em 26/11** (ARCHITECTURE §22.5, PERF §1s): 48 participantes no Arquipélago, só no PC; golden `64065dca`.
 6. **Fechamento:** o portão, a rodada de prints 35, o `CHANGELOG`, a `ARCHITECTURE` (§22) e o `PERF`.
+   - **feita em 26/11** (ARCHITECTURE §22.6 e §22.7, PERF §1t): a rodada de prints 35 (seções 142 a 145) e os consertos
+     dela.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
@@ -68,3 +70,5 @@ conferidos de novo depois de cada junção.
 | AL1 | **O Royale Grande:** o número de participantes sai da medição no PC de referência (alvo 48); no celular e no Switch ele não aparece. | Assim |
 | AL2 | **Os pickups:** uma regra de partida ("armas no mapa") na Partida personalizada, no Sandbox e no Surpreenda-me; com ela todos nascem de pistola e faca e o radial da morte some. Sem card próprio. | Assim |
 | AL3 | **O Fortress na Fazenda:** o card do Fortress oferece a Fazenda (o mapa dele no GDD) e o Posto continua escolhível. | Assim |
+| AL4 | **Topo de tela e de corrimão** (achado da revisão da fase 1): em todos os mapas, o topo de uma tela, de um corrimão ou de um poste ainda dá pé para quem pousa de cima (nenhum leva mais a lugar alto). Deixar como está, ou uma regra na sim ("não dá pé") que fecha todos e muda os goldens. | Deixar como está |
+| AL5 | **A memória do Royale Grande:** 320 MB no Edge (a meta do tecnico.md §16.3 é 200 MB; o limite do PC é 4,4 GB), sem efeito no quadro. | Aceitar no PC |
