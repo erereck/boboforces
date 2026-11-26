@@ -5,7 +5,10 @@ import { MAP_MODES, type MenuMap } from './maps.ts';
 import { MORE_MODE_CARDS, MORE_WATCH_ACTION, moreModePreset, moreModesRoot } from './more-modes.ts';
 import { STORAGE_RECIPE_LIMITS } from './save-store.ts';
 
-/** M7 (fase 8): cada card da página Mais modos tem uma receita válida (o BoboStrike e o Royale, no mapa deles). */
+/**
+ * M7 (fase 8): cada card da página Mais modos tem uma receita válida (o BoboStrike, o Royale e, desde o M10, o Bobo
+ * Paintball, no mapa deles).
+ */
 describe('os cards da página Mais modos', () => {
   it('cada receita passa no validador (o Bobo Training tem a tela dele)', () => {
     for (const card of MORE_MODE_CARDS) {
@@ -15,7 +18,7 @@ describe('os cards da página Mais modos', () => {
       const v = validateMatchRecipe(r, STORAGE_RECIPE_LIMITS);
       expect(v.ok, card.id).toBe(true);
       // Os modos de mapa próprio (os de festa jogam no Construto sem estar no meta.modes dele).
-      if (r!.mode === 'strike' || r!.mode === 'royale.mini') {
+      if (r!.mode === 'strike' || r!.mode === 'royale.mini' || r!.mode === 'paintball') {
         expect(MAP_MODES[r!.map as MenuMap], card.id).toContain(r!.mode);
       }
     }

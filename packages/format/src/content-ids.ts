@@ -67,6 +67,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:port',
   // M10 (fase 4): a Estação Lunar, o mapa do Bobo Chaos com a gravidade da Lua de série (só acrescentado, regra 20)
   'map:moonbase',
+  // M10 (fase 3): o Galpão de Paintball, o mapa do Bobo Paintball (só acrescentado, regra 20)
+  'map:paint-hall',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

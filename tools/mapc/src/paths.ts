@@ -19,4 +19,5 @@ export const MAP_IDS = [
   'construction',
   'port',
   'moonbase',
+  'paint-hall',
 ] as const;

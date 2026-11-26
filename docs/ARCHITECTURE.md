@@ -5120,3 +5120,25 @@ commits é a de chegada.
   holofotes no chão, os tanques a 6,5 m, a pilha de carga a 2,5 m, o hangar fechado na frente). Fica: a regra de
   gravidade da Partida personalizada em 0,25 ainda alcança telhados (escolha de quem monta a partida); as rampas da
   estação esperam a correção do seguidor de caminho (fase 1c) para os bots subirem.
+
+### 21.7 Fase 3: o Galpão de Paintball (26/11/2026)
+
+- **O mapa** (`assets-src/maps/paint-hall.ts`, `paint-hall`, "Galpão"): um galpão coberto de 64 × 84 m (grade de
+  72 × 16 × 108 m), espelhado no meio, de dia, para o Bobo Paintball (o card de Mais modos agora começa nele, e o
+  Surpreenda-me segue o card), o TDM e o Sandbox. 8 spawns por time em 3 caixas atrás de cada parede de largada, cada
+  uma com o seu portão e um anteparo em L. Três rotas: as passarelas de grade a 3,75 m a oeste (cobertas por uma
+  grade, sem altura para ficar em cima do parapeito) até a casa do compressor no meio; a torre do juiz, a parede de
+  madeira, os paletes e os contêineres no centro; o pátio de contêineres a leste. A ponte rolante passa a 2,5 m do chão.
+  Os infláveis são de 2 modelos só (o cilindro e o cubo), arrumados em 8 grupos de 32 m (o teto de grupos do Switch
+  3–4P; um teste prende). O teto tem frestas com vidro em pé: a luz passa, ninguém passa, e a navegação do teto fica em
+  pedaços (um teto inteiro virava a maior área, que a sim usa para as casas do Sandbox e o Destravar).
+- **As medidas:** a maior linha de visão do chão 49,98 m; nenhum poleiro alcançável (pelo pulo de até 1,5 m) passa de
+  50 m; a travessia de 13,5 a 15,2 s; nada de fora de uma caixa vê os spawns dela (as paredes da largada, das caixas e
+  do portão do meio vão do chão ao teto; um teste prende); `.bfmap` com cerca de 5,5 KB.
+- **Os bots:** Paintball 32 × 34 (66 abates), TDM 17 × 22, Sandbox de 4 times, ninguém preso. As passarelas esperam a
+  correção do seguidor de caminho (fase 1c); o piso de grade delas deixa a tinta passar de propósito.
+- **A revisão (Opus) achou:** atirar para dentro das caixas de spawn de poleiros do lado de fora (com o renascer de 1 s,
+  um laço de matar no spawn) e ver dentro das caixas laterais pelos portões; poleiros só de humano com visada de até
+  74 m; os infláveis em 32 grupos (o Switch 3–4P desenha 8 e escondia cobertura que ainda segura a tinta); o teto
+  alcançável com a gravidade baixa e o Arcade; e as passarelas que os bots não sobem. Corrigido antes do commit. Fica: a
+  câmera de cima do Aquário (24 m) mostra o teto.

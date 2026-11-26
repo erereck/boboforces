@@ -57,8 +57,17 @@ function sandboxRecipe(map: string): MatchRecipe {
 }
 
 describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
-  it('a lista: o Construto, o Ringue, a Base Bobo (M10, fase 8), o Canteiro (fase 2), o Porto (fase 1) e a Estação Lunar (fase 4)', () => {
-    expect(mapsForMode('sandbox')).toEqual(['construto', 'ringue', 'airbase', 'construction', 'port', 'moonbase']);
+  it('a lista: o Construto, o Ringue, a Base Bobo (M10, fase 8) e os mapas novos do M10', () => {
+    // O Canteiro (fase 2), o Porto (fase 1), a Estação Lunar (fase 4) e o Galpão de Paintball (fase 3).
+    expect(mapsForMode('sandbox')).toEqual([
+      'construto',
+      'ringue',
+      'airbase',
+      'construction',
+      'port',
+      'moonbase',
+      'paint-hall',
+    ]);
   });
 
   for (const id of mapsForMode('sandbox')) {
@@ -107,7 +116,8 @@ describe('mapas do Bobo Sandbox (M9, fase 3)', () => {
           gaps.push(Math.round(Math.hypot(cx - bx, cz - bz)));
         }
       }
-      // Medido (20/11): Construto 45–48 m, Ringue 20–22 m (48 m de lado), Base Bobo 36–37 m (M10, fase 8).
+      // Medido (20/11): Construto 45–48 m, Ringue 20–22 m (48 m de lado), Base Bobo 36–37 m (M10, fase 8), Galpão de
+      // Paintball 46 m (M10, fase 3).
       expect(Math.min(...gaps), `${id}: distâncias ${gaps.join('/')}`).toBeGreaterThan(id === 'ringue' ? 15 : 30);
       for (let t = 0; t < 20 * 60; t++) match.step();
       const v = match.sim.view();

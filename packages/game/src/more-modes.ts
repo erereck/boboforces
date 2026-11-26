@@ -118,12 +118,13 @@ export function moreModePreset(id: string): MatchRecipe | null {
         teams: [{ humans: 'all', bots: [{ ref: normal, count: 3 }] }, { bots: [{ ref: normal, count: 4 }] }],
       };
     case 'paintball':
-      // GDD §4.1.2: 1 acerto derruba (configurável 1–3 no bloco), renasce em 1 s, 50 abates ou 5 min; 4 contra 4.
+      // GDD §4.1.2: 1 acerto derruba (configurável 1–3 no bloco), renasce em 1 s, 50 abates ou 5 min; 4 contra 4. M10
+      // (fase 3): no Galpão de Paintball, o mapa dele.
       return {
         format: MATCH_RECIPE_FORMAT,
         name: 'Bobo Paintball',
         mode: 'paintball',
-        map: 'construto',
+        map: 'paint-hall',
         seed: 0,
         match: { timeLimitS: 300, scoreLimit: 50 },
         players: { respawnS: 1 },

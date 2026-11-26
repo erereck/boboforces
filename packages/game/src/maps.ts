@@ -14,6 +14,7 @@ export const MENU_MAPS = [
   'construction',
   'port',
   'moonbase',
+  'paint-hall',
 ] as const;
 export type MenuMap = (typeof MENU_MAPS)[number];
 
@@ -37,6 +38,9 @@ export const MAP_MODES: Readonly<Record<MenuMap, readonly string[]>> = {
   port: ['warfare.tdm', 'warfare.ffa', 'warfare.domination', 'sandbox'],
   // M10 (fase 4): a Estação Lunar (a gravidade da Lua em todo modo); o Bobo Chaos é o card dos Times com a Roleta nela.
   moonbase: ['warfare.tdm', 'warfare.ffa', 'sandbox'],
+  // M10 (fase 3): o Galpão de Paintball, o mapa do Bobo Paintball; também joga TDM e o Sandbox (a casa dos times 2 e 3
+  // cai no chão dos lados do meio-campo).
+  'paint-hall': ['paintball', 'warfare.tdm', 'sandbox'],
 };
 
 /**
@@ -50,8 +54,10 @@ export function mapGravity(map: string): number {
   return MAP_GRAVITY[map as MenuMap] ?? 1;
 }
 
-/** Teto de bots do mapa (o do aparelho vale por cima): o Ringue cabe 8 bobos; a Base Bobo, 10 (5 contra 5). */
-const MAP_BOT_CAP: Readonly<Partial<Record<MenuMap, number>>> = { ringue: 7, airbase: 9 };
+/**
+ * Teto de bots do mapa (o do aparelho vale por cima): o Ringue cabe 8 bobos; a Base Bobo, 10 (5 contra 5); o Galpão, 16.
+ */
+const MAP_BOT_CAP: Readonly<Partial<Record<MenuMap, number>>> = { ringue: 7, airbase: 9, 'paint-hall': 15 };
 
 export function mapsForMode(mode: string): MenuMap[] {
   return MENU_MAPS.filter((m) => MAP_MODES[m].includes(mode));

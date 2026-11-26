@@ -37,6 +37,7 @@ const LOCKED_IDS = [
   'map:construction',
   'map:port',
   'map:moonbase',
+  'map:paint-hall',
   'weapon:pistol',
   'weapon:smg',
   'weapon:rifle',
@@ -281,6 +282,7 @@ describe('registro de IDs de conteúdo', () => {
       'construction',
       'port',
       'moonbase',
+      'paint-hall',
     ]);
     expect(contentIdsOfKind('bot')[0]).toBe('vibe-bob');
     expect(contentIdsOfKind('prop')).toEqual([]);

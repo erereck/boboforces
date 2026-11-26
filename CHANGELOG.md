@@ -27,6 +27,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **A Estação Lunar (fase 4):** uma base na Lua com a gravidade baixa em todo modo jogado nela (pulos de quase 3 m e
   sem dano de queda): o regolito com a cratera, a estação com o átrio e as passarelas, e a antena. TDM, FFA, Sandbox e o
   Bobo Chaos, que agora joga lá.
+- **O Galpão de Paintball (fase 3):** um galpão coberto e colorido com infláveis, passarelas, a torre do juiz e a ponte
+  rolante, espelhado, para o Bobo Paintball (o card do modo agora começa nele), o TDM e o Sandbox; as caixas de spawn
+  ficam fechadas para tiro de fora.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).
