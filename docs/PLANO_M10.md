@@ -68,6 +68,7 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
    - **feita em 20/11** (ARCHITECTURE §21.2): 38 blocos e 8 peças; a primeira partida em 941 KB.
 1. **Porto de Contêineres** (médio): verticalidade e corredores entre pilhas de contêineres; TDM, FFA, Domination e
    Sandbox.
+   - **feita em 25/11** (ARCHITECTURE §21.5): 88 × 71,5 m, visada de 49,65 m, 3 pontos de Domination.
 2. **Canteiro de Obras** (médio): andaimes, vigas e o guindaste; TDM, FFA e Sandbox.
    - **feita em 20/11** (ARCHITECTURE §21.3): 72 × 80 m, 3 andares, visada de 47,9 m.
 3. **Galpão de Paintball** (médio): interior colorido com infláveis; Bobo Paintball (e TDM).

@@ -35,6 +35,8 @@ export const GAME_ASSETS_M1 = {
   island: 'maps/island.bfmap',
   /** M10 (fase 2): o Canteiro de Obras (TDM, FFA e Sandbox). */
   construction: 'maps/construction.bfmap',
+  /** M10 (fase 1): o Porto de Contêineres (TDM, FFA, Domination e Sandbox). */
+  port: 'maps/port.bfmap',
   /** Sons do teste de áudio do T0 (item 19; MP3 convertidos dos CC0 da Kenney; frente switch-audio). */
   audioShot: 'audio/t0-tiro.mp3',
   audioImpact: 'audio/t0-impacto.mp3',
@@ -60,4 +62,5 @@ export const MAP_ASSETS: Readonly<Record<string, string>> = {
   airbase: GAME_ASSETS_M1.airbase,
   island: GAME_ASSETS_M1.island,
   construction: GAME_ASSETS_M1.construction,
+  port: GAME_ASSETS_M1.port,
 };

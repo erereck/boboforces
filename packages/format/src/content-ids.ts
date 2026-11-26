@@ -63,6 +63,8 @@ export const CONTENT_IDS: readonly ContentId[] = [
   'map:island',
   // M10 (fase 2): o Canteiro de Obras (só acrescentado, regra 20)
   'map:construction',
+  // M10 (fase 1): o Porto de Contêineres (só acrescentado, regra 20)
+  'map:port',
   // Armas (gameplay.md §4.3)
   'weapon:pistol',
   'weapon:smg',

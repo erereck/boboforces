@@ -22,6 +22,8 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   "Bloop" (granada em arco que explode no contato). Estão no radial da morte (agora com 10 primárias), nas regras de
   arma, no Laboratório, na loja do BoboStrike e nas escadas de Gun Game feitas à mão; os bots usam todas quando uma regra
   dá. O online foi para o protocolo 13.
+- **O Porto de Contêineres (fase 1):** um porto espelhado com pilhas de contêineres, o cais, o navio, o guindaste e o
+  armazém, para TDM, FFA, Domination (3 pontos) e Sandbox; três rotas e a trilha por cima dos contêineres.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

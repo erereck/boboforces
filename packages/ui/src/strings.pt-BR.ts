@@ -163,6 +163,8 @@ export const STRINGS_PT_BR = {
   'map.island': 'Ilha Tropical',
   // M10 (fase 2): o Canteiro de Obras (nome provisório, pergunta AK2).
   'map.construction': 'Canteiro',
+  // M10 (fase 1): o Porto de Contêineres (nome provisório, pergunta AK2).
+  'map.port': 'Porto',
   'mode.short.zombies': 'Zombies',
   'mode.name.zombies': 'Bobo Zombies',
   'mode.desc.zombies': 'Ondas de zumbis. Caiu? O colega levanta.',

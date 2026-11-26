@@ -341,7 +341,10 @@ describe('M9 (fase 3): o Bobo Sandbox na Partida personalizada', () => {
     // M10 (fase 2): depois da Base Bobo, o Canteiro; e volta ao Construto.
     const canteiro = stepCustom('match', airbase, 'map', 1, PC);
     expect(canteiro.map).toBe('construction');
-    expect(stepCustom('match', canteiro, 'map', 1, PC).map).toBe('construto');
+    // M10 (fase 1): depois do Canteiro, o Porto; e volta ao Construto.
+    const port = stepCustom('match', canteiro, 'map', 1, PC);
+    expect(port.map).toBe('port');
+    expect(stepCustom('match', port, 'map', 1, PC).map).toBe('construto');
   });
 
   it('a aba Times: de 2 a 4 times, o seu time, e por time o nome, o bot, quantos, a vida e as armas', () => {

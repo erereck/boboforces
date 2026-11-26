@@ -5066,3 +5066,30 @@ commits é a de chegada.
   anel sem a fonte e o virote cravado que ficava depois da rodada; nos modelos, a mira da besta tapando o centro, a mira
   do DMR por cima da luneta, o virote atravessando painel fino, a mira solta da besta e o teto de camadas. Corrigido
   antes do commit.
+
+### 21.5 Fase 1: o Porto de Contêineres (25/11/2026)
+
+- **O mapa** (`assets-src/maps/port.ts`, `port`, "Porto"): área de 88 × 71,5 m numa grade de 96 × 28 × 96 m,
+  espelhado em x = 48 (o time A a oeste, o B a leste), de dia. O cais a 4,5 m, o topo dos contêineres a 7 m (a
+  plataforma B e a "trilha de cima") e o mezanino do armazém a 7,25 m. Três rotas: o cais (norte: a beira d'água com o
+  navio; o ponto A num canal entre as pilhas), o pátio de contêineres (o meio: corredores entre pilhas de 2, a trilha de
+  cima com pontes de grade, um túnel numa pilha e a praça com o guindaste e a plataforma B) e a rua com o armazém (sul:
+  o ponto C dentro, mezanino e claraboias). Modos: TDM, FFA, Domination (A, B, C) e Sandbox (jogadores 2/12/16; 12
+  bots no Switch 3–4P). A cena de bench `scene=port`.
+- **As medidas:** a maior linha de visão 49,65 m (declarada 50); 8 + 8 spawns de time e 20 no FFA, nenhum visto de um
+  inimigo; a travessia de 12,0 a 12,7 s; a cobertura mais longe a 5,7 m; `port.bfmap` com 7,7 KB; 8.851 nós de
+  navegação (o Construto tem 7.161).
+- **O mar** (`harborWater` do kit): o fundo a 4 m abaixo do cais (mais que a queda de 3 m da navegação) e o plano de
+  morte entre a água e o fundo; a área de jogo para na face de dentro do muro do cais (z 14,5), que tem 0,5 m (a altura
+  do degrau automático: antes, dava para cair no mar sem pular).
+- **Os testes:** as partidas da sim em cada modo (TDM 6×6 terminando aos 141 s com 73 abates; FFA, Domination e
+  Sandbox de 3 min), o seguidor de caminho dos bots subindo a trilha e a plataforma B, os pontos do Domination trocando
+  de mão numa varredura de 4 sementes, e no `mapc` (`tools/mapc/src/port.test.ts`) o "poleiro": o que um humano alcança
+  com o mantle (1,5 m) ou o pulo correndo (vão até 3,7 m, subida até 0,5 m) e a maior visada de lá.
+- **Achado para a IA:** no Domination, o time 0 vence a maioria das sementes, e a vantagem segue o time 0 mesmo com os
+  spawns trocados de lado (o mapa é espelhado célula a célula): é um viés da sim ou da IA, não do mapa (pendência).
+- **A revisão (Opus) achou:** um poleiro só de humano (da trilha para o contêiner do caminhão, com visada de 57–60 m) e
+  outro na caixa de 2 m; o muro do cais que deixava cair no mar (e a casa do time 3 do Sandbox em cima dele); a escada
+  do mezanino que os bots não sobem (o defeito do seguidor de caminho; os testes desse trecho estão marcados para
+  voltar com a fase 1c); o Domination com um time zerado em duas sementes; e a altura das grades. Corrigido antes do
+  commit (os caminhões e a fileira da rua com 2 de altura, a caixa a 5 m da trilha).

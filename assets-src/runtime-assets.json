@@ -21,6 +21,7 @@
     "maps/airbase.bfmap": "maps/generated/airbase.bfmap",
     "maps/island.bfmap": "maps/generated/island.bfmap",
     "maps/construction.bfmap": "maps/generated/construction.bfmap",
+    "maps/port.bfmap": "maps/generated/port.bfmap",
     "audio/t0-tiro.mp3": "audio/generated/t0-tiro.mp3",
     "audio/t0-impacto.mp3": "audio/generated/t0-impacto.mp3",
     "audio/t0-passo.mp3": "audio/generated/t0-passo.mp3",

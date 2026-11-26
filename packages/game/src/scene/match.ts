@@ -744,8 +744,12 @@ export function sceneRecipe(request: SceneRequest, profile: PlatformProfile): Sc
       recipe = {
         format: MATCH_RECIPE_FORMAT,
         mode: 'warfare.tdm',
-        // M7 (fase 1): o TDM na Base Bobo (`scene=airbase`). M10 (fase 2): no Canteiro (`scene=construction`).
-        map: bench.scene === 'airbase' || bench.scene === 'construction' ? bench.scene : 'construto',
+        // M7 (fase 1): o TDM na Base Bobo (`scene=airbase`). M10: no Canteiro (`scene=construction`) e no Porto
+        // (`scene=port`).
+        map:
+          bench.scene === 'airbase' || bench.scene === 'construction' || bench.scene === 'port'
+            ? bench.scene
+            : 'construto',
         seed: bench.seed >>> 0,
         match: { timeLimitS: 0, viewDistanceM: bench.viewDistanceM },
         teams: [{ bots: [{ ref, count: a }] }, { bots: b > 0 ? [{ ref, count: b }] : [] }],
