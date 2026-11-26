@@ -327,7 +327,10 @@ export const AI_SOLDIER = {
   upperChance: 0.3,
   upperSamples: 8,
   upperRiseM: 2.5,
-  /** M6 (fase 1): no Domination, 1 bot em cada tantos (pelo controlador) defende um ponto do time. */
+  /**
+   * M6 (fase 1): no Domination, 1 bot em cada tantos defende um ponto do time. M10: contados dentro de cada time (com
+   * 3: o 2º, o 5º…; `markPointDefenders`), não pelo controlador global.
+   */
   pointDefenderEvery: 3,
   /** M6 (fase 1): quem ataca escolhe outro ponto (não o mais perto) com esta chance, para o time se espalhar. */
   pointSpreadChance: 0.25,

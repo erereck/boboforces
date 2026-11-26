@@ -37,6 +37,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   fazia desistir da rota: a torre do Construto, os mezaninos do Porto, o andar de cima da Lua) e sobem aos andares de
   cima de vez em quando. Os goldens com bots no Construto e na Base Bobo mudaram por isso. O compilador de mapas agora
   mede também os lugares aonde só um pulo correndo leva.
+- **Os consertos do navegador:** o link de uma partida do Paintball (e de outros 5 modos) mostrava o nome do modo
+  como código ("mode.paintball") até a partida carregar; agora todo modo tem o nome desde o menu. No Domination, os
+  bots que ficam defendendo um ponto eram escolhidos de um jeito que dava mais defensores a um time no 5 contra 5;
+  agora cada time tem a mesma parte (o golden do Domination mudou por isso).
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

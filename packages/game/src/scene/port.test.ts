@@ -337,9 +337,11 @@ describe('Porto de Contêineres (M10, fase 1)', () => {
   // Revisão (20/11): numa semente só, um time às vezes não captura nada (quem fica sem captura chega a 0,95 do progresso
   // e é contestado). O mapa é espelhado célula a célula na área jogável (só o caixote pendurado no guindaste, no alto,
   // não tem par). Medido em 8 sementes (1 a 8, 3 min cada): o time 0 vence 7; com os spawns dos times trocados de lado,
-  // o time 0 (agora no leste) ainda vence 5. A vantagem segue o time 0, não o lado: é da sim ou da IA, não do mapa
-  // (fica para a integração). A varredura cobra o que é do mapa: os 3 pontos trocam de dono, os dois times capturam e
-  // toda partida tem placar.
+  // o time 0 (agora no leste) ainda vence 5. M10 (a vantagem do time 0 no Domination): era ruído de 8 sementes. Em 256
+  // sementes por lado (3 min cada), o time 0 vencia 111 a 142 no oeste e 103 a 148 no leste: a vantagem era do time 1,
+  // pelo defensor de ponto escolhido pelo controlador global (1 defensor no time 0 e 2 no time 1 no 5 contra 5). Com o
+  // terço de cada time (`markPointDefenders`): 133 a 120 e 133 a 121 (somados, 266 a 241, dentro do ruído). A
+  // varredura cobra o que é do mapa: os 3 pontos trocam de dono, os dois times capturam e toda partida tem placar.
   it('Domination 5 contra 5 em 4 sementes: os 3 pontos trocam de dono e os dois times capturam', () => {
     const byTeam = [new Set<number>(), new Set<number>()];
     for (const seed of [4, 5, 7, 8]) {

@@ -5198,3 +5198,19 @@ commits é a de chegada.
   "peça sem chão" deixou de acusar a caixa de colisão apoiada noutra caixa da mesma peça (o banco do trator, a cunha).
 - **Achado:** no Construto, um poço fechado ao lado da escada da torre (x 42–44, z 39–44; a escada não tem guarda do
   lado oeste) prende o bot que cai até o Destravar (fechar muda o mapa e os goldens).
+
+### 21.10 Os consertos do navegador: o nome cru dos modos e os defensores do Domination (26/11/2026)
+
+- **O nome cru dos modos** (achado no teste do site de verdade, na tela virtual: o link `#p=` de um preset do
+  Paintball mostrava "mode.paintball" na partida recebida e "mode.short.paintball" no JOGAR). As chaves do nome são
+  montadas com o id (`mode.${recipe.mode}`), então o size-check não as vê, e 6 modos tinham o nome só na tabela
+  extra, que chega com a cena. Agora os 11 modos da lista travada têm `mode.<id>` e `mode.short.<id>` na tabela do
+  menu (os 6 saíram da extra). O teste `game/src/mode-names.test.ts` carrega só a tabela do menu, como a web no
+  boot, e confere o resumo do JOGAR, o atalho e as linhas da partida recebida de todo modo. O menu da web: 334,1 KB.
+- **Os defensores do Domination** (`ai/src/soldier.ts`, `markPointDefenders`): 1 bot em cada 3 defende um ponto do
+  time, mas a conta era pelo controlador global (`controller % 3`), e no 5 contra 5 o time 0 tinha 1 defensor e o
+  time 1, 2. A vantagem do time 0 que a revisão do Porto viu (7 de 8 sementes) era ruído de amostra pequena: em 256
+  sementes por lado (3 min cada), o time 1 é que vencia (111 a 142 com o time 0 no oeste, 103 a 148 no leste). Agora
+  o terço conta dentro de cada time (o 2º, o 5º…): 133 a 120 e 133 a 121, dentro do ruído. Teste:
+  `ai/src/point-defenders.test.ts`. O golden do Domination (4 contra 4 no Construto) foi de `b68b0dee` para
+  `5ceddb7e`: o número de defensores é o mesmo (1 por time), muda qual bot do time 0 defende (o 2º, antes o 3º).

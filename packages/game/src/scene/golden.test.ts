@@ -310,10 +310,15 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
  * M6 (fase 1): o golden do Domination: 4 contra 4 bots Normal no Construto (os 3 pontos do mapa), semente 42, até
  * 3 min. Confere que os bots jogam o objetivo (os dois times capturam pontos e marcam), e o hash entre execuções.
  * Gravado na fase 1 (19/11/2026): `97f2f078` (capturas 2/3, o time 1 fecha 200 a 101). M10 fase 1c (26/11/2026): os
- * bots sobem escada reta e o passeio às vezes sobe: `b68b0dee` (capturas 1/2, o time 1 fecha 200 a 151).
+ * bots sobem escada reta e o passeio às vezes sobe: `b68b0dee` (capturas 1/2, o time 1 fecha 200 a 151). M10: a
+ * vantagem do time 0 no Domination (26/11/2026): `5ceddb7e` (capturas 1/1, placar 123×174 nos 3 min, sem fechar) — a
+ * vantagem do time 0 era ruído de 8 sementes, mas o defensor de ponto saía do controlador global (`controller % 3`, o
+ * 5 contra 5 dava 1 defensor ao time 0 e 2 ao time 1, que vencia 57% no Porto): agora é o terço de cada time, pela
+ * ordem dentro dele (`markPointDefenders`). No 4 contra 4 o número de defensores não muda (1 por time); muda QUAL bot
+ * do time 0 defende (o 2º, antes o 3º).
  * MUDA com a sim, a IA, o mapa ou as regras dos pontos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  */
-const GOLDEN_DOMINATION_HASH = 'b68b0dee';
+const GOLDEN_DOMINATION_HASH = '5ceddb7e';
 const GOLDEN_DOMINATION_TICKS = 10_800;
 
 function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {

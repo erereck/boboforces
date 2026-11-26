@@ -153,6 +153,25 @@ export const STRINGS_PT_BR = {
   'mode.short.warfare.tdm': 'Times',
   'mode.short.warfare.ffa': 'Todos contra todos',
   'mode.short.warfare.domination': 'Domination',
+  // M10: o nome de cada modo (a partida recebida por link, o placar do Tab) e o curto (o resumo do JOGAR, o atalho, o
+  // nome do preset salvo) de TODOS os modos da lista travada (`CONTENT_IDS`) moram aqui, na tabela do menu: as chaves
+  // são montadas com o id (`mode.${recipe.mode}`), o size-check não as vê, e o título as mostra antes da tabela extra.
+  'mode.short.strike': 'Strike',
+  'mode.short.royale.mini': 'Royale',
+  'mode.short.paintball': 'Paintball',
+  'mode.short.juggernaut': 'Juggernaut',
+  'mode.short.chaos': 'Chaos',
+  'mode.short.training': 'Training',
+  'mode.warfare.tdm': 'Bobo Warfare: Times',
+  'mode.warfare.ffa': 'Bobo Warfare: Todos contra todos',
+  'mode.warfare.domination': 'Bobo Warfare: Domination',
+  'mode.strike': 'BoboStrike',
+  'mode.royale.mini': 'Bobo Royale',
+  'mode.paintball': 'Bobo Paintball',
+  'mode.sandbox': 'Bobo Sandbox',
+  'mode.juggernaut': 'Bobo Juggernaut',
+  'mode.chaos': 'Bobo Chaos',
+  'mode.training': 'Bobo Training',
   'map.construto': 'Construto',
   'map.ringue': 'Ringue',
   // M3 (fase 3d): o mapa pequeno do Bobo Zombies (nome provisório).

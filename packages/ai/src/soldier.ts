@@ -329,6 +329,11 @@ export class SoldierBrain {
   /** M3 (fase 3a): o colega caído que este bot vai levantar (índice), ou -1. */
   reviveTarget = -1;
   /**
+   * M10: no Domination, este bot defende um ponto do time (`pickPointGoal`). O diretor marca 1 em cada
+   * `pointDefenderEvery` bots DE CADA TIME, pela ordem dentro do time (`markPointDefenders`).
+   */
+  pointDefender = false;
+  /**
    * M8 (fase 6): a ordem do humano aliado que este bot obedece (`ORDER`; 0 = nenhuma), quem mandou (entidade e
    * geração), o ponto (Segura aqui, Ataca ali), até quando vale e se está andando até quem mandou (Vem comigo).
    */
@@ -894,10 +899,30 @@ function stretchWander(b: SoldierBrain, f: PathFollower, tick: number, t: Soldie
 }
 
 /**
+ * M10: marca os defensores do Domination, 1 em cada `pointDefenderEvery` bots de cada time, pela ordem do bot DENTRO
+ * do time: com 3, o 2º, o 5º, o 8º… (o terço arredondado: 2 a 4 bots → 1, 5 a 7 → 2, 8 → 3). O número de defensores
+ * de um time depende só de quantos bots ele tem, não do índice do time nem do tamanho do outro. Antes, pelo controlador
+ * global (`controller % 3 === 0`, com os bots a partir do 4), o 5 contra 5 só de bots dava 1 defensor ao time 0 e 2 ao
+ * time 1, e o time 1 vencia 290 de 504 partidas decididas no Porto (espelhado; 256 sementes de cada lado, 3 min).
+ * `teams[i]` é o time de `brains[i]`.
+ */
+export function markPointDefenders(brains: readonly SoldierBrain[], teams: readonly number[]): void {
+  const every = AI_SOLDIER.pointDefenderEvery;
+  const pick = every >> 1;
+  const rank = new Map<number, number>();
+  for (let i = 0; i < brains.length; i++) {
+    const team = teams[i]!;
+    const r = rank.get(team) ?? 0;
+    rank.set(team, r + 1);
+    brains[i]!.pointDefender = r % every === pick;
+  }
+}
+
+/**
  * M6 (fase 1): o objetivo no Domination (GDD §4.1.4: os bots jogam o objetivo). Um ponto do time sendo tomado vem
  * primeiro; depois, quem ataca vai ao ponto que não é do time (o mais perto, às vezes outro, para o time se espalhar) e
- * um em cada 3 defende um ponto do time, quando há. O lugar é um nó da navegação dentro do anel. `false` = nenhum ponto
- * alcançável (o passeio de sempre).
+ * um em cada 3 de cada time defende um ponto do time, quando há (`markPointDefenders`). O lugar é um nó da navegação
+ * dentro do anel. `false` = nenhum ponto alcançável (o passeio de sempre).
  */
 function pickPointGoal(
   c: AiContext,
@@ -912,7 +937,7 @@ function pickPointGoal(
   const view = c.view!;
   const cp = view.controlPoints!;
   const nav = view.nav!;
-  const defender = b.controller % AI_SOLDIER.pointDefenderEvery === 0;
+  const defender = b.pointDefender;
   let target = -1;
   let best = Infinity;
   let mineCount = 0;

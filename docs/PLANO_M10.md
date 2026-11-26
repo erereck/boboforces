@@ -87,6 +87,9 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 1c. **Os bots sobem escada e o mapc vê os pulos** (achado das revisões dos mapas): o seguidor de caminho com lance reto
     alto, os andares de cima no passeio dos bots e os topos aonde só o pulo correndo leva na medida de visada do mapc.
    - **feita em 26/11** (ARCHITECTURE §21.9): os goldens com bots no Construto e na Base Bobo mudaram (pergunta AK7).
+1d. **Os consertos do navegador** (achados nos testes do site na tela virtual): o nome cru dos modos no link de
+    preset e os defensores do Domination contados pelo controlador global.
+   - **feita em 26/11** (ARCHITECTURE §21.10): os 11 modos com nome na tabela do menu; o terço de cada time defende.
 9. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)

@@ -316,7 +316,6 @@ export const STRINGS_EXTRA_PT_BR = {
   // M7 (fase 8): o Bobo Royale.
   'mode.name.royale': 'Bobo Royale',
   'mode.desc.royale': 'O último de pé vence.',
-  'mode.royale.mini': 'Bobo Royale',
   'weapon.rarity.rare': '{name} rara',
   'weapon.rarity.epic': '{name} épica',
   'hud.royale.wait': '{alive} vivos · zona {stage} de {stages}',
@@ -1297,10 +1296,6 @@ export const STRINGS_EXTRA_PT_BR = {
   /** M2 (fase 6e): o fantasma dos dedos nas primeiras partidas no celular. */
   'touch.ghost.move': 'Arraste para andar',
   'touch.ghost.look': 'Arraste para mirar',
-  'mode.warfare.tdm': 'Bobo Warfare: Times',
-  'mode.warfare.ffa': 'Bobo Warfare: Todos contra todos',
-  'mode.warfare.domination': 'Bobo Warfare: Domination',
-  'mode.training': 'Bobo Training',
   // M3 (fase 2d): Bobo Zombies.
   'result.zombiesWin': 'Sobreviveram às {waves} ondas!',
   'result.zombiesLoss': 'Caíram na onda {wave}',
@@ -1364,7 +1359,6 @@ export const STRINGS_EXTRA_PT_BR = {
   'issue.bot.valueClamped': 'Um valor do bot passou do limite e foi ajustado.',
   // M9 (fase 3): o Sandbox no jogo.
   // M9 (fase 3): o Bobo Sandbox: a Partida personalizada (a aba Times e o objetivo), o Cenário, o placar e o resultado.
-  'mode.sandbox': 'Bobo Sandbox',
   'custom.tab.teams': 'Times',
   'custom.help.tab.teams': 'De 2 a 4 times, cada um com nome, cor, bots, vida e armas.',
   'custom.row.objective': 'Objetivo',

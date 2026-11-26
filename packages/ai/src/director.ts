@@ -40,7 +40,7 @@ import {
 } from './orders.ts';
 import { ZombieFlow } from './flow.ts';
 import { NAV_PATH_API, PathFollower, PathService, type NavPathApi } from './paths.ts';
-import { SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
+import { markPointDefenders, SoldierBrain, SoldierTiming, thinkSoldier } from './soldier.ts';
 import { TeamBoard } from './team.ts';
 import { thinkZombie, ZombieBrain, ZombieTiming } from './zombie.ts';
 
@@ -209,6 +209,8 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     soldierTeams.push(slot.team);
     maxController = Math.max(maxController, slot.controller);
   }
+  // M10: os defensores do Domination pela ordem dentro de cada time (não pelo controlador global).
+  markPointDefenders(soldiers, soldierTeams);
   /** M3 (fase 1c): 1 = um jogador pilota este soldado (o cérebro não pensa). Os de reserva começam pilotados. */
   const piloted = new Uint8Array(soldiers.length).fill(0, 0, recipeBots).fill(1, recipeBots);
   for (let i = 0; i < zombies; i++) {
