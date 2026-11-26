@@ -23,6 +23,8 @@ import {
 import { ENTITY_FLAG, ENTITY_KIND, type SimMap, type SpawnPoint } from '@boboforces/sim';
 import { isCellSolid, parseBlockDefs } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
+// O passe de pulos do `mapc` (só no teste: as ferramentas não entram no jogo).
+import { findJumpReach } from '../../../../tools/mapc/src/jump-reach.ts';
 import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
 
 /**
@@ -216,6 +218,12 @@ const LEAP: readonly (readonly [number, number])[] = [
   [1.55, 2.5],
 ];
 
+/** O nó (pelas posições `X`, `Z`) fica dentro da área jogável do mapa (fora dela a sim põe parede invisível)? */
+function inPlayArea(map: SimMap, X: Float64Array, Z: Float64Array): (node: number) => boolean {
+  const a = map.playArea!;
+  return (k) => X[k]! >= a.minX && X[k]! <= a.maxX && Z[k]! >= a.minZ && Z[k]! <= a.maxZ;
+}
+
 function leapReach(rise: number): number {
   if (rise > LEAP[LEAP.length - 1]![0]) return -1;
   if (rise <= LEAP[0]![0]) return LEAP[0]![1];
@@ -331,6 +339,16 @@ describe('a Fazenda (M10, fase 5, revisão): sem poleiro', () => {
         hq.push(b);
       });
     }
+    // M10 (fase 10): por cima, o passe de pulos do `mapc` (`jump-reach.ts`: o pulo correndo com os números da sim, do
+    // apoio de uma borda ao da outra, que vai mais longe que a tabela acima) a partir de tudo o que o bobo já alcança;
+    // a tábua da janela conta como parede. O que ele achar entra na conta dos poleiros.
+    const jumps = findJumpReach({
+      nav,
+      reachable: bobo,
+      inArea: inPlayArea(map, X, Z),
+      collides: (x, y, z) => wall((x + 0.5) / 2, (y + 0.5) / 2, (z + 0.5) / 2),
+    });
+    for (let k = 0; k < n; k++) if (jumps.mark[k] === 1) bobo[k] = 1;
     // Poleiro: o bobo alcança, o zumbi não, e nenhum zumbi num nó a até 1,5 m fica a menos de 1 m de altura dele (a IA
     // do zumbi só golpeia "no mesmo andar", |dy| < 1; a sim aceita até 1 m).
     const perches: string[] = [];
@@ -358,10 +376,60 @@ describe('a Fazenda (M10, fase 5, revisão): sem poleiro', () => {
       if (k !== NO_NAV_NODE && Math.abs(Y[k]! - y) < 0.3) expect(bobo[k], name).toBe(0);
     }
     const reached = bobo.reduce((s, v) => s + v, 0);
-    console.log(`[farm] ${reached} nós que o bobo alcança (todas as portas compradas), ${perches.length} poleiros`);
+    console.log(
+      `[farm] ${reached} nós que o bobo alcança (todas as portas compradas; ${jumps.count} só com o pulo correndo), ` +
+        `${perches.length} poleiros`,
+    );
     expect(perches, perches.slice(0, 20).join(' ')).toEqual([]);
     match.dispose();
   }, 120_000);
+
+  it('nem dos campos: nenhum topo só de pulo correndo no mapa (o passe do mapc, com as janelas abertas)', () => {
+    // M10 (fase 10): os campos são dos zumbis (o bobo não passa da janela), mas a Horda armada (`zombies.variant:
+    // 'armed'`, que roda em qualquer mapa do Bobo Zombies) abre as janelas. Topo aonde só o pulo correndo leva é lugar
+    // aonde o zumbi não chega nem golpeia (ele só sobe 1 m) e de onde a visada passa por cima das cercas vivas: o passe
+    // do `mapc`, a partir de todos os spawns e com tudo aberto, não acha nenhum (antes, o trator e os rolos de feno dos
+    // campos eram o degrau para as cercas vivas e as pilhas: 368 nós e uma visada de 106 m).
+    const map = loadFarm();
+    // Sem partida: as ligações valem todas (portas compradas, janelas abertas).
+    const nav = map.nav as NavGridImpl;
+    const n = nav.nodeCount;
+    const X = new Float64Array(n);
+    const Z = new Float64Array(n);
+    const p = new Float64Array(3);
+    for (let i = 0; i < n; i++) {
+      nav.nodePosition(i, p);
+      X[i] = p[0]!;
+      Z[i] = p[2]!;
+    }
+    const reachable = new Uint8Array(n);
+    const queue: number[] = [];
+    for (const s of map.spawns) {
+      const k = nav.nearestNode(s.x, s.y, s.z);
+      if (k !== NO_NAV_NODE && reachable[k] === 0) {
+        reachable[k] = 1;
+        queue.push(k);
+      }
+    }
+    for (let q = 0; q < queue.length; q++) {
+      const a = queue[q]!;
+      for (let l = nav.linkStart[a]!; l < nav.linkStart[a + 1]!; l++) {
+        const b = nav.linkTarget[l]!;
+        if (reachable[b] === 0) {
+          reachable[b] = 1;
+          queue.push(b);
+        }
+      }
+    }
+    const jumps = findJumpReach({
+      nav,
+      reachable,
+      inArea: inPlayArea(map, X, Z),
+      collides: (x, y, z) => isCellSolid(map.grid, map.blocks, x, y, z),
+    });
+    const where = jumps.tops.map((t) => `(${t.at.join(', ')}) de (${t.from.join(', ')})`);
+    expect(jumps.count, where.slice(0, 10).join(' ')).toBe(0);
+  }, 60_000);
 
   /** Um bobo parado em (x, y, z), sem atirar, com a horda: em quantos segundos ele leva o 1º golpe (Infinity = não). */
   function idleHit(x: number, y: number, z: number, maxS: number): number {

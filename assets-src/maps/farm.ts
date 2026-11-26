@@ -23,8 +23,12 @@ import { barnDoor } from './kit.ts';
  *   2,5 m dividem os campos (com passagem alternada: nenhuma reta passa dos 50 m do Switch 3–4P).
  * - SEM POLEIRO (revisão da fase 5): o bobo escala até 1,55 m e o zumbi só sobe 1 m e só bate até 1 m de altura. Onde o
  *   bobo pisa nada passa de 1 m; as pilhas de 2 m ficam fora do alcance do pulo de qualquer degrau e a 3 m das
- *   paliçadas; trator e rolos de feno (que dão para escalar) só nos campos, e o do galpão atrás da tela (o teste
- *   `farm.test.ts` confere que nenhum ponto alcançável pelo bobo fica longe do alcance do zumbi).
+ *   paliçadas; o trator do galpão fica atrás da tela (o teste `farm.test.ts` confere que nenhum ponto alcançável pelo
+ *   bobo fica longe do alcance do zumbi). M10 (fase 10): nos campos também não há degrau para o pulo correndo. O
+ *   trator e os 2 rolos de feno que ficavam lá (só paisagem, com o topo a 1,4–1,5 m: dava para escalar) eram o
+ *   começo de uma escada de pulos para as pilhas de 2 m, o paiol e o alto das cercas vivas de 2,5 m (368 nós aonde o
+ *   zumbi não chega e uma visada de 106 m por cima das cercas); saíram, e o passe de pulos do `mapc` não acha nenhum
+ *   topo (o teste confere o mesmo com as janelas abertas, como na Horda armada).
  *
  * À noite: a lua, lâmpadas nas paredes e nos tetos, a da varanda e holofotes de pé nos campos. Tudo em METROS aqui
  * (múltiplos de 0,5); o builder recebe células. Caixas semiabertas [a, b). Paredes de 0,5 m na "linha" (de a a a + 0,5).
@@ -574,10 +578,6 @@ function fields(b: MapBuilder): void {
   hayStack(b, 104, 96, 6, 3);
   // SUDESTE: a horta (milho baixo) e o paiol de tábua; a cerca viva que fecha a horta do campo de baixo.
   corn(b, 78, 76, 84, 86, 1);
-  // O trator e os rolos de feno ficam nos campos (só paisagem: dentro, o bobo subiria neles e o zumbi não).
-  b.prop('tractor', 85.5, G, 84, 0, 1, 1);
-  b.prop('hay-roll', 101, G, 78, 0.6, 1, 1);
-  b.prop('hay-roll', 33, G, 100, 1.3, 1, 1);
   box(b, 88, G, 75, 92, G + 3, 79, 'plank');
   box(b, 87.5, G + 3, 74.5, 92.5, G + 3.5, 79.5, 'plank-slab');
   hedge(b, 75, 88, 106, 89);
@@ -689,10 +689,6 @@ function cameras(b: MapBuilder): void {
 
 const farm: MapScript = {
   id: 'farm',
-  // TODO (M10, fase 1c): o passe de pulos do mapc acha um topo de ~4,5 m alcançável só com o pulo correndo perto de
-  // (19,5; 40,5), de onde a visada chega a 106 m (e que pode ser um lugar aonde o zumbi não chega). A correção vem
-  // no ajuste da Fazenda.
-  analysis: { jumpSightTodo: 'topo de ~4,5 m perto de (19,5; 40,5) pelo pulo correndo (106 m)' },
   build(b) {
     b.size(c(SIZE), 40, c(SIZE));
     b.meta({

@@ -41,6 +41,10 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   como código ("mode.paintball") até a partida carregar; agora todo modo tem o nome desde o menu. No Domination, os
   bots que ficam defendendo um ponto eram escolhidos de um jeito que dava mais defensores a um time no 5 contra 5;
   agora cada time tem a mesma parte (o golden do Domination mudou por isso).
+- **Os poleiros de pulo (fase 10):** no Canteiro, na Estação Lunar e na Fazenda, os lugares altos aonde só um pulo
+  correndo levava (de onde se via o mapa todo, e na Fazenda onde o zumbi não chegava) foram fechados: um pilar mais
+  alto e uma tela na escada do andaime no Canteiro, muros e rochas mais altos na Lua, e o trator e os rolos de feno
+  saíram dos campos da Fazenda.
 - **As pendências do M9 (fase 8):** a Base Aérea entrou no Sandbox (os times 2 e 3 nascem no chão, não mais em cima
   dos muros); no Sandbox, cada time pode escolher a cor entre 8 (as 4 de sempre e Vermelho, Amarelo, Rosa e Ciano),
   sem repetir, e o nome padrão do time segue a cor; e o ricochete ganhou o som dele (um "piiiu" sintetizado).

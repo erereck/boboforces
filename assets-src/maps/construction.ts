@@ -22,11 +22,14 @@ import { container as kitContainer, towerCrane, type ContainerColor } from './ki
  *   piso alcançável que esteja a menos de 0,5 m abaixo dele (pulo correndo) e a mais de 1,2 m dos que estão a menos de
  *   1,5 m abaixo (mantle). Por isso o bloco da frente fica a 5 m do prédio, o 2º assoalho do andaime leste começa a
  *   4,5 m do contêiner do limite da rota, a escada do 2º assoalho fica dentro do andaime (o almoxarifado a 5 m) e as
- *   travessas e as fôrmas de pilar são altas.
+ *   travessas e as fôrmas de pilar são altas. M10 (fase 10): o pulo correndo de verdade vai mais longe (~6 m de vão no
+ *   mesmo nível, o passe de pulos do `mapc`), e dois degraus levavam aos tetos de contêiner e dali ao mapa todo por cima
+ *   (visada de 85 m): o toco de pilar da quina do 2º andar (agora o pilar sobe 3 m) e o patamar e o lance de cima da
+ *   escada em U do andaime leste (agora com a tela do 1º ao 2º assoalho). Nenhum topo fica só para o pulo.
  * - O PRÉDIO (x 28–52, z 32–56): térreo de salas e corredores em zigue-zague em volta do núcleo do elevador (x 38–42,
  *   z 42–46, até 11 m: quebra as vistas de norte a sul e de leste a oeste); 1º andar inteiro, meio construído
  *   (parapeitos de 1 m e paredes inteiras só em alguns trechos); 2º andar só no terço leste (x 42–52), com os tocos de
- *   pilar e os ferros de espera.
+ *   pilar (o da quina já na altura do 3º andar) e os ferros de espera.
  * - ANDAIMES: o oeste (x 25–28) até o 1º andar e o leste (x 52–56,5) até o 2º; embaixo do assoalho, uma passagem
  *   coberta ao longo da fachada.
  * - ESCADAS em L ou em U, com lances de 1,5 m e patamar: ao 1º andar, 2 nas pontas de cada andaime e 2 dentro; ao 2º
@@ -355,10 +358,12 @@ function buildingHalf(k: Kit): void {
   k.bags(BX0 + 0.5, 34, 3, 2, 2);
   k.bags(48.5, 34, 3, 2, 2);
 
-  // Pilares (1 × 1 m) da grade de 8 m, até o 2º andar; os da fachada leste passam da laje e viram tocos de 1 m.
+  // Pilares (1 × 1 m) da grade de 8 m, até o 2º andar; os da fachada leste passam da laje e viram tocos de 1 m. O da
+  // quina (M10, fase 10) já sobe 3 m, até a laje do 3º andar: o toco de 1 m, rente ao parapeito, era o degrau do pulo
+  // correndo do 2º andar para o teto dos contêineres da frente (e dali para o mapa todo por cima).
   for (const x of [BX0, 35.5, 43.5, BX1 - 1]) {
     for (const z of [BZ0, 39.5]) {
-      const top = x === BX1 - 1 ? L2 + 1 : L2;
+      const top = x !== BX1 - 1 ? L2 : z === BZ0 ? L2 + 3 : L2 + 1;
       k.box(x, G, z, x + 1, top, z + 1, 'concrete');
       k.rebar(x, z, x + 1, z + 1, top);
     }
@@ -432,6 +437,10 @@ function buildingCenter(k: Kit): void {
   k.box(BX1, L1, 42.5, 56, L1 + 1.5, 44, 'concrete');
   k.box(54, L1, 44, 56, L1 + 1.5, 45.5, 'concrete');
   k.stairs(54, 44, 56, 45.5, L1 + 1.5, '+z');
+  // A tela da escada (M10, fase 10): o guarda-corpo de fora sobe do 1º ao 2º assoalho no vão da escada (o resto do
+  // andaime tem o do 2º assoalho). Sem ela, do patamar e do lance de cima o pulo correndo passava por cima do
+  // guarda-corpo de 1 m e chegava ao teto do almoxarifado (o alcance de verdade é ~6 m, não os 4,5 m de antes).
+  k.fence(56, 42.5, 56, 45.5, L1 + 1, 'scaffold-rail', L2 - L1);
 }
 
 /** Andaimes: o oeste até o 1º andar e o leste até o 2º (metade norte; o sul é o espelho). */
@@ -632,10 +641,6 @@ function cameras(k: Kit): void {
 
 const construction: MapScript = {
   id: 'construction',
-  // TODO (M10, fase 1c): do 2º andar do prédio e dos andaimes, pulos correndo de 4–6 m levam aos topos de 6 m (o núcleo,
-  // os quebra-vistas e as fileiras de contêineres das bases) e, encadeados, ao mapa todo por cima; a maior linha de
-  // visão de lá dá 85 m (o teto do Switch é 50 m). Fechar muda o mapa e os goldens: decisão do Erick.
-  analysis: { jumpSightTodo: 'topos de 6 m (contêineres das bases) pelos pulos do prédio e dos andaimes (85 m)' },
   build(b) {
     b.size(160, 48, 176);
     b.meta({

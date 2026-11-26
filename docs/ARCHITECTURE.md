@@ -5214,3 +5214,27 @@ commits é a de chegada.
   o terço conta dentro de cada time (o 2º, o 5º…): 133 a 120 e 133 a 121, dentro do ruído. Teste:
   `ai/src/point-defenders.test.ts`. O golden do Domination (4 contra 4 no Construto) foi de `b68b0dee` para
   `5ceddb7e`: o número de defensores é o mesmo (1 por time), muda qual bot do time 0 defende (o 2º, antes o 3º).
+
+### 21.11 Fase 10: os poleiros de pulo nos mapas novos (26/11/2026)
+
+O padrão da pergunta AK7: fechar nos mapas novos os topos aonde só o pulo correndo leva (o passe da fase 1c), e o
+Construto (66 m) e a Base Bobo (61 m) seguem marcados com `analysis.jumpSightTodo` (fechá-los muda os goldens).
+
+- **O Canteiro** (`assets-src/maps/construction.ts`): o toco de pilar de 1 m da quina do 2º andar, rente ao
+  parapeito, e o patamar e o lance de cima da escada em U do andaime leste eram os degraus do pulo correndo para o
+  teto dos contêineres e dali para o mapa todo por cima (920 nós em 47 lugares, visada de 85 m). O pilar da quina
+  sobe 3 m (até a laje do 3º andar) e a tela da escada vai do 1º ao 2º assoalho. Nenhum topo fica só para o pulo, e
+  o mapc compila sem aviso (`tools/mapc/src/construction.test.ts`).
+- **A Estação Lunar** (`moonbase.ts`): o pulo lunar correndo vence ~12 m de vão, e do alto de uma rocha baixa, da
+  pilha de carga, das muretas da frente do hangar ou do radiador (2 a 2,5 m) o olho passava por cima de todas as
+  rochas e a vista corria as rotas de ponta a ponta (76 m). As rochas dos 4 cantos, da beira oeste, do meio da rota
+  oeste, da quina do hangar e do lado da estação viraram rochedos de 6 m (`boulder`: ninguém sobe, e a vista de cima
+  para neles); as muretas e o radiador subiram para 6 m; o anteparo do vestíbulo, para 3,5 m (a reta do topo da
+  pilha passava entre as portas); e a rocha de 2 m ficou 1 m mais curta. Os topos do pulo seguem como atalhos, como
+  os do Arcade: medido, 208 nós de pulo em 20 lugares e a maior visada de lá em 47,3 m (antes, 76 m).
+- **A Fazenda** (`farm.ts`): o trator e os 2 rolos de feno dos campos (paisagem, com o topo a 1,4–1,5 m, que dá
+  para escalar) eram o começo de uma escada de pulos para as pilhas de 2 m, o paiol e o alto das cercas vivas de
+  2,5 m: 368 nós aonde o zumbi não chega e uma visada de 106 m. Saíram. O teste `game/scene/farm.test.ts` passou a
+  somar o passe de pulos do mapc aos lugares que o bobo alcança (os poleiros contam com ele) e confere, a partir de
+  todos os spawns e com as janelas abertas (a Horda armada abre), que nenhum topo fica só para o pulo.
+- **Os goldens** não mudaram (nenhum joga nesses três mapas).

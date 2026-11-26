@@ -7,8 +7,9 @@ import type { MapBuilder, MapScript, RampDir, RampFamily } from '../../tools/map
  * 72×72 m (x, z de 4 a 76), à noite (o céu escuro com estrelas é o espaço).
  *
  * Simétrico no eixo norte-sul (z ↔ 80 − z): o time 0 nasce no HANGAR SUL, o time 1 no HANGAR NORTE. As 3 rotas:
- * - OESTE (x 4..28): o chão de regolito, a CRATERA no meio (1,5 m de fundo: cobertura natural), afloramentos de rocha
- *   e o MÓDULO DE POUSO de cada lado (o bloco alto que corta as vistas do pátio, com a cabine oca embaixo).
+ * - OESTE (x 4..28): o chão de regolito, a CRATERA no meio (1,5 m de fundo: cobertura natural), afloramentos de rocha,
+ *   rochedos de 6 m e o MÓDULO DE POUSO de cada lado (o bloco alto que corta as vistas do pátio, com a cabine oca
+ *   embaixo).
  * - MEIO (x 28..52): a ESTAÇÃO, um módulo de 24×28 m e 8 m de pé-direito: as ECLUSAS norte e sul (portas de fora e de
  *   dentro desencontradas) com o VESTÍBULO para fora no pátio (portas dos lados e o anteparo no meio), o ÁTRIO com o
  *   reator no meio e o anel de cima (sacadas sobre as eclusas e passarelas de grade nas paredes oeste e leste, a 4 m,
@@ -19,7 +20,12 @@ import type { MapBuilder, MapScript, RampDir, RampFamily } from '../../tools/map
  * Com a gravidade da Lua todo topo até ~2,9 m acima de onde se pisa vira lugar para pular: os telhados ficam altos
  * (a estação a 8,5 m, os hangares a 6,5 m, os vestíbulos a 5,5 m, os módulos de pouso a 6 m) e nada perto deles passa
  * de 3 m, para ninguém subir onde não há rampa (conferido com o "alcance lunar" de local/m10/mapc-moon.ts). O que se
- * alcança só pulando (o topo de um tanque, de uma rocha) é atalho, como os do Arcade. Nenhuma reta passa de 50 m.
+ * alcança só pulando (o topo de uma rocha, da pilha de carga, do duto, do jipe) é atalho, como os do Arcade. Nenhuma
+ * reta passa de 50 m, nem do alto desses atalhos (M10, fase 10: o passe de pulos do `mapc` mede a visada de lá; com o
+ * olho acima de todas as rochas baixas ela cruzava o mapa, 76 m. Os rochedos de 6 m no lugar das rochas dos 4 cantos,
+ * da beira oeste, do meio da rota oeste, da quina do hangar e do lado da estação, o radiador e os muros da frente do
+ * hangar de 6 m e o anteparo do vestíbulo de 3,5 m cortam essas retas: medido, 47,3 m, com 208 nós de pulo em 20
+ * lugares).
  *
  * Tudo em METROS aqui (múltiplos de 0,5); o builder recebe células. Caixas semiabertas [a, b). Vãos de porta começam
  * em metro inteiro (a grade de navegação é de 1 m).
@@ -153,6 +159,16 @@ function rock(s: Side, x0: number, z0: number, x1: number, z1: number, h: number
   s.box(x0 - 0.5, G, z0 + 1, x0, G + Math.max(0.5, h - 1), z1 - 1, 'regolith');
 }
 
+/**
+ * Rochedo de `h` m (M10, fase 10): sem o degrau do lado e com a última camada recuada. Com 6 m, o topo fica mais de
+ * 2,9 m (o pulo lunar) acima de tudo o que se pisa em volta (as rochas baixas vão a 2,5 m): ninguém sobe, e ele corta a
+ * vista de quem está no alto de uma rocha baixa, que passa por cima delas.
+ */
+function boulder(s: Side, x0: number, z0: number, x1: number, z1: number, h: number): void {
+  s.box(x0, G, z0, x1, G + h - 0.5, z1, 'regolith');
+  s.box(x0 + 0.5, G + h - 0.5, z0 + 0.5, x1 - 0.5, G + h, z1 - 0.5, 'regolith');
+}
+
 function ground(b: MapBuilder): void {
   box(b, 0, 0, 0, SIZE, G, SIZE, 'regolith');
   // A cratera do meio da rota oeste (no eixo: ela mesma é simétrica) e as pequenas perto dos pátios.
@@ -188,15 +204,19 @@ function border(b: MapBuilder): void {
 }
 
 /**
- * A rota oeste (metade sul): rochas, a pequena cratera e o módulo de pouso. As rochas da faixa z 47..68 cobrem, juntas,
- * todo x de 4 a 28 (em fileiras desencontradas, com passagem entre elas): nenhuma vista norte-sul atravessa a rota.
+ * A rota oeste (metade sul): rochas, rochedos, a pequena cratera e o módulo de pouso. As pedras da faixa z 47..68
+ * cobrem, juntas, todo x de 4 a 28 (em fileiras desencontradas, com passagem entre elas): nenhuma vista norte-sul
+ * atravessa a rota. M10 (fase 10): do alto de uma rocha (aonde o pulo lunar leva) o olho fica acima de todas as rochas
+ * baixas, então as do canto, da beira oeste, do meio e a junto do hangar viraram rochedos de 6 m (ninguém sobe; a vista
+ * de lá de cima para neles); ficam para pular a rocha de 2 m (1 m mais curta, para o topo dela não ver o outro canto a
+ * mais de 50 m) e a de 2,5 m perto da cratera pequena.
  */
 function westRoute(s: Side): void {
-  rock(s, 4, 47, 11.5, 51, 3);
-  rock(s, 20, 49, 27, 53, 2);
-  rock(s, 10, 53, 16.5, 56, 2.5);
-  rock(s, 4, 70, 8, 76, 2.5);
-  rock(s, 25, 63, 28, 67.5, 2.5);
+  boulder(s, 4, 47, 11.5, 51, 6);
+  rock(s, 20, 49, 27, 52, 2);
+  boulder(s, 10, 53, 16.5, 56, 6);
+  boulder(s, 4, 70, 8, 76, 6);
+  boulder(s, 25, 63, 28, 67.5, 6);
   rock(s, 8, 65, 13, 67.5, 2.5);
   lander(s, 16, 58);
 }
@@ -296,9 +316,11 @@ function hubHalf(s: Side): void {
   s.box(v.x0, G + 3, 54, v.x0 + 0.5, G + 3.5, 57.5, 'hazard-block');
   s.box(v.x1 - 0.5, G + 3, 56.5, v.x1, G + 3.5, 59.5, 'hazard-block');
   s.box(39.5, v.top - 0.5, 56.5, 40.5, v.top, 57.5, 'lamp');
-  // O anteparo do meio (2,5 m, deixando 1,5 m junto da estação): nenhuma reta passa pelas duas portas dos lados.
-  s.box(39.5, G, 55.5, 40.5, G + 2.5, v.z1 - 0.5, 'station-panel');
-  s.box(39.5, G + 2, 55.5, 40.5, G + 2.5, v.z1 - 0.5, 'neon-trim');
+  // O anteparo do meio (3,5 m, deixando 1,5 m junto da estação): nenhuma reta passa pelas duas portas dos lados. M10
+  // (fase 10): com 2,5 m, a reta que vem do alto (do topo da pilha de carga, a 2 m) passava por cima dele, entre as
+  // duas portas (3 m), e cruzava o mapa (58 m).
+  s.box(39.5, G, 55.5, 40.5, G + 3.5, v.z1 - 0.5, 'station-panel');
+  s.box(39.5, G + 3, 55.5, 40.5, G + 3.5, v.z1 - 0.5, 'neon-trim');
   // A porta da eclusa para o vestíbulo (4 × 3 m), com o batente de perigo e as folhas da porta recolhidas.
   s.box(38, G, z1 - 0.5, 42, G + 3, z1, null);
   s.box(37.5, G + 3, z1 - 0.5, 42.5, G + 3.5, z1, 'hazard-block');
@@ -383,11 +405,13 @@ function apron(s: Side): void {
   s.box(32, G, 60, 34, G + 1, 61, 'crate');
   s.box(46.5, G, 61.5, 48.5, G + 1.5, 63, 'crate');
   s.box(39, G, 62.5, 41, G + 1, 63.5, 'metal-panel');
-  // As muretas de proteção (2,5 m) nas quinas da frente do hangar, emendadas nas rochas: de dentro do hangar não se vê
-  // a diagonal até a beirada do outro lado do mapa. Os holofotes ficam no chão, na frente delas (revisão: em cima da
-  // mureta o topo do holofote, a 4,9 m, era a escada para o telhado do hangar; no chão ele fica a 2,4 m).
-  s.box(28, G, 63, 30.5, G + 2.5, 64.5, 'concrete');
-  s.box(49.5, G, 63, 53, G + 2.5, 64.5, 'concrete');
+  // Os muros de proteção nas quinas da frente do hangar, emendados nas rochas: de dentro do hangar não se vê a diagonal
+  // até a beirada do outro lado do mapa. Os holofotes ficam no chão, na frente deles (revisão: em cima da mureta o topo
+  // do holofote, a 4,9 m, era a escada para o telhado do hangar; no chão ele fica a 2,4 m). M10 (fase 10): eram muretas
+  // de 2,5 m, e do topo delas (aonde o pulo lunar leva) a vista descia a rota oeste até o outro lado do mapa (60 m);
+  // com 6 m ninguém sobe e a vista para nelas.
+  s.box(28, G, 63, 30.5, G + 6, 64.5, 'concrete');
+  s.box(49.5, G, 63, 53, G + 6, 64.5, 'concrete');
   s.box(28, G + 2, 63, 30.5, G + 2.5, 64.5, 'hazard-block');
   s.box(49.5, G + 2, 63, 53, G + 2.5, 64.5, 'hazard-block');
   s.prop('floodlight', 29, G, 61.75, Math.PI * 0.8);
@@ -397,8 +421,8 @@ function apron(s: Side): void {
 }
 
 /**
- * A rota leste (metade sul): os painéis solares, os tanques, a pilha de carga, o duto e as rochas. Como na oeste, a
- * faixa z 45..76 cobre todo x de 52 a 76 com fileiras desencontradas.
+ * A rota leste (metade sul): os painéis solares, os tanques, a pilha de carga, o duto, a rocha e os rochedos. Como na
+ * oeste, a faixa z 45..76 cobre todo x de 52 a 76 com fileiras desencontradas.
  */
 function eastRoute(s: Side): void {
   // Painéis solares: base de 0,5 m e a placa inclinada (cobertura baixa de 1 m).
@@ -410,8 +434,9 @@ function eastRoute(s: Side): void {
   solar(55, 61, 45.5);
   solar(71, 75.5, 50.5);
   solar(57, 63, 54);
-  // O radiador (2,5 m) entre a rocha e os tanques: corta as diagonais do pátio leste para o hangar do outro time.
-  s.box(57, G, 48.5, 63.5, G + 2.5, 50, 'metal-panel');
+  // O radiador entre o rochedo e os tanques: corta as diagonais do pátio leste para o hangar do outro time. M10 (fase
+  // 10): 6 m (era 2,5 m e o topo dele, como o da pilha de carga, via a rota leste de ponta a ponta por cima de tudo).
+  s.box(57, G, 48.5, 63.5, G + 6, 50, 'metal-panel');
   s.box(57, G + 2, 48.5, 63.5, G + 2.5, 50, 'led-strip');
   // Os tanques de oxigênio (6,5 m: o deque da antena fica a 3 m e o pulo lunar sobe 2,9 m, então de lá não se pula
   // em cima deles; revisão: com 4 m o topo deles via o fundo do hangar do outro time a mais de 50 m) com o neon.
@@ -432,10 +457,10 @@ function eastRoute(s: Side): void {
   s.prop('crate-large', 67.5, G, 64.5, 0.4);
   s.prop('barrel', 66.5, G, 57.5, 0);
   s.prop('generator', 71.5, G, 55.5, Math.PI / 2);
-  // Rochas do canto e perto do hangar.
-  rock(s, 53.5, 49, 57, 52, 2);
+  // O rochedo ao lado da estação, a rocha perto do hangar e o rochedo do canto.
+  boulder(s, 53.5, 49, 57, 52, 6);
   rock(s, 53, 63, 56, 67.5, 2);
-  rock(s, 72, 70, 76, 76, 2.5);
+  boulder(s, 72, 70, 76, 76, 6);
 }
 
 /** A torre da antena (no eixo): base de 6×6 m a 3 m, as 2 rampas, o mastro e a luz de cima. */
@@ -521,10 +546,6 @@ function cameras(b: MapBuilder): void {
 
 const moonbase: MapScript = {
   id: 'moonbase',
-  // TODO (M10, fase 1c): o pulo lunar correndo vai longe no plano (≈12 m de vão no mesmo nível, conferido contra a sim
-  // no `jump-reach.test.ts` do mapc): topos de 4–5 m (como o de (4,5; 4,5), a 4 m de um nó do chão a 2 m) e, encadeados,
-  // outros; a maior linha de visão de lá dá 76 m (o teto do Switch é 50 m). Fechar muda o mapa: decisão do Erick.
-  analysis: { jumpSightTodo: 'topos de 4–5 m pelo pulo lunar correndo (76 m)' },
   build(b) {
     b.size(c(SIZE), 48, c(SIZE));
     b.meta({

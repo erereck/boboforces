@@ -90,6 +90,10 @@ Cada fase termina verde, revisada (um revisor Opus), commitada e publicada.
 1d. **Os consertos do navegador** (achados nos testes do site na tela virtual): o nome cru dos modos no link de
     preset e os defensores do Domination contados pelo controlador global.
    - **feita em 26/11** (ARCHITECTURE §21.10): os 11 modos com nome na tabela do menu; o terço de cada time defende.
+10. **Os poleiros de pulo nos mapas novos** (pergunta AK7): fechar os topos do pulo correndo no Canteiro, na Lua e
+    na Fazenda.
+   - **feita em 26/11** (ARCHITECTURE §21.11): o Canteiro e a Fazenda sem nenhum; na Lua, a visada de lá abaixo de
+     50 m.
 9. **Fechamento:** o portão, a rodada de prints final, o `CHANGELOG`, a `ARCHITECTURE` e o `PERF`.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
