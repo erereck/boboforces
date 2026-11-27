@@ -11,6 +11,7 @@ export * from './strings-switch.pt-BR.ts';
 export * from './text.ts';
 export * from './tokens.ts';
 export * from './draw-list.ts';
+export * from './motion.ts';
 export * from './font.ts';
 export * from './tree.ts';
 export * from './layout.ts';

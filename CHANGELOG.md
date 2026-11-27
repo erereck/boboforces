@@ -6,6 +6,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
+### M12: o refino
+
+- **Plano** em `docs/PLANO_M12.md` (#85): uma etapa só de refino do que já existe, achado por um levantamento com
+  agentes lendo o código e jogando: a câmera e a arma na mão, a HUD, os menus, o som, o visual, a mira e o toque, e os
+  bots, em frentes paralelas. Entrou junto o ajudante das entradas animadas da interface (`ui/src/motion.ts`).
+  Perguntas AM1–AM11 no padrão.
+
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 
 - **Plano** em `docs/PLANO_M11.md` (#84): os poleiros de pulo e o poço do Construto, os poleiros da Base Bobo, os
