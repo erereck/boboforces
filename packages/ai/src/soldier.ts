@@ -12,7 +12,6 @@ import {
 import { BUTTON, ORDER, quantizeAxis, WEAPON_SLOT_COUNT, type InputFrame } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, pitchToI16, wrapAngle, yawToU16, type Rng } from '@boboforces/shared';
 import {
-  viewAimPoint,
   chaosMaskScaleOf,
   chaosScaleOf,
   ENTITY_FLAG,
@@ -23,6 +22,7 @@ import {
   figurePostureOf,
   secondsToTicks,
   heldClip,
+  METRICS,
   WEAPON_FIRE,
   WEAPON_SLOT,
   weaponDef,
@@ -38,6 +38,7 @@ import {
   AI_LOD,
   AI_ORDERS,
   AI_COVER,
+  AI_FEEL,
   AI_FLANK,
   AI_GRENADE,
   AI_HOLD,
@@ -102,6 +103,23 @@ import {
   type SkillRoom,
   type SkillShift,
 } from './skill.ts';
+import {
+  acquire,
+  applySenses,
+  areaKnowledge,
+  atViewEdge,
+  checkBullet,
+  coneCos,
+  gunfireShooter,
+  noticeRange,
+  regain,
+  remember,
+  seeBody,
+  spawnProtected,
+  spreadFor,
+  targetAimPoint,
+} from './senses.ts';
+import { aimErrorScale, burstAllows, burstLength, stepAimError, trackTarget } from './aim-feel.ts';
 
 /**
  * Soldado N0 do M1 (gameplay.md §6.3 "Zumbi": vai pela rota e atira quando vê; ignora cobertura). Três camadas
@@ -118,11 +136,19 @@ import {
  *   sniper só atira com o ADS completo, o foguete mira no pé com antecipação; troca para a pistola com a primária vazia
  *   ou com o alvo perto demais para o foguete e a sniper, e para a faca com o alvo colado. Nas semiautomáticas o
  *   gatilho solta um tick entre dois tiros (a sim só atira na borda). Granada: só com o N2 (fase 3).
+ * - M12 (fase 7a, ARCHITECTURE §23.7): a percepção e a mira com cara de gente (`senses.ts`, `aim-feel.ts`): o cone,
+ *   o alcance, a audição e o conhecimento pelas regras do bot; o protegido de spawn não é alvo; o alvo atual também
+ *   pelo cone; a reação que varia e aparece; olhar para a ameaça e para a pista; o mato que esconde; o vidro; o erro
+ *   que deriva e atrasa; revidar quem bate; rajadas; sem fila indiana; o passeio que vai ao tiroteio.
  * Determinístico: um fluxo de RNG por bot (`rng.fork('bot', i)`).
  */
 
 const F = ENTITY_FLAG;
-const VIEW_CONE_COS = Math.cos((AI_SENSES.viewConeDeg / 2) * DEG_TO_RAD);
+const VIEW_CONE_COS = coneCos(AI_SENSES.viewConeDeg);
+const LOOK_LAST_KNOWN = AI_FEEL.lookLastKnownDeg * DEG_TO_RAD;
+const LOOK_SPRINT_TURN = AI_FEEL.lookSprintDeg * DEG_TO_RAD;
+const TOUCH = AI_FEEL.touchM;
+const TOUCH_ZOMBIE = AI_FEEL.touchZombieM;
 const FIRE_TOLERANCE = AI_SOLDIER.fireToleranceDeg * DEG_TO_RAD;
 const SPRINT_MAX_TURN = AI_SOLDIER.sprintMaxTurnDeg * DEG_TO_RAD;
 const GOAL_REACHED = 1.5;
@@ -195,12 +221,21 @@ export class SoldierTiming {
   /** M7 (fase 7): o LOD C do Royale (percepção e replanejamento). */
   readonly perceptionC: number;
   readonly replanC: number;
+  /** M12 (fase 7a): a percepção e a mira com cara de gente (`AI_FEEL`), em ticks. */
+  readonly regainGap: number;
+  readonly retaliateEvery: number;
+  readonly burstPauseMin: number;
+  readonly burstPauseMax: number;
+  readonly gunfireRecent: number;
+  readonly areaEvery: number;
+  readonly plantShot: number;
 
   constructor(hz: number) {
     this.hz = hz;
     this.perceptionA = Math.max(1, Math.round(hz / AI_LOD.perceptionHzA));
     this.perceptionB = Math.max(1, Math.round(hz / AI_LOD.perceptionHzB));
-    this.errorResample = Math.max(1, secondsToTicks(0.2, hz));
+    // M12 (fase 7a): o passo do erro que deriva (era um sorteio novo a cada 0,2 s).
+    this.errorResample = Math.max(1, secondsToTicks(AI_FEEL.errorStepS, hz));
     this.visibleAimRefresh = Math.max(1, secondsToTicks(AI_SOLDIER.visibleAimRefreshS, hz));
     this.memory = secondsToTicks(AI_SENSES.memoryS, hz);
     this.chase = secondsToTicks(AI_SENSES.chaseS, hz);
@@ -254,6 +289,13 @@ export class SoldierTiming {
     this.replanB = secondsToTicks(AI_LOD.replanSB, hz);
     this.perceptionC = Math.max(1, Math.round(hz / AI_LOD.perceptionHzC));
     this.replanC = secondsToTicks(AI_LOD.replanSC, hz);
+    this.regainGap = secondsToTicks(AI_FEEL.regainGapS, hz);
+    this.retaliateEvery = Math.max(1, secondsToTicks(AI_FEEL.retaliateEveryS, hz));
+    this.burstPauseMin = Math.max(1, secondsToTicks(AI_FEEL.burstPauseMinS, hz));
+    this.burstPauseMax = Math.max(this.burstPauseMin, secondsToTicks(AI_FEEL.burstPauseMaxS, hz));
+    this.gunfireRecent = secondsToTicks(AI_FEEL.gunfireRecentS, hz);
+    this.areaEvery = Math.max(1, secondsToTicks(AI_FEEL.areaEveryS, hz));
+    this.plantShot = secondsToTicks(AI_FEEL.plantShotS, hz);
   }
 
   /** Janelas sorteadas da IA foram calibradas em ticks de 60 Hz: em outro hz, mesma duração em segundos. */
@@ -318,9 +360,59 @@ export class SoldierBrain {
    * se o alvo muda de tamanho (o gigante passa por uma porta), ele vai na proporção até o próximo refazer.
    */
   aimOffsetScale = 1;
+  /** O erro aplicado (rad) e, desde o M12 (fase 7a), o erro normalizado que deriva (`aim-feel.ts`) e o reforço dele. */
   errYaw = 0;
   errPitch = 0;
+  errZYaw = 0;
+  errZPitch = 0;
+  errBoost = 1;
   errNextTick = 0;
+
+  /**
+   * M12 (fase 7a): os sentidos pelas regras do bot (`applySenses`): o cone (cosseno do meio-cone) e a borda dele, o
+   * alcance (fração do da partida), os raios de audição (m) e o conhecimento.
+   */
+  viewConeCos = VIEW_CONE_COS;
+  viewEdgeCos = 0;
+  viewRangeMul = 1;
+  hearingMul = 1;
+  hearShotM = 0;
+  hearSprintM = 0;
+  hearWalkM = 0;
+  wallhack = false;
+  knowsArea = false;
+  areaNextTick = 0;
+  /** M12 (fase 7a): da habilidade: rajada (`triggerHold`) e troca de alvo (`targetSwitchS`, já em ticks). */
+  triggerHold = 0.5;
+  targetSwitchS = 0.8;
+  targetSwitchTicks = 0;
+  burstLen = 8;
+  /** M12 (fase 7a): o atraso da velocidade estimada do alvo (τ, em ticks e em s) e a estimativa (m/s, no plano). */
+  lagTicks = 1;
+  lagS = 0;
+  estVx = 0;
+  estVz = 0;
+  /** M12 (fase 7a): o último tick em que o alvo atual foi VISTO (a pista do som ou do dano não conta). */
+  targetSeenTick = -1_000_000;
+  /** M12 (fase 7a): a bala bate no caminho até o alvo (o vidro) e quando conferir de novo. */
+  bulletBlocked = false;
+  bulletCheckTick = 0;
+  /** M12 (fase 7a): o próximo revide possível, a rajada (tiros, pausa) e o último tiro já contado. */
+  retaliateNextTick = 0;
+  burstShots = 0;
+  burstPauseUntil = 0;
+  lastShotSeen = -1_000_000;
+  /** M12 (fase 7a): o desvio lateral da pista (sem fila indiana) e a pista para a qual ele foi feito. */
+  spreadX = 0;
+  spreadZ = 0;
+  spreadForX = Number.NaN;
+  spreadForZ = Number.NaN;
+  spreadOn = true;
+  /**
+   * M12 (fase 7a, revisão): o bot está parado por uma ordem de seguir ou cobrir (quem liga é a fase 7b): o `travel` não
+   * gira a mira para a ameaça nem para a pista (quem cuida do olhar é a ordem).
+   */
+  orderHold = false;
 
   hasLastKnown = false;
   lastKnownX = 0;
@@ -500,6 +592,10 @@ export class SoldierBrain {
     this.rules = bot.rules;
     this.skill = aimSkillFromBot(bot.skill, bot.intelligence.level);
     this.grenadeUse = bot.skill.grenadeUse;
+    this.triggerHold = bot.skill.triggerHold;
+    this.targetSwitchS = bot.skill.targetSwitchS;
+    this.burstLen = burstLength(this.triggerHold);
+    applySenses(this, this.rules, this.intelligence.level);
     this.reactionTicks = 0;
     this.acquireTicks = 0;
     this.turnStep = 0;
@@ -522,6 +618,29 @@ export class SoldierBrain {
   }
 
   /**
+   * M12 (fase 7a, revisão): o reinício de quem volta para a IA (o bot devolvido pelo jogador no sofá ou no Aquário,
+   * `setHumanControlled(c, false)` no `director.ts`): esquece o alvo, a reação, a velocidade estimada, a bala, a rajada e
+   * a pista de antes, e o próximo `thinkSoldier` roda o reinício do renascer (mira, rota, cobertura, granada,
+   * personalidade). Sem isso o bot voltava "já vendo" um alvo velho, sem reação.
+   */
+  restart(): void {
+    this.wasDead = true;
+    this.target = -1;
+    this.targetVisible = false;
+    this.wasTargetVisible = false;
+    this.targetSeenTick = -1_000_000;
+    this.reactionReadyTick = 0;
+    this.estVx = 0;
+    this.estVz = 0;
+    this.bulletBlocked = false;
+    this.bulletCheckTick = 0;
+    this.burstShots = 0;
+    this.burstPauseUntil = 0;
+    this.hasLastKnown = false;
+    this.fireHeld = false;
+  }
+
+  /**
    * Troca o nível (habilidade e inteligência do nível; reação, giro e erro de mira); personalidade e regras ficam.
    */
   setLevel(level: BotLevel, timing: SoldierTiming): void {
@@ -529,6 +648,10 @@ export class SoldierBrain {
     this.skill = aimSkillForLevel(level);
     this.intelligence = intelligenceForLevel(LEVEL_ORDER.indexOf(level));
     this.grenadeUse = LEVEL_SKILLS[level].grenadeUse;
+    this.triggerHold = LEVEL_SKILLS[level].triggerHold;
+    this.targetSwitchS = LEVEL_SKILLS[level].targetSwitchS;
+    this.burstLen = burstLength(this.triggerHold);
+    applySenses(this, this.rules, this.intelligence.level);
     this.applySkill(timing);
   }
 
@@ -538,6 +661,10 @@ export class SoldierBrain {
     this.roomUp = room.up;
     this.roomDown = room.down;
     this.reactionTicks = secondsToTicks(this.skill.reactionS * m.reaction, timing.hz);
+    // M12 (fase 7a): a troca por revide (no ajuste do Diretor, como a reação) e o atraso da mira (τ = 0,3·reação).
+    this.targetSwitchTicks = secondsToTicks(this.targetSwitchS * m.reaction, timing.hz);
+    this.lagTicks = Math.max(1, AI_FEEL.lagFrac * this.reactionTicks);
+    this.lagS = this.lagTicks / timing.hz;
     this.acquireTicks = secondsToTicks(this.skill.acquireS * m.acquire, timing.hz);
     this.turnStep = (this.skill.turnDegPerS * m.turn * DEG_TO_RAD) / timing.hz;
     this.errorRad = this.skill.aimErrorDeg * m.aimError * DEG_TO_RAD;
@@ -583,68 +710,61 @@ function targetValid(view: SimView, b: SoldierBrain, zombies = false): boolean {
   );
 }
 
-function acquire(view: SimView, b: SoldierBrain, t: number, tick: number): void {
-  b.target = t;
-  b.targetGen = view.generation[t]!;
-  b.reactionReadyTick = tick + b.reactionTicks;
-  b.acquireStartTick = b.reactionReadyTick;
-  // M6 (fase 4): com "só na cabeça" ligado (na receita ou pela Roleta), todo bot mira na cabeça.
-  const prefersHead = b.rng.chance(b.skill.headPreference);
-  b.aimHead = prefersHead || view.mods.headshotOnly;
-  b.aimOffset.x = 0;
-  b.aimOffset.y = 0;
-  b.aimOffset.z = 0;
-  b.aimOffsetPosture = -1;
-  b.aimOffsetNextTick = 0;
-  b.aimOffsetScale = 1;
-  b.errNextTick = 0;
-}
-
-function remember(view: SimView, b: SoldierBrain, j: number, tick: number): void {
-  b.lastSeenTick = tick;
-  b.hasLastKnown = true;
-  b.lastKnownX = view.position[j * 3]!;
-  b.lastKnownY = view.position[j * 3 + 1]!;
-  b.lastKnownZ = view.position[j * 3 + 2]!;
-}
-
 /** Candidatos da percepção (os mais próximos no cone), em rascunho fixo. */
 const MAX_CANDIDATES = 4;
 const candIndex = new Int32Array(MAX_CANDIDATES);
 const candD2 = new Float64Array(MAX_CANDIDATES);
 
-/** Percepção: confirma o alvo atual ou procura o inimigo visível mais próximo; ouve tiros e passos. */
-function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void {
+/**
+ * Percepção: confirma o alvo atual ou procura o inimigo visível mais próximo; ouve tiros e passos. M12 (fase 7a): o
+ * alvo atual também precisa estar no cone (ou no alerta de dano) e no alcance, e voltar a ele depois de sumir custa
+ * reação (`regain`); o protegido de spawn não é alvo; o candidato novo no mato só é notado mais perto (`noticeRange`);
+ * cone, alcance, audição e conhecimento vêm das regras do bot.
+ */
+function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number, t: SoldierTiming): void {
   const view = c.view!;
   const e3 = e * 3;
   const ex = view.position[e3]!;
   const ey = view.position[e3 + 1]! + viewEyeHeight(view, e, view.flags[e]!);
   const ez = view.position[e3 + 2]!;
+  const wasVisible = b.targetVisible;
   b.targetVisible = false;
+  const alert = tick < b.alertUntil;
+  const range = c.viewDistance * b.viewRangeMul;
   // M2 (fase 3g): o Caçador procura primeiro a presa dele e troca de alvo para ela assim que a vê.
   if (
     b.personality.preset === 'hunter' &&
     b.focus !== b.target &&
     focusValid(c, b) &&
-    inSight(view, b, ex, ez, c.viewDistance)
+    !spawnProtected(view, b.focus) &&
+    inSight(view, b, ex, ez, range)
   ) {
-    if (c.canSee(ex, ey, ez, b.focus)) {
-      acquire(view, b, b.focus, tick);
+    if (seeBody(c, b, ex, ey, ez, b.focus)) {
+      acquire(view, b, b.focus, tick, atViewEdge(view, b, ex, ez, b.focus));
       b.targetVisible = true;
       remember(view, b, b.focus, tick);
       return;
     }
   }
-  if (targetValid(view, b, c.zombiesMode) && c.canSee(ex, ey, ez, b.target)) {
+  // O alvo atual: no cone (ou alerta) e no alcance, como qualquer candidato; o protegido de spawn sai (a sim zera o
+  // dano nele: mirar nele é só ficar pronto para quando a proteção cair).
+  const current = targetValid(view, b, c.zombiesMode) && !spawnProtected(view, b.target) ? b.target : -1;
+  if (
+    current >= 0 &&
+    inView(view, b, ex, ez, current, range, alert, view.kind[current] === ENTITY_KIND.zombie ? TOUCH_ZOMBIE : TOUCH) &&
+    seeBody(c, b, ex, ey, ez, current)
+  ) {
+    if (!wasVisible) regain(view, b, ex, ey, ez, tick, t);
     b.targetVisible = true;
-    remember(view, b, b.target, tick);
+    b.targetSeenTick = tick;
+    remember(view, b, current, tick);
     return;
   }
   const maxCandidates = b.lodA ? AI_LOD.candidatesA : AI_LOD.candidatesB;
   const fwdX = -Math.sin(b.aimYaw);
   const fwdZ = -Math.cos(b.aimYaw);
-  const alert = tick < b.alertUntil;
-  const maxD2 = c.viewDistance * c.viewDistance;
+  const maxD2 = range * range;
+  const stepSpeed2 = AI_SENSES.hearStepSpeed * AI_SENSES.hearStepSpeed;
   let candidates = 0;
   let heard = -1;
   let heardD2 = Infinity;
@@ -654,27 +774,28 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
     const dx = view.position[j * 3]! - ex;
     const dz = view.position[j * 3 + 2]! - ez;
     const d2 = dx * dx + dz * dz;
-    // Audição (gameplay.md §6.3): tiro, passo correndo, passo andando; agachado não faz barulho.
+    // Audição (gameplay.md §6.3): tiro, passo correndo, passo andando; agachado não faz barulho. M12 (fase 7a): os
+    // raios do bot (× `hearing`; o N0 ouve tiro só até 25 m e nenhum passo).
     const fj = view.flags[j]!;
     let hearR = 0;
-    if ((fj & F.firing) !== 0) hearR = AI_SENSES.hearShotM;
+    if ((fj & F.firing) !== 0) hearR = b.hearShotM;
     else if ((fj & F.crouching) === 0) {
       const vx = view.velocity[j * 3]!;
       const vz = view.velocity[j * 3 + 2]!;
-      if (vx * vx + vz * vz > AI_SENSES.hearStepSpeed * AI_SENSES.hearStepSpeed) {
-        hearR = (fj & F.sprinting) !== 0 ? AI_SENSES.hearSprintM : AI_SENSES.hearWalkM;
-      }
+      if (vx * vx + vz * vz > stepSpeed2) hearR = (fj & F.sprinting) !== 0 ? b.hearSprintM : b.hearWalkM;
     }
-    if (d2 <= hearR * hearR && d2 < heardD2) {
+    if (hearR > 0 && d2 <= hearR * hearR && d2 < heardD2) {
       heard = j;
       heardD2 = d2;
     }
+    // O alvo atual já foi conferido acima (e o protegido de spawn não é candidato).
+    if (j === current || (fj & F.spawnProtected) !== 0) continue;
     if (d2 >= maxD2) continue;
     if (candidates === maxCandidates && d2 >= candD2[maxCandidates - 1]!) continue;
-    if (!alert) {
-      const d = Math.sqrt(d2);
-      if (d > 0.01 && (dx * fwdX + dz * fwdZ) / d < VIEW_CONE_COS) continue;
-    }
+    const d = Math.sqrt(d2);
+    if (!alert && d > 0.01 && (dx * fwdX + dz * fwdZ) / d < b.viewConeCos) continue;
+    // O mato esconde o candidato novo (sem raio: 2 leituras da grade).
+    if (d >= noticeRange(view, j, d, range, tick, t)) continue;
     // Inserção ordenada por distância num vetor fixo: o orçamento de raios vai para os inimigos MAIS PRÓXIMOS.
     let k = candidates < maxCandidates ? candidates++ : maxCandidates - 1;
     while (k > 0 && candD2[k - 1]! > d2) {
@@ -688,7 +809,7 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
   let best = -1;
   for (let k = 0; k < candidates; k++) {
     const j = candIndex[k]!;
-    if (c.canSee(ex, ey, ez, j)) {
+    if (seeBody(c, b, ex, ey, ez, j)) {
       best = j;
       break;
     }
@@ -698,19 +819,37 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number): void 
     if (heard >= 0 && !b.targetVisible) remember(view, b, heard, tick);
     return;
   }
-  if (best !== b.target || !targetValid(view, b)) acquire(view, b, best, tick);
+  acquire(view, b, best, tick, atViewEdge(view, b, ex, ez, best));
   b.targetVisible = true;
   remember(view, b, best, tick);
 }
 
-/** O foco do bot está no alcance de visão e no cone (ou o bot está alerta)? */
+/**
+ * O corpo `j` está no alcance `range` e no cone do bot (ou o bot está alerta, 360°)? A menos de `touchM` (m), o cone
+ * não conta (o alvo atual colado: o bot sente quem passa encostado).
+ */
+function inView(
+  view: SimView,
+  b: SoldierBrain,
+  ex: number,
+  ez: number,
+  j: number,
+  range: number,
+  alert: boolean,
+  touchM = 0.01,
+): boolean {
+  const dx = view.position[j * 3]! - ex;
+  const dz = view.position[j * 3 + 2]! - ez;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= range * range) return false;
+  if (alert) return true;
+  const d = Math.sqrt(d2);
+  return d < touchM || (dx * -Math.sin(b.aimYaw) + dz * -Math.cos(b.aimYaw)) / d >= b.viewConeCos;
+}
+
+/** O foco do bot está no alcance de visão e no cone? */
 function inSight(view: SimView, b: SoldierBrain, ex: number, ez: number, maxM: number): boolean {
-  const f3 = b.focus * 3;
-  const dx = view.position[f3]! - ex;
-  const dz = view.position[f3 + 2]! - ez;
-  const d = Math.sqrt(dx * dx + dz * dz);
-  if (d >= maxM) return false;
-  return d < 0.01 || (dx * -Math.sin(b.aimYaw) + dz * -Math.cos(b.aimYaw)) / d >= VIEW_CONE_COS;
+  return inView(view, b, ex, ez, b.focus, maxM, false);
 }
 
 /** Sem navegação: sonda as células à frente (0,45 e 0,8 m) em `heading`: livre, precisa pular ou bloqueado. */
@@ -796,6 +935,8 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
     }
     // M10 (fase 1c): às vezes o passeio sobe (o andar de cima, a torre).
     if (pickUpperGoal(c, b, e, team, y, from)) return;
+    // M12 (fase 7a): no lugar do nó ao acaso, às vezes o tiroteio (o som de tiro longe demais para virar pista).
+    if (e >= 0 && pickGunfireGoal(c, b, e, x, z, from, t)) return;
     for (let k = 0; k < AI_SOLDIER.wanderTries; k++) {
       const n = b.rng.int(0, nav.nodeCount);
       if (from >= 0 && nav.component[n] !== nav.component[from]) continue;
@@ -831,6 +972,44 @@ function pickWanderGoal(c: AiContext, b: SoldierBrain, x: number, y: number, z: 
   b.goalY = y;
   b.goalZ = b.rng.range(minZ + 2, Math.max(minZ + 2.5, maxZ - 2));
   b.hasGoal = true;
+}
+
+/**
+ * M12 (fase 7a): o passeio que vai ao tiroteio (N1+): um inimigo atirou nos últimos 2 s entre o raio de audição de tiro
+ * do bot e 120 m (× `hearing`): com 50% de chance, um nó a até ±10 m dele, no mesmo componente e na área jogável. É o
+ * som, não wallhack: o ponto é a posição de quem atirou, com erro. `false` = o passeio de sempre.
+ */
+function pickGunfireGoal(
+  c: AiContext,
+  b: SoldierBrain,
+  e: number,
+  x: number,
+  z: number,
+  from: number,
+  t: SoldierTiming,
+): boolean {
+  const view = c.view!;
+  const nav = view.nav!;
+  const j = gunfireShooter(c, b, e, x, z, t);
+  if (j < 0 || !b.rng.chance(AI_FEEL.gunfireChance)) return false;
+  const r = AI_FEEL.gunfireSpreadM;
+  const n = nav.nearestNode(
+    view.position[j * 3]! + b.rng.range(-r, r),
+    view.position[j * 3 + 1]!,
+    view.position[j * 3 + 2]! + b.rng.range(-r, r),
+  );
+  if (n < 0 || (from >= 0 && nav.component[n] !== nav.component[from])) return false;
+  nav.nodePosition(n, nodePos, 0);
+  const area = view.playArea;
+  if (
+    area &&
+    (nodePos[0]! < area.minX || nodePos[0]! > area.maxX || nodePos[2]! < area.minZ || nodePos[2]! > area.maxZ)
+  ) {
+    return false;
+  }
+  setWanderGoal(c, b, e);
+  b.wanderStretch = true;
+  return true;
 }
 
 /**
@@ -1191,20 +1370,17 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   }
   // M9 (fase 1): o ponto cresce com o corpo do alvo (fase 1b: o do gigante debaixo de teto, na escala apertada, que
   // fica abaixo da laje). Revisão: o desvio da parte vista vai na escala de agora (escolhido noutra, na proporção).
-  viewAimPoint(view, b.target, b.aimHead, aimPoint);
-  const sizeNow = chaosScaleOf(view, tg);
-  const resize = sizeNow === b.aimOffsetScale ? 1 : sizeNow / b.aimOffsetScale;
-  const offX = off.x * resize;
-  const offY = off.y * resize;
-  const offZ = off.z * resize;
-  const ty = view.yaw[b.target]!;
-  const tc = Math.cos(ty);
-  const ts = Math.sin(ty);
-  let dx = aimPoint.x + tc * offX - ts * offZ - ex;
-  let dy = aimPoint.y + offY - ey;
-  let dz = aimPoint.z - ts * offX - tc * offZ - ez;
+  targetAimPoint(view, b, aimPoint);
+  let dx = aimPoint.x - ex;
+  let dy = aimPoint.y - ey;
+  let dz = aimPoint.z - ez;
   let horiz = Math.sqrt(dx * dx + dz * dz);
   let dist = Math.sqrt(horiz * horiz + dy * dy);
+  // M12 (fase 7a): a velocidade que o bot estima do alvo (atrasa τ = 0,3·reação): os adiantamentos de projétil usam
+  // ela, e a mira fica para trás quando o alvo muda de velocidade (o strafe que vira).
+  trackTarget(view, b);
+  const estVx = b.estVx;
+  const estVz = b.estVz;
 
   // M2: slot pela distância e pela munição; a decisão de tiro vale para a arma NA MÃO (a troca leva 0,4 s).
   chooseSlot(view, b, e, dist);
@@ -1212,32 +1388,35 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   const use: AiWeaponUse = held ? AI_WEAPON_USE[held.category] : AI_WEAPON_USE.rifle;
   // M10 (fase 7): a besta e o lança-granadas sobem a mira pelo arco do projétil (a conta da granada, `throwPitch`).
   let arcPitch = Number.NaN;
+  const t3 = tg * 3;
+  // M12 (fase 7a): mira em pos − (v − v̂)·τ.
+  const lagX = (view.velocity[t3]! - estVx) * b.lagS;
+  const lagZ = (view.velocity[t3 + 2]! - estVz) * b.lagS;
   if (held !== null && use.splash && held.projectileSpeed > 0) {
-    // Foguete: no pé do alvo, adiantado pelo tempo de voo (velocidade atual do alvo).
-    const t3 = tg * 3;
+    // Foguete: no pé do alvo, adiantado pelo tempo de voo (pela velocidade estimada).
     const flight = dist / held.projectileSpeed;
-    dx = view.position[t3]! + view.velocity[t3]! * flight - ex;
+    dx = view.position[t3]! + estVx * flight - lagX - ex;
     dy = view.position[t3 + 1]! + 0.1 - ey;
-    dz = view.position[t3 + 2]! + view.velocity[t3 + 2]! * flight - ez;
+    dz = view.position[t3 + 2]! + estVz * flight - lagZ - ez;
     horiz = Math.sqrt(dx * dx + dz * dz);
     dist = Math.sqrt(horiz * horiz + dy * dy);
     if (held.projectileGravity > 0) arcPitch = arcAim(horiz, dy, held.projectileSpeed, held.projectileGravity);
-  } else if (held !== null && held.fire === WEAPON_FIRE.bolt && held.projectileSpeed > 0) {
-    // M10 (fase 7): o virote: no ponto de sempre (cabeça ou tronco), adiantado pelo voo, com a mira subindo pelo arco.
-    const t3 = tg * 3;
-    const flight = dist / held.projectileSpeed;
-    dx += view.velocity[t3]! * flight;
-    dz += view.velocity[t3 + 2]! * flight;
-    horiz = Math.sqrt(dx * dx + dz * dz);
-    dist = Math.sqrt(horiz * horiz + dy * dy);
-    arcPitch = arcAim(horiz, dy, held.projectileSpeed, held.projectileGravity);
-  } else if (held !== null && held.fire === WEAPON_FIRE.projectile && held.projectileSpeed > 0) {
-    // M6 (fase 5): a bola de tinta: no ponto de sempre, adiantado pelo voo, e mais alto pela queda (½·g·t²).
-    const t3 = tg * 3;
-    const flight = dist / held.projectileSpeed;
-    dx += view.velocity[t3]! * flight;
-    dy += 0.5 * held.projectileGravity * flight * flight;
-    dz += view.velocity[t3 + 2]! * flight;
+  } else {
+    dx -= lagX;
+    dz -= lagZ;
+    if (held !== null && held.fire === WEAPON_FIRE.bolt && held.projectileSpeed > 0) {
+      // M10 (fase 7): o virote: no ponto de sempre (cabeça ou tronco), adiantado pelo voo, com a mira subindo pelo arco.
+      const flight = dist / held.projectileSpeed;
+      dx += estVx * flight;
+      dz += estVz * flight;
+      arcPitch = arcAim(Math.sqrt(dx * dx + dz * dz), dy, held.projectileSpeed, held.projectileGravity);
+    } else if (held !== null && held.fire === WEAPON_FIRE.projectile && held.projectileSpeed > 0) {
+      // M6 (fase 5): a bola de tinta: no ponto de sempre, adiantado pelo voo, e mais alto pela queda (½·g·t²).
+      const flight = dist / held.projectileSpeed;
+      dx += estVx * flight;
+      dy += 0.5 * held.projectileGravity * flight * flight;
+      dz += estVz * flight;
+    }
     horiz = Math.sqrt(dx * dx + dz * dz);
     dist = Math.sqrt(horiz * horiz + dy * dy);
   }
@@ -1245,23 +1424,28 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
   let goalPitch = Number.isNaN(arcPitch) ? Math.atan2(dy, horiz) : arcPitch;
   let buttons = 0;
 
+  // M12 (fase 7a): conta os tiros da rajada em todo tick de combate (o gatilho pode estar solto agora).
+  const burstOk = burstAllows(view, b, e, held, dist, tick, t);
   if (ready) {
-    if (tick >= b.errNextTick) {
-      const p = b.acquireTicks > 0 ? clamp((tick - b.acquireStartTick) / b.acquireTicks, 0, 1) : 1;
-      const scale = b.errorRad * (3 - 2 * p) * Math.SQRT1_2;
-      b.errYaw = b.rng.gaussian() * scale;
-      b.errPitch = b.rng.gaussian() * scale;
-      b.errNextTick = tick + t.errorResample;
-    }
+    // M12 (fase 7a): o erro deriva (Ornstein-Uhlenbeck, passo de 0,1 s) e fecha com a aquisição.
+    stepAimError(b, tick, t);
+    const scale = aimErrorScale(b, tick);
+    b.errYaw = b.errZYaw * scale;
+    b.errPitch = b.errZPitch * scale;
     goalYaw += b.errYaw - sk.recoilControl * view.recoilYaw[e]!;
     goalPitch += b.errPitch - sk.recoilControl * view.recoilPitch[e]!;
     b.aimYaw = turnToward(b.aimYaw, goalYaw, b.turnStep);
     b.aimPitch = clamp(moveToward(b.aimPitch, goalPitch, b.turnStep), -HALF_PI, HALF_PI);
     const remaining = Math.max(Math.abs(angleDelta(b.aimYaw, goalYaw)), Math.abs(goalPitch - b.aimPitch));
     const tolerance = FIRE_TOLERANCE + Math.atan(0.25 / Math.max(dist, 1));
-    if (remaining <= tolerance && canFire(view, b, e, held, use, dist)) buttons |= BUTTON.fire;
+    if (remaining <= tolerance && burstOk && canFire(view, b, e, held, use, dist)) buttons |= BUTTON.fire;
+    if (dist > use.adsMinM) buttons |= BUTTON.ads;
+  } else {
+    // M12 (fase 7a): durante a reação o bot ainda não "notou": gira devagar para o alvo, sem ADS (e, abaixo, sem andar).
+    const step = b.turnStep * AI_FEEL.reactingTurnMul;
+    b.aimYaw = turnToward(b.aimYaw, goalYaw, step);
+    b.aimPitch = clamp(moveToward(b.aimPitch, goalPitch, step), -HALF_PI, HALF_PI);
   }
-  if (dist > use.adsMinM) buttons |= BUTTON.ads;
   // Semiautomática: solta o gatilho um tick entre dois tiros (a sim só atira na borda).
   if (held !== null && !held.automatic && (buttons & BUTTON.fire) !== 0 && b.fireHeld) buttons &= ~BUTTON.fire;
   b.fireHeld = (buttons & BUTTON.fire) !== 0;
@@ -1290,13 +1474,14 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
       }
       local.x = b.strafeDir;
       if (sk.combatMove === 'strafeDodge') {
-        // Agacha em rajadas enquanto troca tiro; pulinho de esquiva só fora do tiro (no ar a dispersão é 2,5x).
+        // Agacha em rajadas enquanto troca tiro; pulinho de esquiva só fora do tiro (no ar a dispersão é 2,5x). M12
+        // (fase 7a): o pulinho era na reação, que agora é parada; vai para a recarga (de novo fora do tiro).
         if (ready && tick >= b.dodgeDecisionTick) {
           b.dodgeDecisionTick = tick + t.ticks60(b.rng.int(18, 42));
           b.crouchUntil = b.rng.chance(0.4) ? b.dodgeDecisionTick : 0;
         }
         if (tick < b.crouchUntil) buttons |= BUTTON.crouch;
-        if (!ready && tick >= b.nextJumpTick && (fl & F.onGround) !== 0) {
+        if ((fl & F.reloading) !== 0 && tick >= b.nextJumpTick && (fl & F.onGround) !== 0) {
           buttons |= BUTTON.jump;
           b.nextJumpTick = tick + t.ticks60(b.rng.int(40, 100));
         }
@@ -1304,6 +1489,15 @@ function combat(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Soldi
       break;
   }
   buttons = personaCombat(c, b, e, t, buttons, dist, approach, local);
+  if (!ready) {
+    // M12 (fase 7a): a reação aparece: parado (nem anda, nem corre, nem pula) e sem ADS até ela vencer. Revisão: nem
+    // atira (o tiro pro alto do Lunático, o Kamikaze puxando a granada); a granada que o Kamikaze já cozinha segue na
+    // mão (soltar o gatilho a jogaria).
+    local.x = 0;
+    local.y = 0;
+    buttons &= ~(BUTTON.ads | BUTTON.sprint | BUTTON.jump | (b.kamikazeCooking ? 0 : BUTTON.fire));
+    if ((buttons & BUTTON.fire) === 0) b.fireHeld = false;
+  }
   // Strafe batendo em parede: troca de lado.
   if (local.x !== 0) {
     const side = b.aimYaw - (local.x > 0 ? HALF_PI : -HALF_PI);
@@ -1512,12 +1706,37 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
     gy = orderAt.y;
     gz = orderAt.z;
   } else if (b.hasLastKnown && tick - b.lastSeenTick < t.chase) {
-    gx = b.lastKnownX;
+    // M12 (fase 7a): sem fila indiana: cada bot desvia 1,5–3 m para o lado dele (refeito quando a pista anda mais que
+    // `spreadRedoM`: a pista do alvo à vista anda a cada percepção, e refazer o lado sempre mexeria o objetivo e a rota);
+    // sem rota até o ponto desviado, tenta o ponto exato antes de largar a pista.
+    const sdx = b.lastKnownX - b.spreadForX;
+    const sdz = b.lastKnownZ - b.spreadForZ;
+    if (!(sdx * sdx + sdz * sdz <= AI_FEEL.spreadRedoM * AI_FEEL.spreadRedoM)) {
+      spreadFor(b, x, z);
+      b.spreadOn = true;
+    }
+    if (f.failed && b.spreadOn) {
+      b.spreadOn = false;
+      f.clear();
+    }
+    gx = b.lastKnownX + (b.spreadOn ? b.spreadX : 0);
     gy = b.lastKnownY;
-    gz = b.lastKnownZ;
+    gz = b.lastKnownZ + (b.spreadOn ? b.spreadZ : 0);
+    // Chegou: perto do ponto desviado ou, na área, perto do ponto da pista e no mesmo andar (o desviado pode cair fora
+    // da navegação, e a rota para no nó mais perto dele).
+    const near = GOAL_REACHED + (b.spreadOn ? Math.hypot(b.spreadX, b.spreadZ) : 0);
     const ddx = gx - x;
     const ddz = gz - z;
-    if (ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED || f.failed) b.hasLastKnown = false;
+    const ldx = b.lastKnownX - x;
+    const ldz = b.lastKnownZ - z;
+    const sameFloor = Math.abs(b.lastKnownY - y) < AI_PATH.arriveDy;
+    if (
+      ddx * ddx + ddz * ddz < GOAL_REACHED * GOAL_REACHED ||
+      (sameFloor && ldx * ldx + ldz * ldz < near * near) ||
+      f.failed
+    ) {
+      b.hasLastKnown = false;
+    }
   } else {
     b.hasLastKnown = false;
     // M2 (fase 3g): o objetivo da personalidade (ponto do Camper, presa, humano do Suporte) vem antes do passeio.
@@ -1637,12 +1856,15 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   let wx = steer.x + push.x * AI_PATH.separationWeight;
   let wz = steer.z + push.z * AI_PATH.separationWeight;
   const wl = Math.sqrt(wx * wx + wz * wz);
-  if (wl > 1e-6) {
+  const moving = wl > 1e-6;
+  let heading = b.aimYaw;
+  let look = b.aimYaw;
+  if (moving) {
     wx /= wl;
     wz /= wl;
-    const heading = Math.atan2(-wx, -wz);
+    heading = Math.atan2(-wx, -wz);
     // M2 (fase 3c): patrulha do N1: sem pista do inimigo, olha para os lados de tempos em tempos.
-    let look = heading;
+    look = heading;
     // M2 (fase 3f): o N4 pré-mira a célula mais quente perto (onde os humanos costumam estar).
     if (b.intelligence.learn && scouting && board !== null) {
       if (tick >= b.preAimNextTick) {
@@ -1667,15 +1889,22 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
       }
       if (tick < b.scanUntil) look = heading + b.scanOffset;
     }
-    b.aimYaw = turnToward(b.aimYaw, look, b.turnStep);
-    if (steer.remaining > AI_SOLDIER.sprintMinM && Math.abs(angleDelta(b.aimYaw, heading)) < SPRINT_MAX_TURN) {
-      buttons |= BUTTON.sprint;
-    }
   } else {
     wx = 0;
     wz = 0;
   }
-  b.aimPitch = moveToward(b.aimPitch, 0, b.turnStep);
+  // M12 (fase 7a): olhar para a ameaça e para a pista (o comentário do `onDamaged` prometia "vira para lá"): ferido há
+  // pouco e sem alvo, para de onde veio o dano (menos correndo para a cobertura); com pista a até 30 m e a até 100° do
+  // rumo, para ela, na altura do olho (pré-mira o canto por onde a rota passa).
+  const looking = !b.orderHold && lookTarget(view, b, e, tick, x, y, z, heading);
+  if (looking) look = lookOut.yaw;
+  if (moving || looking) b.aimYaw = turnToward(b.aimYaw, look, b.turnStep);
+  // Olhando para a pista, ainda corre com ela a até 60° do rumo (a sim corre com o passo para a frente).
+  const sprintTurn = looking && lookOut.clue ? LOOK_SPRINT_TURN : SPRINT_MAX_TURN;
+  if (moving && steer.remaining > AI_SOLDIER.sprintMinM && Math.abs(angleDelta(b.aimYaw, heading)) < sprintTurn) {
+    buttons |= BUTTON.sprint;
+  }
+  b.aimPitch = clamp(moveToward(b.aimPitch, looking ? lookOut.pitch : 0, b.turnStep), -HALF_PI, HALF_PI);
   // Direção desejada no mundo vira moveX/moveY relativos à mira atual (olha para onde anda).
   const s = Math.sin(b.aimYaw);
   const co = Math.cos(b.aimYaw);
@@ -1685,6 +1914,45 @@ function travel(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): num
   const def = weaponDef(view.weapon[e]!);
   if (def && def.clipSize > 0 && heldClip(view, e) < def.clipSize / 2) buttons |= BUTTON.reload;
   return personaTravel(view, b, e, tick, t, buttons, local);
+}
+
+/** M12 (fase 7a): para onde o bot olha andando, quando não é o rumo (`lookTarget`). */
+const lookOut = { yaw: 0, pitch: 0, clue: false };
+
+/**
+ * M12 (fase 7a): o olhar sem alvo à vista. Ferido há pouco (`alertUntil`), para de onde veio o dano, na horizontal
+ * (menos correndo para a cobertura: aí corre de frente); senão, com pista a até `lookLastKnownM` e a até
+ * `lookLastKnownDeg` do rumo, para ela, na altura do olho de quem estivesse lá. Escreve em `lookOut`; `false` = o
+ * olhar de sempre (rumo, varredura, pré-mira).
+ */
+function lookTarget(
+  view: SimView,
+  b: SoldierBrain,
+  e: number,
+  tick: number,
+  x: number,
+  y: number,
+  z: number,
+  heading: number,
+): boolean {
+  if (!b.targetVisible && tick < b.alertUntil && b.coverPhase !== COVER_PHASE.going) {
+    lookOut.yaw = Math.atan2(-(b.threatX - x), -(b.threatZ - z));
+    lookOut.pitch = 0;
+    lookOut.clue = false;
+    return true;
+  }
+  if (!b.hasLastKnown) return false;
+  const dx = b.lastKnownX - x;
+  const dz = b.lastKnownZ - z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= AI_FEEL.lookLastKnownM * AI_FEEL.lookLastKnownM || d2 < 0.25) return false;
+  const yaw = Math.atan2(-dx, -dz);
+  if (Math.abs(angleDelta(heading, yaw)) >= LOOK_LAST_KNOWN) return false;
+  const eye = y + viewEyeHeight(view, e, view.flags[e]!);
+  lookOut.yaw = yaw;
+  lookOut.pitch = Math.atan2(b.lastKnownY + METRICS.eyeHeight - eye, Math.sqrt(d2));
+  lookOut.clue = true;
+  return true;
 }
 
 /** Distância (no plano) de `e` até `j`. */
@@ -1984,14 +2252,18 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     // M7 (fase 7): o LOD C do Royale (longe de todo humano).
     b.lodC =
       c.royaleMode && !b.lodA && !c.observerWithin(view.position[e * 3]!, view.position[e * 3 + 2]!, AI_LOD.farM);
-    perceive(c, b, e, tick);
+    perceive(c, b, e, tick, t);
     b.nextPerceiveTick = tick + (b.lodA ? t.perceptionA : b.lodC ? t.perceptionC : t.perceptionB);
   }
   if (b.target >= 0 && !targetValid(view, b)) {
     b.target = -1;
     b.targetVisible = false;
   }
-  if (b.target >= 0 && !b.targetVisible && tick - b.lastSeenTick > t.memory) b.target = -1;
+  // M12 (fase 7a): a memória do alvo conta de quando ele foi VISTO (a pista do som ou do dano não o segura).
+  if (b.target >= 0 && !b.targetVisible && tick - b.targetSeenTick > t.memory) b.target = -1;
+  // M12 (fase 7a): a regra "sabe a área" e o raio da bala até o alvo à vista (o vidro: não atira, contorna).
+  areaKnowledge(c, b, e, t);
+  checkBullet(c, b, e, t);
   personaTick(c, b, e, t);
 
   // M2 (fase 3e): o N3 avisa o time de onde está o inimigo que vê.
@@ -2132,7 +2404,8 @@ export function thinkSoldier(c: AiContext, b: SoldierBrain, f: InputFrame, t: So
     // M2 (fase 3c): correndo para a cobertura (de perto, troca tiro).
     buttons = travel(c, b, e, t);
     b.progressTick = tick;
-  } else if (b.target >= 0 && b.targetVisible && !royaleIgnore) {
+  } else if (b.target >= 0 && b.targetVisible && !royaleIgnore && !b.bulletBlocked) {
+    // M12 (fase 7a): com a bala batendo no caminho (o vidro), não briga: anda pela pista (contorna) olhando para ele.
     buttons = combat(c, b, e, tick, t);
     // M3 (fase 3a): no Bobo Zombies, zumbi perto: recua atirando (o golpe dele é de perto) e sem correr.
     if (

@@ -101,8 +101,9 @@ describe('IA com janelas com barricada (M3, fase 3d)', () => {
     // Teste: começa sem tábua nenhuma (o zumbi da onda 1 nasce longe e demora a chegar).
     (v.mapObjects!.planks as Uint8Array)[0] = 0;
     // Antes da 1ª onda (5 s) e logo depois: chega em ~3 s e repõe 1 por segundo (depois para para atirar no zumbi
-    // que aparece na janela; com o pool de 1 renascendo, a onda inteira).
-    for (let t = 0; t < 7 * SIM_HZ; t++) match.step();
+    // que aparece na janela; com o pool de 1 renascendo, a onda inteira). M12 (fase 7a): 9 s (eram 7): a reação
+    // aparece (parado, sem atirar) e voltar ao zumbi que some pela janela custa meia reação: a 3ª tábua vem aos ~8,7 s.
+    for (let t = 0; t < 9 * SIM_HZ; t++) match.step();
     expect(repairs).toBeGreaterThanOrEqual(3);
     expect(v.mapObjects!.planks[0]).toBe(repairs);
     match.dispose();

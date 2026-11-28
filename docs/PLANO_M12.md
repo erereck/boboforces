@@ -80,6 +80,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    rajadas; o Pela vibe sem foguete; aliados que seguem em vaga; zumbis que cercam; sem fila indiana; o passeio que
    vai ao tiroteio; o Laboratório e o card que dizem a verdade; comemoração muda; o índice de lugares no loading; o
    spawn do FFA perto da ação.
+   - **7a feita em 27/11** (ARCHITECTURE §23.7): os bots percebem e miram (os 13 itens); os 20 goldens com soldados re-gravados sobre a fase 6; o balance em ordem.
 8. **Fechamento:** o portão, a rodada de prints 36, os consertos que ela achar, o `CHANGELOG`, a `ARCHITECTURE` (§23)
    e o `PERF`.
 

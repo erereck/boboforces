@@ -5895,3 +5895,59 @@ teste); o desenho, em `ui/src/screens/hud.ts` e `match-hud.ts`; a cena só faz a
 - **Contratos:** `GameHandle.receiveLink`; `LoadingModel.summary/details` e o `tipKey` começando em `null`;
   `TitleState.opening?`, `ModesState.note?/help?/bare?`, `PauseState.quitArmed?`; o `MenuSound` `'edge'` e o
   `playUiSound(…, scale, rate)`. Custo: menu 337,3 KB (+2,3), primeira partida 966,7 KB. Nenhum golden mudou.
+
+### 23.7 Fase 7a: os bots percebem e miram como gente (27/11/2026)
+
+- **Onde:** a lógica nova fica em `packages/ai/src/senses.ts` (percepção) e `packages/ai/src/aim-feel.ts` (mira); o
+  `soldier.ts` só faz a cola. Os números ficam em `AI_FEEL` (`config.ts`).
+- **Proteção de spawn:** o corpo com `F.spawnProtected` não entra como candidato nem segue como alvo (a sim zera o dano
+  dele; antes o bot gastava a reação nele e, quando a proteção caía, já estava mirado). É por isso que a precisão do
+  robô de balanceamento subiu: antes os dois atiravam um no outro nos 1,5 s de proteção.
+- **O alvo também pelo cone:** o alvo atual precisa do cone (`rules.visionDeg`) ou do alerta de dano, e do alcance
+  (antes era visto em 360°, sem alcance); colado (menos de 2 m), basta sentir; o zumbi-alvo, a até 4 m. Sumiu por mais
+  de 0,35 s: voltar custa 50% da reação, ou 25% segurando o ângulo com o alvo a até 10° da mira. A memória de 3 s conta
+  do último tick em que ele foi visto (`targetSeenTick`).
+- **A reação varia e aparece:** × (1 + 0,15·N(0,1)) presa em 0,7–1,5, e × 1,4 fora dos 60% centrais do cone. Durante a
+  reação o bot gira a 30%, sem andar, correr, pular, ADS nem atirar (inclusive o gatilho da personalidade; a granada que
+  o Kamikaze já cozinha segue na mão). O pulinho de esquiva do Suado e do Tryhard foi para a recarga.
+- **O olhar:** ferido há pouco e sem alvo, olha para de onde veio o dano. Com pista a até 30 m e a até 100° do rumo,
+  olha para ela na altura do olho e ainda corre com ela a até 60° do rumo. Com `orderHold` (parado por uma ordem de
+  seguir ou cobrir), o `travel` não gira para a ameaça nem para a pista.
+- **O mato** (GDD §4.4.1): candidato novo no capim alto ou no arbusto (pelos ids de conteúdo; vale a célula dos pés ou
+  a de cima, porque a planta tem uma célula de altura) é notado a 50% do alcance; agachado, a 25% com teto de 12 m;
+  normal a menos de 3 m ou tendo atirado há até 1 s. Sem raio.
+- **O vidro:** um raio com `blocksBullets` até o ponto mirado, na aquisição e a cada 0,5 s. Só o que deixa ver e tapa a
+  bala (bloco ou prop sem `blocksSight`: o vidro) faz o bot andar pela pista em vez de atirar. Se bate em algo opaco (o
+  muro baixo na frente do tronco), testa a cabeça (+1 raio) e passa a mirar nela; se nada passa, briga como antes. Com
+  a faca na mão, nunca contorna.
+- **A mira:** erro Ornstein-Uhlenbeck (passo de 0,1 s, ρ 0,7, a escala de antes) e a velocidade estimada do alvo com
+  τ = 0,3·reação, com a mira em pos − (v − v̂)·τ: trocar de lado no strafe faz o bot errar atrás e corrigir. Os
+  adiantamentos de projétil usam v̂.
+- **Revidar quem bate (`targetSwitchS`):** dano de outro inimigo mais perto que o alvo e com linha de visão (até 2
+  raios, no máximo a cada 0,5 s) troca para ele com a reação de troca e o erro inicial 2×.
+- **Rajadas (`triggerHold`):** arma automática acima de 12 m dá 3 + 10·`triggerHold` tiros e pausa de 0,15–0,3 s.
+- **Sem fila indiana:** a pista ganha um desvio lateral de 1,5–3 m pelo índice (no máximo metade da distância), refeito
+  quando a pista anda mais de 2 m; sem rota até o ponto desviado, vai ao exato; "chegou" vale perto do ponto desviado
+  ou, no mesmo andar (`arriveDy`), perto do ponto da pista.
+- **O passeio que vai ao tiroteio (N1+):** no lugar do nó ao acaso, com 50% de chance, um nó a até ±10 m de quem atirou
+  nos últimos 2 s, entre o raio de audição de tiro e 120 m × `hearing` (é o som, não wallhack).
+- **Os níveis fáceis:** o Pela vibe e o De boa sorteiam a primária sem foguete e com 5% de sniper
+  (`BOT_PRIMARY_WEIGHTS_EASY`); o N0 ouve tiro até 25 m e nenhum passo.
+- **O Laboratório vale:** `visionDeg`, `visionRange` (até 1×: o alcance da partida já é o teto da plataforma, regra
+  19), `hearing` × os raios de audição, `knowledge: 'area'` (a pista do inimigo mais perto ±15 m a cada 10 s) e
+  `'wallhack'` (vê sem raio; só bot do Laboratório: nenhum bot de fábrica usa). Os valores padrão dão a percepção de
+  antes.
+- **O bot devolvido:** `SoldierBrain.restart()` faz o reinício do renascer no bot que volta para a IA (chamado pelo
+  `setHumanControlled(c, false)` do `director.ts`: Aquário e sofá).
+- **Custo:** a bala, 1 raio por aquisição + 2/s com alvo à vista (+1 quando bate em algo opaco); o revide, até 4/s; o
+  resto, 0. No golden do M1 foram 35,5 → 34,0 raios por bot por segundo; a IA do `bench:sim` ficou ~3–15% mais cara
+  por tick (medir no Switch).
+- **Balance** (`npm run balance`, semente 42; K/D e precisão): Pela vibe 0,05 / 11,9%, De boa 0,40 / 25,7%, Normal
+  1,03 / 44,1%, Suado 2,75 / 68,9%, Tryhard 12,64 / 93,5%; a ordem continua estritamente crescente.
+- **Revisão (Opus):** 1 achado alto (o raio da bala desligava o combate atrás de qualquer cobertura baixa, não só do
+  vidro: 3 tiros contra 48 atrás de um muro de 1 m), 1 médio (a junção com a 7b) e 6 baixos, corrigidos antes da
+  junção. Testes ajustados com o motivo no comentário (`spawnProtectionS: 0` nos que medem outra coisa, as barricadas
+  de 7 para 9 s pela reação).
+- **Contratos:** nenhum mudou. Exports novos do `@boboforces/ai`: `AI_FEEL`, `BOT_PRIMARY_WEIGHTS_EASY`,
+  `easyBotRef`, o `easy` opcional de `botPrimary`, `SoldierBrain.restart()` e `orderHold`. Os 20 goldens com soldados
+  mudaram (re-gravados por cima da fase 6).

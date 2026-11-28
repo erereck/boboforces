@@ -39,12 +39,14 @@ function arena(botZ: number): SimMap {
   };
 }
 
-function duelRecipe(seed = 3): MatchRecipe {
+function duelRecipe(seed = 3, hp?: number): MatchRecipe {
   return {
     format: MATCH_RECIPE_FORMAT,
     mode: 'warfare.tdm',
     map: 'test',
     seed,
+    // M12 (fase 7a): sem a proteção de spawn (o bot não mira no protegido; estes testes são do uso das armas).
+    players: { spawnProtectionS: 0, ...(hp !== undefined ? { hp } : {}) },
     teams: [{ humans: 1, bots: [] }, { bots: [{ ref: builtinBotRef('normal'), count: 1 }] }],
   };
 }
@@ -54,12 +56,13 @@ function botVsDummy(
   primary: number,
   distance: number,
   onEvents: (events: readonly SimEvent[], match: HeadlessMatch) => void,
+  hp?: number,
 ): HeadlessMatch {
   const primaries = new Array<number>(MAX_CONTROLLERS).fill(WEAPON_CODE.rifle);
   primaries[BOT_CONTROLLER_BASE] = primary;
   let self: HeadlessMatch | null = null;
   const match = createHeadlessMatch({
-    recipe: duelRecipe(),
+    recipe: duelRecipe(3, hp),
     map: arena(HUMAN_Z - distance),
     humans: 1,
     primaries,
@@ -118,14 +121,20 @@ describe('uso das armas', () => {
     const switches: number[] = [];
     let pistolShots = 0;
     let rockets = 0;
-    const match = botVsDummy(WEAPON_CODE.rocket, 3, (events, m) => {
-      const bot = m.sim.controllerEntity(BOT_CONTROLLER_BASE);
-      for (const ev of events) {
-        if (ev.type === 'weapon' && ev.action === 'switch' && ev.entity === bot) switches.push(ev.weapon);
-        if (ev.type === 'shot' && ev.shooter === bot && ev.weapon === WEAPON_CODE.pistol) pistolShots++;
-        if (ev.type === 'projectile' && ev.action === 'launch' && ev.owner === bot) rockets++;
-      }
-    });
+    const match = botVsDummy(
+      WEAPON_CODE.rocket,
+      3,
+      (events, m) => {
+        const bot = m.sim.controllerEntity(BOT_CONTROLLER_BASE);
+        for (const ev of events) {
+          if (ev.type === 'weapon' && ev.action === 'switch' && ev.entity === bot) switches.push(ev.weapon);
+          if (ev.type === 'shot' && ev.shooter === bot && ev.weapon === WEAPON_CODE.pistol) pistolShots++;
+          if (ev.type === 'projectile' && ev.action === 'launch' && ev.owner === bot) rockets++;
+        }
+        // M12 (fase 7a): sem a proteção de spawn, a vida alta segura o humano a 3 m (morto, ele renasceria longe).
+      },
+      1000,
+    );
     match.run(6 * SIM_HZ);
     expect(switches).toContain(WEAPON_CODE.pistol);
     expect(pistolShots).toBeGreaterThan(2);

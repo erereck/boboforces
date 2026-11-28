@@ -150,10 +150,12 @@ describe('a Estação Lunar (M10, fase 4)', () => {
   // semente, o 1º aos 17 s). O deque da antena (16 nós) ainda não: no sorteio por andar ele dividia a faixa de 3 m com
   // o anel da estação (623 nós) e quase nunca saía (0 amostras em 90 s nesta semente; 2 de 8 sementes). M11 (fase 2):
   // o passeio sorteia por lugar (piso plano) e o deque tem a mesma vez que o anel: 88 amostras nesta semente, a 1ª aos
-  // 57 s (7 de 8 sementes); o andar de cima segue com bot (465, o 1º aos 34 s).
-  const upperAndDeck = (): { upper: number; deck: number } => {
+  // 57 s (7 de 8 sementes); o andar de cima segue com bot (465, o 1º aos 34 s). M12 (fase 7a, a IA que percebe e mira
+  // como gente): o deque segue com bot em 7 de 8 sementes (1.294 amostras somadas, eram 997), mas a 42 é a que ficou
+  // sem (a 5 passou a ter): o deque olha a 42 e a 1 (230 amostras, a 1ª aos 9 s).
+  const upperAndDeck = (seed = 42): { upper: number; deck: number } => {
     const map = loadMap('moonbase');
-    const match = createHeadlessMatch({ recipe: RECIPES['Times (TDM)']!, map, humans: 0 });
+    const match = createHeadlessMatch({ recipe: { ...RECIPES['Times (TDM)']!, seed }, map, humans: 0 });
     let upper = 0;
     let deck = 0;
     for (let t = 0; t < 90 * 60; t++) {
@@ -177,7 +179,7 @@ describe('a Estação Lunar (M10, fase 4)', () => {
     expect(upperAndDeck().upper).toBeGreaterThan(0);
   }, 120_000);
   it('os bots sobem para o deque da antena', () => {
-    expect(upperAndDeck().deck).toBeGreaterThan(0);
+    expect(upperAndDeck(42).deck + upperAndDeck(1).deck).toBeGreaterThan(0);
   }, 120_000);
 
   for (const [name, recipe] of Object.entries(RECIPES)) {

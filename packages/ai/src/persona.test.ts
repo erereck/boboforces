@@ -81,7 +81,8 @@ function recipe(
     seed: 7,
     teams,
     embeddedBots: [...embeddedBots],
-    ...(players ? { players } : {}),
+    // M12 (fase 7a): o bot não mira em quem tem a proteção de spawn; estes testes medem a personalidade, não ela.
+    players: { spawnProtectionS: 0, ...players },
   };
 }
 

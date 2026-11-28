@@ -76,8 +76,13 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `f46d8eb9`.
  * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `1efd48f4`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `d8768374`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `d40611b6` (13 abates, 157 tiros, 7×6, 4 caixinhas, 7
+ * granadas).
+ * M12 fase 7a (revisão): `a95c9be3` (a bala só contorna o vidro, a reação tira o gatilho, o zumbi a 4 m, a pista no
+ * mesmo andar, só o mato alto esconde: 10 abates, 131 tiros, 4×6, 6 caixinhas, 5 granadas).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `e2933be3`.
  */
-const GOLDEN_HASH = 'd8768374';
+const GOLDEN_HASH = 'e2933be3';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -199,8 +204,12 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * abates, 7 quedas, ainda jogando nos 2 min).
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `e247f81d`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `6ec0ab3d`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `d8dc5313` (onda 3, 39 abates, 4 quedas, ainda jogando nos
+ * 2 min).
+ * M12 fase 7a (revisão): `bbca08d8` (onda 3, 40 abates, 6 quedas, ainda jogando nos 2 min).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `b3672a98`.
  */
-const GOLDEN_ZOMBIES_HASH = '6ec0ab3d';
+const GOLDEN_ZOMBIES_HASH = 'b3672a98';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -257,8 +266,11 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
  * do arremesso rápido no hash; a partida é a mesma).
  * MUDA com a sim, a IA, o mapa ou as regras das janelas: atualize no mesmo commit e diga o motivo no CHANGELOG.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `0f4dc8b0` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `905dedd1` (onda 3, 38 abates, 7 quedas, tábuas 47/14).
+ * M12 fase 7a (revisão): `2b416ecf` (onda 4, 47 abates, 7 quedas, tábuas 32/6).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `e66ae88f`.
  */
-const GOLDEN_POSTO_HASH = '0f4dc8b0';
+const GOLDEN_POSTO_HASH = 'e66ae88f';
 
 function runPostoGolden(): {
   hash: string;
@@ -338,8 +350,11 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
  * (capturas 1/2, o time 1 fecha 200 a 161).
  * MUDA com a sim, a IA, o mapa ou as regras dos pontos: atualize no mesmo commit e diga o motivo no CHANGELOG.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `6ad3515d` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `cc8e4e0f` (capturas 2/3, o time 1 fecha 200 a 94).
+ * M12 fase 7a (revisão): `12967f80` (capturas 2/2, o time 1 fecha 200 a 97).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `ba15abc0`.
  */
-const GOLDEN_DOMINATION_HASH = '6ad3515d';
+const GOLDEN_DOMINATION_HASH = 'ba15abc0';
 const GOLDEN_DOMINATION_TICKS = 10_800;
 
 function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {
@@ -407,9 +422,15 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
  * Infection `8d512cae`. M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4):
  * Infection `0f81a8cf`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): Gun Game `3aede09b`, Infection `d4fcfa0f`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `a56a723d` (Gun Game fecha em 6.163 ticks, níveis 7, 6, 6,
+ * 5, 5, 4, 2, 2).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `1cac2a7a` (Infection: os 8 infectados em 6.273 ticks).
+ * M12 fase 7a (revisão): `b79c2d2b` (Gun Game fecha em 6.325 ticks, níveis 7, 6, 5, 5, 5, 5, 5, 4).
+ * M12 fase 7a (revisão): `468b4eee` (Infection: os 8 infectados em 6.792 ticks).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `4791502b`.
  */
-const GOLDEN_GUNGAME_HASH = '3aede09b';
-const GOLDEN_INFECTION_HASH = 'd4fcfa0f';
+const GOLDEN_GUNGAME_HASH = '4791502b';
+const GOLDEN_INFECTION_HASH = 'ebf3d1ee';
 const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
 
 function runPartyGolden(kind: 'gunGame' | 'infection'): {
@@ -498,8 +519,11 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
  * 8). MUDA com a sim, a IA, o mapa ou as regras.
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `d7a3fab5`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `c55784b5`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `7ec256d2` (pontos 49, 42, 36, 29, 21, 5 Juggs).
+ * M12 fase 7a (revisão): `df0df447` (pontos 65, 55, 49, 9, 4 Juggs).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `ef841fc7`.
  */
-const GOLDEN_JUGGERNAUT_HASH = 'c55784b5';
+const GOLDEN_JUGGERNAUT_HASH = 'ef841fc7';
 
 function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -570,8 +594,11 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `1bf255d5`.
  * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `a43b1644`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `754890c4`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `9e8a42c8` (placar 26×17).
+ * M12 fase 7a (revisão): `a751104a` (placar 26×22).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `56e1918a`.
  */
-const GOLDEN_CHAOS_HASH = '754890c4';
+const GOLDEN_CHAOS_HASH = '56e1918a';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();
@@ -628,8 +655,11 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `ff749be7`.
  * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `cdeef769`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `5f6b04a9`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `7f0c114f` (45×35 em 3 min).
+ * M12 fase 7a (revisão): `0ce50db5` (30×32 em 3 min).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9667fd35`.
  */
-const GOLDEN_PAINTBALL_HASH = '5f6b04a9';
+const GOLDEN_PAINTBALL_HASH = '9667fd35';
 
 function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -678,8 +708,12 @@ describe('golden do Bobo Paintball (M6, fase 5) com bots no Construto', () => {
  * `cfb8db3d` (os zumbis pelo campo até o gerador; onda 3, o gerador cai para 2.541 e a partida acaba). MUDA com a sim, a
  * IA, o mapa ou o gerador.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `e261095d`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `76af425b` (onda 4, o gerador em 3.421, o mínimo 3.185,
+ * ainda jogando).
+ * M12 fase 7a (revisão): `c50f4595` (onda 3, o gerador em 2.751, ainda jogando).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9a36d995`.
  */
-const GOLDEN_FORTRESS_HASH = 'e261095d';
+const GOLDEN_FORTRESS_HASH = '9a36d995';
 
 function runFortressGolden(): { hash: string; wave: number; hp: number; low: number; phase: string } {
   const { map } = loadWorld('posto');
@@ -736,8 +770,12 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
  * ou o gerador.
  * M11 fase 2, revisão (o lugar precisa de 2 colunas em X e em Z e de nós dentro da área jogável): `30d56a36`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `bd3b8396`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `ce513b53` (onda 4, o gerador cai para 2.577; 9 quedas, 1
+ * levantada, 8.524 ticks).
+ * M12 fase 7a (revisão): `0f7ef26d` (onda 4, o gerador cai; 11 quedas, 5 levantadas, 10.300 ticks).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `3683348d`.
  */
-const GOLDEN_FORTRESS_FARM_HASH = 'bd3b8396';
+const GOLDEN_FORTRESS_FARM_HASH = '3683348d';
 const GOLDEN_FORTRESS_FARM_TICKS = 60 * 60 * 15;
 
 function runFortressFarmGolden(): {
@@ -818,8 +856,11 @@ describe('golden do Bobo Zombies Fortress (M11, fase 3) na Fazenda à noite', ()
  * fase 1c (26/11/2026): os bots sobem escada reta e o passeio às vezes sobe: `72bfc919` (o apoio abate 4 soldados da
  * 1ª onda e a partida acaba). MUDA com a sim, a IA ou o mapa.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `f2323599`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `f94561b7` (onda 2, 10 abates do apoio).
+ * M12 fase 7a (revisão): `040b63b1` (onda 2, 11 abates do apoio).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `fef41731`.
  */
-const GOLDEN_HORDE_HASH = 'f2323599';
+const GOLDEN_HORDE_HASH = 'fef41731';
 
 function runHordeGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
   const { map } = loadWorld('base');
@@ -881,8 +922,11 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
  * `a685af0d` (pontos 180, 142, 180 e 172; 42.188 ticks). MUDA com a sim, a IA, o mapa ou as regras.
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `2572d1aa`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `ebeb9baa`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `19c77dc8` (pontos 67, 180, 78, 180 em 32.046 ticks).
+ * M12 fase 7a (revisão): `29caa29d` (pontos 180, 180, 172, 180 em 44.410 ticks).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `fa6e257d`.
  */
-const GOLDEN_JUGG_FIXED_HASH = 'ebeb9baa';
+const GOLDEN_JUGG_FIXED_HASH = 'fa6e257d';
 
 function runJuggFixedGolden(): {
   hash: string;
@@ -949,8 +993,11 @@ describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
  * com a rota: `3a5f0053` (18 × 24). M11 fase 1 (26/11/2026): os poleiros da Base Bobo (as pilhas de 1 e 1,5 m viraram de
  * 2 m e o jipe do hangar andou 0,5 m): `b61757db` (15 × 24). MUDA com a sim, a IA ou o mapa.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `b990aadb` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `078cbfe8` (placar 20×21).
+ * M12 fase 7a (revisão): `78f7fdb8` (placar 16×17).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `989b29f8`.
  */
-const GOLDEN_AIRBASE_HASH = 'b990aadb';
+const GOLDEN_AIRBASE_HASH = '989b29f8';
 
 function runAirbaseGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld('airbase');
@@ -997,8 +1044,11 @@ describe('golden do TDM na Base Bobo (M7, fase 1)', () => {
  * (19/11/2026): `9bf9f851` (12 rodadas, 6 × 6, 6 plantas). M11 fase 1 (26/11/2026): os poleiros da Base Bobo:
  * `6fd11dc0` (12 rodadas, 6 × 6, 4 plantas). MUDA com a sim, a IA ou o mapa.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `fcb91f50` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `30c8240e` (10 rodadas, 7×3, 7 plantas).
+ * M12 fase 7a (revisão): `ff6ed035` (12 rodadas, 6×6, 3 plantas).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9c4fe6b5`.
  */
-const GOLDEN_STRIKE_HASH = 'fcb91f50';
+const GOLDEN_STRIKE_HASH = '9c4fe6b5';
 
 function runStrikeGolden(): { hash: string; rounds: number; wins: string; plants: number; phase: string } {
   const { map } = loadWorld('airbase');
@@ -1055,8 +1105,11 @@ describe('golden do BoboStrike (M7, fase 3) com bots na Base Bobo', () => {
  * reta (o seguidor de rota é o mesmo do loot e da zona) e o passeio às vezes sobe: `5d105b0b` (81 s, 22 com primária).
  * MUDA com a sim, a IA ou o mapa.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `26404c0b` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `d6901c37` (102 s, vencedor 6).
+ * M12 fase 7a (revisão): `4ff46616` (154 s, vencedor 2).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `57069e56`.
  */
-const GOLDEN_ROYALE_HASH = '26404c0b';
+const GOLDEN_ROYALE_HASH = '57069e56';
 
 function runRoyaleGolden(): { hash: string; seconds: number; winner: number; armed: number; phase: string } {
   const { map } = loadWorld('island');
@@ -1115,8 +1168,11 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
  * hash é o mesmo entre execuções. Gravado na fase 5 do M11 (26/11/2026): `64065dca` (140 s, 45 com primária). MUDA
  * com a sim, a IA ou o mapa.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `287beb4a` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `54d688a0` (264 s, vencedor 2).
+ * M12 fase 7a (revisão): `8d6e7f85` (150 s, vencedor 1).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `43552c05`.
  */
-const GOLDEN_ROYALE_GRANDE_HASH = '287beb4a';
+const GOLDEN_ROYALE_GRANDE_HASH = '43552c05';
 
 function runRoyaleGrandeGolden(squad: 'solo' | 'duo'): {
   hash: string;
@@ -1198,8 +1254,11 @@ describe('golden do Bobo Royale Grande (M11, fase 5) com bots no Arquipélago', 
  * M11 fase 1 (os poleiros e o poço do Construto, os poleiros da Base Bobo), sobre a IA da fase 2: `7e341112`.
  * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `0693e3d1`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `35b8e911`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `cea68138` (placar 16×15).
+ * M12 fase 7a (revisão): `d08e6ee7` (placar 15×15).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `b0b1d767`.
  */
-const GOLDEN_ARCADE_HASH = '35b8e911';
+const GOLDEN_ARCADE_HASH = 'b0b1d767';
 
 function runArcadeGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld();
@@ -1239,8 +1298,11 @@ function runArcadeGolden(): { hash: string; score: [number, number] } {
  * com a sim, a IA ou o mapa.
  * M11 fase 1 na integração (as telas da torre com o topo a 11 m, sobre as fases 2 e 4): `aca32899`.
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `2899c199`.
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `c717510f` (29 s, vencedor o time 0).
+ * M12 fase 7a (revisão): `7d0d3d6b` (41 s, vencedor o time 2).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `c225802b`.
  */
-const GOLDEN_SANDBOX_HASH = '2899c199';
+const GOLDEN_SANDBOX_HASH = 'c225802b';
 
 function runSandboxGolden(): {
   hash: string;
@@ -1348,8 +1410,11 @@ describe('golden do Arcade (M8, fechamento) com bots no Construto', () => {
  * Na integração, sobre a IA da fase 2 (o passeio que sobe por lugar): `6df27838` (220 s, 86 abates, 51 armas pegas,
  * 43 depois da volta).
  * M12 fase 6 (o deslize no pouso: o `slideBufferTicks` no estado e no hash): `05b378f8` (a partida é a mesma).
+ * M12 fase 7a (os bots percebem e miram como gente, §23.7): `e785f5cf` (240 s, 85 abates, 48 armas pegas).
+ * M12 fase 7a (revisão): `f8da4234` (239 s, 85 abates, 48 armas pegas).
+ * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `3790f374`.
  */
-const GOLDEN_PICKUPS_HASH = '05b378f8';
+const GOLDEN_PICKUPS_HASH = '3790f374';
 
 interface PickupsGoldenRun {
   hash: string;

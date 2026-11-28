@@ -52,7 +52,10 @@ export const AI_LOD = {
   replanSC: 4,
 } as const;
 
-/** Percepção (gameplay.md §6.3): cone de 120°, alcance = visão da partida, audição por estado do corpo. */
+/**
+ * Percepção (gameplay.md §6.3): cone de 120°, alcance = visão da partida, audição por estado do corpo. M12 (fase 7a):
+ * são os padrões; a regra do bot (`rules.visionDeg`, `visionRange`, `hearing`) muda cada um por cérebro.
+ */
 export const AI_SENSES = {
   viewConeDeg: 120,
   /** Ouve tiro a 50 m, passo correndo a 15 m, andando a 6 m (agachado: nada). */
@@ -66,6 +69,97 @@ export const AI_SENSES = {
   chaseS: 6,
   /** Depois de tomar dano, olha em volta (360°) por este tempo (s). */
   alertS: 1,
+  /**
+   * M12 (fase 7a): o N0 (Zumbi) ouve tiro só até aqui (m) e não ouve passo: investigar sons é do N1 (GDD §4.4.1). Os
+   * raios de audição de todos os níveis ainda multiplicam pela regra `hearing` do bot.
+   */
+  hearShotN0M: 25,
+} as const;
+
+/**
+ * M12 (fase 7a): os bots percebem e miram como gente (ARCHITECTURE §23.7; `senses.ts` e `aim-feel.ts`). Tempos em
+ * segundos, distâncias em metros.
+ */
+export const AI_FEEL = {
+  /** A reação de cada aquisição: × (1 + `reactionJitter`·N(0,1)), presa entre `reactionMinMul` e `reactionMaxMul`. */
+  reactionJitter: 0.15,
+  reactionMinMul: 0.7,
+  reactionMaxMul: 1.5,
+  /** Alvo na borda do cone (mais que `edgeFrac` do meio-cone fora do centro da vista): a reação × `edgeMul`. */
+  edgeFrac: 0.6,
+  edgeMul: 1.4,
+  /** Durante a reação o bot gira a esta fração da velocidade, sem andar, sem pular e sem ADS. */
+  reactingTurnMul: 0.3,
+  /**
+   * O alvo atual fora de vista por mais que `regainGapS`: voltar a ele custa `regainFrac` da reação; `regainHoldFrac`
+   * se o bot segurava o ângulo (tática do N2) e o alvo reaparece a até `regainHoldDeg` da mira.
+   */
+  regainGapS: 0.35,
+  regainFrac: 0.5,
+  regainHoldFrac: 0.25,
+  regainHoldDeg: 10,
+  /** O alvo atual colado (a menos disto, m) não precisa do cone: o bot sente quem passa encostado nele. */
+  touchM: 2,
+  /**
+   * Revisão: o zumbi-alvo a até `touchZombieM` (o `AI_SUPPORT.fightM`) também não precisa do cone (ele faz barulho e
+   * encosta): o bot de apoio larga o reviver para atirar nele mesmo de costas, como antes da fase 7a.
+   */
+  touchZombieM: 4,
+  /**
+   * O erro da mira é um Ornstein-Uhlenbeck (deriva em vez de pular): a cada `errorStepS`, z ← ρ·z + √(1 − ρ²)·N(0,1),
+   * com ρ = `errorRho`; o erro é z × a escala do nível (a mesma de antes: 3× na aquisição até 1× no fim).
+   */
+  errorStepS: 0.1,
+  errorRho: 0.7,
+  /** A velocidade do alvo que o bot estima segue a real com atraso τ = `lagFrac`·reação; a mira vai em pos − (v − v̂)·τ. */
+  lagFrac: 0.3,
+  /**
+   * Revidar quem bate: levou dano de outro inimigo, mais perto que o alvo atual e com linha de visão (até 2 raios, no
+   * máximo a cada `retaliateEveryS`): troca para ele com a reação de `skill.targetSwitchS` e o erro inicial ×
+   * `switchErrorMul` (volta a 1× junto com o fechar da mira).
+   */
+  retaliateEveryS: 0.5,
+  switchErrorMul: 2,
+  /** Rajadas: arma automática acima de `burstMinM`: `burstBase + burstPerHold·triggerHold` tiros e pausa sorteada. */
+  burstMinM: 12,
+  burstBase: 3,
+  burstPerHold: 10,
+  burstPauseMinS: 0.15,
+  burstPauseMaxS: 0.3,
+  /**
+   * Sem fila indiana: indo ao ponto onde ouviu, levou tiro, viu ou pegou o aviso, cada bot desvia `spreadMinM` a
+   * `spreadMaxM` para o lado (o lado e a distância pelo índice), no máximo metade da distância até o ponto.
+   */
+  spreadMinM: 1.5,
+  spreadMaxM: 3,
+  /** O lado do desvio é refeito quando a pista anda mais que isto (m). */
+  spreadRedoM: 2,
+  /**
+   * O passeio que vai ao tiroteio (N1+): um inimigo atirou nos últimos `gunfireRecentS` entre o raio de audição de
+   * tiro e `gunfireMaxM` (× `hearing`): chance `gunfireChance` de passear para um nó a até `gunfireSpreadM` dele.
+   */
+  gunfireRecentS: 2,
+  gunfireMaxM: 120,
+  gunfireChance: 0.5,
+  gunfireSpreadM: 10,
+  /**
+   * O mato esconde (GDD §4.4.1): candidato novo com o corpo numa planta (capim alto, flores, arbusto: cruz que balança
+   * e não tapa a vista) só é notado a `plantRangeMul` do alcance; agachado, `plantCrouchMul` com teto de
+   * `plantCrouchMaxM`; a menos de `plantNearM` ou tendo atirado há até `plantShotS`, normal.
+   */
+  plantRangeMul: 0.5,
+  plantCrouchMul: 0.25,
+  plantCrouchMaxM: 12,
+  plantNearM: 3,
+  plantShotS: 1,
+  /** Conhecimento "sabe a área": a cada `areaEveryS`, sem pista, o ponto do inimigo mais perto ± `areaSpreadM`. */
+  areaEveryS: 10,
+  areaSpreadM: 15,
+  /** Andando com pista a até `lookLastKnownM` e a até `lookLastKnownDeg` do rumo, olha para ela na altura do olho. */
+  lookLastKnownM: 30,
+  lookLastKnownDeg: 100,
+  /** Olhando para a pista, corre com ela a até tantos graus do rumo (com a mira no rumo, até 30°). */
+  lookSprintDeg: 60,
 } as const;
 
 /** Seguidor de caminho (os dois cérebros). */

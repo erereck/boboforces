@@ -63,6 +63,8 @@ describe('N2: granada', () => {
       mode: 'warfare.tdm',
       map: 'test',
       seed: 4,
+      // M12 (fase 7a): sem a proteção de spawn (o bot não mira no protegido; o teste é da granada).
+      players: { spawnProtectionS: 0 },
       teams: [{ humans: 1, bots: [] }, { bots: [{ ref: 'embedded:g', count: 1 }] }],
       embeddedBots: [
         {

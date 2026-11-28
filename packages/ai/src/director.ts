@@ -495,7 +495,13 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
       return n;
     },
     setHumanControlled(controller, human): void {
-      for (let i = 0; i < soldiers.length; i++) if (soldiers[i]!.controller === controller) piloted[i] = human ? 1 : 0;
+      for (let i = 0; i < soldiers.length; i++) {
+        if (soldiers[i]!.controller !== controller) continue;
+        // M12 (fase 7a, revisão): o bot devolvido (Aquário, sofá) recomeça como no renascer: sem o alvo, a reação e a
+        // velocidade estimada velhos de quando o humano pilotava.
+        if (!human && piloted[i] === 1) soldiers[i]!.restart();
+        piloted[i] = human ? 1 : 0;
+      }
       if (controller >= 0 && controller < isHuman.length && isHuman[controller] !== (human ? 1 : 0)) {
         isHuman[controller] = human ? 1 : 0;
         directorRebuild = true;

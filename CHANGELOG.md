@@ -47,6 +47,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   foco, o +/Start que começa, a última escolha lembrada, "Personalizada" e "Oficina" com um nome só, "Reduzir efeitos",
   a Fortaleza com o mapa no nome, o Royale Grande no Surpreenda-me do PC e o logo em blocos no título, o mesmo da
   abertura.
+- **Os bots percebem e miram como gente (fase 7a):** não miram em quem acabou de nascer, perdem você de vista quando
+  você sai do campo de visão deles e levam um tempo visível para reagir, olham para de onde levaram tiro e para os
+  cantos por onde você sumiu, não te enxergam agachado no capim alto, não descarregam o pente no vidro (e atrás de um
+  muro baixo miram na cabeça), erram de um jeito que deriva e atrasa quando você troca de lado, revidam quem bate
+  neles, atiram em rajadas de longe, não andam em fila indiana e vão atrás do barulho de tiroteio; o Pela vibe e o De
+  boa não usam mais foguete, e o cone, o alcance, a audição e o conhecimento do Laboratório passaram a valer.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

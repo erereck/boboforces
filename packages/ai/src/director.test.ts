@@ -160,6 +160,8 @@ describe('BotDirector', () => {
       mode: 'warfare.tdm',
       map: 'test',
       seed: 5,
+      // M12 (fase 7a): sem a proteção de spawn (o bot não mira no protegido; o teste é do orçamento de raios).
+      players: { spawnProtectionS: 0 },
       teams: [
         { humans: 4, bots: [{ ref: builtinBotRef('normal'), count: 1 }] },
         { bots: [{ ref: builtinBotRef('normal'), count: 1 }] },

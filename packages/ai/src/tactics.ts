@@ -1,6 +1,7 @@
 import { entityIndex, NULL_ENTITY, type SimView } from '@boboforces/sim';
 import { AI_COVER, AI_RETREAT } from './config.ts';
 import type { AiContext } from './context.ts';
+import { retaliate } from './senses.ts';
 import type { SoldierBrain, SoldierTiming } from './soldier.ts';
 
 /**
@@ -16,8 +17,10 @@ export const COVER_PHASE = { none: 0, going: 1, holding: 2 } as const;
 const nodePos = new Float64Array(3);
 
 /**
- * Tomou dano: lembra de onde veio (vira e vai ver, em qualquer nível) e, com `useCover`, talvez corra para uma
- * cobertura. A chance cresce com a cautela e com a vida baixa e cai com a agressividade.
+ * Tomou dano: lembra de onde veio (vira e vai ver, em qualquer nível; M12, fase 7a: o `travel` olha para lá enquanto
+ * dura o alerta) e, com `useCover`, talvez corra para uma cobertura. A chance cresce com a cautela e com a vida baixa e
+ * cai com a agressividade. M12 (fase 7a): com o alvo à vista, o dano de outro inimigo mais perto e à vista faz o bot
+ * revidar (`retaliate`: troca de alvo com a reação de `targetSwitchS`).
  */
 export function onDamaged(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): void {
   const view = c.view!;
@@ -29,7 +32,9 @@ export function onDamaged(c: AiContext, b: SoldierBrain, e: number, t: SoldierTi
   b.threatX = view.position[a3]!;
   b.threatY = view.position[a3 + 1]!;
   b.threatZ = view.position[a3 + 2]!;
-  if (!b.targetVisible) {
+  if (b.targetVisible) {
+    retaliate(c, b, e, a, t);
+  } else {
     b.hasLastKnown = true;
     b.lastSeenTick = c.tick;
     b.lastKnownX = b.threatX;
