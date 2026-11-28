@@ -6050,3 +6050,42 @@ As capturas da rodada 36, num Edge headless de verdade, acharam seis defeitos vi
 - **De quebra:** com aliados Pela vibe ou De boa (o padrão da Partida Rápida), o "Vem comigo" respondia "nenhum bot
   obedeceu" sem dizer por quê; agora diz que esses níveis não seguem ordens (`OrderAnswer.lowLevel`, só um contador na
   resposta: a decisão dos bots e o RNG não mudam).
+
+### 23.11 Fechamento do M12 (28/11/2026)
+
+- **O que entrou:** o refino que o Erick pediu (#85), sem modo, mapa ou arma novos: a câmera e a arma na mão (§23.1),
+  a HUD (§23.2), os menus e o fluxo (§23.3), o som (§23.4), o visual (§23.5), a mira, o toque e o movimento (§23.6), os
+  bots que percebem e miram (§23.7) e os bots em grupo, os zumbis e o spawn (§23.8); os mips das texturas gerados no
+  carregamento para caber no teto da primeira partida (§23.9) e os consertos achados nos prints (§23.10).
+- **Como andou (#82):** um levantamento com 9 agentes (8 lendo o código por área, 1 jogando no Edge headless, no mudo)
+  deu ~130 candidatos; o plano juntou os que mudavam a sensação por pouco custo em 8 frentes, cada uma num agente com o
+  próprio worktree. A primeira noite parou no limite de uso com as frentes pela metade; elas retomaram do ponto salvo.
+  Uma revisão do Opus por frente, com os achados de volta à própria frente; os altos: o degrau que dava tranco duplo no
+  cliente online, a fileira do resultado fora da tela, a barra de recarga presa, a pré-rodada da cortina que quebrava
+  testes e cegava a medição, o freio do cerco que deixava o zumbi sem alcançar quem recua e o raio da bala que desligava
+  o combate atrás de muro baixo. A junção foi na ordem 1, 6, 4, 2, 5, 3, 7a, os mips, 7b; dois choques (o campo `feel`
+  das fases 1 e 2; o `acquire` e o giro duplo das fases 7a e 7b) foram resolvidos pelas próprias frentes, juntando o
+  main no ramo delas. Com a 7a, a primeira partida chegou a 999,1 KB de 1.000 e a 7b passava: o recurso anotado no M10
+  (gerar os mips no carregamento) virou a frente extra §23.9 e abriu 56 KB.
+- **O playtest achou o "P1 gira sozinho":** não era o jogo; o Edge headless recebia o mouse do PC pelo pointer lock com
+  `unadjustedMovement` (§23.6). Os roteiros headless pedem o lock comum desde então.
+- **As versões:** `PROTOCOL_VERSION` 15 e `SNAPSHOT_VERSION` 21 (o deslize no pouso, §23.6), `PREDICT_STATE_SIZE` 23;
+  o `.mips.png` deixou de existir (§23.9).
+- **Os goldens** (21; todos re-gravados: o deslize no estado, a IA da 7a e da 7b): TDM `732c3e74`, Zombies `117dbb8a`,
+  Posto `25d66819`, Domination `b6466aeb`, Gun Game `08bd54ae`, Infection `578196ea`, Juggernaut `b6af71cc`, Chaos
+  `d24b9daf`, Paintball `ca9640fd`, Fortress `abdaa211`, Fortress na Fazenda `5a2328d5`, Horda `667a249b`, Jugg Fixo
+  `a12f9f08`, TDM na Base Bobo `989b29f8`, BoboStrike `a2f0ff5b`, Royale `f29f520e`, Royale Grande `d4b23254`, Arcade
+  `79fcc3a7`, Sandbox `ed886cb6`, armas no mapa `f52131cc`. O `npm run balance` segue em ordem estritamente crescente.
+- **O custo:** `PERF.md` §1u (pareado com o M11: no ruído; a IA nova ~+5% no Construto). O menu da web: 338,7 KB de
+  350; a primeira partida: 947,2 KB de 1.000. 2.652 testes.
+- **Os prints:** a rodada 36 (seções 146 a 151, as perguntas AM1 a AM13), na versão 40 da página das rodadas.
+- **Fica para depois:**
+  - medir no console a cortina (as travadas atrás do preto), os mips no carregamento (~60 ms num quadro do loading
+    sem JIT) e a IA nova;
+  - a escuta do som (AM12): nada da fase 4 foi ouvido;
+  - o bloom falso nas luzes (§23.5) e a quina de porta (§23.6);
+  - o deque da antena da Lua: os bots caem da rampa de 2 m sem corrimão lateral (do mapa);
+  - os bots trocando de arma entre vidas (AM6, "Ainda não");
+  - o aliado colado na câmera: o caso real não apareceu em print depois do conserto (o caminho foi provado com o
+    limiar forçado);
+  - os prints que faltaram: "ABATE DUPLO" e "3 SEGUIDOS", a faixa VITÓRIA, o nascer no Ringue.

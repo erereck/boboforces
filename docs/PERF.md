@@ -537,6 +537,36 @@ nas mesmas condições (`local/m11/medir-ab.ts`).
 - **O Fortress na Fazenda** (4 bots de apoio): 0,096 / 0,566, na faixa do Zombies na Fazenda do §1r.
 - **O Royale Grande:** §1s.
 
+## 1u. O que o M12 (o refino) pôs na partida (fechamento; 28/11/2026, 0.0.1 local, i5-12450H)
+
+Sim + IA por tick, headless (Node com JIT), semente 42, 600 ticks de aquecimento e 3.600 medidos, pareado com uma cópia
+do código do M11 (`1088241`), alternando, nas mesmas condições (`local/m11/medir-ab.ts`, a máquina sem as frentes).
+
+| Caso (TDM 4×4 Normal) | M12 média / p99 (ms) | M11 média / p99 (ms) |
+|---|---|---|
+| Construto | 0,052 / 0,239 · 0,049 / 0,232 | 0,047 / 0,243 · 0,045 / 0,236 |
+| Estação Lunar | 0,051 / 0,262 · 0,051 / 0,274 | 0,049 / 0,271 · 0,050 / 0,248 |
+| Galpão | 0,048 / 0,283 · 0,049 / 0,274 | 0,045 / 0,246 · 0,051 / 0,331 |
+
+- **A IA nova (fases 7a e 7b):** a percepção, a mira e as vagas custam uns +5% na média no Construto (~0,003 ms por
+  tick), no ruído nos outros. O `bench:sim` da fase 7a deu de +3 a +15% por tick (dock-12, 1p-24, stress-48), com
+  ruído de ±10%; os raios por bot no golden do M1 caíram de 35,5 para 34,0 por segundo (o protegido e o alvo fora do
+  cone não gastam raio).
+- **O Royale Grande** (`local/m11/medir-grande.ts 48 180 1`, a mesma rodada): só bots, média 0,170 / p99 1,140 ms
+  (M11: 0,157 / 0,982); com 1 humano parado, 0,130 / 0,927 (M11: 0,143 / 1,063). O 1º tick com o índice de lugares já
+  montado (fase 7b: no loading) cai de ~80 ms de pico para ~4 ms; no headless sem o loading o índice continua no 1º tick.
+- **O 1º tick** (fase 7b, Node): Construto ~21 → 9,6 ms (o índice, 11–12 ms, foi para o loading); Royale Grande 85–136
+  → 17–18 ms (57–61 ms no loading).
+- **As texturas** (os mips no carregamento, §23.9): a primeira partida da web 992,1 → 935,9 KB (947,2 KB no fim do M12,
+  com tudo); a etapa de texturas sem JIT ~1,5 → ~62 ms, a decodificação das tiras ~208 → ~128 ms (−19 ms no total); no
+  Edge, `texturas` 19–26 → 37–44 ms e `assets` 225–243 → 199–204 ms.
+- **O som** (fase 4): 14 sons sintetizados a mais (53 no total); a síntese no Node com JIT foi de 181 para 109 ms (as
+  notas por tabela barateiam as antigas); sem JIT, de 2,72 para 3,06 s. O corte do silêncio do começo dos MP3 custa de
+  0,01 a 0,05 ms por som.
+- **A cortina** (fase 5): a travada do 1º uso dos programas continua, mas cai atrás do preto (a pré-rodada de até 20
+  quadros ou 0,5 s); o item 15 do T0 conta à parte as travadas da cortina (`travadas_cortina`). Medir no console.
+- **O menu da web:** 338,7 KB de 350 (o logo em blocos e as entradas animadas, +2,3 KB; a HUD, o som e a mira, +1,4 KB).
+
 ## 2. Frame no aparelho (painel F2)
 
 | Data | Build | Aparelho | Cena | Viewports | Bots | FPS p50/p90 | ms sim / IA / render / UI | Draw calls (por viewport) | Triângulos | Programas | Heap / maior pausa de GC | Observação |

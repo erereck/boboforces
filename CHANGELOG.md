@@ -6,7 +6,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 
 ## [Não lançado] — 0.0.1 — Primeiro Bloco
 
-### M12: o refino
+### M12: o refino (fechado em 28/11/2026)
 
 - **Plano** em `docs/PLANO_M12.md` (#85): uma etapa só de refino do que já existe, achado por um levantamento com
   agentes lendo o código e jogando: a câmera e a arma na mão, a HUD, os menus, o som, o visual, a mira e o toque, e os
@@ -63,6 +63,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   bots repetidos ganham número no nome ("Chill Bob 2"); e a partida começa sem o engasgo do primeiro instante, porque o
   mapa de lugares dos bots agora é montado na tela de carregamento.
 - **Os consertos achados nos prints (rodada 36):** o confete e os blocos do próprio headshot não enchem mais a câmera da morte, o aliado colado não vira um bloco na tela, o pente da recarga aparece caindo, a faixa do fim do Zombies solo fala no singular, o "R recarrega" aparece com o pente baixo, a contagem não deixa ver o marcador por trás e o "Vem comigo" explica que bots Pela vibe e De boa não seguem ordens.
+- **Fechamento do M12 (fase 8):** o portão verde (2.652 testes), a rodada de prints 36 (a câmera e a arma, a HUD, os menus, o visual, os bots e o som, com as perguntas AM1–AM13) e o custo medido (PERF §1u: pareado com o M11, no ruído). Todos os goldens mudaram (o deslize no pouso e a IA nova); o online foi para o protocolo 15.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

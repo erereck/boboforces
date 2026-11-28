@@ -86,6 +86,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
 8. **Fechamento:** o portão, a rodada de prints 36, os consertos que ela achar, o `CHANGELOG`, a `ARCHITECTURE` (§23)
    e o `PERF`.
    - **os consertos dos prints, feitos em 28/11** (ARCHITECTURE §23.10): a lente limpa, o aliado colado, o pente visível, a faixa do Zombies solo, o "R recarrega" e a contagem.
+   - **feita em 28/11** (ARCHITECTURE §23.11, PERF §1u): a rodada de prints 36 (seções 146 a 151) e os consertos dela.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 
@@ -102,3 +103,5 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
 | AM9 | **O fim da partida:** a faixa VITÓRIA/DERROTA e uma câmera lenta de 0,8 s no último abate (só offline). | Assim |
 | AM10 | **O toque:** o ADS passa a alternar por padrão (só em instalações novas) e o joystick segue o dedo. | Assim |
 | AM11 | **As sequências em texto** ("ABATE DUPLO", "3 SEGUIDOS", "VINGANÇA", "NA CABEÇA"), secas, sem voz. | Assim |
+| AM12 | **A mixagem do som** (fase 4): nada foi ouvido pelo Claude (os prints rodam no mudo): a variação dos tiros, as vinhetas de 3 s, o abafado da morte e da explosão, o vento e os grilos. | Ouvir e dizer |
+| AM13 | **A sensibilidade na mira** (fase 6): ×1 = a tela anda na mira como fora dela, em qualquer zoom (antes 0,7 fixo; na sniper a mira corria 2,8× mais). Quem tinha mudado o ajuste sente diferença. | Assim |
