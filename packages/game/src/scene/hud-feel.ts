@@ -65,6 +65,8 @@ export const HUD_FEEL = {
   /** Fim da partida: a câmera lenta (offline, fora do Aquário) a 0,35× por 0,8 s. */
   endSlowMul: 0.35,
   endSlowS: 0.8,
+  /** M12 (fase 2, prints): o "R recarrega" aparece depois deste tempo sem atirar, com o pente a ≤ 25%. */
+  reloadQuietS: 0.6,
   /** Resultado: travado (esmaecido) por 0,5 s; as linhas entram 40 ms uma depois da outra; os números contam em 0,4 s. */
   resultLockS: 0.5,
   resultRowMs: 40,
@@ -131,6 +133,15 @@ export interface HudFeel {
   lastPoints: number;
   /** O maior tempo de renascer visto nesta morte (a barra que esvazia). */
   respawnMax: number;
+  /**
+   * O "R recarrega" (`reloadPrompt`): a arma e o pente do quadro anterior, quando foi o último tiro (no `clock`), se
+   * ele está na tela e se já saiu neste pente.
+   */
+  rpWeapon: number;
+  rpClip: number;
+  rpSince: number;
+  rpShowing: boolean;
+  rpDone: boolean;
   /** A entidade que a vista seguia no último preenchimento (outra = esquece tudo: o Aquário troca de bobo). */
   entity: number;
   /** A faixa do fim desta vista ("VITÓRIA!") e a cor dela; `''` = jogando. */
@@ -166,6 +177,11 @@ export function createHudFeel(): HudFeel {
     gainCount: 0,
     lastPoints: -1,
     respawnMax: 0,
+    rpWeapon: -1,
+    rpClip: 0,
+    rpSince: 0,
+    rpShowing: false,
+    rpDone: false,
     entity: NULL_ENTITY,
     endText: '',
     endColor: 0,
@@ -186,6 +202,9 @@ export function resetHudFeel(f: HudFeel): void {
   f.gainCount = 0;
   f.lastPoints = -1;
   f.respawnMax = 0;
+  f.rpWeapon = -1;
+  f.rpShowing = false;
+  f.rpDone = false;
 }
 
 /** O seu tiro acertou (a regra da partida pode desligar o hitmarker: quem chama decide). `zero` = sem dano. */
@@ -658,4 +677,39 @@ export function reloadProgress(
   if (!reloading) return -1;
   if (perRound) return clipSize > 0 ? clamp01(clip / clipSize) : 0;
   return startS >= 0 ? clamp01((nowS - startS) / Math.max(0.1, durS)) : 0;
+}
+
+/**
+ * M12 (fase 2, prints): o "R recarrega" (a sim recarrega sozinha com o pente vazio, então "vazio e parado" quase nunca
+ * acontece). Aparece com o pente a ≤ 25%, reserva, sem recarregar e sem atirar há `reloadQuietS`; uma vez por pente:
+ * um tiro com ele na tela o tira até a próxima recarga ou troca de arma. Chame a cada quadro com a arma na mão
+ * (`weapon` = o código; -1 = nenhuma). Devolve se mostra.
+ */
+export function reloadPrompt(
+  f: HudFeel,
+  weapon: number,
+  clip: number,
+  clipSize: number,
+  reserve: number,
+  reloading: boolean,
+): boolean {
+  if (weapon !== f.rpWeapon || reloading || clip > f.rpClip) {
+    // Arma nova, recarregando ou o pente encheu: começa de novo.
+    f.rpWeapon = weapon;
+    f.rpShowing = false;
+    f.rpDone = false;
+    f.rpSince = f.clock;
+  } else if (clip < f.rpClip) {
+    // Um tiro: zera a espera; com o aviso na tela, ele sai e não volta neste pente.
+    f.rpSince = f.clock;
+    if (f.rpShowing) {
+      f.rpShowing = false;
+      f.rpDone = true;
+    }
+  }
+  f.rpClip = clip;
+  const low = weapon >= 0 && clipSize > 0 && clip * 4 <= clipSize && reserve > 0 && !reloading;
+  if (!low) f.rpShowing = false;
+  else if (!f.rpShowing && !f.rpDone && f.clock - f.rpSince >= HUD_FEEL.reloadQuietS) f.rpShowing = true;
+  return f.rpShowing;
 }

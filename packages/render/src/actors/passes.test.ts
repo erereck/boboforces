@@ -29,6 +29,7 @@ import {
 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { createFxPass } from '../fx/index.ts';
+import { FX_NEAR_CUT_M } from '../fx/fx-pass.ts';
 import {
   createFxQueue,
   pushActorImpact,
@@ -385,6 +386,37 @@ describe('passe dos atores (three sem GPU)', () => {
     pass.dispose();
   });
 
+  it('M12 (prints): o boneco colado na câmera da vista some nela (até 2), menos o da própria vista', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    pass.setModels([rifle]);
+    const a = figureActors();
+    // A câmera do `viewContext` fica em (0; 1,6; 5). 0: o da vista (o próprio, colado); 1: colado ao lado (0,5 m), com
+    // a cabeça na altura da câmera; 2: morto (fora do desenho).
+    a.position.set([0, 0, 5.1], 0);
+    a.position.set([0.5, 0, 5], 3);
+    a.position.set([0.3, 0, 4.8], 6);
+    a.scale.fill(1);
+    pass.setActors(a);
+    pass.setFigures(templates, table);
+    pass.update(frame(0));
+    const view = createViewDesc();
+    view.localSlot = 0;
+    pass.beforeView(viewContext(view));
+    const uniforms = (mesh(ctx.scene, 'bobos').material as ShaderMaterial).uniforms;
+    const h0 = uniforms['uNearHide0']!.value as Vector4;
+    const h1 = uniforms['uNearHide1']!.value as Vector4;
+    expect([h0.x, h0.y]).toEqual([0.5, 5]);
+    expect(h0.z).toBeCloseTo(0.81, 5);
+    expect(h1.z).toBe(0);
+    // A 3 m: nada some.
+    a.position.set([3, 0, 5], 3);
+    pass.update(frame(1 / 60));
+    pass.beforeView(viewContext(view));
+    expect(h0.z).toBe(0);
+    pass.dispose();
+  });
+
   it('M12 (revisão): o teto de grupos de props da vista corta junto os discos das props escondidas', () => {
     const { ctx } = fakeContext();
     const pass = createActorPass(ctx);
@@ -421,6 +453,23 @@ describe('passe dos atores (three sem GPU)', () => {
 });
 
 describe('passe de VFX (three sem GPU)', () => {
+  it('M12 (prints): os VFX do mundo têm o corte da lente (0,6 m); os atores e as sombras, não', () => {
+    const { ctx } = fakeContext();
+    const fx = createFxPass(ctx);
+    const actors = createActorPass(ctx);
+    const cut = (name: string): number =>
+      (mesh(ctx.scene, name).material as ShaderMaterial).uniforms['uNearCut']!.value as number;
+    expect(cut('fx-alfa')).toBe(FX_NEAR_CUT_M);
+    expect(cut('fx-aditivo')).toBe(FX_NEAR_CUT_M);
+    expect(cut('desmonte-bonecos')).toBe(FX_NEAR_CUT_M);
+    expect(cut('cubinhos')).toBe(FX_NEAR_CUT_M);
+    // O material dos atores desenha também o viewmodel, colado na câmera: sem o corte.
+    expect(cut('bobos')).toBe(0);
+    expect(cut('sombra-blob')).toBe(0);
+    fx.dispose();
+    actors.dispose();
+  });
+
   it('consome a fila, divide os programas e some sozinho; ≤ 5 malhas no mundo', () => {
     const { ctx, calls } = fakeContext();
     const actors = createActorPass(ctx);
@@ -643,6 +692,61 @@ describe('bonecos do FutBobo nos passes (#56, three sem GPU, rig real da F4)', (
       if (m instanceof ShaderMaterial) shaders.add(m.vertexShader + m.fragmentShader + JSON.stringify(m.defines));
     });
     expect(shaders.size).toBe(2);
+    fx.dispose();
+    actors.dispose();
+  });
+
+  it('M12 (prints): o desmonte da vítima que é a vista local some na câmera da morte dela (a do confete na lente)', () => {
+    const { ctx } = fakeContext();
+    const actors = createActorPass(ctx);
+    const fx = createFxPass(ctx);
+    actors.setModels([rifle]);
+    const a = figureActors();
+    actors.setActors(a);
+    actors.setFigures(templates, table);
+    fx.setFigures(templates);
+    actors.update(frame(0));
+    fx.update(frame(0));
+    const q = createFxQueue(8);
+    const death = {
+      victim: a.entity[0]!,
+      x: 0,
+      y: 0,
+      z: 0,
+      yaw: 0,
+      dirX: 0,
+      dirY: 0,
+      dirZ: -1,
+      force: 6,
+      bodyPart: FIGURE_BONE.head,
+      skin: 90,
+      scale: 1,
+      kind: 0,
+      figure: 0,
+      headshot: true,
+      ownerSlot: 0,
+    };
+    // O tiro na cabeça dela (a vista 0) antes: os cubinhos do acerto nascem no olho dela.
+    pushActorImpact(q, a.entity[0]!, 0, 1.6, 0, 0, 0, -1, FIGURE_BONE.head, 5, 0);
+    pushDeath(q, death);
+    fx.submit(q);
+    actors.update(frame(1 / 60));
+    fx.update(frame(1 / 60));
+    const slotOf = (name: string): number =>
+      (
+        (mesh(ctx.scene, name).geometry.getAttribute('iLayer') as InterleavedBufferAttribute).data.array as Float32Array
+      )[INST.slot]!;
+    // As caixas do desmonte e os cubinhos (do acerto e do desmonte) levam a vista dela (o shader esconde no
+    // `uHideSlot` = 0 da câmera da morte).
+    expect(slotOf('desmonte-bonecos')).toBe(0);
+    expect(slotOf('cubinhos')).toBe(0);
+    // O confete (quadrado, tipo 1) leva o dono 0: código 1 + 16 · (0 + 1).
+    const pe = (mesh(ctx.scene, 'fx-alfa').geometry.getAttribute('pE') as InterleavedBufferAttribute).data
+      .array as Float32Array;
+    const codes = new Set<number>();
+    for (let k = 0; k < 40; k++) codes.add(Math.round(pe[k * 24 + 18]!));
+    expect(codes.has(1 + 16)).toBe(true);
+    expect(codes.has(1)).toBe(false);
     fx.dispose();
     actors.dispose();
   });

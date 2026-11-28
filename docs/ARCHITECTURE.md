@@ -6023,3 +6023,30 @@ no carregamento.
 - **Contratos:** `LoadingTimes.aiIndex`, a fase `'aiIndex'` do loader, `prepareNavLevels`/`PlaceArea`/`coverThreat`
   exportados, `MATCH_DEFAULTS.ffaSpawnIdealDistM`; o config morto das ordens e da dancinha saiu. Os goldens (19 de 21)
   foram re-gravados sobre a 7a e a fase 6; o TDM na Base Bobo não mudou.
+
+### 23.10 Os consertos achados nos prints (28/11/2026)
+
+As capturas da rodada 36, num Edge headless de verdade, acharam seis defeitos visíveis:
+
+- **A lente limpa** (`render/src/fx/fx-pass.ts`, `actors/actor-pass.ts`, `actors/shader.ts`, `fx/shader.ts`): quando o
+  próprio jogador levava headshot, a câmera da morte (no olho da vítima) enchia a tela de confete gigante e de blocos
+  do desmonte. O desmonte, os cubinhos e o confete de quem é uma vista local levam a vista dela
+  (`FxDeath.ownerSlot` no `data[14]`, `pushActorImpact(…, ownerSlot)` no `data[8]`) e somem na câmera da morte dela; as
+  outras vistas veem. Os VFX do mundo a menos de 0,6 m da câmera somem (`uNearCut` nos programas 4 e 5; nem o material
+  dos atores nem o clarão do viewmodel). Sem programa novo.
+- **O aliado colado na câmera:** um aliado colado no jogador virava um bloco grande na vista (no nascer do Construto).
+  Por vista, outro boneco com a origem de um osso ou a arma na mão a menos de 0,8 m da câmera some com a arma
+  (`uNearHide0/1`, até 2 por vista); o da própria vista continua (a 3ª pessoa).
+- **O pente da recarga** (`dropMagazine`, `VIEW_FEEL.magScreen*`): nascia no soquete `mag`, atrás do viewmodel, que é
+  desenhado por cima do mundo, e não aparecia. O soquete é projetado pela câmera do viewmodel e levado, na tela, para a
+  esquerda da arma e logo abaixo da mira; o cubinho de 6 cm nasce ali a 0,9 m pela câmera do mundo e cai por ~0,3 s.
+- **A faixa do fim do Zombies solo** dizia "CAÍRAM NA ONDA 1" e o resultado "Caiu na onda 1": a faixa usa a mesma
+  escolha do resultado (`result.zombiesLossSolo` com 1 jogador).
+- **O "R recarrega" quase nunca aparecia:** a sim recarrega sozinha o pente vazio, então "pente vazio sem recarregar"
+  só valia por instantes. Agora aparece com o pente a ≤ 25%, reserva, sem recarregar e 0,6 s sem atirar, uma vez por
+  pente (`reloadPrompt` em `hud-feel.ts`).
+- **O marcador sobre a contagem:** o chevron de um aliado aparecia pela plaquinha da contagem (70%): a caixa da contagem
+  e do "VALENDO!" foi a 95%.
+- **De quebra:** com aliados Pela vibe ou De boa (o padrão da Partida Rápida), o "Vem comigo" respondia "nenhum bot
+  obedeceu" sem dizer por quê; agora diz que esses níveis não seguem ordens (`OrderAnswer.lowLevel`, só um contador na
+  resposta: a decisão dos bots e o RNG não mudam).

@@ -34,10 +34,12 @@ export interface OrderAnswer {
   obeyed: number;
   /** M8 (fase 6, revisão): o Ataca ali sem chão no ponto (mirando o céu ou o vazio): ninguém ouviu. */
   nowhere: boolean;
+  /** M12 (fase 2, prints): dos que ouviram, quantos são de nível baixo demais para ordens (N0 e N1 sempre recusam). */
+  lowLevel: number;
 }
 
 export function createOrderAnswer(): OrderAnswer {
-  return { tick: -1, order: 0, asked: 0, obeyed: 0, nowhere: false };
+  return { tick: -1, order: 0, asked: 0, obeyed: 0, nowhere: false, lowLevel: 0 };
 }
 
 /** A chance de obedecer a ordem: a lealdade, com os cortes do Covarde no Ataca ali e do Camper no Vem comigo. */

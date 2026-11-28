@@ -85,6 +85,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    - **7b feita em 28/11** (ARCHITECTURE §23.8): os bots em grupo, os zumbis que cercam, o spawn (FFA perto da ação, olhando o lado aberto), os nomes numerados e o índice de lugares no loading.
 8. **Fechamento:** o portão, a rodada de prints 36, os consertos que ela achar, o `CHANGELOG`, a `ARCHITECTURE` (§23)
    e o `PERF`.
+   - **os consertos dos prints, feitos em 28/11** (ARCHITECTURE §23.10): a lente limpa, o aliado colado, o pente visível, a faixa do Zombies solo, o "R recarrega" e a contagem.
 
 ## Perguntas para o Erick (sigo no padrão enquanto ele não responde)
 

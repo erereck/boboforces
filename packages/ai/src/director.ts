@@ -363,6 +363,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     answer.asked = 0;
     answer.obeyed = 0;
     answer.nowhere = false;
+    answer.lowLevel = 0;
     const e = ctx.ctrlToEntity[c]!;
     if (order > ORDER.cover || e < 0 || !ctx.living(e)) return;
     // A mira do próprio quadro da ordem (a da `SimView` é a do tick anterior; o ping da sim usa a do quadro).
@@ -398,6 +399,7 @@ export function createBotDirectorWithPaths(config: BotDirectorConfig, api: NavPa
     for (let k = 0; k < n; k++) {
       const b = soldiers[pickIdx[k]!]!;
       answer.asked++;
+      if (b.intelligence.level < AI_ORDERS.minIntelligence) answer.lowLevel++;
       if (!obeys(orderRng, b, order, e, view.generation[e]!, view.tick, hz)) continue;
       takeOrder(b, order, e, view.generation[e]!, orderAt, until);
       answer.obeyed++;

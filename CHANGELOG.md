@@ -62,6 +62,7 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   da vista de quem quer que seja; ninguém nasce mais de cara para a parede; o Palhaço só comemora de vez em quando; os
   bots repetidos ganham número no nome ("Chill Bob 2"); e a partida começa sem o engasgo do primeiro instante, porque o
   mapa de lugares dos bots agora é montado na tela de carregamento.
+- **Os consertos achados nos prints (rodada 36):** o confete e os blocos do próprio headshot não enchem mais a câmera da morte, o aliado colado não vira um bloco na tela, o pente da recarga aparece caindo, a faixa do fim do Zombies solo fala no singular, o "R recarrega" aparece com o pente baixo, a contagem não deixa ver o marcador por trás e o "Vem comigo" explica que bots Pela vibe e De boa não seguem ordens.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

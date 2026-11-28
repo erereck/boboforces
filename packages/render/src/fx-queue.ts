@@ -45,14 +45,16 @@ export const FX_STRIDE = 16;
  *   (M9: a escala do corpo de quem atirou, o Mini e o gigante; 0 = 1)
  * - tracer: 0–2 início, 3–5 fim, 6 estilo (`TRACER_STYLE`; M9: o do Ricochete é mais grosso, claro e demorado)
  * - impactBlock: 0–2 ponto, 3–5 normal, 6 id local do bloco, 7 face (`NORMAL_TABLE`), 8 cubinhos
- * - impactActor: 0–2 ponto, 3–5 direção do tiro, 6 osso atingido (`FigurePart`, 0..11), 7 cubinhos; `entity` = alvo
+ * - impactActor: 0–2 ponto, 3–5 direção do tiro, 6 osso atingido (`FigurePart`, 0..11), 7 cubinhos, 8 vista local do
+ *   alvo + 1 (M12: os cubinhos somem na vista dele; 0 = nenhuma); `entity` = alvo
  * - impactProp: 0–2 ponto, 3–5 normal, 6 prop atingida (índice em `RenderMap.props` = ordem do `.bfmap`; o `game`
  *   resolve `StaticColliders.owner[ImpactEvent.prop]`), 7 cubinhos
  * - debris: 0–2 ponto, 3–5 velocidade (m/s), 6 cor 0xRRGGBB (exata em float32), 7 cubinhos, 8 espalhamento (m/s),
  *   9 lado do cubinho (m; M12: 0 = 0,06) e 10 vida (s; M12: 0 = 2)
  * - death: 0–2 pés (m), 3 yaw, 4–6 direção do golpe, 7 força (m/s), 8 osso do golpe final, 9 camada da skin,
  *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum), 13 tiro na cabeça (M12:
- *   1 = a cabeça voa com confete); `entity` = vítima
+ *   1 = a cabeça voa com confete), 14 vista local da vítima (M12: o desmonte some na câmera da morte dela; −1 =
+ *   nenhuma); `entity` = vítima
  * - explosion (M2): 0–2 centro (m), 3 raio (m)
  * - trail (M2): 0–2 posição (m), 3–5 direção de voo (unitária; a fumaça sai para trás)
  * - paintBall (M6): 0–2 posição (m), 6 cor 0xRRGGBB
@@ -187,6 +189,7 @@ export function pushActorImpact(
   dirZ: number,
   bodyPart: number,
   cubes: number,
+  ownerSlot = -1,
 ): boolean {
   const o = slot(q, FX_KIND.impactActor, target);
   if (o < 0) return false;
@@ -194,6 +197,7 @@ export function pushActorImpact(
   put3(q.data, o + 3, dirX, dirY, dirZ);
   q.data[o + 6] = bodyPart;
   q.data[o + 7] = cubes;
+  q.data[o + 8] = ownerSlot + 1;
   return true;
 }
 
@@ -267,6 +271,11 @@ export interface FxDeath {
   readonly figure: number;
   /** M12 (fase 5): tiro na cabeça: a cabeça voa mais alto, girando, com confete (ausente = não). */
   readonly headshot?: boolean;
+  /**
+   * M12 (consertos dos prints): a vista local de quem morreu (0..3; ausente ou -1 = nenhuma): o desmonte, os cubinhos e
+   * o confete somem na câmera da morte dele (nasciam na lente).
+   */
+  readonly ownerSlot?: number;
 }
 
 /** Pede o desmonte. `d` pode ser um objeto de rascunho reaproveitado (não é guardado). */
@@ -284,6 +293,7 @@ export function pushDeath(q: FxQueue, d: Readonly<FxDeath>): boolean {
   a[o + 11] = d.kind;
   a[o + 12] = d.figure;
   a[o + 13] = d.headshot === true ? 1 : 0;
+  a[o + 14] = d.ownerSlot ?? -1;
   return true;
 }
 

@@ -25,7 +25,7 @@ import { MAX_BLOCK_ID, sampleLightGrid, type LightGrid } from '@boboforces/world
 import { Group, PerspectiveCamera, Scene, type InstancedMesh } from 'three';
 import { buildFigureCubeGeometry } from '../actors/figure-cube.ts';
 import { FIGURE_BONE_FLOATS } from '../actors/figure-instances.ts';
-import { ACTOR_SKY_FLOOR, INSTANCE_FLOATS } from '../actors/layout.ts';
+import { ACTOR_SKY_FLOOR, INSTANCE_FLOATS, NO_SLOT } from '../actors/layout.ts';
 import { findActor, linkFor } from '../actors/link.ts';
 import { MAT4 } from '../actors/math.ts';
 import {
@@ -107,6 +107,8 @@ const CONFETTI = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff, 0xffd23f, 0xff6fb5, 0x
 /** M2: cores dos cubinhos da explosão (carvão, cinza e laranja da paleta mestra). */
 const EXPLOSION_CUBES = [0x2c2f3b, 0x454955, 0x9a4f30, 0xc4723f] as const;
 
+/** M12 (consertos dos prints): VFX do mundo a menos disto (m) da câmera somem (partícula e cubinho/desmonte). */
+export const FX_NEAR_CUT_M = 0.6;
 /** M12 (fase 5): confetes que saem da cabeça no tiro na cabeça. */
 const HEADSHOT_CONFETTI = 14;
 /** M12 (fase 5): a marca chamuscada da explosão (diâmetro = isto × raio, presa a [mín, máx] m) e até onde o chão conta. */
@@ -135,6 +137,10 @@ export function createFxPass(ctx: PassContext): FxPass {
   const perView = createInstancedUniforms();
   const material = createInstancedMaterial(ctx, perView, 'instanciado-fx');
   const pUniforms = createParticleUniforms();
+  // M12 (consertos dos prints): nada dos VFX do mundo encosta na lente (o confete do tiro na cabeça e a cabeça voando
+  // nasciam na câmera da morte); o clarão do viewmodel tem uniforms próprios, sem o corte.
+  perView.uNearCut.value = FX_NEAR_CUT_M;
+  pUniforms.uNearCut.value = FX_NEAR_CUT_M;
   const additive = createParticleMaterial(ctx, pUniforms, 'additive');
   const alpha = createParticleMaterial(ctx, pUniforms, 'alpha');
   const decal = createParticleMaterial(ctx, pUniforms, 'decal');
@@ -270,8 +276,15 @@ export function createFxPass(ctx: PassContext): FxPass {
       rng.range(0, 6.28),
       rng.range(0, 6.28),
       rng.range(-12, 12),
+      cubeSlot,
     );
   }
+  /**
+   * M12 (consertos dos prints): a vista local em que os cubinhos e o confete do desmonte atual somem (a câmera da morte
+   * de quem morreu: nasciam na lente); `NO_SLOT` / −1 fora do desmonte.
+   */
+  let cubeSlot: number = NO_SLOT;
+  let particleOwner = -1;
 
   /**
    * M12 (fase 5): o chão embaixo de (x, y, z) até `maxDown` m: a altura em `groundY` e a cor do texel do topo do bloco
@@ -537,7 +550,21 @@ export function createFxPass(ctx: PassContext): FxPass {
     return binding ? binding.debrisColor : FALLBACK_DEBRIS_COLOR;
   }
 
+  /**
+   * M12 (consertos dos prints): o acerto em quem é uma vista local (o tiro na cabeça nasce no olho dele, e a câmera da
+   * morte fica ali): os cubinhos e a nuvem somem na vista dele; as outras veem.
+   */
   function actorImpact(i: number, o: number, frame: FrameContext): void {
+    // A vista vem no pedido (o tiro que mata chega com a vítima já fora do `ActorBuffer`).
+    const slot = Math.round(pending.data[o + 8]!) - 1;
+    cubeSlot = slot >= 0 && slot < 4 ? slot : NO_SLOT;
+    particleOwner = slot >= 0 && slot < 4 ? slot : -1;
+    actorImpactBody(i, o, frame);
+    cubeSlot = NO_SLOT;
+    particleOwner = -1;
+  }
+
+  function actorImpactBody(i: number, o: number, frame: FrameContext): void {
     const d = pending.data;
     const x = d[o]!;
     const y = d[o + 1]!;
@@ -623,6 +650,7 @@ export function createFxPass(ctx: PassContext): FxPass {
   function puff(x: number, y: number, z: number): void {
     resetParticleSpec(spec);
     lit();
+    spec.owner = particleOwner;
     spec.kind = PARTICLE_KIND.round;
     spec.x = x;
     spec.y = y;
@@ -743,17 +771,27 @@ export function createFxPass(ctx: PassContext): FxPass {
 
   function death(o: number, frame: FrameContext): void {
     const d = pending.data;
+    // M12 (consertos dos prints): a vítima é a vista local s: o desmonte, os cubinhos e o confete somem na câmera da
+    // morte dela (que fica no olho dela: nasciam na lente); as outras vistas veem.
+    const owner = Math.round(d[o + 14]!);
+    const local = owner >= 0 && owner < 4 ? owner : -1;
+    cubeSlot = local >= 0 ? local : NO_SLOT;
+    particleOwner = local;
+    figureCorpse.slot = cubeSlot;
     const figure = Math.round(d[o + 12]!);
     const templates = figureTemplates;
     if (figure !== NO_FIGURE && templates && templates.count > 0) {
       figureDeath(o, frame, figure, templates);
-      return;
+    } else {
+      // Sem boneco para desmontar (gabaritos ainda não chegaram): só o "poof" na altura do centro do corpo de pé.
+      const scale = d[o + 10]! > 0 ? d[o + 10]! : 1;
+      const cy = d[o + 1]! + FIGURE_CENTER_Y_M * scale;
+      sample(frame.world?.lightGrid ?? null, d[o]!, cy, d[o + 2]!);
+      poof(d[o]!, cy, d[o + 2]!);
     }
-    // Sem boneco para desmontar (gabaritos ainda não chegaram): só o "poof" na altura do centro do corpo de pé.
-    const scale = d[o + 10]! > 0 ? d[o + 10]! : 1;
-    const cy = d[o + 1]! + FIGURE_CENTER_Y_M * scale;
-    sample(frame.world?.lightGrid ?? null, d[o]!, cy, d[o + 2]!);
-    poof(d[o]!, cy, d[o + 2]!);
+    cubeSlot = NO_SLOT;
+    particleOwner = -1;
+    figureCorpse.slot = NO_SLOT;
   }
 
   /** M12 (fase 5): o confete do tiro na cabeça, saindo da cabeça para cima (a luz é a do corpo, já amostrada). */
@@ -761,6 +799,7 @@ export function createFxPass(ctx: PassContext): FxPass {
     for (let k = 0; k < HEADSHOT_CONFETTI; k++) {
       resetParticleSpec(spec);
       lit();
+      spec.owner = particleOwner;
       spec.kind = PARTICLE_KIND.square;
       spec.x = hx;
       spec.y = hy;
@@ -784,6 +823,7 @@ export function createFxPass(ctx: PassContext): FxPass {
     for (let k = 0; k < 22; k++) {
       resetParticleSpec(spec);
       lit();
+      spec.owner = particleOwner;
       spec.kind = PARTICLE_KIND.square;
       spec.x = cx;
       spec.y = cy;
@@ -803,6 +843,7 @@ export function createFxPass(ctx: PassContext): FxPass {
     for (let k = 0; k < 4; k++) {
       resetParticleSpec(spec);
       lit();
+      spec.owner = particleOwner;
       spec.kind = PARTICLE_KIND.round;
       spec.x = cx + rng.range(-0.2, 0.2);
       spec.y = cy + rng.range(-0.3, 0.3);

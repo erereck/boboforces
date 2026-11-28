@@ -1421,6 +1421,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'result.scoreTeam': 'Seu time {own} × {other}',
   'hud.royale.clockWait': 'Fecha em',
   'hud.royale.clockShrink': 'Fechando',
+  /** M12 (fase 2, prints): a resposta da ordem quando quem ouviu é Pela vibe ou De boa (os níveis que não obedecem). */
+  'order.answer.lowLevel': '{order}: bots {vibe} e {chill} não seguem ordens',
   // M12 (fase 3): as dicas do loading (`loadingTipKey`, `LOADING_TIP_COUNT` = 12), sorteadas e trocadas pela cena.
   'loading.tip.1': 'Bot covarde foge quando você recarrega.',
   'loading.tip.2': 'Na pausa, Dificuldade muda o nível dos bots na hora.',

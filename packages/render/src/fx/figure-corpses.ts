@@ -118,13 +118,27 @@ export interface FigureCorpseSpec {
    * mais e gira o dobro.
    */
   headPop: boolean;
+  /** M12 (prints): a vista local em que o desmonte some (a câmera da morte de quem morreu); `NO_SLOT` = todas. */
+  slot: number;
 }
 
 /** M12 (fase 5): o impulso extra para cima da cabeça no tiro na cabeça (m/s). */
 export const HEAD_POP_UP = 4;
 
 export function createFigureCorpseSpec(): FigureCorpseSpec {
-  return { dirX: 0, dirY: 0, dirZ: 0, force: 0, bodyPart: -1, skin: 0, sky: 1, sun: 1, emissive: 0, headPop: false };
+  return {
+    dirX: 0,
+    dirY: 0,
+    dirZ: 0,
+    force: 0,
+    bodyPart: -1,
+    skin: 0,
+    sky: 1,
+    sun: 1,
+    emissive: 0,
+    headPop: false,
+    slot: NO_SLOT,
+  };
 }
 
 /** Inverso afim (3×4) de a[ao ..] vezes b[bo ..], em out[oo ..] (4ª linha 0 0 0 1). Só no nascer. */
@@ -257,7 +271,7 @@ export function spawnFigureCorpse(
     const o = (i0 + k) * INSTANCE_FLOATS;
     if (k < n) {
       pool.boxBone[i0 + k] = templates.boxes[base + k * FIGURE_BOX_STRIDE + F.bone]!;
-      writeFigureBoxData(pool.data, o, templates.boxes, base + k * FIGURE_BOX_STRIDE, spec.skin, NO_SLOT);
+      writeFigureBoxData(pool.data, o, templates.boxes, base + k * FIGURE_BOX_STRIDE, spec.skin, spec.slot);
     } else {
       pool.boxBone[i0 + k] = 0;
       pool.data.fill(0, o, o + INSTANCE_FLOATS);

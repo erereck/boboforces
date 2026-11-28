@@ -1621,7 +1621,17 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const text = watching
         ? aquariumResultTitle(v, sum.winner)
         : zombiesMode
-          ? t(sum.outcome === 'win' ? 'result.zombiesWin' : 'result.zombiesLoss', { waves: wave, wave })
+          ? // M12 (fase 2, prints): a mesma escolha do resultado (solo, "Caiu na onda 1").
+            t(
+              sum.outcome === 'win'
+                ? humans === 1
+                  ? 'result.zombiesWinSolo'
+                  : 'result.zombiesWin'
+                : humans === 1
+                  ? 'result.zombiesLossSolo'
+                  : 'result.zombiesLoss',
+              { waves: wave, wave },
+            )
           : sum.outcome === 'win'
             ? t('result.win')
             : sum.outcome === 'draw'
@@ -1718,17 +1728,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const st = slot.death;
     m.deathVeil =
       m.dead && st.t >= 0 && (st.t < DEATH_CAM.turnS + DEATH_CAM.holdS || m.primaryNames.length > 0) ? 1 : 0;
-    // "R recarrega": pente vazio com reserva e sem recarregar, sem dobrar com a dica `reload` na tela.
+    // "R recarrega" (prints: a sim recarrega sozinha com o pente vazio): pente a ≤ 25% com reserva, parado há 0,6 s sem
+    // atirar, uma vez por pente (`reloadPrompt`), sem dobrar com a dica `reload` na tela.
     const seat = seatOf(slot.controller);
-    const empty =
-      !m.dead &&
-      held !== null &&
-      held.clipSize > 0 &&
-      held.fire !== WEAPON_FIRE.thrown &&
-      m.clip <= 0 &&
-      m.reserve > 0 &&
-      reload < 0 &&
-      (v.flags[e]! & ENTITY_FLAG.reloading) === 0;
+    const gun = !m.dead && held !== null && held.clipSize > 0 && held.fire !== WEAPON_FIRE.thrown;
+    const empty = hf.reloadPrompt(
+      slot.hudFeel,
+      gun ? held.code : -1,
+      m.clip,
+      gun ? held.clipSize : 0,
+      m.reserve,
+      reloading,
+    );
     m.reloadKey = '';
     m.reloadGlyph = -1;
     if (empty && seat >= 0 && !(seat === 0 && tips.current === 'reload' && m.tipAlpha > 0.01)) {
@@ -2138,6 +2149,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     kind: 0,
     figure: NO_FIGURE,
     headshot: false,
+    ownerSlot: -1,
   };
   const lightScratch = new Float32Array(3);
   // M12 (fase 5): o clarão das vistas (a explosão segura; o teto do "Reduzir efeitos") e o pó do deslize.
@@ -2472,6 +2484,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
+  /** M12 (consertos dos prints): a vista local (0..3) que segue `entity` (viva, morta ou na câmera da morte); −1 = nenhuma. */
+  function localViewOf(s: Sim, entity: number): number {
+    for (let sIdx = 0; sIdx < slots.length; sIdx++) {
+      const c = slots[sIdx]!.controller;
+      if (c >= 0 && s.controllerEntity(c) === entity) return sIdx;
+    }
+    return -1;
+  }
+
   const onEvents = (events: readonly SimEvent[], s: Sim): void => {
     const v = s.view();
     ensureCapacity(v.capacity);
@@ -2553,7 +2574,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const i = entityIndex(ev.target);
           if (i < flash.length) flash[i] = 1;
           // `bodyPart` é a `FigurePart` (0..11, o osso da hitbox atingida): o cubinho sai da caixa desse osso.
-          pushActorImpact(fx, ev.target, ev.x, ev.y, ev.z, ev.dirX, ev.dirY, ev.dirZ, ev.bodyPart, CUBES_ACTOR);
+          // M12 (consertos dos prints): os cubinhos do acerto em quem é uma vista local somem na vista dele (nasciam no olho).
+          pushActorImpact(
+            fx,
+            ev.target,
+            ev.x,
+            ev.y,
+            ev.z,
+            ev.dirX,
+            ev.dirY,
+            ev.dirZ,
+            ev.bodyPart,
+            CUBES_ACTOR,
+            localViewOf(s, ev.target),
+          );
           // M6 (fase 4b): a Festa solta confete em cada acerto.
           if (chaosOn(MOD.confetti)) confetti(ev.x, ev.y, ev.z);
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
@@ -2633,6 +2667,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           // M12 (fase 5): no tiro na cabeça, a cabeça voa com confete.
           d.headshot = ev.headshot;
+          // M12 (consertos dos prints): o desmonte de quem é uma vista local some na câmera da morte dele (nascia na lente).
+          d.ownerSlot = localViewOf(s, ev.victim);
           pushDeath(fx, d);
           onDeath(s, ev.victim, ev.killer, ev.weapon, ev.headshot);
           feedKill(v, ev.victim, ev.killer, ev.weapon, ev.headshot);
@@ -6080,9 +6116,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       ? t('order.answer.nowhere', { order })
       : a.asked === 0
         ? t('order.answer.none', { order })
-        : a.obeyed === 0
-          ? t('order.answer.ignored', { order })
-          : t('order.answer', { order, n: a.obeyed, asked: a.asked });
+        : a.obeyed === 0 && a.lowLevel === a.asked
+          ? // M12 (fase 2, prints): os N0 e N1 (Pela vibe e De boa) nunca obedecem: dizer por quê.
+            t('order.answer.lowLevel' as StringKey, { order, vibe: t('level.vibe'), chill: t('level.chill') })
+          : a.obeyed === 0
+            ? t('order.answer.ignored', { order })
+            : t('order.answer', { order, n: a.obeyed, asked: a.asked });
     slot.orderNoticeS = ORDER_NOTICE_S;
   }
   /**
@@ -6389,36 +6428,50 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     camBasis[8] = cy * sp;
   }
 
-  /** O pente que cai na recarga: um cubinho escuro no soquete `mag` da arma na mão (a pose sem os giros). */
+  /**
+   * O pente que cai na recarga: um cubinho cinza-escuro do tamanho de um pente. Rodada 36: nascido no soquete `mag`, ele
+   * ficava atrás da arma (o viewmodel é desenhado por cima do mundo) e não aparecia. Agora o soquete (a pose sem os
+   * giros) é projetado pela câmera do viewmodel (`vm.fovY`), o ponto da tela é puxado para a esquerda da arma e para a
+   * faixa de baixo (`magScreen*`), e o cubinho nasce nesse ponto da tela a `magDepthM` à frente, pela câmera do mundo
+   * (`c.fovY`, `aspect`), jogado para cima, para a frente e para a esquerda, e cai.
+   */
   function dropMagazine(
     c: ViewDesc['camera'],
     vm: ViewmodelDesc,
     mag: { readonly x: number; readonly y: number; readonly z: number } | null,
     v: SimView,
     o: number,
+    aspect: number,
   ): void {
     if (mag === null) return;
+    const F = VIEW_FEEL;
     const hand = VIEWMODEL_POSE.hand;
     const k = vm.scale > 0 ? vm.scale : 1;
     // No espaço da câmera (X direita, Y cima, −Z frente), como a render-atores monta o viewmodel.
     const px = hand[0] + vm.offsetX + mag.x * k;
     const py = hand[1] + vm.offsetY + mag.y * k;
-    const pz = hand[2] + vm.offsetZ + mag.z * k;
+    const pz = Math.min(-0.05, hand[2] + vm.offsetZ + mag.z * k);
+    const a = aspect > 0 ? aspect : 16 / 9;
+    const vmTan = Math.tan(vm.fovY / 2);
+    const sx = Math.min(F.magScreenMaxX, px / -pz / (vmTan * a));
+    const sy = clamp(py / -pz / vmTan, F.magScreenMinY, F.magScreenMaxY);
+    const tan = Math.tan(c.fovY / 2);
+    const d = F.magDepthM;
+    const qx = sx * tan * a * d;
+    const qy = sy * tan * d;
     basisOf(c.yaw, c.pitch);
     const b = camBasis;
-    const F = VIEW_FEEL;
     pushDebris(
       fx,
-      c.x + b[3]! * px + b[6]! * py - b[0]! * pz,
-      c.y + b[7]! * py - b[1]! * pz,
-      c.z + b[5]! * px + b[8]! * py - b[2]! * pz,
-      // Cai e escorrega um pouco para o meio da tela (o viewmodel, desenhado por cima, tampa o soquete).
-      v.velocity[o]! - b[3]! * 0.5,
-      v.velocity[o + 1]! - 0.5,
-      v.velocity[o + 2]! - b[5]! * 0.5,
+      c.x + b[3]! * qx + b[6]! * qy + b[0]! * d,
+      c.y + b[7]! * qy + b[1]! * d,
+      c.z + b[5]! * qx + b[8]! * qy + b[2]! * d,
+      v.velocity[o]! + b[0]! * F.magForwardMs - b[3]! * F.magLeftMs + b[6]! * F.magUpMs,
+      v.velocity[o + 1]! + b[1]! * F.magForwardMs + b[7]! * F.magUpMs,
+      v.velocity[o + 2]! + b[2]! * F.magForwardMs - b[5]! * F.magLeftMs + b[8]! * F.magUpMs,
       F.magColor,
       1,
-      0.2,
+      0.15,
       F.magSizeM,
       F.magLifeS,
     );
@@ -6793,7 +6846,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // Com Reduzir efeitos, sem o clarão na arma (com a SMG ele piscava a ~14 Hz).
     vm.lightEmissive = reducedFx ? lightScratch[2]! : Math.max(lightScratch[2]!, slot.flash * 0.6);
     if (fo.dropMag && vm.visible && held !== null && held.reloadPerRoundS === 0 && VIEW_KICK[held.category].mag) {
-      dropMagazine(c, vm, magOffsets[model] ?? null, v, o);
+      dropMagazine(c, vm, magOffsets[model] ?? null, v, o, aspect);
     }
   }
 

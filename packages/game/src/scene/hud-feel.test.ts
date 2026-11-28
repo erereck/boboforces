@@ -20,6 +20,7 @@ import {
   HUD_FEEL,
   momentTexts,
   reloadProgress,
+  reloadPrompt,
   resultCount,
   showNotice,
   stepMatchFeel,
@@ -339,5 +340,34 @@ describe('M12 (fase 2, revisão): a barra da recarga', () => {
     // A escopeta (0,5 s por cartucho): com 2 de 8, a barra em 25%, mesmo depois do tempo de um cartucho.
     expect(reloadProgress(true, true, 2, 8, 10, 0.5, 15)).toBe(0.25);
     expect(reloadProgress(true, false, 0, 30, -1, 2, 11)).toBe(0);
+  });
+});
+
+describe('M12 (fase 2, prints): o "R recarrega"', () => {
+  it('pente a ≤ 25% com reserva, parado 0,6 s sem atirar; uma vez por pente; a recarga e a troca de arma rearmam', () => {
+    const f = createHudFeel();
+    const frame = (dt: number, weapon: number, clip: number, reloading = false, reserve = 90): boolean => {
+      stepHudFeel(f, dt);
+      return reloadPrompt(f, weapon, clip, 30, reserve, reloading);
+    };
+    expect(frame(0, 1, 30)).toBe(false);
+    // Atirando até 7 (≤ 25% de 30): ainda não (acabou de atirar).
+    expect(frame(0.1, 1, 7)).toBe(false);
+    expect(frame(0.3, 1, 7)).toBe(false);
+    expect(frame(0.35, 1, 7)).toBe(true);
+    expect(frame(0.5, 1, 7)).toBe(true);
+    // Um tiro com ele na tela: sai e não volta neste pente.
+    expect(frame(0.1, 1, 6)).toBe(false);
+    expect(frame(1, 1, 6)).toBe(false);
+    // A recarga rearma (e enquanto recarrega, nada).
+    expect(frame(0.1, 1, 6, true)).toBe(false);
+    expect(frame(0.1, 1, 30)).toBe(false);
+    expect(frame(0.1, 1, 5)).toBe(false);
+    expect(frame(0.7, 1, 5)).toBe(true);
+    // Trocar de arma rearma; sem reserva, nunca.
+    expect(frame(0.1, 2, 5)).toBe(false);
+    expect(frame(0.7, 2, 5)).toBe(true);
+    expect(frame(0.7, 3, 5, false, 0)).toBe(false);
+    expect(frame(0.7, 3, 5, false, 0)).toBe(false);
   });
 });

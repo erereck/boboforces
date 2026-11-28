@@ -2,7 +2,7 @@
 // (lida pela CPU no texel atingido) e luz amostrada, quicando na grade (Verlet). Posições fixas no pool: os dados de
 // cor e luz só sobem quando um cubinho nasce; por frame só as matrizes dos que se mexem. Sem three, sem alocação.
 import { addTexturedBox, GeometryBuilder, type GeometryArrays } from '../actors/geometry.ts';
-import { INST, INSTANCE_FLOATS, VERTEX_FLAG, writeInstanceDefaults, writeRgb01 } from '../actors/layout.ts';
+import { INST, INSTANCE_FLOATS, NO_SLOT, VERTEX_FLAG, writeInstanceDefaults, writeRgb01 } from '../actors/layout.ts';
 import { m4Identity, m4RotateX, m4RotateY, m4Scale, m4Translate, m4Zero, MAT4 } from '../actors/math.ts';
 import { verletStep, VERLET_HIT, type CollisionWorld, type VerletParams } from './verlet.ts';
 
@@ -76,7 +76,8 @@ export function setDebrisBudget(pool: DebrisPool, budget: number): void {
 
 /**
  * Nasce um cubinho em (x, y, z) com velocidade (m/s), cor 0xRRGGBB, lado (m), vida (s), luz (céu, sol, emissivo) e
- * giro. Sem espaço, sobrescreve o mais antigo do anel. Devolve a posição ou -1 se o teto do perfil é 0.
+ * giro. Sem espaço, sobrescreve o mais antigo do anel. Devolve a posição ou -1 se o teto do perfil é 0. `slot` (M12):
+ * a vista local em que ele some (o desmonte de quem morreu, na câmera da morte dele); `NO_SLOT` = todas veem.
  */
 export function spawnDebris(
   pool: DebrisPool,
@@ -95,6 +96,7 @@ export function spawnDebris(
   spinX: number,
   spinY: number,
   spinRate: number,
+  slot: number = NO_SLOT,
 ): number {
   if (pool.budget <= 0) return -1;
   const i = pool.next;
@@ -116,6 +118,7 @@ export function spawnDebris(
   pool.resting[i] = 0;
   const d = i * INSTANCE_FLOATS;
   writeRgb01(pool.data, d + INST.r, rgb);
+  pool.data[d + INST.slot] = slot;
   pool.data[d + INST.sky] = sky;
   pool.data[d + INST.sun] = sun;
   pool.data[d + INST.emissive] = emissive;

@@ -45,8 +45,14 @@ describe('shaders dos programas 4 e 5 (regras de portabilidade)', () => {
     expect(INSTANCED_FRAGMENT).toContain('uniform BF_LAYER_SAMPLER uModels;');
   });
 
-  it('programa 4 sem contorno (#50) nem skin de teste (#51): só uHideSlot e uOuterMaxDist', () => {
-    expect([...INSTANCED_UNIFORM_NAMES]).toEqual(['uHideSlot', 'uOuterMaxDist']);
+  it('programa 4 sem contorno (#50) nem skin de teste (#51): uHideSlot, uOuterMaxDist e os cortes da lente (M12)', () => {
+    expect([...INSTANCED_UNIFORM_NAMES]).toEqual([
+      'uHideSlot',
+      'uOuterMaxDist',
+      'uNearCut',
+      'uNearHide0',
+      'uNearHide1',
+    ]);
     const code = strip(INSTANCED_VERTEX + INSTANCED_FRAGMENT);
     for (const gone of [
       'uDensityLayer',

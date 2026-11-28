@@ -29,7 +29,7 @@ export const PARTICLE_KIND = {
   wall: 8,
 } as const;
 
-export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive', 'uBlobMaxDist'] as const;
+export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive', 'uBlobMaxDist', 'uNearCut'] as const;
 
 const KIND_CONSTS = /* glsl */ `
 const int BF_P_ROUND = 0;
@@ -60,6 +60,9 @@ uniform float uHideSlot;
 // M12 (fase 5): além disto (m, da câmera ao centro) o disco de prop (blob com pC.x = 1) some: o teto de draw calls da
 // vista escondeu o grupo da prop dele (sem a prop, a sombra ficava sozinha no chão).
 uniform float uBlobMaxDist;
+// M12 (consertos dos prints): a partícula que encara a câmera (redonda, quadrada, estrela) a menos disto (m) da câmera
+// some: o confete do tiro na cabeça nascia na lente da câmera da morte (0 = desligado: o clarão do viewmodel).
+uniform float uNearCut;
 
 out vec2 vLocal;
 flat out int vKind;
@@ -128,7 +131,9 @@ void main() {
   vDist = length(world - cameraPosition);
   // Pela distância do CENTRO: os 4 vértices do disco saem juntos (um vértice só fora esticaria o quad).
   bool cutProp = kind == BF_P_BLOB && pC.x > 0.5 && length(pA.xyz - cameraPosition) > uBlobMaxDist;
-  if (!cutProp) clip = projectionMatrix * viewMatrix * vec4(world, 1.0);
+  bool billboard = kind == BF_P_ROUND || kind == BF_P_SQUARE || kind == BF_P_STAR;
+  bool nearCut = uNearCut > 0.0 && billboard && length(pos - cameraPosition) < uNearCut;
+  if (!cutProp && !nearCut) clip = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
   gl_Position = clip;
 }

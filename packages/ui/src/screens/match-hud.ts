@@ -517,7 +517,7 @@ export function drawMatchCountdown(
   const h = capBig + (lineW > 0 ? gap * 2 + cap : 0) + (extraW > 0 ? gap * 2 + cap : 0) + pad * 4;
   const x = Math.round((width - w) / 2);
   const y = Math.round(height * centerFrac - h / 2);
-  pushShape(out, x, y, Math.round(w), Math.round(h), COLORS.hudFundo, Math.round(6 * s));
+  pushShape(out, x, y, Math.round(w), Math.round(h), COUNTDOWN_BOX, Math.round(6 * s));
   // M12 (fase 2): cada segundo entra com escala 1,2 → 1 em 150 ms (o tempo dentro do segundo sai de `seconds`).
   const n0 = out.count;
   paintNumber(out, display, n, 0, width / 2, y + pad * 2, bigPx, COLORS.acao, 0.5);
@@ -536,6 +536,12 @@ export function drawMatchCountdown(
   }
   if (extraW > 0) paintText(out, hud, extra, width / 2, ty, px, COLORS.acao, 0, 0.5);
 }
+
+/**
+ * M12 (fase 2, prints): a caixa da contagem e do "VALENDO!" quase opaca (pela plaquinha de 70% aparecia o chevron de um
+ * aliado desenhado por baixo, na HUD da vista).
+ */
+const COUNTDOWN_BOX = withAlpha(COLORS.hudFundo, 0.95);
 
 /** M12 (fase 2): o centro da plaquinha da contagem, do "VALENDO!" e do aviso central no 1P (fração da altura). */
 export const COUNTDOWN_CENTER = 0.32;
@@ -577,7 +583,7 @@ export function drawMatchGo(
   const x = Math.round((width - w) / 2);
   const y = Math.round(height * centerFrac - h / 2);
   const n0 = out.count;
-  pushShape(out, x, y, Math.round(w), Math.round(h), COLORS.hudFundo, Math.round(6 * s));
+  pushShape(out, x, y, Math.round(w), Math.round(h), COUNTDOWN_BOX, Math.round(6 * s));
   paintText(out, display, text, width / 2, y + pad * 2, px, COLORS.acao, 0.02, 0.5);
   scaleCommands(out, n0, width / 2, y + h / 2, 1 + 0.2 * (1 - enterProgress(ageS * 1000, MOTION.enterMs, reduce)));
 }

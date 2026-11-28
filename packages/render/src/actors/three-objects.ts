@@ -19,6 +19,7 @@ import {
   Sphere,
   StaticDrawUsage,
   Vector3,
+  Vector4,
   type IUniform,
 } from 'three';
 import type { PassContext } from '../shared/passes.ts';
@@ -211,12 +212,20 @@ export function uploadInstances(set: InstanceSet, count: number, dataFirst: numb
 export interface InstancedUniforms {
   readonly uHideSlot: IUniform<number>;
   readonly uOuterMaxDist: IUniform<number>;
+  /** M12 (consertos dos prints): instância a menos disto (m) da câmera some (só o material dos VFX; 0 = desligado). */
+  readonly uNearCut: IUniform<number>;
+  /** M12: por vista, (x, z, r², 0) em volta de até 2 bonecos colados na câmera (r² 0 = nenhum). */
+  readonly uNearHide0: IUniform<Vector4>;
+  readonly uNearHide1: IUniform<Vector4>;
 }
 
 export function createInstancedUniforms(): InstancedUniforms {
   return {
     uHideSlot: { value: -1 },
     uOuterMaxDist: { value: 1e6 },
+    uNearCut: { value: 0 },
+    uNearHide0: { value: new Vector4(0, 0, 0, 0) },
+    uNearHide1: { value: new Vector4(0, 0, 0, 0) },
   };
 }
 
@@ -246,10 +255,12 @@ export interface ParticleUniforms {
   readonly uHideSlot: IUniform<number>;
   /** M12 (fase 5): corte por vista dos discos de prop (m; 1e9 = nenhum). Só o passe dos atores muda. */
   readonly uBlobMaxDist: IUniform<number>;
+  /** M12 (consertos dos prints): partícula que encara a câmera a menos disto (m) some (0 = desligado). */
+  readonly uNearCut: IUniform<number>;
 }
 
 export function createParticleUniforms(): ParticleUniforms {
-  return { uFxTime: { value: 0 }, uHideSlot: { value: -1 }, uBlobMaxDist: { value: 1e9 } };
+  return { uFxTime: { value: 0 }, uHideSlot: { value: -1 }, uBlobMaxDist: { value: 1e9 }, uNearCut: { value: 0 } };
 }
 
 /**

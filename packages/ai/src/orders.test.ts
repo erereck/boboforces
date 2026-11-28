@@ -104,7 +104,7 @@ describe('M8 (fase 6): as ordens na partida', () => {
     const m = orderedMatch('embedded:leal', 3, ORDER.hold, at, false);
     play(m, at + 1);
     const answer = m.director.orderAnswer(0);
-    expect(answer).toMatchObject({ order: ORDER.hold, asked: 3, obeyed: 3 });
+    expect(answer).toMatchObject({ order: ORDER.hold, asked: 3, obeyed: 3, lowLevel: 0 });
     const [hx, hz] = where(m, 0);
     let unstuck = 0;
     play(m, 20 * SIM_HZ, () => {
@@ -152,7 +152,8 @@ describe('M8 (fase 6): as ordens na partida', () => {
       squad('builtin:chill-bob', 2),
     );
     play(m, at + 2);
-    expect(m.director.orderAnswer(0)).toMatchObject({ order: ORDER.attack, asked: 2, obeyed: 0 });
+    // M12 (fase 2, prints): e a resposta diz que foi pelo nível (a cena explica: De boa não segue ordens).
+    expect(m.director.orderAnswer(0)).toMatchObject({ order: ORDER.attack, asked: 2, obeyed: 0, lowLevel: 2 });
     m.dispose();
   }, 30_000);
 

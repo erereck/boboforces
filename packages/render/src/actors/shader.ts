@@ -21,7 +21,7 @@ import { GLSL_COMMON_FRAGMENT, GLSL_COMMON_UNIFORMS, GLSL_COMMON_VERTEX } from '
 import { VERTEX_FLAG } from './layout.ts';
 
 /** Uniforms próprios do programa 4 (além dos comuns e dos de textura `uModels*`). */
-export const INSTANCED_UNIFORM_NAMES = ['uHideSlot', 'uOuterMaxDist'] as const;
+export const INSTANCED_UNIFORM_NAMES = ['uHideSlot', 'uOuterMaxDist', 'uNearCut', 'uNearHide0', 'uNearHide1'] as const;
 
 const FLAG_DEFINES = /* glsl */ `
 const int BF_V_ALPHA = ${VERTEX_FLAG.alphaTest};
@@ -46,6 +46,13 @@ in vec4 iPart;   // caixa: tamanho (px) · outros: sem uso
 
 uniform float uHideSlot;      // slot da vista em 1ª pessoa (-1 = ninguém): o próprio corpo some
 uniform float uOuterMaxDist;  // além disso a camada externa colapsa (perfil; arte-ux.md §1.12)
+// M12 (consertos dos prints): perto da lente. uNearCut (> 0 só no material dos VFX): a instância cujo centro (da caixa
+// ou a origem do modelo) fica a menos disto da câmera some (o desmonte e os cubinhos de quem morreu colado na câmera).
+// uNearHide0/1 (por vista, no material dos atores): (x, z, r², 0) em volta de um boneco colado na câmera; as caixas
+// e a arma na mão (iPart.w = 1) com o centro nesse círculo somem (r² 0 = nenhum).
+uniform float uNearCut;
+uniform vec4 uNearHide0;
+uniform vec4 uNearHide1;
 
 out vec2 vUv;
 flat out float vLayer;
@@ -90,6 +97,13 @@ void main() {
   // Caixa com a flag outer (camada por cima) colapsa de longe.
   bool outer = box && (bflags & BF_B_OUTER) != 0;
   if (outer && vDist > uOuterMaxDist) hidden = true;
+  vec3 anchor = (modelMatrix * vec4(box ? mat3(im) * iLight.xyz + im[3].xyz : im[3].xyz, 1.0)).xyz;
+  if (uNearCut > 0.0 && length(anchor - cameraPosition) < uNearCut) hidden = true;
+  if (box || iPart.w > 0.5) {
+    vec2 h0 = anchor.xz - uNearHide0.xy;
+    vec2 h1 = anchor.xz - uNearHide1.xy;
+    if (dot(h0, h0) < uNearHide0.z || dot(h1, h1) < uNearHide1.z) hidden = true;
+  }
 
   // Escondido: fora do volume de recorte, o triângulo some sem custo de fragmento. Sem return no meio do main
   // (integração do M1): o recompilador de shader do Eden derruba o app com saída antecipada; vira if/else.

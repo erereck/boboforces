@@ -135,9 +135,24 @@ export const VIEW_FEEL = {
   casingRightMs: 1.8,
   casingUpMs: 1.6,
   casingSpreadMs: 0.35,
-  magColor: 0x2b2e34,
-  magSizeM: 0.05,
+  magColor: 0x4a4f58,
+  /** Lado do cubinho do pente (m): o de um pente, não o de uma cápsula. */
+  magSizeM: 0.06,
   magLifeS: 1.5,
+  /**
+   * Onde o pente nasce na TELA (rodada 36: nascido no soquete, ele ficava atrás da arma, que é desenhada por cima do
+   * mundo): o ponto do soquete `mag` projetado pela câmera do viewmodel, puxado para a esquerda da arma (x da tela em
+   * −1..1, no máximo `magScreenMaxX`) e para a faixa de baixo (y entre `magScreenMinY` e `magScreenMaxY`), a
+   * `magDepthM` à frente do olho. De lá é jogado um pouco para cima, para a frente e para a esquerda (m/s) e cai: uns
+   * 0,3 s na tela (os cubinhos caem a 14 m/s²; nascido mais baixo ou mais perto, sumia em um frame).
+   */
+  magScreenMaxX: -0.08,
+  magScreenMinY: -0.2,
+  magScreenMaxY: -0.08,
+  magDepthM: 0.9,
+  magUpMs: 0.6,
+  magForwardMs: 0.6,
+  magLeftMs: 0.2,
 } as const;
 
 const F = VIEW_FEEL;

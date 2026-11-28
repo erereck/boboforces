@@ -82,6 +82,14 @@ const SMALL_VIEW_COUNT = 3;
 const FIGURE_SHADOW_SIZE = 16 * FIGURE_PX_M;
 const SHADOW_ALPHA = 0.42;
 const SHADOW_MAX_HEIGHT = 3;
+/**
+ * M12 (consertos dos prints): outro boneco com uma caixa (a origem do osso dela, mais uma folga de meia caixa) ou a arma
+ * na mão a menos de `NEAR_HIDE_M` da câmera da vista some nela, com a arma (o aliado colado no nascer virava um bloco
+ * na lente); some tudo do boneco num círculo de `NEAR_HIDE_RADIUS_M` (× escala) em volta da raiz. Até 2 por vista.
+ */
+export const NEAR_HIDE_M = 0.6;
+const NEAR_HIDE_SLACK_M = 0.2;
+const NEAR_HIDE_RADIUS_M = 0.9;
 /** Atores que o rig dos bonecos acompanha por índice do `ActorBuffer` (o estado por entidade é dele). */
 const FIGURE_RIG_CAPACITY = 256;
 /** Instâncias de cada prop no buffer dos projéteis (o gerador do Fortress é uma só). */
@@ -435,6 +443,8 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     data[d + INST.emissive] = a.light[i * 3 + 2]!;
     data[d + INST.flash] = a.damageFlash[i]!;
     data[d + INST.team] = a.team[i]!;
+    // M12: arma na mão (o corte do boneco colado na câmera vale para ela também; `iPart.w`).
+    data[d + 15] = 1;
   }
 
   /** As malhas instanciadas do passe (o aquecimento liga e desliga todas). */
@@ -463,6 +473,60 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
         mesh.visible = visible;
       }
     });
+  }
+
+  /** Alguma caixa do boneco i (a origem do osso dela, neste quadro) ou a arma na mão a menos de `d` da câmera? */
+  function nearBoxes(i: number, cx: number, cy: number, cz: number, d: number): boolean {
+    const r = figureInstances.actorRecord[i] ?? -1;
+    if (r < 0) return false;
+    const m = figureInstances.matrices;
+    const d2 = d * d;
+    const start = figureInstances.recStart[r]!;
+    const end = start + figureInstances.recBoxes[r]!;
+    for (let b = start; b < end; b++) {
+      const o = b * MAT4;
+      const dx = m[o + 12]! - cx;
+      const dy = m[o + 13]! - cy;
+      const dz = m[o + 14]! - cz;
+      if (dx * dx + dy * dy + dz * dz < d2) return true;
+    }
+    if (figureInstances.recArmed[r] === 1) {
+      const w = figureInstances.recWeapon;
+      const o = r * MAT4;
+      const dx = w[o + 12]! - cx;
+      const dy = w[o + 13]! - cy;
+      const dz = w[o + 14]! - cz;
+      if (dx * dx + dy * dy + dz * dz < d2) return true;
+    }
+    return false;
+  }
+
+  /** M12 (consertos dos prints): os até 2 bonecos colados na câmera desta vista (`uNearHide0/1`), menos o da vista. */
+  function nearHide(v: ViewContext, cx: number, cy: number, cz: number): void {
+    const h0 = perView.uNearHide0.value;
+    const h1 = perView.uNearHide1.value;
+    h0.set(0, 0, 0, 0);
+    h1.set(0, 0, 0, 0);
+    const a = actors;
+    if (!a) return;
+    const own = v.view.localSlot;
+    let k = 0;
+    for (let i = 0; i < a.count && k < 2; i++) {
+      if (a.figure[i] === NO_FIGURE) continue;
+      if (own >= 0 && a.localSlot[i] === own) continue;
+      const sc = a.scale[i]! > 0 ? a.scale[i]! : 1;
+      const x = a.position[i * 3]!;
+      const z = a.position[i * 3 + 2]!;
+      // Longe da raiz (mais que o boneco inteiro): nem olha as caixas.
+      const fx = x - cx;
+      const fz = z - cz;
+      const far = (NEAR_HIDE_RADIUS_M + NEAR_HIDE_M) * sc;
+      if (fx * fx + fz * fz > far * far) continue;
+      if (!nearBoxes(i, cx, cy, cz, (NEAR_HIDE_M + NEAR_HIDE_SLACK_M) * sc)) continue;
+      const r = NEAR_HIDE_RADIUS_M * sc;
+      (k === 0 ? h0 : h1).set(x, z, r * r, 0);
+      k++;
+    }
   }
 
   const pass: ActorPass & ActorPassFigureStats = {
@@ -653,6 +717,7 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       // distância à SUPERFÍCIE da esfera do grupo, não ao centro: com a dose do jogo (#52) toda prop colide, e um grupo
       // grande com o centro longe pode ter prop a poucos metros, no quadro.
       const cam = v.camera.position;
+      nearHide(v, cam.x, cam.y, cam.z);
       const far = v.camera.far;
       for (let g = 0; g < props.length; g++) {
         const p = props[g]!;
