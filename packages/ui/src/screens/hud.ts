@@ -1,6 +1,16 @@
-import { pushRect, pushShape, type DrawList } from '../draw-list.ts';
+import { DRAW_FLOATS_PER_COMMAND, pushRect, pushShape, type DrawList } from '../draw-list.ts';
 import type { MsdfFont, UiFonts } from '../font.ts';
-import { capHeightPx, numberWidth, paintBar, paintIcon, paintNumber, paintText, textWidth } from '../paint.ts';
+import { enterSlidePx, fadeCommands } from '../motion.ts';
+import {
+  capHeightPx,
+  fitTextPx,
+  numberWidth,
+  paintBar,
+  paintIcon,
+  paintNumber,
+  paintText,
+  textWidth,
+} from '../paint.ts';
 import { t, templateParts } from '../text.ts';
 import { COLORS, HUD_REFERENCE, PLAYER_COLORS, TEAM_COLORS, withAlpha } from '../tokens.ts';
 import type { Insets } from '../tree.ts';
@@ -183,7 +193,76 @@ export interface HudModel {
   nadeCount: number;
   readonly nadeAngle: Float32Array;
   readonly nadeAlpha: Float32Array;
+  // --- M12 (fase 2): a HUD com peso (campos opcionais; o `game` preenche pelo `scene/hud-feel.ts`, já com os tempos e o
+  // "Reduzir efeitos" aplicados: aqui é só desenho). Sem eles, a HUD de antes. ---
+  /** O "pop" do hitmarker (1 = aberto 1 passo a mais; volta a 0 em 50 ms) e o X cinza do acerto sem dano. */
+  hitPop?: number;
+  hitZero?: boolean;
+  /**
+   * O X de abate: alfa 0..1 (0 = nenhum), a escala (começa em 1,4 e encolhe a 1) e se foi na cabeça (âmbar; senão,
+   * `perigo`). Embaixo da retícula, o nome da vítima (`killName`, alfa `killNameAlpha`) e a sequência (`streakText`,
+   * "ABATE DUPLO", alfa `streakAlpha`), já em caixa alta.
+   */
+  killMarker?: number;
+  killScale?: number;
+  killHead?: boolean;
+  killName?: string;
+  killNameAlpha?: number;
+  streakText?: string;
+  streakAlpha?: number;
+  /** A batida do número de ABATES (0..1: 1 = o começo, o número maior). */
+  killsBeat?: number;
+  /** O rastro claro da vida: a vida de onde a barra escorre (≤ `health` = sem rastro). */
+  healthTrail?: number;
+  /** A vinheta blocada da vida baixa (0 = nenhuma; 0..1 = a força, já com o pulso). */
+  lowHealth?: number;
+  /** Até `HUD_DAMAGE_ARCS` indicadores de dano perto da mira: o ângulo (como `damageAngle`), o alfa e a espessura 0..1. */
+  damageCount?: number;
+  readonly damageAngles?: Float32Array;
+  readonly damageAlphas?: Float32Array;
+  readonly damageWeights?: Float32Array;
+  /** O tamanho do pente (a ≤ 25% dele o pente fica âmbar); 0 = não sabe. */
+  clipSize?: number;
+  /** A recarga, 0..1 (< 0 = nenhuma): a barra embaixo da retícula, no lugar da do pavio. */
+  reload?: number;
+  /** "R recarrega" embaixo da retícula (pente vazio com reserva): a tecla, o glifo (como `tipGlyph`) e o texto. */
+  reloadKey?: string;
+  reloadGlyph?: number;
+  reloadText?: string;
+  /**
+   * No toque (`HUD_TOUCH_SIDE`): a munição vai para o lado da vida e o nome da arma some (o botão ARMA já diz); e a
+   * coluna dos botões de toque (px da superfície, da borda direita; no canhoto, da esquerda), que a tela de morte evita.
+   */
+  touchSide?: number;
+  touchReserve?: number;
+  /** Os "+N" dos pontos ao lado da plaquinha do alto: quantos, o valor, o alfa e a subida (0..1). */
+  gainCount?: number;
+  readonly gainValues?: Float32Array;
+  readonly gainAlphas?: Float32Array;
+  readonly gainRise?: Float32Array;
+  /**
+   * A faixa do fim da partida ("VITÓRIA!"), a cor e a entrada (0..1); `''` = nenhuma. Com ela, a retícula, a munição,
+   * as dicas e os avisos do centro saem.
+   */
+  endBanner?: string;
+  endBannerColor?: number;
+  endBannerIn?: number;
+  /** Morto: o que falta do renascer (1 → 0), a barra que esvazia embaixo da contagem; < 0 = nenhuma. */
+  respawnFrac?: number;
+  /** Morto: o golpe foi na cabeça ("· NA CABEÇA" na faixa de quem matou). */
+  deathHead?: boolean;
+  /** Morto: a cena escurece (0..1) só com a câmera de morte e o seletor na tela (o espectador fica limpo). */
+  deathVeil?: number;
+  /** Aliado caído (Zombies, Royale), 1 por marcador: o chevron em `perigo`, piscando por `markerBlink` (0..1). */
+  readonly markerDowned?: Uint8Array;
+  markerBlink?: number;
 }
+
+/** M12 (fase 2): indicadores de dano por vista e "+N" de pontos ao mesmo tempo. */
+export const HUD_DAMAGE_ARCS = 4;
+export const HUD_GAINS = 3;
+/** M12 (fase 2): onde a munição fica no toque (`HudModel.touchSide`): destro, ao lado direito da vida; canhoto, espelhado. */
+export const HUD_TOUCH_SIDE = { none: 0, rightHanded: 1, leftHanded: 2 } as const;
 
 /** M2 (fase 3e): máximo de avisos do time na vista. */
 export const MAX_TEAM_PINGS = 8;
@@ -337,6 +416,41 @@ export function createHudModel(): HudModel {
     nadeCount: 0,
     nadeAngle: new Float32Array(MAX_GRENADE_WARNINGS),
     nadeAlpha: new Float32Array(MAX_GRENADE_WARNINGS),
+    hitPop: 0,
+    hitZero: false,
+    killMarker: 0,
+    killScale: 1,
+    killHead: false,
+    killName: '',
+    killNameAlpha: 0,
+    streakText: '',
+    streakAlpha: 0,
+    killsBeat: 0,
+    healthTrail: -1,
+    lowHealth: 0,
+    damageCount: 0,
+    damageAngles: new Float32Array(HUD_DAMAGE_ARCS),
+    damageAlphas: new Float32Array(HUD_DAMAGE_ARCS),
+    damageWeights: new Float32Array(HUD_DAMAGE_ARCS),
+    clipSize: 0,
+    reload: -1,
+    reloadKey: '',
+    reloadGlyph: -1,
+    reloadText: '',
+    touchSide: HUD_TOUCH_SIDE.none,
+    touchReserve: 0,
+    gainCount: 0,
+    gainValues: new Float32Array(HUD_GAINS),
+    gainAlphas: new Float32Array(HUD_GAINS),
+    gainRise: new Float32Array(HUD_GAINS),
+    endBanner: '',
+    endBannerColor: COLORS.texto,
+    endBannerIn: 1,
+    respawnFrac: -1,
+    deathHead: false,
+    deathVeil: 0,
+    markerDowned: new Uint8Array(MAX_ALLY_MARKERS),
+    markerBlink: 1,
   };
 }
 
@@ -390,6 +504,8 @@ export const HUD_METRICS = {
   /** Indicador de som: raio do anel em volta da retícula e lado de cada ponto (px na referência 1280×720). */
   soundRing: 36,
   soundDot: 5,
+  /** M12 (fase 2): os indicadores de dano ficam a esta fração do anel do som (entre o som e o aviso de granada). */
+  damageRing: 1.5,
   /** Borda da vista na cor do jogador (2–4P; arte-ux.md §6.6: 3 px por vista de 640×360). */
   border: 3,
 } as const;
@@ -468,6 +584,9 @@ interface HudTexts {
   readonly level: string;
   /** M6 (fase 3): a plaquinha em cima do Jugg. */
   readonly jugg: string;
+  /** M12 (fase 2): "NA CABEÇA" (a faixa de quem matou) e o "+" dos pontos que sobem. */
+  readonly head: string;
+  readonly plus: string;
 }
 
 let cachedTexts: HudTexts | null = null;
@@ -506,6 +625,8 @@ function hudTexts(): HudTexts {
     pointLetters: [...t('hud.pointLetters')],
     level: t('hud.level').toUpperCase(),
     jugg: t('hud.jugg').toUpperCase(),
+    head: t('hud.streak.head').toUpperCase(),
+    plus: '+',
   };
   return cachedTexts;
 }
@@ -638,7 +759,9 @@ function drawPointMark(
 
 /**
  * M6 (fase 3): a plaquinha JUGG em cima do Jugg, na cor do time dele. Ao contrário das letras dos pontos, nunca some:
- * fica presa dentro da vista (o `game` já põe na borda quando ele está fora).
+ * fica presa dentro da vista (o `game` já põe na borda quando ele está fora). M12 (fase 2, playtest): presa também
+ * entre `minTop` e `maxBottom` (fora das faixas das plaquinhas de cima e de baixo: a "ZONA" do Royale ficava por cima da
+ * munição) e entre `minLeft` e `maxRight`.
  */
 function drawJuggMark(
   out: DrawList,
@@ -648,14 +771,17 @@ function drawJuggMark(
   y: number,
   px: number,
   scale: number,
-  view: HudViewport,
+  minLeft: number,
+  maxRight: number,
+  minTop: number,
+  maxBottom: number,
 ): void {
   if (hud === null || label === '') return;
   const pad = hudPad(scale);
   const h = Math.round(capHeightPx(hud, px) + pad * 2);
   const w = Math.max(h, Math.round(textWidth(hud, label, px) + pad * 2));
-  const left = Math.round(Math.min(Math.max(x - w / 2, view.x), view.x + view.width - w));
-  const top = Math.round(Math.min(Math.max(y - h / 2, view.y), view.y + view.height - h));
+  const left = Math.round(Math.max(minLeft, Math.min(x - w / 2, maxRight - w)));
+  const top = Math.round(Math.max(minTop, Math.min(y - h / 2, maxBottom - h)));
   plate(out, left, top, w, h, scale);
   const bar = Math.max(2, Math.round(3 * scale));
   pushRect(out, left, top + h - bar, w, bar, pointColor(1));
@@ -763,12 +889,32 @@ function drawScope(out: DrawList, view: HudViewport, scale: number): void {
   pushRect(out, px - dot / 2, py - dot / 2, dot, dot, COLORS.perigo);
 }
 
-/** Hitmarker em X feito de "pixels" (a linguagem blocada do jogo): branco no corpo, âmbar na cabeça. */
-function drawHitMarker(out: DrawList, cx: number, cy: number, from: number, step: number, color: number): void {
+/**
+ * Hitmarker em X feito de "pixels" (a linguagem blocada do jogo): branco no corpo, âmbar na cabeça. M12 (fase 2):
+ * `count` quadrados por braço (o X de abate tem 4).
+ */
+function drawHitMarker(
+  out: DrawList,
+  cx: number,
+  cy: number,
+  from: number,
+  step: number,
+  color: number,
+  count = 3,
+): void {
   const x = Math.round(cx);
   const y = Math.round(cy);
   const half = Math.floor(step / 2);
-  for (let k = 0; k < 3; k++) {
+  // M12 (fase 2, playtest): contorno escuro por baixo (o X claro sumia contra o céu e o concreto), no alfa do X.
+  const shadow = withAlpha(COLORS.bunker, 0.6 * ((color & 0xff) / 255));
+  for (let k = 0; k < count; k++) {
+    const o = from + k * step;
+    pushRect(out, x - o - half - 1, y - o - half - 1, step + 2, step + 2, shadow);
+    pushRect(out, x + o - half - 1, y - o - half - 1, step + 2, step + 2, shadow);
+    pushRect(out, x - o - half - 1, y + o - half - 1, step + 2, step + 2, shadow);
+    pushRect(out, x + o - half - 1, y + o - half - 1, step + 2, step + 2, shadow);
+  }
+  for (let k = 0; k < count; k++) {
     const o = from + k * step;
     pushRect(out, x - o - half, y - o - half, step, step, color);
     pushRect(out, x + o - half, y - o - half, step, step, color);
@@ -777,37 +923,142 @@ function drawHitMarker(out: DrawList, cx: number, cy: number, from: number, step
   }
 }
 
-/** Barra de dano na borda da área útil, na direção de onde veio o tiro. */
-function drawDamage(
-  out: DrawList,
-  angle: number,
-  amount: number,
-  left: number,
-  top: number,
-  right: number,
-  bottom: number,
-  scale: number,
-): void {
-  // Tela: frente = cima, esquerda = esquerda (ângulo positivo = à esquerda, como o yaw).
-  const dx = -Math.sin(angle);
-  const dy = -Math.cos(angle);
-  const hw = (right - left) / 2;
-  const hh = (bottom - top) / 2;
-  const mx = left + hw;
-  const my = top + hh;
-  const th = Math.max(3, Math.round(HUD_METRICS.damageThickness * scale));
-  const color = withAlpha(COLORS.perigo, 0.9 * clamp01(amount));
-  if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
-    const len = Math.min(Math.round(HUD_METRICS.damageLength * scale), bottom - top);
-    const py = my + (dy * hw) / Math.abs(dx);
-    const y = Math.max(top, Math.min(bottom - len, py - len / 2));
-    pushRect(out, Math.round(dx > 0 ? right - th : left), Math.round(y), th, len, color);
-  } else {
-    const len = Math.min(Math.round(HUD_METRICS.damageLength * scale), right - left);
-    const px = mx + (dx * hh) / Math.abs(dy);
-    const x = Math.max(left, Math.min(right - len, px - len / 2));
-    pushRect(out, Math.round(x), Math.round(dy > 0 ? bottom - th : top), len, th, color);
+/**
+ * M12 (fase 2): escala os comandos `[from, list.count)` já desenhados em volta de (cx, cy) por `k` (a batida de um
+ * número, o X de abate que encolhe, o número da contagem). Sem redesenhar e sem alocar; `k` = 1 não faz nada.
+ */
+export function scaleCommands(list: DrawList, from: number, cx: number, cy: number, k: number): void {
+  if (k === 1) return;
+  for (let i = from < 0 ? 0 : from; i < list.count; i++) {
+    const g = i * DRAW_FLOATS_PER_COMMAND;
+    list.geom[g] = cx + ((list.geom[g] ?? 0) - cx) * k;
+    list.geom[g + 1] = cy + ((list.geom[g + 1] ?? 0) - cy) * k;
+    list.geom[g + 2] = (list.geom[g + 2] ?? 0) * k;
+    list.geom[g + 3] = (list.geom[g + 3] ?? 0) * k;
   }
+}
+
+/** M12 (fase 2): a força de cada uma das 3 faixas da vinheta da vida baixa, de fora para dentro. */
+const VIGNETTE_ALPHA: readonly number[] = [0.34, 0.2, 0.09];
+
+/**
+ * M12 (fase 2): a vinheta blocada da vida baixa: 3 molduras em `perigo` por dentro da vista, cada uma mais fraca que a
+ * de fora (12 retângulos, sem gradiente: a linguagem blocada do jogo).
+ */
+function drawVignette(out: DrawList, view: HudViewport, s: number, a: number): void {
+  const band = Math.max(3, Math.round(6 * s));
+  const x = Math.round(view.x);
+  const y = Math.round(view.y);
+  const w = Math.round(view.width);
+  const h = Math.round(view.height);
+  for (let k = 0; k < VIGNETTE_ALPHA.length; k++) {
+    const o = k * band;
+    const inner = h - 2 * o - 2 * band;
+    if (inner <= 0 || w - 2 * o <= 0) break;
+    const color = withAlpha(COLORS.perigo, a * VIGNETTE_ALPHA[k]!);
+    pushRect(out, x + o, y + o, w - 2 * o, band, color);
+    pushRect(out, x + o, y + h - o - band, w - 2 * o, band, color);
+    pushRect(out, x + o, y + o + band, band, inner, color);
+    pushRect(out, x + w - o - band, y + o + band, band, inner, color);
+  }
+}
+
+/**
+ * M12 (fase 2): um indicador de dano: um arco blocado de 7 quadrados a 1,5× o anel do som, na direção de onde veio o
+ * dano (frente = cima; positivo = à esquerda, como o yaw), mais grosso com mais dano (`weight` 0..1).
+ */
+function drawDamageArc(
+  out: DrawList,
+  cx: number,
+  cy: number,
+  angle: number,
+  alpha: number,
+  weight: number,
+  s: number,
+): void {
+  const a01 = clamp01(alpha);
+  if (a01 <= 0.01) return;
+  const r = HUD_METRICS.soundRing * s * HUD_METRICS.damageRing;
+  const side = Math.max(2, Math.round((2.5 + 3.5 * clamp01(weight)) * s));
+  for (let k = -3; k <= 3; k++) {
+    const a = angle + k * 0.11;
+    const x = Math.round(cx - Math.sin(a) * r - side / 2);
+    const y = Math.round(cy - Math.cos(a) * r - side / 2);
+    // As pontas mais fracas: o arco afina sem gradiente.
+    const edge = k === -3 || k === 3 ? 0.5 : 1;
+    pushRect(out, x - 1, y - 1, side + 2, side + 2, withAlpha(COLORS.bunker, 0.5 * a01 * edge));
+    pushRect(out, x, y, side, side, withAlpha(COLORS.perigo, 0.95 * a01 * edge));
+  }
+}
+
+/**
+ * A tecla desenhada (contorno âmbar com o nome ou o glifo do botão de face) e o texto, numa plaquinha centrada em `cx`
+ * com o topo em `y` (a dica de 1 linha; M12: o "R recarrega" embaixo da retícula). Devolve a altura.
+ */
+function drawKeyPrompt(
+  out: DrawList,
+  hud: MsdfFont | null,
+  key: string,
+  glyphIndex: number,
+  text: string,
+  cx: number,
+  y: number,
+  labelPx: number,
+  capL: number,
+  pad: number,
+  gap: number,
+  s: number,
+  a: number,
+): number {
+  const glyph = glyphIndex >= 0 && glyphIndex < 4;
+  const keyW = glyph ? capL : textWidth(hud, key, labelPx);
+  const textW = textWidth(hud, text, labelPx);
+  // A tecla: contorno âmbar com respiro de `pad` em volta do nome; a plaquinha tem mais `capPad` por fora.
+  const capPad = Math.max(3, Math.round(pad * 0.6));
+  const capW = keyW + pad * 2;
+  const capH = capL + pad * 2;
+  const w = capW + gap * 2 + textW;
+  const h = capH + capPad * 2;
+  const x = Math.round(cx - w / 2);
+  pushShape(out, x - capPad * 2, y, w + capPad * 4, h, withAlpha(COLORS.hudFundo, 0.7 * a), Math.round(5 * s));
+  const ring = Math.max(1, Math.round(2 * s));
+  pushShape(out, x, y + capPad, capW, capH, withAlpha(COLORS.acao, a), 0, ring);
+  // O glifo ocupa o miolo inteiro da tecla (o texto deixa `pad` de respiro; o glifo, metade).
+  if (glyph) drawFaceGlyph(out, x + pad / 2, y + capPad + pad / 2, capL + pad, glyphIndex, a);
+  else paintText(out, hud, key, x + pad, y + capPad + pad, labelPx, withAlpha(COLORS.acao, a));
+  paintText(out, hud, text, x + capW + gap * 2, y + capPad + pad, labelPx, withAlpha(COLORS.texto, a));
+  return h;
+}
+
+/**
+ * M12 (fase 2): uma linha curta embaixo da retícula (o nome da vítima, a sequência), numa plaquinha centrada em `cx`
+ * com o topo em `y`. Devolve a altura.
+ */
+function drawCenterLine(
+  out: DrawList,
+  hud: MsdfFont | null,
+  text: string,
+  cx: number,
+  y: number,
+  px: number,
+  pad: number,
+  s: number,
+  color: number,
+  a: number,
+): number {
+  const w = textWidth(hud, text, px, HUD_METRICS.labelTracking);
+  const h = Math.round(capHeightPx(hud, px) + pad * 2);
+  pushShape(
+    out,
+    Math.round(cx - w / 2 - pad),
+    Math.round(y),
+    Math.round(w + pad * 2),
+    h,
+    withAlpha(COLORS.hudFundo, 0.7 * a),
+    Math.round(5 * s),
+  );
+  paintText(out, hud, text, cx, Math.round(y) + pad, px, withAlpha(color, a), HUD_METRICS.labelTracking, 0.5);
+  return h;
 }
 
 /** Borda da vista na cor do jogador, por dentro do retângulo (2–4P). */
@@ -825,8 +1076,10 @@ function drawViewBorder(out: DrawList, view: HudViewport, width: number, color: 
 /**
  * Desenha o HUD de uma vista (arte-ux.md §6.7): retícula que abre com `spread` e hitmarker em X; vida embaixo à
  * esquerda; munição embaixo à direita; abates (e mortes, 1–2P) no alto à esquerda, com o rótulo P1–P4 na cor do
- * jogador no 2–4P; dano direcional nas bordas; "Renascendo…" com a contagem quando morto. No 3–4P (compacto) a vida
- * fica só com número e barra fina e a munição só com o pente. Sem fontes (`null`), só as formas. Sem alocação.
+ * jogador no 2–4P; dano direcional perto da mira; "Renascendo…" com a contagem quando morto. No 3–4P (compacto) a vida
+ * fica só com número e barra fina e a munição só com o pente. Sem fontes (`null`), só as formas. Sem alocação. M12
+ * (fase 2): o X de abate, o hitmarker com peso, a vida com rastro e vinheta, até 4 indicadores de dano, a munição baixa
+ * e a recarga, os "+N", a tela de morte limpa e a faixa do fim (os campos opcionais do `HudModel`).
  */
 export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<HudModel>, view: HudViewport): void {
   const M = HUD_METRICS;
@@ -851,19 +1104,44 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
   const bottom = Math.round(view.y + view.height - Math.max(view.insetBottom, M.marginY * s));
   const cx = view.x + view.width / 2;
   const cy = view.y + view.height / 2;
+  // M12 (fase 2): o fim da partida (a faixa no centro; a retícula, a munição e as dicas saem) e o toque.
+  const ended = (model.endBanner ?? '') !== '';
+  const touch = model.touchSide ?? HUD_TOUCH_SIDE.none;
+  const barH = Math.max(2, Math.round((compact ? M.compactBarHeight : M.barHeight) * s));
+  const healthH = Math.round(pad + (compact ? 0 : capL + pad) + capN + pad + barH + pad);
+  const chipH = Math.round(capL + pad * 2);
 
   // M2: a luneta vem antes de tudo: as plaquinhas (vida, munição, abates) e a borda ficam por cima dela.
-  const scoped = !model.dead && model.scope >= 0.5;
+  const scoped = !model.dead && !ended && model.scope >= 0.5;
   if (scoped) drawScope(out, view, s);
+  // M12 (fase 2, playtest): morto, a cena escurece um pouco (as opções e a faixa leem por cima dela).
+  const veil = model.deathVeil ?? 0;
+  if (model.dead && !ended && veil > 0) {
+    pushRect(
+      out,
+      Math.round(view.x),
+      Math.round(view.y),
+      Math.round(view.width),
+      Math.round(view.height),
+      withAlpha(COLORS.bunker, 0.35 * clamp01(veil)),
+    );
+  }
+  // M12 (fase 2): a vinheta da vida baixa, por baixo da borda e das plaquinhas.
+  const low = model.lowHealth ?? 0;
+  if (!model.dead && low > 0.01) drawVignette(out, view, s, clamp01(low));
   if (multi) drawViewBorder(out, view, Math.max(2, Math.round(M.border * s)), playerColor);
   // M2 (fase 2d): marcadores dos aliados por baixo das plaquinhas (vivo e fora da luneta).
   if (!model.dead && !scoped) {
     const unit = Math.max(2, Math.round(1.5 * s));
+    const downed = model.markerDowned;
+    // M12 (fase 2): o aliado caído em `perigo`, piscando (o `game` já limita a 3 clarões por segundo).
+    const downColor = withAlpha(COLORS.perigo, 0.35 + 0.65 * clamp01(model.markerBlink ?? 1));
     for (let i = 0; i < model.markerCount && i < MAX_ALLY_MARKERS; i++) {
       const x = model.markers[i * 2]!;
       const y = model.markers[i * 2 + 1]!;
       const seat = model.markerSeat[i]!;
-      if (seat >= 0) drawPlayerMarker(out, x, y, unit, seat, view);
+      if (downed !== undefined && downed[i] === 1) drawAllyMarker(out, x, y, unit, downColor, view);
+      else if (seat >= 0) drawPlayerMarker(out, x, y, unit, seat, view);
       else drawAllyMarker(out, x, y, unit, model.markerColor, view);
     }
     for (let i = 0; i < model.pingCount && i < MAX_TEAM_PINGS; i++) {
@@ -888,7 +1166,20 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
     if (model.juggMarkOn) {
       const label = model.juggMarkLabel !== '' ? model.juggMarkLabel : hudTexts().jugg;
-      drawJuggMark(out, hud, label, model.juggMark[0]!, model.juggMark[1]!, labelPx, s, view);
+      // Entre a faixa de cima (a plaquinha dos abates) e a de baixo (vida e munição).
+      drawJuggMark(
+        out,
+        hud,
+        label,
+        model.juggMark[0]!,
+        model.juggMark[1]!,
+        labelPx,
+        s,
+        left,
+        right,
+        top + chipH + gap,
+        bottom - healthH - gap,
+      );
     }
   }
 
@@ -918,7 +1209,7 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     const showDeaths = !compact && left + w + deathsW + pad <= view.x + view.width * HUD_CHIP_MAX_FRACTION;
     if (showDeaths) w += deathsW;
     w += pad;
-    const h = Math.round(capL + pad * 2);
+    const h = chipH;
     plate(out, left, top, w, h, s);
     let x = left + pad;
     const y = top + pad;
@@ -927,41 +1218,91 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       x += icon + gap / 2;
       x += paintText(out, hud, tx.players[slot] as string, x, y, labelPx, playerColor) + gap * 1.5;
     }
+    // M12 (fase 2): a batida do número de ABATES no abate (escala em volta do meio dele).
+    const beat = 1 + 0.35 * clamp01(model.killsBeat ?? 0);
     x += paintText(out, hud, firstLabel, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
-    x += paintNumber(out, hud, firstValue, 0, x, y, labelPx, zm ? COLORS.acao : COLORS.texto);
+    const n0 = out.count;
+    const w0 = paintNumber(out, hud, firstValue, 0, x, y, labelPx, zm ? COLORS.acao : COLORS.texto);
+    if (!zm) scaleCommands(out, n0, x + w0 / 2, y + capL / 2, beat);
+    x += w0;
     if (showDeaths) {
       x += gap * 1.5;
       x += paintText(out, hud, secondLabel, x, y, labelPx, COLORS.textoBaixo, M.labelTracking) + gap;
-      paintNumber(out, hud, secondValue, 0, x, y, labelPx, COLORS.texto);
+      const n1 = out.count;
+      const w1 = paintNumber(out, hud, secondValue, 0, x, y, labelPx, COLORS.texto);
+      if (zm) scaleCommands(out, n1, x + w1 / 2, y + capL / 2, beat);
+    }
+    // M12 (fase 2): os "+N" dos pontos (Zombies, BoboStrike) ao lado da plaquinha, subindo e sumindo; sem espaço ao
+    // lado (o placar do alto é do meio), embaixo dela. No 3–4P, um por vez.
+    const gains = Math.min(model.gainCount ?? 0, compact ? 1 : HUD_GAINS);
+    if (gains > 0 && model.gainValues && model.gainAlphas && model.gainRise) {
+      let gx = left + w + gap;
+      let gy = top;
+      const money = model.pointsLabel;
+      for (let i = 0; i < gains; i++) {
+        const value = Math.max(0, Math.round(model.gainValues[i]!));
+        const a = clamp01(model.gainAlphas[i]!);
+        if (a <= 0.01) continue;
+        const gw = Math.round(
+          pad * 2 +
+            textWidth(hud, tx.plus, labelPx) +
+            textWidth(hud, money, labelPx) +
+            numberWidth(hud, value, 0, labelPx),
+        );
+        if (i === 0 && gx + gw > view.x + view.width * GAIN_MAX_FRACTION) {
+          gx = left;
+          gy = top + h + gap;
+        }
+        const ry = Math.round(gy - clamp01(model.gainRise[i]!) * GAIN_RISE_PX * s);
+        pushShape(out, Math.round(gx), ry, gw, h, withAlpha(COLORS.hudFundo, 0.7 * a), Math.round(5 * s));
+        let pen = gx + pad;
+        const color = withAlpha(COLORS.acao, a);
+        pen += paintText(out, hud, tx.plus, pen, ry + pad, labelPx, color);
+        if (money !== '') pen += paintText(out, hud, money, pen, ry + pad, labelPx, color);
+        paintNumber(out, hud, value, 0, pen, ry + pad, labelPx, color);
+        gx += gw + gap;
+      }
     }
   }
 
-  // Embaixo à esquerda: vida (rótulo, número e barra; no compacto só número e barra fina).
-  {
+  // Embaixo à esquerda: vida (rótulo, número e barra; no compacto só número e barra fina). M12 (fase 2): some com o
+  // jogador morto (a "VIDA 0" e as vantagens); no toque canhoto, embaixo à direita (o lado livre dos botões).
+  const hpInnerW = Math.max(
+    Math.round(M.healthWidth * s * (compact ? 0.6 : 1)),
+    numberWidth(hud, Math.max(0, Math.ceil(model.health)), 0, numberPx),
+    compact ? 0 : textWidth(hud, tx.health, labelPx, M.labelTracking),
+  );
+  const hpW = hpInnerW + pad * 2;
+  const hpX = touch === HUD_TOUCH_SIDE.leftHanded ? right - hpW : left;
+  if (!model.dead) {
     const hp = Math.max(0, Math.ceil(model.health));
     const frac = model.maxHealth > 0 ? clamp01(hp / model.maxHealth) : 0;
-    const low = frac <= 0.35;
-    const barH = Math.max(2, Math.round((compact ? M.compactBarHeight : M.barHeight) * s));
-    const labelW = compact ? 0 : textWidth(hud, tx.health, labelPx, M.labelTracking);
-    const innerW = Math.max(
-      Math.round(M.healthWidth * s * (compact ? 0.6 : 1)),
-      numberWidth(hud, hp, 0, numberPx),
-      labelW,
-    );
-    const h = Math.round(pad + (compact ? 0 : capL + pad) + capN + pad + barH + pad);
+    const lowHp = frac <= 0.35;
+    const h = healthH;
     const y = bottom - h;
-    plate(out, left, y, innerW + pad * 2, h, s);
+    plate(out, hpX, y, hpW, h, s);
     let ty = y + pad;
     if (!compact) {
-      paintText(out, hud, tx.health, left + pad, ty, labelPx, COLORS.textoBaixo, M.labelTracking);
+      paintText(out, hud, tx.health, hpX + pad, ty, labelPx, COLORS.textoBaixo, M.labelTracking);
       ty += capL + pad;
     }
-    paintNumber(out, hud, hp, 0, left + pad, ty, numberPx, low ? COLORS.perigo : COLORS.texto);
-    paintBar(out, left + pad, ty + capN + pad, innerW, barH, frac, COLORS.linha, low ? COLORS.perigo : COLORS.ok);
+    paintNumber(out, hud, hp, 0, hpX + pad, ty, numberPx, lowHp ? COLORS.perigo : COLORS.texto);
+    const by = ty + capN + pad;
+    paintBar(out, hpX + pad, by, hpInnerW, barH, frac, COLORS.linha, lowHp ? COLORS.perigo : COLORS.ok);
+    // M12 (fase 2): o rastro claro do dano, da vida de agora até a de antes do golpe (escorre em 0,4 s).
+    const trail = model.healthTrail ?? -1;
+    if (trail > hp && model.maxHealth > 0) {
+      const bx = hpX + pad;
+      const x0 = Math.round(bx + hpInnerW * frac);
+      const x1 = Math.round(bx + hpInnerW * clamp01(trail / model.maxHealth));
+      const y0 = Math.round(by);
+      if (x1 > x0)
+        pushRect(out, x0, y0, x1 - x0, Math.max(1, Math.round(by + barH) - y0), withAlpha(COLORS.texto, 0.75));
+    }
     // M3 (fase 4c): as vantagens, em plaquinhas quadradas com a inicial na cor de cada uma, em cima da vida.
-    if (model.perks !== 0 && !model.dead) {
+    if (model.perks !== 0) {
       const size = Math.round(capL + pad * 2);
-      let bx = left;
+      let bx = hpX;
       for (let k = 0; k < PERK_COLORS.length; k++) {
         if ((model.perks & (1 << k)) === 0) continue;
         plate(out, bx, y - gap - size, size, size, s);
@@ -983,21 +1324,26 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
 
   // Embaixo à direita: munição (pente / reserva; no compacto só o pente; a faca não tem; a granada na mão é só o
   // pente). M2: à esquerda dela as granadas que sobram e, em cima, "Rattler · Fuzil" (só no 1–2P). Morto, nada disso
-  // (fase 2c: o centro de baixo é da faixa de quem matou).
-  if (!model.dead) {
+  // (fase 2c: o centro de baixo é da faixa de quem matou). M12 (fase 2): no fim da partida, também não; no toque, ao
+  // lado da vida (o PULO cobria a munição), sem o nome da arma; o pente âmbar a ≤ 25% e vermelho vazio.
+  if (!model.dead && !ended) {
     const mode = model.ammoMode;
     const clip = Math.max(0, Math.trunc(model.clip));
     const reserve = Math.max(0, Math.trunc(model.reserve));
-    const clipColor = clip === 0 ? COLORS.perigo : COLORS.texto;
+    const size = model.clipSize ?? 0;
+    const clipColor = clip === 0 ? COLORS.perigo : size > 0 && clip * 4 <= size ? COLORS.acao : COLORS.texto;
     const sep = tx.ammo[1] as string;
     const h = Math.round(capN + pad * 2);
-    let ammoLeft = right + gap;
+    const y = bottom - h;
+    // Para onde a fileira (munição, granadas) cresce: da direita para a esquerda (o normal e o canhoto) ou ao contrário.
+    const toRight = touch === HUD_TOUCH_SIDE.rightHanded;
+    let edge =
+      touch === HUD_TOUCH_SIDE.none ? right : touch === HUD_TOUCH_SIDE.rightHanded ? hpX + hpW + gap : hpX - gap;
     if (mode !== HUD_AMMO.none) {
       const withReserve = mode === HUD_AMMO.full && !compact;
       let w = numberWidth(hud, clip, 0, numberPx);
       if (withReserve) w += textWidth(hud, sep, numberPx) + numberWidth(hud, reserve, 0, numberPx);
-      const x = right - w - pad * 2;
-      const y = bottom - h;
+      const x = toRight ? edge : edge - w - pad * 2;
       plate(out, x, y, w + pad * 2, h, s);
       let tx0 = x + pad;
       tx0 += paintNumber(out, hud, clip, 0, tx0, y + pad, numberPx, clipColor);
@@ -1005,20 +1351,19 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
         tx0 += paintText(out, hud, sep, tx0, y + pad, numberPx, COLORS.textoBaixo);
         paintNumber(out, hud, reserve, 0, tx0, y + pad, numberPx, COLORS.textoBaixo);
       }
-      ammoLeft = x;
+      edge = toRight ? x + w + pad * 2 + gap : x - gap;
     }
     if (!compact && model.grenades >= 0) {
       const count = Math.trunc(model.grenades);
       const icon = Math.max(6, Math.round(capL * 1.2));
       const gw = Math.round(pad + icon + gap / 2 + numberWidth(hud, count, 0, labelPx) + pad);
-      const gx = ammoLeft - gap - gw;
-      const gy = bottom - h;
+      const gx = toRight ? edge : edge - gw;
       const color = count > 0 ? COLORS.texto : COLORS.textoBaixo;
-      plate(out, gx, gy, gw, h, s);
-      drawGrenadeIcon(out, gx + pad, gy + Math.round((h - icon) / 2), icon, color);
-      paintNumber(out, hud, count, 0, gx + pad + icon + gap / 2, gy + Math.round((h - capL) / 2), labelPx, color);
+      plate(out, gx, y, gw, h, s);
+      drawGrenadeIcon(out, gx + pad, y + Math.round((h - icon) / 2), icon, color);
+      paintNumber(out, hud, count, 0, gx + pad + icon + gap / 2, y + Math.round((h - capL) / 2), labelPx, color);
     }
-    if (!compact && model.weaponName !== '') {
+    if (!compact && touch === HUD_TOUCH_SIDE.none && model.weaponName !== '') {
       const nameW = textWidth(hud, model.weaponName, labelPx, M.labelTracking);
       const sepW = textWidth(hud, tx.weaponSeparator, labelPx);
       const catW = textWidth(hud, model.weaponCategory, labelPx);
@@ -1035,8 +1380,34 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
   }
 
-  // Centro: retícula + hitmarker, ou "Renascendo…" com a contagem.
+  // M12 (fase 2): o topo da faixa das plaquinhas de baixo (vida, vantagens, munição, nome da arma) e a altura da
+  // plaquinha do meio (caído / plantando, ou o aviso de interagir): o que empilha embaixo da retícula fica acima delas.
+  let bandTop = bottom;
   if (!model.dead) {
+    bandTop = Math.min(bandTop, bottom - healthH - (model.perks !== 0 ? gap + chipH : 0));
+    if (!ended) {
+      const ammoH = Math.round(capN + pad * 2);
+      if (model.ammoMode !== HUD_AMMO.none || (!compact && model.grenades >= 0))
+        bandTop = Math.min(bandTop, bottom - ammoH);
+      if (!compact && touch === HUD_TOUCH_SIDE.none && model.weaponName !== '') {
+        bandTop = Math.min(bandTop, bottom - ammoH - gap - chipH);
+      }
+    }
+  }
+  const centerH =
+    model.dead || ended
+      ? 0
+      : model.downed !== HUD_DOWNED.none || model.centerLabel !== ''
+        ? Math.round(pad * 2 + capL + gap + capN)
+        : model.interact !== HUD_INTERACT.none
+          ? chipH
+          : 0;
+  // Centro: retícula + hitmarker, ou "Renascendo…" com a contagem; M12: ou a faixa do fim da partida.
+  /** O que vai embaixo da retícula empilha a partir daqui (a barra da recarga, o nome da vítima, a sequência…). */
+  let below = Math.round(cy + capN * 2);
+  if (ended) {
+    drawEndBanner(out, display, model, view, s, compact, pad);
+  } else if (!model.dead) {
     const thick = Math.max(2, Math.round(M.crossThickness * s));
     const len = Math.max(4, Math.round(M.crossLength * s));
     const crossGap = Math.max(3, Math.round((M.crossGap + M.crossSpread * clamp01(model.spread)) * s));
@@ -1057,94 +1428,175 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       paintIcon(out, 1, x - 1, y - 1, size + 2, withAlpha(COLORS.bunker, 0.7 * k));
       paintIcon(out, 1, x, y, size, withAlpha(COLORS.perigo, k));
     }
-    // Refino R2 (#79): o arco da granada (pontinhos que somem com a distância; o fim, um quadrado âmbar) e o pavio.
+    // Refino R2 (#79): o arco da granada e o pavio. M12 (fase 2, playtest): os pontos maiores, com contorno escuro (os
+    // de 2 px sumiam na parede clara), e no fim a marca de onde ela cai (o anel âmbar com o miolo).
     if (!scoped && model.arcCount > 0) {
       const n = Math.min(model.arcCount, MAX_GRENADE_ARC);
-      const dotS = Math.max(2, Math.round(1.6 * s));
+      const dotS = Math.max(3, Math.round(2.2 * s));
       for (let i = 0; i < n - 1; i++) {
         const x = Math.round(model.arc[i * 2]! - dotS / 2);
         const y = Math.round(model.arc[i * 2 + 1]! - dotS / 2);
-        pushRect(out, x, y, dotS, dotS, withAlpha(COLORS.texto, 0.85 - (0.45 * i) / n));
+        const a = 0.95 - (0.45 * i) / n;
+        pushRect(out, x - 1, y - 1, dotS + 2, dotS + 2, withAlpha(COLORS.bunker, 0.65 * a));
+        pushRect(out, x, y, dotS, dotS, withAlpha(COLORS.texto, a));
       }
-      const end = Math.max(6, Math.round(5 * s));
+      const end = Math.max(8, Math.round(7 * s));
+      const ring = Math.max(2, Math.round(s));
       const ex = Math.round(model.arc[(n - 1) * 2]! - end / 2);
       const ey = Math.round(model.arc[(n - 1) * 2 + 1]! - end / 2);
-      pushShape(out, ex, ey, end, end, COLORS.acao, 0, Math.max(2, Math.round(s)));
+      pushShape(out, ex - 1, ey - 1, end + 2, end + 2, withAlpha(COLORS.bunker, 0.7), 0, ring + 2);
+      pushShape(out, ex, ey, end, end, COLORS.acao, 0, ring);
+      const core = Math.max(2, Math.round(end * 0.3));
+      pushRect(out, Math.round(ex + (end - core) / 2), Math.round(ey + (end - core) / 2), core, core, COLORS.acao);
     }
-    if (model.cook >= 0) {
+    below = Math.round(cy + crossGap + len + gap);
+    // O pavio da granada ou (M12) a recarga: a barra fina logo embaixo da retícula.
+    const reload = model.reload ?? -1;
+    if (model.cook >= 0 || reload >= 0) {
       const w = Math.round(34 * s);
       const h = Math.max(3, Math.round(2.5 * s));
-      const y = Math.round(cy + crossGap + len + gap);
-      pushRect(out, Math.round(cx - w / 2), y, w, h, withAlpha(COLORS.bunker, 0.7));
-      const left = clamp01(model.cook);
-      pushRect(out, Math.round(cx - w / 2), y, Math.round(w * left), h, left < 0.35 ? COLORS.perigo : COLORS.acao);
+      pushRect(out, Math.round(cx - w / 2), below, w, h, withAlpha(COLORS.bunker, 0.7));
+      if (model.cook >= 0) {
+        const fuse = clamp01(model.cook);
+        pushRect(
+          out,
+          Math.round(cx - w / 2),
+          below,
+          Math.round(w * fuse),
+          h,
+          fuse < 0.35 ? COLORS.perigo : COLORS.acao,
+        );
+      } else pushRect(out, Math.round(cx - w / 2), below, Math.round(w * clamp01(reload)), h, COLORS.acao);
+      below += h + gap;
     }
     const marker = Math.max(model.hitMarker, model.headshotMarker);
     if (marker > 0.01) {
       const step = Math.max(2, Math.round(M.hitStep * s));
-      const color = withAlpha(model.headshotMarker > 0.01 ? COLORS.acao : COLORS.texto, clamp01(marker));
-      drawHitMarker(out, cx, cy, crossGap + step, step, color);
+      // M12 (fase 2): o "pop" abre o X 1 passo no começo; o acerto sem dano (proteção, fim da partida) é cinza.
+      const pop = Math.round(clamp01(model.hitPop ?? 0) * step);
+      const base = model.hitZero ? COLORS.textoBaixo : model.headshotMarker > 0.01 ? COLORS.acao : COLORS.texto;
+      drawHitMarker(out, cx, cy, crossGap + step + pop, step, withAlpha(base, clamp01(marker)));
     }
-    if (model.clickToAim) {
+    // M12 (fase 2): o X de abate, maior e em `perigo` (âmbar na cabeça), que encolhe de 1,4 a 1.
+    const kill = model.killMarker ?? 0;
+    if (kill > 0.01) {
+      const step = Math.max(3, Math.round(M.hitStep * 1.5 * s));
+      const n0 = out.count;
+      const color = withAlpha(model.killHead ? COLORS.acao : COLORS.perigo, clamp01(kill));
+      drawHitMarker(out, cx, cy, crossGap + step, step, color, 4);
+      scaleCommands(out, n0, Math.round(cx), Math.round(cy), Math.max(1, model.killScale ?? 1));
+    }
+    // M12 (fase 2): embaixo da retícula empilham o "Clique para mirar", o "R recarrega", o nome da vítima e a sequência
+    // ("ABATE DUPLO"), cada um só se couber acima da plaquinha do meio (interagir, plantar, caído), da dica e das
+    // plaquinhas de baixo (a vista baixa do 2P a 640×360 fica só com o X).
+    const lineH = Math.round(capL + pad * 2);
+    const tipOn = model.tipAlpha > 0.01 && (model.tipKey !== '' || model.tipGlyph >= 0);
+    const tipY = Math.round(view.y + view.height * 0.66);
+    let stackLimit = (tipOn ? Math.min(bandTop, tipY) : bandTop) - gap;
+    if (centerH > 0) stackLimit -= centerH + gap;
+    if (model.clickToAim && below + gap + lineH <= stackLimit) {
       const w = textWidth(hud, tx.clickToAim, labelPx);
-      const y = Math.round(cy + crossGap + len + gap * 2);
+      const y = below + gap;
       plate(out, cx - w / 2 - pad, y, w + pad * 2, capL + pad * 2, s);
       paintText(out, hud, tx.clickToAim, cx, y + pad, labelPx, COLORS.texto, 0, 0.5);
+      below = y + lineH + gap;
     }
-    if (model.tipAlpha > 0.01 && (model.tipKey !== '' || model.tipGlyph >= 0)) {
+    const rKey = model.reloadKey ?? '';
+    const rGlyph = model.reloadGlyph ?? -1;
+    const promptH = lineH + Math.max(3, Math.round(pad * 0.6)) * 2;
+    if ((rKey !== '' || rGlyph >= 0) && (model.reloadText ?? '') !== '' && below + gap / 2 + promptH <= stackLimit) {
+      below +=
+        drawKeyPrompt(out, hud, rKey, rGlyph, model.reloadText!, cx, below + gap / 2, labelPx, capL, pad, gap, s, 1) +
+        gap;
+    }
+    const nameA = model.killNameAlpha ?? 0;
+    if (nameA > 0.01 && (model.killName ?? '') !== '' && below + lineH <= stackLimit) {
+      below += drawCenterLine(out, hud, model.killName!, cx, below, labelPx, pad, s, COLORS.texto, nameA) + gap / 2;
+    }
+    const streakA = model.streakAlpha ?? 0;
+    if (streakA > 0.01 && (model.streakText ?? '') !== '' && below + lineH <= stackLimit) {
+      below += drawCenterLine(out, hud, model.streakText!, cx, below, labelPx, pad, s, COLORS.acao, streakA) + gap / 2;
+    }
+    if (tipOn) {
       // A dica: abaixo do meio (longe da retícula e do "Clique para mirar"), numa plaquinha.
-      const a = clamp01(model.tipAlpha);
-      const glyph = model.tipGlyph >= 0 && model.tipGlyph < 4;
-      const keyW = glyph ? capL : textWidth(hud, model.tipKey, labelPx);
-      const textW = textWidth(hud, model.tipText, labelPx);
-      // A tecla: contorno âmbar com respiro de `pad` em volta do nome; a plaquinha tem mais `capPad` por fora.
-      const capPad = Math.max(3, Math.round(pad * 0.6));
-      const capW = keyW + pad * 2;
-      const capH = capL + pad * 2;
-      const w = capW + gap * 2 + textW;
-      const h = capH + capPad * 2;
-      const x = Math.round(cx - w / 2);
-      const y = Math.round(view.y + view.height * 0.66);
-      pushShape(out, x - capPad * 2, y, w + capPad * 4, h, withAlpha(COLORS.hudFundo, 0.7 * a), Math.round(5 * s));
-      const ring = Math.max(1, Math.round(2 * s));
-      pushShape(out, x, y + capPad, capW, capH, withAlpha(COLORS.acao, a), 0, ring);
-      // O glifo ocupa o miolo inteiro da tecla (o texto deixa `pad` de respiro; o glifo, metade).
-      if (glyph) drawFaceGlyph(out, x + pad / 2, y + capPad + pad / 2, capL + pad, model.tipGlyph, a);
-      else paintText(out, hud, model.tipKey, x + pad, y + capPad + pad, labelPx, withAlpha(COLORS.acao, a));
-      paintText(out, hud, model.tipText, x + capW + gap * 2, y + capPad + pad, labelPx, withAlpha(COLORS.texto, a));
+      drawKeyPrompt(
+        out,
+        hud,
+        model.tipKey,
+        model.tipGlyph,
+        model.tipText,
+        cx,
+        tipY,
+        labelPx,
+        capL,
+        pad,
+        gap,
+        s,
+        clamp01(model.tipAlpha),
+      );
     }
+    // A plaquinha do meio: embaixo do que empilhou, mas sempre acima das plaquinhas de baixo.
+    // (Nunca por cima do que já empilhou: sem espaço, encosta na faixa de baixo.)
+    below = Math.max(below, Math.min(Math.max(below, Math.round(cy + capN * 2)), Math.round(bandTop - gap - centerH)));
   } else {
     // Morto: a contagem no centro. Com o anel da primária (M2, fase 2c), ela vai em letra de rótulo, numa plaquinha
-    // baixa que cabe no meio do anel; sem anel, no título grande de antes.
+    // baixa que cabe no meio do anel; sem anel, no título grande de antes. M12 (fase 2, playtest): no toque, tudo no
+    // espaço livre dos botões; o anel só até 8 opções (mais que isso, a fileira compacta embaixo da contagem: o anel
+    // largo espalhava 10 nomes pela cena).
+    const reserveW = touch !== HUD_TOUCH_SIDE.none ? Math.max(0, model.touchReserve ?? 0) : 0;
+    const fx0 = view.x + (touch === HUD_TOUCH_SIDE.leftHanded ? reserveW : 0);
+    const fx1 = view.x + view.width - (touch === HUD_TOUCH_SIDE.rightHanded ? reserveW : 0);
+    const dcx = (fx0 + fx1) / 2;
+    const freeW = fx1 - fx0;
     const showCount = model.respawnS > 0 && !model.waitWave;
     const count = Math.ceil(model.respawnS);
     const respawning = model.waitWave ? (model.waitText !== '' ? model.waitText : tx.waitWave) : tx.respawning;
     const smallH = Math.round(pad * 2 + capL + (showCount ? gap + capN : 0));
+    const options = model.primaryNames.length;
     const r0 =
-      model.primaryNames.length > 0 && !compact
-        ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s, model.primaryNames.length)
+      options > 0 && options <= RING_ROUND_MAX && !compact && reserveW === 0
+        ? ringRadius(view, hud, smallH, labelPx, numberPx, pad, gap, s, options)
         : 0;
-    // M10: com mais de 8 opções o anel abre numa elipse; sem espaço para ela, fica a fileira (ou a linha).
-    const rx = r0 > 0 ? ringHalfWidth(model, view, hud, r0, labelPx, pad, gap, s) : 0;
-    const r = rx > 0 ? r0 : 0;
+    const r = r0;
     let y: number;
     let h: number;
+    let pw: number;
     if (r > 0) {
       const w = Math.max(textWidth(hud, respawning, labelPx, M.labelTracking), numberWidth(hud, count, 0, numberPx));
       h = smallH;
       y = Math.round(cy - h / 2);
-      plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
-      paintText(out, hud, respawning, cx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
-      if (showCount) paintNumber(out, hud, count, 0, cx, y + pad + capL + gap, numberPx, COLORS.acao, 0.5);
+      pw = w + pad * 4;
+      plate(out, dcx - pw / 2, y, pw, h, s);
+      paintText(out, hud, respawning, dcx, y + pad, labelPx, COLORS.texto, M.labelTracking, 0.5);
+      if (showCount) paintNumber(out, hud, count, 0, dcx, y + pad + capL + gap, numberPx, COLORS.acao, 0.5);
     } else {
-      const headPx = Math.max(M.headingPx * s, view.minTextPx);
+      const headPx = fitTextPx(
+        display,
+        respawning,
+        Math.max(M.headingPx * s, view.minTextPx),
+        0.02,
+        freeW - pad * 8,
+        view.minTextPx,
+      );
       const capH = capHeightPx(display, headPx);
       const w = Math.max(textWidth(display, respawning, headPx, 0.02), numberWidth(hud, count, 0, numberPx));
       h = Math.round(pad * 2 + capH + (showCount ? gap + capN : 0));
-      y = Math.round(cy - h / 2);
-      plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
-      paintText(out, display, respawning, cx, y + pad, headPx, COLORS.texto, 0.02, 0.5);
-      if (showCount) paintNumber(out, hud, count, 0, cx, y + pad + capH + gap, numberPx, COLORS.acao, 0.5);
+      // No toque, a contagem sobe (a faixa de quem matou fica no alto e a fileira em até 5 linhas embaixo dela).
+      y = Math.round((reserveW > 0 ? view.y + view.height * 0.38 : cy) - h / 2);
+      pw = w + pad * 4;
+      plate(out, dcx - pw / 2, y, pw, h, s);
+      paintText(out, display, respawning, dcx, y + pad, headPx, COLORS.texto, 0.02, 0.5);
+      if (showCount) paintNumber(out, hud, count, 0, dcx, y + pad + capH + gap, numberPx, COLORS.acao, 0.5);
+    }
+    // M12 (fase 2): a barra que esvazia com o renascer, no pé da plaquinha da contagem (dentro do respiro de baixo).
+    const respawnFrac = model.respawnFrac ?? -1;
+    if (showCount && respawnFrac >= 0) {
+      const bh = Math.max(2, Math.round(1.5 * s));
+      const bw = Math.round(pw - pad * 2);
+      const bx = Math.round(dcx - bw / 2);
+      const by = Math.round(y + h - pad / 2 - bh / 2);
+      pushRect(out, bx, by, bw, bh, withAlpha(COLORS.linha, 0.9));
+      pushRect(out, bx, by, Math.round(bw * clamp01(respawnFrac)), bh, COLORS.acao);
     }
     // M2 (fase 2c): o menu da primária e, embaixo dele, quem matou e a dica da derrota feia (no alto ficam o placar e
     // os abates). O formato sai do espaço: anel em volta da contagem quando cabe, uma fileira embaixo dela nas vistas
@@ -1153,23 +1605,41 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     hit.layout = PRIMARY_LAYOUT.none;
     hit.count = 0;
     hit.wide = false;
-    let below = y + h;
-    if (model.primaryNames.length > 0) {
-      if (r > 0)
-        below = drawPrimaryRing(out, hud, model, tx, cx, cy, r, rx, model.primaryNames.length, labelPx, pad, gap, s);
-      else if (!compact) below = drawPrimaryRow(out, hud, model, view, cx, below + gap * 2, labelPx, pad, gap, s);
+    let below2 = y + h;
+    if (options > 0) {
+      if (r > 0) below2 = drawPrimaryRing(out, hud, model, tx, dcx, cy, r, r, options, labelPx, pad, gap, s);
+      else if (!compact) {
+        // No toque a faixa de quem matou vai para o alto (embaixo do placar): a fileira tem até 5 linhas no espaço livre.
+        const rows = reserveW > 0 ? MAX_PRIMARY_ROWS + 2 : MAX_PRIMARY_ROWS;
+        below2 = drawPrimaryRow(
+          out,
+          hud,
+          model,
+          view,
+          dcx,
+          below2 + gap * 2,
+          labelPx,
+          pad,
+          gap,
+          s,
+          false,
+          reserveW > 0 ? 0 : -1,
+          freeW,
+          rows,
+        );
+      }
       if (hit.layout === PRIMARY_LAYOUT.none)
-        below = drawPrimaryLine(out, hud, model, tx, cx, below + gap, labelPx, pad, s);
+        below2 = drawPrimaryLine(out, hud, model, tx, dcx, below2 + gap, labelPx, pad, s);
     }
     const bannerTop =
-      hit.layout === PRIMARY_LAYOUT.ring || hit.layout === PRIMARY_LAYOUT.row
-        ? below + gap * 2
+      reserveW === 0 && (hit.layout === PRIMARY_LAYOUT.ring || hit.layout === PRIMARY_LAYOUT.row)
+        ? below2 + gap * 2
         : view.y + view.height * (compact ? 0.18 : 0.14);
-    drawDeathBanner(out, hud, model, tx, cx, bannerTop, labelPx, pad, gap, s);
+    drawDeathBanner(out, hud, model, tx, dcx, bannerTop, labelPx, pad, gap, s);
   }
 
   // M7 (fase 4): o anel da compra do BoboStrike (vivo, na compra), como o da primária da tela de morte.
-  if (!model.dead && model.buyTitle !== '' && model.primaryNames.length > 0) {
+  if (!model.dead && !ended && model.buyTitle !== '' && model.primaryNames.length > 0) {
     const ringH = Math.round(pad * 2 + capL);
     const n = Math.min(model.primaryNames.length, MAX_PRIMARY_OPTIONS);
     const r = ringRadius(view, hud, ringH, labelPx, numberPx, pad, gap, s, n);
@@ -1199,27 +1669,28 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
       paintText(out, hud, model.buyTitle, cx, titleY + pad, smallPx, COLORS.textoBaixo, 0.08, 0.5);
     }
   }
-  // M7 (fase 4): plantando ou desarmando, no meio (o rótulo e os segundos que faltam).
-  if (!model.dead && model.downed === HUD_DOWNED.none && model.centerLabel !== '') {
+  // M7 (fase 4): plantando ou desarmando, no meio (o rótulo e os segundos que faltam). M12: embaixo do que já empilhou
+  // embaixo da retícula.
+  if (!model.dead && !ended && model.downed === HUD_DOWNED.none && model.centerLabel !== '') {
     const value = Math.max(0, Math.ceil(model.centerValue));
     const w = Math.max(
       textWidth(hud, model.centerLabel, labelPx, M.labelTracking),
       numberWidth(hud, value, 0, numberPx),
     );
     const h = Math.round(pad * 2 + capL + gap + capN);
-    const y = Math.round(cy + capN * 2);
+    const y = below;
     plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
     paintText(out, hud, model.centerLabel, cx, y + pad, labelPx, COLORS.acao, M.labelTracking, 0.5);
     paintNumber(out, hud, value, 0, cx, y + pad + capL + gap, numberPx, COLORS.texto, 0.5);
   }
 
-  if (!model.dead && model.downed !== HUD_DOWNED.none) {
+  if (!model.dead && !ended && model.downed !== HUD_DOWNED.none) {
     const label =
       model.downed === HUD_DOWNED.reviving ? tx.reviving : model.downed === HUD_DOWNED.selfUp ? tx.selfUp : tx.downed;
     const value = Math.max(0, Math.ceil(model.downedValue));
     const w = Math.max(textWidth(hud, label, labelPx, M.labelTracking), numberWidth(hud, value, 0, numberPx));
     const h = Math.round(pad * 2 + capL + gap + capN);
-    const y = Math.round(cy + capN * 2);
+    const y = below;
     plate(out, cx - w / 2 - pad * 2, y, w + pad * 4, h, s);
     const color = model.downed === HUD_DOWNED.bleeding ? COLORS.perigo : COLORS.ok;
     paintText(out, hud, label, cx, y + pad, labelPx, color, M.labelTracking, 0.5);
@@ -1228,12 +1699,13 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
 
   if (
     !model.dead &&
+    !ended &&
     model.downed === HUD_DOWNED.none &&
     model.centerLabel === '' &&
     model.interact !== HUD_INTERACT.none
   ) {
     // M3 (fase 3d): consertar a janela / abrir a porta, numa plaquinha embaixo da mira.
-    const y = Math.round(cy + capN * 2);
+    const y = below;
     const h = Math.round(pad * 2 + capL);
     if (model.interact === HUD_INTERACT.repair || model.interact === HUD_INTERACT.text) {
       const label = model.interact === HUD_INTERACT.text ? model.interactName : tx.repair;
@@ -1289,7 +1761,53 @@ export function drawHud(out: DrawList, fonts: UiFonts | null, model: Readonly<Hu
     }
   }
 
-  if (model.damageAmount > 0.01) drawDamage(out, model.damageAngle, model.damageAmount, left, top, right, bottom, s);
+  // M12 (fase 2): até 4 indicadores de dano perto da mira, girando com a vista (a origem fica no mundo); sem a lista,
+  // o indicador único de antes (`damageAngle`), no mesmo desenho.
+  if (!model.dead && !ended) {
+    const n = Math.min(model.damageCount ?? 0, HUD_DAMAGE_ARCS);
+    if (n > 0 && model.damageAngles && model.damageAlphas && model.damageWeights) {
+      for (let i = 0; i < n; i++) {
+        drawDamageArc(out, cx, cy, model.damageAngles[i]!, model.damageAlphas[i]!, model.damageWeights[i]!, s);
+      }
+    } else if (model.damageAmount > 0.01) drawDamageArc(out, cx, cy, model.damageAngle, model.damageAmount, 0.5, s);
+  }
+}
+
+/** M12 (fase 2): os "+N" ficam à direita da plaquinha do alto até esta fração da vista (depois, embaixo dela). */
+const GAIN_MAX_FRACTION = 0.4;
+/** M12 (fase 2): quanto o "+N" sobe (px de referência) enquanto some. */
+const GAIN_RISE_PX = 8;
+
+/**
+ * M12 (fase 2): a faixa do fim da partida ("VITÓRIA!", "DERROTA"…): uma faixa escura de lado a lado no meio da vista,
+ * com dois traços na cor do resultado e o texto grande na fonte display; entra seca (`endBannerIn`: alfa e 8 px).
+ */
+function drawEndBanner(
+  out: DrawList,
+  display: MsdfFont | null,
+  model: Readonly<HudModel>,
+  view: HudViewport,
+  s: number,
+  compact: boolean,
+  pad: number,
+): void {
+  const text = model.endBanner ?? '';
+  const color = model.endBannerColor ?? COLORS.texto;
+  const px0 = Math.max(HUD_METRICS.headingPx * s * (compact ? 1.4 : 2.2), view.minTextPx * 1.5);
+  const px = fitTextPx(display, text, px0, 0.02, view.width - pad * 8, view.minTextPx);
+  const capH = capHeightPx(display, px);
+  const h = Math.round(capH + pad * 4);
+  const x = Math.round(view.x);
+  const w = Math.round(view.width);
+  const y = Math.round(view.y + view.height / 2 - h / 2);
+  const p = clamp01(model.endBannerIn ?? 1);
+  const n0 = out.count;
+  pushRect(out, x, y, w, h, COLORS.hudFundo);
+  const line = Math.max(2, Math.round(1.5 * s));
+  pushRect(out, x, y, w, line, color);
+  pushRect(out, x, y + h - line, w, line, color);
+  paintText(out, display, text, view.x + view.width / 2, y + pad * 2, px, color, 0.02, 0.5);
+  if (p < 1) fadeCommands(out, n0, p, 0, enterSlidePx(p) * s);
 }
 
 // --- Tela de morte (M2, fase 2c) ---------------------------------------------------------------------------------
@@ -1525,7 +2043,9 @@ function drawDeathBanner(
   const weaponW = model.deathWeapon !== '' ? sepW + textWidth(hud, model.deathWeapon, labelPx) : 0;
   const hp = Math.max(0, Math.ceil(model.deathHp));
   const hpW = model.deathHp >= 0 ? sepW + numberWidth(hud, hp, 0, labelPx) + textWidth(hud, tx.hp, labelPx) : 0;
-  const lineW = nameW + weaponW + hpW;
+  // M12 (fase 2): "· NA CABEÇA" no fim da linha, em âmbar.
+  const headW = model.deathHead === true ? sepW + textWidth(hud, tx.head, labelPx, HUD_METRICS.labelTracking) : 0;
+  const lineW = nameW + weaponW + hpW + headW;
   const labelW = model.deathLabel !== '' ? textWidth(hud, model.deathLabel, labelPx * 0.8, 0.08) : 0;
   const hintW = model.hardTimeHint ? textWidth(hud, tx.hardTime, labelPx) : 0;
   const rulesW = model.deathRules !== '' ? textWidth(hud, model.deathRules, labelPx * 0.8) : 0;
@@ -1553,7 +2073,11 @@ function drawDeathBanner(
   if (hpW > 0) {
     x += paintText(out, hud, tx.weaponSeparator, x, ly, labelPx, COLORS.textoBaixo);
     x += paintNumber(out, hud, hp, 0, x, ly, labelPx, COLORS.texto);
-    paintText(out, hud, tx.hp, x, ly, labelPx, COLORS.textoBaixo);
+    x += paintText(out, hud, tx.hp, x, ly, labelPx, COLORS.textoBaixo);
+  }
+  if (headW > 0) {
+    x += paintText(out, hud, tx.weaponSeparator, x, ly, labelPx, COLORS.textoBaixo);
+    paintText(out, hud, tx.head, x, ly, labelPx, COLORS.acao, HUD_METRICS.labelTracking);
   }
   ly += capL + gap;
   if (rulesW > 0) {
@@ -1643,6 +2167,10 @@ function drawPrimaryRow(
   s: number,
   cats = false,
   reserveBelow = -1,
+  /** M12 (fase 2): a largura livre (no toque, sem a coluna dos botões); < 0 = a vista inteira. */
+  freeW = -1,
+  /** M12 (fase 2): até quantas linhas (no toque, com a faixa de quem matou no alto, cabem mais). */
+  maxRows: number = MAX_PRIMARY_ROWS,
 ): number {
   const n = Math.min(model.primaryNames.length, MAX_PRIMARY_OPTIONS);
   const smallPx = labelPx * 0.8;
@@ -1652,7 +2180,8 @@ function drawPrimaryRow(
     optionW[i] = (cats ? Math.max(nameW, textWidth(hud, model.primaryCategories[i] ?? '', smallPx)) : nameW) + pad * 2;
     total += optionW[i]!;
   }
-  const avail = view.width - 2 * Math.max(HUD_METRICS.marginX * s, view.insetLeft, view.insetRight);
+  const avail =
+    (freeW >= 0 ? freeW : view.width) - 2 * Math.max(HUD_METRICS.marginX * s, view.insetLeft, view.insetRight);
   const capL = capHeightPx(hud, labelPx);
   const capCat = cats ? capHeightPx(hud, smallPx) : 0;
   const h = Math.round(capL + pad * 2 + (cats ? gap * 0.5 + capCat : 0));
@@ -1662,7 +2191,7 @@ function drawPrimaryRow(
   let per = n;
   if (total > avail) {
     rows = 0;
-    for (let k = 2; k <= MAX_PRIMARY_ROWS && rows === 0; k++) {
+    for (let k = 2; k <= maxRows && rows === 0; k++) {
       const p = Math.ceil(n / k);
       let fits = true;
       for (let first = 0; first < n && fits; first += p) fits = rowWidth(first, Math.min(n, first + p), gap) <= avail;
@@ -1790,6 +2319,14 @@ export interface HudSharedModel {
    */
   modsLine: string;
   modsWarn: boolean;
+  /**
+   * M12 (fase 2): o seu time (um traço de 2 px na cor dele embaixo do placar dele; -1 = nenhum, como no versus do sofá)
+   * e a batida de cada placar que mudou (0..1, por time).
+   */
+  ownTeam?: number;
+  readonly teamBeat?: Float32Array;
+  /** M12 (fase 2, playtest): o rótulo curto antes do relógio ("FECHA EM", no Royale); `''` = só o relógio. */
+  clockLabel?: string;
 }
 
 export function createHudSharedModel(): HudSharedModel {
@@ -1806,6 +2343,9 @@ export function createHudSharedModel(): HudSharedModel {
     points: 0,
     pointOwner: new Int8Array(MAX_CONTROL_POINTS).fill(-1),
     pointProgress: new Float32Array(MAX_CONTROL_POINTS),
+    ownTeam: -1,
+    teamBeat: new Float32Array(4),
+    clockLabel: '',
   };
 }
 
@@ -1887,6 +2427,7 @@ function sharedContentWidth(
   icon: number,
   gap: number,
   tx: HudTexts,
+  labelPx: number,
 ): number {
   let w = 0;
   const teams = Math.max(0, Math.min(4, Math.trunc(model.teamCount)));
@@ -1895,6 +2436,8 @@ function sharedContentWidth(
   }
   if (model.timeLeftS >= 0) {
     const total = Math.ceil(model.timeLeftS);
+    const label = model.clockLabel ?? '';
+    if (label !== '') w += textWidth(font, label, labelPx, HUD_METRICS.labelTracking) + gap;
     w += textWidth(font, tx.time[0] as string, numberPx) + numberWidth(font, Math.floor(total / 60), 0, numberPx);
     w += textWidth(font, tx.time[1] as string, numberPx) + numberWidth(font, total % 60, 0, numberPx, 2);
     w += textWidth(font, tx.time[2] as string, numberPx);
@@ -1906,7 +2449,10 @@ function sharedContentWidth(
   return w;
 }
 
-/** Placar e tempo numa linha: metade dos times, o relógio, a outra metade. Devolve a largura. */
+/**
+ * Placar e tempo numa linha: metade dos times, o relógio, a outra metade. Devolve a largura. M12 (fase 2): o seu time
+ * com o traço embaixo, o placar que mudou com a batida, o relógio âmbar a 60 s e vermelho a 10 s.
+ */
 function paintSharedLine(
   out: DrawList,
   font: MsdfFont | null,
@@ -1917,29 +2463,28 @@ function paintSharedLine(
   icon: number,
   gap: number,
   tx: HudTexts,
+  s: number,
+  labelPx: number,
 ): number {
   const teams = Math.max(0, Math.min(4, Math.trunc(model.teamCount)));
   const hasTime = model.timeLeftS >= 0;
   const leftTeams = hasTime ? Math.ceil(teams / 2) : teams;
   let pen = x;
   for (let i = 0; i < leftTeams; i++) {
-    pen += paintTeamScore(
-      out,
-      font,
-      i,
-      model.teamScores[i] ?? 0,
-      model.teamColors[i] ?? COLORS.texto,
-      pen,
-      capTop,
-      numberPx,
-      icon,
-      gap,
-    );
+    pen += paintTeamScore(out, font, model, i, pen, capTop, numberPx, icon, gap, s);
     if (hasTime || i < teams - 1) pen += gap * 2;
   }
   if (hasTime) {
     const total = Math.ceil(model.timeLeftS);
-    const color = total <= 10 ? COLORS.perigo : COLORS.texto;
+    const color = total <= 10 ? COLORS.perigo : total <= 60 ? COLORS.acao : COLORS.texto;
+    const label = model.clockLabel ?? '';
+    if (label !== '') {
+      const lpx = labelPx;
+      const capN = capHeightPx(font, numberPx);
+      const capS = capHeightPx(font, lpx);
+      pen += paintText(out, font, label, pen, capTop + capN - capS, lpx, COLORS.textoBaixo, HUD_METRICS.labelTracking);
+      pen += gap;
+    }
     pen += paintText(out, font, tx.time[0] as string, pen, capTop, numberPx, color);
     pen += paintNumber(out, font, Math.floor(total / 60), 0, pen, capTop, numberPx, color);
     pen += paintText(out, font, tx.time[1] as string, pen, capTop, numberPx, color);
@@ -1948,38 +2493,42 @@ function paintSharedLine(
   }
   for (let i = leftTeams; i < teams; i++) {
     pen += gap * 2;
-    pen += paintTeamScore(
-      out,
-      font,
-      i,
-      model.teamScores[i] ?? 0,
-      model.teamColors[i] ?? COLORS.texto,
-      pen,
-      capTop,
-      numberPx,
-      icon,
-      gap,
-    );
+    pen += paintTeamScore(out, font, model, i, pen, capTop, numberPx, icon, gap, s);
   }
   return pen - x;
 }
 
-/** Ícone + placar de um time, na cor do time. Devolve a largura. */
+/**
+ * Ícone + placar de um time, na cor do time. Devolve a largura. M12 (fase 2): o número que mudou dá uma batida (escala
+ * em volta do meio dele) e o seu time ganha um traço de 2 px embaixo, na cor dele.
+ */
 function paintTeamScore(
   out: DrawList,
   font: MsdfFont | null,
+  model: Readonly<HudSharedModel>,
   team: number,
-  score: number,
-  color: number,
   x: number,
   capTop: number,
   numberPx: number,
   icon: number,
   gap: number,
+  s: number,
 ): number {
+  const score = model.teamScores[team] ?? 0;
+  const color = model.teamColors[team] ?? COLORS.texto;
   const capN = capHeightPx(font, numberPx);
   paintIcon(out, team, x, capTop + (capN - icon) / 2, icon, color);
-  return icon + gap / 2 + paintNumber(out, font, score, 0, x + icon + gap / 2, capTop, numberPx, color);
+  const n0 = out.count;
+  const nx = x + icon + gap / 2;
+  const nw = paintNumber(out, font, score, 0, nx, capTop, numberPx, color);
+  const beat = model.teamBeat?.[team] ?? 0;
+  if (beat > 0.001) scaleCommands(out, n0, nx + nw / 2, capTop + capN / 2, 1 + 0.3 * clamp01(beat));
+  const w = icon + gap / 2 + nw;
+  if (model.ownTeam === team) {
+    const th = Math.max(2, Math.round(s));
+    pushRect(out, Math.round(x), Math.round(capTop + capN + Math.max(1, Math.round(s))), Math.round(w), th, color);
+  }
+  return w;
 }
 
 /** M6 (fase 4): as duas metades da linha dos modificadores quando ela não cabe (refeitas só quando a linha muda). */
@@ -2051,14 +2600,18 @@ function drawModsLine(
 
 /**
  * Desenha o placar e o tempo na área compartilhada (ver `layoutHudScreen`). Sem relógio e sem times, só o fundo do
- * quadrante livre (3P). Sem alocação.
+ * quadrante livre (3P). Sem alocação. M12 (fase 2): `bounds` recebe o retângulo da plaquinha do placar (x, y, largura,
+ * altura; largura 0 = nenhuma no alto nem no centro), para o kill feed não passar dela; com 5 posições, a 5ª é o pé de
+ * tudo o que vem embaixo dela.
  */
 export function drawHudShared(
   out: DrawList,
   fonts: UiFonts | null,
   model: Readonly<HudSharedModel>,
   area: HudSharedArea,
+  bounds?: Float32Array,
 ): void {
+  if (bounds !== undefined) bounds.fill(0);
   const tx = hudTexts();
   const font: MsdfFont | null = fonts?.hud ?? null;
   const s = area.scale > 0 ? area.scale : 1;
@@ -2110,22 +2663,46 @@ export function drawHudShared(
       const numberPx = hudNumberPx(s, area.minTextPx);
       const capN = capHeightPx(font, numberPx);
       const icon = Math.round(capN * 0.8);
-      const w = sharedContentWidth(font, model, numberPx, icon, gap, tx) + pad * 2;
+      const w = sharedContentWidth(font, model, numberPx, icon, gap, tx, hudLabelPx(s, area.minTextPx)) + pad * 2;
       const h = hudSharedPlateHeight(s, area.minTextPx);
       const x = Math.round(area.x + (area.width - w) / 2);
       const y = Math.round(area.y + gap);
       plate(out, x, y, w, h, s);
-      paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
+      paintSharedLine(
+        out,
+        font,
+        model,
+        x + pad,
+        y + (h - capN) / 2,
+        numberPx,
+        icon,
+        gap,
+        tx,
+        s,
+        hudLabelPx(s, area.minTextPx),
+      );
       drawModsLine(out, font, model, area.x + area.width / 2, y + h + gap, s, area.minTextPx, area.width - pad * 2);
       return;
     }
     // Quadrante livre: o mesmo placar, em dobro, centrado.
     const numberPx = hudNumberPx(s, area.minTextPx) * 2;
     const icon = Math.round(capHeightPx(font, numberPx) * 0.8);
-    const w = sharedContentWidth(font, model, numberPx, icon, gap, tx);
+    const w = sharedContentWidth(font, model, numberPx, icon, gap, tx, hudLabelPx(s, area.minTextPx));
     const capN = capHeightPx(font, numberPx);
     const x = area.x + (area.width - w) / 2;
-    paintSharedLine(out, font, model, x, area.y + (area.height - capN) / 2, numberPx, icon, gap, tx);
+    paintSharedLine(
+      out,
+      font,
+      model,
+      x,
+      area.y + (area.height - capN) / 2,
+      numberPx,
+      icon,
+      gap,
+      tx,
+      s,
+      hudLabelPx(s, area.minTextPx),
+    );
     const below3 = area.y + (area.height + capN) / 2 + gap;
     drawModsLine(out, font, model, area.x + area.width / 2, below3, s, area.minTextPx, area.width - pad * 2);
     return;
@@ -2142,7 +2719,7 @@ export function drawHudShared(
   const numberPx = hudNumberPx(s, area.minTextPx);
   const capN = capHeightPx(font, numberPx);
   const icon = Math.round(capN * 0.8);
-  const w = sharedContentWidth(font, model, numberPx, icon, gap, tx) + pad * 2;
+  const w = sharedContentWidth(font, model, numberPx, icon, gap, tx, hudLabelPx(s, area.minTextPx)) + pad * 2;
   const h = hudSharedPlateHeight(s, area.minTextPx);
   const x = Math.round(area.x + (area.width - w) / 2);
   const y =
@@ -2150,7 +2727,25 @@ export function drawHudShared(
       ? Math.round(area.y + Math.max(area.insetTop, HUD_METRICS.marginY * s))
       : Math.round(area.y + (area.height - h) / 2);
   plate(out, x, y, w, h, s);
-  paintSharedLine(out, font, model, x + pad, y + (h - capN) / 2, numberPx, icon, gap, tx);
+  if (bounds !== undefined) {
+    bounds[0] = x;
+    bounds[1] = y;
+    bounds[2] = Math.round(w);
+    bounds[3] = h;
+  }
+  paintSharedLine(
+    out,
+    font,
+    model,
+    x + pad,
+    y + (h - capN) / 2,
+    numberPx,
+    icon,
+    gap,
+    tx,
+    s,
+    hudLabelPx(s, area.minTextPx),
+  );
   // M6 (fase 1): os pontos do Domination embaixo do placar (a morte súbita vai embaixo deles).
   const rowH = paintPointsRow(out, font, model, area.x + area.width / 2, Math.round(y + h + gap), s, area.minTextPx);
   let below = Math.round(y + h + gap + (rowH > 0 ? rowH + gap : 0));
@@ -2172,7 +2767,9 @@ export function drawHudShared(
       0.5,
     );
   }
-  drawModsLine(out, font, model, area.x + area.width / 2, below, s, area.minTextPx, area.width - pad * 2);
+  const modsH = drawModsLine(out, font, model, area.x + area.width / 2, below, s, area.minTextPx, area.width - pad * 2);
+  // M12 (fase 2, revisão): o pé de tudo o que vem embaixo da plaquinha (os pontos, a morte súbita, os modificadores).
+  if (bounds !== undefined && bounds.length > 4) bounds[4] = below + modsH;
 }
 
 // --- Divisão da tela (1 a 4 vistas) --------------------------------------------------------------------------------

@@ -53,6 +53,7 @@ import {
   createKeyboardMouseProfile,
   createTouchProfile,
   BUTTON,
+  DEFAULT_TOUCH_LAYOUT,
   FRAME_HUMAN,
   keyIndex,
   MAX_GAMEPADS,
@@ -119,6 +120,7 @@ import {
   BOX,
   BOX_PHASE,
   CHAOS_MODS,
+  DEFAULT_PRIMARY,
   ENTITY_FLAG,
   ENTITY_KIND,
   entityIndex,
@@ -202,8 +204,12 @@ import {
   COLORS,
   createKillFeedModel,
   createScoreboardModel,
+  createOverlayPlace,
+  drawCenterNotice,
   drawKillFeed,
+  placeOverlay,
   drawMatchCountdown,
+  drawMatchGo,
   drawScoreboard,
   directorShiftText,
   MAX_ALLY_MARKERS,
@@ -236,6 +242,7 @@ import {
   HUD_CROSSHAIR,
   HUD_DOWNED,
   HUD_INTERACT,
+  HUD_TOUCH_SIDE,
   layoutHudScreen,
   measureText,
   MIN_TEXT,
@@ -289,6 +296,7 @@ import {
   type PlayerSeatLine,
 } from '../pause.ts';
 import {
+  cascadeResult,
   prizeLine,
   RESULT_ACTION,
   resultScreen,
@@ -321,6 +329,8 @@ import {
   deathCamBackoff,
   deathTexts,
   DEATH_CAM,
+  deathArmed,
+  snapshotHeld,
   endDeath,
   fillDeathBanner,
   isCurrentEntity,
@@ -336,6 +346,7 @@ import {
   type DeathState,
 } from './death.ts';
 import { createFigureClip, type FigureClipRun } from './figure-clip.ts';
+import * as hf from './hud-feel.ts';
 import { projectToEdge, projectToView, type ProjectCamera, type ProjectRect } from './markers.ts';
 import {
   createMatchStats,
@@ -422,8 +433,6 @@ import { ownerReserveFor } from '../owner-reserve.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
-const HIT_MARKER_S = 0.15;
-const DAMAGE_S = 0.8;
 const RECOIL_S = 0.12;
 const FIRING_S = 0.08;
 const SPAWN_S = 0.4;
@@ -475,6 +484,8 @@ const EMOTE_HEIGHT_M = 2.35;
 const RESULT_DELAY_S = 2.5;
 /** M7 (fase 8, revisão): no Royale, o resultado de quem saiu vem depois da câmera de morte (s). */
 const ROYALE_RESULT_DELAY_S = 4;
+/** M12 (fase 2): o resultado com a trava, a cascata e a contagem já passadas (o gancho dos prints) (s). */
+const RESULT_SETTLED_S = 10;
 /** Cubinhos por impacto (o render limita pelo teto do perfil). */
 const CUBES_BLOCK = 6;
 const CUBES_ACTOR = 5;
@@ -917,7 +928,6 @@ interface ViewSlot {
   controller: number;
   eye: number;
   adsBlend: number;
-  damageT: number;
   /** Clarão de tiro na luz ambiente desta vista, 0..1 (arte-ux.md §1.8; vai para `ViewDesc.flash`). */
   flash: number;
   /**
@@ -927,6 +937,8 @@ interface ViewSlot {
   readonly feel: ViewFeel;
   /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
   readonly death: DeathState;
+  /** M12 (fase 2): os tempos da HUD com peso desta vista (`scene/hud-feel.ts`). */
+  readonly hudFeel: hf.HudFeel;
   /** M7 (fase 8): o Royale: a colocação e o texto de quem saiu, a arma da troca e o aviso dela (feitos ao mudar). */
   royalePlace: number;
   royaleOut: string;
@@ -1474,10 +1486,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       controller: -1,
       eye: -1,
       adsBlend: 0,
-      damageT: 0,
       flash: 0,
       feel: createViewFeel(),
       death: createDeathState(),
+      hudFeel: hf.createHudFeel(),
       royalePlace: -1,
       royaleOut: '',
       royaleArmor: -1,
@@ -1513,6 +1525,310 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   const sharedHud = createHudSharedModel();
   for (let i = 0; i < sharedHud.teamColors.length; i++) sharedHud.teamColors[i] = teamColors[i]!;
+
+  // --- M12 (fase 2): a HUD com peso (a lógica em `hud-feel.ts`; aqui, só a cola com a sim e as vistas) ---
+  const matchFeel = hf.createMatchFeel();
+  const streakTx = hf.streakTexts();
+  const momentTx = hf.momentTexts();
+  /** "Reduzir efeitos": o ajuste (hoje "Reduzir tremor") ou o `prefers-reduced-motion` da plataforma. */
+  const reduceFx = (): boolean => host.settings.current.accessibility.reduceShake || platform.features.reducedMotion;
+  /** As explosões deste lote de eventos (até 4): o indicador de dano aponta para o centro delas. */
+  const blasts = new Float32Array(16);
+  let blastCount = 0;
+  function noteBlast(x: number, y: number, z: number, r: number): void {
+    if (blastCount >= 4) return;
+    const o = blastCount++ * 4;
+    blasts[o] = x;
+    blasts[o + 1] = y;
+    blasts[o + 2] = z;
+    blasts[o + 3] = r;
+  }
+  const originScratch = new Float32Array(3);
+  /**
+   * De onde veio o dano em (px, py, pz) com a direção (dx, dy, dz): o centro da explosão deste lote que o explica, ou
+   * quem atirou (a altura do peito), ou 4 m para trás da direção. `false` = sem direção (a queda).
+   */
+  function damageOrigin(
+    v: SimView,
+    shooter: number,
+    target: number,
+    px: number,
+    py: number,
+    pz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+  ): boolean {
+    for (let k = 0; k < blastCount; k++) {
+      const o = k * 4;
+      const ox = px - blasts[o]!;
+      const oy = py - blasts[o + 1]!;
+      const oz = pz - blasts[o + 2]!;
+      const d = Math.hypot(ox, oy, oz);
+      if (d <= blasts[o + 3]! + 0.5 && (d < 1e-3 || (ox * dx + oy * dy + oz * dz) / d > 0.8)) {
+        originScratch[0] = blasts[o]!;
+        originScratch[1] = blasts[o + 1]!;
+        originScratch[2] = blasts[o + 2]!;
+        return true;
+      }
+    }
+    const si = entityIndex(shooter);
+    if (shooter !== NULL_ENTITY && shooter !== target && si < v.count && v.alive[si] === 1) {
+      originScratch[0] = v.position[si * 3]!;
+      originScratch[1] = v.position[si * 3 + 1]! + 1.2;
+      originScratch[2] = v.position[si * 3 + 2]!;
+      return true;
+    }
+    if (dx * dx + dz * dz < 1e-4) return false;
+    originScratch[0] = px - dx * 4;
+    originScratch[1] = py - dy * 4;
+    originScratch[2] = pz - dz * 4;
+    return true;
+  }
+  /** Um abate: o X, o nome e a sequência na vista de quem matou; a vingança e a sequência zerada na de quem morreu. */
+  function feelKills(s: Sim, v: SimView, victim: number, killer: number, head: boolean): void {
+    const vi = entityIndex(victim);
+    for (let k = 0; k < slots.length; k++) {
+      const slot = slots[k]!;
+      if (slot.controller < 0) continue;
+      const mine = s.controllerEntity(slot.controller);
+      if (mine === victim) hf.feelDeath(slot.hudFeel, killer, victim);
+      else if (mine === killer && vi < v.count) {
+        hf.feelKill(slot.hudFeel, timeS, nameOf(v, vi).toUpperCase(), head, victim, !zombiesMode, streakTx);
+      }
+    }
+  }
+  /** A partida acabou: a faixa de cada vista ("VITÓRIA!", "DERROTA", "EMPATE", "Fulano venceu"; no Zombies, a onda). */
+  function feelEnded(s: Sim, v: SimView): void {
+    hf.feelEnd(matchFeel);
+    for (let k = 0; k < slots.length; k++) {
+      const f = slots[k]!.hudFeel;
+      const c = slots[k]!.controller;
+      const watching = k === 0 && aquarium && pilot < 0;
+      f.endText = '';
+      if (c < 0 || (seatOf(c) < 0 && !watching)) continue;
+      const sum = summarizeMatch(matchStats, v, watching ? -1 : entityIndex(s.controllerEntity(c)), solo, juggernaut);
+      const wave = v.match.zombieWave;
+      const text = watching
+        ? aquariumResultTitle(v, sum.winner)
+        : zombiesMode
+          ? t(sum.outcome === 'win' ? 'result.zombiesWin' : 'result.zombiesLoss', { waves: wave, wave })
+          : sum.outcome === 'win'
+            ? t('result.win')
+            : sum.outcome === 'draw'
+              ? t('result.draw')
+              : solo && sum.winner >= 0
+                ? t('result.ffaWinner', { name: nameOf(v, sum.winner) })
+                : t('result.loss');
+      f.endText = text.toUpperCase();
+      f.endColor = watching
+        ? COLORS.texto
+        : sum.outcome === 'win'
+          ? COLORS.acao
+          : sum.outcome === 'loss'
+            ? COLORS.perigo
+            : COLORS.texto;
+    }
+  }
+  /** O placar do alto: a plaquinha desenhada (o kill feed não passa dela). */
+  const sharedBounds = new Float32Array(5);
+  const overlayPlace = createOverlayPlace();
+  /** M12 (fase 2): o jogador local já escolheu a primária na tela de morte (senão, a destacada é a da mão). */
+  const seatChose = [false, false, false, false];
+  /** M12 (fase 2, revisão): a entrada do quadro (a morte guarda o que estava apertado nela). */
+  let frameRaw: Readonly<RawInputState> | null = null;
+  /**
+   * M12 (fase 2, playtest): na morte, a primária destacada no radial é exatamente a que vai nascer: a escolhida antes
+   * (se o time ainda pode pegar) ou a que estava na mão; e ela vai para o quadro (o `InputFrame.primary`).
+   */
+  function syncPrimary(v: SimView, victim: number, controller: number): void {
+    const seat = seatOf(controller);
+    const m = mapperOf(controller);
+    if (seat < 0 || m === null || fixedLoadout || strikeMode || royaleMode || sandboxElimination || mapWeapons) return;
+    const e = entityIndex(victim);
+    const choices = teamChoices[choicesOf(e < v.count ? v.team[e]! : 0)]!;
+    if (choices.length <= 1) return;
+    const num = seatNum[seat]!;
+    let pick = seatPrimary[num]!;
+    // Revisão: no Sandbox com as Ferramentas do Dono, o "dar arma" muda a primária da sim: sem escolha, não mexe.
+    if (!seatChose[num] && ownerTools !== null) return;
+    if (!seatChose[num] || !choices.includes(pick)) {
+      // Revisão: sem escolha, a primária padrão da sim (a da mão pode ser a de um modificador, como a troca por abate).
+      const def = PRIMARY_ORDER.indexOf(DEFAULT_PRIMARY);
+      pick = choices.includes(def) ? def : choices[0]!;
+    }
+    seatPrimary[num] = pick;
+    m.setPrimary(PRIMARY_ORDER[pick]! + 1);
+  }
+  /**
+   * O "R recarrega" do pente vazio: a tecla do dispositivo de cada vista (como a da dica; refeita só quando ele muda;
+   * revisão: uma por vista, o sofá mistura aparelhos).
+   */
+  const reloadKind: (DeviceKind | null)[] = [null, null, null, null];
+  const reloadKey = ['', '', '', ''];
+  const reloadGlyph = [-1, -1, -1, -1];
+  const reloadText = t('tip.reload');
+  function reloadLabel(s: number, kind: DeviceKind): void {
+    if (kind === reloadKind[s]) return;
+    reloadKind[s] = kind;
+    const sources = profileBindings(profiles[kind], TIPS.reload.action);
+    const src = sources[0];
+    reloadKey[s] = src !== undefined ? bindingLabel(src) : '';
+    reloadGlyph[s] =
+      src !== undefined && src.device === 'padButton' && !src.hold ? FACE_GLYPHS.indexOf(src.button) : -1;
+  }
+  /** Revisão: o indicador de dano olha do bobo da vista (na 3ª pessoa a câmera fica 2,6 m atrás), com o yaw da câmera. */
+  const feelCam = { x: 0, z: 0, yaw: 0 };
+  const touchArea = hf.createTouchBounds();
+  /** Os campos da HUD com peso da vista `s` (o fim do `fillHud`): os tempos, a munição, o toque e a faixa do fim. */
+  function fillFeel(s: number, m: HudModel, v: SimView, e: number, held: WeaponDef | null): void {
+    const slot = slots[s]!;
+    const reduce = reduceFx();
+    const id = sim.controllerEntity(slot.controller);
+    if (slot.hudFeel.entity !== id) {
+      hf.resetHudFeel(slot.hudFeel);
+      slot.hudFeel.entity = id;
+    }
+    hf.feelPoints(slot.hudFeel, (zombiesMode || strikeMode) && !m.dead ? v.points[e]! : -1);
+    feelCam.x = v.position[e * 3]!;
+    feelCam.z = v.position[e * 3 + 2]!;
+    feelCam.yaw = slot.desc.camera.yaw;
+    hf.fillFeelHud(m, slot.hudFeel, feelCam, reduce);
+    // A regra que desliga o hitmarker desliga o X de abate também.
+    if (!showHitmarker) m.killMarker = 0;
+    m.clipSize = held !== null ? held.clipSize : 0;
+    // A recarga só com a sim recarregando (revisão: a troca de arma no meio dela zera a da sim e não avisa); por
+    // cartucho (a escopeta), o pente que enche; senão, o tempo desde o começo.
+    const reloading = !m.dead && held !== null && (v.flags[e]! & ENTITY_FLAG.reloading) !== 0;
+    const perRound = held !== null && held.reloadPerRoundS > 0;
+    const r0 = e < reloadStart.length ? reloadStart[e]! : -1;
+    const dur = e < reloadDur.length ? reloadDur[e]! : 1;
+    const reload = hf.reloadProgress(reloading, perRound, m.clip, m.clipSize, r0, dur, timeS);
+    m.reload = reload;
+    // Morto: o véu só com a câmera de morte e o seletor na tela (não no espectador do Strike, Royale e Zombies).
+    const st = slot.death;
+    m.deathVeil =
+      m.dead && st.t >= 0 && (st.t < DEATH_CAM.turnS + DEATH_CAM.holdS || m.primaryNames.length > 0) ? 1 : 0;
+    // "R recarrega": pente vazio com reserva e sem recarregar, sem dobrar com a dica `reload` na tela.
+    const seat = seatOf(slot.controller);
+    const empty =
+      !m.dead &&
+      held !== null &&
+      held.clipSize > 0 &&
+      held.fire !== WEAPON_FIRE.thrown &&
+      m.clip <= 0 &&
+      m.reserve > 0 &&
+      reload < 0 &&
+      (v.flags[e]! & ENTITY_FLAG.reloading) === 0;
+    m.reloadKey = '';
+    m.reloadGlyph = -1;
+    if (empty && seat >= 0 && !(seat === 0 && tips.current === 'reload' && m.tipAlpha > 0.01)) {
+      reloadLabel(s, seat === 0 ? device : (extraDevices[seat - 1]?.kind ?? device));
+      m.reloadKey = reloadKey[s]!;
+      m.reloadGlyph = reloadGlyph[s]!;
+      m.reloadText = reloadText;
+    }
+    // No toque: a munição ao lado da vida, e a tela de morte fora da coluna dos botões (espelha no canhoto).
+    if (s === 0 && humans > 0 && device === 'touch') {
+      const layout = player.profile.touch ?? DEFAULT_TOUCH_LAYOUT;
+      m.touchSide = layout.leftHanded ? HUD_TOUCH_SIDE.leftHanded : HUD_TOUCH_SIDE.rightHanded;
+      m.touchReserve = hf.touchBounds(layout, platform.graphics.pixelRatio, touchArea).reserve;
+    } else m.touchSide = HUD_TOUCH_SIDE.none;
+    // A faixa do fim (a retícula, a munição e as dicas saem com ela).
+    m.endBanner = matchFeel.endAge >= 0 && !resultShown ? slot.hudFeel.endText : '';
+    m.endBannerColor = slot.hudFeel.endColor;
+    m.endBannerIn = hf.endBannerIn(matchFeel, reduce);
+  }
+  /** O time de todos os jogadores locais (o traço do placar), ou -1: FFA, versus do sofá, sem humanos. */
+  function ownTeamOfLocals(): number {
+    if (ffa || humans <= 0) return -1;
+    const v = sim.view();
+    let team = -1;
+    for (let k = 0; k < seatCtrl.length; k++) {
+      const i = entityIndex(sim.controllerEntity(seatCtrl[k]!));
+      if (i >= v.count) continue;
+      if (team < 0) team = v.team[i]!;
+      else if (team !== v.team[i]) return -1;
+    }
+    return team;
+  }
+  /**
+   * Por cima das vistas, uma vez por quadro: o kill feed (no 1–2P no alto à direita, sem passar da plaquinha do placar
+   * nem dos botões de toque; no 3–4P, 2 linhas no cruzamento central), a contagem (a da partida e os 3 s finais do
+   * descanso do Zombies), o "VALENDO!" e o aviso central (no 3–4P no cruzamento, menor). Devolve se a contagem ou o
+   * "VALENDO!" estão na tela.
+   */
+  function drawMatchOverlay(
+    list: DrawList,
+    fonts: UiFonts | null,
+    w: number,
+    h: number,
+    hs: number,
+    minText: number,
+    lay: HudScreenLayout,
+    mv: SimView['match'],
+  ): boolean {
+    const reduce = reduceFx();
+    // O lugar do feed e do aviso (`placeOverlay`): no toque destro, o feed entre os botões de cima e os de baixo.
+    const layout = player.profile.touch ?? DEFAULT_TOUCH_LAYOUT;
+    const touchOn = humans > 0 && device === 'touch' && !layout.leftHanded;
+    const tb = touchOn ? hf.touchBounds(layout, platform.graphics.pixelRatio, touchArea) : null;
+    const spareTop = lay.shared.mode === 'spare' ? hudSpareTopBand(lay.shared, sharedHud) : 0;
+    const p = placeOverlay(
+      overlayPlace,
+      fonts,
+      killFeed,
+      lay,
+      sharedBounds,
+      spareTop,
+      w,
+      h,
+      minText,
+      tb?.top ?? 0,
+      tb?.bottom ?? 0,
+    );
+    drawKillFeed(
+      list,
+      fonts,
+      killFeed,
+      p.feedX,
+      p.feedTop,
+      p.feedScale,
+      minText,
+      p.feedLines,
+      p.feedMaxW,
+      reduce,
+      p.feedAlign,
+    );
+    const countdown = mv.phase === 'warmup' && mv.countdownTicks > 0;
+    const rest = zombiesMode && mv.zombieRestTicks > 0 && mv.zombieRestTicks <= 3 * sim.hz;
+    if (countdown) {
+      drawMatchCountdown(list, fonts, mv.countdownTicks / sim.hz, todayLine, w, h, minText, nemesisLine, reduce);
+    } else if (rest) {
+      drawMatchCountdown(list, fonts, mv.zombieRestTicks / sim.hz, '', w, h, minText, '', reduce);
+    } else if (matchFeel.goAge >= 0) {
+      drawMatchGo(list, fonts, momentTx.go, matchFeel.goAge, w, h, minText, reduce);
+    } else if (matchFeel.noticeAge >= 0 && matchFeel.endAge < 0) {
+      // 1P: no meio, a 32% da altura; 2P e 4P: à esquerda da plaquinha do cruzamento, menor; 3P: no quadrante livre.
+      drawCenterNotice(
+        list,
+        fonts,
+        matchFeel.notice,
+        matchFeel.noticeAge,
+        p.noticeX,
+        p.noticeY,
+        p.noticeMaxW,
+        p.noticeScale,
+        minText,
+        p.noticeSmall,
+        reduce,
+        p.noticeVAlign,
+        p.noticeHAlign,
+        p.noticeMinX,
+      );
+    }
+    return countdown || rest || matchFeel.goAge >= 0;
+  }
   // M2 (fase 5d): Bobo Training: sem placar nem relógio; a linha dos números, refeita só quando eles mudam.
   const training = recipe.mode === 'training';
   /** M3 (fase 2d): Bobo Zombies: a linha da onda no lugar do placar, refeita só quando a onda ou os números mudam. */
@@ -2153,11 +2469,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
     const human = humans > 0 ? s.controllerEntity(me) : NULL_ENTITY;
     if (matchStats.capacity < v.capacity) matchStats = createMatchStats(v.capacity);
+    blastCount = 0;
     for (let k = 0; k < events.length; k++) {
       const ev = events[k]!;
       matchSound.event(ev, v, timeS);
       recordMatchEvent(matchStats, ev, human);
-      if (ev.type === 'matchPhase' && ev.phase === 'ended' && endedAt < 0) endedAt = timeS;
+      if (ev.type === 'matchPhase' && ev.phase === 'ended' && endedAt < 0) {
+        endedAt = timeS;
+        feelEnded(s, v);
+      }
       // M10 (revisão): os virotes cravados saem quando a partida muda de fase e quando uma porta do Zombies abre (o
       // virote podia estar nela). A rodada nova do BoboStrike e do Jugg Fixo limpa em `fillStuckBolts`.
       if (ev.type === 'matchPhase' || (ev.type === 'door' && ev.action === 'open')) clearStuckBolts();
@@ -2222,24 +2542,29 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const slot = slots[sIdx]!;
             if (slot.controller < 0) continue;
             const mine = s.controllerEntity(slot.controller);
-            // M2 (fase 4e): a regra da partida pode desligar o hitmarker.
-            if (mine === ev.shooter && showHitmarker) {
-              if (ev.part === 'head') slot.model.headshotMarker = 1;
-              else slot.model.hitMarker = 1;
-            }
-            if (mine === ev.target) {
+            // M2 (fase 4e): a regra da partida pode desligar o hitmarker. M12 (fase 2): com peso e cinza sem dano.
+            if (mine === ev.shooter && showHitmarker) hf.feelHit(slot.hudFeel, ev.part === 'head', ev.damage <= 0);
+            if (mine === ev.target && ev.damage > 0) {
               rumble(sIdx, Math.min(1, ev.damage / 60), 0.35, 120);
-              // De onde veio o tiro (o contrário da direção), relativo à mira (positivo = à esquerda, como o yaw).
-              const from = Math.atan2(ev.dirX, ev.dirZ);
-              slot.model.damageAngle = wrapAngle(from - slot.desc.camera.yaw);
-              slot.model.damageAmount = 1;
-              slot.damageT = DAMAGE_S;
+              // M12 (fase 2): o indicador guarda a origem no mundo (o centro da explosão ou quem atirou).
+              if (damageOrigin(v, ev.shooter, ev.target, ev.x, ev.y, ev.z, ev.dirX, ev.dirY, ev.dirZ))
+                hf.feelDamage(
+                  slot.hudFeel,
+                  originScratch[0]!,
+                  originScratch[1]!,
+                  originScratch[2]!,
+                  ev.damage,
+                  slot.model.maxHealth,
+                  ev.shooter,
+                );
               // M12 (fase 1): o solavanco de quem levou (trauma pequeno e o empurrão para longe do tiro). Sem direção:
-              // a queda (no pé, sem atirador) empurra para baixo; a zona e o sangrar, só o trauma.
+              // a queda (no pé, sem atirador) empurra para baixo; a zona e o sangrar, só o trauma. O ângulo de onde veio
+              // o tiro (o contrário da direção), relativo à mira (positivo = à esquerda, como o yaw).
+              const hurtAngle = wrapAngle(Math.atan2(ev.dirX, ev.dirZ) - slot.desc.camera.yaw);
               const aimed = ev.dirX * ev.dirX + ev.dirZ * ev.dirZ > 1e-6;
               const fall = !aimed && ev.shooter === NULL_ENTITY && ev.bodyPart === FIGURE_BONE.footR;
               const push = aimed ? HURT_PUSH.away : fall ? HURT_PUSH.down : HURT_PUSH.none;
-              feelHurt(slot.feel, ev.damage, slot.model.damageAngle, push, reducedFx);
+              feelHurt(slot.feel, ev.damage, hurtAngle, push, reducedFx);
             }
           }
           break;
@@ -2289,8 +2614,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           d.scale = v.bodyScale[i]! * drawnScale(v, i);
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
           pushDeath(fx, d);
-          onDeath(s, ev.victim, ev.killer, ev.weapon);
+          onDeath(s, ev.victim, ev.killer, ev.weapon, ev.headshot);
           feedKill(v, ev.victim, ev.killer, ev.weapon, ev.headshot);
+          feelKills(s, v, ev.victim, ev.killer, ev.headshot);
           break;
         }
         case 'signal':
@@ -2383,6 +2709,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             }
           }
           if (ev.weapon !== WEAPON_GOO) pushExplosion(fx, ev.x, ev.y, ev.z, ev.radius);
+          noteBlast(ev.x, ev.y, ev.z, ev.radius);
           flashViews(ev.x, ev.y, ev.z, -1);
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
@@ -2474,7 +2801,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const j = juggIndex(v);
       if (j !== lastJugg) {
         lastJugg = j;
-        if (j >= 0) feedJugg(v, j);
+        if (j >= 0) {
+          feedJugg(v, j);
+          // M12 (fase 2): o Jugg novo também no aviso central ("FULANO VIROU O JUGG").
+          const waiting = v.match.phase === 'warmup' && v.match.countdownTicks > 0;
+          hf.showNotice(matchFeel, `${nameOf(v, j)} ${juggFeed.is} ${juggFeed.jugg}`.toUpperCase(), waiting);
+        }
       }
     }
   };
@@ -2811,6 +3143,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     player.writeFrame(drain, 0);
     player.setPrimary(0);
     seatPrimary[0] = 0;
+    seatChose[0] = false;
     const slot = slots[0]!;
     slot.buyOpen = false;
     slot.buyPick = -1;
@@ -3107,7 +3440,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     },
     showResult(previewRecord): void {
       // Os prints não gravam estatística (o recorde, quando pedido, é só a prévia do título).
-      if (humans > 0 && !resultShown) showResult(false, previewRecord ?? null);
+      if (humans > 0 && !resultShown) {
+        showResult(false, previewRecord ?? null);
+        // M12 (fase 2): o dos prints já entra assentado (sem a trava, a cascata e a contagem no meio do print).
+        resultAge = RESULT_SETTLED_S;
+        rebuildResult();
+      }
       changed();
     },
     setFrozen(on: boolean): void {
@@ -4103,6 +4441,49 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   /** M2 (fase 2e): monta a tela de resultado com as contas da partida (uma vez, no fim). */
   /** M2 (fase 4e): o que o resultado mostra (para refazer a tela ao salvar o preset). */
   let resultData: ResultScreenData | null = null;
+  /** M12 (fase 2): há quanto tempo (s) o resultado está na tela (-1 = não está) e a precisão dele (para contar). */
+  let resultAge = -1;
+  let resultAccuracy = -1;
+  /**
+   * M12 (fase 2): a tela do resultado como ela está agora: nos primeiros 0,5 s os botões travados e esmaecidos (o
+   * pulo e o agachar que vinham da partida acionavam o "De novo"); nos primeiros 0,4 s os 3 números contando de 0.
+   */
+  /** Revisão: a chave da última tela montada (trava e os 3 números): só refaz a árvore quando algo dela muda. */
+  const resultBuilt = new Int32Array(4).fill(-1);
+  function rebuildResult(): void {
+    const locked = resultAge >= 0 && resultAge < hf.HUD_FEEL.resultLockS;
+    const p = resultData !== null ? hf.resultCount(resultAge, reduceFx()) : 1;
+    const d = resultData;
+    const kills = d !== null ? Math.round(d.kills * p) : 0;
+    const streak = d !== null ? Math.round(d.bestStreak * p) : 0;
+    const accuracy = resultAccuracy >= 0 ? Math.round(resultAccuracy * p) : -1;
+    const k = resultBuilt;
+    if (k[0] === (locked ? 1 : 0) && k[1] === kills && k[2] === streak && k[3] === accuracy) return;
+    k[0] = locked ? 1 : 0;
+    k[1] = kills;
+    k[2] = streak;
+    k[3] = accuracy;
+    if (d !== null) {
+      resultMenu.setRoot(
+        resultScreen.build(
+          p >= 1 && !locked
+            ? d
+            : { ...d, locked, kills, bestStreak: streak, accuracy: accuracy >= 0 ? `${accuracy}%` : d.accuracy },
+        ),
+      );
+    } else if (zombiesData !== null) {
+      resultMenu.setRoot(zombiesResultScreen.build(locked ? { ...zombiesData, locked } : zombiesData));
+    }
+  }
+  /** O relógio do resultado: refaz a tela só quando um número que conta ou a trava mudam. */
+  function stepResult(dt: number): void {
+    if (resultAge < 0) return;
+    const before = resultAge;
+    resultAge += dt;
+    if (before < hf.HUD_FEEL.resultLockS || (resultData !== null && before < hf.HUD_FEEL.resultCountS)) {
+      rebuildResult();
+    }
+  }
   function showResult(record: boolean, previewRecord: 'kills' | 'streak' | 'both' | null = null): void {
     const v = sim.view();
     const human = humans > 0 ? entityIndex(sim.controllerEntity(me)) : -1;
@@ -4189,6 +4570,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       ...(watching ? { watching: true } : {}),
       ...(watching && (solo || rov !== null) ? { scoreLine: '' } : {}),
       mvp: nm(sum.mvp),
+      // M12 (fase 2): a linha do MVP em âmbar quando o MVP é você.
+      ...(human >= 0 && sum.mvp === human && !watching ? { mvpIsYou: true } : {}),
+      ...(!solo && !watching && ownTeamOfLocals() >= 0 ? { teamScore: true } : {}),
       nemesis: nm(sum.nemesis),
       ...(currentLevel === BOT_LEVELS[BOT_LEVELS.length - 1] ? { openLab: true } : {}),
       nemesisKills: sum.nemesisKills,
@@ -4207,7 +4591,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       ...(request.online ? { online: true } : {}),
     };
     resultData = data;
-    resultMenu.setRoot(resultScreen.build(data));
+    // M12 (fase 2): entra travado, com os números contando de 0 (`stepResult`).
+    resultAccuracy = sum.accuracy;
+    resultAge = 0;
+    rebuildResult();
     resultShown = true;
     host.log(`[partida] fim: ${sum.outcome} ${sum.ownScore}×${sum.otherScore} abates=${sum.kills}`);
   }
@@ -4312,7 +4699,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }),
     };
     zombiesData = data;
-    resultMenu.setRoot(zombiesResultScreen.build(data));
+    resultAge = 0;
+    rebuildResult();
     resultShown = true;
   }
 
@@ -5009,8 +5397,20 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return v.kind[i] === ENTITY_KIND.zombie ? deathTx.zombie : (names[v.controller[i]!] ?? deathTx.zombie);
   }
   function colorOf(v: SimView, i: number): number {
+    // M12 (fase 2): um jogador local sempre na cor dele (P1–P4), também no TDM.
+    const local = localSeatOf(i);
+    if (local >= 0) return PLAYER_COLORS[local] as number;
     if (!ffa && !royaleMode && v.kind[i] !== ENTITY_KIND.zombie) return teamColors[v.team[i]!] ?? COLORS.texto;
-    return v.controller[i] === me && humans > 0 ? (PLAYER_COLORS[0] as number) : COLORS.texto;
+    return COLORS.texto;
+  }
+  /** M12 (fase 2): o número do jogador local (0..3) que é a entidade de índice `i`, ou -1 (bot, ou sem humanos). */
+  function localSeatOf(i: number): number {
+    if (humans <= 0) return -1;
+    for (let k = 0; k < slots.length; k++) {
+      const c = slots[k]!.controller;
+      if (c >= 0 && seatOf(c) >= 0 && entityIndex(sim.controllerEntity(c)) === i) return slots[k]!.seat;
+    }
+    return -1;
   }
 
   /** M2 (fase 2d): uma morte no kill feed ("Normal Bob  Rattler  P1"; sem matador, "P1  Caiu no vazio"). */
@@ -5028,7 +5428,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             : weapon === WEAPON_ZONE
               ? deathTx.zone
               : deathTx.fall;
-      pushKillFeed(killFeed, '', COLORS.texto, cause, nameOf(v, vi), colorOf(v, vi), false);
+      pushKillFeed(killFeed, '', COLORS.texto, cause, nameOf(v, vi), colorOf(v, vi), false, localSeatOf(vi) >= 0);
       return;
     }
     const label =
@@ -5037,7 +5437,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         : weapon === WEAPON_NONE
           ? deathTx.bite
           : (weaponNames[weapon] ?? '');
-    pushKillFeed(killFeed, nameOf(v, ki), colorOf(v, ki), label, nameOf(v, vi), colorOf(v, vi), headshot);
+    const mine = localSeatOf(ki) >= 0 || localSeatOf(vi) >= 0;
+    pushKillFeed(killFeed, nameOf(v, ki), colorOf(v, ki), label, nameOf(v, vi), colorOf(v, vi), headshot, mine);
   }
 
   /** M6 (fase 1): os textos do Domination no kill feed (resolvidos uma vez: o evento não cria string). */
@@ -5121,6 +5522,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     healing: sk('hud.royale.healing').toUpperCase(),
     zone: sk('hud.royale.zone').toUpperCase(),
     spectate: sk('hud.royale.spectate').toUpperCase(),
+    // M12 (fase 2, playtest): o rótulo do relógio da zona (o "1:30" sozinho não dizia o que era).
+    clockWait: sk('hud.royale.clockWait').toUpperCase(),
+    clockShrink: sk('hud.royale.clockShrink').toUpperCase(),
   };
   const strikePrices = STRIKE_SHOP.map((it) => `$${moneyText(it.price)}`);
 
@@ -5271,7 +5675,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
    * M2 (fase 2c): alguém morreu. A vista que seguia a vítima entra na tela de morte (câmera parte da mira atual). Para o
    * humano: a conta da derrota feia, a dica (1 vez por partida) e a mira zerada, que vira o cursor do radial.
    */
-  function onDeath(s: Sim, victim: number, killer: number, weapon: number): void {
+  function onDeath(s: Sim, victim: number, killer: number, weapon: number, headshot = false): void {
     const human = humans > 0 ? s.controllerEntity(me) : NULL_ENTITY;
     if (human !== NULL_ENTITY && killer === human && victim !== human) deathsWithoutKill = 0;
     // M7 (fase 9): no Aquário, quem matou o bobo seguido (a câmera passa para ele depois da câmera de morte).
@@ -5280,7 +5684,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const slot = slots[sIdx]!;
       if (slot.controller < 0 || s.controllerEntity(slot.controller) !== victim) continue;
       const c = slot.desc.camera;
-      beginDeath(slot.death, victim, killer, weapon, c.yaw, c.pitch);
+      beginDeath(slot.death, victim, killer, weapon, c.yaw, c.pitch, headshot);
+      syncPrimary(s.view(), victim, slot.controller);
+      // M12 (fase 2, revisão): o que o jogador segurava na morte (só isso segura o seletor).
+      const seat = seatOf(slot.controller);
+      if (seat >= 0 && frameRaw !== null) {
+        const b = seat > 0 ? extraDevices[seat - 1] : undefined;
+        const pad = b === undefined ? padIndex : b.kind === 'gamepad' ? b.index : 0;
+        snapshotHeld(slot.death, frameRaw, b !== undefined ? b.kind : device, pad);
+      }
       if (victim !== human || slot.controller !== me) continue;
       deathsWithoutKill++;
       if (
@@ -5315,6 +5727,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const choices = teamChoices[choicesOf(ent === NULL_ENTITY ? 0 : sim.view().team[entityIndex(ent)]!)]!;
       const n = choices.length;
       if (n <= 1) continue;
+      // M12 (fase 2, playtest): o seletor só destrava depois de soltar o que estava apertado na hora da morte (ou
+      // sozinho em 1,5 s).
+      if (!st.armed) {
+        st.armed = deathArmed(st, raw);
+        m.setAngles(0, 0);
+        st.cursorX = 0;
+        st.cursorY = 0;
+        if (!st.armed) continue;
+      }
       const current = Math.max(0, choices.indexOf(seatPrimary[seatNum[seat]!]!));
       const hit = slots[sIdx]!.model.primaryHit;
       let pick = -1;
@@ -5339,6 +5760,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       }
       if (pick >= 0 && pick !== current) {
         seatPrimary[seatNum[seat]!] = choices[pick]!;
+        seatChose[seatNum[seat]!] = true;
         m.setPrimary(PRIMARY_ORDER[choices[pick]!]! + 1);
       }
     }
@@ -5512,6 +5934,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const stage = d[ZONE.stage]!;
     sharedHud.trainingLine = '';
     sharedHud.timeLeftS = stage < rv.zone.length ? d[ZONE.ticks]! / sim.hz : -1;
+    sharedHud.clockLabel = d[ZONE.shrinking] === 1 ? royaleTx.clockShrink : royaleTx.clockWait;
     let alive = 0;
     for (let i = 0; i < v.count; i++) {
       if (v.alive[i] === 1 && v.kind[i] === ENTITY_KIND.bobo && (v.flags[i]! & ENTITY_FLAG.dead) === 0) alive++;
@@ -6669,7 +7092,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const tz = pz - c[CIRCLE.toCz]!;
       const outsideNow = dx * dx + dz * dz >= c[CIRCLE.r]! * c[CIRCLE.r]!;
       const outsideNext = rov.data[ZONE.shrinking] === 1 && tx * tx + tz * tz >= c[CIRCLE.toR]! * c[CIRCLE.toR]!;
-      if (outsideNow || outsideNext) {
+      // M12 (fase 2, playtest): perto da borda também (a direção do centro da zona antes de sair dela).
+      const edge = Math.max(0, c[CIRCLE.r]! - Math.max(6, c[CIRCLE.r]! * 0.1));
+      const nearEdge = dx * dx + dz * dz >= edge * edge;
+      if (outsideNow || outsideNext || nearEdge) {
         const rect = lay.rects[s]!;
         projectToEdge(
           desc.camera,
@@ -6742,11 +7168,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         const o = j * 3;
         const top = v.position[o + 1]! + ALLY_MARKER_HEIGHT_M * drawnScale(v, j);
-        if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
-        if (seat < 0 && projected[2]! > ALLY_MARKER_MAX_M) continue;
+        // M12 (fase 2): o aliado caído (Zombies, Royale) a qualquer distância, preso na borda quando fora da vista.
+        const down = (zombiesMode || royaleMode) && (v.flags[j]! & ENTITY_FLAG.downed) !== 0;
+        if (down)
+          projectToEdge(c, rect, v.position[o]!, top, v.position[o + 2]!, Math.max(16, rect.height * 0.06), projected);
+        else if (!projectToView(c, rect, v.position[o]!, top, v.position[o + 2]!, projected)) continue;
+        else if (seat < 0 && projected[2]! > ALLY_MARKER_MAX_M) continue;
         m.markers[m.markerCount * 2] = projected[0]!;
         m.markers[m.markerCount * 2 + 1] = projected[1]!;
         m.markerSeat[m.markerCount] = seat;
+        m.markerDowned![m.markerCount] = down ? 1 : 0;
         m.markerCount++;
       }
     }
@@ -6848,6 +7279,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.tipText = slot.orderNotice;
       m.tipGlyph = -1;
     }
+    // M12 (fase 2): a HUD com peso (os tempos em `hud-feel.ts`).
+    fillFeel(s, m, v, e, held);
     // M9 (fase 5b, revisão): a plaquinha dos congelados por baixo das plaquinhas da HUD desta vista (como os balões).
     drawFrozen(slot.hud, fonts, s, lay.rects[s]!, lay.views[s]!.minTextPx, alpha);
     drawHud(slot.hud, fonts, m, lay.views[s]!);
@@ -6864,13 +7297,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (firing[i]! > 0) firing[i] = Math.max(0, firing[i]! - dt);
     }
     // Laço por índice: no interpretador do Switch o for-of aloca um iterador (regra 11).
+    // M12 (fase 2): os tempos da HUD com peso (o hitmarker e o dano saem de `fillFeelHud`) e os avisos de momento.
+    const mv = sim.view().match;
+    hf.stepMatchFeel(matchFeel, dt, mv.phase === 'warmup' && mv.countdownTicks > 0);
+    hf.detectMoments(matchFeel, sim.view(), sim.hz, momentTx);
     for (let s = 0; s < slots.length; s++) {
       const slot = slots[s]!;
       const m = slot.model;
-      m.hitMarker = Math.max(0, m.hitMarker - dt / HIT_MARKER_S);
-      m.headshotMarker = Math.max(0, m.headshotMarker - dt / HIT_MARKER_S);
-      slot.damageT = Math.max(0, slot.damageT - dt);
-      m.damageAmount = slot.damageT / DAMAGE_S;
+      hf.stepHudFeel(slot.hudFeel, dt);
       // M2 (fase 7c): o indicador visual de som, se ligado nos Ajustes.
       m.soundCount = host.settings.current.audio.soundIndicator
         ? matchSound.fillIndicator(s, m.soundAngle, m.soundAlpha)
@@ -7519,6 +7953,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (f2 && !f2Down) panel.visible = !panel.visible;
       f2Down = f2;
       lastPointerLocked = raw.pointerLocked;
+      frameRaw = raw;
 
       // --- entrada e sim ---
       let signal: SceneSignal = 'none';
@@ -7529,8 +7964,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         const last = menu.lastDevice;
         if (last !== null && !couch) useDevice(last, last === 'gamepad' ? Math.max(0, menu.lastGamepad) : padIndex);
         if (resultShown) {
-          // M2 (fase 2e): o resultado é um menu (D-pad, mouse, toque); o jogador não anda por trás dele.
+          // M2 (fase 2e): o resultado é um menu (D-pad, mouse, toque); o jogador não anda por trás dele. M12 (fase 2): o
+          // relógio dele (a trava e a contagem) e o B (voltar) leva o foco ao Sair.
+          stepResult(dt);
           const nav = resultMenu.update(menu, raw, ui);
+          if (nav.back) resultMenu.focus('quit');
           const a = nav.activated;
           if (a === RESULT_ACTION.again) signal = 'again';
           else if (a === RESULT_ACTION.easier) signal = 'easier';
@@ -7630,14 +8068,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (running) {
         // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render). M9 (fase 5): a câmera lenta
         // do dono (só offline) desacelera do mesmo jeito.
-        lastTicks = driver.update((aquarium && pilot < 0 ? dt * aqSpeed : dt) * (ownerTools?.slow ?? 1));
+        // M12 (fase 2, AM9): o fim da partida em câmera lenta (~0,35× por 0,8 s), pelo mesmo caminho; só offline.
+        const endSlow = hf.endSlowFactor(matchFeel, !driver.online && !aquarium && humans > 0 && !benchState);
+        lastTicks = driver.update((aquarium && pilot < 0 ? dt * aqSpeed : dt) * (ownerTools?.slow ?? 1) * endSlow);
         feelTicks += lastTicks;
         trace('sim e IA');
         timeS += dt;
         ownerTools?.update(dt);
         // M7 (fase 9, revisão): acelerado, o frame faz mais ticks: a sonda da qualidade não conta. M9 (fase 5, revisão):
         // na câmera lenta do dono, menos ticks por frame: também não.
-        if (!(aquarium && pilot < 0 && aqSpeed > 1) && (ownerTools?.slow ?? 1) >= 1) probeQuality(dt);
+        if (!(aquarium && pilot < 0 && aqSpeed > 1) && (ownerTools?.slow ?? 1) >= 1 && endSlow >= 1) probeQuality(dt);
         decay(dt);
         if (!resultShown && endedAt < 0) updateTips(dt);
         if (overrideRoute) routeTime += dt;
@@ -7682,6 +8122,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       updateBuys(raw);
       updateOrders(raw, dt);
       for (let s = 0; s < slots.length; s++) updateView(s, running ? dt : 0, alpha, lay);
+      // M12 (fase 2, playtest): a arma na mão não aparece atrás do resultado.
+      if (resultShown) for (let s = 0; s < slots.length; s++) slots[s]!.desc.viewmodel.visible = false;
       hideBodiesAroundCameras();
       // M2 (fase 7b): cada vista ouve da própria câmera; passos, coração e contagem andam com a partida.
       matchSound.setListenerCount(slots.length);
@@ -7787,33 +8229,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             sharedHud.trainingLine !== '' ||
             sharedHud.modsLine !== ''
           ) {
-            drawHudShared(list, fonts, sharedHud, sharedArea);
-          }
+            // M12 (fase 2): o traço do seu time e a batida do placar que mudou.
+            sharedHud.ownTeam = ownTeamOfLocals();
+            hf.feelScores(matchFeel, sharedHud.teamScores, sharedHud.teamCount, sharedHud.teamBeat, reduceFx());
+            drawHudShared(list, fonts, sharedHud, sharedArea, sharedBounds);
+          } else sharedBounds.fill(0);
           if (sharedHud.spareMap) drawSpareMinimap(list, sharedArea);
           const hs = Math.min(ui.width / 640, ui.height / 360);
           const minText = ui.options.minTextPx ?? 0;
-          const v0 = lay.views[0]!;
-          drawKillFeed(
-            list,
-            fonts,
-            killFeed,
-            ui.width - Math.max(v0.insetRight, 16 * hs),
-            Math.max(v0.insetTop, 12 * hs),
-            hs,
-            minText,
-          );
-          if (mv.phase === 'warmup' && mv.countdownTicks > 0) {
-            drawMatchCountdown(
-              list,
-              fonts,
-              mv.countdownTicks / sim.hz,
-              todayLine,
-              ui.width,
-              ui.height,
-              minText,
-              nemesisLine,
-            );
-          }
+          // M12 (fase 2): o kill feed (com o lugar dele em cada layout), a contagem, o "VALENDO!" e o aviso central.
+          const countShown = drawMatchOverlay(list, fonts, ui.width, ui.height, hs, minText, lay, mv);
           let wantsScoreboard = (humans > 0 && player.isDown('scoreboard')) || (aquarium && pilot < 0 && aqList);
           for (let k = 0; k < extras.length; k++) if (extras[k]!.isDown('scoreboard')) wantsScoreboard = true;
           if (!paused && wantsScoreboard) {
@@ -7842,7 +8267,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             tf.pixelRatio = platform.graphics.pixelRatio;
             tf.minTextPx = ui.options.minTextPx ?? 0;
             touchOverlay.draw(list, fonts, tf, player);
-            if (ghostAlpha > 0) {
+            // M12 (fase 2, playtest): sem o fantasma dos dedos por cima da contagem (o "3" cortava o "ARRASTE PARA MIRAR").
+            if (ghostAlpha > 0 && !countShown) {
               const left = host.settings.current.controls.touch.leftHanded;
               touchOverlay.drawGhost(list, fonts, tf, left, ghostAlpha, timeS);
             }
@@ -7861,7 +8287,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           else if (royaleOutAt < 0) royaleOutAt = timeS;
           else if (timeS - royaleOutAt >= ROYALE_RESULT_DELAY_S) showResult(true);
         }
-        if (resultShown) resultMenu.draw(list, ui);
+        if (resultShown) {
+          // M12 (fase 2): as linhas entram em cascata (40 ms cada; instantâneo com Reduzir efeitos).
+          const n0 = list.count;
+          resultMenu.draw(list, ui);
+          cascadeResult(list, n0, resultMenu.layout, Math.max(0, resultAge) * 1000, ui.scale, reduceFx());
+        }
         if (panel.visible) {
           fillPanel();
           drawDebugPanel(list, fonts, panel, ui.width, ui.height);

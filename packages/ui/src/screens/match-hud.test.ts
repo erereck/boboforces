@@ -43,10 +43,12 @@ describe('kill feed', () => {
     expect(m.count).toBe(0);
   });
 
-  it('alinhado à direita, dentro da tela; tiro de cabeça com a arma em âmbar; sem matador, vítima e causa', () => {
+  it('alinhado à direita, dentro da tela; a sua linha com a arma em âmbar; sem matador, vítima e causa', () => {
     const m = createKillFeedModel();
-    pushKillFeed(m, 'Normal Bob', TEAM_COLORS[1]!, 'Peekaboo', 'P1', TEAM_COLORS[0]!, true);
+    pushKillFeed(m, 'Normal Bob', TEAM_COLORS[1]!, 'Peekaboo', 'P1', TEAM_COLORS[0]!, true, true);
     pushKillFeed(m, '', COLORS.texto, 'Caiu no vazio', 'Sweaty Bob', TEAM_COLORS[1]!, false);
+    // M12 (fase 2): depois da entrada (150 ms).
+    ageKillFeed(m, 0.2);
     const list = createDrawList();
     drawKillFeed(list, fonts, m, W - 32, 24, 2, MIN_TEXT.tv);
     within(list, W, H);

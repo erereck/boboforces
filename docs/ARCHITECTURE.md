@@ -5740,3 +5740,59 @@ de chegada.
 - **Contratos:** `Mixer` (`duckBus`, `setPanWidth`, `setAmbient`, `leadingSilenceS`, `duckMusic.holdS`),
   `PlayOptions.range` e `noDuck`, `ListenerSet.panWidth`, `MatchSoundDeps` (`maxHealth`, `reduceEffects`, `ambient`,
   `coop`). Nenhum golden mudou.
+
+### 23.2 Fase 2: a HUD da partida (27/11/2026)
+
+A HUD confirma o que aconteceu e mostra o estado. A lógica dos tempos fica em `game/src/scene/hud-feel.ts` (puro, com
+teste); o desenho, em `ui/src/screens/hud.ts` e `match-hud.ts`; a cena só faz a cola.
+
+- **Hitmarker e X de abate:** o hitmarker fica cheio 60 ms e some em 0,2 s (~0,26 s visível; antes 0,15 s e o playtest
+  não o pegava), com um pop de 50 ms, cinza com dano 0 e contorno escuro. O X de abate tem 4 passos por braço, em
+  `perigo` (âmbar na cabeça), começa 1,4× e encolhe em 80 ms, e o ABATES dá uma batida. Embaixo da retícula ficam, por
+  1,2 s, o nome da vítima e a sequência (VINGANÇA > 5 SEGUIDOS > 3 SEGUIDOS > ABATE DUPLO > NA CABEÇA, fora do Zombies;
+  AM11), e depois o "R recarrega" com o mesmo desenho da dica; cada item só entra se couber acima da faixa de baixo.
+- **Vida e dano:** a vida tem um rastro que escorre em 0,4 s e uma vinheta de 3 faixas a ≤ 30% (pulsa a 1 Hz, fixa com
+  Reduzir efeitos; o mesmo limite do coração do som). Até 4 indicadores de dano guardam a origem no mundo (quem atirou
+  ou o centro da explosão) e giram com a vista, a 1,5× o anel do som, medidos a partir do bobo da vista (na 3ª pessoa
+  também).
+- **Munição:** o pente fica âmbar a ≤ 25% e vermelho vazio; a barra de recarga fica no lugar da do pavio e só aparece
+  com a sim recarregando (na escopeta, segue o pente que enche). No toque, a munição vai para o lado da vida (espelhada
+  no canhoto) e o nome da arma some (o botão PULO a cobria).
+- **Kill feed e placar:** a sua linha tem fundo âmbar a 18% e você na cor do P1–P4; a arma é âmbar na sua linha e cinza
+  nas outras; a linha nova entra com 8 px em 150 ms. A posição do feed e do aviso central sai de `placeOverlay`
+  (`match-hud.ts`): no 3P, no quadrante livre; no 1P, o feed desce para baixo do placar quando não cabe ao lado; no 2P e
+  no 4P, o aviso fica à esquerda da plaquinha do cruzamento, menor. O feed encolhe até o piso do texto. O placar ganhou
+  o traço do seu time (nenhum no versus do sofá), a batida de 150 ms e o relógio âmbar a ≤ 60 s. O placar do Tab
+  limitado (Royale) mostra as primeiras linhas mais as suas e não cobre o relógio.
+- **Avisos, contagem e pontos:** os avisos centrais (`detectMoments`: morte súbita, onda, rodada, Boom Box, zona, Jugg)
+  usam a fonte display, ficam 1,5 s e esperam a contagem sair. A contagem entra com escala 1,2→1 e termina num
+  "VALENDO!" de 0,6 s (também no fim do descanso do Zombies). Os "+N" (Zombies, BoboStrike) sobem 8 px em 0,8 s; ganhos
+  em 0,5 s se somam.
+- **Morte:** a cena escurece só enquanto a câmera de morte e o seletor estão na tela (`deathVeil`; o espectador fica
+  limpo). Com mais de 8 opções, a fileira compacta substitui o anel largo; no toque, tudo fica fora da coluna dos
+  botões. O seletor fica travado ao menos 0,35 s e só espera soltar o que estava apertado na hora da morte
+  (`snapshotHeld`; destrava sozinho em 1,5 s): antes, a seta segurada para girar caía no seletor. A arma destacada é a
+  que nasce (sem escolha, a padrão da sim; antes o destaque partia do índice 0 e o boneco nascia com outra). A faixa
+  diz "· NA CABEÇA" e a barra do renascer esvazia. O aliado caído no Zombies e no Royale fica em `perigo`, piscando a
+  2,5 Hz, a qualquer distância e preso na borda.
+- **Royale:** o aviso da ZONA fica entre as faixas de cima e de baixo (cobria a vida e a munição) e aparece também perto
+  da borda; o relógio ganhou rótulo ("FECHA EM" / "FECHANDO"); "Kits" virou "Kits de cura".
+- **Granada:** os pontos do arco ficaram maiores, com contorno, e com a marca de onde ela cai.
+- **Fim e resultado:** a faixa do fim (VITÓRIA!/DERROTA/EMPATE/"Fulano venceu") é por vista e tira a retícula, a
+  munição e as dicas; offline e fora do Aquário, a sim anda a 0,35× por 0,8 s pelo mesmo caminho da câmera lenta do
+  dono (AM9; depois de `ended` não há mais dano: o resultado, o golden e o replay não mudam). O resultado fica travado e
+  esmaecido por 0,5 s (pular ou agachar na hora pulava o resultado); o B leva ao Sair; as linhas entram em cascata de
+  40 ms; os 3 números contam em 0,4 s; o MVP fica em âmbar quando é você; o placar diz "Seu time" quando todos os
+  jogadores locais estão no mesmo time; a arma na mão some atrás dele; o "Salvar na Oficina" é compacto, ao lado da
+  linha do Nêmesis (também no online).
+- **Reduzir efeitos** (`reduceShake` ou `reducedMotion`) desliga pop, escala, batida, pulso, pisca, subida, faixa,
+  cascata, contagem e deslize; a trava de 0,5 s do resultado fica (é proteção de entrada).
+- **Revisão (Opus):** 2 achados altos (a fileira de baixo do resultado saía da tela com o Nêmesis; a barra de recarga
+  ficava cheia ao trocar de arma no meio dela), 5 médios e 8 baixos, corrigidos antes da junção; o layout do resultado
+  ganhou um teste com o atlas real em 7 alvos.
+- **Contratos** (só acréscimos opcionais): `HudModel` (hitmarker com peso, X de abate e sequências, rastro e vinheta,
+  indicadores de dano, recarga e "R recarrega", toque, "+N", faixa do fim, barra do renascer e "na cabeça", aliado
+  caído, `deathVeil`), `HudSharedModel.ownTeam/teamBeat/clockLabel`, `KillFeedModel.mine`, `drawHudShared(…, bounds)`,
+  `drawCenterNotice`, `drawMatchGo`, `placeOverlay`, `ResultScreenData.mvpIsYou/locked/teamScore`, `DeathState`
+  (`headshot`, `armed`). Strings novas: `hud.go`, `hud.streak.*`, `result.scoreTeam`, `hud.royale.clock*`. Nenhum
+  golden mudou.

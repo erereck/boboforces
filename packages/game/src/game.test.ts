@@ -2811,7 +2811,8 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     fake.absent.s = 10.2;
     platform.pump(2);
     expect(platform.logLines.some((l) => l.includes('o host não voltou em 10 s'))).toBe(true);
-    // O resultado online (só "Voltar à sala"): o Enter volta à sala.
+    // O resultado online (só "Voltar à sala"): o Enter volta à sala. M12 (fase 2): depois da trava de 0,5 s.
+    platform.pump(40);
     platform.tap('Enter');
     expect(game.screen).toBe('online');
     game.dispose();

@@ -29,6 +29,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   mais rápido e os pontos, a zona, as rodadas, a Roleta e o ping têm som, a vitória e a derrota ganharam vinhetas de
   3 s (e o empate a dele), o mundo abafa quando você morre ou leva uma explosão colada, o vento e os grilos tocam
   baixinho no mapa e os sons começam sem o atrasinho do MP3.
+- **A HUD da partida (fase 2):** o X de abate com o nome de quem caiu e as sequências ("ABATE DUPLO", "VINGANÇA"), o
+  hitmarker que dá para ver, a vida com rastro e vinheta quando está baixa, até 4 avisos de dano que giram com você, a
+  munição que avisa quando acaba (com a barra de recarga e o "R recarrega") e que não fica mais embaixo do botão de
+  pulo no celular, a sua linha destacada no kill feed, o placar com o seu time, avisos grandes de momento, a contagem
+  com "VALENDO!", os pontos que sobem, uma tela de morte limpa em que a arma escolhida é a que nasce (e a seta segurada
+  não escolhe mais por você), o colega caído marcado, a zona do Royale que não cobre a vida, o fim com faixa e câmera
+  lenta, e um resultado que não some com o pulo da partida.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

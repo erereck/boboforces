@@ -1,4 +1,16 @@
-import { COLORS, t, type Screen, type StringKey, type UiNode } from '@boboforces/ui';
+import {
+  COLORS,
+  DRAW_FLOATS_PER_COMMAND,
+  enterProgress,
+  enterSlidePx,
+  MOTION,
+  t,
+  type DrawList,
+  type LayoutResult,
+  type Screen,
+  type StringKey,
+  type UiNode,
+} from '@boboforces/ui';
 
 /** M2 (fase 2e): ações da tela de resultado (gameplay.md §2.2). */
 export const RESULT_ACTION = {
@@ -59,6 +71,15 @@ export interface ResultScreenData {
   readonly watching?: boolean;
   /** M9 (fase 3): o Bobo Sandbox: o preset é um Cenário ("Salvar Cenário", "Cenário salvo"). */
   readonly scenario?: boolean;
+  /** M12 (fase 2): o MVP é você (a linha em âmbar). */
+  readonly mvpIsYou?: boolean;
+  /** M12 (fase 2, playtest): o placar é de times ("Seu time 10 × 14": o "10 × 14" sozinho não dizia qual era o seu). */
+  readonly teamScore?: boolean;
+  /**
+   * M12 (fase 2): os botões travados e esmaecidos (os primeiros ~0,5 s: o pulo ou o agachar que ainda vinha da partida
+   * acionava o "De novo").
+   */
+  readonly locked?: boolean;
 }
 
 const RECORD_TITLE = {
@@ -71,17 +92,27 @@ function line(id: string, key: StringKey, params: Record<string, string | number
   return { kind: 'text', id, text: { key, params }, style: 'body', color, textAlign: 'center' } as UiNode;
 }
 
-function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}): UiNode {
-  return { kind: 'button', id, text: { key }, action, variant: 'secondary', ...extra } as UiNode;
+function button(id: string, key: StringKey, action: string, extra: Partial<UiNode> = {}, locked = false): UiNode {
+  return {
+    kind: 'button',
+    id,
+    text: { key },
+    action,
+    variant: 'secondary',
+    ...extra,
+    ...(locked ? { disabled: true, autofocus: false } : {}),
+  } as UiNode;
 }
 
 /** M5 (fase 4c): a fileira de baixo do resultado de uma partida online. */
-function onlineActions(): UiNode {
+function onlineActions(locked = false): UiNode {
   return {
     kind: 'row',
     id: 'actions',
     gap: 12,
-    children: [button('quit', 'result.backToRoom', RESULT_ACTION.quit, { variant: 'primary', autofocus: true })],
+    children: [
+      button('quit', 'result.backToRoom', RESULT_ACTION.quit, { variant: 'primary', autofocus: true }, locked),
+    ],
   } as UiNode;
 }
 
@@ -93,6 +124,7 @@ function onlineActions(): UiNode {
 export const resultScreen: Screen<ResultScreenData> = {
   id: 'result',
   build(d) {
+    const lock = d.locked === true;
     const nemesis: UiNode[] =
       d.nemesis !== ''
         ? [
@@ -101,13 +133,16 @@ export const resultScreen: Screen<ResultScreenData> = {
               id: 'nemesisRow',
               align: 'center',
               gap: 12,
+              // M12 (fase 2, revisão): o "Salvar na Oficina" compacto ao lado da linha (na fileira de baixo, os 4 botões
+              // passavam da tela; e vale também no online).
               children: [
                 line('nemesis', 'result.nemesis', { name: d.nemesis, n: d.nemesisKills }),
                 button(
                   'saveWorkshop',
                   d.nemesisSaved ? 'result.nemesisSaved' : 'result.saveWorkshop',
                   RESULT_ACTION.saveWorkshop,
-                  { disabled: d.nemesisSaved === true },
+                  { disabled: d.nemesisSaved === true, compact: true },
+                  lock,
                 ),
               ],
             } as UiNode,
@@ -148,7 +183,10 @@ export const resultScreen: Screen<ResultScreenData> = {
                     text:
                       d.scoreLine !== undefined
                         ? { literal: d.scoreLine }
-                        : { key: 'result.score', params: { own: d.own, other: d.other } },
+                        : {
+                            key: d.teamScore === true ? 'result.scoreTeam' : 'result.score',
+                            params: { own: d.own, other: d.other },
+                          },
                     style: 'heading',
                     color: COLORS.texto,
                   } as UiNode,
@@ -156,7 +194,7 @@ export const resultScreen: Screen<ResultScreenData> = {
             line('level', 'result.level', { level: d.level }, COLORS.textoBaixo),
             { kind: 'box', height: 6 },
             d.mvp !== ''
-              ? line('mvp', 'result.mvp', { name: d.mvp })
+              ? line('mvp', 'result.mvp', { name: d.mvp }, d.mvpIsYou === true ? COLORS.acao : COLORS.texto)
               : line('mvp', 'result.noMvp', {}, COLORS.textoBaixo),
             ...(d.watching === true
               ? []
@@ -198,24 +236,30 @@ export const resultScreen: Screen<ResultScreenData> = {
               : []),
             { kind: 'box', height: 10 },
             ...(d.online === true
-              ? [onlineActions()]
+              ? [onlineActions(lock)]
               : [
                   {
                     kind: 'row',
                     id: 'actions',
                     gap: 12,
                     children: [
-                      button('again', 'result.again', RESULT_ACTION.again, {
-                        variant: 'primary',
-                        autofocus: !d.focusEasier,
-                      }),
-                      button('easier', 'result.easier', RESULT_ACTION.easier, {
-                        disabled: !d.canEasier,
-                        autofocus: d.focusEasier && d.canEasier,
-                      }),
+                      button(
+                        'again',
+                        'result.again',
+                        RESULT_ACTION.again,
+                        { variant: 'primary', autofocus: !d.focusEasier },
+                        lock,
+                      ),
+                      button(
+                        'easier',
+                        'result.easier',
+                        RESULT_ACTION.easier,
+                        { disabled: !d.canEasier, autofocus: d.focusEasier && d.canEasier },
+                        lock,
+                      ),
                       d.openLab
-                        ? button('harder', 'result.openLab', RESULT_ACTION.lab)
-                        : button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }),
+                        ? button('harder', 'result.openLab', RESULT_ACTION.lab, {}, lock)
+                        : button('harder', 'result.harder', RESULT_ACTION.harder, { disabled: !d.canHarder }, lock),
                     ],
                   } as UiNode,
                   {
@@ -223,7 +267,7 @@ export const resultScreen: Screen<ResultScreenData> = {
                     id: 'more',
                     gap: 12,
                     children: [
-                      button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                      button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules, {}, lock),
                       d.presetSaved
                         ? button(
                             'savePreset',
@@ -235,8 +279,10 @@ export const resultScreen: Screen<ResultScreenData> = {
                             'savePreset',
                             d.scenario === true ? 'result.saveScenario' : 'result.savePreset',
                             RESULT_ACTION.savePreset,
+                            {},
+                            lock,
                           ),
-                      button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
+                      button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }, lock),
                     ],
                   } as UiNode,
                 ]),
@@ -273,6 +319,8 @@ export interface ZombiesResultData {
   readonly presetSaved?: boolean;
   /** M5 (fase 4c): partida online: só Voltar à sala. */
   readonly online?: boolean;
+  /** M12 (fase 2): os botões travados e esmaecidos nos primeiros ~0,5 s (como no `ResultScreenData`). */
+  readonly locked?: boolean;
 }
 
 /** As colunas da tabela: largura (px de referência) e o título. */
@@ -305,6 +353,7 @@ function cell(id: string, width: number, text: string, color: number, left: bool
 export const zombiesResultScreen: Screen<ZombiesResultData> = {
   id: 'result-zombies',
   build(d) {
+    const lock = d.locked === true;
     const header: UiNode = {
       kind: 'row',
       id: 'tableHead',
@@ -363,18 +412,18 @@ export const zombiesResultScreen: Screen<ZombiesResultData> = {
             ...rows,
             { kind: 'box', height: 10 },
             d.online === true
-              ? onlineActions()
+              ? onlineActions(lock)
               : {
                   kind: 'row',
                   id: 'actions',
                   gap: 12,
                   children: [
-                    button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: true }),
-                    button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules),
+                    button('again', 'result.again', RESULT_ACTION.again, { variant: 'primary', autofocus: true }, lock),
+                    button('changeRules', 'result.changeRules', RESULT_ACTION.changeRules, {}, lock),
                     d.presetSaved
                       ? button('savePreset', 'result.presetSaved', RESULT_ACTION.savePreset, { disabled: true })
-                      : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset),
-                    button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }),
+                      : button('savePreset', 'result.savePreset', RESULT_ACTION.savePreset, {}, lock),
+                    button('quit', 'result.quit', RESULT_ACTION.quit, { variant: 'danger' }, lock),
                   ],
                 },
           ],
@@ -387,4 +436,48 @@ export const zombiesResultScreen: Screen<ZombiesResultData> = {
 /** "Mira torta: Normal Bob" (montado uma vez, no fim da partida). */
 export function prizeLine(prize: string, name: string): string {
   return t('result.prizeLine', { prize: t(`prize.${prize}` as StringKey), name });
+}
+
+/** M12 (fase 2): cada linha do resultado entra este tanto depois da de cima (ms). */
+export const RESULT_ROW_MS = 40;
+
+/**
+ * M12 (fase 2): a entrada em cascata do resultado: cada filho da coluna `main` (o título, o placar, o MVP…, os botões)
+ * entra `RESULT_ROW_MS` depois do de cima, em 150 ms e 8 px de baixo para cima (o véu do fundo vem com o 1º). Mexe nos
+ * comandos já desenhados `[from, list.count)`, pelo meio de cada um; com `reduce`, nada (entrada instantânea). Sem
+ * alocar.
+ */
+export function cascadeResult(
+  list: DrawList,
+  from: number,
+  layout: LayoutResult | null,
+  ageMs: number,
+  scale: number,
+  reduce: boolean,
+): void {
+  if (reduce || layout === null) return;
+  const main = layout.byId.get('main');
+  if (main === undefined || main.kind !== 'column') return;
+  const kids = main.children;
+  if (ageMs >= (kids.length - 1) * RESULT_ROW_MS + MOTION.enterMs) return;
+  for (let i = from < 0 ? 0 : from; i < list.count; i++) {
+    const g = i * DRAW_FLOATS_PER_COMMAND;
+    const h = list.geom[g + 3] ?? 0;
+    const mid = (list.geom[g + 1] ?? 0) + h / 2;
+    // O véu (do tamanho da tela) entra com a 1ª linha; o resto, com a linha em que está o meio dele.
+    let k = 0;
+    if (h < list.height * 0.5) {
+      for (let c = 0; c < kids.length; c++) {
+        const r = layout.rects.get(kids[c]!);
+        if (r === undefined) continue;
+        if (mid >= r.y) k = c;
+        if (mid <= r.y + r.h) break;
+      }
+    }
+    const p = enterProgress(ageMs - k * RESULT_ROW_MS, MOTION.enterMs, false);
+    if (p >= 1) continue;
+    const c = list.colors[i] ?? 0;
+    list.colors[i] = ((c & 0xffffff00) | Math.round((c & 0xff) * p)) >>> 0;
+    list.geom[g + 1] = (list.geom[g + 1] ?? 0) + enterSlidePx(p) * scale;
+  }
 }

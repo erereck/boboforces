@@ -14,6 +14,7 @@ import {
   WEAPON_NONE,
 } from '@boboforces/sim';
 import { createHudModel } from '@boboforces/ui';
+import { createRawInputState } from '@boboforces/input';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import {
@@ -26,6 +27,11 @@ import {
   deathCamBackoff,
   deathTexts,
   DEATH_CAM,
+  deathArmed,
+  DEATH_ARM_MAX_S,
+  DEATH_ARM_S,
+  snapshotHeld,
+  stillHeld,
   fillDeathBanner,
   losingBadly,
   moveRadialCursor,
@@ -348,5 +354,64 @@ describe('M10 (fases 6 e 7): as primárias novas no radial', () => {
     expect([stepPick(-1, 1, 13), stepPick(-1, -1, 13)]).toEqual([0, 12]);
     expect([stepPick(12, 1, 13), stepPick(0, -1, 13), stepPick(5, 1, 13)]).toEqual([0, 12, 6]);
     expect(stepPick(3, 1, 0)).toBe(-1);
+  });
+});
+
+describe('M12 (fase 2, playtest): o seletor da primária só destrava com tudo solto', () => {
+  it('beginDeath trava o seletor; só o que já estava apertado na morte o segura, e ele destrava sozinho em 1,5 s', () => {
+    const st = createDeathState();
+    beginDeath(st, 1, 2, WEAPON_CODE.rifle, 0, 0, true);
+    expect([st.armed, st.headshot]).toEqual([false, true]);
+    const raw = createRawInputState();
+    // Teclado: a seta que girava a mira na morte segura; uma tecla nova não.
+    raw.keys[5] = 1;
+    snapshotHeld(st, raw, 'keyboardMouse', 0);
+    expect(stillHeld(st, raw)).toBe(true);
+    raw.keys[5] = 0;
+    raw.keys[6] = 1;
+    expect(stillHeld(st, raw)).toBe(false);
+    st.t = 0.2;
+    expect(deathArmed(st, raw)).toBe(false);
+    st.t = DEATH_ARM_S;
+    expect(deathArmed(st, raw)).toBe(true);
+    // Toque: o polegar que já estava no joystick segura, mas só até 1,5 s; um dedo novo não segura.
+    raw.keys[6] = 0;
+    const thumb = raw.touches[0]!;
+    thumb.active = true;
+    thumb.id = 7;
+    snapshotHeld(st, raw, 'touch', 0);
+    st.t = 1;
+    expect(deathArmed(st, raw)).toBe(false);
+    st.t = DEATH_ARM_MAX_S;
+    expect(deathArmed(st, raw)).toBe(true);
+    thumb.id = 8;
+    st.t = 1;
+    expect(deathArmed(st, raw)).toBe(true);
+    // Controle: o analógico empurrado segura até voltar; o gatilho parado em −1 (axes[2]) não prende para sempre.
+    thumb.active = false;
+    const pad = raw.gamepads[0]!;
+    pad.connected = true;
+    pad.axes[0] = 0.9;
+    pad.axes[2] = -1;
+    snapshotHeld(st, raw, 'gamepad', 0);
+    expect(stillHeld(st, raw)).toBe(true);
+    pad.axes[0] = 0;
+    // O gatilho continua em −1: ainda "segurado", até o tempo máximo.
+    expect(stillHeld(st, raw)).toBe(true);
+    st.t = DEATH_ARM_MAX_S;
+    expect(deathArmed(st, raw)).toBe(true);
+    pad.buttons[0] = 1;
+    snapshotHeld(st, raw, 'gamepad', 0);
+    pad.axes[2] = 0.6;
+    pad.buttons[0] = 0;
+    expect(stillHeld(st, raw)).toBe(false);
+  });
+  it('"· NA CABEÇA" na faixa só com quem matou', () => {
+    const m = createHudModel();
+    const st = createDeathState();
+    beginDeath(st, 1, NULL_ENTITY, WEAPON_KILL_PLANE, 0, 0, true);
+    const view = { count: 0 } as unknown as Parameters<typeof fillDeathBanner>[2];
+    fillDeathBanner(m, st, view, [], [], deathTexts());
+    expect(m.deathHead).toBe(false);
   });
 });

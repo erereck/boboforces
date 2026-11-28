@@ -324,8 +324,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'hud.royale.shrink': '{alive} vivos · a zona está fechando!',
   'hud.royale.closed': '{alive} vivos · zona fechada',
   'hud.royale.zone': 'Zona',
-  'hud.royale.kits': 'Kits',
-  'hud.royale.armorKits': 'Colete {armor} · Kits',
+  'hud.royale.kits': 'Kits de cura',
+  'hud.royale.armorKits': 'Colete {armor} · Kits de cura',
   'hud.royale.swap': 'Usar: trocar por {name}',
   'hud.royale.healing': 'Curando',
   'hud.royale.out': 'Fora · {place}º lugar',
@@ -1401,6 +1401,18 @@ export const STRINGS_EXTRA_PT_BR = {
   'result.scenarioSaved': 'Cenário salvo',
   'result.sandboxWinner': '{team} venceu · {other} × {own}',
   'hud.sandbox.out': 'Fora até o fim da partida',
+  /** M12 (fase 2): o fim da contagem (a da partida e a da onda do Zombies), em âmbar. */
+  'hud.go': 'Valendo!',
+  /** M12 (fase 2): as sequências embaixo do X de abate (AM11: secas, sem voz); a última também na faixa da morte. */
+  'hud.streak.double': 'Abate duplo',
+  'hud.streak.three': '3 seguidos',
+  'hud.streak.five': '5 seguidos',
+  'hud.streak.revenge': 'Vingança',
+  'hud.streak.head': 'Na cabeça',
+  /** M12 (fase 2, playtest): o placar do resultado nos modos de time; o rótulo do relógio da zona do Royale. */
+  'result.scoreTeam': 'Seu time {own} × {other}',
+  'hud.royale.clockWait': 'Fecha em',
+  'hud.royale.clockShrink': 'Fechando',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type ExtraStringKey = keyof typeof STRINGS_EXTRA_PT_BR;

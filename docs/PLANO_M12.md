@@ -56,6 +56,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    sua linha no kill feed; o placar com o seu time; avisos centrais de momento; a contagem com "VALENDO!"; os "+N" de
    pontos; as sequências em texto; a tela de morte; o aliado caído marcado; o kill feed no 3–4P; o fim da partida com
    faixa e respiro; o resultado em cascata, com 0,5 s de trava e o B no Sair.
+   - **feita em 27/11** (ARCHITECTURE §23.2): os 15 itens e os 9 do playtest (a arma que trocava sozinha na morte, a ZONA e o toque que cobriam a HUD, o Tab do Royale); nenhum golden mudou.
 3. **Os menus e o fluxo:** um destaque por tela; as entradas secas; o "Sair da partida" em dois apertos; o loading com
    o nome do mapa, o resumo e dicas que giram; toda tecla responde ("Abrindo…", erro sem rede, som de erro); a linha
    de ajuda do Mais modos; a Oficina que segue o foco; o +/Start começa; lembrar a última escolha; os nomes iguais em

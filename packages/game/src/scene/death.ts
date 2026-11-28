@@ -14,6 +14,7 @@ import {
   WEAPON_ZONE,
 } from '@boboforces/sim';
 import { t, type HudModel, type PrimaryHit, type StringKey } from '@boboforces/ui';
+import type { DeviceKind, RawInputState } from '@boboforces/input';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 
 /**
@@ -120,7 +121,29 @@ export interface DeathState {
   cursorY: number;
   /** Mostra "Tá puxado?" nesta morte. */
   hint: boolean;
+  /** M12 (fase 2): o golpe foi na cabeça ("· NA CABEÇA" na faixa). */
+  headshot: boolean;
+  /**
+   * M12 (fase 2, playtest): o seletor da primária já aceita entrada. Começa travado: só destrava depois de
+   * `DEATH_ARM_S` e com o que estava apertado NA HORA DA MORTE solto (a seta que girava a mira caía no seletor e
+   * trocava a arma), ou sozinho em `DEATH_ARM_MAX_S` (revisão: um dedo no joystick ou um gatilho parado em −1 não
+   * prendem o seletor).
+   */
+  armed: boolean;
+  /** O que estava apertado na morte (`snapshotHeld`): teclas, botões do mouse, do controle, analógicos e dedos. */
+  heldKeys: Uint8Array;
+  heldMouse: number;
+  readonly heldButtons: Uint8Array;
+  readonly heldAxes: Float32Array;
+  readonly heldTouches: Float64Array;
+  heldKind: DeviceKind;
+  heldPad: number;
 }
+
+/** M12 (fase 2): o seletor da primária fica travado ao menos este tempo depois da morte (s), além de esperar soltar. */
+export const DEATH_ARM_S = 0.35;
+/** M12 (fase 2, revisão): e destrava sozinho depois deste tempo (s), mesmo com algo ainda apertado. */
+export const DEATH_ARM_MAX_S = 1.5;
 
 export function createDeathState(): DeathState {
   return {
@@ -133,6 +156,15 @@ export function createDeathState(): DeathState {
     cursorX: 0,
     cursorY: 0,
     hint: false,
+    headshot: false,
+    armed: false,
+    heldKeys: new Uint8Array(0),
+    heldMouse: 0,
+    heldButtons: new Uint8Array(HELD_BUTTONS),
+    heldAxes: new Float32Array(HELD_AXES),
+    heldTouches: new Float64Array(HELD_TOUCHES).fill(Number.NaN),
+    heldKind: 'keyboardMouse',
+    heldPad: 0,
   };
 }
 
@@ -144,8 +176,11 @@ export function beginDeath(
   weapon: number,
   yaw: number,
   pitch: number,
+  headshot = false,
 ): void {
   st.t = 0;
+  st.headshot = headshot;
+  st.armed = false;
   st.victim = victim;
   st.killer = killer;
   st.weapon = weapon;
@@ -159,6 +194,77 @@ export function beginDeath(
 export function endDeath(st: DeathState): void {
   st.t = -1;
   st.hint = false;
+}
+
+/** Quantos botões, analógicos e dedos o retrato do que estava apertado guarda (os do `RawInputState` cabem). */
+const HELD_BUTTONS = 32;
+const HELD_AXES = 8;
+const HELD_TOUCHES = 10;
+/** Botão apertado e analógico fora do centro (acima de qualquer zona morta de controle gasto). */
+const HELD_BUTTON = 0.5;
+const HELD_AXIS = 0.35;
+/** O analógico que andou isto desde a morte foi solto (ou mexido de novo: um gatilho parado em −1 não conta). */
+const AXIS_MOVED = 0.3;
+
+/**
+ * M12 (fase 2, revisão): guarda o que estava apertado no dispositivo do jogador (`kind`, o controle `pad`) na hora da
+ * morte. Sem alocar (fora as teclas, na 1ª vez).
+ */
+export function snapshotHeld(st: DeathState, raw: Readonly<RawInputState>, kind: DeviceKind, pad: number): void {
+  st.heldKind = kind;
+  st.heldPad = pad;
+  if (st.heldKeys.length !== raw.keys.length) st.heldKeys = new Uint8Array(raw.keys.length);
+  st.heldKeys.set(raw.keys);
+  st.heldMouse = raw.mouseButtons;
+  st.heldButtons.fill(0);
+  st.heldAxes.fill(0);
+  const p = raw.gamepads[pad];
+  if (p !== undefined && p.connected) {
+    for (let i = 0; i < p.buttons.length && i < HELD_BUTTONS; i++)
+      st.heldButtons[i] = p.buttons[i]! >= HELD_BUTTON ? 1 : 0;
+    for (let i = 0; i < p.axes.length && i < HELD_AXES; i++) st.heldAxes[i] = p.axes[i]!;
+  }
+  st.heldTouches.fill(Number.NaN);
+  for (let i = 0, n = 0; i < raw.touches.length && n < HELD_TOUCHES; i++) {
+    if (raw.touches[i]!.active) st.heldTouches[n++] = raw.touches[i]!.id;
+  }
+}
+
+/**
+ * M12 (fase 2, revisão): alguma coisa que estava apertada na morte (`snapshotHeld`) continua apertada? Só o que já
+ * estava: uma tecla nova, outro dedo ou um gatilho parado não seguram o seletor.
+ */
+export function stillHeld(st: DeathState, raw: Readonly<RawInputState>): boolean {
+  if (st.heldKind === 'touch') {
+    for (let i = 0; i < raw.touches.length; i++) {
+      const tch = raw.touches[i]!;
+      if (!tch.active) continue;
+      for (let k = 0; k < HELD_TOUCHES; k++) if (st.heldTouches[k] === tch.id) return true;
+    }
+    return false;
+  }
+  if (st.heldKind === 'gamepad') {
+    const p = raw.gamepads[st.heldPad];
+    if (p === undefined || !p.connected) return false;
+    for (let i = 0; i < p.buttons.length && i < HELD_BUTTONS; i++) {
+      if (st.heldButtons[i] === 1 && p.buttons[i]! >= HELD_BUTTON) return true;
+    }
+    for (let i = 0; i < p.axes.length && i < HELD_AXES; i++) {
+      const was = st.heldAxes[i]!;
+      if (Math.abs(was) >= HELD_AXIS && Math.abs(p.axes[i]! - was) < AXIS_MOVED) return true;
+    }
+    return false;
+  }
+  if ((raw.mouseButtons & st.heldMouse) !== 0) return true;
+  const keys = st.heldKeys;
+  for (let i = 0; i < raw.keys.length && i < keys.length; i++) if (keys[i] === 1 && raw.keys[i] === 1) return true;
+  return false;
+}
+
+/** O seletor destrava agora? (`DEATH_ARM_S` passou e o que estava apertado foi solto, ou `DEATH_ARM_MAX_S` passou.) */
+export function deathArmed(st: DeathState, raw: Readonly<RawInputState>): boolean {
+  if (st.t < DEATH_ARM_S) return false;
+  return st.t >= DEATH_ARM_MAX_S || !stillHeld(st, raw);
 }
 
 /** A entidade deste id ainda existe na vista (mesma geração)? */
@@ -452,6 +558,8 @@ export function fillDeathBanner(
   m.deathLabel = '';
   m.deathWeapon = '';
   m.deathHp = -1;
+  // M12 (fase 2): "· NA CABEÇA" só com quem matou (e não foi você mesmo).
+  m.deathHead = st.headshot && st.killer !== NULL_ENTITY && st.killer !== st.victim;
   if (st.killer === NULL_ENTITY) {
     m.deathName = st.weapon === WEAPON_KILL_PLANE ? tx.void : st.weapon === WEAPON_ZONE ? tx.zone : tx.fall;
     return;

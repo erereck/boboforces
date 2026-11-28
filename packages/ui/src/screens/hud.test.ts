@@ -394,21 +394,25 @@ describe('HUD por vista: conteúdo', () => {
     for (const c of drawnCommands(list)) expect(inside(c, view)).toBe(true);
   });
 
-  it('dano direcional na borda certa (positivo = à esquerda, como o yaw)', () => {
-    const side = (angle: number): DrawnCommand => {
+  it('dano direcional: M12 (fase 2) um arco perto da mira, do lado certo (positivo = à esquerda, como o yaw)', () => {
+    const side = (angle: number): { x: number; y: number } => {
       const m = sampleModel();
       m.damageAngle = angle;
       m.damageAmount = 1;
       const list = createDrawList();
       drawHud(list, fonts, m, view);
-      const bars = drawnCommands(list).filter((c) => c.color === withAlpha(COLORS.perigo, 0.9));
-      expect(bars.length).toBe(1);
-      return bars[0]!;
+      const arc = drawnCommands(list).filter((c) => c.color === withAlpha(COLORS.perigo, 0.95));
+      expect(arc.length).toBe(5);
+      const x = arc.reduce((t, c) => t + c.x + c.w / 2, 0) / arc.length;
+      const y = arc.reduce((t, c) => t + c.y + c.h / 2, 0) / arc.length;
+      // Perto da mira: a 1,5× o anel do som (36 px × escala 2), não na borda da tela.
+      expect(Math.hypot(x - 640, y - 360)).toBeLessThan(HUD_METRICS.soundRing * 2 * 1.6);
+      return { x, y };
     };
-    expect(side(0).y).toBeLessThan(100);
-    expect(side(Math.PI).y).toBeGreaterThan(600);
-    expect(side(Math.PI / 2).x).toBeLessThan(100);
-    expect(side(-Math.PI / 2).x).toBeGreaterThan(1100);
+    expect(side(0).y).toBeLessThan(300);
+    expect(side(Math.PI).y).toBeGreaterThan(420);
+    expect(side(Math.PI / 2).x).toBeLessThan(580);
+    expect(side(-Math.PI / 2).x).toBeGreaterThan(700);
   });
 
   it('"Clique para mirar" sob a retícula; sem fontes, só formas (não lança)', () => {
@@ -572,7 +576,7 @@ describe('tela de morte (M2, fase 2c)', () => {
     'Metralhadora',
   ];
 
-  it('M10: 10 primárias nas 4 resoluções e em 2 vistas a 720p+: anel largo ou fileira em linhas, nada se tocando', () => {
+  it('M10: 10 primárias nas 4 resoluções e em 2 vistas a 720p+: a fileira em linhas (M12), nada se tocando', () => {
     const layouts: string[] = [];
     for (const size of SIZES) {
       for (const count of size.width >= 1280 ? [1, 2] : [1]) {
@@ -601,13 +605,14 @@ describe('tela de morte (M2, fase 2c)', () => {
         }
       }
     }
-    // 640×360: a fileira em 2 linhas (cabe no toque); celular e 720p+: o anel largo; 2 vistas: a fileira.
+    // M12 (fase 2, playtest): com mais de 8 opções, a fileira compacta embaixo da contagem em todo tamanho (o anel largo
+    // espalhava os 10 nomes pela cena).
     expect(layouts).toEqual([
       `640:1:${PRIMARY_LAYOUT.row}:10:false`,
-      `667:1:${PRIMARY_LAYOUT.ring}:10:true`,
-      `1280:1:${PRIMARY_LAYOUT.ring}:10:true`,
+      `667:1:${PRIMARY_LAYOUT.row}:10:false`,
+      `1280:1:${PRIMARY_LAYOUT.row}:10:false`,
       `1280:2:${PRIMARY_LAYOUT.row}:10:false`,
-      `1920:1:${PRIMARY_LAYOUT.ring}:10:true`,
+      `1920:1:${PRIMARY_LAYOUT.row}:10:false`,
       `1920:2:${PRIMARY_LAYOUT.row}:10:false`,
     ]);
   });

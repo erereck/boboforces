@@ -1,6 +1,27 @@
-import { COLORS, type ButtonNode, type UiNode } from '@boboforces/ui';
+import {
+  BUTTON,
+  BUTTON_COMPACT,
+  COLORS,
+  createDrawList,
+  DRAW_FLOATS_PER_COMMAND,
+  drawTree,
+  layoutTree,
+  MIN_TEXT,
+  MIN_TOUCH_TARGET,
+  parseFontPack,
+  type ButtonNode,
+  type UiNode,
+} from '@boboforces/ui';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { RESULT_ACTION, resultScreen, zombiesResultScreen, type ResultScreenData } from './result-screen.ts';
+import {
+  cascadeResult,
+  RESULT_ACTION,
+  resultScreen,
+  zombiesResultScreen,
+  type ResultScreenData,
+} from './result-screen.ts';
 
 /** M2, fase 5e: os botões do resultado que levam ao Laboratório. */
 
@@ -129,5 +150,130 @@ describe('M8 (fase 4): a rivalidade no resultado', () => {
       text: { literal: 'Na rivalidade: te pegou 12, você 4 · 3 partidas' },
     });
     expect(find(resultScreen.build(base), 'rivalry')).toBeNull();
+  });
+});
+
+describe('M12 (fase 2): o resultado com respiro', () => {
+  const buttons = (node: UiNode, out: ButtonNode[] = []): ButtonNode[] => {
+    if (node.kind === 'button') out.push(node);
+    const kids = 'children' in node && node.children ? node.children : [];
+    for (const k of kids) buttons(k, out);
+    return out;
+  };
+
+  it('travado: todos os botões desligados (e sem foco inicial); destravado, como antes', () => {
+    for (const tree of [
+      resultScreen.build({ ...base, locked: true }),
+      resultScreen.build({ ...base, locked: true, online: true }),
+      zombiesResultScreen.build({
+        title: 'x',
+        titleColor: COLORS.texto,
+        config: '',
+        record: '',
+        newRecord: false,
+        rows: [],
+        locked: true,
+      }),
+    ]) {
+      const bs = buttons(tree);
+      expect(bs.length).toBeGreaterThan(0);
+      for (const b of bs) expect([b.id, b.disabled, b.autofocus]).toEqual([b.id, true, false]);
+    }
+    expect(find(resultScreen.build(base), 'again')!.disabled).toBeFalsy();
+  });
+
+  it('o MVP em âmbar quando é você; o placar de times diz qual é o seu; o Salvar na Oficina compacto ao lado do Nêmesis', () => {
+    const tree = resultScreen.build({ ...base, mvpIsYou: true, teamScore: true });
+    const json = JSON.stringify(tree);
+    expect(json).toContain(
+      `"id":"mvp","text":{"key":"result.mvp","params":{"name":"Tryhard Bob"}},"style":"body","color":${COLORS.acao}`,
+    );
+    expect(json).toContain('"key":"result.scoreTeam"');
+    const kidsOf = (n: UiNode): readonly UiNode[] => ('children' in n && n.children ? n.children : []);
+    const row = kidsOf(kidsOf(tree)[0]!).find((c) => c.id === 'nemesisRow')!;
+    expect(find(row, 'saveWorkshop')).toMatchObject({ compact: true });
+    expect(find(resultScreen.build({ ...base, watching: true }), 'saveWorkshop')).toBeNull();
+  });
+
+  it('cascata: no começo tudo apagado; aos 100 ms as linhas de cima já entram e as de baixo não; com Reduzir, nada muda', () => {
+    const root = resultScreen.build(base);
+    const layout = layoutTree(root, { x: 0, y: 0, w: 1280, h: 720 });
+    const draw = (ageMs: number, reduce: boolean) => {
+      const list = createDrawList();
+      list.width = 1280;
+      list.height = 720;
+      drawTree(layout, null, list);
+      cascadeResult(list, 0, layout, ageMs, 1, reduce);
+      return list;
+    };
+    const alphaAt = (list: ReturnType<typeof createDrawList>, i: number): number => list.colors[i]! & 0xff;
+    const start = draw(0, false);
+    for (let i = 0; i < start.count; i++) expect(alphaAt(start, i)).toBe(0);
+    const mid = draw(100, false);
+    const full = draw(100, true);
+    // O véu (o 1º comando, do tamanho da tela) já entrou; o último botão (lá embaixo) ainda não.
+    expect(alphaAt(mid, 0)).toBeGreaterThan(0);
+    let lowest = 0;
+    for (let i = 1; i < mid.count; i++)
+      if (mid.geom[i * DRAW_FLOATS_PER_COMMAND + 1]! > mid.geom[lowest * DRAW_FLOATS_PER_COMMAND + 1]!) lowest = i;
+    expect(alphaAt(mid, lowest)).toBe(0);
+    for (let i = 0; i < full.count; i++) expect(full.colors[i]).toBe(draw(10_000, false).colors[i]);
+  });
+});
+
+describe('M12 (fase 2, revisão): o resultado cabe na tela com o atlas real', () => {
+  const ROOT = resolve(import.meta.dirname, '..', '..', '..');
+  const RUNTIME = JSON.parse(readFileSync(join(ROOT, 'assets-src', 'runtime-assets.json'), 'utf8')) as {
+    files: Record<string, string>;
+  };
+  const fonts = parseFontPack(
+    JSON.parse(readFileSync(join(ROOT, 'assets-src', RUNTIME.files['fonts/ui-fonts.json'] as string), 'utf8')),
+  ).fonts;
+  const TARGETS = [
+    ['web 1280×720', 1280, 720, MIN_TEXT.phone, 0],
+    ['web 640×360', 640, 360, MIN_TEXT.phone, 0],
+    ['toque 640×360', 640, 360, MIN_TEXT.phone, MIN_TOUCH_TARGET],
+    ['celular 1334×750 (DPR 2)', 1334, 750, MIN_TEXT.phone * 2, MIN_TOUCH_TARGET * 2],
+    ['4:3 1024×768', 1024, 768, MIN_TEXT.phone, 0],
+    ['Switch 1280×720', 1280, 720, MIN_TEXT.tv, 0],
+    ['Switch 4:3 960×720', 960, 720, MIN_TEXT.tv, 0],
+  ] as const;
+  const full: ResultScreenData = {
+    ...base,
+    title: 'Vitória!',
+    nemesis: 'Jorge the Immortal',
+    victim: 'Bob Sniper',
+    victimKills: 6,
+    mvp: 'Tryhard Bob',
+    teamScore: true,
+  };
+
+  it('nenhum botão sai da área útil e todo texto de botão cabe nele (normal, Tryhard, Cenário, online, travado)', () => {
+    for (const [name, w, h, minTextPx, minTarget] of TARGETS) {
+      for (const [variant, d] of [
+        ['normal', full],
+        ['Tryhard', { ...full, openLab: true }],
+        ['Cenário', { ...full, scenario: true }],
+        ['online', { ...full, online: true }],
+        ['travado', { ...full, locked: true, nemesisSaved: true }],
+      ] as const) {
+        const l = layoutTree(resultScreen.build(d), { x: 0, y: 0, w, h }, 1, { fonts, minTextPx, minTarget });
+        const c = l.content;
+        const tag = `${name} [${variant}]`;
+        for (const node of l.order) {
+          if (node.kind !== 'button') continue;
+          const r = l.rects.get(node)!;
+          expect(r.x >= c.x - 1 && r.x + r.w <= c.x + c.w + 1, `${tag}: ${node.id} (${r.x}, ${r.w})`).toBe(true);
+          expect(r.y >= c.y - 1 && r.y + r.h <= c.y + c.h + 1, `${tag}: ${node.id} (${r.y}, ${r.h})`).toBe(true);
+          const text = l.texts.get(node);
+          const padX = node.compact ? BUTTON_COMPACT.padX : BUTTON.padX;
+          if (text) expect(text.width, `${tag}: ${node.id}`).toBeLessThanOrEqual(r.w - 2 * padX * l.scale + 0.01);
+        }
+      }
+    }
+  });
+
+  it('o online com Nêmesis também tem o "Salvar na Oficina"', () => {
+    expect(find(resultScreen.build({ ...full, online: true }), 'saveWorkshop')).not.toBeNull();
   });
 });
