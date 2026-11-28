@@ -238,6 +238,69 @@ describe('perfis Tático e Personalizado (M2, fase 6a)', () => {
     expect(climbs(1, { movement: 'tactical', gravity: 2 })).toBe(true);
   });
 
+  it('M12 (fase 6): o deslize no pouso: o agachar apertado no ar (vindo de corrida) fica guardado 0,1 s', () => {
+    /**
+     * Corre 30 ticks, pula correndo e, `before` ticks antes do tick em que pousa (−1 = sem agachar), aperta o agachar e
+     * segura até o fim (`release`: solta 1 tick antes de pousar). Devolve quantos deslizes saíram e se desliza no 2º
+     * tick no chão.
+     */
+    const takeOff = (sprint: boolean): ReturnType<typeof setup> => {
+      const a = setup();
+      const base = sprint ? BUTTON.sprint : 0;
+      a.frame.moveY = quantizeAxis(1);
+      a.frame.buttons = base;
+      for (let i = 0; i < 30; i++) a.step();
+      a.frame.buttons = base | BUTTON.jump;
+      a.step();
+      a.frame.buttons = base;
+      return a;
+    };
+    const run = (
+      before: number,
+      sprint = true,
+      release = false,
+      jumpBefore = -1,
+    ): { slides: number; sliding: boolean } => {
+      // O tick do pouso, contado depois do pulo (a mesma conta em toda rodada: a sim é determinística).
+      const dry = takeOff(sprint);
+      const flight = ticksUntil(dry.step, dry.onGround);
+      const a = takeOff(sprint);
+      const base = sprint ? BUTTON.sprint : 0;
+      let slides = 0;
+      let jumps = 0;
+      for (let t = 1; t <= flight + 2; t++) {
+        let buttons = before >= 0 && t >= flight - before ? base | BUTTON.crouch : base;
+        if (release && t >= flight - 1) buttons = base;
+        // O 2º pulo, um toque no ar (guardado até o pouso, como o bunny hop).
+        if (jumpBefore >= 0 && t === flight - jumpBefore) buttons |= BUTTON.jump;
+        a.frame.buttons = buttons;
+        // Os eventos são do pool (valem até o próximo tick): conta os deste.
+        const seen = a.events.length;
+        a.step();
+        for (let k = seen; k < a.events.length; k++) {
+          const ev = a.events[k]!;
+          if (ev.type === 'move' && ev.move === 'slide') slides++;
+          if (ev.type === 'move' && ev.move === 'jump') jumps++;
+        }
+      }
+      if (jumpBefore >= 0) expect(jumps).toBe(1);
+      // Deslizando, ainda acima da corrida (o deslize começa em 8 m/s; agachado, freia para 2,4).
+      return { slides, sliding: a.speed() > MOVEMENT_BOBO.sprint };
+    };
+    // Apertado no tick do pouso, ou até 5 ticks antes (o buffer é de 6 a 60 Hz, como o do pulo): desliza.
+    for (const before of [0, 3, 5]) expect(run(before)).toEqual({ slides: 1, sliding: true });
+    // Cedo demais (no meio do voo): pousa agachado, sem deslizar (o agachar no ar continua valendo para passar baixo).
+    expect(run(20)).toEqual({ slides: 0, sliding: false });
+    // Sem vir correndo (pulo andando), ou soltando o agachar antes de pousar: nada.
+    expect(run(3, false)).toEqual({ slides: 0, sliding: false });
+    expect(run(3, true, true)).toEqual({ slides: 0, sliding: false });
+    // Sem agachar: pousa correndo.
+    expect(run(-1).slides).toBe(0);
+    // Revisão: o pulo guardado (ou apertado no pouso) sai sem o deslize de um tick: nem o evento nem os 7,9 m/s dele no
+    // pulo (que ficaria acima da corrida).
+    for (const jumpBefore of [0, 2]) expect(run(3, true, false, jumpBefore)).toEqual({ slides: 0, sliding: false });
+  });
+
   it('o Tático freia no pouso; o Bobo não', () => {
     const landing = (players: PlayerRules): number => {
       const a = setup(SIM_HZ, undefined, undefined, players);

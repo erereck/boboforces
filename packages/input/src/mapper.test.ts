@@ -106,7 +106,7 @@ describe('teclado e mouse', () => {
     expect(m.pitch).toBeCloseTo(50 * sens, 9);
   });
 
-  it('Y invertido, multiplicador do ADS e aimScale da assistência', () => {
+  it('Y invertido e aimScale (a assistência e, desde o M12, o ADS pelo zoom: o botão sozinho não muda nada)', () => {
     const raw = createRawInputState();
     raw.pointerLocked = true;
     raw.mouseDY = 10;
@@ -120,7 +120,11 @@ describe('teclado e mouse', () => {
     raw.mouseDX = 10;
     raw.mouseButtons = MOUSE_BUTTON.right;
     ads.update(raw, DT, 0.5);
-    expect(ads.yaw).toBeCloseTo(-10 * sens * 0.7 * 0.5, 9);
+    // M12 (fase 6): o mapeador não multiplica mais pelo ADS no aperto (era ×0,7): o `game` manda o do zoom no
+    // `aimScale` (`adsLookScale`), seguindo o quanto o ADS já entrou.
+    expect(ads.isDown('ads')).toBe(true);
+    expect(ads.yaw).toBeCloseTo(-10 * sens * 0.5, 9);
+    expect(createKeyboardMouseProfile().adsSensitivityMul).toBe(1);
   });
 
   it('pitch para no limite e yaw dá a volta', () => {
@@ -203,6 +207,31 @@ describe('teclado e mouse', () => {
     expect(frameOf(h).buttons & BUTTON.ads).toBe(BUTTON.ads);
     h.update(raw, DT);
     expect([h.isDown('ads'), h.wasPressed('ads')]).toEqual([true, false]);
+  });
+
+  it('M12 (fase 6, revisão): começar a correr solta o ADS alternado; o ADS segurado fica', () => {
+    const raw = createRawInputState();
+    const m = kbm({ ...createKeyboardMouseProfile(), toggleAds: true });
+    raw.mouseButtons = MOUSE_BUTTON.right;
+    m.update(raw, DT);
+    raw.mouseButtons = 0;
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(true);
+    press(raw, 'KeyW', 'ShiftLeft');
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(false);
+    expect(frameOf(m).buttons & (BUTTON.ads | BUTTON.sprint)).toBe(BUTTON.sprint);
+    // Segurando o Shift, mirar de novo liga (só a borda da corrida solta).
+    raw.mouseButtons = MOUSE_BUTTON.right;
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(true);
+    // Sem alternância, o ADS segurado não é solto pela corrida (a sim decide).
+    release(raw, 'ShiftLeft');
+    const h = kbm();
+    h.update(raw, DT);
+    press(raw, 'ShiftLeft');
+    h.update(raw, DT);
+    expect(h.isDown('ads')).toBe(true);
   });
 
   it('refino R1 (#79): a corrida alternada solta quando o jogador para de ir para a frente', () => {
@@ -441,7 +470,8 @@ describe('toque', () => {
     finger(raw, 0, 7, 600, 500, 300, 500);
     m.update(raw, DT);
     expect(frameOf(m)).toMatchObject({ moveX: 127, moveY: 0 });
-    expect(m.touchJoystick.knobX).toBe(420);
+    // M12 (fase 6): passando do raio, a base vem atrás do dedo (base = dedo − direção·raio; o pino fica no dedo).
+    expect(m.touchJoystick).toMatchObject({ baseX: 480, baseY: 500, knobX: 600, knobY: 500 });
     raw.touches[0]!.active = false;
     m.update(raw, DT);
     expect(m.touchJoystick.active).toBe(false);
@@ -465,6 +495,71 @@ describe('toque', () => {
     finger(raw, 0, 7, 420, 500, 300, 500);
     m.update(raw, DT);
     expect(frameOf(m).buttons & BUTTON.sprint).toBe(0);
+  });
+
+  it('M12 (fase 6): a base que segue o dedo: voltar freia na hora e o dedo longe segue correndo', () => {
+    const raw = touchRaw();
+    const m = createInputMapper({ kind: 'touch' }, createTouchProfile());
+    finger(raw, 0, 7, 300, 500);
+    m.update(raw, DT);
+    // O dedo vai 300 px para cima (2,5 raios): a base sobe junto até ficar a 1 raio (120 px reais) dele.
+    finger(raw, 0, 7, 300, 200, 300, 500);
+    m.update(raw, DT);
+    expect(m.touchJoystick).toMatchObject({ baseX: 300, baseY: 320, knobX: 300, knobY: 200 });
+    expect(frameOf(m).buttons & BUTTON.sprint).toBe(BUTTON.sprint);
+    // Voltando só 60 px (meio raio), o bobo já anda pela metade (antes ainda correria: 240 px da base parada).
+    finger(raw, 0, 7, 300, 260, 300, 500);
+    m.update(raw, DT);
+    expect(m.touchJoystick).toMatchObject({ baseX: 300, baseY: 320 });
+    const f = frameOf(m);
+    expect(f.buttons & BUTTON.sprint).toBe(0);
+    // (60 − 16) / (120 − 16) = 0,42 da frente.
+    expect(f.moveY).toBe(Math.round(((60 - 16) / (120 - 16)) * 127));
+    // O dedo novo nasce outra base onde encostou.
+    raw.touches[0]!.active = false;
+    m.update(raw, DT);
+    finger(raw, 0, 8, 400, 450);
+    m.update(raw, DT);
+    expect(m.touchJoystick).toMatchObject({ baseX: 400, baseY: 450 });
+  });
+
+  it('M12 (fase 6): o PULO e o ADS também miram ao arrastar; o ADS alterna e o botão fica aceso', () => {
+    const raw = touchRaw();
+    const p = createTouchProfile();
+    expect(p.toggleAds).toBe(true);
+    const m = createInputMapper({ kind: 'touch' }, p);
+    // ADS: centro a (224, 56) px de layout do canto inferior direito.
+    const ax = 1334 - 224 * 2;
+    const ay = 750 - 56 * 2;
+    finger(raw, 2, 4, ax, ay);
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(true);
+    finger(raw, 2, 4, ax - 30, ay, ax, ay);
+    m.update(raw, DT);
+    expect(m.yaw).toBeCloseTo(30 * (p.lookSensitivity / 2), 9);
+    // Soltou: o ADS continua (alternância) e o botão aceso.
+    raw.touches[2]!.active = false;
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(true);
+    expect(m.isTouchControlDown('ads')).toBe(true);
+    expect(m.isTouchControlDown('fire')).toBe(false);
+    // Outro toque desliga.
+    finger(raw, 2, 5, ax, ay);
+    m.update(raw, DT);
+    raw.touches[2]!.active = false;
+    m.update(raw, DT);
+    expect(m.isDown('ads')).toBe(false);
+    expect(m.isTouchControlDown('ads')).toBe(false);
+    // PULO: centro a (56, 56); arrastar para cima mira para cima.
+    const jx = 1334 - 56 * 2;
+    const jy = 750 - 56 * 2;
+    const pitch0 = m.pitch;
+    finger(raw, 1, 6, jx, jy);
+    m.update(raw, DT);
+    expect(m.wasPressed('jump')).toBe(true);
+    finger(raw, 1, 6, jx, jy - 20, jx, jy);
+    m.update(raw, DT);
+    expect(m.pitch).toBeGreaterThan(pitch0);
   });
 
   it('arrastar na metade direita mira (em px de layout)', () => {

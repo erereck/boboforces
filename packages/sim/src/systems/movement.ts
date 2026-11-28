@@ -73,6 +73,8 @@ class ProfileTicks {
   sprintFireDelay = 0;
   slideTotal = 0;
   slideCooldown = 0;
+  /** M12 (fase 6): quanto o agachar apertado no ar fica guardado para o deslize no pouso, em ticks. */
+  slideLandBuffer = 0;
   airStep = 0;
   /** M8 (fase 7): a janela do bunny hop, em ticks no chão desde o pouso. */
   bhopWindow = 0;
@@ -87,6 +89,7 @@ class ProfileTicks {
     this.sprintFireDelay = secondsToTicks(p.sprintFireDelayS, hz);
     this.slideTotal = p.slide ? Math.max(1, secondsToTicks(p.slide.durationS, hz)) : 0;
     this.slideCooldown = p.slide ? secondsToTicks(p.slide.cooldownS, hz) : 0;
+    this.slideLandBuffer = p.slide ? secondsToTicks(p.slide.landBufferS, hz) : 0;
     this.airStep = Math.max(0, Math.min(METRICS.stepHeight, p.mantleHeight - p.jump) + MANTLE_SLACK);
     this.bhopWindow = secondsToTicks(ARCADE_TUNING.bhopWindowS, hz);
   }
@@ -280,11 +283,19 @@ function moveBody(ctx: SimContext, e: number): void {
   // --- Deslize (agachar correndo, perfil Bobo) ---
   let sliding = (fl & F.sliding) !== 0;
   if (s.slideCooldownTicks[e]! > 0) s.slideCooldownTicks[e]!--;
+  // M12 (fase 6): o deslize no pouso. O agachar apertado no ar vindo de corrida fica guardado `landBufferS` (como o
+  // pulo); no 1º tick no chão, com ele guardado e o agachar ainda seguro, desliza (no ar o agachar desliga a corrida,
+  // então pular e pousar deslizando não saía).
+  let slideBuffer = s.slideBufferTicks[e]!;
+  if (slide && !wasOnGround && wasSprinting && (pressed & BUTTON.crouch) !== 0) slideBuffer = pt.slideLandBuffer + 1;
+  // Revisão: com o pulo saindo neste tick (guardado ou apertado agora) o pouso não desliza: o deslize de um tick
+  // levaria a velocidade dele (7,9 m/s) para o pulo, gastaria a recarga e soltaria o som e a pose à toa.
+  const jumpNow = s.jumpBufferTicks[e]! > 0 || (pressed & BUTTON.jump) !== 0;
+  const landSlide = slideBuffer > 0 && (btn & BUTTON.crouch) !== 0 && !jumpNow;
   if (
     slide &&
     !sliding &&
-    (pressed & BUTTON.crouch) !== 0 &&
-    wasSprinting &&
+    (((pressed & BUTTON.crouch) !== 0 && wasSprinting) || landSlide) &&
     wasOnGround &&
     s.slideCooldownTicks[e] === 0 &&
     hSpeed >= p.walk * 0.9
@@ -299,6 +310,10 @@ function moveBody(ctx: SimContext, e: number): void {
     }
     ctx.events.move(ctx.tick, s.idOf(e), 'slide', arcade ? s.slideSpeed[e]! : slide.startSpeed);
   }
+  // No chão o guardado já valeu (ou não); no ar ele corre como o do pulo.
+  if (wasOnGround) slideBuffer = 0;
+  else if (slideBuffer > 0) slideBuffer--;
+  s.slideBufferTicks[e] = slideBuffer;
 
   // --- Agachar (levanta só se couber em pé: caixa agachada varrida para cima, com formas e props) ---
   let crouching = (fl & F.crouching) !== 0;

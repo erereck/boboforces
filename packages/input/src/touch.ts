@@ -3,8 +3,9 @@ import { TOUCH_CONTROLS, type TouchControlId } from './bindings.ts';
 /**
  * Layout do toque no celular (arte-ux.md §7.3, tecnico.md §10). Tudo em px de LAYOUT; o mapeador e a UI multiplicam
  * por `RawInputState.pixelRatio`.
- * - Metade esquerda: joystick que nasce onde o dedo toca (raio 60, zona morta 8).
- * - Metade direita: arrastar para mirar; o botão de tiro também mira enquanto o dedo arrasta.
+ * - Metade esquerda: joystick que nasce onde o dedo toca (raio 60, zona morta 8); M12 (fase 6): passando do raio, a
+ *   base vem atrás do dedo.
+ * - Metade direita: arrastar para mirar; os botões de tiro, pulo e ADS também miram enquanto o dedo arrasta.
  * - Botões de pelo menos 64 px (pausa: 48, acima do alvo mínimo de 44), 12 px entre eles.
  * - Nada começa a menos de 24 px da borda (gestos de voltar e deslize do sistema).
  * - Canhoto espelha tudo na horizontal.
@@ -21,7 +22,7 @@ export interface TouchButtonDef {
   /** Distância do centro até a borda horizontal do canto (para dentro), px de layout. */
   readonly y: number;
   readonly radius: number;
-  /** O dedo que começou neste botão também mira ao arrastar (o ATIRAR). */
+  /** O dedo que começou neste botão também mira ao arrastar (o ATIRAR, o PULO e o ADS). */
   readonly aims: boolean;
 }
 
@@ -47,13 +48,14 @@ export const DEFAULT_TOUCH_LAYOUT: TouchLayout = {
   edgeMargin: 24,
   hitSlop: 6,
   leftHanded: false,
+  // M12 (fase 6): o PULO e o ADS também miram ao arrastar (o polegar direito pula ou mira sem parar de mirar).
   buttons: [
-    { control: 'jump', anchor: 'bottomRight', x: 56, y: 56, radius: 32, aims: false },
+    { control: 'jump', anchor: 'bottomRight', x: 56, y: 56, radius: 32, aims: true },
     { control: 'crouch', anchor: 'bottomRight', x: 56, y: 132, radius: 32, aims: false },
     { control: 'grenade', anchor: 'bottomRight', x: 56, y: 208, radius: 32, aims: false },
     { control: 'fire', anchor: 'bottomRight', x: 140, y: 100, radius: 40, aims: true },
     { control: 'reload', anchor: 'bottomRight', x: 140, y: 184, radius: 32, aims: false },
-    { control: 'ads', anchor: 'bottomRight', x: 224, y: 56, radius: 32, aims: false },
+    { control: 'ads', anchor: 'bottomRight', x: 224, y: 56, radius: 32, aims: true },
     { control: 'weapon', anchor: 'bottomRight', x: 224, y: 140, radius: 32, aims: false },
     { control: 'pause', anchor: 'topRight', x: 56, y: 56, radius: 24, aims: false },
     // M2 (fase 6e): a faca à esquerda da troca de arma (fora da área de mirar, no alto) e a câmera (1ª/3ª pessoa) ao

@@ -49,7 +49,10 @@ export interface ControlProfile {
   readonly keyLookRate: number;
   /** Multiplicador da sensibilidade vertical (sensibilidade X/Y separada). */
   readonly lookSensitivityYMul: number;
-  /** Multiplicador da sensibilidade durante o ADS. */
+  /**
+   * Multiplicador da sensibilidade no ADS, sobre o do zoom (M12, fase 6: `adsLookScale`; 1 = a mira anda na tela como
+   * no quadril). Quem aplica é o `game`, pelo `aimScale`, seguindo o quanto o ADS já entrou.
+   */
   readonly adsSensitivityMul: number;
   readonly invertY: boolean;
   readonly deadzoneInner: number;
@@ -81,7 +84,8 @@ const COMMON = {
   lookKeys: {},
   keyLookRate: 2.4,
   lookSensitivityYMul: 1,
-  adsSensitivityMul: 0.7,
+  // M12 (fase 6): 1 (era 0,7 fixo para toda arma): o zoom de cada uma já desacelera (`adsLookScale`).
+  adsSensitivityMul: 1,
   invertY: false,
   deadzoneInner: 0.15,
   deadzoneOuter: 0.95,
@@ -274,6 +278,8 @@ export function createTouchProfile(layout: TouchLayout = DEFAULT_TOUCH_LAYOUT): 
     lookStick: null,
     lookSensitivity: 0.006,
     aimAssist: AIM_ASSIST_LEVELS.medium,
+    // M12 (fase 6, AM10): no toque o ADS alterna (segurar o botão prendia o polegar que mira).
+    toggleAds: true,
     touch: layout,
   };
 }

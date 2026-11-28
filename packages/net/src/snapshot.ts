@@ -97,7 +97,8 @@ export interface SnapshotTarget {
  */
 // M8 (fase 7): mais os do Arcade: pulos no ar e chão desde o pouso em 16 bits; as velocidades e a chave da parede em
 // f32 (as chaves das paredes são inteiros < 2^24: exatas).
-const PRIV_F32 = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1] as const;
+// M12 (fase 6): mais o agachar guardado para o deslize no pouso (i16).
+const PRIV_F32 = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0] as const;
 if (PRIV_F32.length !== PREDICT_STATE_SIZE) throw new Error('net: estado de movimento da sim mudou');
 /** 1 bit "veio" + entidade + os valores. */
 export const PRIV_BITS = 1 + ENTITY_INDEX_BITS + PRIV_F32.reduce<number>((n, f) => n + (f ? 32 : 16), 0);

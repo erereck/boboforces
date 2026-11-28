@@ -57,6 +57,13 @@ describe('settings@1', () => {
     expect(DEFAULT_SETTINGS.controls.keyboardMouse.aimAssist).toBe('off');
     expect(DEFAULT_SETTINGS.controls.gamepad.aimAssist).toBe('medium');
     expect(DEFAULT_SETTINGS.controls.touch.aimAssist).toBe('medium');
+    // M12 (fase 6, AM10): o ADS alterna no toque por padrão; quem já tem o save (com o campo escrito) fica como estava.
+    expect(DEFAULT_SETTINGS.controls.touch.toggleAds).toBe(true);
+    expect(DEFAULT_SETTINGS.controls.gamepad.toggleAds).toBe(false);
+    const old = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as { controls: { touch: { toggleAds: boolean } } };
+    old.controls.touch.toggleAds = false;
+    const kept = validateSettings(old);
+    expect(kept.ok && kept.value.controls.touch.toggleAds).toBe(false);
   });
 
   it('o que falta vem do padrão; fora da faixa é limitado; tipo errado cai no padrão; tudo com aviso conhecido', () => {

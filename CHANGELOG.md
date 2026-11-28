@@ -17,6 +17,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   coiceia diferente em cada arma, sobe na troca, gira na recarga soltando o pente, estoca com a faca e acende com o
   clarão, cápsulas douradas pulam a cada tiro, levar dano dá um solavanco, o controle vibra no tiro e no abate, as
   luvas ficam na sua cor no FFA e no Royale, e "Reduzir efeitos" tira tudo isso.
+- **A mira, o toque e o movimento (fase 6):** no ADS a sensibilidade acompanha o zoom de cada arma (a luneta não
+  dispara mais na tela), no celular o ADS alterna, o polegar continua mirando no PULO e no ADS e o joystick vem atrás
+  do dedo, a assistência de mira acompanha quem anda de lado sem puxar da cabeça para o peito e trava suave no Forte,
+  pular correndo e segurar o agachar perto do chão sai deslizando, e no online a correção do próprio boneco desliza em
+  vez de dar um tranco. O online foi para o protocolo 15.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

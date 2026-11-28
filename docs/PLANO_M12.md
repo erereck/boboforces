@@ -70,6 +70,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
 6. **A mira, o toque e o movimento:** a sensibilidade do ADS pelo zoom; o toque que mira segurando o ADS e o joystick
    que segue o dedo; a assistência de mira que acompanha quem anda de lado; o deslize no pouso (sim, golden e
    protocolo); a correção do online sem estalo.
+   - **feita em 27/11** (ARCHITECTURE §23.6): o ADS pelo zoom, o toque, a assistência honesta, o deslize no pouso (protocolo 15) e a correção do online; a quina ficou de fora.
 7. **Os bots:** respeitar a proteção de spawn; o alvo também pelo cone; a reação que varia e aparece; olhar para a
    ameaça e para o canto; o mato que esconde; não atirar no vidro; a mira que deriva e atrasa; revidar quem bate;
    rajadas; o Pela vibe sem foguete; aliados que seguem em vaga; zumbis que cercam; sem fila indiana; o passeio que

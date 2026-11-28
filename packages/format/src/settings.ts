@@ -172,7 +172,10 @@ export const DEFAULT_SETTINGS: SettingsDocument = {
     keyboardMouse: deviceDefaults('off'),
     // Refino R1 (#79): no controle, correr alterna com o L3 (segurar o L3 andando cansa); solta ao parar.
     gamepad: { ...deviceDefaults('medium'), toggleSprint: true },
-    touch: deviceDefaults('medium'),
+    // M12 (fase 6, AM10): no toque o ADS alterna por padrão (segurar o botão prendia o polegar que mira). Vale para
+    // quem ainda não tem o documento de ajustes gravado (ele só é gravado quando algum ajuste muda): quem já mexeu em
+    // qualquer ajuste fica com o `toggleAds` que tinha.
+    touch: { ...deviceDefaults('medium'), toggleAds: true },
   },
   video: {
     quality: 'auto',

@@ -9,6 +9,11 @@ export interface SlideParams {
   readonly durationS: number;
   readonly startSpeed: number;
   readonly cooldownS: number;
+  /**
+   * M12 (fase 6): o agachar apertado no ar, vindo de corrida, fica guardado este tanto (como o buffer do pulo): pousando
+   * com ele guardado e o agachar ainda seguro, desliza (antes o deslize só saía apertando o agachar já no chão).
+   */
+  readonly landBufferS: number;
 }
 
 export interface MovementProfile {
@@ -82,7 +87,7 @@ export const MOVEMENT_BOBO: MovementProfile = {
   adsMoveMul: 0.75,
   moveSpreadMul: 0.7,
   fallDamage: true,
-  slide: { durationS: 0.7, startSpeed: 8, cooldownS: 1 },
+  slide: { durationS: 0.7, startSpeed: 8, cooldownS: 1, landBufferS: 0.1 },
   bhop: false,
   wallJump: false,
   doubleJump: false,
@@ -141,7 +146,7 @@ export const MOVEMENT_ARCADE: MovementProfile = {
   adsMoveMul: 0.75,
   moveSpreadMul: 0.7,
   fallDamage: false,
-  slide: { durationS: 0.9, startSpeed: 9, cooldownS: 0.6 },
+  slide: { durationS: 0.9, startSpeed: 9, cooldownS: 0.6, landBufferS: 0.1 },
   bhop: true,
   wallJump: true,
   doubleJump: true,

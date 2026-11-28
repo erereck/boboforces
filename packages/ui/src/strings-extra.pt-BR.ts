@@ -954,7 +954,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'settings.help.device': 'Qual controle você está ajustando. Cada um guarda os seus ajustes.',
   'settings.help.sens': 'Quanto a câmera gira ao mexer o mouse ou o analógico.',
   'settings.help.sensY': 'A sensibilidade para cima e para baixo, em relação à dos lados.',
-  'settings.help.ads': 'A sensibilidade enquanto você mira com a arma.',
+  // M12 (fase 6, revisão): o zoom de cada arma já entra na conta; ×1 = a mira anda na tela como sem mirar.
+  'settings.help.ads': 'Na mira, com ×1 a tela anda como sem mirar, em qualquer zoom.',
   'settings.help.invertY': 'Inverte o cima e o baixo da câmera.',
   'settings.help.assist': 'Quanto a mira desacelera e puxa perto de um inimigo.',
   'settings.help.toggleAds': 'Segurar: mira enquanto o botão está apertado. Alternar: um toque liga.',

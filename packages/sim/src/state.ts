@@ -77,6 +77,8 @@ export class SimState {
   readonly jumpBufferTicks = new Int16Array(MAX_ENTITIES);
   readonly slideTicks = new Int16Array(MAX_ENTITIES);
   readonly slideCooldownTicks = new Int16Array(MAX_ENTITIES);
+  /** M12 (fase 6): o agachar apertado no ar vindo de corrida, guardado para o deslize no pouso (ticks; 0 = nenhum). */
+  readonly slideBufferTicks = new Int16Array(MAX_ENTITIES);
   /**
    * M8 (fase 7): o Arcade: os pulos no ar já usados (o duplo), os ticks no chão desde o pouso (a janela do bunny hop),
    * a velocidade no plano no pouso, a do começo do deslize e as paredes dos wall jumps deste voo (`wallKeys`, duas
@@ -246,6 +248,7 @@ export class SimState {
       f('jumpBufferTicks', this.jumpBufferTicks),
       f('slideTicks', this.slideTicks),
       f('slideCooldownTicks', this.slideCooldownTicks),
+      f('slideBufferTicks', this.slideBufferTicks),
       f('slideDir', this.slideDir, 2),
       f('airPeakY', this.airPeakY),
       f('fireCooldownS', this.fireCooldownS),

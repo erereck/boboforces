@@ -4,7 +4,7 @@ import { DEG_TO_RAD } from '@boboforces/shared';
 import { createSim, eyeHeightFor, type SimMap } from '@boboforces/sim';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
-import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim } from './aim-assist.ts';
+import { AIM_ASSIST, createAimAssistState, findAimAssist, steerAim } from './aim-assist.ts';
 
 /** M2, fase 3h: a assistência de mira (fricção, ímã e trava) do controle e do toque. */
 
@@ -81,23 +81,118 @@ describe('assistência de mira', () => {
     expect(s.target).toBe(-1);
   });
 
-  it('ímã: mexendo a mira, puxa uma fração do erro por segundo; parado, não puxa', () => {
+  it('M12 (fase 6): o segmento quadril–cabeça e a velocidade angular do alvo (o movimento dos dois)', () => {
+    const { v, e, eye, pitch } = setup(false, 1);
+    const s = createAimAssistState();
+    findAimAssist(v, e, false, eye.x, eye.y, eye.z, 0, pitch, 0.4, 1, 100, s);
+    const j = s.target;
+    expect(j).toBeGreaterThanOrEqual(0);
+    const feet = v.position[j * 3 + 1]!;
+    expect(s.pitchLow).toBeCloseTo(Math.atan2(feet + AIM_ASSIST.hipM - eye.y, 15), 9);
+    expect(s.pitchHigh).toBeCloseTo(Math.atan2(feet + AIM_ASSIST.headM - eye.y, 15), 9);
+    expect(s.pitchLow).toBeLessThan(s.targetPitch);
+    expect(s.pitchHigh).toBeGreaterThan(s.targetPitch);
+    expect(s.yawRate).toBeCloseTo(0, 12);
+    expect(s.pitchRate).toBeCloseTo(0, 12);
+    // O alvo anda de lado para a direita (+x, olhando para −z) a 3 m/s: a 15 m, o yaw cai 3/15 rad/s.
+    v.velocity[j * 3] = 3;
+    findAimAssist(v, e, false, eye.x, eye.y, eye.z, 0, pitch, 0.4, 1, 100, s);
+    expect(s.yawRate).toBeCloseTo(-3 / 15, 9);
+    // O jogador andando junto, para o mesmo lado: nada a acompanhar.
+    v.velocity[e * 3] = 3;
+    findAimAssist(v, e, false, eye.x, eye.y, eye.z, 0, pitch, 0.4, 1, 100, s);
+    expect(s.yawRate).toBeCloseTo(0, 9);
+    v.velocity[e * 3] = 0;
+    // Revisão: perto do polo (o olho 10 cm ao lado e 3 m acima do alvo) um passo de lado giraria o yaw a dezenas de
+    // rad/s: o teto segura em `maxRateRadS`.
+    v.velocity[j * 3 + 2] = 5;
+    const tx = v.position[j * 3]!;
+    const tz = v.position[j * 3 + 2]!;
+    const top = feet + AIM_ASSIST.chestM + 3;
+    // Mirando direto no alvo, lá embaixo (sem o teto, o yaw dele giraria a 0,1·5/0,1² = 50 rad/s).
+    findAimAssist(v, e, false, tx + 0.1, top, tz, Math.PI / 2, Math.atan2(-3, 0.1), 0.4, 1, 100, s);
+    expect(s.target).toBe(j);
+    expect(Math.abs(s.yawRate)).toBe(AIM_ASSIST.maxRateRadS);
+    expect(Math.abs(s.pitchRate)).toBeLessThanOrEqual(AIM_ASSIST.maxRateRadS);
+    v.velocity[j * 3 + 2] = 0;
+  });
+
+  it('ímã: mexendo a mira ou andando, puxa uma fração do erro por segundo até o eixo e o segmento; parado, não', () => {
     const s = createAimAssistState();
     s.target = 3;
     s.targetYaw = 0.05;
     s.targetPitch = -0.02;
+    s.pitchLow = -0.04;
+    s.pitchHigh = 0.01;
     const out = new Float64Array(2);
-    pullAim(s, 0.4, 1 / 60, true, 0, 0, out);
     const f = 0.4 * AIM_ASSIST.pullPerS * (1 / 60);
+    // Mirando abaixo do quadril (−0,1): o pitch sobe até o quadril (−0,04), não até o peito.
+    steerAim(s, 0.4, 1 / 60, false, true, false, 0, -0.1, out);
     expect(out[0]).toBeCloseTo(0.05 * f, 9);
-    expect(out[1]).toBeCloseTo(-0.02 * f, 9);
-    pullAim(s, 0.4, 1 / 60, false, 0, 0, out);
+    expect(out[1]).toBeCloseTo(-0.1 + 0.06 * f, 9);
+    // Mirando na cabeça (dentro do segmento): o pitch não é arrastado para baixo.
+    steerAim(s, 0.4, 1 / 60, false, true, false, 0, 0.005, out);
+    expect(out[1]).toBe(0.005);
+    // Acima da cabeça: desce até ela.
+    steerAim(s, 0.4, 1 / 60, false, true, false, 0, 0.05, out);
+    expect(out[1]).toBeCloseTo(0.05 - 0.04 * f, 9);
+    // Parado (sem mexer a mira nem andar): nada.
+    steerAim(s, 0.4, 1 / 60, false, false, false, 0, 0, out);
     expect([out[0], out[1]]).toEqual([0, 0]);
     // Um quadro enorme não passa do alvo.
-    pullAim(s, 0.6, 5, true, 0, 0, out);
+    steerAim(s, 0.6, 5, false, true, false, 0, 0, out);
     expect(out[0]).toBeCloseTo(0.05, 9);
     s.target = -1;
-    pullAim(s, 0.4, 1 / 60, true, 0.3, 0.1, out);
+    steerAim(s, 0.4, 1 / 60, true, true, false, 0.3, 0.1, out);
     expect([out[0], out[1]]).toEqual([0.3, 0.1]);
+  });
+
+  it('acompanhar: mexendo a mira, segue nível · 0,5 da velocidade angular do alvo; sem mexer, não', () => {
+    const s = createAimAssistState();
+    s.target = 3;
+    s.pitchLow = -1;
+    s.pitchHigh = 1;
+    s.yawRate = -0.2;
+    s.pitchRate = 0.1;
+    const out = new Float64Array(2);
+    const dt = 1 / 60;
+    // No eixo do alvo: o acompanhar anda e o ímã puxa uma fração de volta para o eixo (0).
+    steerAim(s, 0.4, dt, true, false, false, 0, 0, out);
+    const k = 0.4 * AIM_ASSIST.rotation * dt;
+    const f = 0.4 * AIM_ASSIST.pullPerS * dt;
+    expect(out[0]).toBeCloseTo(-0.2 * k * (1 - f), 12);
+    expect(out[1]).toBeCloseTo(0.1 * k, 12);
+    // Só andando (sem mexer a mira): o ímã, sem acompanhar.
+    steerAim(s, 0.4, dt, false, true, false, 0, 0, out);
+    expect([out[0], out[1]]).toEqual([0, 0]);
+  });
+
+  it('Forte: o ADS trava em 0,1 s, suave (uma fração por quadro), e chega no alvo; o Médio não trava', () => {
+    const s = createAimAssistState();
+    s.target = 3;
+    s.targetYaw = 0.06;
+    s.pitchLow = -0.05;
+    s.pitchHigh = 0.02;
+    const out = new Float64Array(2);
+    const dt = 1 / 60;
+    steerAim(s, AIM_ASSIST_LEVELS.medium, dt, false, false, true, 0, -0.1, out);
+    expect(s.snapLeft).toBe(0);
+    expect([out[0], out[1]]).toEqual([0, -0.1]);
+    steerAim(s, AIM_ASSIST_LEVELS.strong, dt, false, false, true, 0, -0.1, out);
+    // O primeiro quadro anda só dt/0,1 do caminho (antes ia de uma vez).
+    expect(out[0]).toBeCloseTo(0.06 * (dt / AIM_ASSIST.snapS), 9);
+    let frames = 1;
+    while (s.snapLeft > 0 && frames < 20) {
+      steerAim(s, AIM_ASSIST_LEVELS.strong, dt, false, false, false, out[0]!, out[1]!, out);
+      frames++;
+    }
+    expect(frames).toBe(Math.round(AIM_ASSIST.snapS / dt));
+    expect(out[0]).toBeCloseTo(0.06, 9);
+    expect(out[1]).toBeCloseTo(-0.05, 9);
+    // Perdeu o alvo no meio: a trava acaba.
+    s.snapLeft = 0.05;
+    s.target = -1;
+    steerAim(s, AIM_ASSIST_LEVELS.strong, dt, false, false, false, 0, 0, out);
+    expect(s.snapLeft).toBe(0);
   });
 });

@@ -39,6 +39,7 @@ import {
   createRawInputState,
   DEFAULT_TOUCH_LAYOUT,
   keyIndex,
+  MOUSE_BUTTON,
   PAD_BUTTON,
   placeTouchButton,
   type RawInputState,
@@ -438,6 +439,67 @@ describe('startGame (NullRenderer)', () => {
     expect(game.debug).toBeNull();
     game.dispose();
   }, 120_000);
+
+  it('M12 (fase 6): sem entrada nenhuma, o P1 não gira nem anda depois da contagem', async () => {
+    // O "P1 gira sozinho" do Edge headless era o mouse de verdade do PC chegando pelo pointer lock com
+    // `unadjustedMovement` (ver `plainPointerLockInit` em apps/web/scripts/edge.ts): a cena, sem entrada, fica parada.
+    const { platform, game } = await bootToTitle();
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    const sim = game.match!.sim;
+    const view = sim.view();
+    platform.pump(view.match.countdownTicks + 5);
+    expect(view.match.phase).toBe('playing');
+    const me = entityIndex(sim.controllerEntity(0));
+    const at = (): number[] => [view.yaw[me]!, view.pitch[me]!, view.position[me * 3]!, view.position[me * 3 + 2]!];
+    const start = at();
+    for (let s = 0; s < 15; s++) {
+      platform.pump(30);
+      if ((view.flags[me]! & ENTITY_FLAG.dead) !== 0) break;
+      expect(at()).toEqual(start);
+    }
+    game.dispose();
+  }, 120_000);
+
+  it('M12 (fase 6, revisão): o ADS alternado solta na troca de arma, na morte e no renascer', async () => {
+    const kbm = { ...DEFAULT_SETTINGS.controls.keyboardMouse, toggleAds: true };
+    const settings = JSON.stringify({
+      ...DEFAULT_SETTINGS,
+      controls: { ...DEFAULT_SETTINGS.controls, keyboardMouse: kbm },
+    });
+    const { platform, game } = await bootToTitle('web', {}, { settings });
+    platform.tap('Enter');
+    await untilRunning(platform, game);
+    const sim = game.match!.sim;
+    const v = sim.view();
+    platform.pump(v.match.countdownTicks + 5);
+    const me = (): number => entityIndex(sim.controllerEntity(0));
+    const ads = (): boolean => (v.flags[me()]! & ENTITY_FLAG.ads) !== 0;
+    const aim = (): void => {
+      platform.rawNext.mouseButtons = MOUSE_BUTTON.right;
+      platform.pump(2);
+      platform.rawNext.mouseButtons = 0;
+      platform.pump(10);
+    };
+    platform.rawNext.pointerLocked = true;
+    aim();
+    expect(ads()).toBe(true);
+    // Troca de arma (o 2): o ADS sai.
+    platform.tap('Digit2');
+    platform.pump(10);
+    expect(ads()).toBe(false);
+    aim();
+    expect(ads()).toBe(true);
+    // Morte (o plano de morte) e o renascer: renasce sem mirar.
+    v.position[me() * 3 + 1] = -500;
+    for (let i = 0; i < 60 && (v.flags[me()]! & ENTITY_FLAG.dead) === 0; i++) platform.pump(1);
+    expect(v.flags[me()]! & ENTITY_FLAG.dead).toBe(ENTITY_FLAG.dead);
+    for (let i = 0; i < 900 && (v.flags[me()]! & ENTITY_FLAG.dead) !== 0; i++) platform.pump(1);
+    expect(v.flags[me()]! & ENTITY_FLAG.dead).toBe(0);
+    platform.pump(10);
+    expect(ads()).toBe(false);
+    game.dispose();
+  }, 180_000);
 
   it('bench (GameDeps.bench): 2 vistas seguindo bots, relatório no formato e sondas [t0] do jogo', async () => {
     const platform = createFakePlatform();

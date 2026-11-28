@@ -5635,3 +5635,46 @@ de chegada.
 - **Contratos:** `ViewmodelDesc.glove?`, `pushDebris(…, size, life)`, `placeShoulderCamera(…, ads)` e os campos
   `THIRD_PERSON.adsBackM/adsSideM/exitFirstArmM`, `viewmodelSocketOffset` em `@boboforces/render/data`, `rumble(…, low)`.
   Nenhum golden mudou.
+
+### 23.6 Fase 6: a mira, o toque e o movimento (27/11/2026)
+
+- **ADS pelo zoom** (`input/src/ads-look.ts`, a cola `adsAimScale` em `match.ts`): o multiplicador do ADS era 0,7 fixo,
+  aplicado no aperto do botão enquanto o FOV entrava devagar; na sniper (4×) a mira andava 2,8× mais rápido na tela
+  que no quadril. Agora `adsLookScale(adsMul, blend, zoom) = (1 + (adsMul−1)·blend) / (1 + (zoom−1)·blend)`, que é
+  `tan(fovADS/2)/tan(fovQuadril/2)` vezes o ajuste do jogador, seguindo o `slot.adsBlend` (o mesmo valor suavizado da
+  fase 1 que o zoom do FOV lê). Entra no `aimScale` do mapeador junto com a fricção, para o P1 e os do sofá. A base
+  `adsSensitivityMul` virou 1: ×1 na "Sensib. na mira" = a mira anda na tela como fora dela, em qualquer zoom (a ajuda
+  diz isso). Sem migração: quem tinha mudado o ajuste sente a diferença.
+- **O toque (AM10):** o ADS alterna por padrão (`DEFAULT_SETTINGS.controls.touch.toggleAds` e o perfil de toque); vale
+  para quem ainda não tem o documento de ajustes gravado (ele só é gravado quando algum ajuste muda). O ADS alternado
+  solta ao começar a correr (`mapper.ts`) e na morte, no renascer e na troca de arma (`match.ts`). O PULO e o ADS miram
+  ao arrastar (`aims: true` em `input/src/touch.ts`). A base do joystick nasce onde o dedo encosta e, além dos 60 px,
+  vem atrás dele (base = dedo − direção·raio): voltar o dedo freia na hora e a corrida (92% do raio) fica fácil de
+  segurar. O botão de uma ação alternada fica aceso.
+- **A assistência honesta** (`game/src/scene/aim-assist.ts`, `steerAim`): o ímã puxa o yaw até o eixo do alvo e o pitch
+  só até o segmento quadril–cabeça (0,8–1,55 m; agachado 0,45–0,8; × a escala do corpo); dentro dele, nada. Mexendo a
+  mira, acompanha `nível·0,5·ω`, com ω a velocidade angular do alvo vista do olho pelo movimento relativo dos dois em
+  `view.velocity` (no online o `prev` dos outros é igual ao atual), limitada a 4 rad/s por eixo (`maxRateRadS`; perto
+  do polo passava de dezenas). O Forte trava em 0,1 s. Tudo antes do `InputFrame`: nenhum golden mudou por isto.
+- **O deslize no pouso** (`sim/src/systems/movement.ts`): o agachar apertado no ar vindo de corrida arma
+  `slideBufferTicks` por `slide.landBufferS` (0,1 s, como o buffer do pulo). No 1º tick no chão, com o agachar seguro,
+  sem a recarga, a ≥ 0,9 × andar e sem o pulo saindo no mesmo tick (guardado ou apertado: senão o pulo saía com a
+  velocidade do deslize), desliza. Campo novo no estado (`SNAPSHOT_VERSION` 21), na predição (`PREDICT_STATE_SIZE` 23;
+  o `priv` ganhou um i16) e no protocolo (`PROTOCOL_VERSION` 15, com o `apps/web/public/net.json`). Os 20 goldens
+  mudaram de hash pelo campo novo no estado.
+- **A correção do online sem estalo** (`net/src/client.ts`): cada reconciliação soma `posição prevista antiga − nova` a
+  um deslocamento de render (`ownOffset`) de até 0,15 m (`RECONCILE_SMOOTH.maxM`; o que passa disso salta na hora), que
+  some com τ 0,1 s; acima de 1 m tudo salta. Entra na view (posição e `prevPosition` do próprio boneco) no fim do
+  `update` e sai no começo do seguinte: a predição, o erro medido e as entradas usam os valores exatos. O teto existe
+  porque o deslocamento também move a câmera de 1ª pessoa e o tiro sai do olho exato no host.
+- **O "P1 gira sozinho" do Edge headless** (`apps/web/scripts/edge.ts`): o playtest viu o P1 girar sem entrada. Era o
+  pointer lock com `unadjustedMovement`, que no Edge headless do Windows recebe o movimento bruto do mouse do PC
+  (medido: os `mousemove` da página batiam com o cursor do Windows; com o lock comum, nenhum). O `launchEdge` headless
+  põe `plainPointerLockInit` em todo contexto (smoke, prints, bench, drivers); numa janela de verdade o lock só existe
+  com o foco. Teste: sem entrada, o P1 fica parado depois da contagem.
+- **Revisão (Opus):** nenhum achado alto; 2 médios (o deslize fantasma com o pulo guardado e o ADS alternado que não
+  soltava) e 4 baixos, corrigidos antes da junção. A quina de porta (empurrão lateral na varredura) ficou de fora:
+  mexeria de novo nos goldens, nos bots e na navegação.
+- **Contratos:** `InputMapper.update` (o `aimScale` traz o ADS), `ControlProfile.adsSensitivityMul` 1,
+  `SlideParams.landBufferS`, `ClientDriver.ownOffset`, `RECONCILE_SMOOTH`, `AimAssistState` e `steerAim` no lugar do
+  `pullAim`, `AIM_ASSIST.maxRateRadS`.

@@ -190,6 +190,21 @@ export const EDGE_HIGH_PERFORMANCE_GPU = '--force_high_performance_gpu';
  */
 export const EDGE_NO_VSYNC: readonly string[] = ['--disable-gpu-vsync', '--disable-frame-rate-limit'];
 
+/**
+ * M12 (fase 6): no Edge headless do Windows, o pointer lock com `unadjustedMovement` (o que o jogo pede) recebe o raw
+ * input do MOUSE DE VERDADE do PC, mesmo sem janela: quem usa o computador enquanto o script roda gira a mira do P1
+ * (medido: os `mousemove` da página batem, no tempo e na direção, com o cursor do Windows; com o lock comum, nenhum,
+ * e o `page.mouse` dos roteiros continua mirando). Numa janela de verdade não acontece: o lock só vem com o foco, sai
+ * quando ela perde o foco e aí o mouse é o do jogador. Este script de página (o `launchEdge` headless põe em todo
+ * contexto) tira a opção do pedido.
+ */
+export function plainPointerLockInit(): void {
+  const original = Element.prototype.requestPointerLock;
+  Element.prototype.requestPointerLock = function (this: Element) {
+    return original.call(this);
+  } as typeof original;
+}
+
 /** Abre o Edge instalado. `headless: false` mostra a janela (bench do PC com a GPU e o vsync de verdade). */
 export async function launchEdge(
   options: { readonly headless?: boolean; readonly args?: readonly string[] } = {},
@@ -198,11 +213,23 @@ export async function launchEdge(
   const ci = process.env['CI'] !== undefined;
   const args = [...(ci ? ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] : []), ...(options.args ?? [])];
   const headless = options.headless ?? true;
+  let launched: LaunchedBrowser;
   try {
-    return { browser: await chromium.launch({ channel: 'msedge', headless, args }), fallback: null };
+    launched = { browser: await chromium.launch({ channel: 'msedge', headless, args }), fallback: null };
   } catch (error) {
     if (!ci) throw error;
     const fallback = `Edge indisponível no CI (${String(error).split('\n')[0]}); usando o Chrome`;
-    return { browser: await chromium.launch({ channel: 'chrome', headless, args }), fallback };
+    launched = { browser: await chromium.launch({ channel: 'chrome', headless, args }), fallback };
   }
+  // M12 (fase 6): headless, todo contexto pede o pointer lock comum (ver `plainPointerLockInit`).
+  if (headless) {
+    const browser = launched.browser;
+    const newContext = browser.newContext.bind(browser);
+    browser.newContext = async (...a: Parameters<Browser['newContext']>) => {
+      const ctx = await newContext(...a);
+      await ctx.addInitScript(plainPointerLockInit);
+      return ctx;
+    };
+  }
+  return launched;
 }

@@ -10,6 +10,7 @@ export * from './stick.ts';
 export * from './touch.ts';
 export * from './profiles.ts';
 export * from './mapper.ts';
+export * from './ads-look.ts';
 export * from './local-players.ts';
 export * from './menu-input.ts';
 export * from './remap.ts';

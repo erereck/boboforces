@@ -470,6 +470,7 @@ export function applyControls(base: ControlProfile, c: DeviceControls): ControlP
     lookSensitivity: base.lookSensitivity * c.sensitivity,
     keyLookRate: base.keyLookRate * c.sensitivity,
     lookSensitivityYMul: base.lookSensitivityYMul * c.sensitivityYMul,
+    // M12 (fase 6): a base é 1 e o zoom da arma entra na cena (`adsLookScale`): ×1 = a mira anda na tela como no quadril.
     adsSensitivityMul: base.adsSensitivityMul * c.adsMul,
     invertY: c.invertY,
     aimAssist: AIM_ASSIST_LEVELS[c.aimAssist],

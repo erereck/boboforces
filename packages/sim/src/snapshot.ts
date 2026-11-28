@@ -23,7 +23,8 @@ const SNAPSHOT_MAGIC = 0x50414e53; // 'SNAP'
 // 9 (M3, fase 3d): janelas com barricada e portas pagas; pontos de conserto da onda.
 // 19 (M8, fase 7): os campos do Arcade (só com ele).
 // 20 (M9, fase 4): os campos do dono (só com as Ferramentas do Dono).
-const SNAPSHOT_VERSION = 20;
+// 21 (M12, fase 6): o agachar guardado para o deslize no pouso (`slideBufferTicks`).
+const SNAPSHOT_VERSION = 21;
 
 const PHASES: readonly MatchPhase[] = ['warmup', 'playing', 'ended', 'suddenDeath'];
 

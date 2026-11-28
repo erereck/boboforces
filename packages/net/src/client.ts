@@ -93,6 +93,12 @@ export interface ClientDriver extends NetMatchDriver {
   /** Fase 2b: o índice do próprio boneco (-1 = ainda não veio). */
   readonly ownEntity: number;
   /**
+   * M12 (fase 6): o deslocamento de render do próprio boneco agora (m; x, y, z): a posição prevista antiga − a nova
+   * de cada reconciliação (até `RECONCILE_SMOOTH.maxM`), sumindo em `tauS`. Entre os `update`, a view mostra o boneco com ele
+   * (posição e `prevPosition` somados; dentro do `update` a predição volta aos valores exatos).
+   */
+  readonly ownOffset: Readonly<Float64Array>;
+  /**
    * M5 (fase 5a): há quantos segundos o host está ausente (0 = presente): desde o aviso dele, ou desde o último
    * snapshot quando passa de `HOST_SILENT_S` sem nada.
    */
@@ -116,6 +122,13 @@ const MAX_TICKS = 4;
 export const INTERP_DELAY_S = 0.1;
 /** Entradas guardadas para refazer (em `seq`): mais que o ida e volta de 1 s a 60 Hz. */
 const REPLAY = 64;
+/**
+ * M12 (fase 6): a correção da reconciliação no próprio boneco some em `tauS` (exponencial) em vez de estalar na tela.
+ * Revisão: o deslocamento mostrado fica em até `maxM` (o que passar disso salta na hora): ele anda também com a câmera
+ * de 1ª pessoa, e o tiro sai do olho exato no host; 15 cm por até ~0,1 s não aparecem na mira (o erro de predição
+ * comum fica abaixo de 10 cm, medido no M5). Acima de `snapM` (respawn, desentalar) é teleporte: salta tudo.
+ */
+export const RECONCILE_SMOOTH = { tauS: 0.1, maxM: 0.15, snapM: 1, restM: 1e-4 } as const;
 
 /**
  * O driver do cliente (M5): manda a entrada de cada tick (com as 3 anteriores). O próprio boneco é previsto com o
@@ -217,6 +230,43 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     if (renderTick > newest.tick) renderTick = newest.tick;
   };
 
+  // M12 (fase 6): a correção sem estalo. O deslocamento entra na view no fim do `update` (os valores exatos ficam
+  // guardados) e sai no começo do seguinte: a predição, a medida do erro e as entradas nunca o veem.
+  const ownOffset = new Float64Array(3);
+  const shownExact = new Float64Array(6);
+  let shiftedEntity = -1;
+  const unshiftOwn = (): void => {
+    if (shiftedEntity < 0) return;
+    const v = sim.view();
+    const o = shiftedEntity * 3;
+    for (let k = 0; k < 3; k++) {
+      v.position[o + k] = shownExact[k]!;
+      v.prevPosition[o + k] = shownExact[3 + k]!;
+    }
+    shiftedEntity = -1;
+  };
+  const shiftOwn = (step: number): void => {
+    const keep = Math.exp(-step / RECONCILE_SMOOTH.tauS);
+    let len2 = 0;
+    for (let k = 0; k < 3; k++) {
+      ownOffset[k] = ownOffset[k]! * keep;
+      len2 += ownOffset[k]! * ownOffset[k]!;
+    }
+    if (len2 < RECONCILE_SMOOTH.restM * RECONCILE_SMOOTH.restM || own < 0) {
+      ownOffset.fill(0);
+      return;
+    }
+    const v = sim.view();
+    const o = own * 3;
+    for (let k = 0; k < 3; k++) {
+      shownExact[k] = v.position[o + k]!;
+      shownExact[3 + k] = v.prevPosition[o + k]!;
+      v.position[o + k] = shownExact[k]! + ownOffset[k]!;
+      v.prevPosition[o + k] = shownExact[3 + k]! + ownOffset[k]!;
+    }
+    shiftedEntity = own;
+  };
+
   const notePredicted = (k: number): void => {
     const p = sim.view().position;
     predicted[k * 3] = p[own * 3]!;
@@ -226,6 +276,12 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
 
   /** Fase 2b: o próprio boneco volta ao estado do host e refaz as entradas que o host ainda não tinha usado. */
   const reconcile = (newest: NetFrame): void => {
+    // M12 (fase 6): onde o boneco estava antes da correção (o mesmo boneco; trocou de entidade, nada a suavizar).
+    const sameOwn = own >= 0 && own === newest.privEntity;
+    const p = sim.view().position;
+    const ox = sameOwn ? p[own * 3]! : 0;
+    const oy = sameOwn ? p[own * 3 + 1]! : 0;
+    const oz = sameOwn ? p[own * 3 + 2]! : 0;
     own = newest.privEntity;
     const used = assembler.newestInputSeq;
     const ku = used & (REPLAY - 1);
@@ -259,6 +315,23 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     patchOwn(newest, sim.view(), own);
     reconciledTick = newest.tick;
     stats.reconciles++;
+    // A diferença vira deslocamento de render (que some em τ); teleporte (> `snapM`) salta.
+    if (!sameOwn) {
+      ownOffset.fill(0);
+      return;
+    }
+    const dx = ownOffset[0]! + ox - p[own * 3]!;
+    const dy = ownOffset[1]! + oy - p[own * 3 + 1]!;
+    const dz = ownOffset[2]! + oz - p[own * 3 + 2]!;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len > RECONCILE_SMOOTH.snapM) ownOffset.fill(0);
+    else {
+      // Até `maxM` desliza; o resto salta agora.
+      const k = len > RECONCILE_SMOOTH.maxM ? RECONCILE_SMOOTH.maxM / len : 1;
+      ownOffset[0] = dx * k;
+      ownOffset[1] = dy * k;
+      ownOffset[2] = dz * k;
+    }
   };
 
   const onMessage = (from: number, channel: NetChannel, bytes: Uint8Array): void => {
@@ -322,6 +395,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
     get ownEntity(): number {
       return own;
     },
+    ownOffset,
     get hostAbsentS(): number {
       return absentS();
     },
@@ -329,6 +403,9 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
       return hostAway;
     },
     update(frameSeconds: number): number {
+      // M12 (fase 6): o deslocamento de render do próprio boneco sai da view (a predição anda nos valores exatos) e volta
+      // no fim, com o que a reconciliação deste quadro somou, já mais perto de zero.
+      unshiftOwn();
       if (!helloSent) {
         out.reset();
         writeHello(out, hello);
@@ -365,11 +442,15 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         // Fase 2b: o próprio boneco volta ao do host a cada snapshot novo.
         if (newest.tick > reconciledTick && newest.privEntity >= 0) reconcile(newest);
       }
-      if (state !== 'playing') return 0;
+      if (state !== 'playing') {
+        shiftOwn(step);
+        return 0;
+      }
       // M5 (fase 5a): com o host ausente, o próprio boneco não anda sozinho nem manda entradas (a partida está parada
       // do lado dele); quando ele volta, a predição recomeça do snapshot dele.
       if (absentS() > 0) {
         acc = 0;
+        shiftOwn(step);
         return 0;
       }
       acc += step;
@@ -394,6 +475,7 @@ export function createClientDriver(config: ClientDriverConfig): ClientDriver {
         ticks++;
       }
       if (acc >= dt) acc = 0;
+      shiftOwn(step);
       return ticks;
     },
     /** Solta a sim também (como o `LocalDriver`: quem cria o driver entrega a sim a ele). */

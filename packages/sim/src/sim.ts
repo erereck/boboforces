@@ -272,7 +272,8 @@ export interface SimRemote {
  * tiro depois de correr.
  */
 /** M8 (fase 7): mais os 6 do Arcade (pulos no ar, chão desde o pouso, velocidade do pouso e do deslize, as 2 paredes). */
-export const PREDICT_STATE_SIZE = 22;
+/** M12 (fase 6): mais o agachar guardado para o deslize no pouso. */
+export const PREDICT_STATE_SIZE = 23;
 
 /**
  * M5 (fase 2b, só o cliente online): o cliente prediz o próprio movimento com o mesmo código do `step`. O host manda,
@@ -1189,6 +1190,7 @@ export function createSim(config: SimConfig): Sim {
       out[19] = s.slideSpeed[e]!;
       out[20] = s.wallKeys[e * 2]!;
       out[21] = s.wallKeys[e * 2 + 1]!;
+      out[22] = s.slideBufferTicks[e]!;
     },
     load(e, from): void {
       // M6 (fase 3, revisão): o próprio time chega do snapshot mais novo (os outros, do atrasado): as regras do Jugg
@@ -1218,6 +1220,7 @@ export function createSim(config: SimConfig): Sim {
       s.slideSpeed[e] = from[19]!;
       s.wallKeys[e * 2] = from[20]!;
       s.wallKeys[e * 2 + 1] = from[21]!;
+      s.slideBufferTicks[e] = from[22]!;
     },
     round(phase, ticks): void {
       if (ctx.rounds === null) return;

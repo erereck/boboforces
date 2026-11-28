@@ -57,8 +57,9 @@ import {
  * versões diferentes (quem está na mais antiga atualiza). M9 (fase 5): 12, o começo leva a opção do dono (`owner`).
  * M10 (fase 7): 13, o evento `projectile` ganhou a ação `stick` (o virote da besta cravado; o campo passa a 2 bits).
  * M11 (fase 4, revisão): 14, o grupo de entidade `rules` (a máscara das armas de cada um, que o dono muda no host).
+ * M12 (fase 6): 15, o estado de movimento do dono (`priv`) ganhou o agachar guardado do deslize no pouso.
  */
-export const PROTOCOL_VERSION = 14;
+export const PROTOCOL_VERSION = 15;
 
 /** Teto de uma mensagem (tecnico.md §13.2): um snapshot maior vai em partes, por prioridade de entidade. */
 export const MAX_MESSAGE_BYTES = 1100;

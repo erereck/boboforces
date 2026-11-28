@@ -69,6 +69,7 @@ import {
   type RemapAction,
   ORDER_WHEEL,
   withOrder,
+  adsLookScale,
 } from '@boboforces/input';
 import {
   ACTOR_KIND,
@@ -257,7 +258,7 @@ import {
 import { CELLS_PER_METER, isCellSolid, sampleLightGrid } from '@boboforces/world';
 import { soloViewMode } from '../maps.ts';
 import { seatRecipe, type LocalSeat } from './seats.ts';
-import { AIM_ASSIST, createAimAssistState, findAimAssist, pullAim, type AimAssistState } from './aim-assist.ts';
+import { createAimAssistState, findAimAssist, steerAim, type AimAssistState } from './aim-assist.ts';
 import { switchedSlot } from './switch-slot.ts';
 import { approachScale, cameraInsideBody } from './body-scale.ts';
 import { createTips, createTipSignals, stepTips, TIP_RULES, tipAlpha, TIPS, type TipId } from './tips.ts';
@@ -2244,6 +2245,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               if (sIdx < rumbleAgain.length) rumbleAgain[sIdx] = timeS + 0.12;
             }
           }
+          // M12 (fase 6, revisão): o ADS alternado (o padrão no toque) solta na morte, no renascer e na troca de arma
+          // (senão o bobo renasce mirando: a sim não deixa correr e ele anda a 0,75×).
+          for (let k = 0; k < seatCtrl.length; k++) {
+            const m = mapperOf(seatCtrl[k]!);
+            if (m !== null && s.controllerEntity(seatCtrl[k]!) === ev.victim) m.release('ads');
+          }
           const o = i * 3;
           const zombie = v.kind[i] === ENTITY_KIND.zombie;
           const d = deathScratch;
@@ -2292,6 +2299,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             if (m === null || ev.entity !== s.controllerEntity(h)) continue;
             m.setAngles(v.yaw[i]!, 0);
             m.setWeapon(v.slot[i]!);
+            m.release('ads');
           }
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
@@ -2310,7 +2318,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             for (let k = 0; k < seatCtrl.length; k++) {
               const h = seatCtrl[k]!;
               const m = mapperOf(h);
-              if (m !== null && ev.entity === s.controllerEntity(h) && m.weapon !== slot) m.setWeapon(slot);
+              if (m === null || ev.entity !== s.controllerEntity(h)) continue;
+              if (m.weapon !== slot) m.setWeapon(slot);
+              m.release('ads');
             }
           }
           if (ev.action === 'reloadStart') {
@@ -3199,19 +3209,33 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return st.scale;
   }
 
-  /** Depois do `update`: o ímã (mexendo a mira ou andando) e, no Forte, a trava ao apertar o ADS. */
+  /**
+   * Depois do `update`: o ímã (mexendo a mira ou andando), o acompanhar e, no Forte, a trava ao apertar o ADS (M12,
+   * fase 6: a lógica é do `steerAim`).
+   */
   function aimAssistAfter(dt: number, looked: boolean, m: InputMapper = player, st: AimAssistState = assist): void {
-    if (st.target < 0) return;
     const level = assistAllowed ? m.profile.aimAssist : 0;
-    if (level >= AIM_ASSIST.snapLevel && m.wasPressed('ads')) {
-      m.setAngles(st.targetYaw, st.targetPitch);
-      return;
-    }
-    const active = looked || m.moveX !== 0 || m.moveY !== 0;
-    pullAim(st, level, dt, active, m.yaw, m.pitch, assistAngles);
+    const moving = m.moveX !== 0 || m.moveY !== 0;
+    steerAim(st, level, dt, looked, moving, m.wasPressed('ads'), m.yaw, m.pitch, assistAngles);
     if (assistAngles[0] !== m.yaw || assistAngles[1] !== m.pitch) {
       m.setAngles(assistAngles[0]!, assistAngles[1]!);
     }
+  }
+
+  /**
+   * M12 (fase 6): a sensibilidade do ADS pelo zoom da arma na mão (`adsLookScale`), pelo quanto o ADS da vista do
+   * jogador já entrou (o `adsBlend` do quadro anterior, o mesmo que encolhe o FOV). Vai no `aimScale` do mapeador.
+   */
+  function adsAimScale(m: InputMapper, controller: number): number {
+    for (let s = 0; s < slots.length; s++) {
+      const slot = slots[s]!;
+      if (slot.controller !== controller || slot.adsBlend <= 0) continue;
+      const v = sim.view();
+      const e = entityIndex(sim.controllerEntity(controller));
+      const held = e < v.count ? weaponDef(v.weapon[e]!) : null;
+      return adsLookScale(m.profile.adsSensitivityMul, slot.adsBlend, held !== null ? held.adsZoom : 1 / ADS_FOV_SCALE);
+    }
+    return 1;
   }
 
   // --- M3 (fase 1c): entrar no meio ---
@@ -3515,7 +3539,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         m.setAngles(yaw0, pitch0);
       } else {
         const st = extraAssists[k]!;
-        const scale = aimAssistBefore(m, seatCtrl[k + 1]!, st);
+        // M12 (fase 6): a fricção da assistência vezes o ADS pelo zoom.
+        const scale = aimAssistBefore(m, seatCtrl[k + 1]!, st) * adsAimScale(m, seatCtrl[k + 1]!);
         m.update(raw, dt, scale);
         aimAssistAfter(dt, m.yaw !== yaw0 || m.pitch !== pitch0, m, st);
       }
@@ -7523,7 +7548,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M7 (fase 9): a assistência mira do bobo do P1 (no Aquário, o bot assumido; no online, o da sala). M9 (fase
           // 5, revisão): não com a ferramenta do dono (o ADS que cancela não puxa a mira para um inimigo).
           const noAssist = frozen || ownerHolds();
-          const scale = noAssist ? 1 : aimAssistBefore(player, me);
+          // M12 (fase 6): a fricção da assistência vezes o ADS pelo zoom (que segue o quanto o ADS entrou).
+          const scale = (noAssist ? 1 : aimAssistBefore(player, me)) * adsAimScale(player, me);
           player.update(raw, frozen ? 0 : dt, scale);
           if (!noAssist) aimAssistAfter(dt, player.yaw !== yaw0 || player.pitch !== pitch0);
           if (!ghostDone && device === 'touch' && !frozen) {

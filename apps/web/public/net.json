@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "protocolVersion": 14,
+  "protocolVersion": 15,
   "relays": [
     "wss://nos.lol",
     "wss://relay.nostr.dev.br",

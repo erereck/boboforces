@@ -64,8 +64,9 @@ export interface InputMapper {
   /** Joystick de toque (só no dispositivo `touch`). */
   readonly touchJoystick: TouchJoystickState;
   /**
-   * Lê o estado bruto (1x por frame de render) e integra a mira. `aimScale` multiplica a sensibilidade (a
-   * desaceleração da assistência de mira); o multiplicador do ADS do perfil já é aplicado aqui dentro.
+   * Lê o estado bruto (1x por frame de render) e integra a mira. `aimScale` multiplica a sensibilidade: a
+   * desaceleração da assistência de mira e, desde o M12 (fase 6), o ADS pelo zoom (`adsLookScale`, com o
+   * `adsSensitivityMul` do perfil), que o `game` calcula pelo quanto o ADS já entrou.
    */
   update(raw: Readonly<RawInputState>, dtSeconds: number, aimScale?: number): void;
   /** A ação de jogo está segurada agora (com alternância, o estado alternado). */
@@ -74,7 +75,10 @@ export interface InputMapper {
   wasPressed(action: GameAction): boolean;
   /** A ação de menu disparou neste frame (borda, com auto-repetição nas direções). */
   menuPressed(action: MenuAction): boolean;
-  /** Algum dedo segura este controle de toque (para a UI acender o botão). */
+  /**
+   * Algum dedo segura este controle de toque, ou a ação dele está alternada (o ADS que alterna fica aceso; M12, fase
+   * 6): para a UI acender o botão.
+   */
   isTouchControlDown(control: TouchControlId): boolean;
   /**
    * Preenche o InputFrame do próximo tick (botões, movimento quantizado, ângulos absolutos, arma desejada). Um botão
@@ -189,6 +193,8 @@ interface CompiledBindings {
   readonly tap: Uint8Array;
   /** Segundos segurando (fontes com `hold` ou `tap`). */
   readonly held: Float32Array;
+  /** M12 (fase 6): a ação de jogo de cada controle de toque (-1 = nenhuma), para acender o botão alternado. */
+  readonly touchAction: Int8Array;
 }
 
 function compile(profile: ControlProfile): CompiledBindings {
@@ -208,6 +214,7 @@ function compile(profile: ControlProfile): CompiledBindings {
     hold: new Uint8Array(n),
     tap: new Uint8Array(n),
     held: new Float32Array(n),
+    touchAction: new Int8Array(TOUCH_CONTROLS.length).fill(-1),
   };
   rows.forEach(([target, index, s], r) => {
     const [device, code, dir] = sourceCode(s);
@@ -218,6 +225,7 @@ function compile(profile: ControlProfile): CompiledBindings {
     c.dir[r] = dir;
     c.hold[r] = s.hold === true ? 1 : 0;
     c.tap[r] = s.tap === true ? 1 : 0;
+    if (device === SRC_TOUCH && code >= 0 && target === TGT_GAME) c.touchAction[code] = index;
   });
   return c;
 }
@@ -280,6 +288,9 @@ class Mapper implements InputMapper {
   private readonly touchControlDown = new Uint8Array(TOUCH_CONTROLS.length);
   private joystickMoveX = 0;
   private joystickMoveY = 0;
+  /** M12 (fase 6): a base do joystick (nasce onde o dedo encostou e vem atrás dele além do raio), px reais. */
+  private joyBaseX = 0;
+  private joyBaseY = 0;
   private touchLookX = 0;
   private touchLookY = 0;
 
@@ -347,7 +358,11 @@ class Mapper implements InputMapper {
   }
 
   isTouchControlDown(control: TouchControlId): boolean {
-    return this.touchControlDown[touchControlIndex(control)] === 1;
+    const c = touchControlIndex(control);
+    if (c < 0) return false;
+    if (this.touchControlDown[c] === 1) return true;
+    const a = this.bindings.touchAction[c]!;
+    return a >= 0 && this.toggleMask[a] === 1 && this.toggled[a] === 1;
   }
 
   writeFrame(out: InputFrame, seq: number): void {
@@ -379,6 +394,9 @@ class Mapper implements InputMapper {
     if (this.toggleMask[A_SPRINT] === 1 && this.toggled[A_SPRINT] === 1 && this.moveY < SPRINT_RELEASE_FORWARD) {
       this.toggled[A_SPRINT] = 0;
     }
+    // M12 (fase 6, revisão): começar a correr solta o ADS alternado (a sim não corre mirando; no toque, o joystick na
+    // borda para a frente corre e o ADS alternado, agora o padrão, prendia o bobo a 0,75×).
+    if (this.pressed[A_SPRINT] === 1 && this.toggleMask[A_ADS] === 1 && this.toggled[A_ADS] === 1) this.release('ads');
     this.updateLook(raw, pad, dt, aimScale);
 
     this.active = this.detectActivity(raw, pad, p.pressThreshold, p.deadzoneInner);
@@ -552,7 +570,9 @@ class Mapper implements InputMapper {
 
   private updateLook(raw: Readonly<RawInputState>, pad: RawGamepad, dt: number, aimScale: number): void {
     const p = this.profile;
-    const scale = aimScale * (this.down[A_ADS] === 1 ? p.adsSensitivityMul : 1);
+    // M12 (fase 6): o ADS não multiplica mais aqui no aperto do botão: o `game` manda o do zoom (`adsLookScale`), que
+    // segue o quanto o ADS já entrou, dentro do `aimScale`.
+    const scale = aimScale;
     const ySign = p.invertY ? -1 : 1;
     let dYaw = 0;
     let dPitch = 0;
@@ -645,6 +665,10 @@ class Mapper implements InputMapper {
             this.touchAims[i] = layout.buttons[hit]!.aims ? 1 : 0;
           } else if (inJoystickHalf(layout, t.startX, w)) {
             this.touchRole[i] = joystickTaken ? ROLE_IGNORED : ROLE_JOYSTICK;
+            if (!joystickTaken) {
+              this.joyBaseX = t.startX;
+              this.joyBaseY = t.startY;
+            }
             joystickTaken = true;
           } else this.touchRole[i] = ROLE_LOOK;
         }
@@ -660,15 +684,24 @@ class Mapper implements InputMapper {
       if (role === ROLE_JOYSTICK) {
         const radius = layout.joystickRadius * pr;
         const dead = layout.joystickDeadzone * pr;
-        const dx = t.x - t.startX;
-        const dy = t.y - t.startY;
-        const len = Math.sqrt(dx * dx + dy * dy);
+        let dx = t.x - this.joyBaseX;
+        let dy = t.y - this.joyBaseY;
+        let len = Math.sqrt(dx * dx + dy * dy);
+        // M12 (fase 6): passando do raio, a base vem atrás do dedo (base = dedo − direção·raio): voltar o dedo freia
+        // na hora, sem atravessar o caminho todo de volta, e correr (92% do raio) fica fácil de manter.
+        if (len > radius) {
+          const k = radius / len;
+          dx *= k;
+          dy *= k;
+          len = radius;
+          this.joyBaseX = t.x - dx;
+          this.joyBaseY = t.y - dy;
+        }
         js.active = true;
-        js.baseX = t.startX;
-        js.baseY = t.startY;
-        const k = len > radius ? radius / len : 1;
-        js.knobX = t.startX + dx * k;
-        js.knobY = t.startY + dy * k;
+        js.baseX = this.joyBaseX;
+        js.baseY = this.joyBaseY;
+        js.knobX = this.joyBaseX + dx;
+        js.knobY = this.joyBaseY + dy;
         if (len > dead) {
           const m = Math.min(1, (len - dead) / (radius - dead)) / len;
           this.joystickMoveX = dx * m;

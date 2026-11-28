@@ -7,8 +7,12 @@ import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
  * - **fricção:** com um inimigo no cone, a mira desacelera a fração do nível (Leve 25%, Média 40%, Forte 60%), mais
  *   no centro e sumindo na borda;
  * - **magnetismo leve:** com o jogador mexendo a mira ou andando, a mira é puxada para o alvo uma fração do erro por
- *   segundo (proporcional ao nível); parado, nada puxa;
- * - **Forte:** ao apertar o ADS com um alvo no cone, a mira trava nele.
+ *   segundo (proporcional ao nível); parado, nada puxa. M12 (fase 6): puxa só até o segmento quadril–cabeça
+ *   (`hipM`–`headM`): mirando na cabeça (ou em qualquer ponto do corpo entre os dois), o ímã não arrasta para o peito;
+ * - **acompanhar** (M12, fase 6): mexendo a mira, ela segue uma fração (`nível · rotation`) da velocidade angular do
+ *   alvo vista do olho (o movimento dos dois, pela `velocity`: no online o `prev` dos outros é igual ao atual), quem anda
+ *   de lado não escapa da mira só por andar;
+ * - **Forte:** ao apertar o ADS com um alvo no cone, a mira vai até ele em `snapS` (0,1 s, sem estalo; era de uma vez).
  * O alvo é o inimigo vivo mais perto do centro da tela, dentro do cone (o tronco com folga, `AIM_ASSIST.radiusM`, visto
  * da distância dele), até o alcance de visão e com a linha de visão livre (no máximo `maxRays` raios DDA por frame,
  * dos candidatos mais centrais). Calculada no cliente sobre o estado interpolado (o mesmo `alpha` do render), antes de
@@ -20,13 +24,29 @@ export const AIM_ASSIST = {
   radiusM: 1.1,
   minDeg: 2,
   maxDeg: 10,
-  /** Altura do ponto mirado acima do pé (m): o meio do tronco em pé; agachado, `crouchChestM`. */
+  /** Altura do centro do cone acima do pé (m): o meio do tronco em pé; agachado, `crouchChestM`. */
   chestM: 1.15,
   crouchChestM: 0.8,
+  /**
+   * M12 (fase 6): o segmento até onde o ímã puxa, acima do pé (m): do quadril à cabeça (o olho, 1,55 m); agachado, a
+   * cabeça no olho agachado (0,8 m) e o quadril na mesma proporção.
+   */
+  hipM: 0.8,
+  headM: 1.55,
+  crouchHipM: 0.45,
+  crouchHeadM: 0.8,
   /** Magnetismo: fração do erro corrigida por segundo, vezes o nível. */
   pullPerS: 2.5,
-  /** A partir deste nível (o Forte), o ADS trava no alvo. */
+  /** M12 (fase 6): fração da velocidade angular do alvo que a mira acompanha (vezes o nível), mexendo a mira. */
+  rotation: 0.5,
+  /**
+   * Revisão: teto da velocidade angular acompanhada (rad/s, em cada eixo). Perto do polo (alvo quase em cima ou embaixo,
+   * a poucos cm na horizontal) o yaw do alvo gira dezenas de rad/s com um passo de lado.
+   */
+  maxRateRadS: 4,
+  /** A partir deste nível (o Forte), o ADS trava no alvo, em `snapS` segundos (M12, fase 6: suave). */
   snapLevel: 0.6,
+  snapS: 0.1,
   /** Raios de linha de visão por frame (os candidatos mais centrais primeiro). */
   maxRays: 3,
 } as const;
@@ -34,14 +54,32 @@ export const AIM_ASSIST = {
 export interface AimAssistState {
   /** Multiplicador da sensibilidade neste frame (1 = sem fricção). */
   scale: number;
-  /** Entidade do alvo no cone (-1 = nenhum) e a direção até ele (rad, absoluta). */
+  /** Entidade do alvo no cone (-1 = nenhum) e a direção até ele (rad, absoluta; o pitch é o do centro do cone). */
   target: number;
   targetYaw: number;
   targetPitch: number;
+  /** M12 (fase 6): o pitch do quadril e o da cabeça do alvo (o segmento do ímã e da trava). */
+  pitchLow: number;
+  pitchHigh: number;
+  /** M12 (fase 6): a velocidade angular do alvo vista do olho (rad/s; o movimento dos dois). */
+  yawRate: number;
+  pitchRate: number;
+  /** M12 (fase 6): segundos que faltam da trava do Forte (0 = nenhuma). */
+  snapLeft: number;
 }
 
 export function createAimAssistState(): AimAssistState {
-  return { scale: 1, target: -1, targetYaw: 0, targetPitch: 0 };
+  return {
+    scale: 1,
+    target: -1,
+    targetYaw: 0,
+    targetPitch: 0,
+    pitchLow: 0,
+    pitchHigh: 0,
+    yawRate: 0,
+    pitchRate: 0,
+    snapLeft: 0,
+  };
 }
 
 const MAX_CANDIDATES = 8;
@@ -163,31 +201,108 @@ export function findAimAssist(
     ) {
       continue;
     }
-    out.target = candIndex[k]!;
+    const j = candIndex[k]!;
+    out.target = j;
     out.targetYaw = candYaw[k]!;
     out.targetPitch = candPitch[k]!;
     out.scale = 1 - level * (1 - candNorm[k]!);
+    targetSegment(view, self, j, ex, ey, ez, candX[k]!, candY[k]!, candZ[k]!, out);
     return;
   }
 }
 
 /**
- * Magnetismo: com o jogador mexendo a mira ou andando (`active`), puxa (yaw, pitch) para o alvo uma fração do erro
- * (`level · pullPerS · dt`, no máximo o erro todo). Escreve os ângulos novos em `angles[0]` e `angles[1]`.
+ * M12 (fase 6): o segmento quadril–cabeça do alvo `j` (o centro do cone em `cx, cy, cz`) visto do olho, e a velocidade
+ * angular dele (o movimento relativo dos dois, pela `velocity` da view).
  */
-export function pullAim(
+function targetSegment(
+  view: SimView,
+  self: number,
+  j: number,
+  ex: number,
+  ey: number,
+  ez: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  out: AimAssistState,
+): void {
+  const fl = view.flags[j]!;
+  const size = chaosScaleOf(view, j);
+  const crouch = (fl & ENTITY_FLAG.crouching) !== 0;
+  const feet = cy - (crouch ? AIM_ASSIST.crouchChestM : AIM_ASSIST.chestM) * size;
+  const dx = cx - ex;
+  const dz = cz - ez;
+  const h2 = dx * dx + dz * dz;
+  const h = Math.sqrt(h2);
+  out.pitchLow = Math.atan2(feet + (crouch ? AIM_ASSIST.crouchHipM : AIM_ASSIST.hipM) * size - ey, h);
+  out.pitchHigh = Math.atan2(feet + (crouch ? AIM_ASSIST.crouchHeadM : AIM_ASSIST.headM) * size - ey, h);
+  out.yawRate = 0;
+  out.pitchRate = 0;
+  if (h < 1e-3) return;
+  const vel = view.velocity;
+  const o = j * 3;
+  const so = self * 3;
+  const vx = vel[o]! - vel[so]!;
+  const vy = vel[o + 1]! - vel[so + 1]!;
+  const vz = vel[o + 2]! - vel[so + 2]!;
+  // yaw = atan2(−dx, −dz) e pitch = atan2(dy, h): as derivadas no tempo com o deslocamento relativo (vx, vy, vz).
+  const max = AIM_ASSIST.maxRateRadS;
+  out.yawRate = clamp((dz * vx - dx * vz) / h2, -max, max);
+  const dy = cy - ey;
+  const dh = (dx * vx + dz * vz) / h;
+  out.pitchRate = clamp((h * vy - dy * dh) / (h2 + dy * dy), -max, max);
+}
+
+/**
+ * Depois do `update` do mapeador (M12, fase 6; antes `pullAim` e a trava de uma vez na cena): escreve em `angles[0]` e
+ * `angles[1]` a mira assistida a partir de (yaw, pitch).
+ * - **Forte** (`level ≥ snapLevel`) com o ADS apertado (`adsPressed`): a trava anda até o alvo em `snapS`, uma fração
+ *   `dt / restante` por quadro (chega no fim mesmo com o alvo andando);
+ * - mexendo a mira (`looked`): acompanha `level · rotation` da velocidade angular do alvo;
+ * - mexendo a mira ou andando (`moving`): o ímã, `level · pullPerS · dt` do erro até o eixo do alvo (yaw) e até o
+ *   segmento quadril–cabeça (pitch: dentro dele, nada).
+ * Sem alvo, nada (e a trava acaba).
+ */
+export function steerAim(
   state: AimAssistState,
   level: number,
   dt: number,
-  active: boolean,
+  looked: boolean,
+  moving: boolean,
+  adsPressed: boolean,
   yaw: number,
   pitch: number,
   angles: Float64Array,
 ): void {
   angles[0] = yaw;
   angles[1] = pitch;
-  if (state.target < 0 || !active || level <= 0 || dt <= 0) return;
-  const f = Math.min(1, level * AIM_ASSIST.pullPerS * dt);
-  angles[0] = wrapAngle(yaw + angleDelta(yaw, state.targetYaw) * f);
-  angles[1] = pitch + (state.targetPitch - pitch) * f;
+  if (state.target < 0 || level <= 0) {
+    state.snapLeft = 0;
+    return;
+  }
+  if (level >= AIM_ASSIST.snapLevel && adsPressed) state.snapLeft = AIM_ASSIST.snapS;
+  if (dt <= 0) return;
+  if (state.snapLeft > 0) {
+    // O último quadro (sobra ≤ dt, com folga do ponto flutuante) chega no alvo e acaba a trava.
+    const f = state.snapLeft <= dt + 1e-9 ? 1 : dt / state.snapLeft;
+    state.snapLeft = f >= 1 ? 0 : state.snapLeft - dt;
+    angles[0] = wrapAngle(yaw + angleDelta(yaw, state.targetYaw) * f);
+    angles[1] = pitch + (clamp(pitch, state.pitchLow, state.pitchHigh) - pitch) * f;
+    return;
+  }
+  let y = yaw;
+  let p = pitch;
+  if (looked) {
+    const k = level * AIM_ASSIST.rotation * dt;
+    y += state.yawRate * k;
+    p += state.pitchRate * k;
+  }
+  if (looked || moving) {
+    const f = Math.min(1, level * AIM_ASSIST.pullPerS * dt);
+    y += angleDelta(y, state.targetYaw) * f;
+    p += (clamp(p, state.pitchLow, state.pitchHigh) - p) * f;
+  }
+  angles[0] = wrapAngle(y);
+  angles[1] = p;
 }
