@@ -110,11 +110,18 @@ float bfHashF(ivec3 c) {
 // Luz do cenário (tecnico.md §6.4): AO escurece só céu e sol; o emissivo não passa pelo AO; o clarão soma ambiente.
 // n: normal unitária em mundo; ao, sky, sun, emissive em 0..1. O céu tem um PISO de 1 nível (1/15): interior fechado
 // fica escuro, nunca preto puro (arte-ux.md §1.3 reserva o preto para pupilas e frestas; verificação do M1).
+// M12 (fase 5, pergunta AM7): o piso do céu é proporcional às cores da hora e, à noite, dava ~0,02 (a casa da Fazenda
+// virava (1,1,1) na tela); o BF_LIGHT_FLOOR é um piso ABSOLUTO da luz antes do emissivo, vezes o AO (o canto continua
+// mais escuro que a parede) e vezes o quanto o céu da hora é escuro (luminância de uSkyLightColor × uSkyStrength:
+// noite ~0,25 → 1, entardecer ~0,38 → ~0,6, dia ~0,67 → 0): de dia a conta é a de antes, sem tirar o AO dos interiores.
 const float BF_SKY_FLOOR = 0.0667;
+const float BF_LIGHT_FLOOR = 0.045;
 vec3 bfSceneLight(vec3 n, float ao, float sky, float sun, float emissive) {
   vec3 hemi = mix(uGroundColor, uSkyLightColor, n.y * 0.5 + 0.5);
   float ndl = max(dot(n, uSunDir), 0.0);
   vec3 lit = ao * (max(sky, BF_SKY_FLOOR) * uSkyStrength * hemi + sun * uSunStrength * ndl * uSunColor);
+  float dark = clamp((0.5 - dot(uSkyLightColor, vec3(0.299, 0.587, 0.114)) * uSkyStrength) * 5.0, 0.0, 1.0);
+  lit = max(lit, vec3(BF_LIGHT_FLOOR * ao * dark));
   return lit + emissive * uEmissiveColor + uFlash * 0.35 * hemi;
 }
 

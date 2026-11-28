@@ -91,7 +91,7 @@ export function barrel(): BuiltModel {
 /** Caixa d'água de 1,5 m de diâmetro sobre laje de concreto, telhado cônico, tampa e escada. */
 export function waterTank(): BuiltModel {
   const m = new ModelBuilder('water-tank', 'prop', {
-    flags: F.blocksBullets | F.blocksSight,
+    flags: F.blocksBullets | F.blocksSight | F.blobShadow,
     debrisColor: tone('placa', 1),
     blocksNav: true,
   });
@@ -155,7 +155,7 @@ export function waterTank(): BuiltModel {
 /** Jipe militar genérico low-poly: 3 m × 1,5 m, caçamba aberta, para-brisa sem vidro, estepe atrás. */
 export function jeep(): BuiltModel {
   const m = new ModelBuilder('jeep', 'prop', {
-    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable,
+    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.blobShadow,
     debrisColor: tone('metal', 3),
     blocksNav: true,
   });
@@ -425,7 +425,7 @@ export function column(): BuiltModel {
 /** Tenda de lona (2 m × 2,5 m, cumeeira a 1,5 m): duas águas, saias, empenas, porta e mastros. Balança no vento. */
 export function tarp(): BuiltModel {
   const m = new ModelBuilder('tarp', 'prop', {
-    flags: F.blocksSight | F.swaysInWind,
+    flags: F.blocksSight | F.swaysInWind | F.blobShadow,
     debrisColor: tone('lona', 2),
     blocksNav: true,
   });
@@ -530,7 +530,7 @@ export function tarp(): BuiltModel {
 /** Gerador sobre esquis: corpo de 1 × 0,75 × 1,5 m, respiros, painel com mostradores e lâmpada âmbar (luz 6). */
 export function generator(ctx: PropContext): BuiltModel {
   const m = new ModelBuilder('generator', 'prop', {
-    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.emissive,
+    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.emissive | F.blobShadow,
     debrisColor: tone('metal', 3),
     blocksNav: true,
   });
@@ -597,7 +597,7 @@ export function generator(ctx: PropContext): BuiltModel {
 /** Pinheiro low-poly: tronco de 6 lados e três copas cônicas de 8 lados. Balança no vento. */
 export function tree(): BuiltModel {
   const m = new ModelBuilder('tree', 'prop', {
-    flags: F.blocksBullets | F.blocksSight | F.swaysInWind,
+    flags: F.blocksBullets | F.blocksSight | F.swaysInWind | F.blobShadow,
     debrisColor: tone('grama', 3),
     blocksNav: true,
   });
@@ -631,7 +631,7 @@ export function tree(): BuiltModel {
 /** Muro de sacos de areia arredondados (2 m × 1 m × 0,5 m): 4 + 3 + 4 sacos sextavados, um pouco amassados. */
 export function sandbags(): BuiltModel {
   const m = new ModelBuilder('sandbags', 'prop', {
-    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable,
+    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.blobShadow,
     debrisColor: tone('areia', 1),
     blocksNav: true,
   });
@@ -673,7 +673,7 @@ export function sandbags(): BuiltModel {
 /** Caixote grande de 1 m (tábuas, moldura com bevel e travessa diagonal). ID a registrar: `model:crate-large`. */
 export function crateLarge(): BuiltModel {
   const m = new ModelBuilder('crate-large', 'prop', {
-    flags: F.blocksBullets | F.blocksSight | F.walkable,
+    flags: F.blocksBullets | F.blocksSight | F.walkable | F.blobShadow,
     debrisColor: tone('madeira', 3),
     blocksNav: true,
   });

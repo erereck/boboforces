@@ -119,6 +119,8 @@ export interface BenchReport {
     readonly max: number;
     readonly stalls: number;
     readonly frames: number;
+    /** M12 (fase 5): quantas das travadas caíram na pré-rodada da cortina (ausente = 0). */
+    readonly curtainStalls?: number;
   };
   readonly cpuMs: { readonly p50: number; readonly p99: number };
   /** `null` sem `gpuFinish`. */
@@ -236,7 +238,7 @@ export function formatBenchReport(r: BenchReport): string {
     `frames_lentos 40a60=${r.slowFrames.from40} 60a100=${r.slowFrames.from60} 100a250=${r.slowFrames.from100}` +
       ` acima250=${r.slowFrames.from250} vaos_1s=${r.slowFrames.gaps}`,
     `inicio_ms primeiro=${ms(r.startupMs.first)} max=${ms(r.startupMs.max)} travadas_inicio=${r.startupMs.stalls}` +
-      ` frames=${r.startupMs.frames}`,
+      ` frames=${r.startupMs.frames} travadas_cortina=${r.startupMs.curtainStalls ?? 0}`,
     `cpu_ms p50=${ms(r.cpuMs.p50)} p99=${ms(r.cpuMs.p99)}`,
     r.gpuMs ? `gpu_ms p50=${ms(r.gpuMs.p50)} p99=${ms(r.gpuMs.p99)}` : 'gpu_ms -',
     `fases_ms sim=${ms(r.phasesMs.sim)} ia=${ms(r.phasesMs.ai)} render=${ms(r.phasesMs.render)} ui=${ms(r.phasesMs.ui)}`,

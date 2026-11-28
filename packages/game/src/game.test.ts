@@ -89,6 +89,7 @@ import type { BatteryReading, SceneBundle, SceneRequest } from './scene-api.ts';
 import { createConstrutoLoader } from './scene/load.ts';
 import { SCENE_MODULE } from './scene/index.ts';
 import { aquariumPauseItems } from './scene/aquarium.ts';
+import { CURTAIN } from './scene/curtain.ts';
 import {
   createSceneFigures,
   FIGURE_DEFAULT_LOOK,
@@ -369,7 +370,7 @@ describe('startGame (NullRenderer)', () => {
     expect(match.director!.botCount).toBe(7);
     // M2 (fase 2d): o JOGAR começa com a contagem de 3 s, sem ninguém andar; os bots saem depois dela.
     expect([view.match.phase, view.match.countdownTicks > 0]).toEqual(['warmup', true]);
-    platform.pump(view.match.countdownTicks + 5);
+    platform.pump(view.match.countdownTicks + 5 + CURTAIN.prerollFrames);
     expect(view.match.phase).toBe('playing');
     const bots = [4, 5, 6, 7].map((c) => entityIndex(sim.controllerEntity(c)));
     const start = bots.map((e) => [view.position[e * 3]!, view.position[e * 3 + 2]!] as const);
@@ -448,7 +449,7 @@ describe('startGame (NullRenderer)', () => {
     await untilRunning(platform, game);
     const sim = game.match!.sim;
     const view = sim.view();
-    platform.pump(view.match.countdownTicks + 5);
+    platform.pump(view.match.countdownTicks + 5 + CURTAIN.prerollFrames);
     expect(view.match.phase).toBe('playing');
     const me = entityIndex(sim.controllerEntity(0));
     const at = (): number[] => [view.yaw[me]!, view.pitch[me]!, view.position[me * 3]!, view.position[me * 3 + 2]!];
@@ -472,7 +473,7 @@ describe('startGame (NullRenderer)', () => {
     await untilRunning(platform, game);
     const sim = game.match!.sim;
     const v = sim.view();
-    platform.pump(v.match.countdownTicks + 5);
+    platform.pump(v.match.countdownTicks + 5 + CURTAIN.prerollFrames);
     const me = (): number => entityIndex(sim.controllerEntity(0));
     const ads = (): boolean => (v.flags[me()]! & ENTITY_FLAG.ads) !== 0;
     const aim = (): void => {
@@ -1765,7 +1766,7 @@ describe('3ª pessoa (M2, fase 6b)', () => {
     platform.tap('Enter');
     await untilRunning(platform, game);
     const view = game.match!.sim.view();
-    platform.pump(view.match.countdownTicks + 5);
+    platform.pump(view.match.countdownTicks + 5 + CURTAIN.prerollFrames);
     expect(game.save.settings.video).toMatchObject({ view: 'first', shoulder: 'right' });
     // X sem a 3ª pessoa não faz nada.
     platform.tap('KeyX');

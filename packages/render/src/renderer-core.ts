@@ -751,8 +751,8 @@ export function createRendererCore(
       p.actors.beforeView(ctx);
       p.fx.beforeView(ctx);
       // M4 (fase 5b): desenha de verdade cada malha dos passes (e o viewmodel) uma vez, no pixel do canto.
-      const undoActors = p.actors.warmDraw();
-      const undoFx = p.fx.warmDraw();
+      const undoActors = p.actors.warmDraw(camera);
+      const undoFx = p.fx.warmDraw(camera);
       three.render(scene, camera);
       undoFx();
       undoActors();

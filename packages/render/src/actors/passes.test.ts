@@ -9,6 +9,7 @@ import {
   FIGURE_PRESETS,
   FIGURE_STANCE,
   figurePosture,
+  MODEL_FLAG,
   MODEL_FORMAT,
   type ModelDocument,
 } from '@boboforces/format';
@@ -325,6 +326,97 @@ describe('passe dos atores (three sem GPU)', () => {
     expect(prop.visible).toBe(false);
     pass.dispose();
     expect(ctx.scene.getObjectByName('prop-generator')).toBeUndefined();
+  });
+
+  it('M12: sombra-blob das props com a flag (prefixo estático) e dos itens no chão, na mesma malha', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    const shadowed: ModelDocument = { ...barrel, id: 'barrel', flags: MODEL_FLAG.blobShadow };
+    const box: ModelDocument = { ...ammoBox, flags: MODEL_FLAG.blobShadow };
+    pass.setModels([rifle, shadowed, box, barrel]);
+    const map = {
+      sizeX: 64,
+      sizeY: 16,
+      sizeZ: 64,
+      regions: [],
+      lightGrid: { sizeX: 1, sizeY: 1, sizeZ: 1, data: new Uint8Array([255, 128, 0]) },
+      grid: createWorldGrid(64, 16, 64),
+      blocks: createBlockRegistry([]),
+      props: [
+        { model: 1, x: 3, y: 0, z: 4, yaw: 0, scale: 1, dose: 0 },
+        // Sem a flag: sem sombra.
+        { model: 3, x: 5, y: 0, z: 5, yaw: 0, scale: 1, dose: 0 },
+        { model: 1, x: 8, y: 0, z: 8, yaw: 0, scale: 2, dose: 2 },
+      ],
+      blockFaceLayers: new Uint8Array(6),
+    } as RenderMap;
+    pass.setMap(map);
+    const buffer = createProjectileBuffer(4);
+    buffer.count = 3;
+    buffer.model[0] = 2;
+    buffer.model[1] = 0;
+    // A 3ª é a caixinha marcada sem sombra (como a arma na parede do Zombies).
+    buffer.model[2] = 2;
+    buffer.noShadow[2] = 1;
+    buffer.position.set([10, 0, 10, 1, 1, 1, 12, 1.3, 12], 0);
+    pass.setProjectiles(buffer);
+    const debug = createRenderDebug();
+    debug.propDose = 'double';
+    pass.update(frame(0, debug));
+    const shadow = mesh(ctx.scene, 'sombra-blob');
+    // 2 props com a flag + a caixinha (o rifle no buffer não tem a flag; a caixinha marcada não entra); nenhum boneco.
+    expect(shadow.count).toBe(3);
+    const data = (shadow.geometry.getAttribute('pA') as InterleavedBufferAttribute).data.array as Float32Array;
+    // No centro da pegada do modelo (a caixa vai de z −0,5 a 0,125 m: centro em −0,1875) e 1 cm acima da base.
+    expect([data[0], data[1], data[2]]).toEqual([3, Math.fround(0.01), 4 - 0.1875]);
+    // A segunda prop tem escala 2: a sombra dobra.
+    expect(data[24 + 3]).toBeCloseTo(2 * data[3]!, 5);
+    // A caixinha vem depois do prefixo, no chão embaixo do centro da pegada dela, no tamanho dela (sem mínimo).
+    expect([data[48], data[50]]).toEqual([10, 10 - 0.1875]);
+    expect(data[48 + 3]).toBeCloseTo(data[3]!, 5);
+    // O disco de prop é marcado (`pC.x` = 1: o corte da vista vale para ele); o do item, não.
+    expect([data[8], data[24 + 8], data[48 + 8]]).toEqual([1, 1, 0]);
+    // A chave de dose esconde a prop do dobro (alfa 0: o shader descarta), sem tirar do buffer.
+    debug.propDose = 'blocks';
+    pass.update(frame(1 / 60, debug));
+    expect(shadow.count).toBe(3);
+    expect(data[24 + 15]).toBe(0);
+    expect(data[15]).toBeGreaterThan(0.2);
+    pass.dispose();
+  });
+
+  it('M12 (revisão): o teto de grupos de props da vista corta junto os discos das props escondidas', () => {
+    const { ctx } = fakeContext();
+    const pass = createActorPass(ctx);
+    // 17 modelos com a flag (um grupo cada), uma prop de cada a 3 m uma da outra na frente da câmera (−z).
+    const docs: ModelDocument[] = Array.from({ length: 17 }, (_, k) => ({
+      ...barrel,
+      id: `prop-${k}`,
+      flags: MODEL_FLAG.blobShadow,
+    }));
+    pass.setModels(docs);
+    pass.setMap({
+      sizeX: 64,
+      sizeY: 16,
+      sizeZ: 64,
+      regions: [],
+      lightGrid: { sizeX: 1, sizeY: 1, sizeZ: 1, data: new Uint8Array([255, 128, 0]) },
+      grid: createWorldGrid(64, 16, 64),
+      blocks: createBlockRegistry([]),
+      props: docs.map((_, k) => ({ model: k, x: 0, y: 0, z: -2 - 3 * k, yaw: 0, scale: 1, dose: 0 })),
+      blockFaceLayers: new Uint8Array(6),
+    } as RenderMap);
+    pass.update(frame(0));
+    const material = mesh(ctx.scene, 'sombra-blob').material as ShaderMaterial;
+    pass.beforeView(viewContext(createViewDesc()));
+    // O teto é 15 grupos: os 2 mais longe saem, e o corte fica na superfície do mais perto deles.
+    expect(pass.lastViewPropGroups).toBe(15);
+    const cut = material.uniforms['uBlobMaxDist']!.value as number;
+    expect(cut).toBeLessThan(1e9);
+    // A câmera em z = 5: a 16ª prop (k = 15) está em z = −47, a ~52 m (a superfície da esfera um pouco antes).
+    expect(cut).toBeGreaterThan(48);
+    expect(cut).toBeLessThan(53);
+    pass.dispose();
   });
 });
 

@@ -5796,3 +5796,57 @@ teste); o desenho, em `ui/src/screens/hud.ts` e `match-hud.ts`; a cena só faz a
   `drawCenterNotice`, `drawMatchGo`, `placeOverlay`, `ResultScreenData.mvpIsYou/locked/teamScore`, `DeathState`
   (`headshot`, `armed`). Strings novas: `hud.go`, `hud.streak.*`, `result.scoreTeam`, `hud.royale.clock*`. Nenhum
   golden mudou.
+
+### 23.5 Fase 5: o visual (27/11/2026)
+
+- **O strafe sem patinar** (`render/src/actors/anim/rig.ts`, `motion-config.ts`): acima de `strafeStrideFromUs`..`ToUs`
+  (25–45 u/s, smoothstep) o deslocamento lateral entra na passada (fase e amplitude pela velocidade do plano). As
+  pernas viram para o rumo até `strafeYawMax` 1,2 rad (era 0,35; `strafeYawLow` 0,35 no passinho), seguidas a
+  `strafeYawRate` 10/s, com histerese frente/ré (`FLAG.back`, cos δ ±0,34); o tronco fecha a diferença pelo
+  `compensateTorso`. O passinho do goleiro vai a no máximo `shuffleMaxHz` 3 (eram ~6,8 aberturas de quadril por
+  segundo no ADAD dos bots). O balanço lateral e a inclinação do tronco só valem na passada de frente (E.2). Pé no
+  chão: desliza 0,60 do que o corpo anda (antes 1,0; de frente 0,42). A hitbox vem da pose da tabela e não muda;
+  `ANIM_FIELDS` 48 → 49; o hash E.17 do rig (`rig.test.ts`, do render) foi re-gravado.
+- **A noite legível** (AM7): `BF_LIGHT_FLOOR` 0,045 × AO × `dark` na `bfSceneLight` (`shared/glsl-common.ts`, contrato
+  do M1), com `dark` = clamp((0,5 − luminância(uSkyLightColor) × uSkyStrength) × 5; 0; 1) (noite 1, entardecer ~0,6,
+  dia 0: de dia a conta é a de antes); e `ACTOR_SKY_FLOOR` 0,3 (`actors/layout.ts`) no céu dos bonecos, da arma na mão,
+  do desmonte e do viewmodel. Pretos puros (≤ 2/255): celeiro da Fazenda 27,9% → 0,3%, casa 4,7% → 0,1%; o Construto
+  de dia igual.
+- **A sombra-blob das props e do chão** (`actors/blob-shadows.ts`, `actor-pass.ts`): a malha "sombra-blob" leva um
+  prefixo estático com uma sombra por prop com `MODEL_FLAG.blobShadow` (a flag existia e o render não a usava),
+  refeito no `setMap`/`setModels`, até 2048; cada disco encolhe até assentar no chão (`fitBlobToGround`: 8 pontos da
+  borda, frações 1/0,75/0,55; nenhuma assenta, sem disco). Por vista, o uniform `uBlobMaxDist` (programa 5) apaga os
+  discos de prop além do grupo mais perto que o teto de draw calls cortou (sem ele, a sombra ficava sem a prop).
+  Depois vêm a dos bonecos e a dos itens do buffer de projéteis com a flag, no centro da pegada e no tamanho dela (piso
+  0,3 m), sem a arma da parede e a da Caixa Misteriosa (`ProjectileBuffer.noShadow`). Zero draw a mais. O disco ganhou
+  miolo cheio até 55% do raio e borda em 2 degraus: na rampa antiga o pé cobria o que escurecia, e a sombra dos próprios
+  bonecos quase não aparecia. Flag nos modelos de `assets-src/models` (armas, pickups, pinheiro, jipe, gerador, tenda…)
+  e o `.bfmodel` regenerado.
+- **A explosão com peso** (`fx/fx-pass.ts`, `scene/visual-fx.ts`): marca chamuscada de 0,7·raio (1–2,8 m; a forma da
+  mancha de tinta na cor do chão a 32%, 20 s no anel de marcas) se há chão sólido a até 0,6·raio, um anel de 10
+  baforadas na cor do chão, e o clarão das vistas com ganho 1 segurando 150 ms × a contribuição da vista (`VISUAL_FX`);
+  a gosma do Chonker clareia como um tiro. Com "Reduzir efeitos", no máximo 3 clarões por segundo por vista (também os
+  do tiro).
+- **O pó do chão** (`FX_KIND.dust`, `pushDust`): 4–6 cubinhos na cor do texel do topo do bloco embaixo e uma
+  nuvenzinha, sem marca, no pouso acima de 6 m/s de queda; no deslize, só a nuvem e 1 cubinho a cada 0,1 s (0,2 s com
+  "Reduzir efeitos").
+- **O headshot que se vê** (`FxDeath.headshot` no `data[13]` do pedido `death`, `figure-corpses.ts`): a cabeça sobe
+  +4 m/s e gira o dobro, com 14 confetes saindo dela (GDD §5.5).
+- **O aquecimento que desenha e a cortina** (`shared/warm-twins.ts`, `scene/curtain.ts`): cada malha ganha no
+  aquecimento um gêmeo de 1 instância válida na frente da câmera (o mesmo material: nenhum programa novo), que gera
+  fragmento de verdade (o aquecimento antigo desenhava um ponto degenerado) e é descartado no mesmo `warmup()`. Na
+  entrada da partida, uma pré-rodada de 20 quadros ou 0,5 s de jogo (o que vier antes) desenha sem dar passo na sim
+  (fora do online), atrás de uma cortina preta que sai em 0,3 s (instantânea com "Reduzir efeitos"); `Curtain.done`
+  libera o `readyForPrint` e o `whenReady`. O item 15 do T0 conta os quadros da pré-rodada e separa as travadas dela
+  (`travadas_cortina`, também no relatório do bench). Sem ganho mensurável no PC carregado: a travada do 1º uso
+  continua, mas atrás do preto; medir no console.
+- **O Meu Bobo vivo** (`scene/wardrobe.ts`): o manequim do vestiário tem entidade própria (`WARDROBE.entity`): respira,
+  pisca e dá o passinho no giro; a cada troca de peça as partes caem e encaixam em 0,4 s. Os manequins da entidade 0
+  (prints, testes) continuam congelados.
+- **Revisão (Opus):** 1 achado alto (a pré-rodada quebrava dois testes da cena e cegava a medição das travadas), 3
+  médios (prints e smoke dentro da cortina, sombras fantasmas das props cortadas, armas da parede com sombra no chão) e
+  6 baixos, corrigidos antes da junção. O bloom falso nas luzes ficou de fora.
+- **Contratos:** `FX_KIND.dust` e `pushDust(…, slide)`, `FxDeath.headshot`, `FigureCorpseSpec.headPop`,
+  `ProjectileBuffer.noShadow`, `ParticleUniforms.uBlobMaxDist`, `startupMs.curtainStalls?`, o `BF_LIGHT_FLOOR` na
+  `bfSceneLight`, os campos novos do `FigureMotionConfig`. Primeira partida 975,1 KB de 1.000 (com as fases 1 e 6).
+  Nenhum golden mudou.

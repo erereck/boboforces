@@ -44,8 +44,19 @@ export interface FigureMotionConfig {
   readonly shuffleWidth: number;
   readonly shuffleHipZ: number;
   readonly shuffleBob: number;
-  /** As pernas apontam o rumo do strafe até isto (rad), por `hipsY`; o tronco fecha a diferença. */
+  /**
+   * M12 (fase 5): o strafe sem patinar. Acima de `strafeStrideFromUs`..`strafeStrideToUs` (u/s de lado, smoothstep) o
+   * deslocamento lateral entra na PASSADA (o pé fica plantado no rumo) e as pernas viram para o rumo até
+   * `strafeYawMax` (rad, por `hipsY`; o tronco fecha a diferença pelo `compensateTorso`); abaixo disso fica o passinho
+   * do goleiro, com as pernas até `strafeYawLow` e no máximo `shuffleMaxHz` aberturas por segundo. O giro das pernas
+   * segue o alvo com `strafeYawRate` (1/s): a troca de frente para ré no meio do strafe vira um giro curto do quadril.
+   */
   readonly strafeYawMax: number;
+  readonly strafeYawLow: number;
+  readonly strafeStrideFromUs: number;
+  readonly strafeStrideToUs: number;
+  readonly strafeYawRate: number;
+  readonly shuffleMaxHz: number;
 
   // --- Giro preguiçoso (`character.ts:3221-3250`): só as pernas, o tronco fecha ---
   readonly lazyYawMax: number;
@@ -174,7 +185,12 @@ export const FIGURE_MOTION: FigureMotionConfig = Object.freeze({
   shuffleWidth: 0.06,
   shuffleHipZ: 0.1,
   shuffleBob: 0.58,
-  strafeYawMax: 0.35,
+  strafeYawMax: 1.2,
+  strafeYawLow: 0.35,
+  strafeStrideFromUs: 25,
+  strafeStrideToUs: 45,
+  strafeYawRate: 10,
+  shuffleMaxHz: 3,
 
   lazyYawMax: 0.35,
   lazyStart: 0.3,

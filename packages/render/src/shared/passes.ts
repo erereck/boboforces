@@ -29,6 +29,7 @@ import type { FigureGameTable, FigureTemplateSet, ModelDocument } from '@bobofor
 import type { Disposable } from '@boboforces/shared';
 import type { BlockRegistry, LightGrid, WorldGrid } from '@boboforces/world';
 import type {
+  Camera,
   Frustum,
   IUniform,
   PerspectiveCamera,
@@ -188,9 +189,11 @@ export interface ScenePass extends Disposable {
   /**
    * M4 (fase 5b): no frame fora da tela do aquecimento (viewport de 1 px já aplicado), deixa toda malha do passe
    * visível com ao menos 1 instância e desenha a cena do viewmodel, para o 1º DESENHO de cada programa e estado
-   * (mistura, profundidade, decalque) acontecer no loading e não no 1º tiro. Devolve quem desfaz.
+   * (mistura, profundidade, decalque) acontecer no loading e não no 1º tiro. M12 (fase 5): com a `camera` do
+   * aquecimento, cada malha ganha um gêmeo de 1 instância VÁLIDA na frente dela (`warm-twins.ts`): o desenho gera
+   * fragmento de verdade. Devolve quem desfaz.
    */
-  warmDraw(): () => void;
+  warmDraw(camera?: Camera): () => void;
 }
 
 /** Programa 4: bonecos (1 draw de caixas instanciadas), armas, props por grupo de 32 m, acessórios e viewmodel. */

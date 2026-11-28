@@ -113,10 +113,18 @@ export interface FigureCorpseSpec {
   sky: number;
   sun: number;
   emissive: number;
+  /**
+   * M12 (fase 5): tiro na cabeça (GDD §5.5, "o chapéu voa com confete"): o grupo da cabeça sobe `HEAD_POP_UP` m/s a
+   * mais e gira o dobro.
+   */
+  headPop: boolean;
 }
 
+/** M12 (fase 5): o impulso extra para cima da cabeça no tiro na cabeça (m/s). */
+export const HEAD_POP_UP = 4;
+
 export function createFigureCorpseSpec(): FigureCorpseSpec {
-  return { dirX: 0, dirY: 0, dirZ: 0, force: 0, bodyPart: -1, skin: 0, sky: 1, sun: 1, emissive: 0 };
+  return { dirX: 0, dirY: 0, dirZ: 0, force: 0, bodyPart: -1, skin: 0, sky: 1, sun: 1, emissive: 0, headPop: false };
 }
 
 /** Inverso afim (3×4) de a[ao ..] vezes b[bo ..], em out[oo ..] (4ª linha 0 0 0 1). Só no nascer. */
@@ -330,8 +338,10 @@ export function spawnFigureCorpse(
       oz /= ol;
     }
     const boost = g === hitGroup ? 1 : 0.45;
+    // M12 (fase 5): no tiro na cabeça, a cabeça (grupo 0) sobe mais e gira o dobro.
+    const pop = spec.headPop && g === 0;
     const vx = dx * force * boost + ox * 1.6 + (rng.next() - 0.5) * 1.6;
-    const vy = dy * force * boost + oy * 1.2 + 2.2 + rng.next() * 1.8;
+    const vy = dy * force * boost + oy * 1.2 + 2.2 + rng.next() * 1.8 + (pop ? HEAD_POP_UP : 0);
     const vz = dz * force * boost + oz * 1.6 + (rng.next() - 0.5) * 1.6;
     pool.pos[b * 3] = wx;
     pool.pos[b * 3 + 1] = wy;
@@ -339,9 +349,10 @@ export function spawnFigureCorpse(
     pool.prev[b * 3] = wx - vx * dt;
     pool.prev[b * 3 + 1] = wy - vy * dt;
     pool.prev[b * 3 + 2] = wz - vz * dt;
-    pool.spin[b * 3] = (rng.next() - 0.5) * 16;
-    pool.spin[b * 3 + 1] = (rng.next() - 0.5) * 10;
-    pool.spin[b * 3 + 2] = (rng.next() - 0.5) * 16;
+    const spinK = pop ? 2 : 1;
+    pool.spin[b * 3] = (rng.next() - 0.5) * 16 * spinK;
+    pool.spin[b * 3 + 1] = (rng.next() - 0.5) * 10 * spinK;
+    pool.spin[b * 3 + 2] = (rng.next() - 0.5) * 16 * spinK;
   }
   const first = i0;
   const last = i0 + FIGURE_MAX_BOXES - 1;

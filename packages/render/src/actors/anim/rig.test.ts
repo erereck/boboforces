@@ -271,7 +271,9 @@ describe('rig do boneco (F4)', () => {
     expect(run()).toBe(a);
     // Muda se mudar o motor, os ganhos (`FIGURE_MOTION`) ou as bases congeladas do `figure.ts`: refazer de propósito.
     // `9cd6df1e` → `3ecdbb31`: arma na moldura da mira (decisão 3 da §I) e recarga no envelope (decisão 4).
-    expect(a).toBe('3ecdbb31');
+    // `3ecdbb31` → `489c1327` (M12, fase 5): o strafe sem patinar (o lado na passada, as pernas até 1,2 rad para o rumo
+    // com histerese frente/ré, o passinho até 3 Hz, o balanço e a inclinação só na passada de frente).
+    expect(a).toBe('489c1327');
   });
 
   it('E.17 (texto): sem sorteio nem relógio em render/src/actors/anim/**', () => {
@@ -882,6 +884,106 @@ describe('rig do boneco (F4)', () => {
     }
     // Parado, só a respiração separa o motor da base; o tiro empurra a mola de novo.
     expect(kicked).toBeGreaterThan(quiet + 0.05);
+  });
+
+  it('M12: strafe sem patinar: o lado entra na passada, as pernas viram para o rumo e o pé no chão desliza menos', () => {
+    // Strafe puro para a direita (+x, yaw 0) a 4,8 m/s por 3 s; mede o giro das pernas (eixo z da coxa, a frente do
+    // FutBobo) e quanto cada pé anda enquanto está no chão (centro da chuteira a < 9,5 cm), contra o quanto o corpo
+    // andou nesses quadros. Referência: andando de frente a 4,8 m/s dá ~0,42 (a passada do FutBobo não planta 100%).
+    const run = (motion: typeof FIGURE_MOTION): { legYaw: number; slip: number; torso: number } => {
+      const rig = createFigureRig(1, { motion });
+      const base = createFigureRig(1, { motion: FIGURE_MOTION_STOPPED });
+      const table = createFigureGameTable();
+      rig.setTable(table);
+      base.setTable(table);
+      const actors = createActorBuffer(1);
+      actors.count = 1;
+      const frame = createHarnessFrame();
+      const out = new Float32Array(192);
+      const ref = new Float32Array(192);
+      // Centro da chuteira (0; −1,15; 0,55) px no osso do pé, em metros do mundo.
+      const sole = (m: Float32Array, b: number, k: number): number =>
+        m[b * 16 + 4 + k]! * -1.15 + m[b * 16 + 8 + k]! * 0.55 + m[b * 16 + 12 + k]!;
+      let yawSum = 0;
+      let yawN = 0;
+      let slid = 0;
+      let moved = 0;
+      let torso = 0;
+      // Último ponto no chão de cada pé (NaN = estava no ar).
+      const last = [NaN, NaN, NaN, NaN];
+      let lastBody = 0;
+      for (let n = 0; n < 180; n++) {
+        const x = (4.8 * n) / 60;
+        put(actors, 0, { entity: 5, posture: RIFLE, x, vx: 4.8 });
+        step(rig, frame, actors, out, n);
+        step(base, frame, actors, ref, n);
+        if (n < 60) {
+          lastBody = x;
+          continue;
+        }
+        for (const b of [6, 7]) {
+          yawSum += Math.atan2(out[b * 16 + 8]!, -out[b * 16 + 10]!);
+          yawN++;
+        }
+        // Tronco (osso 1, ponto (0, 6, 0)): o motor contra a base, em px.
+        const p = (m: Float32Array, r: number): number => m[16 + 4 + r]! * 6 + m[16 + 12 + r]!;
+        torso = Math.max(torso, Math.hypot(p(out, 0) - p(ref, 0), p(out, 2) - p(ref, 2)) / FIGURE_PX_M);
+        for (let k = 0; k < 2; k++) {
+          const b = 10 + k;
+          const grounded = sole(out, b, 1) < 0.095;
+          const fx = sole(out, b, 0);
+          const fz = sole(out, b, 2);
+          if (grounded && last[k * 2] === last[k * 2]) {
+            slid += Math.hypot(fx - last[k * 2]!, fz - last[k * 2 + 1]!);
+            moved += x - lastBody;
+          }
+          last[k * 2] = grounded ? fx : NaN;
+          last[k * 2 + 1] = fz;
+        }
+        lastBody = x;
+      }
+      return { legYaw: yawSum / yawN, slip: slid / moved, torso };
+    };
+    const now = run(FIGURE_MOTION);
+    // O passinho de antes: o lado nunca entra na passada, pernas até 0,35 rad, sem teto de frequência.
+    const old = run({
+      ...FIGURE_MOTION,
+      strafeStrideFromUs: 1e6,
+      strafeStrideToUs: 2e6,
+      strafeYawMax: 0.35,
+      shuffleMaxHz: 1e3,
+    });
+    // As coxas (o pé no balanço chega a virar de ponta-cabeça) giram de −z (a mira) para +x (o rumo).
+    expect(now.legYaw).toBeGreaterThan(1);
+    expect(old.legYaw).toBeLessThan(0.4);
+    // Antes o pé no chão andava junto com o corpo (~1,0); agora ~0,6 (o resto é o rumo além do teto de 1,2 rad).
+    expect(old.slip).toBeGreaterThan(0.9);
+    expect(now.slip).toBeLessThan(0.7);
+    // O tronco fica onde a base põe (o giro das pernas é fechado pelo `compensateTorso`; só o quique da passada).
+    expect(now.torso).toBeLessThan(1.5);
+  });
+
+  it('M12: a troca frente ↔ ré no strafe não salta: o giro das pernas anda no máximo `strafeYawRate` por quadro', () => {
+    const rig = createFigureRig(1);
+    rig.setTable(createFigureGameTable());
+    const actors = createActorBuffer(1);
+    actors.count = 1;
+    const frame = createHarnessFrame();
+    const out = new Float32Array(192);
+    let prev = NaN;
+    let worst = 0;
+    for (let n = 0; n < 240; n++) {
+      const t = n / 60;
+      // Diagonal para a frente, strafe puro e diagonal de ré, a 4,8 m/s (o rumo gira de 45° a 135°).
+      const a = Math.PI / 4 + (Math.PI / 2) * Math.min(1, t / 3);
+      put(actors, 0, { entity: 6, posture: RIFLE, vx: 4.8 * Math.sin(a), vz: -4.8 * Math.cos(a) });
+      step(rig, frame, actors, out, n);
+      const yawLeg = Math.atan2(out[6 * 16 + 8]!, -out[6 * 16 + 10]!);
+      if (prev === prev) worst = Math.max(worst, Math.abs(yawLeg - prev));
+      prev = yawLeg;
+    }
+    // 2,4 rad de troca a 10/s: no máximo ~0,4 rad num quadro de 60 Hz (contando o balanço da passada).
+    expect(worst).toBeLessThan(0.45);
   });
 
   it('motor ligado: sem NaN numa sequência longa com tudo junto', () => {

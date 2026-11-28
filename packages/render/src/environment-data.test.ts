@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_OF_DAY_PRESETS } from './environment.ts';
+import { GLSL_COMMON_VERTEX } from './shared/glsl-common.ts';
 import { buildGradeLut, emissiveLayerBits, fogRange, GRADE_LUT_SIZE } from './environment-data.ts';
 
 describe('LUT de grading', () => {
@@ -46,5 +47,26 @@ describe('camadas emissivas', () => {
     expect(bits[1]).toBe(1 << 5);
     expect(bits[5]).toBe(1);
     expect(bits[7]).toBe(0);
+  });
+});
+
+describe('M12 (fase 5, revisão): o piso de luz só vale com o céu escuro', () => {
+  // A mesma conta do `bfSceneLight` (glsl-common.ts): luminância do céu da hora × força.
+  const dark = (p: (typeof TIME_OF_DAY_PRESETS)['day']): number => {
+    const c = p.skyLightColor;
+    const l = (0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255;
+    return Math.max(0, Math.min(1, (0.5 - l * p.skyStrength) * 5));
+  };
+
+  it('dia 0 (a conta de antes), entardecer no meio, noite inteiro', () => {
+    expect(dark(TIME_OF_DAY_PRESETS.day)).toBe(0);
+    expect(dark(TIME_OF_DAY_PRESETS.dusk)).toBeGreaterThan(0.3);
+    expect(dark(TIME_OF_DAY_PRESETS.dusk)).toBeLessThan(0.9);
+    expect(dark(TIME_OF_DAY_PRESETS.night)).toBe(1);
+  });
+
+  it('o shader tem a mesma conta (piso × AO × céu escuro)', () => {
+    expect(GLSL_COMMON_VERTEX).toContain('vec3(0.299, 0.587, 0.114)) * uSkyStrength) * 5.0, 0.0, 1.0)');
+    expect(GLSL_COMMON_VERTEX).toContain('lit = max(lit, vec3(BF_LIGHT_FLOOR * ao * dark));');
   });
 });

@@ -69,6 +69,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
 5. **O visual:** o strafe sem patinar; a noite legível; a sombra-blob nas props e no que está no chão; a explosão com
    marca e clarão; o pó no pouso e no deslize; o headshot com confete; o Meu Bobo vivo; o aquecimento que desenha de
    verdade e a cortina de entrada.
+   - **feita em 27/11** (ARCHITECTURE §23.5): o strafe, a noite, as sombras, a explosão, o pó, o headshot, a cortina e o Meu Bobo; o bloom ficou de fora; nenhum golden mudou.
 6. **A mira, o toque e o movimento:** a sensibilidade do ADS pelo zoom; o toque que mira segurando o ADS e o joystick
    que segue o dedo; a assistência de mira que acompanha quem anda de lado; o deslize no pouso (sim, golden e
    protocolo); a correção do online sem estalo.

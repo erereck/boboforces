@@ -17,15 +17,24 @@ import { sampleLightGrid } from '@boboforces/world';
 import { Group, PerspectiveCamera, Scene, Sphere, type InstancedMesh } from 'three';
 import { INITIAL_ACTOR_CAPACITY } from '../limits.ts';
 import type { ActorPass, FrameContext, PassContext, ViewContext } from '../shared/passes.ts';
+import { createWarmTwins } from '../shared/warm-twins.ts';
 import { ACTOR_POSE, NO_FIGURE, NO_MODEL, type ActorBuffer, type ProjectileBuffer, type RenderMap } from '../types.ts';
 import { floorBelow } from '../fx/verlet.ts';
 import { PARTICLE_FLOATS } from '../fx/particles.ts';
-import { PARTICLE_KIND } from '../fx/shader.ts';
 import { createFigureRig, type FigureLodStats } from './anim/index.ts';
+import {
+  applyPropShadowDose,
+  blobFootprint,
+  buildPropShadows,
+  hasBlobShadow,
+  ITEM_SHADOW_ALPHA,
+  writeBlob,
+  type PropShadows,
+} from './blob-shadows.ts';
 import { buildFigureCubeGeometry } from './figure-cube.ts';
 import { createFigureFrame } from './figure-frame.ts';
 import { createFigureInstances, FIGURE_INSTANCES_MAX } from './figure-instances.ts';
-import { INST, INSTANCE_FLOATS, NO_SLOT, writeInstanceDefaults, writeRgb01 } from './layout.ts';
+import { ACTOR_SKY_FLOOR, INST, INSTANCE_FLOATS, NO_SLOT, writeInstanceDefaults, writeRgb01 } from './layout.ts';
 import { linkFor } from './link.ts';
 import {
   m4Copy,
@@ -91,12 +100,22 @@ export interface ActorPassFigureStats {
   readonly figureOverflow: number;
 }
 
-/** Sombras-blob dos atores (uma por ator desenhado) e a capacidade que também dimensiona as armas na mão. */
+/**
+ * Sombras-blob: o prefixo das props (M12) e uma por ator desenhado; `capacity` (atores) também dimensiona as armas na
+ * mão.
+ */
 interface ShadowMeshes {
   readonly capacity: number;
+  /** Sombras de prop no começo do buffer (estáticas: sobem só quando o prefixo muda). */
+  readonly prefix: number;
   readonly data: Float32Array;
   readonly shadow: ParticleMesh;
 }
+
+/** M12 (fase 5): itens do buffer de projéteis com sombra por quadro (armas e caixinhas no chão, granadas). */
+const PROJECTILE_SHADOW_CAP = 256;
+/** Sombra do item no ar: some aos 3 m de altura, como a do boneco. */
+const ITEM_SHADOW_MAX_HEIGHT = 3;
 
 interface WeaponMeshes {
   readonly set: InstanceSet;
@@ -152,6 +171,10 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
   link.viewmodelCamera = vmCamera;
   const warmCamera = new PerspectiveCamera();
 
+  // M12 (fase 5): o prefixo das sombras das props (antes de criar a malha, que o copia) e se ele precisa subir.
+  let propShadows: PropShadows = buildPropShadows([], []);
+  let shadowPrefixDirty = true;
+  let appliedDose: PropDoseView | null = null;
   let shadows = createShadows(INITIAL_ACTOR_CAPACITY);
   let actors: ActorBuffer | null = null;
   let projectiles: ProjectileBuffer | null = null;
@@ -169,9 +192,10 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
   let map: RenderMap | null = null;
   let props: PropMeshes[] = [];
   let propVisible = new Uint8Array(0);
+  /** M12 (fase 5): o grupo era candidato da vista antes do teto de draw calls (para o corte dos discos de prop). */
+  let propCandidate = new Uint8Array(0);
   let propDistance = new Float32Array(0);
   let propOrder = new Int32Array(0);
-  let appliedDose: PropDoseView | null = null;
 
   let viewsLastFrame = 1;
   let viewsThisFrame = 0;
@@ -187,11 +211,19 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
   const vmMatrix = new Float32Array(MAT4);
   const sphere = new Sphere();
 
+  /**
+   * A malha "sombra-blob": M12 (fase 5) o prefixo estático das props (`propShadows`), depois uma por boneco
+   * (`capacity`) e uma por item do buffer de projéteis com a flag (`PROJECTILE_SHADOW_CAP`). Um draw para tudo.
+   */
   function createShadows(capacity: number): ShadowMeshes {
-    const data = new Float32Array(Math.max(1, capacity) * PARTICLE_FLOATS);
+    const prefix = propShadows.count;
+    const data = new Float32Array((prefix + Math.max(1, capacity) + PROJECTILE_SHADOW_CAP) * PARTICLE_FLOATS);
+    data.set(propShadows.data.subarray(0, prefix * PARTICLE_FLOATS));
+    if (appliedDose) applyPropShadowDose(propShadows, data, doseIndex(appliedDose));
     const shadow = createParticleMesh(quad, data, shadowMaterial, 'sombra-blob');
     root.add(shadow.mesh);
-    return { capacity, data, shadow };
+    shadowPrefixDirty = true;
+    return { capacity, prefix, data, shadow };
   }
 
   function disposeShadows(b: ShadowMeshes): void {
@@ -306,6 +338,13 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
   function rebuildProps(): void {
     disposeProps();
     appliedDose = null;
+    // M12 (fase 5): o prefixo das sombras das props com `blobShadow` (vazio sem mapa ou sem modelos).
+    propShadows =
+      map && bindings.length > 0
+        ? buildPropShadows(map.props, bindings, { grid: map.grid, blocks: map.blocks })
+        : buildPropShadows([], []);
+    disposeShadows(shadows);
+    shadows = createShadows(shadows.capacity);
     if (!map || bindings.length === 0) return;
     const grid = map.lightGrid;
     const groups = buildPropGroups(map.props, bindings, (x, y, z, out, o) => sampleLightGrid(grid, x, y, z, out, o));
@@ -323,6 +362,7 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       return { group, set, mesh };
     });
     propVisible = new Uint8Array(props.length);
+    propCandidate = new Uint8Array(props.length);
     propDistance = new Float32Array(props.length);
     propOrder = new Int32Array(props.length);
   }
@@ -331,11 +371,12 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     const k = doseIndex(view);
     for (const p of props) p.mesh.count = p.group.countByDose[k];
     appliedDose = view;
+    applyPropShadowDose(propShadows, shadows.data, k);
+    shadowPrefixDirty = true;
   }
 
+  /** Sombra do boneco i na posição n do buffer (depois do prefixo das props). */
   function writeShadow(n: number, a: ActorBuffer, i: number, frame: FrameContext, size: number): void {
-    const d = shadows.data;
-    const o = n * PARTICLE_FLOATS;
     const x = a.position[i * 3]!;
     const y = a.position[i * 3 + 1]!;
     const z = a.position[i * 3 + 2]!;
@@ -345,21 +386,43 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     const height = Number.isNaN(ground) ? SHADOW_MAX_HEIGHT : Math.max(0, y - ground);
     const fade = Math.max(0, 1 - height / SHADOW_MAX_HEIGHT);
     const scale = a.scale[i]! > 0 ? a.scale[i]! : 1;
-    d[o] = x;
-    d[o + 1] = (Number.isNaN(ground) ? y : ground) + 0.01;
-    d[o + 2] = z;
-    d[o + 3] = size * scale * (1 - 0.3 * (1 - fade));
-    d.fill(0, o + 4, o + 15);
-    d[o + 9] = 1;
-    d[o + 15] = SHADOW_ALPHA * fade;
-    d[o + 16] = 0;
-    d[o + 17] = 1e9;
-    d[o + 18] = PARTICLE_KIND.blob;
-    d[o + 19] = 1;
-    d[o + 20] = 1;
-    d[o + 21] = 1;
-    d[o + 22] = 0;
-    d[o + 23] = 0;
+    writeBlob(
+      shadows.data,
+      n,
+      x,
+      Number.isNaN(ground) ? y : ground,
+      z,
+      size * scale * (1 - 0.3 * (1 - fade)),
+      SHADOW_ALPHA * fade,
+    );
+  }
+
+  /**
+   * M12 (fase 5): sombra do item p do buffer de projéteis (o modelo tem `blobShadow` e o item não tem `noShadow`) na
+   * posição n: no chão embaixo do centro da pegada (girado pelo yaw do item), no tamanho da pegada, menor e mais clara
+   * com a altura. Devolve se escreveu.
+   */
+  function writeItemShadow(
+    n: number,
+    pj: ProjectileBuffer,
+    p: number,
+    binding: ModelBinding,
+    frame: FrameContext,
+  ): boolean {
+    if (pj.noShadow[p] === 1) return false;
+    const fp = blobFootprint(binding);
+    const yaw = pj.yaw[p]!;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    const x = pj.position[p * 3]! + fp.cx * c + fp.cz * s;
+    const y = pj.position[p * 3 + 1]!;
+    const z = pj.position[p * 3 + 2]! - fp.cx * s + fp.cz * c;
+    const ground = frame.world ? floorBelow(frame.world, x, y + 0.05, z, ITEM_SHADOW_MAX_HEIGHT) : y;
+    if (Number.isNaN(ground)) return false;
+    const fade = Math.max(0, 1 - Math.max(0, y - ground) / ITEM_SHADOW_MAX_HEIGHT);
+    if (fade <= 0) return false;
+    writeBlob(shadows.data, n, x, ground, z, fp.size * (1 - 0.3 * (1 - fade)), ITEM_SHADOW_ALPHA * fade);
+    return true;
   }
 
   /** Dados da arma na mão: os do dono (skin, luz, clarão, slot que a esconde na 1ª pessoa). */
@@ -367,7 +430,7 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
     writeInstanceDefaults(data, d);
     data[d + INST.layer] = a.skin[i]!;
     data[d + INST.slot] = a.localSlot[i]!;
-    data[d + INST.sky] = a.light[i * 3]!;
+    data[d + INST.sky] = Math.max(ACTOR_SKY_FLOOR, a.light[i * 3]!);
     data[d + INST.sun] = a.light[i * 3 + 1]!;
     data[d + INST.emissive] = a.light[i * 3 + 2]!;
     data[d + INST.flash] = a.damageFlash[i]!;
@@ -481,14 +544,16 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
         if (w) w.count = 0;
       }
       slotCounts.fill(0);
-      let shadowCount = 0;
       const figureOn = figureFrame.active;
+      if (a && a.count > shadows.capacity) {
+        disposeShadows(shadows);
+        shadows = createShadows(Math.max(a.count, a.capacity));
+        buildWeapons();
+      }
+      // M12 (fase 5): as sombras dos bonecos e dos itens vêm depois do prefixo das props.
+      const shadowPrefix = shadows.prefix;
+      let shadowCount = shadowPrefix;
       if (a) {
-        if (a.count > shadows.capacity) {
-          disposeShadows(shadows);
-          shadows = createShadows(Math.max(a.count, a.capacity));
-          buildWeapons();
-        }
         if (figureOn) figureFrame.update(frame, a, frameIndex++);
         for (let i = 0; figureOn && i < a.count; i++) {
           // Sem gabarito o ator não tem corpo (o `game` sempre preenche `figure`).
@@ -531,6 +596,11 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
         weapon.set.data[d + INST.sun] = pj.light[i * 3 + 1]!;
         weapon.set.data[d + INST.emissive] = pj.light[i * 3 + 2]!;
         weapon.count++;
+        // M12 (fase 5): a arma, a caixinha e a granada no chão (ou no ar, até 3 m) com a sombra-blob do modelo.
+        const binding = bindings[model];
+        if (hasBlobShadow(binding) && shadowCount < shadowPrefix + shadows.capacity + PROJECTILE_SHADOW_CAP) {
+          if (writeItemShadow(shadowCount, pj, i, binding, frame)) shadowCount++;
+        }
       }
       boboCount = figureOn ? figureFrame.stats.figures : 0;
 
@@ -551,10 +621,12 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
         );
       }
 
+      // O prefixo das props só sobe quando muda (mapa, modelos, dose); o resto sobe todo quadro.
       const shadow = shadows.shadow;
       shadow.mesh.count = shadowCount;
       shadow.mesh.visible = shadowCount > 0;
-      uploadRange(shadow.buffer, shadow.range, PARTICLE_FLOATS, 0, shadowCount - 1);
+      uploadRange(shadow.buffer, shadow.range, PARTICLE_FLOATS, shadowPrefixDirty ? 0 : shadowPrefix, shadowCount - 1);
+      if (shadowCount > 0) shadowPrefixDirty = false;
       for (let k = 0; k < weapons.length; k++) {
         const w = weapons[k];
         if (!w) continue;
@@ -592,7 +664,15 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
         propVisible[g] = p.mesh.count > 0 && surface < far && v.frustum.intersectsSphere(sphere) ? 1 : 0;
       }
       const cap = small ? PROP_DRAWS_PER_VIEW_SMALL : PROP_DRAWS_PER_VIEW;
+      propCandidate.set(propVisible);
       lastViewPropGroups = limitGroups(propVisible, propDistance, propOrder, props.length, cap);
+      // M12 (fase 5): os discos de prop além do grupo mais perto que o teto cortou somem nesta vista (o grupo cortado
+      // está mais longe que ele; sem isso a sombra do pinheiro escondido ficava sozinha no chão).
+      let cut = 1e9;
+      for (let g = 0; g < props.length; g++) {
+        if (propCandidate[g] === 1 && propVisible[g] === 0 && propDistance[g]! < cut) cut = propDistance[g]!;
+      }
+      shadowUniforms.uBlobMaxDist.value = cut;
       for (let g = 0; g < props.length; g++) props[g]!.mesh.visible = propVisible[g] === 1;
     },
 
@@ -640,7 +720,7 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       const glove = vm.glove ?? -1;
       if (glove >= 0) writeRgb01(d, INST.r, glove);
       else d[INST.r] = -1;
-      d[INST.sky] = vm.lightSky;
+      d[INST.sky] = Math.max(ACTOR_SKY_FLOOR, vm.lightSky);
       d[INST.sun] = vm.lightSun;
       d[INST.emissive] = vm.lightEmissive;
       d[INST.slot] = NO_SLOT;
@@ -660,15 +740,21 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       set.mesh.visible = false;
     },
 
-    warmDraw() {
+    warmDraw(camera) {
       if (disposed) return () => undefined;
-      const undo = showForWarmDraw(passMeshes());
+      const meshes = passMeshes();
+      const undo = showForWarmDraw(meshes);
+      // M12 (fase 5): os gêmeos de 1 instância válida (fragmento de verdade no pixel do aquecimento).
+      const twins = camera ? createWarmTwins(meshes, camera, root, 0) : null;
       const three = ctx.three;
       const autoClear = three.autoClear;
       three.autoClear = false;
       three.render(vmScene, warmCamera);
       three.autoClear = autoClear;
-      return undo;
+      return () => {
+        twins?.dispose();
+        undo();
+      };
     },
 
     warmup() {

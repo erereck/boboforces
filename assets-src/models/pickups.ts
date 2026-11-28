@@ -3,9 +3,12 @@
  * das armas (`weapons.ts`): caixas a 32 px/m, tamanhos inteiros em texels, uma camada 64×64. O render desenha no
  * conjunto instanciado do modelo (programa 4, sem programa novo). Origem no centro do fundo (os pés da caixinha na sim).
  */
+import { MODEL_FLAG } from '@boboforces/format';
 import { LayerCanvas, ModelBuilder, shaded, type BuiltModel, type Painter } from '../../tools/modelgen/src/builder.ts';
 import { tone } from '../../tools/skingen/src/palette.ts';
 
+/** M12 (fase 5): o que fica no chão (caixinha, colete, kit, máquinas, drops) ganha a sombra-blob do render. */
+const BLOB = MODEL_FLAG.blobShadow;
 const OLIVE = tone('metal', 3);
 const OLIVE_DARK = tone('metal', 2);
 const STEEL = tone('aco', 1);
@@ -13,7 +16,7 @@ const YELLOW = tone('amarelo', 2);
 
 /** Lata de munição oliva (44 × 28 × 25 cm), com faixa amarela, cartucho desenhado dos dois lados e alça de aço. */
 export function ammoBox(): BuiltModel {
-  const m = new ModelBuilder('ammo-box', 'pickup', { flags: 0, debrisColor: OLIVE, blocksNav: false });
+  const m = new ModelBuilder('ammo-box', 'pickup', { flags: BLOB, debrisColor: OLIVE, blocksNav: false });
   const L = m.layer('mdl_ammo_box', 'opaque', OLIVE);
   const body = m.part('body');
 
@@ -121,7 +124,11 @@ export function zombieDoor(): BuiltModel {
  * com cantos de aço e um "?" amarelo em cada face (a arma sorteada aparece flutuando em cima, desenhada à parte).
  */
 export function mysteryBox(): BuiltModel {
-  const m = new ModelBuilder('mystery-box', 'pickup', { flags: 0, debrisColor: tone('madeira', 1), blocksNav: false });
+  const m = new ModelBuilder('mystery-box', 'pickup', {
+    flags: BLOB,
+    debrisColor: tone('madeira', 1),
+    blocksNav: false,
+  });
   const L = m.layer('mdl_mystery_box', 'opaque', tone('madeira', 1));
   const question = (p: Painter, x0: number, y0: number): void => {
     const Y = tone('amarelo', 2);
@@ -180,7 +187,7 @@ export function mysteryBox(): BuiltModel {
  * na cor da vantagem, com o painel claro e uma garrafa desenhada, a grade de ventilação embaixo e a tampa escura.
  */
 function perkMachine(id: string, body: number, dark: number): BuiltModel {
-  const m = new ModelBuilder(id, 'pickup', { flags: 0, debrisColor: body, blocksNav: false });
+  const m = new ModelBuilder(id, 'pickup', { flags: BLOB, debrisColor: body, blocksNav: false });
   const L = m.layer(`mdl_${id.replace('-', '_')}`, 'opaque', body);
   const light = tone('placa', 3);
   const front = m.tile(L, 32, 32, (p) => {
@@ -230,7 +237,11 @@ export const perkBuddy = (): BuiltModel => perkMachine('perk-buddy', tone('time'
  * origem no centro (o render faz ela flutuar e girar).
  */
 export function dropDouble(shared: PickupLayers): BuiltModel {
-  const m = new ModelBuilder('drop-double', 'pickup', { flags: 0, debrisColor: tone('amarelo', 2), blocksNav: false });
+  const m = new ModelBuilder('drop-double', 'pickup', {
+    flags: BLOB,
+    debrisColor: tone('amarelo', 2),
+    blocksNav: false,
+  });
   const L = shared.misc;
   const face = m.tile(L, 16, 16, (p) => {
     p.fill(tone('amarelo', 2));
@@ -322,7 +333,7 @@ export function chalkOutline(shared: PickupLayers): BuiltModel {
  * Na camada compartilhada (o pacote está com 31 das 32 camadas).
  */
 export function boomBox(shared: PickupLayers): BuiltModel {
-  const m = new ModelBuilder('boom-box', 'pickup', { flags: 0, debrisColor: tone('tijolo', 2), blocksNav: false });
+  const m = new ModelBuilder('boom-box', 'pickup', { flags: BLOB, debrisColor: tone('tijolo', 2), blocksNav: false });
   const L = shared.misc;
   const red = m.tile(L, 4, 4, (p) => {
     p.fill(tone('tijolo', 3));
@@ -353,7 +364,7 @@ export function boomBox(shared: PickupLayers): BuiltModel {
  * as tiras de velcro), origem no chão. Na camada compartilhada.
  */
 export function armorVest(shared: PickupLayers): BuiltModel {
-  const m = new ModelBuilder('armor-vest', 'pickup', { flags: 0, debrisColor: tone('time', 0), blocksNav: false });
+  const m = new ModelBuilder('armor-vest', 'pickup', { flags: BLOB, debrisColor: tone('time', 0), blocksNav: false });
   const L = shared.misc;
   const cloth = m.tile(L, 4, 4, (p) => {
     p.fill(tone('time', 0));
@@ -378,7 +389,7 @@ export function armorVest(shared: PickupLayers): BuiltModel {
  * no chão, frente em -Z. Na camada compartilhada.
  */
 export function medkit(shared: PickupLayers): BuiltModel {
-  const m = new ModelBuilder('medkit', 'pickup', { flags: 0, debrisColor: tone('placa', 3), blocksNav: false });
+  const m = new ModelBuilder('medkit', 'pickup', { flags: BLOB, debrisColor: tone('placa', 3), blocksNav: false });
   const L = shared.misc;
   const face = m.tile(L, 8, 6, (p) => {
     p.fill(tone('placa', 3));

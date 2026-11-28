@@ -81,6 +81,12 @@ export const FIGURE_INST = {
   sz: 14,
 } as const;
 
+/**
+ * M12 (fase 5, pergunta AM7): piso do canal céu dos bonecos, da arma na mão, do desmonte e do viewmodel (na CPU, ao
+ * escrever a luz da instância): no canto mais fundo da casa à noite o boneco ainda lê. Fora de casa o céu já é ~1.
+ */
+export const ACTOR_SKY_FLOOR = 0.3;
+
 /** Slot "ninguém" (o 255 do `ActorBuffer.localSlot`): nunca bate com o `uHideSlot` da vista. */
 export const NO_SLOT = 255;
 /** Time "nenhum" (FFA, zumbi, prop). */

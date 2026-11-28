@@ -28,6 +28,11 @@ export const FX_KIND = {
   paintBall: 10,
   /** M6 (fase 5): a mancha de tinta (decal na cor do time), no anel das manchas com o teto da plataforma. */
   paint: 11,
+  /**
+   * M12 (fase 5): pó no chão (pouso forte, deslize): 4–6 cubinhos na cor do bloco embaixo e uma nuvenzinha clara, sem
+   * marca de tiro.
+   */
+  dust: 12,
 } as const;
 export type FxKind = (typeof FX_KIND)[keyof typeof FX_KIND];
 
@@ -46,11 +51,14 @@ export const FX_STRIDE = 16;
  * - debris: 0–2 ponto, 3–5 velocidade (m/s), 6 cor 0xRRGGBB (exata em float32), 7 cubinhos, 8 espalhamento (m/s),
  *   9 lado do cubinho (m; M12: 0 = 0,06) e 10 vida (s; M12: 0 = 2)
  * - death: 0–2 pés (m), 3 yaw, 4–6 direção do golpe, 7 força (m/s), 8 osso do golpe final, 9 camada da skin,
- *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum); `entity` = vítima
+ *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum), 13 tiro na cabeça (M12:
+ *   1 = a cabeça voa com confete); `entity` = vítima
  * - explosion (M2): 0–2 centro (m), 3 raio (m)
  * - trail (M2): 0–2 posição (m), 3–5 direção de voo (unitária; a fumaça sai para trás)
  * - paintBall (M6): 0–2 posição (m), 6 cor 0xRRGGBB
  * - paint (M6): 0–2 ponto (m), 3–5 normal da superfície, 6 cor 0xRRGGBB, 7 tamanho (m), 8 teto de manchas
+ * - dust (M12): 0–2 pés (m), 3 força 0..1 (quantos cubinhos e o tamanho da nuvem), 4 e 5 velocidade no chão (x, z em
+ *   m/s: o deslize joga o pó para a frente), 6 deslize (1 = só a nuvem e 1 cubinho)
  */
 export interface FxQueue {
   readonly capacity: number;
@@ -257,6 +265,8 @@ export interface FxDeath {
   readonly kind: number;
   /** Gabarito do boneco que se desmonta (#56; o mesmo índice de `ActorBuffer.figure`, 255 = `NO_FIGURE`, nenhum). */
   readonly figure: number;
+  /** M12 (fase 5): tiro na cabeça: a cabeça voa mais alto, girando, com confete (ausente = não). */
+  readonly headshot?: boolean;
 }
 
 /** Pede o desmonte. `d` pode ser um objeto de rascunho reaproveitado (não é guardado). */
@@ -273,6 +283,32 @@ export function pushDeath(q: FxQueue, d: Readonly<FxDeath>): boolean {
   a[o + 10] = d.scale;
   a[o + 11] = d.kind;
   a[o + 12] = d.figure;
+  a[o + 13] = d.headshot === true ? 1 : 0;
+  return true;
+}
+
+/**
+ * M12 (fase 5): pó do chão nos pés (x, y, z) com força 0..1 (pouso forte = 1; um passo do deslize ≈ 0,5) e a
+ * velocidade no chão (vx, vz) de quem levanta o pó. `slide`: o pó do deslize (sai a cada 0,1 s: só a nuvem e 1
+ * cubinho, para não gastar o anel de detritos).
+ */
+export function pushDust(
+  q: FxQueue,
+  x: number,
+  y: number,
+  z: number,
+  strength: number,
+  vx = 0,
+  vz = 0,
+  slide = false,
+): boolean {
+  const o = slot(q, FX_KIND.dust, 0);
+  if (o < 0) return false;
+  put3(q.data, o, x, y, z);
+  q.data[o + 3] = strength;
+  q.data[o + 4] = vx;
+  q.data[o + 5] = vz;
+  q.data[o + 6] = slide ? 1 : 0;
   return true;
 }
 

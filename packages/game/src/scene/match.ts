@@ -90,6 +90,7 @@ import {
   pushBlockImpact,
   pushDeath,
   pushDebris,
+  pushDust,
   pushExplosion,
   pushMuzzleFlash,
   pushPaint,
@@ -381,7 +382,9 @@ import {
   type FlyBounds,
   type FlyCamera,
 } from './aquarium.ts';
-import { createWardrobe, WARDROBE, type Wardrobe } from './wardrobe.ts';
+import { createCurtain, CURTAIN } from './curtain.ts';
+import { createSlideDust, createViewFlashes, landDustStrength, VISUAL_FX } from './visual-fx.ts';
+import { createWardrobe, createWardrobePuppet, WARDROBE, type Wardrobe } from './wardrobe.ts';
 import {
   aimFromCamera,
   AUTO_FIRE_RANGE_M,
@@ -528,7 +531,6 @@ const DROP_TEXT: readonly StringKey[] = [
   'drop.carpenter',
 ];
 const FLASH_GAIN = 0.35;
-const FLASH_DECAY_S = 0.08;
 /**
  * Grupos de manequins do mapa (`MANNEQUIN_KIND` do format): a vitrine (sempre) e os de print, só com a câmera nomeada
  * deles: `leitura:*` com as `print:leitura-*`, `densidade` com as `print:densidade-*`, a régua `altura:*` com a
@@ -2128,8 +2130,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     scale: 1,
     kind: 0,
     figure: NO_FIGURE,
+    headshot: false,
   };
   const lightScratch = new Float32Array(3);
+  // M12 (fase 5): o clarão das vistas (a explosão segura; o teto do "Reduzir efeitos") e o pó do deslize.
+  const viewFlashes = createViewFlashes();
+  const slideDust = createSlideDust();
 
   // --- manequins do mapa: gabarito, skin, postura, arma e luz resolvidos no loading e no gancho dos prints (nada por
   // frame, regra 11). Os de print só aparecem com a câmera do print deles; bench e partida desenham só a vitrine
@@ -2294,6 +2300,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // --- M2 (fase 6c): o Meu Bobo (o editor; o bobo é o manequim do meio do Ringue) ---
   const wardrobeMq = request.kind === 'wardrobe' ? (mannequinByName.get(WARDROBE.mannequin) ?? -1) : -1;
   let wardrobe: Wardrobe | null = null;
+  // M12 (fase 5): o nascer do Meu Bobo a cada troca de peça.
+  const wardrobePuppet = createWardrobePuppet();
   if (wardrobeMq >= 0) {
     overrideCamera = cameraByName.get(WARDROBE.camera) ?? null;
     wardrobe = createWardrobe({
@@ -2313,6 +2321,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         });
         mqTurn[wardrobeMq] = turn;
         if (figures.takeTemplatesChanged()) renderer.setFigures(figures.templates, figures.table);
+        wardrobePuppet.restart();
       },
       turn(deg) {
         mqTurn[wardrobeMq] = (deg * Math.PI) / 180;
@@ -2436,9 +2445,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   /**
    * Clarão de tiro na luz ambiente das vistas que veem o evento a até 30 m, proporcional à distância (arte-ux.md §1.8);
-   * a vista do atirador recebe o clarão inteiro. Antes era um uniform global: um tiro clareava as 4 vistas.
+   * a vista do atirador recebe o clarão inteiro. Antes era um uniform global: um tiro clareava as 4 vistas. M12 (fase
+   * 5): a explosão passa `gain` ~1 e `holdS` ~150 ms; com "Reduzir efeitos", no máximo 3 clarões por segundo por vista.
    */
-  function flashViews(x: number, y: number, z: number, owner: number): void {
+  function flashViews(x: number, y: number, z: number, owner: number, gain = FLASH_GAIN, holdS = 0): void {
+    const reduced = reducedFx;
     for (let s = 0; s < slots.length; s++) {
       const slot = slots[s]!;
       let d = 0;
@@ -2450,7 +2461,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       }
       if (d >= FLASH_RANGE_M) continue;
-      slot.flash = Math.min(1, slot.flash + FLASH_GAIN * (1 - d / FLASH_RANGE_M));
+      slot.flash = viewFlashes.bump(s, slot.flash, gain * (1 - d / FLASH_RANGE_M), holdS, timeS, reduced);
     }
   }
 
@@ -2613,6 +2624,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           // M9 (fase 1): o tamanho de quem caiu (o Mini e o gigante desmontam do tamanho que tinham).
           d.scale = v.bodyScale[i]! * drawnScale(v, i);
           d.kind = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.bobo;
+          // M12 (fase 5): no tiro na cabeça, a cabeça voa com confete.
+          d.headshot = ev.headshot;
           pushDeath(fx, d);
           onDeath(s, ev.victim, ev.killer, ev.weapon, ev.headshot);
           feedKill(v, ev.victim, ev.killer, ev.weapon, ev.headshot);
@@ -2622,6 +2635,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         case 'signal':
           onSignal(v, ev.entity, ev.kind, ev.x, ev.y, ev.z);
           break;
+        case 'move': {
+          // M12 (fase 5): o pouso forte levanta pó do chão (`visual-fx.ts`).
+          const strength = ev.move === 'land' ? landDustStrength(ev.speed) : 0;
+          const i = strength > 0 ? entityIndex(ev.entity) : -1;
+          if (i >= 0 && i < v.count && hiddenNow[i] !== 1) {
+            pushDust(fx, v.position[i * 3]!, v.position[i * 3 + 1]!, v.position[i * 3 + 2]!, strength);
+          }
+          break;
+        }
         case 'point':
           feedPoint(ev.index, ev.team, ev.action === 'captured');
           break;
@@ -2710,7 +2732,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           }
           if (ev.weapon !== WEAPON_GOO) pushExplosion(fx, ev.x, ev.y, ev.z, ev.radius);
           noteBlast(ev.x, ev.y, ev.z, ev.radius);
-          flashViews(ev.x, ev.y, ev.z, -1);
+          // M12 (fase 5): a explosão clareia de verdade e segura; a gosma do Chonker clareia como um tiro.
+          if (ev.weapon === WEAPON_GOO) flashViews(ev.x, ev.y, ev.z, -1);
+          else flashViews(ev.x, ev.y, ev.z, -1, VISUAL_FX.explosionFlashGain, VISUAL_FX.explosionFlashHoldS);
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const slot = slots[sIdx]!;
             const c = slot.desc.camera;
@@ -3282,6 +3306,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   let heapCheckS = 0;
   let paused = false;
   let frozen = false;
+  // M12 (fase 5): a pré-rodada e a cortina da entrada (fora do online: lá a sim não pode esperar).
+  const curtain = createCurtain(driver.online ? 0 : CURTAIN.prerollFrames);
   let disposed = false;
   let hudVisible = bench ? bench.hud : true;
   let lastPointerLocked = false;
@@ -3331,6 +3357,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         startFirst: -1,
         startMax: 0,
         startStalls: 0,
+        // M12 (fase 5): quantas dessas travadas caíram na pré-rodada (atrás da cortina preta, sem a sim andar).
+        curtainStalls: 0,
         // Pior frame lento da janela atual (vira UMA linha `[bench] pico` no fim da janela).
         windowEnd: 0,
         spikeT: -1,
@@ -3378,7 +3406,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   const clipPending = (): boolean => clipRun !== null && !clipRun.done;
   const debugApi: GameDebugApi = {
     get readyForPrint(): boolean {
-      return !disposed && stableFrames >= 3 && !clipPending();
+      return !disposed && stableFrames >= 3 && !clipPending() && curtain.done;
     },
     cameras: cameraNames,
     setZone(cx: number, cz: number, r: number): void {
@@ -4841,6 +4869,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       actors.velocity[k] = vx;
       actors.velocity[k + 1] = lerp(velPrev[o + 1]!, velCur[o + 1]!, alpha);
       actors.velocity[k + 2] = vz;
+      // M12 (fase 5): o deslize levanta pó a cada 0,1 s (`visual-fx.ts`).
+      if (slideDust.step(i, (flags & ENTITY_FLAG.sliding) !== 0, dt, reducedFx)) {
+        pushDust(fx, x, y, z, VISUAL_FX.slideDustStrength, vx, vz, true);
+      }
       // Balanço do viewmodel (1ª pessoa) pela distância andada; o boneco de 3ª pessoa anda pelo rig.
       const speed = (flags & ENTITY_FLAG.onGround) !== 0 ? Math.sqrt(vx * vx + vz * vz) : 0;
       walkPhase[i] = (walkPhase[i]! + ((speed * dt) / STRIDE_M) * Math.PI * 2) % (Math.PI * 64);
@@ -4905,6 +4937,11 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         // como entidade (respira e pisca pela chave dela).
         actors.entity[n] = mqPitch[m] !== 0 ? (MANNEQUIN_AIM_ENTITY | m) >>> 0 : 0;
         actors.kind[n] = zombie ? ACTOR_KIND.zombie : ACTOR_KIND.mannequin;
+        // M12 (fase 5): o Meu Bobo vivo (entidade própria: respira, pisca, passinho no giro; nasce a cada troca).
+        if (m === wardrobeMq) {
+          actors.entity[n] = WARDROBE.entity;
+          if (wardrobePuppet.take(dt)) actors.pose[n] = mqPose[m]! | ACTOR_POSE.spawning;
+        }
       }
       actors.expression[n] = expression;
       n++;
@@ -4961,6 +4998,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const v = sim.view();
     const pv = v.projectiles;
     let n = 0;
+    // M12 (fase 5): todo item com sombra, salvo os que a cena marca (arma na parede, arma da Caixa Misteriosa).
+    projectiles.noShadow.fill(0);
     for (let p = 0; p < pv.count && n < projectiles.capacity; p++) {
       if (pv.alive[p] !== 1) continue;
       const code = pv.weapon[p]!;
@@ -5284,6 +5323,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       projectiles.yaw[n] = nx !== 0 ? 0 : Math.PI / 2;
       projectiles.pitch[n] = 0;
       projectiles.roll[n] = 0;
+      // M12 (fase 5): pendurada na parede, sem sombra no chão.
+      projectiles.noShadow[n] = 1;
       sampleLightGrid(loaded.lightGrid, x + nx * 0.4, y, z + nz * 0.4, lightScratch, 0);
       projectiles.light[n * 3] = lightScratch[0]!;
       projectiles.light[n * 3 + 1] = lightScratch[1]!;
@@ -5351,6 +5392,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             phase === BOX_PHASE.offering ? yaw + Math.PI / 2 + Math.sin(timeS * 1.5) * 0.4 : yaw + Math.PI / 2;
           projectiles.pitch[n] = 0;
           projectiles.roll[n] = 0;
+          // M12 (fase 5): em cima da caixa, sem sombra (o disco cairia dentro dela).
+          projectiles.noShadow[n] = 1;
           // A arma brilha um pouco (leitura de "pegue-me" no escuro).
           projectiles.light[n * 3] = Math.min(1.5, lightScratch[0]! * 1.4 + 0.2);
           projectiles.light[n * 3 + 1] = Math.min(1.5, lightScratch[1]! * 1.4 + 0.2);
@@ -7309,7 +7352,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       m.soundCount = host.settings.current.audio.soundIndicator
         ? matchSound.fillIndicator(s, m.soundAngle, m.soundAlpha)
         : 0;
-      slot.flash = Math.max(0, slot.flash - dt / FLASH_DECAY_S);
+      // M12 (fase 5): o clarão da explosão segura antes de cair (`visual-fx.ts`).
+      slot.flash = viewFlashes.decay(s, slot.flash, dt);
     }
   }
 
@@ -7344,17 +7388,27 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     return { avgAlive: b.zFrames > 0 ? b.zSum / b.zFrames : 0, maxAlive: b.zMax, pool, wave: zv.match.zombieWave };
   }
 
+  /**
+   * Começo da partida (item 15): os primeiros `STARTUP_FRAMES` frames desenhados, a pré-rodada da cortina incluída
+   * (M12, fase 5: a travada que a cortina esconde continua contando; `hidden` = o frame foi da pré-rodada, e conta
+   * também em `travadas_cortina`). Os 2 primeiros intervalos ainda carregam o fim do loading: valem só pela CPU.
+   */
+  function benchStartSample(frameMs: number, cpuMs: number, hidden: boolean): void {
+    const b = benchState;
+    if (!b || !bench || b.startFrames >= STARTUP_FRAMES || b.phase === 'done') return;
+    const v = b.startFrames < 2 ? cpuMs : Math.max(cpuMs, frameMs);
+    if (b.startFirst < 0) b.startFirst = v;
+    if (v > b.startMax) b.startMax = v;
+    if (v >= 100) {
+      b.startStalls++;
+      if (hidden) b.curtainStalls++;
+    }
+    b.startFrames++;
+  }
+
   function benchSample(frameMs: number, cpuMs: number, renderMs: number, uiMs: number): void {
     const b = benchState;
     if (!b || !bench) return;
-    // Começo da partida (item 15): os 2 primeiros intervalos ainda carregam o fim do loading, então valem só pela CPU.
-    if (b.startFrames < STARTUP_FRAMES && b.phase !== 'done') {
-      const v = b.startFrames < 2 ? cpuMs : Math.max(cpuMs, frameMs);
-      if (b.startFirst < 0) b.startFirst = v;
-      if (v > b.startMax) b.startMax = v;
-      if (v >= 100) b.startStalls++;
-      b.startFrames++;
-    }
     if (b.phase === 'warmup') {
       if (b.t >= bench.warmupS) {
         b.phase = 'measure';
@@ -7512,6 +7566,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         first: Math.max(0, b.startFirst),
         max: b.startMax,
         stalls: b.startStalls,
+        curtainStalls: b.curtainStalls,
         frames: b.startFrames,
       },
       cpuMs: { p50: b.cpu.percentile(0.5), p99: b.cpu.percentile(0.99) },
@@ -7649,6 +7704,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             travadas_inicio: b.startStalls,
             frames_inicio: b.startFrames,
             travadas_100ms: b.stalls,
+            travadas_cortina: b.curtainStalls,
             ...cut,
           }),
     );
@@ -8063,7 +8119,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         if (benchState && benchState.phase !== 'done') finishBench(true);
         signal = 'quit';
       }
-      const running = (!paused || driver.online) && !frozen;
+      // M12 (fase 5): na pré-rodada da cortina a cena desenha sem dar passo na sim.
+      const preroll = curtain.prerolling;
+      const running = (!paused || driver.online) && !frozen && !preroll;
       trace('entrada');
       if (running) {
         // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render). M9 (fase 5): a câmera lenta
@@ -8298,6 +8356,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           drawDebugPanel(list, fonts, panel, ui.width, ui.height);
         }
       }
+      // M12 (fase 5): a cortina da entrada (preta na pré-rodada, sai em 0,3 s; `curtain.ts`), por cima de tudo.
+      const curtainAlpha = curtain.frame(dt, reducedFx);
+      if (curtainAlpha > 0) pushRect(list, 0, 0, ui.width, ui.height, Math.round(curtainAlpha * 255) & 0xff);
       renderer.drawUi(list);
       uiMs += now() - tUi1;
       trace('ui');
@@ -8309,6 +8370,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       panel.cpuMs = cpuMs;
       panel.renderMs = renderMs;
       panel.uiMs = uiMs;
+      if (running || preroll) benchStartSample(frameMs, cpuMs, preroll);
       if (running) benchSample(frameMs, cpuMs, renderMs, uiMs);
       traceTimes(cpuMs, frameMs);
 
@@ -8318,7 +8380,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       const clipBusy = clipPending();
       for (let i = waiters.length - 1; i >= 0; i--) {
         const w = waiters[i]!;
-        if (framesDrawn >= w.target && stableFrames >= 1 && !clipBusy) {
+        if (framesDrawn >= w.target && stableFrames >= 1 && !clipBusy && curtain.done) {
           waiters.splice(i, 1);
           w.resolve();
         }

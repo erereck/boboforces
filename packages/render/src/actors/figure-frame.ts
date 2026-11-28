@@ -15,6 +15,7 @@ import {
 import { FIGURE_POSE_RESULT, type FigureRig } from './anim/types.ts';
 import { actorKey } from './entity-table.ts';
 import { createFigureInstances, type FigureInstances } from './figure-instances.ts';
+import { ACTOR_SKY_FLOOR } from './layout.ts';
 import { MAT4 } from './math.ts';
 import type { FrameContext } from '../shared/passes.ts';
 import { ACTOR_KIND, ACTOR_POSE, NO_FIGURE, NO_MODEL, type ActorBuffer } from '../types.ts';
@@ -172,7 +173,9 @@ export function createFigureFrame(rig: FigureRig, instances: FigureInstances = c
       if (bottom === bottom) clipHairBox(m, dst, bottom, sp.top[tpl * FIGURE_MAX_BOXES + k]!, ceiling);
     }
     // 4ª linha de toda caixa: o mesmo que `writeFigureRow4`, escrito aqui (uma chamada por caixa pesaria).
-    const sky = a.light[i * 3]!;
+    // M12 (fase 5): o céu dos bonecos tem piso (`ACTOR_SKY_FLOOR`): no escuro fundo o boneco ainda lê.
+    const skyRaw = a.light[i * 3]!;
+    const sky = skyRaw > ACTOR_SKY_FLOOR ? skyRaw : ACTOR_SKY_FLOOR;
     const sun = a.light[i * 3 + 1]!;
     const emissive = a.light[i * 3 + 2]!;
     const flash = a.damageFlash[i]!;

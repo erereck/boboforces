@@ -13,7 +13,7 @@
  *
  * Eixos: Y para cima, cano para −Z; origem no topo da empunhadura (onde a mão direita fecha). Medidas em texels.
  */
-import type { TexelVec3 } from '@boboforces/format';
+import { MODEL_FLAG, type TexelVec3 } from '@boboforces/format';
 import {
   LayerCanvas,
   ModelBuilder,
@@ -25,6 +25,8 @@ import {
 } from '../../tools/modelgen/src/builder.ts';
 import { tone } from '../../tools/skingen/src/palette.ts';
 
+/** M12 (fase 5): arma no chão (pickup), granada e foguete em voo ganham a sombra-blob do render. */
+const BLOB = MODEL_FLAG.blobShadow;
 const GUNMETAL = tone('aco', 1);
 const GUNMETAL_DARK = tone('aco', 0);
 const POLYMER = tone('concreto', 1);
@@ -67,7 +69,7 @@ function lens(p: Painter): void {
 // ---------------------------------------------------------------------------------------------------------------
 
 export function pistol(): BuiltModel {
-  const m = new ModelBuilder('pistol', 'weapon', { flags: 0, debrisColor: GUNMETAL, blocksNav: false });
+  const m = new ModelBuilder('pistol', 'weapon', { flags: BLOB, debrisColor: GUNMETAL, blocksNav: false });
   const L = m.layer('mdl_pistol', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   const slide = m.part('bolt', body.index);
@@ -122,7 +124,7 @@ export function pistol(): BuiltModel {
 // ---------------------------------------------------------------------------------------------------------------
 
 export function rifle(): BuiltModel {
-  const m = new ModelBuilder('rifle', 'weapon', { flags: 0, debrisColor: OLIVE, blocksNav: false });
+  const m = new ModelBuilder('rifle', 'weapon', { flags: BLOB, debrisColor: OLIVE, blocksNav: false });
   const L = m.layer('mdl_rifle', 'opaque', POLYMER_DARK);
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -189,7 +191,7 @@ export function rifle(): BuiltModel {
 // ---------------------------------------------------------------------------------------------------------------
 
 export function sniper(): BuiltModel {
-  const m = new ModelBuilder('sniper', 'weapon', { flags: 0, debrisColor: TAN, blocksNav: false });
+  const m = new ModelBuilder('sniper', 'weapon', { flags: BLOB, debrisColor: TAN, blocksNav: false });
   const L = m.layer('mdl_sniper', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -262,7 +264,7 @@ export function sniper(): BuiltModel {
 // LMG oliva com caixa de munição amarela.
 
 export function smg(): BuiltModel {
-  const m = new ModelBuilder('smg', 'weapon', { flags: 0, debrisColor: POLYMER_DARK, blocksNav: false });
+  const m = new ModelBuilder('smg', 'weapon', { flags: BLOB, debrisColor: POLYMER_DARK, blocksNav: false });
   const L = m.layer('mdl_smg', 'opaque', POLYMER_DARK);
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -312,7 +314,7 @@ export function smg(): BuiltModel {
 }
 
 export function shotgun(): BuiltModel {
-  const m = new ModelBuilder('shotgun', 'weapon', { flags: 0, debrisColor: tone('madeira', 2), blocksNav: false });
+  const m = new ModelBuilder('shotgun', 'weapon', { flags: BLOB, debrisColor: tone('madeira', 2), blocksNav: false });
   const L = m.layer('mdl_shotgun', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   const pump = m.part('bolt', body.index);
@@ -353,7 +355,7 @@ export function shotgun(): BuiltModel {
 }
 
 export function rocket(): BuiltModel {
-  const m = new ModelBuilder('rocket', 'weapon', { flags: 0, debrisColor: tone('lona', 2), blocksNav: false });
+  const m = new ModelBuilder('rocket', 'weapon', { flags: BLOB, debrisColor: tone('lona', 2), blocksNav: false });
   const L = m.layer('mdl_rocket', 'opaque', tone('lona', 1));
   const body = m.part('body');
   const warhead = m.part('mag', body.index, [0, 3, -22]);
@@ -409,7 +411,7 @@ export function rocket(): BuiltModel {
 }
 
 export function knife(): BuiltModel {
-  const m = new ModelBuilder('knife', 'weapon', { flags: 0, debrisColor: tone('aco', 3), blocksNav: false });
+  const m = new ModelBuilder('knife', 'weapon', { flags: BLOB, debrisColor: tone('aco', 3), blocksNav: false });
   const L = m.layer('mdl_knife', 'opaque', tone('aco', 2));
   const body = m.part('body');
   const steel = tone('aco', 3);
@@ -437,7 +439,7 @@ export function knife(): BuiltModel {
 }
 
 export function grenade(): BuiltModel {
-  const m = new ModelBuilder('grenade', 'weapon', { flags: 0, debrisColor: tone('grama', 1), blocksNav: false });
+  const m = new ModelBuilder('grenade', 'weapon', { flags: BLOB, debrisColor: tone('grama', 1), blocksNav: false });
   const L = m.layer('mdl_grenade', 'opaque', tone('grama', 0));
   const body = m.part('body');
   const green = tone('grama', 1);
@@ -464,7 +466,7 @@ export function grenade(): BuiltModel {
 }
 
 export function lmg(): BuiltModel {
-  const m = new ModelBuilder('lmg', 'weapon', { flags: 0, debrisColor: OLIVE, blocksNav: false });
+  const m = new ModelBuilder('lmg', 'weapon', { flags: BLOB, debrisColor: OLIVE, blocksNav: false });
   const L = m.layer('mdl_lmg', 'opaque', tone('metal', 1));
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -518,7 +520,7 @@ export function lmg(): BuiltModel {
  * das armas (o render orienta pela velocidade). Origem no centro, ogiva para −Z.
  */
 export function rocketShell(): BuiltModel {
-  const m = new ModelBuilder('rocket-shell', 'weapon', { flags: 0, debrisColor: tone('lona', 2), blocksNav: false });
+  const m = new ModelBuilder('rocket-shell', 'weapon', { flags: BLOB, debrisColor: tone('lona', 2), blocksNav: false });
   const L = m.layer('mdl_rocket_shell', 'opaque', tone('lona', 1));
   const body = m.part('body');
   body.box([-1.5, -1.5, -6], [3, 3, 12], L, (face, p) => {
@@ -551,7 +553,7 @@ export function rocketShell(): BuiltModel {
 export function desmontador(): BuiltModel {
   const GREEN = tone('time', 2);
   const GREEN_DARK = tone('grama', 1);
-  const m = new ModelBuilder('desmontador', 'weapon', { flags: 0, debrisColor: GREEN, blocksNav: false });
+  const m = new ModelBuilder('desmontador', 'weapon', { flags: BLOB, debrisColor: GREEN, blocksNav: false });
   const L = m.layer('mdl_desmontador', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   // Corpo, empunhadura com sulcos e guarda.
@@ -587,7 +589,7 @@ export function desmontador(): BuiltModel {
 export function bigBrrt(): BuiltModel {
   const ORANGE = tone('laranja', 2);
   const yellow = tone('amarelo', 1);
-  const m = new ModelBuilder('big-brrt', 'weapon', { flags: 0, debrisColor: GUNMETAL_DARK, blocksNav: false });
+  const m = new ModelBuilder('big-brrt', 'weapon', { flags: BLOB, debrisColor: GUNMETAL_DARK, blocksNav: false });
   const L = m.layer('mdl_big_brrt', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   const mag = m.part('mag', body.index, [-5, -1, -3]);
@@ -644,7 +646,7 @@ export function bigBrrt(): BuiltModel {
  */
 export function dmr(): BuiltModel {
   const red = tone('tijolo', 3);
-  const m = new ModelBuilder('rifle.dmr', 'weapon', { flags: 0, debrisColor: POLYMER_DARK, blocksNav: false });
+  const m = new ModelBuilder('rifle.dmr', 'weapon', { flags: BLOB, debrisColor: POLYMER_DARK, blocksNav: false });
   const L = m.layer('mdl_dmr', 'opaque', POLYMER_DARK);
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -713,7 +715,7 @@ export function revolver(): BuiltModel {
   const steel = tone('aco', 2);
   const brass = tone('amarelo', 2);
   const wood = tone('madeira', 2);
-  const m = new ModelBuilder('pistol.revolver', 'weapon', { flags: 0, debrisColor: steel, blocksNav: false });
+  const m = new ModelBuilder('pistol.revolver', 'weapon', { flags: BLOB, debrisColor: steel, blocksNav: false });
   const L = m.layer('mdl_revolver', 'opaque', GUNMETAL_DARK);
   const body = m.part('body');
   const hammer = m.part('bolt', body.index);
@@ -768,7 +770,7 @@ export function revolver(): BuiltModel {
 export function autoShotgun(): BuiltModel {
   const green = tone('grama', 3);
   const shell = tone('tijolo', 2);
-  const m = new ModelBuilder('shotgun.auto', 'weapon', { flags: 0, debrisColor: POLYMER_DARK, blocksNav: false });
+  const m = new ModelBuilder('shotgun.auto', 'weapon', { flags: BLOB, debrisColor: POLYMER_DARK, blocksNav: false });
   const L = m.layer('mdl_auto_shotgun', 'opaque', POLYMER_DARK);
   const body = m.part('body');
   const bolt = m.part('bolt', body.index);
@@ -826,7 +828,7 @@ export function crossbow(): BuiltModel {
   const wood = tone('madeira', 3);
   const woodDark = tone('madeira', 1);
   const orange = tone('laranja', 2);
-  const m = new ModelBuilder('sniper.crossbow', 'weapon', { flags: 0, debrisColor: wood, blocksNav: false });
+  const m = new ModelBuilder('sniper.crossbow', 'weapon', { flags: BLOB, debrisColor: wood, blocksNav: false });
   const L = m.layer('mdl_crossbow', 'opaque', woodDark);
   const body = m.part('body');
   const loaded = m.part('mag', body.index, [0, 3, -6]);
@@ -884,7 +886,7 @@ export function grenadeLauncher(): BuiltModel {
   const oliveDark = tone('lona', 1);
   const orange = tone('laranja', 2);
   const m = new ModelBuilder('rocket.grenade-launcher', 'weapon', {
-    flags: 0,
+    flags: BLOB,
     debrisColor: olive,
     blocksNav: false,
   });
@@ -969,7 +971,7 @@ export function crossbowBolt(layers: M10ProjectileLayers): BuiltModel {
 /** A granada do lança-granadas em voo (`grenade-launcher-shell`): o corpo oliva com o anel laranja e a ponta escura. */
 export function grenadeLauncherShell(layers: M10ProjectileLayers): BuiltModel {
   const m = new ModelBuilder('grenade-launcher-shell', 'pickup', {
-    flags: 0,
+    flags: BLOB,
     debrisColor: tone('lona', 2),
     blocksNav: false,
   });

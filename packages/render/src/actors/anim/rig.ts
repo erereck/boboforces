@@ -7,13 +7,14 @@
 //   1. postura e pitch do `ActorBuffer`;
 //   2. pose base = `figureGamePose` misturada entre a postura anterior e a atual (120 ms, linear; entre posturas de pé
 //      no chão o `bodyY` segue o `legDrop` das pernas misturadas, para a sola não afundar no meio da troca);
-//   3. locomoção 2D com `ActorBuffer.velocity`: passada do FutBobo com fase própria (para trás com cos δ < 0), passinho
-//      de lado com `hipsY` até ±0,35, sprint pelo bit; respiração parado; passinho de giro; pernas do pulo;
+//   3. locomoção 2D com `ActorBuffer.velocity`: passada do FutBobo com fase própria (para trás com cos δ < −0,34, com
+//      histerese), o lado entra na passada acima de ~35 u/s (M12) e o passinho do goleiro fica abaixo disso (≤ 3 Hz),
+//      sprint pelo bit; respiração parado; passinho de giro; pernas do pulo;
 //   4. molas, freada, achatamento, dano e nascer, dentro do envelope;
 //   5. recarga (braço E pelas chaves da tabela, giro e queda da arma, olhar no pente, sem a respiração) e recuo
 //      (braços e arma na amostra `pitch + 0,12·recoil`, arma para trás, impulso na mola na borda do `firing`);
-//   6. giro preguiçoso das pernas (≤ 0,35 rad, o tronco fecha a diferença pela composição exata) e pé plano (só o X do
-//      tornozelo; o Z é −hipZ dentro do `figureFk`);
+//   6. giro preguiçoso das pernas (≤ 0,35 rad) e o giro para o rumo do strafe (≤ 1,2 rad com o lado na passada, M12),
+//      o tronco fecha a diferença pela composição exata; pé plano (só o X do tornozelo; o Z é −hipZ no `figureFk`);
 //   7. `figureFk` direto em `out`; o nascer soma a queda de cada osso ao m[13];
 //   8. arma numa 4×4 em METROS (ver `weapon`): ORIENTAÇÃO da moldura da mira (yaw da raiz e o ângulo da mira dos
 //      braços, a mesma moldura em que a tabela monta a arma) e ORIGEM no soquete da palma D vinda do FK (antebraço D ×
@@ -120,8 +121,10 @@ export const ANIM_FIELD = {
   pendingDt: 46,
   /** Reação do giro preguiçoso (s): constante do boneco, sorteada pelo hash do EntityId na entrada. */
   reaction: 47,
+  /** M12 (fase 5): giro das pernas para o rumo do strafe (rad, suavizado; o tronco fecha a diferença). */
+  strafeYaw: 48,
 } as const;
-export const ANIM_FIELDS = 48;
+export const ANIM_FIELDS = 49;
 
 /** Bits de `ANIM_FIELD.flags` (bordas do quadro anterior e LOD). */
 const FLAG = {
@@ -134,7 +137,14 @@ const FLAG = {
   armed: 64,
   /** Molas, achatamento e filtros de aceleração zerados (parado): o bloco das molas é pulado. */
   calm: 128,
+  /**
+   * M12 (fase 5): a passada anda de ré (com histerese: liga com cos δ < −0,34 e desliga com > 0,34). No strafe puro
+   * (cos δ ≈ 0) fica o lado de antes: as pernas não trocam de frente a cada flutuação do `gait` em volta de 0.
+   */
+  back: 256,
 } as const;
+/** cos δ da troca frente ↔ ré da passada (≈ 70°/110°: no meio da faixa as pernas já estão no teto do giro). */
+const BACK_COS = 0.34;
 
 /** Nível de LOD por ator (`begin`). */
 export const FIGURE_LOD = { l0: 0, l1: 1, l2: 2 } as const;
@@ -195,7 +205,8 @@ const K_NECK = 8;
 const K_PEAK = 9;
 /** O dt dos fatores guardados (NaN = nenhum). */
 const K_DT = 10;
-const K_SIZE = 11;
+const K_STRAFE = 11;
+const K_SIZE = 12;
 /** Taxa do pico de velocidade da freada (1/s, `character.ts:3650`). */
 const PEAK_RATE = 1.2;
 
@@ -375,6 +386,7 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
     K[K_BANK] = 1 - Math.exp(-cfg.bankRate * dt);
     K[K_NECK] = 1 - Math.exp(-cfg.neckLagRate * dt);
     K[K_PEAK] = 1 - Math.exp(-PEAK_RATE * dt);
+    K[K_STRAFE] = 1 - Math.exp(-cfg.strafeYawRate * dt);
     return K;
     // fim-quente
   }
@@ -592,18 +604,35 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
       }
       const aF = gait < 0 ? -gait : gait;
       const aS = side < 0 ? -side : side;
+      // M12 (fase 5): o lado entra na passada acima de ~35 u/s (smoothstep entre `strafeStrideFromUs` e `..ToUs`); a
+      // passada anda na velocidade do plano (frente e o lado que entrou), com as pernas viradas para o rumo (passo 6).
+      let sideIn = (aS - cfg.strafeStrideFromUs) / (cfg.strafeStrideToUs - cfg.strafeStrideFromUs);
+      sideIn = sideIn <= 0 ? 0 : sideIn >= 1 ? 1 : sideIn * sideIn * (3 - 2 * sideIn);
+      const sideRun = side * sideIn;
+      const aRun = sideIn > 0 ? Math.sqrt(gait * gait + sideRun * sideRun) : aF;
+      // Frente ou ré da passada, com histerese (FLAG.back): o cos δ só conta com velocidade que se veja.
+      const plane2 = gait * gait + side * side;
+      if (plane2 > 1) {
+        const cosD = gait / Math.sqrt(plane2);
+        if ((flags & FLAG.back) === 0) {
+          if (cosD < -BACK_COS) flags |= FLAG.back;
+        } else if (cosD > BACK_COS) flags &= ~FLAG.back;
+      }
+      const back = (flags & FLAG.back) !== 0;
       // Fase guiada pela distância (o pé fica plantado): `cycle(v)` u por ciclo, para trás andando de ré.
-      let cycle = 22 + 0.26 * aF;
+      let cycle = 22 + 0.26 * aRun;
       cycle = cycle < 26 ? 26 : cycle > 95 ? 95 : cycle;
       let runPhase = st[s0 + S.runPhase]!;
-      if (aF > 0.5) {
-        const rate = aF / cycle < 4.4 ? aF / cycle : 4.4;
-        runPhase = wrapPhase(runPhase + (gait < 0 ? -TAU : TAU) * rate * dt);
+      if (aRun > 0.5) {
+        const rate = aRun / cycle < 4.4 ? aRun / cycle : 4.4;
+        runPhase = wrapPhase(runPhase + (back ? -TAU : TAU) * rate * dt);
         st[s0 + S.runPhase] = runPhase;
       }
+      // Passinho do goleiro: no máximo `shuffleMaxHz` aberturas por segundo (eram ~6,8 a 4,8 m/s).
       let shufflePhase = st[s0 + S.shufflePhase]!;
       if (aS > 0) {
-        shufflePhase = wrapPhase(shufflePhase + (TAU * aS * dt) / 16);
+        const hz = aS / 16 < cfg.shuffleMaxHz ? aS / 16 : cfg.shuffleMaxHz;
+        shufflePhase = wrapPhase(shufflePhase + TAU * hz * dt);
         st[s0 + S.shufflePhase] = shufflePhase;
       }
 
@@ -665,7 +694,8 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
       }
 
       // Camadas de pernas e quique: passada (frente/trás), passinho (lado), passinho de giro e pulo.
-      const fShare = (gait * gait) / (gait * gait + side * side + 1e-6);
+      // A passada leva a frente e o lado que entrou nela; o resto do lado é passinho.
+      const fShare = (gait * gait + sideIn * side * side) / (plane2 + 1e-6);
       const strideW = runW * fShare;
       const shuffleW = runW - strideW;
       const legScale = 1 - (1 - cfg.crouchStride) * crouchW - (1 - cfg.zombieStride) * zombieW;
@@ -674,9 +704,9 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
         legsMoved = true;
         const sinP = Math.sin(runPhase);
         const cosP = Math.cos(runPhase);
-        let g = (aF - 55) / 70;
+        let g = (aRun - 55) / 70;
         g = g <= 0 ? 0 : g >= 1 ? 1 : g * g * (3 - 2 * g);
-        let d = (aF - 80) / 120;
+        let d = (aRun - 80) / 120;
         d = d <= 0 ? 0 : d >= 1 ? 1 : d * d * (3 - 2 * d);
         const reach = (cycle * (0.85 - 0.25 * d)) / 51.85;
         let amp = Math.asin(reach < 1 ? reach : 1);
@@ -700,7 +730,10 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
           strideW * (cfg.strideBob * (walkBob + (runBob - walkBob) * g) - cfg.strideSink * 0.5 * sprintW);
         // Agachado e no zumbi (tronco inclinado) o balanço e a torção levariam a cabeça de lado: só as pernas andam.
         const upright = 1 - crouchW - zombieW;
-        pose[P.bodyRotZ] = pose[P.bodyRotZ]! + strideW * upright * 0.035 * sinP * (1 - g);
+        // O balanço de lado é da passada de frente: na de lado (pernas viradas, tronco não) ele levaria a cabeça junto
+        // (M12: no ADAD a passada lenta da virada passava o E.2).
+        const sway = (gait * gait) / (plane2 + 1e-6);
+        pose[P.bodyRotZ] = pose[P.bodyRotZ]! + strideW * sway * upright * 0.035 * sinP * (1 - g);
         if (freeW > 0) {
           const k = strideW * freeW;
           const armAmp = (0.32 + 0.55 * g) * (amp / 0.9) + 0.12 * sprintW;
@@ -720,7 +753,8 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
         pose[P.hipsY] = pose[P.hipsY]! + hy;
         pose[P.torsoY] = pose[P.torsoY]! + ty;
         pose[P.neckY] = pose[P.neckY]! - 0.5 * (hy + ty);
-        const lean = strideW * cfg.strideLean * (0.05 + 0.13 * g + 0.26 * sprintW);
+        // A inclinação também é da passada de frente (na de lado o tronco segue a mira, não o rumo).
+        const lean = strideW * sway * cfg.strideLean * (0.05 + 0.13 * g + 0.26 * sprintW);
         pose[P.torsoX] = pose[P.torsoX]! + lean;
         pose[P.neckX] = pose[P.neckX]! - 0.6 * lean;
         if (zombieW > 0) pose[P.neckZ] = pose[P.neckZ]! + zombieW * strideW * cfg.zombieNeckZ * sinP;
@@ -823,6 +857,7 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
         st[s0 + S.brakeT] = -1;
         st[s0 + S.damageT] = -1;
         st[s0 + S.legYaw] = 0;
+        st[s0 + S.strafeYaw] = 0;
       }
       if (spawnT >= 0) {
         spawnT += dt;
@@ -1114,14 +1149,24 @@ export function createFigureRig(capacity: number, options: FigureRigOptions = {}
       }
 
       // 6. Pernas atrasadas (preguiça e strafe), o tronco fecha a diferença; pé plano (só o X do tornozelo).
-      let strafeYaw = 0;
+      // M12 (fase 5): as pernas viram para o rumo, até `strafeYawLow` no passinho e `strafeYawMax` com o lado na
+      // passada; o alvo é seguido com `strafeYawRate` (a troca frente ↔ ré vira um giro curto do quadril, não um salto).
+      let yawT = 0;
       if (runW > 1e-4 && aS > 1) {
+        // Ângulo do rumo ao eixo frente/ré mais perto; na faixa da histerese ele passa de ~70°, acima dos dois tetos.
         const a = Math.atan2(aS, aF);
-        const max = cfg.strafeYawMax;
-        strafeYaw = (side < 0 ? 1 : -1) * (gait < 0 ? -1 : 1) * (a < max ? a : max) * runW;
+        const max = cfg.strafeYawLow + (cfg.strafeYawMax - cfg.strafeYawLow) * sideIn;
+        yawT = (side < 0 ? 1 : -1) * (back ? -1 : 1) * (a < max ? a : max) * runW;
       }
+      let strafeYaw = st[s0 + S.strafeYaw]!;
+      if (strafeYaw !== yawT) {
+        strafeYaw += (yawT - strafeYaw) * K[K_STRAFE]!;
+        if (strafeYaw - yawT < 1e-5 && yawT - strafeYaw < 1e-5) strafeYaw = yawT;
+        st[s0 + S.strafeYaw] = strafeYaw;
+      }
+      const yawCap = lazyMax > cfg.strafeYawMax ? lazyMax : cfg.strafeYawMax;
       let extra = legYaw + strafeYaw;
-      extra = extra < -lazyMax ? -lazyMax : extra > lazyMax ? lazyMax : extra;
+      extra = extra < -yawCap ? -yawCap : extra > yawCap ? yawCap : extra;
       if (extra > 1e-6 || extra < -1e-6) {
         pose[P.hipsY] = pose[P.hipsY]! + extra;
         F64[EXTRA] = extra;

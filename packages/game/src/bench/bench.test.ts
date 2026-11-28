@@ -113,7 +113,7 @@ describe('bench: relatório e linhas [t0]', () => {
     expect(lines[3]).toMatch(/ hud=1 vm=1 fx=1 atores=1 bots_efetivos=12 manequins=6 detritos=120 armas=rifle$/);
     expect(lines).toContain('frame_ms media=33.37 p50=33.33 p90=34.10 p99=38.90 max=52.00');
     expect(lines).toContain('frames_lentos 40a60=12 60a100=3 100a250=1 acima250=0 vaos_1s=0');
-    expect(lines).toContain('inicio_ms primeiro=48.00 max=61.00 travadas_inicio=0 frames=120');
+    expect(lines).toContain('inicio_ms primeiro=48.00 max=61.00 travadas_inicio=0 frames=120 travadas_cortina=0');
     expect(lines).toContain(
       'sim_ia_ms sim_media=3.05 sim_p99=6.00 sim_max=9.00 ia_media=2.38 ia_p99=7.00 ia_max=15.00 ticks=36000' +
         ' sim_por_tick=1.52 ia_por_tick=1.19',

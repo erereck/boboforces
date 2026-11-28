@@ -36,6 +36,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   com "VALENDO!", os pontos que sobem, uma tela de morte limpa em que a arma escolhida é a que nasce (e a seta segurada
   não escolhe mais por você), o colega caído marcado, a zona do Royale que não cobre a vida, o fim com faixa e câmera
   lenta, e um resultado que não some com o pulo da partida.
+- **O visual (fase 5):** os bonecos correm de lado com as pernas viradas para onde vão em vez de patinar, a noite
+  deixou de ter cantos em preto puro, armas, caixinhas, pinheiros e props ganharam sombra no chão (e a dos bonecos
+  aparece de verdade), a explosão deixa marca chamuscada e levanta poeira com um clarão de verdade, pousos fortes e
+  deslizes soltam pó do chão, o tiro na cabeça faz a cabeça voar com confete, a partida entra atrás de uma cortina, e o
+  Meu Bobo respira, pisca e se monta de novo a cada peça trocada.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

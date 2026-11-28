@@ -239,6 +239,11 @@ export interface ProjectileBuffer {
   readonly roll: Float32Array;
   /** Luz amostrada da grade (céu, sol, emissivo), 3 por projétil. */
   readonly light: Float32Array;
+  /**
+   * M12 (fase 5): 1 = sem sombra-blob mesmo com a flag do modelo (a arma pendurada na parede, a da Caixa Misteriosa).
+   * O `game` zera a cada quadro.
+   */
+  readonly noShadow: Uint8Array;
 }
 
 export function createProjectileBuffer(capacity: number): ProjectileBuffer {
@@ -251,6 +256,7 @@ export function createProjectileBuffer(capacity: number): ProjectileBuffer {
     pitch: new Float32Array(capacity),
     roll: new Float32Array(capacity),
     light: new Float32Array(capacity * 3).fill(1),
+    noShadow: new Uint8Array(capacity),
   };
 }
 

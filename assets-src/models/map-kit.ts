@@ -183,7 +183,7 @@ export function silo(kit: MapKitLayers): BuiltModel {
  */
 export function tractor(kit: MapKitLayers): BuiltModel {
   const m = new ModelBuilder('tractor', 'prop', {
-    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable,
+    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.blobShadow,
     debrisColor: tone('tijolo', 1),
     blocksNav: true,
   });
@@ -264,7 +264,7 @@ export function tractor(kit: MapKitLayers): BuiltModel {
 /** Rolo de feno deitado (Ø 1,5 m × 1,5 m, 10 lados): a palha enrolada em volta e a espiral nas pontas. */
 export function hayRoll(kit: MapKitLayers): BuiltModel {
   const m = new ModelBuilder('hay-roll', 'prop', {
-    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable,
+    flags: F.blocksBullets | SIGHT_PARTIAL | F.walkable | F.blobShadow,
     debrisColor: tone('areia', 2),
     blocksNav: true,
   });

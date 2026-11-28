@@ -244,10 +244,12 @@ export function createInstancedMaterial(ctx: PassContext, perView: InstancedUnif
 export interface ParticleUniforms {
   readonly uFxTime: IUniform<number>;
   readonly uHideSlot: IUniform<number>;
+  /** M12 (fase 5): corte por vista dos discos de prop (m; 1e9 = nenhum). Só o passe dos atores muda. */
+  readonly uBlobMaxDist: IUniform<number>;
 }
 
 export function createParticleUniforms(): ParticleUniforms {
-  return { uFxTime: { value: 0 }, uHideSlot: { value: -1 } };
+  return { uFxTime: { value: 0 }, uHideSlot: { value: -1 }, uBlobMaxDist: { value: 1e9 } };
 }
 
 /**

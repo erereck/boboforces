@@ -25,7 +25,43 @@ export const WARDROBE = {
   camera3: { x: 25.6, y: 2.7, z: 27.3, lookY: 2.35, fovYDeg: 52 },
   /** Giro sozinho (graus por segundo). */
   spinDegS: 20,
+  /**
+   * M12 (fase 5): o Meu Bobo vivo. O manequim do vestiário tem entidade PRÓPRIA (a 0 é a dos manequins congelados dos
+   * prints e dos testes): o rig respira, pisca e dá o passinho no giro. A cada troca de peça ele nasce de novo (as
+   * partes caem e encaixam em `respawnS`, o nascer do rig).
+   */
+  entity: 0xfffb0001,
+  respawnS: 0.4,
 } as const;
+
+/**
+ * M12 (fase 5): o "nascer" do Meu Bobo a cada troca. `restart` na troca; `take(dt)` uma vez por quadro diz se o bit
+ * `spawning` do boneco vai ligado. Troca no meio de um nascer: 1 quadro desligado antes (o rig nasce na BORDA do bit).
+ */
+export interface WardrobePuppet {
+  restart(): void;
+  take(dt: number): boolean;
+}
+
+export function createWardrobePuppet(respawnS: number = WARDROBE.respawnS): WardrobePuppet {
+  let t = Infinity;
+  let gap = false;
+  return {
+    restart() {
+      if (t < respawnS) gap = true;
+      t = 0;
+    },
+    take(dt) {
+      if (gap) {
+        gap = false;
+        return false;
+      }
+      if (!(t < respawnS)) return false;
+      t += dt > 0 ? dt : 0;
+      return true;
+    },
+  };
+}
 
 export const WARDROBE_ACTION = { back: 'back', random: 'random' } as const;
 

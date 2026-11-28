@@ -21,11 +21,11 @@ import {
   type FigureTemplateSet,
 } from '@boboforces/format';
 import { createRng, type Rng } from '@boboforces/shared';
-import { sampleLightGrid, type LightGrid } from '@boboforces/world';
+import { MAX_BLOCK_ID, sampleLightGrid, type LightGrid } from '@boboforces/world';
 import { Group, PerspectiveCamera, Scene, type InstancedMesh } from 'three';
 import { buildFigureCubeGeometry } from '../actors/figure-cube.ts';
 import { FIGURE_BONE_FLOATS } from '../actors/figure-instances.ts';
-import { INSTANCE_FLOATS } from '../actors/layout.ts';
+import { ACTOR_SKY_FLOOR, INSTANCE_FLOATS } from '../actors/layout.ts';
 import { findActor, linkFor } from '../actors/link.ts';
 import { MAT4 } from '../actors/math.ts';
 import {
@@ -45,6 +45,7 @@ import {
 } from '../actors/three-objects.ts';
 import { createFxQueue, FX_KIND, FX_STRIDE, type FxQueue } from '../fx-queue.ts';
 import type { FrameContext, FxPass, PassContext, ViewContext } from '../shared/passes.ts';
+import { createWarmTwins } from '../shared/warm-twins.ts';
 import { NO_FIGURE, type RenderMap } from '../types.ts';
 import {
   blockTexelColor,
@@ -83,7 +84,7 @@ import {
 } from './particles.ts';
 import { PARTICLE_KIND } from './shader.ts';
 import { tracerLife, tracerLookOf } from './tracer.ts';
-import type { CollisionWorld } from './verlet.ts';
+import { floorBelow, type CollisionWorld } from './verlet.ts';
 
 /** Tamanho dos anéis (arte-ux.md §4.1: traçantes 128, marcas de tiro 256). */
 export const FX_RING_SIZES = { additive: 384, alpha: 384, decal: 256 } as const;
@@ -105,6 +106,21 @@ const CONFETTI = [0xff7a1a, 0x2e8bff, 0x3ddc97, 0xa66bff, 0xffd23f, 0xff6fb5, 0x
 
 /** M2: cores dos cubinhos da explosão (carvão, cinza e laranja da paleta mestra). */
 const EXPLOSION_CUBES = [0x2c2f3b, 0x454955, 0x9a4f30, 0xc4723f] as const;
+
+/** M12 (fase 5): confetes que saem da cabeça no tiro na cabeça. */
+const HEADSHOT_CONFETTI = 14;
+/** M12 (fase 5): a marca chamuscada da explosão (diâmetro = isto × raio, presa a [mín, máx] m) e até onde o chão conta. */
+export const SCORCH_SIZE_PER_RADIUS = 0.7;
+const SCORCH_MIN_M = 1;
+const SCORCH_MAX_M = 2.8;
+/** Tom da marca chamuscada: a cor do chão vezes isto. */
+const SCORCH_TONE = 0.32;
+/** Altura máxima (× raio) da explosão ao chão para deixar marca e levantar o anel de poeira. */
+const SCORCH_REACH_PER_RADIUS = 0.6;
+/** Pedaços do anel de poeira da explosão. */
+const DUST_RING_PUFFS = 10;
+/** Cor do pó sem o chão à mão (sem mundo ou sem camada): terra clara. */
+const FALLBACK_DUST_COLOR = 0xa89a80;
 
 /**
  * M7 (fase 8): a parede da zona do Royale: pedaços em pé em volta do círculo (o raio de 130 m da ilha dá ~13 m por
@@ -255,6 +271,82 @@ export function createFxPass(ctx: PassContext): FxPass {
       rng.range(0, 6.28),
       rng.range(-12, 12),
     );
+  }
+
+  /**
+   * M12 (fase 5): o chão embaixo de (x, y, z) até `maxDown` m: a altura em `groundY` e a cor do texel do topo do bloco
+   * (`blockTexelColor`, com a variedade `du`/`dv`); -1 sem chão sólido (no ar, fora da grade).
+   */
+  let groundY = 0;
+  function groundColor(world: CollisionWorld, x: number, y: number, z: number, maxDown: number): number {
+    const g = floorBelow(world, x, y + 0.05, z, maxDown);
+    if (!(g === g)) return -1;
+    groundY = g;
+    const cy = Math.floor((g - 0.01) * 2);
+    const grid = world.grid;
+    const cx = Math.floor(x * 2);
+    const cz = Math.floor(z * 2);
+    if (cy < 0 || cx < 0 || cz < 0 || cx >= grid.sizeX || cz >= grid.sizeZ || cy >= grid.sizeY) {
+      return FALLBACK_DUST_COLOR;
+    }
+    const block = grid.get(cx, cy, cz) & MAX_BLOCK_ID;
+    const blocks = ctx.textures.assets?.blocks ?? null;
+    const rgb = blockTexelColor(blocks, map, block, -1, x, g, z, 0, 1, 0, 0, 0);
+    return rgb === FALLBACK_DEBRIS_COLOR ? FALLBACK_DUST_COLOR : rgb;
+  }
+
+  /**
+   * M12 (fase 5): pó do pouso forte e do deslize: 4–6 cubinhos na cor do bloco do chão (com variação) e uma
+   * nuvenzinha clara, sem marca. No ar (sem chão até 0,6 m) não levanta nada.
+   */
+  function dust(o: number, frame: FrameContext): void {
+    const d = pending.data;
+    const x = d[o]!;
+    const y = d[o + 1]!;
+    const z = d[o + 2]!;
+    const s = Math.max(0, Math.min(1, d[o + 3]!));
+    const vx = d[o + 4]!;
+    const vz = d[o + 5]!;
+    let rgb = FALLBACK_DUST_COLOR;
+    let ground = y;
+    const world = frame.world;
+    if (world) {
+      rgb = groundColor(world, x, y, z, 0.6);
+      if (rgb < 0) return;
+      ground = groundY;
+    }
+    sample(world?.lightGrid ?? null, x, ground + 0.3, z);
+    // O deslize (a cada 0,1 s) solta só 1 cubinho: o anel de detritos é de 120–200 no Switch.
+    const n = d[o + 6]! > 0.5 ? 1 : 4 + Math.round(2 * s);
+    for (let k = 0; k < n; k++) {
+      const up = 0.8 + rng.next() * (0.8 + 1.2 * s);
+      cube(
+        x + rng.range(-0.18, 0.18),
+        ground + 0.05,
+        z + rng.range(-0.18, 0.18),
+        vx * 0.35 + rng.range(-1.1, 1.1) * (0.6 + s),
+        up,
+        vz * 0.35 + rng.range(-1.1, 1.1) * (0.6 + s),
+        jitterColor(rgb, 0.12, rng.next()),
+        0.035 + rng.next() * 0.03,
+        0.7 + rng.next() * 0.4,
+      );
+    }
+    resetParticleSpec(spec);
+    lit();
+    spec.kind = PARTICLE_KIND.round;
+    spec.x = x;
+    spec.y = ground + 0.12;
+    spec.z = z;
+    spec.vx = vx * 0.2;
+    spec.vy = 0.35;
+    spec.vz = vz * 0.2;
+    spec.gravity = -0.2;
+    spec.size = 0.2 + 0.25 * s;
+    spec.growth = 2.6;
+    spec.life = 0.45 + 0.2 * s;
+    setColor(lightenColor(rgb, 0.4), 0.45);
+    emitParticle(rings.alpha, spec, clock);
   }
 
   /** Poeira, marca e faíscas comuns ao tiro no cenário e na prop. */
@@ -586,9 +678,14 @@ export function createFxPass(ctx: PassContext): FxPass {
     figureCorpse.force = d[o + 7]!;
     figureCorpse.bodyPart = Math.round(d[o + 8]!);
     figureCorpse.skin = d[o + 9]!;
-    figureCorpse.sky = light[0]!;
+    figureCorpse.sky = Math.max(ACTOR_SKY_FLOOR, light[0]!);
     figureCorpse.sun = light[1]!;
     figureCorpse.emissive = light[2]!;
+    // M12 (fase 5): tiro na cabeça: a cabeça voa mais alto, girando, com confete na altura dela (GDD §5.5).
+    figureCorpse.headPop = d[o + 13]! > 0.5;
+    if (figureCorpse.headPop) {
+      headConfetti(bones[boneOffset + 12]!, bones[boneOffset + 13]!, bones[boneOffset + 14]!);
+    }
     spawnFigureCorpse(figureCorpses, bones, boneOffset, templates, figure, figureCorpse, rng);
     // Cubinhos na cor da roupa: o texel do meio da frente do tronco (caixa 1, osso do tronco, frente +z do FutBobo).
     const models = ctx.textures.assets?.models ?? null;
@@ -657,6 +754,29 @@ export function createFxPass(ctx: PassContext): FxPass {
     const cy = d[o + 1]! + FIGURE_CENTER_Y_M * scale;
     sample(frame.world?.lightGrid ?? null, d[o]!, cy, d[o + 2]!);
     poof(d[o]!, cy, d[o + 2]!);
+  }
+
+  /** M12 (fase 5): o confete do tiro na cabeça, saindo da cabeça para cima (a luz é a do corpo, já amostrada). */
+  function headConfetti(hx: number, hy: number, hz: number): void {
+    for (let k = 0; k < HEADSHOT_CONFETTI; k++) {
+      resetParticleSpec(spec);
+      lit();
+      spec.kind = PARTICLE_KIND.square;
+      spec.x = hx;
+      spec.y = hy;
+      spec.z = hz;
+      spec.vx = rng.range(-1.6, 1.6);
+      spec.vy = rng.range(4.5, 6.5);
+      spec.vz = rng.range(-1.6, 1.6);
+      spec.gravity = 6;
+      spec.size = 0.06;
+      spec.growth = 0.8;
+      spec.spin = rng.range(-12, 12);
+      spec.rotation = rng.range(0, Math.PI);
+      spec.life = 1.3 + rng.next() * 0.5;
+      setColor(CONFETTI[(k + 3) % CONFETTI.length]!, 1);
+      emitParticle(rings.alpha, spec, clock);
+    }
   }
 
   /** "Poof" de confete e fumaça branca da morte. */
@@ -791,6 +911,58 @@ export function createFxPass(ctx: PassContext): FxPass {
         1.6 + rng.next() * 0.8,
       );
     }
+    explosionGround(x, y, z, r, frame);
+  }
+
+  /**
+   * M12 (fase 5): a explosão com peso no chão: com chão sólido a até 0,6·raio embaixo, a marca chamuscada (0,7·raio de
+   * diâmetro no anel de marcas, 20 s: a forma de mancha da tinta, com a borda em gotas, na cor do chão queimada; o
+   * miolo preto da marca de tiro virava uma cruz de pixels de 35 cm) e um anel de poeira na cor do chão que corre para
+   * fora.
+   */
+  function explosionGround(x: number, y: number, z: number, r: number, frame: FrameContext): void {
+    const world = frame.world;
+    if (!world) return;
+    const rgb = groundColor(world, x, y + 0.2, z, Math.max(0.6, r * SCORCH_REACH_PER_RADIUS));
+    if (rgb < 0) return;
+    const ground = groundY;
+    sample(world.lightGrid, x, ground + 0.4, z);
+    resetParticleSpec(spec);
+    lit();
+    spec.kind = PARTICLE_KIND.paint;
+    spec.x = x;
+    spec.y = ground;
+    spec.z = z;
+    spec.x1 = 0;
+    spec.y1 = 1;
+    spec.z1 = 0;
+    spec.size = Math.min(SCORCH_MAX_M, Math.max(SCORCH_MIN_M, r * SCORCH_SIZE_PER_RADIUS));
+    spec.life = DECAL_LIFE_S;
+    spec.rotation = rng.range(0, Math.PI * 2);
+    // A cor do chão a 32% (o `jitterColor` com sorteio 0 escala por 1 − quanto).
+    setColor(jitterColor(rgb, 1 - SCORCH_TONE, 0), 0.88);
+    emitParticle(rings.decal, spec, clock);
+    const dustRgb = lightenColor(rgb, 0.3);
+    for (let k = 0; k < DUST_RING_PUFFS; k++) {
+      const a = ((k + rng.next() * 0.5) / DUST_RING_PUFFS) * Math.PI * 2;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      resetParticleSpec(spec);
+      lit();
+      spec.kind = PARTICLE_KIND.round;
+      spec.x = x + ca * r * 0.25;
+      spec.y = ground + 0.2;
+      spec.z = z + sa * r * 0.25;
+      spec.vx = ca * r * (1 + rng.next() * 0.4);
+      spec.vy = 0.3 + rng.next() * 0.3;
+      spec.vz = sa * r * (1 + rng.next() * 0.4);
+      spec.gravity = -0.2;
+      spec.size = 0.45;
+      spec.growth = 2.8;
+      spec.life = 0.8 + rng.next() * 0.3;
+      setColor(dustRgb, 0.5);
+      emitParticle(rings.alpha, spec, clock);
+    }
   }
 
   /** M2: rastro do foguete (uma fumacinha clara que cresce e sobe, e a chama colada na traseira). */
@@ -905,6 +1077,9 @@ export function createFxPass(ctx: PassContext): FxPass {
           break;
         case FX_KIND.paintBall:
           paintBall(o);
+          break;
+        case FX_KIND.dust:
+          dust(o, frame);
           break;
         case FX_KIND.paint:
           paint(o, frame);
@@ -1088,15 +1263,21 @@ export function createFxPass(ctx: PassContext): FxPass {
       vmMesh.mesh.visible = false;
     },
 
-    warmDraw() {
+    warmDraw(camera) {
       if (disposed) return () => undefined;
-      const undo = showForWarmDraw(allMeshes());
+      const meshes = allMeshes();
+      const undo = showForWarmDraw(meshes);
+      // M12 (fase 5): os gêmeos de 1 instância válida (o clarão do viewmodel também: o estado sem profundidade dele).
+      const twins = camera ? createWarmTwins(meshes, camera, root, clock) : null;
       const three = ctx.three;
       const autoClear = three.autoClear;
       three.autoClear = false;
       three.render(vmScene, warmCamera);
       three.autoClear = autoClear;
-      return undo;
+      return () => {
+        twins?.dispose();
+        undo();
+      };
     },
 
     warmup() {

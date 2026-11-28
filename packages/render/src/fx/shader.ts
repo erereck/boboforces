@@ -29,7 +29,7 @@ export const PARTICLE_KIND = {
   wall: 8,
 } as const;
 
-export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive'] as const;
+export const PARTICLE_UNIFORM_NAMES = ['uFxTime', 'uHideSlot', 'uAdditive', 'uBlobMaxDist'] as const;
 
 const KIND_CONSTS = /* glsl */ `
 const int BF_P_ROUND = 0;
@@ -57,6 +57,9 @@ in vec4 pF;  // céu, sol, emissivo, giro (rad/s)
 
 uniform float uFxTime;
 uniform float uHideSlot;
+// M12 (fase 5): além disto (m, da câmera ao centro) o disco de prop (blob com pC.x = 1) some: o teto de draw calls da
+// vista escondeu o grupo da prop dele (sem a prop, a sombra ficava sozinha no chão).
+uniform float uBlobMaxDist;
 
 out vec2 vLocal;
 flat out int vKind;
@@ -123,7 +126,9 @@ void main() {
     world = pos + (camRight * rc.x + camUp * rc.y) * size;
   }
   vDist = length(world - cameraPosition);
-  clip = projectionMatrix * viewMatrix * vec4(world, 1.0);
+  // Pela distância do CENTRO: os 4 vértices do disco saem juntos (um vértice só fora esticaria o quad).
+  bool cutProp = kind == BF_P_BLOB && pC.x > 0.5 && length(pA.xyz - cameraPosition) > uBlobMaxDist;
+  if (!cutProp) clip = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
   gl_Position = clip;
 }
@@ -184,7 +189,9 @@ void main() {
   } else if (vKind == BF_P_BLOB) {
     // A sombra-blob vive "para sempre" (vT ~ 0): o fade só começa no fim. A borda 0 do smoothstep TEM de ficar abaixo
     // de 1,0 (com 2,0 o resultado é indefinido e, na prática, dava 1 → alfa 0 → discard: a sombra nunca aparecia).
-    shape = floor(clamp(1.0 - r, 0.0, 1.0) * 4.0) / 4.0;
+    // M12 (fase 5): miolo cheio até 55% do raio e a borda em 2 degraus (antes caía em rampa desde o centro: o pé do
+    // boneco e a base da prop cobriam o pouco que escurecia e a sombra sumia, a 15 m nem se via).
+    shape = r < 0.55 ? 1.0 : (r < 0.78 ? 0.62 : (r < 0.95 ? 0.3 : 0.0));
     fadeStart = 0.99;
   } else if (vKind == BF_P_WALL) {
     // A parede da zona: faixas diagonais (em pixels de 1/8 do pedaço), mais forte embaixo e sumindo para o alto.

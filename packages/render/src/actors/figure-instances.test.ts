@@ -318,6 +318,7 @@ describe('instâncias dos bonecos (E.14)', () => {
     const frame = createFigureFrame(createRestFigureRig(), inst);
     frame.setFigures(templates, gameTable());
     const a = actorsOf(2);
+    // M12 (fase 5): o céu abaixo de `ACTOR_SKY_FLOOR` (0,3) sobe até ele; o resto passa igual.
     a.light.set([0.25, 0.75, 0.5], 3);
     for (let e = 0; e < 8; e++) {
       for (const flash of [0, 0.3, 1]) {
@@ -327,7 +328,11 @@ describe('instâncias dos bonecos (E.14)', () => {
         const r = inst.actorRecord[1]!;
         for (let k = 0; k < inst.recBoxes[r]!; k++) {
           const o = (inst.recStart[r]! + k) * MAT4;
-          expect([inst.matrices[o + 3], inst.matrices[o + 7], inst.matrices[o + 11]]).toEqual([0.25, 0.75, 0.5]);
+          expect([inst.matrices[o + 3], inst.matrices[o + 7], inst.matrices[o + 11]]).toEqual([
+            Math.fround(0.3),
+            0.75,
+            0.5,
+          ]);
           const w = inst.matrices[o + 15]!;
           expect(figureRow4Expression(w)).toBe(e);
           expect(Math.fround(w - 2 * figureRow4Expression(w))).toBeCloseTo(flash, 6);
