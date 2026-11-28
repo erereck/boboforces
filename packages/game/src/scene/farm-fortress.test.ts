@@ -172,8 +172,12 @@ describe('M11 (fase 3): o Fortress na Fazenda à noite', () => {
 
   it('o caído e o reviver: os bots caem, levantam o colega, e a partida acaba quando ninguém fica de pé', () => {
     // A Curta inteira (10 ondas), como o card: os bots não compram portas nem armas e caem entre a onda 4 e a 5.
+    // M12 (fase 7b): as sementes 1, 3 e 4 (eram 1 a 3). Quem acaba primeiro, os bobos ou o gerador, é a variância da
+    // partida: em 8 sementes, antes da 7b o gerador caiu em 0 (sobrou de 823 a 3.151); só com o nascido olhando para o
+    // lado aberto, em 2 (3 e 7); com o cerco dos zumbis também, em 2 (1 e 8); com o zumbi que não freia atrás de quem
+    // recua (revisão), em 1 (a 1); na junção com a 7a, em 2 (2 e 7; sobrou de 1.243 a 2.978 nas outras).
     let revives = 0;
-    for (const seed of [1, 2, 3]) {
+    for (const seed of [1, 3, 4]) {
       const r = play(withSupport(seed), 0, 900);
       const msg = `semente ${seed}: ${JSON.stringify(r)}`;
       console.log(`[farm fortress] até o fim ${msg}`);

@@ -324,6 +324,7 @@ import type { RecordBreaks, SceneHost, SceneRequest, SceneSignal, TrainingReport
 import {
   beginDeath,
   controllerNames,
+  numberRepeatedBots,
   controllerRules,
   countdownLine,
   createDeathState,
@@ -1314,6 +1315,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   }
   const scoreOrder = new Int16Array(SCOREBOARD_MAX_ROWS);
   const todayLine = countdownLine(recipe, humans, names, me);
+  /** M12 (fase 7b): o nome de cada bot (o look, a legenda das regras e a contagem já agruparam pelo nome do bot). */
+  const botNames = names.slice();
+  numberRepeatedBots(names, recipe, humans);
   /** M8 (fase 4, revisão): os controladores que um jogador já assumiu (o sofá, o Aquário): não contam como bot. */
   const everHuman = new Set<number>();
   /**
@@ -1330,7 +1334,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const myTeam = slots.find((sl) => sl.controller === me)?.team ?? 0;
     for (const slot of slots) {
       if (slot.bot !== null && (everyone || slot.team !== myTeam) && resolveBot(recipe, slot.bot).id === mem.id) {
-        const name = names[slot.controller] ?? mem.name;
+        // M12 (fase 7b, revisão): o nome do bot, sem o número de uma das cópias.
+        const name = botNames[slot.controller] ?? mem.name;
         return t('nemesis.back', { name, them: mem.killedYou, you: mem.youKilled });
       }
     }
@@ -4466,7 +4471,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       if (id.length > 48) continue;
       tallies.push({
         id,
-        name: Array.from(nameOf(v, e)).slice(0, 24).join(''),
+        // M12 (fase 7b): a memória é do bot (pelo id), com o nome dele sem o número da partida.
+        name: Array.from(botNames[slot.controller] ?? nameOf(v, e))
+          .slice(0, 24)
+          .join(''),
         killedYou: matchStats.killedHuman[e]!,
         youKilled: matchStats.killedByHuman[e]!,
       });
@@ -7690,6 +7698,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         malha: Math.round(t.mesh),
         luz: Math.round(t.light),
         nav: Math.round(t.nav),
+        // M12 (fase 7b): o índice de lugares da IA (0 sem IA na partida: o amigo online, o provador).
+        indice_ia: Math.round(t.aiIndex),
         figuras: Math.round(t.figures),
         skins: Math.round(t.skins),
         shaders: Math.round(t.shaders),

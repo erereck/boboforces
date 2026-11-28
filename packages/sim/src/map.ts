@@ -6,6 +6,7 @@ import { weaponCodeOf } from './config/weapons.ts';
 import { perkBit } from './config/zombie.ts';
 import { MAX_TEAMS } from './constants.ts';
 import type { SimMap, SpawnPoint } from './sim.ts';
+import { openSpawnYaw } from './spawn-facing.ts';
 
 /** O que sai do loading de um `.bfmap` (o `game` monta a grade, o registro, as props e a navegação). */
 export interface SimMapSource {
@@ -49,11 +50,18 @@ export function spawnPointsFromMarkers(markers: Pick<MapMarkers, 'spawns'>): Spa
  * mapa substitui o padrão (10 m abaixo do bloco mais baixo). `colliders` e `nav` só passam adiante.
  */
 export function simMapFromMarkers(source: SimMapSource): SimMap {
-  const spawns = spawnPointsFromMarkers(source.markers);
-  assert(spawns.length > 0, 'mapa: nenhum spawn nos marcadores');
+  const markerSpawns = spawnPointsFromMarkers(source.markers);
+  assert(markerSpawns.length > 0, 'mapa: nenhum spawn nos marcadores');
   const area = source.markers.playArea;
   assert(area.minX < area.maxX && area.minZ < area.maxZ, 'mapa: área jogável vazia');
   assert(Number.isFinite(area.killPlaneY), 'mapa: plano de morte inválido');
+  // M12 (fase 7b): o nascido olha para o lado aberto quando o marcador aponta para uma parede logo à frente (o ponto
+  // não muda; `spawn-facing.ts`).
+  const colliders = source.colliders ?? null;
+  const spawns = markerSpawns.map((sp) => ({
+    ...sp,
+    yaw: openSpawnYaw(source.grid, source.blocks, colliders, area, sp.x, sp.y, sp.z, sp.yaw),
+  }));
   return {
     grid: source.grid,
     blocks: source.blocks,

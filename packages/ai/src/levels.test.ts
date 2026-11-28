@@ -4,7 +4,7 @@ import { BOBO_NAV_METRICS, ENTITY_FLAG, ENTITY_KIND, SIM_HZ, type SimMap } from 
 import { createTestBlocks, createWorldGrid, fillBox, makeCell } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
 import { createHeadlessMatch } from './headless.ts';
-import { NavLevels, strongComponents } from './levels.ts';
+import { NavLevels, prepareNavLevels, strongComponents } from './levels.ts';
 
 /**
  * M10 (fase 1c): o passeio que sobe. O índice (`NavLevels`) só guarda o grupo principal (o maior componente fortemente
@@ -138,6 +138,54 @@ describe('índice de lugares', () => {
     // O mezanino tem 66 nós e o deque, 8; o sorteio por lugar dá a mesma vez aos dois.
     expect(places[2]!.nodes.length).toBeGreaterThan(places[1]!.nodes.length * 5);
   });
+
+  it('M12 (fase 7b): o índice montado no loading é o mesmo do 1º tick, e a partida com ele também', () => {
+    const area = { minX: 1, maxX: 23, minZ: 1, maxZ: 31 };
+    const fresh = towerMap().map.nav!;
+    const built = new NavLevels();
+    built.bind(fresh, area);
+    const nav = towerMap().map.nav!;
+    expect(prepareNavLevels(nav, area)).toBe(built.count);
+    const levels = new NavLevels();
+    levels.bind(nav, area);
+    expect(levels.count).toBe(built.count);
+    expect(Array.from(levels.order)).toEqual(Array.from(built.order));
+    expect(Array.from(levels.start)).toEqual(Array.from(built.start));
+    expect(Array.from(levels.floorY)).toEqual(Array.from(built.floorY));
+    expect(Array.from(levels.compStart)).toEqual(Array.from(built.compStart));
+    expect(Array.from(levels.group)).toEqual(Array.from(built.group));
+    expect(Array.from(levels.mainGroup)).toEqual(Array.from(built.mainGroup));
+    // O 1º tick só copia: os arrays são os do loading (nada montado de novo).
+    const again = new NavLevels();
+    again.bind(nav, area);
+    expect(again.order).toBe(levels.order);
+    // Outra área: monta de novo (o índice depende dela).
+    const other = new NavLevels();
+    other.bind(nav, { minX: 1, maxX: 12, minZ: 1, maxZ: 31 });
+    expect(other.order).not.toBe(levels.order);
+    // A partida com o índice pronto é a mesma da que monta no 1º tick.
+    const recipe: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'test',
+      seed: 5,
+      match: { timeLimitS: 0 },
+      teams: [
+        { bots: [{ ref: builtinBotRef('normal'), count: 2 }] },
+        { bots: [{ ref: builtinBotRef('normal'), count: 1 }] },
+      ],
+    };
+    const run = (prepare: boolean): bigint | number => {
+      const { map } = towerMap();
+      if (prepare) prepareNavLevels(map.nav!, map.playArea ?? null);
+      const match = createHeadlessMatch({ recipe, map, humans: 0 });
+      match.run(20 * SIM_HZ);
+      const h = match.sim.stateHash();
+      match.dispose();
+      return h;
+    };
+    expect(run(true)).toBe(run(false));
+  }, 60_000);
 
   it('o passeio dos bots sobe ao deque pequeno (3 bots, sem inimigo, 2 min) e nunca vai ao poleiro', () => {
     const { map, deckY, perchY } = towerMap();

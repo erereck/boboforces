@@ -5,8 +5,10 @@ import {
   ENTITY_FLAG,
   ENTITY_KIND,
   MAX_CONTROLLERS_WITH_ZOMBIES,
+  MAX_ENTITIES,
   MAX_HUMANS,
   MOD,
+  NULL_ENTITY,
   type SimView,
   viewAimPoint,
 } from '@boboforces/sim';
@@ -15,6 +17,7 @@ import type { TeamBoard } from './team.ts';
 import type { RoyaleClaims } from './royale.ts';
 import { AI_BUDGET, AI_LOD, AI_PATH, AI_SOLDIER } from './config.ts';
 import type { ZombieFlow } from './flow.ts';
+import { AI_GROUP, turnYaw } from './group.ts';
 import { NavLevels } from './levels.ts';
 import type { PathService } from './paths.ts';
 
@@ -85,6 +88,29 @@ export class AiContext {
   /** M2 (fases 3e e 3f): o quadro do time (avisos, objetivos, calor), criado no 1º tick com o tamanho do mapa. */
   board: TeamBoard | null = null;
   readonly observers = new Float64Array(MAX_HUMANS * 3);
+  /**
+   * M12 (fase 7b): o rumo de cada bobo, para as vagas atrás do líder (`group.ts`): um yaw que gira até o do movimento
+   * (andando acima de `AI_GROUP.headingSpeed`) ou, parado há `headingSettleS`, até o yaw dele (revisão: o humano que
+   * para e vira para a porta deixava os seguidores entre ele e a porta), no máximo `headingTurnDegPerS` (o A/D não
+   * troca o lado das vagas). Ao nascer, o yaw dele.
+   */
+  readonly heading = new Float64Array(MAX_ENTITIES);
+  private readonly headingReady = new Uint8Array(MAX_ENTITIES);
+  private readonly stillTicks = new Int32Array(MAX_ENTITIES);
+  private readonly headingStep: number;
+  private readonly settleTicks: number;
+  /** M12 (fase 7b, revisão): a altura dos pés no último tick no chão (a vaga não segue o pulo do líder). */
+  readonly groundY = new Float64Array(MAX_ENTITIES);
+  /** M12 (fase 7b): quem segue quem (o líder de cada corpo, -1 = ninguém) e o último tick em que seguiu. */
+  readonly followLeader = new Int32Array(MAX_ENTITIES).fill(-1);
+  readonly followTick = new Int32Array(MAX_ENTITIES).fill(-1_000_000);
+  /**
+   * M12 (fase 7b): os últimos inimigos que feriram cada bobo (o handle da `lastAttacker` e o tick; `coverAttackers`
+   * por corpo, o mais velho sai), para o Me cobre.
+   */
+  readonly hurtBy = new Uint32Array(MAX_ENTITIES * AI_GROUP.coverAttackers);
+  readonly hurtTick = new Int32Array(MAX_ENTITIES * AI_GROUP.coverAttackers).fill(-1_000_000);
+  private readonly hurtHp = new Float32Array(MAX_ENTITIES);
   private readonly rayHit = createRayHit();
   /** Rascunho do ponto de mira (cabeça ou tronco do alvo, no mundo). */
   private readonly aim: AimPoint = { x: 0, y: 0, z: 0 };
@@ -104,6 +130,8 @@ export class AiContext {
     this.ffa = ffa;
     this.viewDistance = viewDistance;
     this.paths = paths;
+    this.headingStep = (AI_GROUP.headingTurnDegPerS * Math.PI) / 180 / hz;
+    this.settleTicks = Math.max(1, Math.round(AI_GROUP.headingSettleS * hz));
   }
 
   begin(view: SimView): void {
@@ -115,6 +143,7 @@ export class AiContext {
     this.observerCount = 0;
     for (let i = 0; i < view.count; i++) {
       if (view.alive[i] === 0 || !isBodyKind(view.kind[i]!)) continue;
+      if (view.kind[i] === ENTITY_KIND.bobo) this.trackBobo(view, i);
       const c = view.controller[i]!;
       if (c < 0 || c >= MAX_CONTROLLERS_WITH_ZOMBIES) continue;
       this.ctrlToEntity[c] = i;
@@ -129,6 +158,56 @@ export class AiContext {
     }
     this.paths.bind(view.nav);
     this.levels.bind(view.nav, view.playArea);
+  }
+
+  /** M12 (fase 7b): o rumo de movimento e quem feriu o bobo `i` (uma vez por tick, no `begin`). */
+  private trackBobo(view: SimView, i: number): void {
+    const fl = view.flags[i]!;
+    if ((fl & F.dead) !== 0) {
+      this.headingReady[i] = 0;
+      this.hurtHp[i] = 0;
+      return;
+    }
+    if (this.headingReady[i] === 0) {
+      this.heading[i] = view.yaw[i]!;
+      this.headingReady[i] = 1;
+      this.stillTicks[i] = 0;
+      this.groundY[i] = view.position[i * 3 + 1]!;
+    }
+    if ((fl & F.onGround) !== 0) this.groundY[i] = view.position[i * 3 + 1]!;
+    const vx = view.velocity[i * 3]!;
+    const vz = view.velocity[i * 3 + 2]!;
+    const s = AI_GROUP.headingSpeed;
+    if (vx * vx + vz * vz > s * s) {
+      this.stillTicks[i] = 0;
+      this.heading[i] = turnYaw(this.heading[i]!, Math.atan2(-vx, -vz), this.headingStep);
+    } else if (this.stillTicks[i]! < this.settleTicks) {
+      this.stillTicks[i]!++;
+    } else {
+      this.heading[i] = turnYaw(this.heading[i]!, view.yaw[i]!, this.headingStep);
+    }
+    const hp = view.health[i]!;
+    if (hp < this.hurtHp[i]! - 0.01) {
+      const a = view.lastAttacker[i]!;
+      if (a !== NULL_ENTITY) this.noteHurt(i, a);
+    }
+    this.hurtHp[i] = hp;
+  }
+
+  /** Guarda o atacante `a` (handle) do bobo `i`: o mesmo renova o tick; um novo toma a vaga do mais velho. */
+  private noteHurt(i: number, a: number): void {
+    const n = AI_GROUP.coverAttackers;
+    const base = i * n;
+    let oldest = base;
+    for (let k = base; k < base + n; k++) {
+      if (this.hurtBy[k] === a && this.hurtTick[k]! > -1_000_000) {
+        this.hurtTick[k] = this.tick;
+        return;
+      }
+      if (this.hurtTick[k]! < this.hurtTick[oldest]!) oldest = k;
+    }
+    this.hurtBy[oldest] = a;
+    this.hurtTick[oldest] = this.tick;
   }
 
   /** Mesma regra da sim: zumbi é inimigo de todo bobo e de nenhum zumbi; entre bobos, FFA ou times diferentes. */

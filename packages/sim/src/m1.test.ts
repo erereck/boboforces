@@ -348,8 +348,12 @@ describe('mapa do M1: marcadores, área jogável e plano de morte', () => {
   it('spawns e área jogável saem dos marcadores', () => {
     const grid = createWorldGrid(40, 16, 60);
     const map = simMapFromMarkers({ grid, blocks, markers });
-    expect(map.spawns).toEqual(spawnPointsFromMarkers(markers));
-    expect(map.spawns[2]).toEqual({ x: 5.25, y: 0.5, z: 5.25, yaw: 1, team: -1 });
+    expect(map.spawns.slice(0, 2)).toEqual(spawnPointsFromMarkers(markers).slice(0, 2));
+    // M12 (fase 7b): o 3º nasce no canto da área olhando para fora dela (a borda a 1,5 m): vira para dentro.
+    const { yaw, ...rest } = map.spawns[2]!;
+    expect(rest).toEqual({ x: 5.25, y: 0.5, z: 5.25, team: -1 });
+    expect(-Math.sin(yaw)).toBeGreaterThan(0);
+    expect(-Math.cos(yaw)).toBeGreaterThan(0);
     expect(map.playArea).toEqual({ minX: 4, minZ: 4, maxX: 16, maxZ: 26 });
     expect(map.killPlaneY).toBe(-3);
     expect(map.colliders).toBeUndefined();

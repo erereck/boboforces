@@ -1,8 +1,12 @@
 import {
+  BOT_FORMAT,
+  BOT_RANGES,
   builtinBot,
   builtinBotRef,
   DEFAULT_BOT_RULES,
+  levelBot,
   MATCH_RECIPE_FORMAT,
+  type BotDocument,
   type MatchRecipe,
 } from '@boboforces/format';
 import {
@@ -35,6 +39,7 @@ import {
   fillDeathBanner,
   losingBadly,
   moveRadialCursor,
+  numberRepeatedBots,
   PRIMARY_ORDER,
   primaryChoices,
   radialIndex,
@@ -171,6 +176,84 @@ describe('câmera de morte', () => {
     // Uma parede em z = 23 m (célula 46, até 5 m de altura): o recuo para 0,3 m antes dela.
     fillBox(v.world, 0, 1, 46, 39, 10, 46, concrete);
     expect(deathCamBackoff(st, v, 10, 2, 21, 1, fovY, 3, dir)).toBeCloseTo(2 - DEATH_CAM.wallM, 9);
+  });
+});
+
+describe('M12 (fase 7b): o mesmo bot repetido ganha número', () => {
+  it('"Chill Bob", "Chill Bob 2"…, pulando o nome que já existe; o bot único e o humano ficam como estão', () => {
+    const recipe: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.tdm',
+      map: 'construto',
+      seed: 1,
+      teams: [
+        { humans: 1, bots: [{ ref: builtinBotRef('chill'), count: 2 }] },
+        {
+          bots: [
+            { ref: builtinBotRef('chill'), count: 2 },
+            { ref: builtinBotRef('sweaty'), count: 1 },
+          ],
+        },
+      ],
+    };
+    const names = controllerNames(recipe, 1);
+    const bots = names.filter((n, c) => n !== undefined && c > 0);
+    expect(bots).toEqual(['Chill Bob', 'Chill Bob', 'Chill Bob', 'Chill Bob', 'Sweaty Bob']);
+    // A contagem agrupa pelo nome do bot (antes do número).
+    expect(countdownLine(recipe, 1, names)).toBe('Hoje: 2 × Chill Bob, 1 × Sweaty Bob');
+    // O humano (online, o nome da sala) chamado "Chill Bob 2": o número pula para o 3.
+    names[0] = 'Chill Bob 2';
+    numberRepeatedBots(names, recipe, 1);
+    expect(names.filter((n, c) => n !== undefined && c > 0)).toEqual([
+      'Chill Bob',
+      'Chill Bob 3',
+      'Chill Bob 4',
+      'Chill Bob 5',
+      'Sweaty Bob',
+    ]);
+    expect(names[0]).toBe('Chill Bob 2');
+    // A mesma conta dá os mesmos nomes (o host e o amigo online).
+    const again = controllerNames(recipe, 1);
+    again[0] = 'Chill Bob 2';
+    numberRepeatedBots(again, recipe, 1);
+    expect(again).toEqual(names);
+    // Revisão: o humano da sala chamado "Sweaty Bob" (o bot único): o bot ganha número também.
+    const same = controllerNames(recipe, 1);
+    same[0] = 'Sweaty Bob';
+    numberRepeatedBots(same, recipe, 1);
+    expect(same.filter((n, c) => n !== undefined && c > 0)).toEqual([
+      'Chill Bob',
+      'Chill Bob 2',
+      'Chill Bob 3',
+      'Chill Bob 4',
+      'Sweaty Bob 2',
+    ]);
+  });
+
+  it('revisão: o nome numerado cabe no tamanho do nome de bot (corta o nome antes do número)', () => {
+    const long: BotDocument = {
+      ...levelBot('normal'),
+      format: BOT_FORMAT,
+      id: 'longo',
+      name: 'Sargento Almondega Longa',
+    };
+    expect(long.name.length).toBe(BOT_RANGES.nameMaxLength);
+    const recipe: MatchRecipe = {
+      format: MATCH_RECIPE_FORMAT,
+      mode: 'warfare.ffa',
+      map: 'construto',
+      seed: 1,
+      teams: [{ humans: 1, bots: [{ ref: 'embedded:longo', count: 12 }] }],
+      embeddedBots: [long],
+    };
+    const names = controllerNames(recipe, 1);
+    numberRepeatedBots(names, recipe, 1);
+    const bots = names.filter((n, c) => n !== undefined && c > 0);
+    expect(bots[0]).toBe('Sargento Almondega Longa');
+    expect(bots[1]).toBe('Sargento Almondega Lon 2');
+    expect(bots[11]).toBe('Sargento Almondega Lo 12');
+    for (const n of bots) expect(n.length).toBeLessThanOrEqual(BOT_RANGES.nameMaxLength);
+    expect(new Set(bots).size).toBe(12);
   });
 });
 

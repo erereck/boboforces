@@ -1,9 +1,13 @@
 import type { BotPersonality } from '@boboforces/format';
 import { ORDER } from '@boboforces/input';
 import type { Rng } from '@boboforces/shared';
-import { ENTITY_FLAG, secondsToTicks, viewEyeHeight, type SimView } from '@boboforces/sim';
+import { ENTITY_FLAG, entityIndex, secondsToTicks, viewEyeHeight, type SimView } from '@boboforces/sim';
 import { BLOCK_FLAG, createRayHit, raycastGrid } from '@boboforces/world';
 import { AI_ORDERS } from './config.ts';
+import { AI_GROUP } from './config-group.ts';
+import type { AiContext } from './context.ts';
+import { turnYaw } from './group.ts';
+import { seeBody, spawnProtected } from './senses.ts';
 import type { SoldierBrain } from './soldier.ts';
 
 /**
@@ -197,48 +201,30 @@ export function orderGoal(
       dropOrder(b);
       return ORDER_GOAL.none;
     }
-    const o3 = b.orderOwner * 3;
-    const ox = view.position[o3]!;
-    const oy = view.position[o3 + 1]!;
-    const oz = view.position[o3 + 2]!;
-    const dx = ox - x;
-    const dz = oz - z;
-    const far = order === ORDER.cover ? AI_ORDERS.coverFarM : AI_ORDERS.followFarM;
-    const near = order === ORDER.cover ? AI_ORDERS.coverNearM : AI_ORDERS.followNearM;
-    const d2 = dx * dx + dz * dz;
-    // Colado (dentro do "perto" e no mesmo andar), fica; entre o perto e o longe, só segue se já estava indo (sem
-    // tremer na borda).
-    const sameFloor = Math.abs(oy - y) < AI_ORDERS.sameFloorM;
-    if (sameFloor && (d2 <= near * near || (d2 <= far * far && !b.orderMoving))) {
-      b.orderMoving = false;
+    // M12 (fase 7b): a vaga atrás de quem mandou (`group.ts`: pelo rumo de movimento dele e pela ordem do bot entre os
+    // que o seguem), calculada no `personaTick` deste tick. Era um ponto só para todos, atrás do YAW: quem olhava
+    // para trás punha o ponto na frente dele.
+    const g = b.group;
+    if (g.tick !== tick || g.leader !== b.orderOwner) {
+      // Sem a vaga deste tick (quem chama não passou pelo `personaTick`): vai até quem mandou.
+      const o3 = b.orderOwner * 3;
+      out.x = view.position[o3]!;
+      out.y = view.position[o3 + 1]!;
+      out.z = view.position[o3 + 2]!;
+      return ORDER_GOAL.go;
+    }
+    b.orderMoving = g.moving;
+    if (!g.moving) {
+      // Parado na vaga: olha para fora (o yaw de quem mandou + o setor da vaga), não para as costas dele. O `orderHold`
+      // (da 7a) avisa o `travel` para não girar a mira de novo neste tick (o `personaTick` desliga a cada tick).
+      b.aimYaw = turnYaw(b.aimYaw, g.watchYaw, b.turnStep);
+      b.orderHold = true;
       stay(out, x, y, z);
       return ORDER_GOAL.stay;
     }
-    b.orderMoving = true;
-    // Atrás de quem mandou (do lado contrário ao que ele olha), dentro do "perto" (chegando, já fica) e do lado de cá
-    // do que estiver atrás dele (de costas para a parede, o ponto não cai na sala vizinha).
-    const yaw = view.yaw[b.orderOwner]!;
-    const bx = Math.sin(yaw);
-    const bz = Math.cos(yaw);
-    const back = near * 0.6;
-    const hit = raycastGrid(
-      view.world,
-      view.blocks,
-      ox,
-      oy + 1,
-      oz,
-      bx,
-      0,
-      bz,
-      back + 0.5,
-      BLOCK_FLAG.solid,
-      rayHit,
-      view.colliders,
-    );
-    const t = hit ? Math.max(0, rayHit.distance - 0.5) : back;
-    out.x = ox + bx * t;
-    out.y = oy;
-    out.z = oz + bz * t;
+    out.x = g.slotX;
+    out.y = g.slotY;
+    out.z = g.slotZ;
     return ORDER_GOAL.go;
   }
   const dx = b.orderX - x;
@@ -262,6 +248,82 @@ function stay(out: OrderPoint, x: number, y: number, z: number): void {
   out.x = x;
   out.y = y;
   out.z = z;
+}
+
+/** `j` (vivo, da geração do handle guardado) feriu o bobo `victim` nos últimos `recent` ticks? */
+function hurtRecently(c: AiContext, victim: number, j: number, recent: number): boolean {
+  const n = AI_GROUP.coverAttackers;
+  const gen = c.view!.generation[j]!;
+  for (let k = victim * n; k < victim * n + n; k++) {
+    if (c.tick - c.hurtTick[k]! > recent) continue;
+    const a = c.hurtBy[k]!;
+    if (entityIndex(a) === j && a >>> 16 === gen) return true;
+  }
+  return false;
+}
+
+/**
+ * O inimigo `j` vale para o Me cobre: vivo, inimigo, sem a proteção de spawn, no alcance de visão do bot e no cone
+ * dele (ou o bot alerta), ou fora do cone a até a audição de tiro dele (`hearShotM`, das regras do bot: a 7a); devolve
+ * a distância² no plano, ou -1.
+ */
+function coverCandidate(c: AiContext, b: SoldierBrain, e: number, j: number, ex: number, ez: number): number {
+  const view = c.view!;
+  if (j === e || !c.living(j) || !c.hostile(e, j) || spawnProtected(view, j)) return -1;
+  const dx = view.position[j * 3]! - ex;
+  const dz = view.position[j * 3 + 2]! - ez;
+  const d2 = dx * dx + dz * dz;
+  const range = c.viewDistance * b.viewRangeMul;
+  if (d2 >= range * range) return -1;
+  if (c.tick < b.alertUntil || d2 <= b.hearShotM * b.hearShotM) return d2;
+  const d = Math.sqrt(d2);
+  return d < 0.01 || (dx * -Math.sin(b.aimYaw) + dz * -Math.cos(b.aimYaw)) / d >= b.viewConeCos ? d2 : -1;
+}
+
+/**
+ * M12 (fase 7b): no Me cobre, o alvo vem primeiro dos inimigos que feriram quem mandou nos últimos
+ * `AI_GROUP.coverAttackerS` (o `AiContext` guarda os últimos de cada bobo): o mais perto que o bot vê agora (no
+ * alcance e com a linha de visão do orçamento; fora do cone só até `hearShotM`: o guarda-costas ouve os tiros em quem
+ * ele cobre e vira para o atirador). Revisão: com histerese: o alvo atual fica enquanto é um desses atacantes (ou
+ * alguém que feriu o próprio bot) e está à vista; outro atacante só toma o lugar estando a menos de
+ * `coverSwitchFrac` da distância dele (cada troca zera a reação e o erro da mira). Sem nenhum à vista, -1: a
+ * percepção de sempre escolhe entre todos (os outros inimigos não somem). Antes o Me cobre só colava e levantava quem
+ * mandou.
+ */
+export function coverThreat(c: AiContext, b: SoldierBrain, e: number, ex: number, ey: number, ez: number): number {
+  if (b.order !== ORDER.cover || c.tick >= b.orderUntil) return -1;
+  const view = c.view!;
+  if (!orderOwnerAlive(view, b)) return -1;
+  const recent = secondsToTicks(AI_GROUP.coverAttackerS, c.hz);
+  const owner = b.orderOwner;
+  let best = -1;
+  let bestD2 = Infinity;
+  // O alvo atual, se ainda é um atacante (de quem mandou ou do próprio bot) e está à vista.
+  const cur = b.target;
+  if (cur >= 0 && cur < view.count && view.generation[cur] === b.targetGen) {
+    const d2 = coverCandidate(c, b, e, cur, ex, ez);
+    if (
+      d2 >= 0 &&
+      (hurtRecently(c, owner, cur, recent) || hurtRecently(c, e, cur, recent)) &&
+      seeBody(c, b, ex, ey, ez, cur)
+    ) {
+      best = cur;
+      bestD2 = d2 * AI_GROUP.coverSwitchFrac * AI_GROUP.coverSwitchFrac;
+    }
+  }
+  const n = AI_GROUP.coverAttackers;
+  for (let k = owner * n; k < owner * n + n; k++) {
+    if (c.tick - c.hurtTick[k]! > recent) continue;
+    const a = c.hurtBy[k]!;
+    const j = entityIndex(a);
+    if (j === best || j >= view.count || view.generation[j] !== a >>> 16) continue;
+    const d2 = coverCandidate(c, b, e, j, ex, ez);
+    if (d2 < 0 || d2 >= bestD2) continue;
+    if (!seeBody(c, b, ex, ey, ez, j)) continue;
+    best = j;
+    bestD2 = d2;
+  }
+  return best;
 }
 
 /**

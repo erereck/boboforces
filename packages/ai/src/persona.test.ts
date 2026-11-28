@@ -9,12 +9,13 @@ import {
   type MatchRecipe,
   type PersonalityId,
 } from '@boboforces/format';
-import { BUTTON } from '@boboforces/input';
+import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { buildNavGrid } from '@boboforces/nav';
 import { angleDelta, createRng } from '@boboforces/shared';
 import {
   BOBO_NAV_METRICS,
   BOT_CONTROLLER_BASE,
+  createInputFrames,
   createSim,
   ENTITY_FLAG,
   SIM_HZ,
@@ -23,11 +24,13 @@ import {
   type SimMap,
   type Sim,
 } from '@boboforces/sim';
+import { TEST_NAV_PATHS } from '@boboforces/sim/testing';
 import { createTestBlocks, createWorldGrid, fillBox, makeCell, type WorldGrid } from '@boboforces/world';
 import { describe, expect, it } from 'vitest';
+import { AiContext } from './context.ts';
 import { createHeadlessMatch } from './headless.ts';
-import { PathFollower } from './paths.ts';
-import { personaOverride } from './persona.ts';
+import { PathFollower, PathService } from './paths.ts';
+import { personaOverride, personaTick } from './persona.ts';
 import { SoldierBrain, SoldierTiming } from './soldier.ts';
 import { retreatBelow } from './tactics2.ts';
 
@@ -339,39 +342,98 @@ describe('personalidades: comportamento visível', () => {
     match.dispose();
   });
 
-  it('Palhaço dança depois do abate (gira e agacha); o Equilibrado não', () => {
-    const spin = (preset: PersonalityId): number => {
-      let killTick = -1;
-      const match = createHeadlessMatch({
-        recipe: duel(persona('p', preset), { hp: 25 }),
-        map: field([
-          { x: 15, z: 60, yaw: 0, team: 0 },
-          { x: 15, z: 45, yaw: Math.PI, team: 1 },
-        ]),
-        humans: 1,
-        primaries: [],
-        onEvents: (events: readonly SimEvent[], sim: Sim) => {
-          for (const ev of events) {
-            if (killTick < 0 && ev.type === 'kill' && ev.killer === sim.controllerEntity(BOT)) killTick = sim.tick;
-          }
-        },
-      });
-      for (let i = 0; i < 10 * SIM_HZ && killTick < 0; i++) match.step();
-      expect(killTick).toBeGreaterThan(0);
-      const b = entity(match.sim, BOT);
-      const v = match.sim.view();
-      let turned = 0;
-      let last = v.yaw[b]!;
-      for (let i = 0; i < 1.5 * SIM_HZ; i++) {
-        match.step();
-        turned += Math.abs(angleDelta(last, v.yaw[b]!));
-        last = v.yaw[b]!;
+  it('M12 (fase 7b): só o Palhaço comemora, às vezes (bobeira · 0,5) e sem alvo à vista', () => {
+    const map = field([
+      { x: 15, z: 80, yaw: 0, team: 0 },
+      { x: 15, z: 40, yaw: Math.PI, team: 1 },
+    ]);
+    const celebrations = (doc: BotDocument, seen: boolean): number => {
+      const sim = createSim({ recipe: duel(doc), map, humans: 1 });
+      const t = new SoldierTiming(SIM_HZ);
+      const c = new AiContext(SIM_HZ, false, 100, new PathService(TEST_NAV_PATHS, []));
+      c.begin(sim.view());
+      const e = entity(sim, BOT);
+      let n = 0;
+      for (let i = 0; i < 400; i++) {
+        const b = new SoldierBrain(0, BOT, 'normal', createRng(100 + i), t, new PathFollower(0), doc);
+        // Um abate novo neste tick.
+        b.lastKills = -1;
+        b.targetVisible = seen;
+        personaTick(c, b, e, t);
+        if (b.danceUntil > c.tick) n++;
       }
-      match.dispose();
-      return turned;
+      sim.dispose();
+      return n;
     };
-    expect(spin('clown')).toBeGreaterThan(4 * Math.PI);
-    expect(spin('balanced')).toBeLessThan(Math.PI);
+    // O Palhaço (bobeira 0,5): 25% dos abates; com bobeira 1, 50%; com alguém à vista, nunca; o Equilibrado, nunca.
+    const clown = celebrations(persona('p', 'clown'), false);
+    expect(clown).toBeGreaterThan(70);
+    expect(clown).toBeLessThan(130);
+    const silly = persona('s', 'clown');
+    const sillier = celebrations({ ...silly, personality: { ...silly.personality, silliness: 1 } }, false);
+    expect(sillier).toBeGreaterThan(160);
+    expect(sillier).toBeLessThan(240);
+    expect(celebrations(persona('p', 'clown'), true)).toBe(0);
+    expect(celebrations(persona('p', 'balanced'), false)).toBe(0);
+  });
+
+  it('M12 (fase 7b): a comemoração é um giro de uma volta em 0,4 s ou um pulinho, recarregando, sem agachar', () => {
+    const map = field([
+      { x: 15, z: 80, yaw: 0, team: 0 },
+      { x: 15, z: 40, yaw: Math.PI, team: 1 },
+    ]);
+    const sim = createSim({ recipe: duel(persona('p', 'clown')), map, humans: 1 });
+    const f = createInputFrames();
+    for (let i = 0; i < 30; i++) sim.step(f);
+    const e = entity(sim, BOT);
+    const v = sim.view();
+    // Pente pela metade (a comemoração recarrega).
+    const k = e * WEAPON_SLOT_COUNT + v.slot[e]!;
+    (v.slotClip as Uint16Array)[k] = 3;
+    const t = new SoldierTiming(SIM_HZ);
+    const run = (until: number): { turned: number; jumps: number; crouch: number; reload: number; ticks: number } => {
+      const b = new SoldierBrain(0, BOT, 'normal', createRng(1), t, new PathFollower(0), persona('p', 'clown'));
+      b.danceUntil = until;
+      const local = { x: 1, y: 1 };
+      let turned = 0;
+      let jumps = 0;
+      let crouch = 0;
+      let reload = 0;
+      let ticks = 0;
+      for (let tick = until - 24; tick < until + 5; tick++) {
+        const before = b.aimYaw;
+        const buttons = personaOverride(v, b, e, tick, t, local);
+        if (buttons < 0) continue;
+        ticks++;
+        turned += angleDelta(before, b.aimYaw);
+        if ((buttons & BUTTON.jump) !== 0) jumps++;
+        if ((buttons & BUTTON.crouch) !== 0) crouch++;
+        if ((buttons & BUTTON.reload) !== 0) reload++;
+        expect(local).toEqual({ x: 0, y: 0 });
+      }
+      return { turned, jumps, crouch, reload, ticks };
+    };
+    // O tipo sai do tick em que acaba e do bot (índice 0): par = giro, ímpar = pulinho.
+    const spin = run(1000);
+    expect(spin.ticks).toBe(24);
+    expect(spin.turned).toBeCloseTo(Math.PI * 2, 6);
+    expect(spin.jumps).toBe(0);
+    const hop = run(1001);
+    expect(hop.turned).toBe(0);
+    // O botão de pulo nos primeiros ticks no chão (a sim pula na borda; no ar, ninguém aperta).
+    expect(hop.jumps).toBeGreaterThan(0);
+    expect(hop.jumps).toBeLessThanOrEqual(12);
+    for (const r of [spin, hop]) {
+      expect(r.crouch).toBe(0);
+      expect(r.reload).toBe(r.ticks);
+    }
+    // Alguém à vista: para e briga.
+    const b = new SoldierBrain(0, BOT, 'normal', createRng(1), t, new PathFollower(0), persona('p', 'clown'));
+    b.danceUntil = 1000;
+    b.targetVisible = true;
+    expect(personaOverride(v, b, e, 990, t, { x: 0, y: 0 })).toBe(-1);
+    expect(b.danceUntil).toBe(0);
+    sim.dispose();
   });
 });
 

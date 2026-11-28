@@ -55,7 +55,8 @@ import {
   type AiWeaponUse,
 } from './config.ts';
 import type { AiContext } from './context.ts';
-import { dropOrder, ORDER_GOAL, orderGoal, orderOwnerAlive, type OrderPoint } from './orders.ts';
+import { GroupState } from './group.ts';
+import { coverThreat, dropOrder, ORDER_GOAL, orderGoal, orderOwnerAlive, type OrderPoint } from './orders.ts';
 import { STRIKE_ACT, strikeBuy, strikeGoal, strikeObjective, strikeWander } from './strike.ts';
 import {
   ROYALE_ACT,
@@ -196,7 +197,7 @@ export class SoldierTiming {
   readonly buddyGoalAge: number;
   readonly preAimEvery: number;
   readonly fakeRetreatEvery: number;
-  /** M2 (fase 3g): personalidades, em ticks (a dancinha gira `danceSpinStep` rad por tick). */
+  /** M2 (fase 3g): personalidades, em ticks. */
   readonly hop: number;
   readonly rusherJumpMin: number;
   readonly rusherJumpMax: number;
@@ -210,11 +211,6 @@ export class SoldierTiming {
   readonly campRetry: number;
   readonly quarryEvery: number;
   readonly pursuitEvery: number;
-  readonly supportEvery: number;
-  readonly dance: number;
-  readonly danceCrouch: number;
-  readonly danceJump: number;
-  readonly danceSpinStep: number;
   readonly dummyStride: number;
   readonly replanA: number;
   readonly replanB: number;
@@ -279,11 +275,6 @@ export class SoldierTiming {
     this.campRetry = secondsToTicks(P.campRetryS, hz);
     this.quarryEvery = secondsToTicks(P.quarryEveryS, hz);
     this.pursuitEvery = secondsToTicks(P.pursuitEveryS, hz);
-    this.supportEvery = secondsToTicks(P.supportEveryS, hz);
-    this.dance = secondsToTicks(P.danceS, hz);
-    this.danceCrouch = Math.max(1, secondsToTicks(P.danceCrouchS, hz));
-    this.danceJump = Math.max(2, secondsToTicks(P.danceJumpS, hz));
-    this.danceSpinStep = (P.danceSpinDegPerS * DEG_TO_RAD) / hz;
     this.dummyStride = Math.max(1, secondsToTicks(P.dummyStrideS, hz));
     this.replanA = secondsToTicks(AI_LOD.replanSA, hz);
     this.replanB = secondsToTicks(AI_LOD.replanSB, hz);
@@ -572,6 +563,8 @@ export class SoldierBrain {
   /** M2: slot pedido no `InputFrame.weapon` (0 primária, 1 pistola, 2 faca) e o gatilho do tick anterior. */
   wantSlot = 0;
   fireHeld = false;
+  /** M12 (fase 7b): a vaga de quem segue um líder (o Vem comigo, o Me cobre, o Suporte; `group.ts`). */
+  readonly group = new GroupState();
 
   constructor(
     index: number,
@@ -745,6 +738,16 @@ function perceive(c: AiContext, b: SoldierBrain, e: number, tick: number, t: Sol
       remember(view, b, b.focus, tick);
       return;
     }
+  }
+  // M12 (fase 7b): no Me cobre, quem feriu quem mandou vem antes (`coverThreat`; sem nenhum à vista, o de sempre).
+  const threat = coverThreat(c, b, e, ex, ey, ez);
+  if (threat >= 0) {
+    if (threat !== b.target || !targetValid(view, b))
+      acquire(view, b, threat, tick, atViewEdge(view, b, ex, ez, threat));
+    b.targetVisible = true;
+    b.targetSeenTick = tick;
+    remember(view, b, threat, tick);
+    return;
   }
   // O alvo atual: no cone (ou alerta) e no alcance, como qualquer candidato; o protegido de spawn sai (a sim zera o
   // dano nele: mirar nele é só ficar pronto para quando a proteção cair).

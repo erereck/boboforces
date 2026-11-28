@@ -307,4 +307,30 @@ describe('spawn pontuado', () => {
   it('TDM: o ponto do time com menos inimigos à vista', () => {
     expect(new Set(respawnSpots('warfare.tdm', [1, 2, 3, 4, 5, 6]))).toEqual(new Set([75]));
   });
+
+  it('M12 (fase 7b, AM5): no FFA, entre os seguros, os 3 com o inimigo mais perto perto de 35 m (não o mais longe)', () => {
+    // O matador (0) em z = 5 m e a vítima (1) em z = 8 m, atrás de uma parede de 5 m em z = 12 m: os pontos do outro
+    // lado ficam todos fora da vista, a 32, 42, 65 e 145 m dele. Os 3 mais perto de 35 m são os de 32, 42 e 65 m; o de
+    // 145 m (o mais longe, que a regra antiga sempre incluía) nunca sai.
+    const grid = createWorldGrid(80, 16, 320);
+    fillBox(grid, 0, 0, 0, 79, 0, 319, concrete);
+    fillBox(grid, 0, 1, 24, 79, 10, 24, concrete);
+    const spawns = [spawn(5, -1), spawn(8, -1), spawn(37, -1), spawn(47, -1), spawn(70, -1), spawn(150, -1)];
+    const spots = [1, 2, 3, 4, 5, 6].map((seed) => {
+      const teams: MatchRecipe['teams'] = [{ humans: 'all', bots: [] }];
+      const sim = createSim({
+        recipe: { ...recipe('warfare.ffa', teams), seed },
+        map: { grid, blocks, spawns },
+        humans: 2,
+      });
+      const f = createInputFrames();
+      run(sim, f, PAST_PROTECTION);
+      shoot(sim, f, 0, 1, () => dead(sim, 1));
+      expect(dead(sim, 1)).toBe(true);
+      run(sim, f, (MATCH_DEFAULTS.respawnS + 0.2) * SIM_HZ);
+      return sim.view().position[entity(sim, 1) * 3 + 2]!;
+    });
+    for (const z of spots) expect([37, 47, 70]).toContain(z);
+    expect(spots).toContain(37);
+  });
 });

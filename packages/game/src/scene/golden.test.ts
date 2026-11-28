@@ -81,8 +81,11 @@ import { buildMapNav, buildMapWorld, buildSimMap } from './world.ts';
  * M12 fase 7a (revisão): `a95c9be3` (a bala só contorna o vidro, a reação tira o gatilho, o zumbi a 4 m, a pista no
  * mesmo andar, só o mato alto esconde: 10 abates, 131 tiros, 4×6, 6 caixinhas, 5 granadas).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `e2933be3`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (10 dos 28 spawns do Construto viravam para uma parede a
+ * menos de 4 m): `38d5c6fb` (14 abates, 146 tiros, 6×8, 8 caixinhas, 7 granadas).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `732c3e74` (14 abates, 118 tiros, 7×7, 3 caixinhas, 5 granadas).
  */
-const GOLDEN_HASH = 'e2933be3';
+const GOLDEN_HASH = '732c3e74';
 const GOLDEN_TICKS = 3600;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -208,8 +211,13 @@ describe('golden do M1: 8 bots no Construto real (.bfmap + nav), semente 42, 3.6
  * 2 min).
  * M12 fase 7a (revisão): `bbca08d8` (onda 3, 40 abates, 6 quedas, ainda jogando nos 2 min).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `b3672a98`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (`1e63632b`) e os zumbis cercam (a menos de 4 m, uma vaga
+ * do anel de 0,9 m em volta do alvo): `07ed3606` (onda 4, 42 abates, 2 quedas, ainda jogando nos 2 min).
+ * M12 fase 7b (revisão): o zumbi só freia perto da vaga com o alvo quase parado (atrás de quem recua, alcança o
+ * golpe): `564566f3` (onda 3, 39 abates, 2 quedas, ainda jogando nos 2 min).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `117dbb8a` (onda 3, 34 abates, 5 quedas, ainda jogando nos 2 min).
  */
-const GOLDEN_ZOMBIES_HASH = 'b3672a98';
+const GOLDEN_ZOMBIES_HASH = '117dbb8a';
 const GOLDEN_ZOMBIES_TICKS = 7200;
 
 function runZombiesGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
@@ -269,8 +277,13 @@ describe('golden do Bobo Zombies (M3, fase 2e): 4 bots de apoio no Construto, se
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `905dedd1` (onda 3, 38 abates, 7 quedas, tábuas 47/14).
  * M12 fase 7a (revisão): `2b416ecf` (onda 4, 47 abates, 7 quedas, tábuas 32/6).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `e66ae88f`.
+ * M12 fase 7b (27/11/2026): os zumbis cercam (a vaga do anel em volta do alvo; os spawns do Posto não viram):
+ * `c317d61b` (onda 4, 44 abates, 5 quedas, 40/14 tábuas, ainda jogando nos 2 min).
+ * M12 fase 7b (revisão): o zumbi só freia perto da vaga com o alvo quase parado: `2c5d0730` (onda 3, 41 abates, 8
+ * quedas, 30/9 tábuas, derrota antes dos 2 min).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `25d66819` (onda 4, 42 abates, 6 quedas, 45/27 tábuas).
  */
-const GOLDEN_POSTO_HASH = 'e66ae88f';
+const GOLDEN_POSTO_HASH = '25d66819';
 
 function runPostoGolden(): {
   hash: string;
@@ -353,8 +366,10 @@ describe('golden do Bobo Zombies no Posto Avançado (M3, fase 3e): janelas e por
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `cc8e4e0f` (capturas 2/3, o time 1 fecha 200 a 94).
  * M12 fase 7a (revisão): `12967f80` (capturas 2/2, o time 1 fecha 200 a 97).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `ba15abc0`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `40576015` (capturas 1/2, o time 1 fecha 200 a 131).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `b6466aeb` (capturas 3/2, o time 0 fecha 200 a 121).
  */
-const GOLDEN_DOMINATION_HASH = 'ba15abc0';
+const GOLDEN_DOMINATION_HASH = 'b6466aeb';
 const GOLDEN_DOMINATION_TICKS = 10_800;
 
 function runDominationGolden(): { hash: string; captures: number[]; score: number[]; owned: number[]; phase: string } {
@@ -428,9 +443,14 @@ describe('golden do Domination (M6, fase 1): 4 contra 4 bots no Construto, semen
  * M12 fase 7a (revisão): `b79c2d2b` (Gun Game fecha em 6.325 ticks, níveis 7, 6, 5, 5, 5, 5, 5, 4).
  * M12 fase 7a (revisão): `468b4eee` (Infection: os 8 infectados em 6.792 ticks).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `4791502b`.
+ * M12 fase 7b (27/11/2026): o spawn do FFA perto da ação (AM5: entre os seguros, o inimigo mais perto perto de 35 m;
+ * só o Gun Game, `a8af6a1b`) e o nascido olha para o lado aberto: Gun Game `6408218d` (um bot fecha em 5.101 ticks;
+ * níveis 6, 6, 6, 5, 4, 3, 3, 2), Infection `f6ca91ee` (os 8 infectados em 4.755 ticks).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): Gun Game `08bd54ae` (fecha em 7.156 ticks; níveis 7, 6, 5, 5, 4,
+ * 4, 4, 2), Infection `578196ea` (os 8 infectados em 7.629 ticks).
  */
-const GOLDEN_GUNGAME_HASH = '4791502b';
-const GOLDEN_INFECTION_HASH = 'ebf3d1ee';
+const GOLDEN_GUNGAME_HASH = '08bd54ae';
+const GOLDEN_INFECTION_HASH = '578196ea';
 const GUN_GAME_LADDER = ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'pistol', 'knife'];
 
 function runPartyGolden(kind: 'gunGame' | 'infection'): {
@@ -522,8 +542,10 @@ describe('goldens dos modos de festa (M6, fase 2): Gun Game e Infection com bots
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `7ec256d2` (pontos 49, 42, 36, 29, 21, 5 Juggs).
  * M12 fase 7a (revisão): `df0df447` (pontos 65, 55, 49, 9, 4 Juggs).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `ef841fc7`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `f80e1c0d` (3 Juggs em 3 min; pontos 88, 55 e 36).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `b6af71cc` (4 Juggs em 3 min; pontos 64, 51, 33 e 30).
  */
-const GOLDEN_JUGGERNAUT_HASH = 'ef841fc7';
+const GOLDEN_JUGGERNAUT_HASH = 'b6af71cc';
 
 function runJuggernautGolden(): { hash: string; points: number[]; holders: number; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -570,7 +592,9 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
     expect(b.hash).toBe(a.hash);
     const msg = `pontos ${a.points.join(',')}, ${a.holders} Juggs, fase ${a.phase} em ${a.ticks} ticks`;
     console.log(`[juggernaut] ${msg} · hash ${a.hash}`);
-    expect(a.holders, msg).toBeGreaterThanOrEqual(4);
+    // M12 fase 7b: o piso caiu de 4 para 3 Juggs (o Jugg ainda troca de mãos): com o nascido olhando para o lado aberto,
+    // esta semente sorteou 3; nas sementes 42 e 1 a 5, a média foi de 4,33 Juggs antes e 4,17 depois (3 a 5: ruído).
+    expect(a.holders, msg).toBeGreaterThanOrEqual(3);
     expect(a.points[0]!, msg).toBeGreaterThanOrEqual(10);
     expect(a.phase, msg).toBe('ended');
     expect(a.hash, msg).toBe(GOLDEN_JUGGERNAUT_HASH);
@@ -597,8 +621,11 @@ describe('golden do Juggernaut (M6, fase 3) com bots no Construto', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `9e8a42c8` (placar 26×17).
  * M12 fase 7a (revisão): `a751104a` (placar 26×22).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `56e1918a`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `fac99b06` (as mesmas trocas; 27 × 21 em 10.800
+ * ticks).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `d24b9daf` (as mesmas trocas; 24 × 20 em 10.800 ticks).
  */
-const GOLDEN_CHAOS_HASH = '56e1918a';
+const GOLDEN_CHAOS_HASH = 'd24b9daf';
 
 function runChaosGolden(): { hash: string; masks: number[]; score: number[]; ticks: number } {
   const { map } = loadWorld();
@@ -658,8 +685,10 @@ describe('golden do Bobo Chaos (M6, fase 4) com bots no Construto', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `7f0c114f` (45×35 em 3 min).
  * M12 fase 7a (revisão): `0ce50db5` (30×32 em 3 min).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9667fd35`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `b7e9a033` (49 × 32 em 3 min).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `ca9640fd` (31 × 40 em 3 min).
  */
-const GOLDEN_PAINTBALL_HASH = '9667fd35';
+const GOLDEN_PAINTBALL_HASH = 'ca9640fd';
 
 function runPaintballGolden(): { hash: string; score: number[]; ticks: number; phase: string } {
   const { map } = loadWorld();
@@ -712,8 +741,13 @@ describe('golden do Bobo Paintball (M6, fase 5) com bots no Construto', () => {
  * ainda jogando).
  * M12 fase 7a (revisão): `c50f4595` (onda 3, o gerador em 2.751, ainda jogando).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9a36d995`.
+ * M12 fase 7b (27/11/2026): os zumbis cercam (a vaga do anel em volta do alvo): `3898fd8b` (onda 3, o gerador cai para
+ * 1.963 e a partida acaba).
+ * M12 fase 7b (revisão): o zumbi só freia perto da vaga com o alvo quase parado: `623a045f` (onda 3, o gerador cai
+ * para 3.461 e a partida acaba).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `abdaa211` (onda 4, o gerador cai para 3.077, ainda jogando).
  */
-const GOLDEN_FORTRESS_HASH = '9a36d995';
+const GOLDEN_FORTRESS_HASH = 'abdaa211';
 
 function runFortressGolden(): { hash: string; wave: number; hp: number; low: number; phase: string } {
   const { map } = loadWorld('posto');
@@ -774,8 +808,14 @@ describe('golden do Bobo Zombies Fortress (M6, fase 6a) no Posto Avançado', () 
  * levantada, 8.524 ticks).
  * M12 fase 7a (revisão): `0f7ef26d` (onda 4, o gerador cai; 11 quedas, 5 levantadas, 10.300 ticks).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `3683348d`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (`725a1797`) e os zumbis cercam: `06137a15` (onda 4; o
+ * gerador cai para 3.128; 8 quedas, 1 levantada; a partida acaba em 9.227 ticks).
+ * M12 fase 7b (revisão): o zumbi só freia perto da vaga com o alvo quase parado: `47918f50` (onda 5; o gerador cai
+ * para 561; 11 quedas, 4 levantadas; a partida acaba em 12.727 ticks).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `5a2328d5` (onda 5; o gerador cai para 248; 11 quedas, 2
+ * levantadas; 12.626 ticks).
  */
-const GOLDEN_FORTRESS_FARM_HASH = '3683348d';
+const GOLDEN_FORTRESS_FARM_HASH = '5a2328d5';
 const GOLDEN_FORTRESS_FARM_TICKS = 60 * 60 * 15;
 
 function runFortressFarmGolden(): {
@@ -859,8 +899,9 @@ describe('golden do Bobo Zombies Fortress (M11, fase 3) na Fazenda à noite', ()
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `f94561b7` (onda 2, 10 abates do apoio).
  * M12 fase 7a (revisão): `040b63b1` (onda 2, 11 abates do apoio).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `fef41731`.
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `667a249b` (onda 2, 10 abates do apoio).
  */
-const GOLDEN_HORDE_HASH = 'fef41731';
+const GOLDEN_HORDE_HASH = '667a249b';
 
 function runHordeGolden(): { hash: string; wave: number; kills: number; downs: number; phase: string } {
   const { map } = loadWorld('base');
@@ -925,8 +966,10 @@ describe('golden do Bobo Zombies Horda armada (M6, fase 6b) na Base Abandonada',
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `19c77dc8` (pontos 67, 180, 78, 180 em 32.046 ticks).
  * M12 fase 7a (revisão): `29caa29d` (pontos 180, 180, 172, 180 em 44.410 ticks).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `fa6e257d`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `c5b72f5c` (pontos 93, 180, 180 e 146; 37.683 ticks).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `a12f9f08` (pontos 80, 170, 180 e 65; 31.513 ticks).
  */
-const GOLDEN_JUGG_FIXED_HASH = 'fa6e257d';
+const GOLDEN_JUGG_FIXED_HASH = 'a12f9f08';
 
 function runJuggFixedGolden(): {
   hash: string;
@@ -996,6 +1039,7 @@ describe('golden do Juggernaut Fixo (M7, fase 0) com bots no Construto', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `078cbfe8` (placar 20×21).
  * M12 fase 7a (revisão): `78f7fdb8` (placar 16×17).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `989b29f8`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (2 dos 12 spawns da Base Bobo): `4e25daf7` (15 × 24).
  */
 const GOLDEN_AIRBASE_HASH = '989b29f8';
 
@@ -1047,8 +1091,10 @@ describe('golden do TDM na Base Bobo (M7, fase 1)', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `30c8240e` (10 rodadas, 7×3, 7 plantas).
  * M12 fase 7a (revisão): `ff6ed035` (12 rodadas, 6×6, 3 plantas).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `9c4fe6b5`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `fcca4323` (11 rodadas, 7 × 4, 4 plantas).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `a2f0ff5b` (12 rodadas, 6 × 6, 2 plantas).
  */
-const GOLDEN_STRIKE_HASH = '9c4fe6b5';
+const GOLDEN_STRIKE_HASH = 'a2f0ff5b';
 
 function runStrikeGolden(): { hash: string; rounds: number; wins: string; plants: number; phase: string } {
   const { map } = loadWorld('airbase');
@@ -1108,8 +1154,11 @@ describe('golden do BoboStrike (M7, fase 3) com bots na Base Bobo', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `d6901c37` (102 s, vencedor 6).
  * M12 fase 7a (revisão): `4ff46616` (154 s, vencedor 2).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `57069e56`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (2 dos 41 spawns da Ilha): `d094c722` (104 s, 22 com
+ * primária).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `f29f520e` (68 s, 24 com primária).
  */
-const GOLDEN_ROYALE_HASH = '57069e56';
+const GOLDEN_ROYALE_HASH = 'f29f520e';
 
 function runRoyaleGolden(): { hash: string; seconds: number; winner: number; armed: number; phase: string } {
   const { map } = loadWorld('island');
@@ -1171,8 +1220,11 @@ describe('golden do Bobo Royale (M7, fase 7) com bots na Ilha Tropical', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `54d688a0` (264 s, vencedor 2).
  * M12 fase 7a (revisão): `8d6e7f85` (150 s, vencedor 1).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `43552c05`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto (4 dos 59 spawns do Arquipélago): `f57b73e2` (214 s, 44
+ * com primária).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `d4b23254` (254 s, 45 com primária).
  */
-const GOLDEN_ROYALE_GRANDE_HASH = '43552c05';
+const GOLDEN_ROYALE_GRANDE_HASH = 'd4b23254';
 
 function runRoyaleGrandeGolden(squad: 'solo' | 'duo'): {
   hash: string;
@@ -1257,8 +1309,10 @@ describe('golden do Bobo Royale Grande (M11, fase 5) com bots no Arquipélago', 
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `cea68138` (placar 16×15).
  * M12 fase 7a (revisão): `d08e6ee7` (placar 15×15).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `b0b1d767`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `9bdcf251` (12 × 20).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `79fcc3a7` (10 × 24).
  */
-const GOLDEN_ARCADE_HASH = 'b0b1d767';
+const GOLDEN_ARCADE_HASH = '79fcc3a7';
 
 function runArcadeGolden(): { hash: string; score: [number, number] } {
   const { map } = loadWorld();
@@ -1301,8 +1355,13 @@ function runArcadeGolden(): { hash: string; score: [number, number] } {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `c717510f` (29 s, vencedor o time 0).
  * M12 fase 7a (revisão): `7d0d3d6b` (41 s, vencedor o time 2).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `c225802b`.
+ * M12 fase 7b (27/11/2026): o nascido olha para o lado aberto: `138290f6` (31 s; o Laranja vence com 2 de pé; abatidos
+ * 1/3/3/3; a casa no mesmo lugar).
+ * M12 fase 7b (revisão): as casas dos times 2 e 3 (sem ponto no mapa) também nascem olhando para o lado aberto:
+ * `9f99d7a3` (54 s; o time 3 vence com 1 de pé; abatidos 3/3/3/2; a casa no mesmo lugar).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `ed886cb6` (44 s; o time 3 vence com 1 de pé; abatidos 3/3/3/2).
  */
-const GOLDEN_SANDBOX_HASH = 'c225802b';
+const GOLDEN_SANDBOX_HASH = 'ed886cb6';
 
 function runSandboxGolden(): {
   hash: string;
@@ -1413,8 +1472,12 @@ describe('golden do Arcade (M8, fechamento) com bots no Construto', () => {
  * M12 fase 7a (os bots percebem e miram como gente, §23.7): `e785f5cf` (240 s, 85 abates, 48 armas pegas).
  * M12 fase 7a (revisão): `f8da4234` (239 s, 85 abates, 48 armas pegas).
  * M12 fase 7a na integração (a IA da 7a sobre o deslize da fase 6): `3790f374`.
+ * M12 fase 7b (27/11/2026): o spawn do FFA perto da ação (AM5; `3cd72206`) e o nascido olha para o lado aberto (14 dos
+ * 36 spawns do Porto): `03a735d7` (213 s, 76 abates, o 1º com 15; 47 armas pegas, 39 depois da volta).
+ * M12 fase 7b na integração (sobre a 7a e a fase 6): `f52131cc` (212 s, 74 abates, o 1º com 15; 46 armas pegas, 38
+ * depois da volta).
  */
-const GOLDEN_PICKUPS_HASH = '3790f374';
+const GOLDEN_PICKUPS_HASH = 'f52131cc';
 
 interface PickupsGoldenRun {
   hash: string;

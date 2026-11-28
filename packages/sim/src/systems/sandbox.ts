@@ -5,6 +5,7 @@ import { MAX_TEAMS } from '../constants.ts';
 import type { PlayArea, SimContext } from '../context.ts';
 import { ENTITY_FLAG, ENTITY_KIND } from '../entity.ts';
 import type { SimMap, SpawnPoint } from '../sim.ts';
+import { openSpawnYaw } from '../spawn-facing.ts';
 
 /**
  * M9 (fase 2): o Bobo Sandbox (`mode: 'sandbox'`, GDD §4.1.2). Na sim ele é o TDM de até 4 times (o placar de abates,
@@ -222,7 +223,9 @@ export function sandboxSpawns(map: SimMap, teams: number, navMain: number, popul
       if (n < 0 || used.includes(n)) continue;
       used.push(n);
       map.nav.nodePosition(n, pos, 0);
-      const yaw = Math.atan2(-(cx - pos[0]!), -(cz - pos[2]!));
+      // M12 (fase 7b, revisão): olhando para o meio, ou para o lado aberto se houver parede logo à frente.
+      const toMid = Math.atan2(-(cx - pos[0]!), -(cz - pos[2]!));
+      const yaw = openSpawnYaw(map.grid, map.blocks, map.colliders ?? null, area, pos[0]!, pos[1]!, pos[2]!, toMid);
       out.push({ x: pos[0]!, y: pos[1]!, z: pos[2]!, yaw, team: t });
     }
   }

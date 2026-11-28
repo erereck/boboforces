@@ -1,5 +1,5 @@
 import { type MatchRecipe, resolveBot } from '@boboforces/format';
-import { rulesText } from '../bot-card.ts';
+import { copyName, rulesText } from '../bot-card.ts';
 import { clamp, lerp, lerpAngle, smoothstep } from '@boboforces/shared';
 import {
   ENTITY_KIND,
@@ -493,6 +493,48 @@ export function controllerNames(recipe: MatchRecipe, humans: number): string[] {
     else out[slot.controller] = resolveBot(recipe, slot.bot).name || t('bot.name.normal-bob');
   }
   return out;
+}
+
+/**
+ * M12 (fase 7b): o mesmo bot repetido na partida ganha número na ordem da receita ("Chill Bob", "Chill Bob 2",
+ * "Chill Bob 3"…; 23 "Normal Bob" no Royale viram "Normal Bob" a "Normal Bob 23"): o kill feed ("Chill Bob Rattler
+ * Chill Bob"), o placar, o MVP, o Nêmesis e os prêmios diziam o mesmo nome para bots diferentes. O número (e não um
+ * nome sorteado) guarda qual bot é (o nível e o card que o jogador escolheu), cabe no feed e não precisa de glifo novo.
+ * Só os bots da receita; o número pula os nomes que já existem (`names`: humanos, a reserva do dono), e o 1º também
+ * ganha número se alguém de fora dos bots repetidos (um humano da sala) já tem o nome dele. O nome numerado cabe em
+ * `BOT_RANGES.nameMaxLength` (corta o nome do bot antes do número, como a cópia da Oficina: `copyName`). Sai só da
+ * receita e dos nomes da sala: o host e o amigo online fazem a mesma conta. Em `names`, no lugar.
+ */
+export function numberRepeatedBots(names: string[], recipe: MatchRecipe, humans: number): void {
+  const slots = expandRecipe(recipe, humans);
+  const count = new Map<string, number>();
+  const bot = new Set<number>();
+  for (const slot of slots) {
+    const name = slot.bot === null ? undefined : names[slot.controller];
+    if (name === undefined) continue;
+    bot.add(slot.controller);
+    count.set(name, (count.get(name) ?? 0) + 1);
+  }
+  const taken = new Set<string>();
+  const others = new Set<string>();
+  for (let c = 0; c < names.length; c++) {
+    const name = names[c];
+    if (name === undefined) continue;
+    taken.add(name);
+    if (!bot.has(c)) others.add(name);
+  }
+  const seen = new Set<string>();
+  for (const slot of slots) {
+    const base = slot.bot === null ? undefined : names[slot.controller];
+    if (base === undefined || ((count.get(base) ?? 0) < 2 && !others.has(base))) continue;
+    // O 1º fica com o nome do bot (a não ser que alguém de fora já tenha esse nome).
+    const first = !seen.has(base);
+    seen.add(base);
+    if (first && !others.has(base)) continue;
+    const name = copyName(base, taken);
+    taken.add(name);
+    names[slot.controller] = name;
+  }
 }
 
 /**

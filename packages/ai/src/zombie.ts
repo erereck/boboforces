@@ -1,5 +1,5 @@
 import { BUTTON, quantizeAxis, type InputFrame } from '@boboforces/input';
-import { DEG_TO_RAD, pitchToI16, yawToU16, type Rng } from '@boboforces/shared';
+import { angleDelta, DEG_TO_RAD, pitchToI16, yawToU16, type Rng } from '@boboforces/shared';
 import {
   ENTITY_FLAG,
   ENTITY_KIND,
@@ -11,6 +11,7 @@ import {
 } from '@boboforces/sim';
 import { AI_PATH, AI_ZOMBIE } from './config.ts';
 import type { AiContext } from './context.ts';
+import { AI_GROUP, zombieRingAngle } from './group.ts';
 import { createSteer, type PathFollower } from './paths.ts';
 import { turnToward } from './soldier.ts';
 
@@ -18,8 +19,9 @@ import { turnToward } from './soldier.ts';
  * Zumbi do teste de estresse (tecnico.md §8.3: "zumbi é mais barato que soldado"): N0 puro, sem percepção por raio.
  * Sabe onde estão os bobos (como no Bobo Zombies), escolhe o vivo mais perto a cada 0,5 s (1 s longe dos humanos),
  * persegue pelo flow field compartilhado (M3, fase 3c; sem ele, pela rota do A*, na mesma fila com orçamento dos
- * soldados), vai direto nos últimos metros e segura o golpe quando está colado. Pula nas ligações de pulo e quando
- * empaca. M3 (fase 3a): no Bobo Zombies, quem está caído não é presa.
+ * soldados), vai direto nos últimos metros (M12, fase 7b: a uma vaga do anel em volta do alvo, o cerco) e segura o
+ * golpe quando está colado. Pula nas ligações de pulo e quando empaca. M3 (fase 3a): no Bobo Zombies, quem está caído
+ * não é presa.
  */
 
 const F = ENTITY_FLAG;
@@ -65,6 +67,13 @@ export class ZombieBrain {
   progressX = 0;
   progressZ = 0;
   jumpHeld = false;
+  /**
+   * M12 (fase 7b): o cerco. De onde o zumbi chegou ao alvo (o ângulo, rad, do alvo até ele: frente = sin, cos) e de
+   * qual alvo; a vaga do anel sai disto e do índice (`group.ts`).
+   */
+  ringTarget = -1;
+  ringGen = 0;
+  ringAngle = 0;
 
   constructor(index: number, controller: number, rng: Rng, timing: ZombieTiming, follower: PathFollower) {
     this.index = index;
@@ -77,6 +86,44 @@ export class ZombieBrain {
 
 const steer = createSteer();
 const push = { x: 0, z: 0 };
+const ring = { x: 0, z: 0 };
+
+/**
+ * M12 (fase 7b): a direção (em `ring`, comprimento até 1) até a vaga do zumbi no anel de `AI_GROUP.zombieRingM` em
+ * volta do alvo (em tx, tz; `dist` no plano): no ângulo de onde ele chegou + ((índice % 5) − 2)·0,45 rad. O ângulo de
+ * chegada fica fixo enquanto o alvo é o mesmo e não passa para o outro lado (mais de 90°): a vaga não gira junto com o
+ * zumbi.
+ */
+function ringSteer(zb: ZombieBrain, v: SimView, x: number, z: number, tx: number, tz: number, dist: number): void {
+  const t = zb.target;
+  const now = dist > 1e-6 ? Math.atan2(x - tx, z - tz) : zb.ringAngle;
+  if (
+    zb.ringTarget !== t ||
+    zb.ringGen !== v.generation[t]! ||
+    Math.abs(angleDelta(zb.ringAngle, now)) > AI_GROUP.zombieRelatchRad
+  ) {
+    zb.ringTarget = t;
+    zb.ringGen = v.generation[t]!;
+    zb.ringAngle = now;
+  }
+  const a = zombieRingAngle(zb.ringAngle, zb.index);
+  const sx = tx + Math.sin(a) * AI_GROUP.zombieRingM - x;
+  const sz = tz + Math.cos(a) * AI_GROUP.zombieRingM - z;
+  const d = Math.sqrt(sx * sx + sz * sz);
+  if (d < 1e-6) {
+    ring.x = 0;
+    ring.z = 0;
+    return;
+  }
+  // Perto da vaga, desacelera (sem tremer em volta dela), só com o alvo quase parado. Revisão: freando atrás de quem
+  // recua, o zumbi ficava 1,07–1,2 m atrás, fora do `attackM`, e não golpeava.
+  const vx = v.velocity[t * 3]!;
+  const vz = v.velocity[t * 3 + 2]!;
+  const slow = vx * vx + vz * vz < AI_GROUP.zombieEaseTargetMps * AI_GROUP.zombieEaseTargetMps;
+  const k = slow && d < AI_GROUP.zombieSlotEaseM ? 1 / AI_GROUP.zombieSlotEaseM : 1 / d;
+  ring.x = sx * k;
+  ring.z = sz * k;
+}
 
 /** O bobo vivo (humano ou bot) mais perto, ou -1. */
 function nearestPrey(c: AiContext, x: number, y: number, z: number): number {
@@ -228,7 +275,13 @@ export function thinkZombie(c: AiContext, zb: ZombieBrain, f: InputFrame, t: Zom
     const dy = ty - y;
     const dist = Math.sqrt(dx * dx + dz * dz);
     const sameFloor = Math.abs(dy) < 1;
-    if ((dist < AI_ZOMBIE.directM && sameFloor) || v.nav === null) {
+    if (dist < AI_ZOMBIE.directM && sameFloor) {
+      // M12 (fase 7b): o cerco: perto, vai à vaga dele no anel em volta do alvo (era reto ao centro, e só a separação
+      // abria a fila).
+      ringSteer(zb, v, x, z, tx, tz, dist);
+      wx = ring.x;
+      wz = ring.z;
+    } else if (v.nav === null) {
       if (dist > 1e-6) {
         wx = dx / dist;
         wz = dz / dist;

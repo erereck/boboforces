@@ -56,6 +56,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
 - **Download menor:** a primeira partida no navegador baixa uns 56 KB a menos, porque as versões reduzidas das
   texturas (as que o jogo usa ao longe) agora são calculadas no carregamento, idênticas às de antes, sem deixar o
   loading mais lento.
+- **Os bots em grupo (fase 7b):** quem segue você ("Vem comigo", o Suporte) fica numa vaga atrás do seu caminho, cada
+  um no seu lugar e vigiando para fora em vez de encarar as suas costas ou ficar na sua frente; o "Me cobre" vai atrás
+  de quem atirou em você; os zumbis cercam em vez de fazer fila; no Todos contra todos você nasce perto da ação, longe
+  da vista de quem quer que seja; ninguém nasce mais de cara para a parede; o Palhaço só comemora de vez em quando; os
+  bots repetidos ganham número no nome ("Chill Bob 2"); e a partida começa sem o engasgo do primeiro instante, porque o
+  mapa de lugares dos bots agora é montado na tela de carregamento.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

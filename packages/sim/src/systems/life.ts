@@ -705,8 +705,9 @@ let best2 = -1;
 /**
  * Melhor ponto para renascer (gameplay.md §5.3). Candidatos: os do time (ou `-1`; FFA e zumbi: todos; sem nenhum,
  * qualquer ponto). Nota base = menor distância² até um inimigo vivo.
- * - FFA: em ordem de nota, os pontos a mais de `ffaSpawnMinDistM` de todo inimigo e sem linha de visão de nenhum; a
- *   visão só é testada até achar 3. Sem ponto seguro, cai na regra da distância.
+ * - FFA: os pontos a mais de `ffaSpawnMinDistM` de todo inimigo e sem linha de visão de nenhum, na ordem do inimigo
+ *   mais perto mais próximo de `ffaSpawnIdealDistM` (M12, fase 7b: era do mais longe); a visão só é testada até achar
+ *   3. Sem ponto seguro, cai na regra da distância (os 3 mais longe).
  * - TDM: cada inimigo que enxerga o ponto tira `SIGHT_PENALTY` da nota; o sorteio fica entre os 3 melhores que têm
  *   tão poucos inimigos à vista quanto o melhor.
  * - Zumbi: só a distância.
@@ -742,22 +743,28 @@ export function pickSpawn(ctx: SimContext, e: number): number {
   }
   if (!zombie && ctx.ffa) {
     const minD2 = MATCH_DEFAULTS.ffaSpawnMinDistM * MATCH_DEFAULTS.ffaSpawnMinDistM;
+    const ideal = MATCH_DEFAULTS.ffaSpawnIdealDistM;
     mark.fill(0, 0, n);
     let found = 0;
     let a0 = -1;
     let a1 = -1;
     let a2 = -1;
     while (found < 3) {
+      // M12 (fase 7b, AM5): entre os pontos a mais de 20 m de todo inimigo, o do inimigo mais perto mais próximo de
+      // `ffaSpawnIdealDistM` (era o mais longe: o FFA nascia no canto, longe da ação). Sem inimigo vivo, todos têm a
+      // nota do teto e o 1º da lista ganha, como antes.
       let pick = -1;
-      let v = -Infinity;
+      let v = Infinity;
       for (let i = 0; i < n; i++) {
-        if (mark[i] === 0 && score[i]! > v) {
-          v = score[i]!;
+        const d2 = score[i]!;
+        if (mark[i] !== 0 || d2 <= minD2) continue;
+        const off = Math.abs(Math.sqrt(d2) - ideal);
+        if (off < v) {
+          v = off;
           pick = i;
         }
       }
-      // Daqui para baixo todo ponto está a menos de 20 m de algum inimigo.
-      if (pick < 0 || v <= minD2) break;
+      if (pick < 0) break;
       mark[pick] = 1;
       const sp = spawns[pick]!;
       if (enemiesSeeing(ctx, e, sp.x, sp.y, sp.z, 1) > 0) continue;

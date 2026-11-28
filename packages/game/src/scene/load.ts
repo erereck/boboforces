@@ -8,6 +8,7 @@ import {
   type ModelDocument,
   type TextureArrayName,
 } from '@boboforces/format';
+import { prepareNavLevels } from '@boboforces/ai';
 import type { NavGrid } from '@boboforces/nav';
 import {
   assembleTextureArray,
@@ -78,6 +79,11 @@ export interface LoadingTimes {
   mesh: number;
   light: number;
   nav: number;
+  /**
+   * M12 (fase 7b): o índice de lugares da IA (`prepareNavLevels`), logo depois da navegação e no mesmo passo da tela
+   * de loading; antes ele era montado no 1º tick da partida.
+   */
+  aiIndex: number;
   skins: number;
   /** #56: tabela de jogo do boneco (uma vez) + gabaritos dos looks da cena (a etapa "figuras", antes das skins). */
   figures: number;
@@ -91,7 +97,7 @@ interface RawFiles {
   strips: Record<TextureArrayName, { png: Uint8Array; json: string }[]>;
 }
 
-type Phase = 'assets' | 'textures' | 'light' | 'mesh' | 'nav' | 'done' | 'error';
+type Phase = 'assets' | 'textures' | 'light' | 'mesh' | 'nav' | 'aiIndex' | 'done' | 'error';
 
 /**
  * Detalhe da etapa de assets para o log do Teste Zero. No Eden (03/11): ~1,2 s = chegada dos arquivos ~0,55 s com só
@@ -125,8 +131,11 @@ export interface ConstrutoLoader {
 /** Fatia do job de luz (células visitadas por chamada; o laço segue até o orçamento de tempo do frame). */
 const LIGHT_SLICE = 40_000;
 
-/** M2 (fase 5c): `mapId` escolhe o mapa (o nome "Construto" do loader ficou do M1: ele carrega qualquer `map@1`). */
-export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): ConstrutoLoader {
+/**
+ * M2 (fase 5c): `mapId` escolhe o mapa (o nome "Construto" do loader ficou do M1: ele carrega qualquer `map@1`). M12
+ * (fase 7b, revisão): `aiIndex` = montar o índice de lugares da IA (sem IA na partida, a etapa é pulada).
+ */
+export function createConstrutoLoader(host: SceneHost, mapId = 'construto', aiIndex = true): ConstrutoLoader {
   const { platform, renderer } = host;
   const now = (): number => platform.now();
   const model = createLoadingModel();
@@ -139,6 +148,7 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     mesh: 0,
     light: 0,
     nav: 0,
+    aiIndex: 0,
     skins: 0,
     figures: 0,
     shaders: 0,
@@ -363,13 +373,32 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     phase = 'nav';
   }
 
+  let builtNav: NavGrid | null = null;
+  let builtSimMap: SimMap | null = null;
+
   function stepNav(): void {
     const t0 = now();
     mark('nav', 0);
-    const nav = buildMapNav(world!);
-    const simMap = buildSimMap(world!, nav);
+    builtNav = buildMapNav(world!);
+    builtSimMap = buildSimMap(world!, builtNav);
     times.nav = now() - t0;
-    finish('nav', times.nav);
+    mark('nav', 0.8);
+    phase = 'aiIndex';
+  }
+
+  /**
+   * M12 (fase 7b): o índice de lugares da IA (`NavLevels`) com a navegação e a área jogável da partida: o 1º tick só
+   * copia. Num passo à parte (o frame da navegação já é longo), contado na etapa "navegação" da tela de loading.
+   */
+  function stepAiIndex(): void {
+    const t0 = now();
+    const nav = builtNav!;
+    const simMap = builtSimMap!;
+    if (aiIndex) prepareNavLevels(nav, simMap.playArea ?? null);
+    times.aiIndex = now() - t0;
+    finish('nav', times.nav + times.aiIndex);
+    builtNav = null;
+    builtSimMap = null;
     result = {
       doc: doc!,
       world: world!,
@@ -427,6 +456,7 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
         if (phase === 'light' && now() < deadline) stepLight(deadline);
         if (phase === 'mesh' && now() < deadline) stepMesh(deadline);
         if (phase === 'nav' && now() < deadline) stepNav();
+        if (phase === 'aiIndex' && now() < deadline) stepAiIndex();
       } catch (e) {
         error = e;
         phase = 'error';

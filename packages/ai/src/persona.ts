@@ -1,5 +1,5 @@
 import { PERSONALITY_PRESETS } from '@boboforces/format';
-import { BUTTON, WEAPON_SLOT_COUNT } from '@boboforces/input';
+import { BUTTON, ORDER, WEAPON_SLOT_COUNT } from '@boboforces/input';
 import { angleDelta, clamp, DEG_TO_RAD, HALF_PI, wrapAngle } from '@boboforces/shared';
 import {
   ENTITY_FLAG,
@@ -8,6 +8,7 @@ import {
   heldClip,
   MAX_HUMANS,
   NULL_ENTITY,
+  secondsToTicks,
   WEAPON_SLOT,
   weaponDef,
   type SimView,
@@ -15,6 +16,9 @@ import {
 import { CELLS_PER_METER } from '@boboforces/world';
 import { AI_PERSONA, AI_TEAM, type AiWeaponUse } from './config.ts';
 import type { AiContext } from './context.ts';
+import { AI_CELEBRATE, AI_GROUP } from './config-group.ts';
+import { updateFollowSlot } from './group.ts';
+import { orderOwnerAlive } from './orders.ts';
 import type { SoldierBrain, SoldierTiming } from './soldier.ts';
 
 /**
@@ -31,8 +35,10 @@ import type { SoldierBrain, SoldierTiming } from './soldier.ts';
  * - **Kamikaze:** persegue o humano mais perto, nunca recua e cola no alvo; com granada, se explode (segura o gatilho
  *   até ela estourar na mão);
  * - **Caçador:** escolhe o humano com mais abates e o persegue pelo mapa, preferindo ele a qualquer outro alvo;
- * - **Suporte:** segue o humano aliado, vigia as costas dele e vai atrás de quem atirou nele;
- * - **Palhaço:** dancinha depois do abate (gira, agacha e pula) e pulinhos andando;
+ * - **Suporte:** segue o humano aliado (M12, fase 7b: numa vaga atrás dele, `group.ts`), vigia as costas dele e vai
+ *   atrás de quem atirou nele;
+ * - **Palhaço:** às vezes comemora o abate sem ninguém à vista (M12, fase 7b: um pulinho ou um giro curto; era uma
+ *   dancinha que girava, agachava várias vezes e pulava) e dá pulinhos andando;
  * - **Equilibrado:** o padrão.
  * A distância preferida é relativa à do Equilibrado (a de cada arma) e só encurta. A perseguição
  * do Kamikaze e do Caçador sabe onde a presa está, com erro (é o comportamento declarado no card). A personalidade só
@@ -74,27 +80,55 @@ export function focusValid(c: AiContext, b: SoldierBrain): boolean {
   return f >= 0 && c.living(f) && c.view!.generation[f] === b.focusGen;
 }
 
-/** Uma vez por tick (vivo), antes das decisões: abates novos (dancinha, troca de ponto), foco e guarda do Suporte. */
+/**
+ * Uma vez por tick (vivo), antes das decisões: abates novos (a comemoração, troca de ponto), foco e guarda do Suporte e
+ * (M12, fase 7b) a vaga de quem segue um líder.
+ */
 export function personaTick(c: AiContext, b: SoldierBrain, e: number, t: SoldierTiming): void {
   const view = c.view!;
   const tick = c.tick;
   const preset = b.personality.preset;
   const kills = view.kills[e]!;
   if (kills > b.lastKills) {
-    if (preset === 'clown') b.danceUntil = tick + t.dance;
+    // M12 (fase 7b): só o Palhaço, sem alvo à vista, às vezes (bobeira · `chanceMul`): um pulinho ou um giro curto.
+    if (preset === 'clown' && !b.targetVisible && b.rng.chance(b.personality.silliness * AI_CELEBRATE.chanceMul)) {
+      b.danceUntil = tick + celebrateTicks(t);
+    }
     if (b.campPhase === CAMP_PHASE.holding) {
       b.campKillCount += kills - b.lastKills;
       if (b.campKillCount >= AI_PERSONA.campKills) leaveCamp(b, tick, t);
     }
   }
   b.lastKills = kills;
-  if (preset !== 'hunter' && preset !== 'kamikaze' && preset !== 'support') return;
-  if (tick >= b.focusNextTick || (b.focus >= 0 && !focusValid(c, b))) {
-    b.focusNextTick = tick + t.quarryEvery;
-    pickFocus(c, b, e, preset === 'support', preset === 'hunter');
-    b.guardHp = b.focus >= 0 ? view.health[b.focus]! : 0;
+  if (preset === 'hunter' || preset === 'kamikaze' || preset === 'support') {
+    if (tick >= b.focusNextTick || (b.focus >= 0 && !focusValid(c, b))) {
+      b.focusNextTick = tick + t.quarryEvery;
+      pickFocus(c, b, e, preset === 'support', preset === 'hunter');
+      b.guardHp = b.focus >= 0 ? view.health[b.focus]! : 0;
+    }
+    if (preset === 'support') guardHuman(c, b, e, tick);
   }
-  if (preset === 'support') guardHuman(c, b, e, tick);
+  // A ordem que segura o bot parado na vaga liga isto de novo neste tick (`orderGoal`).
+  b.orderHold = false;
+  const stale = secondsToTicks(AI_GROUP.followStaleS, c.hz);
+  updateFollowSlot(c, view, b.group, e, followLeader(c, b), b.order === ORDER.cover, stale);
+}
+
+/**
+ * M12 (fase 7b): o líder que o bot segue agora: quem mandou o Vem comigo ou o Me cobre (valendo); sem ordem, o humano
+ * do Suporte; senão -1.
+ */
+function followLeader(c: AiContext, b: SoldierBrain): number {
+  const view = c.view!;
+  if ((b.order === ORDER.follow || b.order === ORDER.cover) && c.tick < b.orderUntil && orderOwnerAlive(view, b)) {
+    return b.orderOwner;
+  }
+  if (b.order === ORDER.none && b.personality.preset === 'support' && focusValid(c, b)) return b.focus;
+  return -1;
+}
+
+function celebrateTicks(t: SoldierTiming): number {
+  return Math.max(2, secondsToTicks(AI_CELEBRATE.seconds, t.hz));
 }
 
 /**
@@ -207,14 +241,24 @@ export function personaOverride(
     return BUTTON.crouch;
   }
   if (tick < b.danceUntil) {
+    // M12 (fase 7b): a comemoração do Palhaço: parado, um pulinho OU um giro de uma volta (pelo tick em que acaba e
+    // pelo bot: varia sem sortear), e recarrega. Nunca agacha. Apareceu alguém: briga.
+    if (b.targetVisible) {
+      b.danceUntil = 0;
+      return -1;
+    }
     local.x = 0;
     local.y = 0;
     b.fireHeld = false;
-    b.aimYaw = wrapAngle(b.aimYaw + t.danceSpinStep);
     b.aimPitch = stepTo(b.aimPitch, 0, b.turnStep);
+    const total = celebrateTicks(t);
     const left = b.danceUntil - tick;
-    if (Math.floor(left / t.danceCrouch) % 2 === 0) return BUTTON.crouch;
-    return left % t.danceJump === 0 && (view.flags[e]! & F.onGround) !== 0 ? BUTTON.jump : 0;
+    let buttons = 0;
+    if (((b.danceUntil + b.index) & 1) === 0) b.aimYaw = wrapAngle(b.aimYaw + (Math.PI * 2) / total);
+    else if (left * 2 > total && (view.flags[e]! & F.onGround) !== 0) buttons = BUTTON.jump;
+    const def = weaponDef(view.weapon[e]!);
+    if (def && def.clipSize > 0 && heldClip(view, e) < def.clipSize) buttons |= BUTTON.reload;
+    return buttons;
   }
   return -1;
 }
@@ -408,18 +452,14 @@ export function personaGoal(
     b.pursuitNextTick = 0;
   }
   if (preset === 'support') {
-    const dx = fx - x;
-    const dz = fz - z;
-    if (dx * dx + dz * dz <= AI_PERSONA.supportFarM * AI_PERSONA.supportFarM) return false;
-    if (tick >= b.pursuitNextTick || !b.hasGoal) {
-      // Atrás do humano (do lado contrário ao que ele olha).
-      b.pursuitNextTick = tick + t.supportEvery;
-      const yaw = view.yaw[b.focus]!;
-      b.goalX = fx + Math.sin(yaw) * AI_PERSONA.supportNearM;
-      b.goalY = view.position[f3 + 1]!;
-      b.goalZ = fz + Math.cos(yaw) * AI_PERSONA.supportNearM;
-      b.hasGoal = true;
-    }
+    // M12 (fase 7b): a vaga atrás do humano (`group.ts`: pelo rumo de movimento dele, uma por seguidor), refeita a cada
+    // tick no `personaTick`. Era um ponto atrás do YAW dele, refeito a cada 1,5 s, e o Suporte parava a até 6 m.
+    const g = b.group;
+    if (g.tick !== tick || g.leader !== b.focus) return false;
+    b.goalX = g.slotX;
+    b.goalY = g.slotY;
+    b.goalZ = g.slotZ;
+    b.hasGoal = true;
     b.goalUntil = tick + t.wander;
     return true;
   }
@@ -561,12 +601,10 @@ export function personaHold(
         : b.campLook + Math.sin((tick / t.hz) * 1.3) * AI_PERSONA.campScanDeg * DEG_TO_RAD;
     buttons = BUTTON.crouch;
   } else if (preset === 'support' && !b.hasLastKnown && focusValid(c, b)) {
-    const f3 = b.focus * 3;
-    const dx = view.position[f3]! - x;
-    const dz = view.position[f3 + 2]! - z;
-    if (dx * dx + dz * dz > AI_PERSONA.supportFarM * AI_PERSONA.supportFarM) return -1;
-    // Vigia as costas do humano, varrendo devagar.
-    look = view.yaw[b.focus]! + Math.PI + Math.sin((tick / t.hz) * 0.9) * HALF_PI * 0.6;
+    // M12 (fase 7b): parado na vaga (`group.ts`), vigia para fora: as costas e o lado do humano do setor da vaga.
+    const g = b.group;
+    if (g.tick !== tick || g.leader !== b.focus || g.moving) return -1;
+    look = g.watchYaw;
   } else {
     return -1;
   }

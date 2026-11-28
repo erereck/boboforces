@@ -22,6 +22,10 @@ import { AI_SOLDIER } from './config.ts';
  *
  * Montado uma vez por navegação (`bind`, no 1º tick, como o `NavPath` da busca); ordem estável (componente, piso e
  * menor índice de nó; determinístico). Nada é alocado depois.
+ *
+ * M12 (fase 7b): o jogo monta o índice numa etapa do loading (`prepareNavLevels`, em `game/src/scene/load.ts`): o 1º
+ * tick só copia as referências (15–110 ms a menos no PC; ~50 ms no Royale Grande). O índice pronto é o MESMO que o
+ * `bind` montaria (mesma função, mesma navegação e mesma área): a IA não muda.
  */
 /** A área jogável (a da `SimView.playArea`), para o índice não contar os lugares de fora. */
 export interface PlaceArea {
@@ -29,6 +33,41 @@ export interface PlaceArea {
   readonly maxX: number;
   readonly minZ: number;
   readonly maxZ: number;
+}
+
+/** O índice pronto de uma navegação (só leitura depois de montado: os cérebros compartilham os arrays). */
+interface PreparedLevels {
+  readonly area: PlaceArea | null;
+  readonly count: number;
+  readonly group: Int32Array;
+  readonly mainGroup: Int32Array;
+  readonly compStart: Int32Array;
+  readonly floorY: Float32Array;
+  readonly start: Int32Array;
+  readonly order: Int32Array;
+}
+
+/**
+ * Os índices montados no loading, por navegação. Fraco: some com a navegação (a partida e a cena soltam o mapa), sem
+ * `dispose` a fazer; no máximo um por mapa carregado.
+ */
+const prepared = new WeakMap<NavGrid, PreparedLevels>();
+
+function sameArea(a: PlaceArea | null, b: PlaceArea | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.minX === b.minX && a.maxX === b.maxX && a.minZ === b.minZ && a.maxZ === b.maxZ;
+}
+
+/**
+ * M12 (fase 7b): monta o índice de lugares de `nav` fora da partida (a etapa do loading). O `bind` do 1º tick com a
+ * mesma navegação e a mesma área só copia. Devolve quantos lugares o índice tem.
+ */
+export function prepareNavLevels(nav: NavGrid, area: PlaceArea | null = null): number {
+  const known = prepared.get(nav);
+  if (known !== undefined && sameArea(known.area, area)) return known.count;
+  const levels = new NavLevels();
+  levels.bind(nav, area);
+  return levels.count;
 }
 
 export class NavLevels {
@@ -51,7 +90,36 @@ export class NavLevels {
     this.nav = nav;
     this.count = 0;
     this.compStart = new Int32Array(1);
+    this.floorY = new Float32Array(0);
+    this.start = new Int32Array(1);
+    this.order = new Int32Array(0);
     if (nav === null) return;
+    // M12 (fase 7b): montado no loading (`prepareNavLevels`): só as referências.
+    const ready = prepared.get(nav);
+    if (ready !== undefined && sameArea(ready.area, area)) {
+      this.count = ready.count;
+      this.group = ready.group;
+      this.mainGroup = ready.mainGroup;
+      this.compStart = ready.compStart;
+      this.floorY = ready.floorY;
+      this.start = ready.start;
+      this.order = ready.order;
+      return;
+    }
+    this.build(nav, area);
+    prepared.set(nav, {
+      area: area === null ? null : { minX: area.minX, maxX: area.maxX, minZ: area.minZ, maxZ: area.maxZ },
+      count: this.count,
+      group: this.group,
+      mainGroup: this.mainGroup,
+      compStart: this.compStart,
+      floorY: this.floorY,
+      start: this.start,
+      order: this.order,
+    });
+  }
+
+  private build(nav: NavGrid, area: PlaceArea | null): void {
     const n = nav.nodeCount;
     const keep = this.groups(nav);
     const components = this.mainGroup.length;

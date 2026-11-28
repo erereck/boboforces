@@ -69,7 +69,9 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
   const profile = profileFor(platform.features.profileHint, views, request.bench);
   const recipe = sceneRecipe(request, profile);
   // M2 (fase 5c): o mapa da receita (Construto ou Ringue).
-  const loader = createConstrutoLoader(host, recipe.recipe.map);
+  // M12 (fase 7b, revisão): o índice de lugares da IA só onde há IA (o amigo online e o provador não têm).
+  const withAi = request.kind !== 'wardrobe' && request.online?.role !== 'client';
+  const loader = createConstrutoLoader(host, recipe.recipe.map, withAi);
   const loading: LoadingModel = loader.model;
   // M12 (fase 3): o loading fala do jogo: o Meu Bobo pelo nome dele, o resumo da partida e uma dica sorteada pela
   // semente que troca a cada `TIP_TURN_S` (a mesma do loading do chunk); as etapas com ms só no bench ou com o F2.

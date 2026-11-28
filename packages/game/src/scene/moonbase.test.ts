@@ -153,7 +153,13 @@ describe('a Estação Lunar (M10, fase 4)', () => {
   // 57 s (7 de 8 sementes); o andar de cima segue com bot (465, o 1º aos 34 s). M12 (fase 7a, a IA que percebe e mira
   // como gente): o deque segue com bot em 7 de 8 sementes (1.294 amostras somadas, eram 997), mas a 42 é a que ficou
   // sem (a 5 passou a ter): o deque olha a 42 e a 1 (230 amostras, a 1ª aos 9 s).
+  // M12 (fase 7b): os bots que vão ao deque escolhem o lugar, mas caem da rampa de 2 m (1:1, sem corrimão do lado)
+  // quando brigam ou cortam a curva no alto dela e ficam pulando ao lado da parede de 3 m do deque: quem chega depende
+  // da semente (pendência do mapa). Na junção ficou o teste da 7a (a 42 e a 1 em 90 s), com cada semente rodada uma vez.
+  const runs = new Map<number, { upper: number; deck: number }>();
   const upperAndDeck = (seed = 42): { upper: number; deck: number } => {
+    const known = runs.get(seed);
+    if (known !== undefined) return known;
     const map = loadMap('moonbase');
     const match = createHeadlessMatch({ recipe: { ...RECIPES['Times (TDM)']!, seed }, map, humans: 0 });
     let upper = 0;
@@ -173,7 +179,9 @@ describe('a Estação Lunar (M10, fase 4)', () => {
       }
     }
     match.dispose();
-    return { upper, deck };
+    const run = { upper, deck };
+    runs.set(seed, run);
+    return run;
   };
   it('os bots sobem para o andar de cima da estação', () => {
     expect(upperAndDeck().upper).toBeGreaterThan(0);

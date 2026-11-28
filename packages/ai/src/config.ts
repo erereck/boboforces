@@ -377,15 +377,7 @@ export const AI_PERSONA = {
   pursuitNoiseM: 6,
   /** Kamikaze: com granada, a menos disto do alvo troca para ela e segura o gatilho até explodir na mão. */
   kamikazeBoomM: 3,
-  /** Suporte: segue o humano aliado (fica a `supportNearM`..`supportFarM` atrás dele) e vigia as costas dele. */
-  supportNearM: 3,
-  supportFarM: 6,
-  supportEveryS: 1.5,
-  /** Palhaço: dancinha de `danceS` depois do abate (gira, agacha e pula). */
-  danceS: 2,
-  danceSpinDegPerS: 540,
-  danceCrouchS: 0.25,
-  danceJumpS: 0.6,
+  // M12 (fase 7b): o Suporte segue numa vaga (`AI_GROUP`) e o Palhaço comemora pelo `AI_CELEBRATE` (`config-group.ts`).
 } as const;
 
 /** M2 (fase 3c): patrulha do N1: olhando em volta enquanto anda sem pista do inimigo (a cada 1,5–3,5 s, ±`deg`). */
@@ -598,11 +590,7 @@ export const AI_ORDERS = {
   holdS: 45,
   attackS: 40,
   coverS: 60,
-  /** Vem comigo: passando de `followFarM`, volta para `followNearM` atrás de quem mandou. Me cobre: mais colado. */
-  followNearM: 3,
-  followFarM: 6,
-  coverNearM: 2,
-  coverFarM: 4,
+  // M12 (fase 7b): o Vem comigo e o Me cobre seguem numa vaga atrás de quem mandou (`AI_GROUP`, `config-group.ts`).
   /** Segura aqui: fora de `holdM` do ponto, volta para ele. */
   holdM: 2.5,
   /** Ataca ali: chegando a `attackReachM` do ponto, a ordem acaba (caça dali); o "ali" vai até `attackRangeM`. */
@@ -612,8 +600,6 @@ export const AI_ORDERS = {
   reviveSeekM: 40,
   /** Quem recusou não sorteia de novo a mesma ordem do mesmo humano por este tempo (s): reenviar não vence a lealdade. */
   refuseS: 15,
-  /** Mais longe que isto na altura (m), quem mandou está em outro andar: o Vem comigo não para ainda. */
-  sameFloorM: 1.5,
   /** O Ataca ali cai no chão embaixo do ponto da mira até esta altura (m); sem chão, a ordem não vale. */
   groundDropM: 20,
   /** Os cortes da lealdade (pergunta Z6): o Covarde no Ataca ali (70% → 50%) e o Camper no Vem comigo (70% → 30%). */

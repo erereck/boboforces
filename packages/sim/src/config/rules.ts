@@ -33,6 +33,11 @@ export const MATCH_DEFAULTS = {
   /** M2: no FFA, o spawn fica sem linha de visão de inimigo e a mais disto dele (gameplay.md §5.3). */
   ffaSpawnMinDistM: 20,
   /**
+   * M12 (fase 7b, pergunta AM5; GDD §4.2.4): entre os pontos seguros do FFA, os 3 com o inimigo mais perto mais próximo
+   * desta distância (m): perto da ação, não no canto mais longe do mapa.
+   */
+  ffaSpawnIdealDistM: 35,
+  /**
    * M2 (fase 2b): caixinha de munição de quem morre no Bobo Warfare (gameplay.md §4.1): some depois disto e é pega a
    * esta distância (no plano) dos pés. Dá 1 pente da primária e da pistola e 1 granada, até o máximo de cada.
    */
@@ -67,4 +72,16 @@ export const SANDBOX_SPAWN = {
 export const MAP_WEAPONS = {
   respawnS: 20,
   swapReachM: 1.2,
+} as const;
+
+/**
+ * M12 (fase 7b): para onde o bobo olha ao nascer (`spawn-facing.ts`): com a vista à frente (e a ±22,5°) livre até
+ * `keepM`, o yaw do marcador; senão o rumo mais aberto de `directions` (raios de até `rangeM`), com `bonusM · cos` para o
+ * rumo do marcador.
+ */
+export const SPAWN_FACING = {
+  keepM: 4,
+  directions: 16,
+  rangeM: 24,
+  bonusM: 2,
 } as const;

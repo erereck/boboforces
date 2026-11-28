@@ -5977,3 +5977,49 @@ no carregamento.
   225–243 → 199–204 ms (o loading empata). Medir no console.
 - **Contratos:** `TextureStrip.mips` opcional (ausente = gerar); `textureStripPaths` sem `mips`; o comentário do
   `layers@1` (o `mipLevels` são os níveis da cadeia). Nenhum golden mudou.
+
+### 23.8 Fase 7b: os bots em grupo, os zumbis e o spawn (28/11/2026)
+
+- **O índice de lugares no loading** (`ai/src/levels.ts` `prepareNavLevels`; `game/src/scene/load.ts`, a etapa `aiIndex`
+  depois da navegação, em `LoadingTimes.aiIndex` e na linha 13 do Teste Zero como `indice_ia`): o `NavLevels` montava no
+  1º tick. O loading monta com a navegação e a área jogável e guarda num `WeakMap` por navegação; o `bind` do 1º tick
+  só copia as referências. É o mesmo índice (o `levels.test.ts` confere arrays e hash iguais com e sem ele); sem IA (o
+  amigo online, o provador), a etapa é pulada. 1º tick: Construto ~21 → 9,6 ms (índice de 11–12 ms no loading); Royale
+  Grande 85–136 → 17–18 ms (57–61 ms no loading).
+- **Aliados em vaga** (`ai/src/group.ts`; `persona.ts`, `orders.ts`, `context.ts`; constantes em
+  `ai/src/config-group.ts`): o Vem comigo, o Me cobre e o Suporte vão a uma vaga atrás do líder (antes, todos ao mesmo
+  ponto 1,8 m atrás pelo yaw: quando o humano olhava para trás o ponto ia para a frente dele). "Atrás" é pelo rumo do
+  líder (`AiContext.heading`), que gira no máximo 180°/s até o do movimento (acima de 1,5 m/s) ou, parado há 0,5 s, até
+  o yaw dele: quem entra, para e vira para a porta fica com os seguidores nas costas, e o A/D não troca o lado das
+  vagas. A vaga sai da ordem do seguidor: +40°, −40°, +80°, −80° a 2,5 m (Me cobre 1,6 m), do lado de cá de parede e
+  presa num nó do mesmo piso à vista do líder, pelo chão do líder (o último tick no chão; sem nó bom, a anterior).
+  Parado, o seguidor olha para fora (yaw do líder + π + setor, varrendo ±20°), com `orderHold` (o `travel` da 7a não
+  gira por cima).
+- **Os zumbis cercam** (`zombie.ts` `ringSteer`): a menos de 4 m, vaga no anel de 0,9 m no ângulo de chegada +
+  ((índice % 5) − 2)·0,45 rad, fixo por alvo até ele passar para o outro lado. O freio nos últimos 0,3 m só vale com o
+  alvo abaixo de 0,5 m/s (na revisão, o freio deixava o zumbi fora do `attackM` de quem recua: 0 golpes contra 12).
+  Atrás de quem anda, o espalhamento lateral foi de 2,29 para 3,39 m e o arco de 95° para 127°.
+- **O spawn do FFA perto da ação** (AM5; `sim/src/systems/life.ts`, `MATCH_DEFAULTS.ffaSpawnIdealDistM` = 35): entre os
+  seguros (> 20 m e sem linha de visão), os 3 com o inimigo mais perto mais próximo de 35 m (antes, os 3 mais longe).
+  Sem ponto seguro, como antes.
+- **O nascido olha para o lado aberto** (`sim/src/spawn-facing.ts`, no `simMapFromMarkers`, uma vez por mapa, sem mudar
+  o ponto; `SPAWN_FACING` em `sim/src/config/rules.ts`): se a vista no rumo do marcador ou a ±22,5° acaba a menos de
+  4 m (pelo que tapa a vista), o yaw vira o rumo mais aberto de 16; vale também para as casas dos times sem ponto do
+  Sandbox. Viram 10/28 spawns do Construto, 16/28 do Ringue, 14/36 do Porto, 16/28 do Canteiro e poucos nos outros.
+- **A comemoração** (`persona.ts`, `AI_CELEBRATE`): só o Palhaço, depois do abate e sem alvo à vista, com chance
+  bobeira·0,5; por 0,4 s, parado, um pulinho ou um giro (pelo tick e pelo bot), recarregando; nunca agacha.
+- **O Me cobre** (`orders.ts` `coverThreat`): o `AiContext` guarda os 3 últimos que feriram cada bobo; com a ordem
+  valendo, o alvo vem primeiro dos que feriram quem mandou nos últimos 3 s e que o bot vê (pelos sentidos da 7a: sem
+  proteção de spawn, alcance do bot), fora do cone só até `hearShotM`. Com histerese: o alvo atual fica enquanto é
+  atacante e está à vista; outro só toma o lugar a menos de 70% da distância.
+- **Os bots repetidos ganham número** (`game/src/scene/death.ts` `numberRepeatedBots`): "Chill Bob 2"… (antes, sete
+  "Chill Bob" no feed), também quando um humano da sala tem o nome, cortado para caber em `BOT_RANGES.nameMaxLength`.
+  Só da receita e dos nomes da sala: igual no host e no amigo; fora da sim e do hash. O Nêmesis guarda o nome base.
+- **A Estação Lunar:** os bots escolhem o deque da antena, mas caem da rampa de 2 m (1:1, sem corrimão lateral) quando
+  brigam ou cortam a curva; quem chega em 90 s depende da semente. Fica como pendência do mapa.
+- **Revisão (Opus):** 1 achado alto (o freio do cerco), 2 médios (as vagas na linha de tiro do líder parado; o Me cobre
+  sem histerese) e 5 baixos, corrigidos antes da junção. O caído da Fortaleza na Fazenda usa as sementes 1, 3 e 4 (em 8
+  sementes o gerador cai primeiro em 2).
+- **Contratos:** `LoadingTimes.aiIndex`, a fase `'aiIndex'` do loader, `prepareNavLevels`/`PlaceArea`/`coverThreat`
+  exportados, `MATCH_DEFAULTS.ffaSpawnIdealDistM`; o config morto das ordens e da dancinha saiu. Os goldens (19 de 21)
+  foram re-gravados sobre a 7a e a fase 6; o TDM na Base Bobo não mudou.

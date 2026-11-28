@@ -5,6 +5,7 @@
 export * from './skill.ts';
 export * from './config.ts';
 export * from './paths.ts';
+export { prepareNavLevels, type PlaceArea } from './levels.ts';
 export * from './director.ts';
 export * from './headless.ts';
 export * from './weapons.ts';
