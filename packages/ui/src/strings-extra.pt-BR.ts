@@ -411,6 +411,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'pause.help.settings': 'Controles, botões, tela e som, na hora.',
   'pause.help.unstuck': 'Leva o seu bobo para um lugar livre.',
   'pause.help.quit': 'Volta ao menu; esta partida não conta.',
+  // M12 (fase 3): o 1º aperto do Sair da partida arma; o 2º sai (qualquer outra coisa desarma).
+  'pause.quitArmed': 'Aperte de novo para sair.',
   'pause.help.leave': 'Um bot assume o seu lugar no sofá.',
   // M4 (fase 3): a página Jogadores da pausa (refazer os assentos depois de dock, HOME ou controle caído) e a bateria.
   'pause.players': 'Jogadores',
@@ -525,7 +527,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'result.backToRoom': 'Voltar à sala',
   // Os textos da Partida personalizada, do Laboratório e da Oficina (saíram do menu: as telas já vinham com os
   // editores, e o menu está no teto de 350 KB).
-  'custom.title': 'Partida personalizada',
+  // M12 (fase 3, AM3): o mesmo nome do card ("Personalizada").
+  'custom.title': 'Personalizada',
   'custom.save': 'Salvar preset',
   // M7 (fase 9): o Aquário.
   'custom.watch': 'Assistir',
@@ -631,6 +634,9 @@ export const STRINGS_EXTRA_PT_BR = {
   'surprise.enemiesMode': 'Os do modo',
   'modes.watch.off': 'Aquário: desligado',
   'modes.watch.on': 'Aquário: ligado',
+  // M12 (fase 3): a linha de ajuda da Mais modos com o foco no Aquário.
+  'modes.watch.help.off': 'Desligado: você joga. Ligado: só bots jogam; você assiste.',
+  'modes.watch.help.on': 'Ligado: só bots jogam; você assiste.',
   'aquarium.title': 'Aquário',
   'aquarium.cam.follow': 'Seguindo {name}',
   'aquarium.cam.eyes': 'Nos olhos de {name}',
@@ -934,7 +940,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'settings.default': 'Padrão',
   'settings.degrees': '{n}°',
   'settings.row.uiScale': 'Tamanho dos menus',
-  'settings.row.reduceShake': 'Reduzir tremor',
+  // M12 (fase 3, pergunta AM1): o mesmo ajuste (`reduceShake` no save) vale para todo efeito de tela.
+  'settings.row.reduceShake': 'Reduzir efeitos',
   'settings.row.tips': 'Dicas',
   // M2 (fase 4f, parte 2): a aba Botões (remapeamento) e os nomes das teclas e dos botões (pela posição, sem marcas).
   'settings.tab.buttons': 'Botões',
@@ -943,7 +950,7 @@ export const STRINGS_EXTRA_PT_BR = {
   'settings.help.tab.buttons': 'Qual botão faz o quê, em cada controle.',
   'settings.help.tab.video': 'O que você vê: câmera, campo de visão, tela dividida, gráficos e menus.',
   'settings.help.tab.audio': 'Volumes e música.',
-  'settings.help.tab.access': 'Tremor da câmera, vibração, o aviso visual dos sons e as dicas.',
+  'settings.help.tab.access': 'Efeitos da tela, vibração, o aviso visual dos sons e as dicas.',
   'settings.help.tab.data': 'O backup do seu perfil, ajustes, presets e recordes num arquivo.',
   'settings.help.tab.about': 'Versão, créditos, novidades e o relatório para relatar erros.',
   'settings.help.view': 'Primeira pessoa ou por cima do ombro. Também troca na partida.',
@@ -978,7 +985,7 @@ export const STRINGS_EXTRA_PT_BR = {
   'settings.help.musicInMatch': 'Toca a música também durante a partida.',
   'settings.help.mono': 'Junta os dois lados do som, para um fone só ou uma caixa só.',
   'settings.help.soundIndicator': 'Mostra em volta da mira de onde vêm tiros e passos.',
-  'settings.help.shake': 'Menos tremor da câmera com tiros e explosões.',
+  'settings.help.shake': 'Sem tremor, balanço, pulsar e entradas animadas; até 3 clarões por segundo.',
   'settings.help.vibration': 'O controle vibra com dano, morte e explosões perto.',
   'settings.help.export': 'Salva perfil, ajustes, presets, bots e recordes num arquivo.',
   'settings.help.import': 'Lê um arquivo de backup. Depois você escolhe juntar ou substituir.',
@@ -1277,7 +1284,8 @@ export const STRINGS_EXTRA_PT_BR = {
   'result.again': 'De novo',
   'result.easier': 'Mais fácil',
   'result.harder': 'Mais difícil',
-  'result.changeRules': 'Mudar regras',
+  // M12 (fase 3, AM3): abre a Personalizada com esta partida (era "Mudar regras").
+  'result.changeRules': 'Personalizada',
   'result.savePreset': 'Salvar preset',
   'result.presetSaved': 'Preset salvo',
   'result.saveWorkshop': 'Salvar na Oficina',
@@ -1413,6 +1421,19 @@ export const STRINGS_EXTRA_PT_BR = {
   'result.scoreTeam': 'Seu time {own} × {other}',
   'hud.royale.clockWait': 'Fecha em',
   'hud.royale.clockShrink': 'Fechando',
+  // M12 (fase 3): as dicas do loading (`loadingTipKey`, `LOADING_TIP_COUNT` = 12), sorteadas e trocadas pela cena.
+  'loading.tip.1': 'Bot covarde foge quando você recarrega.',
+  'loading.tip.2': 'Na pausa, Dificuldade muda o nível dos bots na hora.',
+  'loading.tip.3': 'Ficou preso? Na pausa, Estou preso leva você a um lugar livre.',
+  'loading.tip.4': 'Na Oficina, o Laboratório monta bots nos 4 eixos.',
+  'loading.tip.5': 'No fim da partida, Mais fácil e Mais difícil mudam o nível dos bots.',
+  'loading.tip.6': 'O bot que mais te pegou é o Nêmesis: salve-o na Oficina.',
+  'loading.tip.7': 'No Bobo Zombies, quem cai pode ser levantado por um colega.',
+  'loading.tip.8': 'No Surpreenda-me, trave uma linha para ela ficar no próximo sorteio.',
+  'loading.tip.9': 'A Personalizada tem todas as regras e salva a partida como preset.',
+  'loading.tip.10': 'Tiro na cabeça tira mais vida.',
+  'loading.tip.11': 'Em Ajustes, Calibrar mira acerta a sensibilidade em alvos.',
+  'loading.tip.12': 'Reduzir efeitos, em Ajustes, tira o tremor e o balanço da tela.',
 } as const satisfies Readonly<Record<string, string>>;
 
 export type ExtraStringKey = keyof typeof STRINGS_EXTRA_PT_BR;

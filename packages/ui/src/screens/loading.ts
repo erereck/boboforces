@@ -2,7 +2,7 @@ import { pushRect, type DrawList } from '../draw-list.ts';
 import type { MsdfFont, UiFonts } from '../font.ts';
 import { capHeightPx, fitTextPx, numberWidth, paintBar, paintNumber, paintText, textWidth } from '../paint.ts';
 import type { StringKey } from '../strings.pt-BR.ts';
-import { t, templateParts } from '../text.ts';
+import { hasString, t, templateParts } from '../text.ts';
 import { COLORS, MIN_TEXT, SCREEN_MARGIN, TYPE, uiScale } from '../tokens.ts';
 import type { Insets } from '../tree.ts';
 
@@ -51,8 +51,32 @@ export interface LoadingModel {
   readonly ms: Float32Array;
   /** Etapa em andamento (índice em `LOADING_STEPS`; -1 = nenhuma). */
   current: number;
-  /** Dica de uma linha no rodapé (arte-ux.md §6.9); `null` = sem dica. */
+  /**
+   * Dica de uma linha no rodapé (arte-ux.md §6.9); `null` = sem dica. M12 (fase 3): as dicas moram na tabela extra
+   * (`loadingTipKey`) e giram (a cena sorteia e troca); antes de a tabela chegar, a chave não aparece crua (`hasString`).
+   */
   tipKey: StringKey | null;
+  /** M12 (fase 3): o resumo da partida embaixo do nome ("Times · Normal · 4 contra 4 · Construto"); `''` = sem linha. */
+  summary: string;
+  /** M12 (fase 3): as etapas com o tempo de cada uma (só com o F2 ou no bench); sem elas, o nome, o resumo e a barra. */
+  details: boolean;
+}
+
+/** M12 (fase 3): quantas dicas de loading a tabela extra tem (`loading.tip.1` a `loading.tip.<n>`). */
+export const LOADING_TIP_COUNT = 12;
+
+/**
+ * M12 (fase 3): a 1ª dica de um loading, sorteada pela semente da partida (um hash: sementes seguidas não andam de 3 em
+ * 3 na lista). O loading do `game` (o chunk da cena chegando) e o da cena começam na mesma.
+ */
+export function loadingTipIndex(seed: number): number {
+  return (Math.imul(seed | 0, 0x9e3779b1) >>> 16) % LOADING_TIP_COUNT;
+}
+
+/** M12 (fase 3): a chave da dica `i` (qualquer inteiro: dá a volta na lista). */
+export function loadingTipKey(i: number): StringKey {
+  const n = (((Math.trunc(i) % LOADING_TIP_COUNT) + LOADING_TIP_COUNT) % LOADING_TIP_COUNT) + 1;
+  return `loading.tip.${n}` as StringKey;
 }
 
 export function createLoadingModel(): LoadingModel {
@@ -65,7 +89,9 @@ export function createLoadingModel(): LoadingModel {
     weights,
     ms: new Float32Array(n).fill(-1),
     current: -1,
-    tipKey: 'loading.tip.coward',
+    tipKey: null,
+    summary: '',
+    details: false,
   };
 }
 
@@ -121,8 +147,8 @@ const mapCache = { source: '', text: '' };
 
 /**
  * Desenha a tela de loading em `width`×`height`, composta à esquerda como os menus (a direita fica para o fundo):
- * rótulo CARREGANDO, nome do mapa, barra total âmbar com a porcentagem e a lista das etapas (concluída: tempo em ms;
- * em andamento: barra; na fila: "Na fila"). Dica no rodapé. Sem alocação (o nome do mapa só vira caixa alta quando
+ * rótulo CARREGANDO, nome do mapa, o resumo da partida, barra total âmbar com a porcentagem e, com `details`, a lista
+ * das etapas (concluída: tempo em ms; em andamento: barra; na fila: "Na fila"). Dica no rodapé. Sem alocação (o nome do mapa só vira caixa alta quando
  * muda).
  */
 export function drawLoadingScreen(
@@ -168,6 +194,10 @@ export function drawLoadingScreen(
     paintText(out, display, mapCache.text, left, y, namePx, COLORS.texto, TYPE.title.tracking);
     y += Math.round(capHeightPx(display, namePx) + gap * 1.5);
   }
+  if (model.summary !== '') {
+    paintText(out, hud, model.summary, left, y, bodyPx, COLORS.textoBaixo);
+    y += Math.round(capB + gap * 1.5);
+  }
   const fraction = loadingFraction(model);
   const barW = Math.min(Math.round(L.barWidth * s), maxW);
   const barH = Math.max(4, Math.round(L.barHeight * s));
@@ -195,8 +225,9 @@ export function drawLoadingScreen(
   const rowH = Math.round(capB + gap * 0.9);
   const capC = capB;
   const tipY = bottom - capC;
-  const rowsBottom = model.tipKey !== null ? tipY - gap : bottom;
-  for (let i = 0; i < LOADING_STEPS.length; i++) {
+  const tip = model.tipKey !== null && hasString(model.tipKey) ? model.tipKey : null;
+  const rowsBottom = tip !== null ? tipY - gap : bottom;
+  for (let i = 0; model.details && i < LOADING_STEPS.length; i++) {
     if (y + capB > rowsBottom) break;
     const progress = Math.min(1, Math.max(0, model.progress[i] as number));
     const ms = model.ms[i] as number;
@@ -219,5 +250,5 @@ export function drawLoadingScreen(
     y += rowH;
   }
 
-  if (model.tipKey !== null) paintText(out, hud, t(model.tipKey), left, tipY, bodyPx, COLORS.textoBaixo);
+  if (tip !== null) paintText(out, hud, t(tip), left, tipY, bodyPx, COLORS.textoBaixo);
 }

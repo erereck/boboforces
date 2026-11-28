@@ -11,6 +11,7 @@ import { SHARE_ACTION } from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
 import { createSaveStore, libraryCapsFor } from './save-store.ts';
 import { createShareFlow, shareAvailable } from './share.ts';
+import { rollSurprise, surpriseCodeDoc } from './surprise.ts';
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -153,5 +154,29 @@ describe('M8 (fase 1, revisão): o resto do fluxo', () => {
     flow.act(SHARE_ACTION.save);
     flow.act(SHARE_ACTION.save);
     expect(save.presets.saved.filter((p) => (p.name ?? '').startsWith('Festa'))).toHaveLength(1);
+  });
+});
+
+describe('M12 (fase 3, revisão): o sorteio do Royale Grande fora do PC', () => {
+  it('o código diz "Este modo só roda no PC." (não "código inválido")', () => {
+    const fake = fakePlatform();
+    const save = createSaveStore(memoryStorage(), libraryCapsFor('web'));
+    const flow = createShareFlow({
+      platform: fake.platform,
+      save,
+      // O teto do celular: o Grande não roda.
+      limits: { maxBots: 12, maxLocalHumans: 4, maxViewDistanceM: 100, maxRoyaleGrandeParticipants: 0 },
+      linkFor: null,
+      rng: createRng(7),
+      factoryBots: [builtinBot('normal-bob')!],
+      play: () => undefined,
+    });
+    let seed = 1;
+    while (rollSurprise(seed, null, new Set(), true).mode !== 'royaleGrande') seed++;
+    const enc = encodeShareCode('surprise', surpriseCodeDoc(rollSurprise(seed, null, new Set(), true)));
+    if (!enc.ok) throw new Error('código');
+    flow.openCode(enc.code);
+    expect(flow.mode).toBe('error');
+    expect(flow.lines).toEqual(['Este modo só roda no PC.']);
   });
 });

@@ -1,6 +1,7 @@
 import type { StringKey } from '../strings.pt-BR.ts';
 import { COLORS } from '../tokens.ts';
 import type { Screen, UiNode } from '../tree.ts';
+import { BLOCK_LOGO_SIZE } from './logo.ts';
 
 /**
  * Tela de título (arte-ux.md §6.3): logotipo, JOGAR (com o resumo do preset que ele vai jogar embaixo) e o rodapé com
@@ -34,7 +35,14 @@ export interface TitleState {
    * modo só roda no PC."). Texto já montado pelo `game`; a mesma linha, então o título não muda de altura.
    */
   readonly note?: string;
+  /**
+   * M12 (fase 3): uma tela pedida está chegando (o pedaço dos editores ou do Online): a mesma linha diz "Abrindo…" em
+   * âmbar até ela abrir (antes, o aperto não dava sinal nenhum).
+   */
+  readonly opening?: boolean;
 }
+
+const OPENING = { key: 'menu.opening' } as const;
 
 /** M1: item extra do título (o `game` recebe da casca por `GameDeps.testItems`). */
 export interface TitleExtraItem {
@@ -64,7 +72,7 @@ const TITLE_ITEMS = [
   ['modes', 'menu.modes'],
   ['couch', 'menu.couchShort'],
   ['bobo', 'menu.bobo'],
-  ['lab', 'menu.lab'],
+  ['lab', 'menu.workshop'],
   ['settings', 'menu.settings'],
 ] as const satisfies readonly (readonly [keyof typeof TITLE_ACTION, StringKey])[];
 /** M1: prefixo da ação de item extra (`test:bench`). */
@@ -196,7 +204,8 @@ export const titleScreen: Screen<TitleState> = {
           anchor: 'left',
           y: -12,
           children: [
-            { kind: 'text', id: 'logo', text: { key: 'title.logo' }, style: 'logo', color: COLORS.texto },
+            // M12 (fase 3, #43): a caixa do logo em blocos (o `game` desenha as letras nela: `drawTitleLogo`).
+            { kind: 'box', id: 'logo', width: BLOCK_LOGO_SIZE.width, height: BLOCK_LOGO_SIZE.height },
             spacer(18),
             { kind: 'box', id: 'logoBar', width: 176, height: 10, color: COLORS.acao, chamfer: true },
             spacer(30),
@@ -215,14 +224,16 @@ export const titleScreen: Screen<TitleState> = {
                   variant: 'primary',
                   autofocus: true,
                 },
-                ...(state.note || state.playSummary
+                ...(state.note || state.opening || state.playSummary
                   ? [
                       {
                         kind: 'text',
                         id: 'playSummary',
-                        text: { literal: state.note || state.playSummary || '' },
+                        // M12 (fase 3): o aviso (vermelho) passa na frente do "Abrindo…" (âmbar), que passa do resumo.
+                        text:
+                          state.note || !state.opening ? { literal: state.note || state.playSummary || '' } : OPENING,
                         style: 'caption',
-                        color: state.note ? COLORS.perigo : COLORS.textoBaixo,
+                        color: state.note ? COLORS.perigo : state.opening ? COLORS.acao : COLORS.textoBaixo,
                       } as const,
                     ]
                   : []),

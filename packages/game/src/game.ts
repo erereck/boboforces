@@ -43,6 +43,9 @@ import {
   createTestScreenModel,
   drawLoadingScreen,
   drawTestScreen,
+  drawTitleLogo,
+  loadingTipIndex,
+  loadingTipKey,
   CUSTOM_ACTION,
   CUSTOM_ROW_PREFIX,
   CUSTOM_SHARE_ROW,
@@ -59,6 +62,7 @@ import {
   newsScreen,
   MODES_PREFIX,
   modesScreen,
+  type ModesState,
   QUICK_ACTION,
   QUICK_ROWS,
   QUICK_SHORTCUT_PREFIX,
@@ -89,6 +93,8 @@ import type { BenchConfig, GameDebugApi, TestItem, TestRunner } from './bench/ty
 import type { SceneDriver } from './scene/scene-driver.ts';
 import type { LocalSeat } from './scene/seats.ts';
 import { createMenuController, followTab, setMenuSoundSink, type UiFrame } from './menu.ts';
+import { createMenuEntry } from './menu-entry.ts';
+import { createCustomDraft, startButtonHeld } from './menu-memory.ts';
 import type { SettingsFlow } from './settings-flow.ts';
 import { presetShortcut, presetSummary, rollSurprise } from './presets-ui.ts';
 import type { ShareFlow } from './share.ts';
@@ -121,6 +127,10 @@ import {
   MENU_MUSIC_ID,
   MENU_SOUNDS,
   playUiSound,
+  UI_EDGE_VOLUME,
+  UI_EXTRA_SOUNDS,
+  UI_JOIN_RATES,
+  UI_START_RATE,
   wantsMusic,
 } from './sound-bank.ts';
 import { createMixer, type MixerStats } from '@boboforces/audio';
@@ -286,6 +296,11 @@ export interface GameHandle extends Disposable {
   readonly save: SaveStore;
   /** M5 (fase 4c): a sala do Online aberta agora (o F2 e o teste das duas abas). */
   readonly onlineRoom: OnlineRoom | null;
+  /**
+   * M12 (fase 3): um link de código (`#bot=…`, `#p=…`) que chegou com o jogo aberto (a web, no `hashchange`): a tela de
+   * receber abre quando o jogador estiver no título (no meio da partida, ao sair dela).
+   */
+  receiveLink(hash: string): void;
   /** M2 (fase 7b): os contadores do mixer e o estado do contexto (`'none'` sem áudio), para o F2 e os scripts. */
   readonly audio: {
     readonly stats: MixerStats;
@@ -300,6 +315,17 @@ export interface GameHandle extends Disposable {
 function minTextFor(platform: Platform): number {
   if (platform.id === 'switch') return MIN_TEXT.tv;
   return MIN_TEXT.phone * Math.max(1, platform.graphics.pixelRatio);
+}
+
+/**
+ * M12 (fase 3): o card dos Modos que joga a receita (o foco abre nele): os Times, o Todos contra todos e o Bobo Zombies
+ * de sempre; o Sandbox é da Personalizada; o resto (as festas, as variantes) mora na Mais modos.
+ */
+export function modesCardFor(r: MatchRecipe): string {
+  if (r.mode === 'zombies') return r.zombies?.variant === undefined ? 'zombies' : 'more';
+  if (r.mode === 'sandbox') return 'custom';
+  if (r.mode !== 'warfare.tdm' && r.mode !== 'warfare.ffa') return 'more';
+  return r.weapons?.ladder !== undefined || r.infection !== undefined || r.chaos !== undefined ? 'more' : r.mode;
 }
 
 function routesOf(bench: BenchConfig | null | undefined): RendererRoutes {
@@ -365,7 +391,12 @@ export function startGame(deps: GameDeps): GameHandle {
       (error: unknown) => log(`[game] qualidade automática: sem leitura do aparelho (${String(error)})`),
     );
   }
-  setMenuSoundSink((sound) => playUiSound(mixer, MENU_SOUNDS[sound]));
+  // M12 (fase 3): a borda do D-pad toca o som de erro, baixinho.
+  setMenuSoundSink((sound) =>
+    sound === 'edge'
+      ? playUiSound(mixer, UI_EXTRA_SOUNDS.error, UI_EDGE_VOLUME)
+      : playUiSound(mixer, MENU_SOUNDS[sound]),
+  );
   function startSoundFiles(): Promise<void> {
     soundFiles ??= loadSoundFiles(mixer, platform.assets, (id, error) =>
       platform.diagnostics.appendLog(`[audio] ${id}: ${error instanceof Error ? error.message : String(error)}`),
@@ -452,6 +483,11 @@ export function startGame(deps: GameDeps): GameHandle {
   /** M8 (fase 3): o Surpreenda-me completo (a tela mora no pedaço dos editores). O sorteio simples fica para a sala. */
   let surpriseFlow: SurpriseFlow | null = null;
   const surpriseRng = createRng(Math.floor(platform.now()) >>> 0);
+  /**
+   * M12 (fase 3): toda tecla responde: uma tela pedida está chegando (o pedaço dos editores ou do Online). O título e
+   * os Modos dizem "Abrindo…" até ela abrir (`syncOpening`, 1x por frame).
+   */
+  let openingShown = false;
   function refreshTitle(): void {
     titleMenu.setRoot(
       titleScreen.build({
@@ -460,6 +496,7 @@ export function startGame(deps: GameDeps): GameHandle {
         canExit: platform.features.canExit,
         playSummary: presetSummary(currentPreset()),
         ...(titleNote !== '' ? { note: titleNote } : {}),
+        ...(openingShown ? { opening: true } : {}),
         ...(extraItems.length > 0 ? { extraItems } : {}),
         ...(deps.loadOnline ? { online: true } : {}),
       }),
@@ -695,24 +732,56 @@ export function startGame(deps: GameDeps): GameHandle {
   const quickMenu = createMenuController();
   const modesMenu = createMenuController();
   const moreMenu = createMenuController();
-  modesMenu.setRoot(
-    modesScreen.build({
-      modes: [
-        ...QUICK_MODES.map((id) => ({
-          id,
-          nameKey: id === 'warfare.tdm' ? ('mode.name.warfare.tdm' as const) : ('mode.name.warfare.ffa' as const),
-          descKey: id === 'warfare.tdm' ? ('mode.desc.warfare.tdm' as const) : ('mode.desc.warfare.ffa' as const),
-        })),
-        // M3 (fase 2d): o Bobo Zombies começa direto (fase 5a: na Base Abandonada).
-        { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
-        // M6 (fase 0): o Bobo Training foi para a página "Mais modos", com os modos novos (fora do menu).
-        { id: 'more', nameKey: 'mode.name.more' as const, descKey: 'mode.desc.more' as const },
-        // Refino R3b (#79): o Surpreenda-me e a Partida personalizada (com a última partida) moram aqui agora.
-        { id: 'surprise', nameKey: 'title.surprise' as const, descKey: 'mode.desc.surprise' as const },
-        { id: 'custom', nameKey: 'mode.name.custom' as const, descKey: 'mode.desc.custom' as const },
-      ],
-    }),
-  );
+  const MODES_STATE: ModesState = {
+    modes: [
+      ...QUICK_MODES.map((id) => ({
+        id,
+        nameKey: id === 'warfare.tdm' ? ('mode.name.warfare.tdm' as const) : ('mode.name.warfare.ffa' as const),
+        descKey: id === 'warfare.tdm' ? ('mode.desc.warfare.tdm' as const) : ('mode.desc.warfare.ffa' as const),
+      })),
+      // M3 (fase 2d): o Bobo Zombies começa direto (fase 5a: na Base Abandonada).
+      { id: 'zombies', nameKey: 'mode.name.zombies' as const, descKey: 'mode.desc.zombies' as const },
+      // M6 (fase 0): o Bobo Training foi para a página "Mais modos", com os modos novos (fora do menu).
+      { id: 'more', nameKey: 'mode.name.more' as const, descKey: 'mode.desc.more' as const },
+      // Refino R3b (#79): o Surpreenda-me e a Partida personalizada (com a última partida) moram aqui agora.
+      { id: 'surprise', nameKey: 'title.surprise' as const, descKey: 'mode.desc.surprise' as const },
+      { id: 'custom', nameKey: 'mode.name.custom' as const, descKey: 'mode.desc.custom' as const },
+    ],
+  };
+  /**
+   * M12 (fase 3): os Modos com o "Abrindo…" na linha do título enquanto o pedaço dos editores chega (só ele: o Online
+   * é do título).
+   */
+  let modesOpeningShown = false;
+  function rebuildModes(): void {
+    modesMenu.setRoot(modesScreen.build(modesOpeningShown ? { ...MODES_STATE, note: t('menu.opening') } : MODES_STATE));
+  }
+  rebuildModes();
+  /**
+   * M12 (fase 3): na 1ª vez da sessão, os Modos e a Mais modos abrem com o foco no card da última partida (depois, o
+   * controlador lembra o último foco).
+   */
+  let modesOpened = false;
+  let moreOpened = false;
+  function openModes(): void {
+    if (!modesOpened) {
+      modesOpened = true;
+      modesMenu.focus(MODES_PREFIX + modesCardFor(currentPreset()));
+    }
+    screen = 'modes';
+  }
+  /** A Mais modos, com a linha de ajuda do card com o foco (refeita quando o foco anda). */
+  let moreFocus: string | null = null;
+  function rebuildMore(): void {
+    moreFocus = moreMenu.focusedId;
+    const pc = platform.features.profileHint === 'pc';
+    moreMenu.setRoot(editors!.moreModesRoot(moreWatch, pc, moreFocus, platform.features.touch));
+  }
+  /**
+   * M12 (fase 3): o rascunho da Personalizada aberta pelos Modos e a aba dele (na sessão; `menu-memory.ts`): o Voltar
+   * guarda só se a receita ou a aba mudaram; qualquer partida começada limpa (`requestScene`).
+   */
+  const customDraft = createCustomDraft();
   /**
    * M3 (fase 2d): o Bobo Zombies dos Modos: a Curta (10 ondas), só os humanos contra as ondas. Fase 5a: na Base
    * Abandonada, à noite (o Posto Avançado e o Construto continuam nos recentes).
@@ -797,13 +866,17 @@ export function startGame(deps: GameDeps): GameHandle {
     recipe: MatchRecipe,
     back: GameScreen,
     done: ((recipe: MatchRecipe | null) => void) | null = null,
+    tab = 0,
   ): void {
+    const from = screen;
     withEditors(() => {
       // M5 (fase 4c): o pedaço dos editores chegou depois de o host já ter começado a partida: não abre por cima dela.
-      if (done !== null && screen !== 'online') return;
+      // M12 (fase 3, revisão): vale para todo caminho (os Modos, a Partida Rápida): só abre com o jogador onde pediu.
+      if (screen !== from) return;
       customDone = done;
       customRecipe = recipe;
-      customTab = 0;
+      customTab = tab;
+      customDraft.opened(recipe, tab);
       customNote = '';
       customReturn = back;
       rebuildCustom();
@@ -829,8 +902,13 @@ export function startGame(deps: GameDeps): GameHandle {
       screen = 'online';
       return;
     }
+    // M12 (fase 3): carregando, o título já diz "Abrindo…" (o aperto a mais não pede de novo).
     if (onlineLoading || !deps.loadOnline) return;
     onlineLoading = true;
+    if (titleNote !== '') {
+      titleNote = '';
+      refreshTitle();
+    }
     deps.loadOnline().then(
       (bundle) => {
         onlineLoading = false;
@@ -863,8 +941,13 @@ export function startGame(deps: GameDeps): GameHandle {
       },
       (error: unknown) => {
         onlineLoading = false;
-        // Sem rede (o pedaço não veio): o jogo segue; o botão tenta de novo no próximo aperto.
+        // Sem rede (o pedaço não veio): o jogo segue; o botão tenta de novo no próximo aperto. M12 (fase 3): o título
+        // avisa ("Sem conexão: tente de novo.", com o som de erro), até a próxima partida ou o próximo aperto.
         log(`[online] não carregou: ${error instanceof Error ? error.message : String(error)}`);
+        if (disposed) return;
+        titleNote = t('title.noConnection');
+        playUiSound(mixer, UI_EXTRA_SOUNDS.error);
+        refreshTitle();
       },
     );
   }
@@ -948,12 +1031,15 @@ export function startGame(deps: GameDeps): GameHandle {
       screen = 'settings';
     });
   }
+  /** M12 (fase 3, revisão): de onde o Surpreenda-me abriu (os Modos ou o lobby do Switch): o voltar leva para lá. */
+  let surpriseReturn: GameScreen = 'modes';
   function openSurprise(): void {
     const from = screen;
     withEditors(() => {
       if (screen !== from) return;
       surpriseFlow ??= editors!.createSurpriseFlow({ platform, rng: surpriseRng });
       surpriseFlow.open();
+      surpriseReturn = from;
       screen = 'surprise';
     });
   }
@@ -964,8 +1050,8 @@ export function startGame(deps: GameDeps): GameHandle {
   let scene: Scene | null = null;
   /** Cena pedida esperando o `loadScene` (web: o chunk da cena chegando). */
   let pendingScene: SceneRequest | null = null;
+  /** O loading enquanto o chunk da cena chega (o mapa, o resumo e a dica: `requestScene`). */
   const pendingLoading = createLoadingModel();
-  pendingLoading.mapName = 'Construto';
   let runner: TestRunner | null = null;
   const testModel = createTestScreenModel();
   let matches = 0;
@@ -1227,7 +1313,11 @@ export function startGame(deps: GameDeps): GameHandle {
   /** Um frame da tela: entradas e saídas de cada dispositivo, o lado de cada um e os botões do P1. */
   function couchFrame(raw: Readonly<RawInputState>, u: UiFrame): void {
     const joined = locals.update(raw, true);
-    if (joined >= 0) log(`[game] sofá: P${joined + 1} entrou (${couchDeviceLabel(locals.slots[joined]!.device!)})`);
+    if (joined >= 0) {
+      log(`[game] sofá: P${joined + 1} entrou (${couchDeviceLabel(locals.slots[joined]!.device!)})`);
+      // M12 (fase 3): cada jogador que entra soa um tom acima do anterior (P1 a P4).
+      playUiSound(mixer, UI_EXTRA_SOUNDS.join, 1, UI_JOIN_RATES[joined] ?? 1);
+    }
     // M4 (fase 1): o 1º A da casa só põe o P1 (que passa a mandar nos menus); o mesmo aperto não começa a partida.
     const p1Device = locals.slots[0]!.device;
     if (joined === 0 && localEdition && p1Device !== null) {
@@ -1275,7 +1365,7 @@ export function startGame(deps: GameDeps): GameHandle {
         if (quitArmed) platform.exit();
         quitArmed = true;
         couchSig = -1;
-      } else if (a === COUCH_ACTION.modes) screen = 'modes';
+      } else if (a === COUCH_ACTION.modes) openModes();
       else if (a === COUCH_ACTION.surprise) openSurprise();
       else if (a === COUCH_ACTION.settings) openSettings();
       else if (a === COUCH_ACTION.lab) openWorkshop();
@@ -1317,6 +1407,7 @@ export function startGame(deps: GameDeps): GameHandle {
     if (kind === 'play' && online === null && recipe !== null && !playableHere(recipe)) {
       log(`[game] ${recipe.mode} recusado: este aparelho não roda o modo`);
       titleNote = t('title.pcOnly');
+      playUiSound(mixer, UI_EXTRA_SOUNDS.error);
       screen = 'title';
       refreshTitle();
       titleMenu.focus(TITLE_ACTION.play);
@@ -1353,6 +1444,18 @@ export function startGame(deps: GameDeps): GameHandle {
     playingOnline = online !== null;
     screen = 'scene';
     pendingLoading.current = 0;
+    // M12 (fase 3): o loading fala do jogo desde o 1º quadro (o chunk da cena ainda chegando): o mapa da receita (no
+    // Meu Bobo, o nome dele), o resumo da partida e uma dica; as etapas com ms só no bench (e com o F2, na cena).
+    pendingLoading.mapName = kind === 'wardrobe' ? t('menu.bobo') : t(`map.${recipe?.map ?? 'construto'}` as StringKey);
+    pendingLoading.summary = kind === 'play' && recipe !== null ? presetSummary(recipe) : '';
+    pendingLoading.details = bench !== null;
+    pendingLoading.tipKey = loadingTipKey(loadingTipIndex(pendingScene.seed));
+    // M12 (fase 3): começar a partida soa mais pesado que um confirmar (a trava do pente, mais grave, por cima dele).
+    // Revisão: e limpa o rascunho da Personalizada (ela volta a abrir com a última partida).
+    if (kind === 'play') {
+      playUiSound(mixer, UI_EXTRA_SOUNDS.start, 1, UI_START_RATE);
+      customDraft.clear();
+    }
     if (!bundlePromise) {
       bundlePromise = deps.loadScene();
       bundlePromise.then(
@@ -1539,6 +1642,40 @@ export function startGame(deps: GameDeps): GameHandle {
     else hooks.releasePointerLock?.();
   }
 
+  /** M12 (fase 3): o "Abrindo…" do título e dos Modos segue o pedaço pedido (refaz as telas só quando muda). */
+  function syncOpening(): void {
+    const busy = editorsAfter !== null || onlineLoading;
+    if (busy !== openingShown) {
+      openingShown = busy;
+      refreshTitle();
+    }
+    // Revisão: nos Modos, só o pedaço dos editores (o Online é do título).
+    const modesBusy = editorsAfter !== null;
+    if (modesBusy !== modesOpeningShown) {
+      modesOpeningShown = modesBusy;
+      rebuildModes();
+    }
+  }
+
+  /** M12 (fase 3): o +/Start do quadro anterior (com o sofá, só o do P1: `startButtonHeld`). */
+  let startWasDown = true;
+
+  /** M12 (fase 3): a entrada seca da tela de menu (`menu-entry.ts`) e o quadro entregue ao renderer. */
+  const menuEntry = createMenuEntry();
+  let frameMs = 0;
+  function presentMenu(): void {
+    menuEntry.apply(
+      list,
+      0,
+      screen,
+      frameMs,
+      save.settings.accessibility.reduceShake || platform.features.reducedMotion,
+      ui.scale,
+    );
+    renderer.renderViews(NO_VIEWS);
+    renderer.drawUi(list);
+  }
+
   function step(timestampMs: number): void {
     // O timestamp do rAF marca o vsync; `platform.now()` aqui dentro somaria o jitter de quando o callback rodou.
     const nowMs = Number.isFinite(timestampMs) ? timestampMs : platform.now();
@@ -1565,9 +1702,19 @@ export function startGame(deps: GameDeps): GameHandle {
       editorsAfter = null;
       then();
     }
+    syncOpening();
     updateMusic();
     platform.input.poll(raw);
     menuInput.update(raw, dt);
+    frameMs = intervalMs;
+    // M12 (fase 3): o +/Start (borda de subida) começa a Rápida, a Personalizada e o Surpreenda-me. Só lido nessas
+    // telas; fora delas conta como apertado, para o + que entrou segurado não começar nada.
+    let startPressed = false;
+    if (screen === 'quick' || screen === 'custom' || screen === 'surprise') {
+      const startDown = startButtonHeld(raw, couchActive ? locals.slots[0]!.device : null);
+      startPressed = startDown && !startWasDown;
+      startWasDown = startDown;
+    } else startWasDown = true;
     // M5 (fase 4c): a sala anda em toda tela (no lobby, na partida e no resultado).
     onlineFlow?.tick();
     const u = syncUi();
@@ -1610,7 +1757,7 @@ export function startGame(deps: GameDeps): GameHandle {
         const nav = titleMenu.update(menuInput, raw, u);
         const action = nav.activated;
         if (action === TITLE_ACTION.play) play();
-        else if (action === TITLE_ACTION.modes) screen = 'modes';
+        else if (action === TITLE_ACTION.modes) openModes();
         else if (action === TITLE_ACTION.online) openOnline();
         else if (action === TITLE_ACTION.couch) openCouch(raw);
         else if (action === TITLE_ACTION.settings) openSettings();
@@ -1623,8 +1770,9 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (action === TITLE_ACTION.quit) platform.exit();
         if (screen === 'title') {
           titleMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          // M12 (fase 3, #43): o logo em blocos na caixa que o título reserva.
+          if (titleMenu.layout !== null) drawTitleLogo(list, titleMenu.layout);
+          presentMenu();
         }
         break;
       }
@@ -1643,8 +1791,7 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'tests') {
           testsMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1652,8 +1799,7 @@ export function startGame(deps: GameDeps): GameHandle {
         couchFrame(raw, u);
         if (screen === 'couch') {
           couchMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1669,8 +1815,7 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'labIntro') {
           labIntroMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1690,8 +1835,7 @@ export function startGame(deps: GameDeps): GameHandle {
             rebuildLab();
           }
           if (labKeyboard === null) labMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1707,8 +1851,7 @@ export function startGame(deps: GameDeps): GameHandle {
             rebuildCustom();
           }
         } else {
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1718,8 +1861,7 @@ export function startGame(deps: GameDeps): GameHandle {
         else if (r.kind === 'lab') openLab(r.bot);
         else if (screen === 'workshop') {
           // (Jogar uma partida recebida troca a tela no meio do frame: aí não desenha o menu.)
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1728,14 +1870,13 @@ export function startGame(deps: GameDeps): GameHandle {
         if (nav.back || nav.activated === NEWS_ACTION.ok) screen = newsReturn;
         else {
           newsMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
       case 'quick': {
         const nav = quickMenu.update(menuInput, raw, u);
-        const a = nav.activated;
+        const a = startPressed ? QUICK_ACTION.start : nav.activated;
         // Refino R3b (#79): a Partida Rápida se abre pelos Modos (Times, Todos contra todos).
         if (nav.back || a === QUICK_ACTION.back) screen = 'modes';
         else if (a === QUICK_ACTION.start) playPreset(quickToPreset(quick));
@@ -1751,8 +1892,7 @@ export function startGame(deps: GameDeps): GameHandle {
         }
         if (screen === 'quick') {
           quickMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1762,8 +1902,7 @@ export function startGame(deps: GameDeps): GameHandle {
           const typing = customTyping.frame(menuInput, raw, u, list);
           if (typing !== 'done') {
             if (typing === 'system') customMenu.draw(list, u);
-            renderer.renderViews(NO_VIEWS);
-            renderer.drawUi(list);
+            presentMenu();
             break;
           }
           customTyping = null;
@@ -1771,8 +1910,13 @@ export function startGame(deps: GameDeps): GameHandle {
           rebuildCustom();
         }
         const nav = customMenu.update(menuInput, raw, u);
-        const a = nav.activated;
-        if (nav.tab !== 0) {
+        const a = startPressed ? CUSTOM_ACTION.start : nav.activated;
+        // M12 (fase 3): aberta pelos Modos, o que foi mexido (a receita ou a aba) fica guardado na sessão no Voltar;
+        // sem mexida, o rascunho fica como estava (começar uma partida limpa: `requestScene`).
+        if (customReturn === 'modes' && customDone === null && (nav.back || a === CUSTOM_ACTION.back)) {
+          customDraft.back(customRecipe, customTab);
+        }
+        if (nav.tab !== 0 && !startPressed) {
           const count = editors!.customTabs(customRecipe).length;
           customTab = (customTab + nav.tab + count) % count;
           followTab(customMenu, customTab);
@@ -1822,8 +1966,7 @@ export function startGame(deps: GameDeps): GameHandle {
         if (screen === 'custom' && customMenu.focusedId !== customHelpFocus) rebuildCustom();
         if (screen === 'custom') {
           customMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1836,18 +1979,25 @@ export function startGame(deps: GameDeps): GameHandle {
           if ((QUICK_MODES as readonly string[]).includes(id)) openQuick(id as QuickMode);
           else if (id === 'more') {
             withEditors(() => {
+              // M12 (fase 3, revisão): o pedaço chegou com o jogador em outra tela: não puxa para a Mais modos.
+              if (screen !== 'modes') return;
               moreWatch = false;
-              moreMenu.setRoot(editors!.moreModesRoot(false, platform.features.profileHint === 'pc'));
+              // M12 (fase 3): na 1ª vez da sessão, o foco no card da última partida.
+              if (!moreOpened) {
+                moreOpened = true;
+                const card = editors!.moreCardFor(playingPreset ?? currentPreset());
+                if (card !== null) moreMenu.focus(MODES_PREFIX + card);
+              }
+              rebuildMore();
               screen = 'more';
             });
           } else if (id === 'zombies') playPreset(ZOMBIES_PRESET);
           else if (id === 'surprise') openSurprise();
-          else if (id === 'custom') openCustom(currentPreset(), 'modes');
+          else if (id === 'custom') openCustom(customDraft.recipeOr(currentPreset()), 'modes', null, customDraft.tab);
         }
         if (screen === 'modes') {
           modesMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1861,27 +2011,32 @@ export function startGame(deps: GameDeps): GameHandle {
         } else if (a === editors!.MORE_WATCH_ACTION) {
           // M7 (fase 9): o Aquário liga e desliga (o foco fica no botão).
           moreWatch = !moreWatch;
-          moreMenu.setRoot(editors!.moreModesRoot(moreWatch, platform.features.profileHint === 'pc'));
+          rebuildMore();
         } else if (a !== null && a.startsWith(MODES_PREFIX)) {
           const id = a.slice(MODES_PREFIX.length);
           const preset = editors!.moreModePreset(id);
           if (id === 'training') playTraining(trainingPreset());
           else if (preset !== null) playPreset(preset, moreWatch);
         }
+        // M12 (fase 3): a linha de ajuda segue o foco (o resumo do card; o que o Aquário faz).
+        if (screen === 'more' && moreMenu.focusedId !== moreFocus) rebuildMore();
         if (screen === 'more') {
           moreMenu.draw(list, u);
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
       case 'surprise': {
+        // M12 (fase 3): o +/Start joga o sorteio da tela, como o Jogar.
+        if (startPressed) {
+          playPreset(surpriseFlow!.play());
+          break;
+        }
         const r = surpriseFlow!.frame(menuInput, raw, u, list);
-        if (r.kind === 'back') screen = 'modes';
+        if (r.kind === 'back') screen = surpriseReturn;
         else if (r.kind === 'play') playPreset(r.recipe);
         else {
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1891,8 +2046,7 @@ export function startGame(deps: GameDeps): GameHandle {
         if (r === 'back') screen = 'title';
         else if (r === 'news') openNews('settings');
         else if (r === 'calibrate') playTraining(trainingPreset(), true);
-        renderer.renderViews(NO_VIEWS);
-        renderer.drawUi(list);
+        presentMenu();
         break;
       }
       case 'test': {
@@ -1915,8 +2069,7 @@ export function startGame(deps: GameDeps): GameHandle {
       case 'online': {
         onlineFlow!.frame(menuInput, raw, u, list);
         if (screen === 'online') {
-          renderer.renderViews(NO_VIEWS);
-          renderer.drawUi(list);
+          presentMenu();
         }
         break;
       }
@@ -1924,6 +2077,8 @@ export function startGame(deps: GameDeps): GameHandle {
         break;
     }
     if (screen === 'scene') {
+      // M12 (fase 3): a tela de menu que vier depois da cena entra do zero.
+      menuEntry.clear();
       if (pendingScene !== null) {
         if (bundle !== null) startPendingScene();
         else {
@@ -2061,6 +2216,9 @@ export function startGame(deps: GameDeps): GameHandle {
     save,
     get onlineRoom(): OnlineRoom | null {
       return onlineFlow?.room ?? null;
+    },
+    receiveLink(hash: string): void {
+      pendingShareLink = hash;
     },
     get audio() {
       return { stats: mixer.stats, state: mixer.context?.state ?? 'none', sounds: soundCount, music: mixer.music };

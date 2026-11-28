@@ -1380,7 +1380,9 @@ describe('as Ferramentas do Dono na cena: a revisão', () => {
     expect(hold(MOUSE_BUTTON.left, 20)).toBe(false);
     // A sim andou (online não pausa), só o tiro não saiu.
     expect(sim.tick).toBeGreaterThan(t0 + 15);
-    // Fechada a pausa (a tecla da pausa fecha de qualquer página), o clique atira.
+    // Fechada a pausa, o clique atira. M12 (fase 3): o Esc numa página da pausa volta um nível (à pausa); o 2º fecha.
+    platform.tap('Escape');
+    expect(game.paused).toBe(true);
     platform.tap('Escape');
     expect(game.paused).toBe(false);
     expect(hold(MOUSE_BUTTON.left, 20)).toBe(true);

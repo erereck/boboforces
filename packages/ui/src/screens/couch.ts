@@ -88,7 +88,7 @@ function homeButtons(home: CouchHome): UiNode[] {
       gap: 12,
       children: [
         small('bobo', 'menu.bobo'),
-        small('lab', 'menu.lab'),
+        small('lab', 'menu.workshop'),
         small('settings', 'menu.settings'),
         ...(home.tests ? [small('tests', 'title.tests')] : []),
         // "Sair" curto: no 4:3 com o piso da TV, "Sair do jogo" passava da borda. A confirmação vai na linha de cima.

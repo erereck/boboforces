@@ -41,6 +41,15 @@ export interface ModesState {
   readonly wide?: boolean;
   /** M7 (fase 9): um botão a mais na linha do título (o Aquário da página Mais modos). */
   readonly headingExtra?: UiNode;
+  /** M12 (fase 3): o aviso em âmbar na linha do título ("Abrindo…" enquanto o pedaço dos editores chega). */
+  readonly note?: string;
+  /** M12 (fase 3): a linha de ajuda embaixo da grade (na Mais modos, o resumo do card com o foco). */
+  readonly help?: string;
+  /**
+   * M12 (fase 3): os cards sem a descrição (a Mais modos no toque, onde os alvos de 44 px não deixam lugar para ela no
+   * piso de 13 px): a linha de ajuda diz o que o card com o foco faz. O card com o 2º botão fica com ela.
+   */
+  readonly bare?: boolean;
 }
 
 /** Largura de cada card (px de referência). */
@@ -92,7 +101,9 @@ export const modesScreen: Screen<ModesState> = {
             };
       const lines: UiNode[] =
         extra === null
-          ? [main, desc]
+          ? state.bare === true
+            ? [main]
+            : [main, desc]
           : onNameLine
             ? [{ kind: 'row', gap: EXTRA_BUTTON_GAP, children: [main, extra] }, desc]
             : [
@@ -111,7 +122,10 @@ export const modesScreen: Screen<ModesState> = {
         chamfer: true,
         padding: tight ? 6 : 10,
         width: cardWidth,
-        children: [{ kind: 'column', gap: tight ? 4 : 8, children: lines }],
+        // M12 (fase 3): o contorno do foco fica 7 px para fora do botão (`BUTTON.focusGap` + `focusStroke`) e o texto
+        // começa ~2 px abaixo da caixa dele: o vão até a descrição deixa 4 a 6 px de folga (antes, 8 e 4 px: o contorno
+        // encostava ou passava por cima do texto).
+        children: [{ kind: 'column', gap: tight ? 12 : 11, children: lines }],
       };
     });
     const back: UiNode = {
@@ -156,18 +170,36 @@ export const modesScreen: Screen<ModesState> = {
                 },
                 ...(backInHeading ? [back] : []),
                 ...(state.headingExtra ? [state.headingExtra] : []),
+                ...(state.note
+                  ? [
+                      {
+                        kind: 'text',
+                        id: 'note',
+                        text: { literal: state.note },
+                        style: 'body',
+                        color: COLORS.acao,
+                      } as const,
+                    ]
+                  : []),
               ],
             },
-            { kind: 'box', height: tight ? 6 : 12 },
+            // M12 (fase 3, revisão): apertado, 2 px a menos em cada vão (a linha de ajuda cabe no toque a 640×360).
+            { kind: 'box', height: tight ? 4 : 12 },
             { kind: 'box', id: 'headingBar', width: 120, height: tight ? 6 : 8, color: COLORS.acao, chamfer: true },
-            { kind: 'box', height: tight ? 8 : 14 },
+            { kind: 'box', height: tight ? 6 : 12 },
             // M2 (fase 5d): em grade de 2 colunas (o Bobo Training é o 3º card); M6: 3 com mais de 6 cards.
             {
               kind: 'column',
               id: 'cards',
-              gap: tight ? 6 : 10,
+              gap: tight ? 4 : 10,
               children: rows,
             },
+            ...(state.help !== undefined
+              ? ([
+                  { kind: 'box', height: tight ? 2 : 8 },
+                  { kind: 'text', id: 'help', text: { literal: state.help }, style: 'caption', color: COLORS.texto },
+                ] as UiNode[])
+              : []),
             ...(backInRow || backInHeading ? [] : ([{ kind: 'box', height: tight ? 6 : 12 }, back] as UiNode[])),
           ],
         },

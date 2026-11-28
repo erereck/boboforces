@@ -4,7 +4,7 @@ import { moveFocus } from '../focus.ts';
 import { parseFontPack } from '../font.ts';
 import { layoutTree } from '../layout.ts';
 import type { StringKey } from '../strings.pt-BR.ts';
-import { t } from '../text.ts';
+import { registerStrings, t } from '../text.ts';
 import {
   drawnCommands,
   syntheticFontFile,
@@ -17,7 +17,16 @@ import { COLORS, MIN_TEXT, PLAYER_COLORS } from '../tokens.ts';
 import type { Rect } from '../tree.ts';
 import { createDebugPanelModel, DEBUG_PANEL_METRICS, drawDebugPanel } from './debug-panel.ts';
 import { drawFontSpecimen } from './font-specimen.ts';
-import { createLoadingModel, drawLoadingScreen, loadingFraction, loadingStepIndex, LOADING_STEPS } from './loading.ts';
+import {
+  createLoadingModel,
+  drawLoadingScreen,
+  loadingFraction,
+  loadingStepIndex,
+  LOADING_STEPS,
+  LOADING_TIP_COUNT,
+  loadingTipIndex,
+  loadingTipKey,
+} from './loading.ts';
 import {
   controllerLiteral,
   createTestScreenModel,
@@ -249,9 +258,40 @@ describe('tela de loading', () => {
     expect(loadingFraction(m)).toBeCloseTo(1 / LOADING_STEPS.length);
   });
 
+  it('M12 (fase 3): sem o F2 nem o bench, o nome, o resumo, a barra e a dica (as etapas ficam de fora)', () => {
+    const m = createLoadingModel();
+    m.mapName = 'Construto';
+    m.summary = 'Times · Normal · 4 contra 4 · Construto';
+    m.progress[0] = 1;
+    m.ms[0] = 412;
+    // Chave de fora das tabelas registradas: não aparece crua.
+    m.tipKey = 'loading.tip.99' as StringKey;
+    for (const [w, h] of SIZES) {
+      const l = list(w, h);
+      drawLoadingScreen(l, fonts, m, w, h, { minTextPx: w >= 1280 ? MIN_TEXT.tv : MIN_TEXT.phone });
+      expectInside(l, w, h);
+      const text = syntheticGlyphText(l);
+      expect(text).toContain('CONSTRUTOTimes·Normal·4contra4·Construto');
+      expect(text).not.toContain('Arquivos');
+      expect(text).not.toContain('loading');
+    }
+    m.tipKey = loadingTipKey(3);
+    registerStrings({ 'loading.tip.4': 'Dica de teste.' });
+    const l = list(1280, 720);
+    drawLoadingScreen(l, fonts, m, 1280, 720, { minTextPx: MIN_TEXT.tv });
+    expect(syntheticGlyphText(l)).toContain('Dicadeteste.');
+    // A volta da lista e o sorteio pela semente (sementes seguidas não andam de 3 em 3).
+    expect(loadingTipKey(LOADING_TIP_COUNT)).toBe('loading.tip.1');
+    expect(loadingTipKey(-1)).toBe(`loading.tip.${LOADING_TIP_COUNT}`);
+    const seen = new Set<number>();
+    for (let k = 0; k < 40; k++) seen.add(loadingTipIndex(0x6b0b0 + k * 0x9e37));
+    expect(seen.size).toBeGreaterThan(8);
+  });
+
   it('concluída mostra ms, em andamento mostra barra, na fila mostra "Na fila"; cabe nas 4 resoluções', () => {
     const m = createLoadingModel();
     m.mapName = 'Construto';
+    m.details = true;
     m.progress[0] = 1;
     m.ms[0] = 412;
     m.progress[1] = 1;

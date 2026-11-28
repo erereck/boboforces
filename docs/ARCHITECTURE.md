@@ -5850,3 +5850,48 @@ teste); o desenho, em `ui/src/screens/hud.ts` e `match-hud.ts`; a cena só faz a
   `ProjectileBuffer.noShadow`, `ParticleUniforms.uBlobMaxDist`, `startupMs.curtainStalls?`, o `BF_LIGHT_FLOOR` na
   `bfSceneLight`, os campos novos do `FigureMotionConfig`. Primeira partida 975,1 KB de 1.000 (com as fases 1 e 6).
   Nenhum golden mudou.
+
+### 23.3 Fase 3: os menus e o fluxo (27/11/2026)
+
+- **Um destaque por tela** (AM2): o primário sem foco é a chapa com contorno e texto âmbar (`ui/src/draw.ts`); só o
+  foco é cheio (os prints mostravam dois destaques ao mesmo tempo).
+- **Entradas secas** (`game/src/menu-entry.ts`): a tela nova sobe 8→0 px (× a escala da UI) e aparece em 150 ms
+  (`fadeCommands`, §23 fase 0), sem o fundo que cobre o alvo (a tela não pisca); instantânea com `reduceShake` ou
+  `reducedMotion`. O `game.ts` aplica no `presentMenu`; a `match.ts`, em cada página da pausa.
+- **Pausa:** o Sair em dois apertos (`createQuitGuard`, `pause.ts`; "Aperte de novo para sair." em vermelho; outra
+  ação, o voltar ou o foco saindo desarmam; vale no host, no cliente e no Aquário); o Esc numa página volta um nível, o
+  + fecha tudo.
+- **Loading:** o mapa da receita (no Meu Bobo, "MEU BOBO") e o resumo desde o quadro do chunk; as etapas com ms só no
+  bench ou com o F2; 12 dicas (`loading.tip.N` na tabela extra, `loadingTipIndex` por hash da semente, trocam a cada
+  5 s, nunca cruas).
+- **Toda tecla responde:** "Abrindo…" no título enquanto chega o pedaço dos editores ou do Online, e nos Modos só pelos
+  editores; "Sem conexão: tente de novo." com o `ui-erro` (o som existia e nunca tocava); o `ui-erro` a 35% na borda do
+  D-pad, uma vez por aperto; o começar com o `recarga-poe` a 0,8; o P1–P4 entrando no sofá com o `ui-confirmar` a
+  1/1,12/1,26/1,41. O +/Start começa a Rápida, a Personalizada e o Surpreenda-me (não o resultado); com o sofá, só o do
+  P1 (`startButtonHeld`, `game/src/menu-memory.ts`).
+- **Memória da sessão:** o foco no card da última partida (`modesCardFor`, `moreCardFor`), a aba dos Ajustes, o
+  rascunho da Personalizada aberta pelos Modos (`createCustomDraft`: só guarda com mexida na receita ou na aba; qualquer
+  partida começada limpa); a Oficina escolhe o bot com o foco; o Surpreenda-me volta para onde abriu (os Modos ou o
+  lobby do Switch). Nada vai para o disco.
+- **Nomes** (AM3): "Personalizada" no card, no botão da Partida Rápida (era "Mais regras"), no título da tela (era
+  "Partida personalizada") e no resultado (era "Mudar regras"); "Oficina" no título, no lobby e nas chamadas (o botão
+  era "Laboratório"); "Laboratório" é só o editor do bot; "Reduzir efeitos" (AM1; o campo do save continua
+  `reduceShake`).
+- **Mais modos:** a linha de ajuda com o nome e o resumo do card com o foco ("N bobos" no Infection e no Juggernaut) e o
+  que o Aquário faz; no toque, os cards sem descrição (`bare`); o vão do card até a descrição foi para 11/12 px de
+  referência (o foco encostava no texto).
+- **Fortaleza: \<mapa\>** (`fortressName`) nos recentes, na Personalizada e no Surpreenda-me; o Royale Grande no
+  Surpreenda-me com peso 1 só onde o perfil aceita (no fim da lista: os códigos `BFR1-` antigos decodificam igual), e o
+  código dele fora do PC diz "Este modo só roda no PC."; a linha Modo da Personalizada usa `mode.short.<modo>` (aberta
+  pelo Training dizia "Times").
+- **Logo em blocos** (#43, AM8; `ui/src/screens/logo.ts`): o mesmo do splash (o teste confere bloco a bloco com o SVG
+  do `index.html`), 5×7 blocos de 12 px de referência com bisel de 1/8 do bloco e a faixa laranja das placas, ~1.100
+  retângulos por quadro numa draw call, sem textura. No Switch o título não aparece (vai ao lobby).
+- **Link recebido com o jogo aberto:** o `hashchange` da web chama `GameHandle.receiveLink`; a "Partida recebida" abre
+  na volta ao título.
+- **Revisão (Opus):** nenhum achado alto; 2 médios (o + de qualquer controle começava a partida no sofá; o rascunho da
+  Personalizada guardado sem mudança) e 8 baixos, mais 2 defeitos de antes (as telas de edição puxavam o jogador de
+  outra tela quando o pedaço chegava; o Surpreenda-me do lobby voltava aos Modos), corrigidos antes da junção.
+- **Contratos:** `GameHandle.receiveLink`; `LoadingModel.summary/details` e o `tipKey` começando em `null`;
+  `TitleState.opening?`, `ModesState.note?/help?/bare?`, `PauseState.quitArmed?`; o `MenuSound` `'edge'` e o
+  `playUiSound(…, scale, rate)`. Custo: menu 337,3 KB (+2,3), primeira partida 966,7 KB. Nenhum golden mudou.

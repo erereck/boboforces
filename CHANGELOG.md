@@ -41,6 +41,12 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   aparece de verdade), a explosão deixa marca chamuscada e levanta poeira com um clarão de verdade, pousos fortes e
   deslizes soltam pó do chão, o tiro na cabeça faz a cabeça voar com confete, a partida entra atrás de uma cortina, e o
   Meu Bobo respira, pisca e se monta de novo a cada peça trocada.
+- **Os menus e o fluxo (fase 3):** um destaque só por tela, entradas secas nos menus e na pausa, "Sair da partida" em
+  dois apertos e o Esc que volta um nível, o loading com o mapa, o resumo da partida e dicas que giram, toda tecla com
+  resposta (Abrindo…, sem conexão, som na borda e no começar), a linha de ajuda da Mais modos, a Oficina que segue o
+  foco, o +/Start que começa, a última escolha lembrada, "Personalizada" e "Oficina" com um nome só, "Reduzir efeitos",
+  a Fortaleza com o mapa no nome, o Royale Grande no Surpreenda-me do PC e o logo em blocos no título, o mesmo da
+  abertura.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

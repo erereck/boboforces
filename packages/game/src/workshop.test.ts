@@ -1,8 +1,17 @@
 import { builtinBot, encodeShareCode, type BotDocument, type MatchRecipe } from '@boboforces/format';
 import type { Platform, Storage } from '@boboforces/platform-api';
 import { createRng } from '@boboforces/shared';
-import { SHARE_ACTION, TABBED_ROW_PREFIX, WORKSHOP_ACTION, WORKSHOP_BOT_PREFIX } from '@boboforces/ui';
+import { createRawInputState, type MenuInput } from '@boboforces/input';
+import {
+  createDrawList,
+  resetDrawList,
+  SHARE_ACTION,
+  TABBED_ROW_PREFIX,
+  WORKSHOP_ACTION,
+  WORKSHOP_BOT_PREFIX,
+} from '@boboforces/ui';
 import { describe, expect, it } from 'vitest';
+import type { UiFrame } from './menu.ts';
 import { customRows, stepCustom } from './custom-match.ts';
 import { createSaveStore, libraryCapsFor } from './save-store.ts';
 import { createShareFlow, type ShareFlow } from './share.ts';
@@ -223,5 +232,26 @@ describe('M8 (fase 2, revisão): os casos de borda dos esquadrões', () => {
     }
     expect(seen.has('Esquadrão The Jorges')).toBe(true);
     expect([...seen].filter((v) => v.startsWith('Esquadrão'))).toEqual(['Esquadrão The Jorges']);
+  });
+});
+
+describe('M12 (fase 3): a Oficina segue o foco', () => {
+  it('o foco num bot da lista o escolhe (sem confirmar); o "Novo esquadrão" só abre no confirmar', () => {
+    const { flow, factoryBots } = setup();
+    const list = createDrawList(8192);
+    const ui: UiFrame = { width: 1280, height: 720, scale: 1, userScale: 1, options: {}, revision: 1 };
+    const raw = createRawInputState();
+    const press = (action: string): MenuInput => ({ pressed: (x: string) => x === action }) as unknown as MenuInput;
+    const idle = press('');
+    resetDrawList(list, 1280, 720);
+    flow.frame(idle, raw, ui, list);
+    expect(flow.selected).toBe(factoryBots[0]!.id);
+    // Para baixo até o próximo bot de fábrica: ele vira o escolhido no mesmo quadro.
+    for (let i = 0; i < 8 && flow.selected === factoryBots[0]!.id; i++) {
+      resetDrawList(list, 1280, 720);
+      flow.frame(press('down'), raw, ui, list);
+    }
+    expect(flow.selected).toBe(factoryBots[1]!.id);
+    expect(flow.mode).toBe('list');
   });
 });

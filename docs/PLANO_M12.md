@@ -61,6 +61,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    o nome do mapa, o resumo e dicas que giram; toda tecla responde ("Abrindo…", erro sem rede, som de erro); a linha
    de ajuda do Mais modos; a Oficina que segue o foco; o +/Start começa; lembrar a última escolha; os nomes iguais em
    cada tela; a Fortaleza com o mapa no nome; o Surpreenda-me com o Royale Grande no PC; o logo em blocos.
+   - **feita em 27/11** (ARCHITECTURE §23.3): os 14 itens e os 6 do playtest (o Esc da pausa, a Personalizada do Training, o foco, o logo em blocos igual ao da abertura); nenhum golden mudou.
 4. **O som:** o cooldown que calava o inimigo; a variação de tom; a parede que abafa; o dano com lado e o coração que
    acelera; o foley das armas em tempos; o zunido da bala; o abate que sobe de tom e o colete que quebra; passos e
    pouso; os sons dos objetivos (Boom Box, pontos, zona, rodadas, ping); vinhetas de 3 s e o empate; o abafado na

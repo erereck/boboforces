@@ -56,6 +56,52 @@ export interface PauseState {
   readonly items?: readonly UiNode[];
   /** M9 (fase 5): o P1 tem o botão das Ferramentas do Dono (o Sandbox), no canto de cima. */
   readonly owner?: boolean;
+  /**
+   * M12 (fase 3): o 1º aperto do "Sair da partida" armou (`createQuitGuard`): a frase de ajuda vira "Aperte de novo para
+   * sair", em vermelho.
+   */
+  readonly quitArmed?: boolean;
+}
+
+/** M12 (fase 3): o que o aperto fez com o Sair em dois tempos. */
+export type QuitStep = 'none' | 'armed' | 'disarmed' | 'quit';
+
+/**
+ * M12 (fase 3): o "Sair da partida" em dois apertos (o lobby do Switch já fazia assim com o Sair do jogo): o 1º arma, o
+ * 2º sai; qualquer outra ação (outro botão, o voltar, o foco que sai do Sair) desarma. `step` 1x por navegação da
+ * página principal da pausa; `reset` ao abrir a pausa.
+ */
+export interface QuitGuard {
+  readonly armed: boolean;
+  step(activated: string | null, back: boolean, focusedId: string | null): QuitStep;
+  reset(): void;
+}
+
+export function createQuitGuard(): QuitGuard {
+  let armed = false;
+  return {
+    get armed() {
+      return armed;
+    },
+    step(activated, back, focusedId) {
+      if (activated === PAUSE_ACTION.quit && !back) {
+        if (armed) {
+          armed = false;
+          return 'quit';
+        }
+        armed = true;
+        return 'armed';
+      }
+      if (armed && (activated !== null || back || focusedId !== PAUSE_ACTION.quit)) {
+        armed = false;
+        return 'disarmed';
+      }
+      return 'none';
+    },
+    reset() {
+      armed = false;
+    },
+  };
 }
 
 /** Refino R4 (#79): a frase de cada item da pausa (o que ele faz), pelo id do botão. */
@@ -73,6 +119,7 @@ const PAUSE_HELP: Readonly<Record<string, StringKey>> = {
 /** A frase do item com o foco (`''` sem frase). Calibrar e Pular calibração dependem do estado. */
 export function pauseHelp(focusedId: string | null, state: PauseState | null): string {
   if (focusedId === null) return '';
+  if (state?.quitArmed === true && focusedId === 'quit') return t('pause.quitArmed');
   if (focusedId === 'calibrate') return t(state?.calibrating ? 'pause.help.calibrateSkip' : 'pause.help.calibrate');
   const key = PAUSE_HELP[focusedId];
   return key !== undefined ? t(key) : '';
@@ -127,7 +174,7 @@ export const pauseScreen: Screen<PauseState | null> = {
                     id: 'help',
                     text: { literal: state.help },
                     style: 'caption',
-                    color: COLORS.texto,
+                    color: state.quitArmed === true ? COLORS.perigo : COLORS.texto,
                     textAlign: 'center',
                   } as const,
                 ]

@@ -289,6 +289,7 @@ import {
   calibratedScreen,
   challengeLevel,
   challengeScreen,
+  createQuitGuard,
   PAUSE_ACTION,
   pauseHelp,
   pauseScreen,
@@ -433,6 +434,7 @@ import {
   type OwnerTools,
 } from './owner-tools.ts';
 import { ownerReserveFor } from '../owner-reserve.ts';
+import { createMenuEntry } from '../menu-entry.ts';
 
 /** Quanto o flash de dano, a retícula e o tiro duram (s). */
 const FLASH_S = 0.25;
@@ -3288,6 +3290,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // --- mapeador, pausa, painel F2 ---
   const pauseMenu = createMenuController();
   pauseMenu.setRoot(pauseScreen.build(pauseState));
+  // M12 (fase 3): o Sair da partida em dois apertos e a entrada seca de cada página da pausa (`menu-entry.ts`).
+  const quitGuard = createQuitGuard();
+  const pauseEntry = createMenuEntry();
   const touchOverlay = createTouchOverlay();
   /** Rascunho do quadro do overlay de toque (preenchido por frame, sem objeto novo). */
   const touchFrame = { width: 0, height: 0, pixelRatio: 1, minTextPx: 0 };
@@ -4013,6 +4018,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     paused = true;
     pausedBy = seat > 0 && seat < seatCtrl.length ? seat : 0;
     menuOwnerFor(pausedBy);
+    quitGuard.reset();
     matchSound.silence();
     // M2 (fase 5f): refeita ao abrir (calibrando, o item é "Pular calibração").
     if (pausePage === 'main') pauseMain();
@@ -4126,6 +4132,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       director: directorPauseLine(),
       // M9 (fase 5): as Ferramentas do Dono (o Sandbox), no alto da pausa do P1.
       owner: ownerTools !== null,
+      quitArmed: quitGuard.armed,
       // M7 (fase 9): os itens do Aquário (a velocidade, assumir e voltar a assistir).
       ...(aquarium
         ? {
@@ -4139,7 +4146,8 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           }
         : {}),
     };
-    const help = (aquarium ? aquariumPauseHelp(pauseMainFocus) : null) ?? pauseHelp(pauseMainFocus, st);
+    const help =
+      (aquarium && !quitGuard.armed ? aquariumPauseHelp(pauseMainFocus) : null) ?? pauseHelp(pauseMainFocus, st);
     pauseMenu.setRoot(pauseScreen.build({ ...st, help }));
   }
 
@@ -4322,6 +4330,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   function pauseAction(nav: MenuNavigation, raw: Readonly<RawInputState>): SceneSignal {
     const a = nav.activated;
     if (pausePage === 'main') {
+      // M12 (fase 3): o Sair arma no 1º aperto e sai no 2º; outra ação ou o foco fora dele desarma (a frase volta).
+      const quit = quitGuard.step(a, nav.back, pauseMenu.focusedId);
+      if (quit === 'armed' || quit === 'disarmed') pauseMain();
+      if (quit === 'armed') return 'none';
       if (nav.back || a === PAUSE_ACTION.resume) resume();
       else if (a === PAUSE_ACTION.challenge) {
         pausePage = 'challenge';
@@ -4368,7 +4380,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       } else if (a === AQUARIUM_ACTION.watch) {
         resume();
         releaseBot();
-      } else if (a === PAUSE_ACTION.quit) return request.online?.role === 'client' ? 'leave' : 'quit';
+      } else if (quit === 'quit') return request.online?.role === 'client' ? 'leave' : 'quit';
       // Refino R4: a frase de ajuda segue o foco.
       if (paused && pausePage === 'main' && pauseMenu.focusedId !== pauseMainFocus) pauseMain();
       return 'none';
@@ -8104,7 +8116,10 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           const extraPause = updateExtras(raw, 0, false, true);
           // Capturando um botão (e esperando soltar tudo depois): nem a pausa nem o menu andam.
           if (capture.active) finishCapture(capture.update(raw));
-          else if (player.wasPressed('pause') || extraPause > 0) resume();
+          // M12 (fase 3): numa página da pausa (Ajustes, Dificuldade…), o Esc (pausa e voltar ao mesmo tempo) volta um
+          // nível pelo menu, em vez de fechar tudo; o + continua fechando.
+          else if ((player.wasPressed('pause') && (pausePage === 'main' || !menu.pressed('back'))) || extraPause > 0)
+            resume();
           else if (pausePage !== 'players' || !playersInput(raw)) {
             // M9 (fase 5, revisão): no online a sim anda com a pausa aberta: a resposta do dono refaz a página (um
             // modificador recusado apaga, a reserva muda).
@@ -8334,7 +8349,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         }
         drawBenchStatus(list, fonts, ui);
         if (wardrobe) wardrobe.draw(list, ui);
-        if (paused) pauseMenu.draw(list, ui);
+        if (paused) {
+          const from = list.count;
+          pauseMenu.draw(list, ui);
+          const reduce = host.settings.current.accessibility.reduceShake || host.platform.features.reducedMotion;
+          pauseEntry.apply(list, from, pausePage, dt * 1000, reduce, ui.scale);
+        } else pauseEntry.clear();
         // M2 (fase 2e): o resultado entra 2,5 s depois do fim (dá para ver o último abate).
         if (!resultShown && endedAt >= 0 && (humans > 0 || aquarium) && timeS - endedAt >= RESULT_DELAY_S)
           showResult(true);

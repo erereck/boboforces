@@ -156,6 +156,16 @@ function start(
       void webInput.requestPointerLock();
     }
   });
+  // M12 (fase 3): o link de um código colado na barra com o jogo aberto (só o hash muda; a página não recarrega): a tela
+  // de receber abre no título (no meio da partida, ao sair dela). Tirado da barra como o do boot.
+  if (!bench && !switchTitle) {
+    window.addEventListener('hashchange', () => {
+      const next = window.location.hash;
+      if (!/(^#|&)(bot|p)=/.test(next)) return;
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      game.receiveLink(next);
+    });
+  }
   bench?.install(window, platform.graphics.canvas);
   window.__bfDebug = createDebugHook({
     game,

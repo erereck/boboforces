@@ -351,6 +351,20 @@ export function createWorkshopFlow(deps: WorkshopDeps): WorkshopFlow {
 
   // --- a lista ---
 
+  /**
+   * M12 (fase 3): o card segue o foco: com o foco num bot ou esquadrão da lista, ele vira o escolhido (antes, só ao
+   * confirmar). O "Novo esquadrão" só abre no confirmar.
+   */
+  function followFocus(focusedId: string | null): void {
+    if (mode !== 'list' || focusedId === null || !focusedId.startsWith(WORKSHOP_BOT_PREFIX)) return;
+    const id = focusedId.slice(focusedId.indexOf(':', WORKSHOP_BOT_PREFIX.length) + 1);
+    if (id === NEW_SQUAD || id === selected) return;
+    selected = id;
+    confirm = null;
+    note = '';
+    rebuildList();
+  }
+
   function listAction(a: string): void {
     if (a.startsWith(WORKSHOP_BOT_PREFIX)) {
       // `bot:<grupo>:<id>`
@@ -480,6 +494,7 @@ export function createWorkshopFlow(deps: WorkshopDeps): WorkshopFlow {
         if (mode === 'squad') squadAction(nav);
         else if (nav.back || nav.activated === WORKSHOP_ACTION.back) return BACK;
         else if (nav.activated !== null) listAction(nav.activated);
+        else followFocus(menu.focusedId);
       }
       if (pending !== null) {
         const r = pending;

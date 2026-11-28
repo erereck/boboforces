@@ -216,7 +216,7 @@ export function createSettingsFlow(deps: SettingsDeps): SettingsFlow {
 
   return {
     open(lastDevice) {
-      tab = 0;
+      // M12 (fase 3): a aba da última visita fica (na sessão); antes, abria sempre na 1ª.
       capture.stop();
       capturing = null;
       note = '';

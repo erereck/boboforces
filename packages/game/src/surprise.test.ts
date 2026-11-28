@@ -131,7 +131,11 @@ describe('M11 (fase 4): as armas no mapa no Surpreenda-me', () => {
 });
 
 describe('M8 (fase 3): a tela do Surpreenda-me', () => {
-  const platform = { id: 'web', clipboard: { writeText: async () => true } } as unknown as Platform;
+  const platform = {
+    id: 'web',
+    clipboard: { writeText: async () => true },
+    features: { profileHint: 'mobile' },
+  } as unknown as Platform;
 
   it('a linha apertada trava; o "Rolar de novo" muda as outras; Jogar devolve a receita', () => {
     const flow = createSurpriseFlow({ platform, rng: createRng(5) });
@@ -186,7 +190,11 @@ describe('M8 (fase 3, revisão): o que o card diz é o que se joga', () => {
 
   it('direita trava, esquerda solta (segurar não pisca)', () => {
     const flow = createSurpriseFlow({
-      platform: { id: 'web', clipboard: { writeText: async () => true } } as unknown as Platform,
+      platform: {
+        id: 'web',
+        clipboard: { writeText: async () => true },
+        features: { profileHint: 'mobile' },
+      } as unknown as Platform,
       rng: createRng(8),
     });
     flow.open();
@@ -196,5 +204,47 @@ describe('M8 (fase 3, revisão): o que o card diz é o que se joga', () => {
     flow.act(TABBED_ROW_PREFIX + 'map', -1);
     flow.act(TABBED_ROW_PREFIX + 'map', -1);
     expect(flow.locks.has('map')).toBe(false);
+  });
+});
+
+describe('M12 (fase 3): o Bobo Royale Grande no Surpreenda-me do PC', () => {
+  it('peso 1, só quando o aparelho roda (o PC); a receita, o card e o código', () => {
+    const count = (grande: boolean): number => {
+      let n = 0;
+      for (let seed = 1; seed <= 3000; seed++) if (rollSurprise(seed, null, none, grande).mode === 'royaleGrande') n++;
+      return n;
+    };
+    expect(count(false)).toBe(0);
+    // Peso 1 em 27 (~3,7%).
+    expect(count(true)).toBeGreaterThan(40);
+    expect(count(true)).toBeLessThan(160);
+    let seed = 1;
+    while (rollSurprise(seed, null, none, true).mode !== 'royaleGrande') seed++;
+    const roll = rollSurprise(seed, null, none, true);
+    const r = surpriseRecipe(roll);
+    expect([r.mode, r.map]).toEqual(['royale.grande', 'archipelago']);
+    expect(surpriseLineText(roll, 'mode')).toBe('Bobo Royale Grande');
+    expect(surpriseFromCode(JSON.parse(JSON.stringify(surpriseCodeDoc(roll))))).toEqual(roll);
+    // O fluxo do PC sorteia; o do celular, nunca.
+    const pc = { id: 'web', features: { profileHint: 'pc' } } as unknown as Platform;
+    const phone = { id: 'web', features: { profileHint: 'mobile' } } as unknown as Platform;
+    const seen = (platform: Platform): boolean => {
+      const flow = createSurpriseFlow({ platform, rng: createRng(11) });
+      for (let i = 0; i < 400; i++) {
+        flow.open();
+        if (flow.roll.mode === 'royaleGrande') return true;
+      }
+      return false;
+    };
+    expect(seen(pc)).toBe(true);
+    expect(seen(phone)).toBe(false);
+  });
+
+  it('a Fortaleza leva o mapa sorteado no nome', () => {
+    for (let seed = 1; seed <= 4000; seed++) {
+      const roll = rollSurprise(seed, null, none);
+      if (roll.mode !== 'zombiesFortress') continue;
+      expect(surpriseRecipe(roll).name).toBe(roll.map === 'farm' ? 'Fortaleza: Fazenda' : 'Fortaleza: Posto Avançado');
+    }
   });
 });

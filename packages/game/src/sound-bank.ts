@@ -232,11 +232,29 @@ export const MENU_SOUNDS = {
   change: 'ui-trocar',
 } as const satisfies Readonly<Record<string, SoundId>>;
 
-const uiOptions = { bus: 'ui' as AudioBus, volume: 1, priority: SOUND_RANK.ui };
+const uiOptions = { bus: 'ui' as AudioBus, volume: 1, priority: SOUND_RANK.ui, rate: 1 };
 
-/** Toca um som de interface (2D, canal da interface). */
-export function playUiSound(mixer: Mixer, id: SoundId): void {
+/**
+ * Toca um som de interface (2D, no canal do som). M12 (fase 3): `scale` multiplica o volume (a borda do D-pad toca o
+ * `ui-erro` baixinho) e `rate` muda o tom (o P2–P4 entrando no sofá; o começar mais grave).
+ */
+export function playUiSound(mixer: Mixer, id: SoundId, scale = 1, rate = 1): void {
   uiOptions.bus = SOUNDS[id].bus;
-  uiOptions.volume = SOUNDS[id].volume;
+  uiOptions.volume = SOUNDS[id].volume * scale;
+  uiOptions.rate = rate;
   mixer.play(id, uiOptions);
 }
+
+/** M12 (fase 3): os sons de interface que não são gestos do menu (`MENU_SOUNDS`). */
+export const UI_EXTRA_SOUNDS = {
+  /** O aperto que não deu certo (sem conexão, o modo que só roda no PC). */
+  error: 'ui-erro',
+  /** Começar a partida: a trava do pente, mais grave, por cima do confirmar. */
+  start: 'recarga-poe',
+  /** O P1–P4 entrando no sofá: o confirmar subindo de tom. */
+  join: 'ui-confirmar',
+} as const satisfies Readonly<Record<string, SoundId>>;
+/** O volume da borda do D-pad (sobre o do `ui-erro`), o tom do começar e os tons do P1 ao P4 entrando. */
+export const UI_EDGE_VOLUME = 0.35;
+export const UI_START_RATE = 0.8;
+export const UI_JOIN_RATES: readonly number[] = [1, 1.12, 1.26, 1.41];

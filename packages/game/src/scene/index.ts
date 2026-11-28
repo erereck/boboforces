@@ -4,7 +4,17 @@
 import { registerStrings, STRINGS_EXTRA_PT_BR } from '@boboforces/ui';
 import type { Scene, SceneHost, SceneModule, SceneRequest } from '../scene-api.ts';
 import { FIGURE_SKIN_LAYERS } from '@boboforces/format';
-import { drawLoadingScreen, loadingStepIndex, type DrawList, type LoadingModel } from '@boboforces/ui';
+import {
+  drawLoadingScreen,
+  loadingStepIndex,
+  loadingTipIndex,
+  loadingTipKey,
+  t,
+  type DrawList,
+  type LoadingModel,
+} from '@boboforces/ui';
+import { keyIndex } from '@boboforces/input';
+import { presetSummary } from '../presets-ui.ts';
 import type { ViewDesc } from '@boboforces/render/data';
 import { teamColorTable } from '../team-colors.ts';
 import { createSceneFigures, type SceneFigures } from './figures.ts';
@@ -43,6 +53,9 @@ export { createSamples, type Samples } from './stats.ts';
  */
 const LOADING_BUDGET_MS = 90;
 const NO_VIEWS: readonly ViewDesc[] = [];
+/** M12 (fase 3): de quanto em quanto tempo a dica do loading troca (s) e a tecla que mostra as etapas com ms. */
+const TIP_TURN_S = 5;
+const F2_KEY = keyIndex('F2');
 
 /**
  * Cria a cena do Construto: loading por etapas nos próprios frames (assets → texturas → luz → malha → navegação →
@@ -58,6 +71,15 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
   // M2 (fase 5c): o mapa da receita (Construto ou Ringue).
   const loader = createConstrutoLoader(host, recipe.recipe.map);
   const loading: LoadingModel = loader.model;
+  // M12 (fase 3): o loading fala do jogo: o Meu Bobo pelo nome dele, o resumo da partida e uma dica sorteada pela
+  // semente que troca a cada `TIP_TURN_S` (a mesma do loading do chunk); as etapas com ms só no bench ou com o F2.
+  if (request.kind === 'wardrobe') loading.mapName = t('menu.bobo');
+  loading.summary = request.kind === 'play' ? presetSummary(recipe.recipe) : '';
+  loading.details = request.bench !== null;
+  let tipIndex = loadingTipIndex(request.seed);
+  loading.tipKey = loadingTipKey(tipIndex);
+  let tipS = 0;
+  let f2Down = false;
   let phase: 'loading' | 'running' | 'error' = 'loading';
   let post: 'none' | 'figures' | 'skins' | 'shaders' = 'none';
   let match: ConstrutoMatch | null = null;
@@ -239,6 +261,14 @@ export function createConstrutoScene(host: SceneHost, request: SceneRequest): Sc
           host.log(`[cena] loading falhou: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
         }
         if (phase === 'loading') {
+          tipS += dt;
+          if (tipS >= TIP_TURN_S) {
+            tipS = 0;
+            loading.tipKey = loadingTipKey(++tipIndex);
+          }
+          const f2 = F2_KEY >= 0 && raw.keys[F2_KEY] === 1;
+          if (f2 && !f2Down) loading.details = !loading.details;
+          f2Down = f2;
           drawLoading(list, ui.width, ui.height, ui.options.minTextPx ?? 0);
           return 'none';
         }

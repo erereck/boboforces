@@ -111,4 +111,31 @@ describe('menu: sons (M2, fase 7c)', () => {
       setMenuSoundSink(null);
     }
   });
+
+  it('M12 (fase 3): o D-pad que bate na borda toca "edge" (o foco fica)', () => {
+    const heard: MenuSound[] = [];
+    setMenuSoundSink((k) => heard.push(k));
+    try {
+      const menu = createMenuController();
+      menu.setRoot(titleScreen.build({ version: '0.0.1', codename: 'teste' }));
+      const ui = frame(1280, 720);
+      const press = (action: string): MenuInput => ({ pressed: (x: string) => x === action }) as unknown as MenuInput;
+      menu.update(IDLE, createRawInputState(), ui);
+      // O JOGAR é o de cima: para cima não tem para onde ir.
+      menu.update(press('up'), createRawInputState(), ui);
+      expect(menu.focusedId).toBe('play');
+      // Revisão: segurado (a auto-repetição), não toca de novo; solto por 1 s, o aperto novo toca.
+      for (let i = 0; i < 5; i++) {
+        menu.update(IDLE, createRawInputState(), ui);
+        menu.update(press('up'), createRawInputState(), ui);
+      }
+      expect(heard).toEqual(['edge']);
+      for (let i = 0; i < 61; i++) menu.update(IDLE, createRawInputState(), ui);
+      menu.update(press('up'), createRawInputState(), ui);
+      menu.update(press('down'), createRawInputState(), ui);
+      expect(heard).toEqual(['edge', 'edge', 'move']);
+    } finally {
+      setMenuSoundSink(null);
+    }
+  });
 });

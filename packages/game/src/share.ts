@@ -65,6 +65,8 @@ export interface ShareFlow {
   openCode(code: string): void;
   /** O jeito da tela agora (os testes). */
   readonly mode: ShareMode;
+  /** M12 (fase 3, revisão): as linhas que a tela mostra (os testes). */
+  readonly lines: readonly string[];
   /** Um botão da tela (o `frame` chama pelo menu; os testes, direto). */
   act(action: string): void;
   /** 1x por frame com a tela aberta (desenha em `list`). */
@@ -244,11 +246,16 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
       const roll = decoded.ok ? surpriseFromCode(decoded.doc) : null;
       const checked = roll !== null ? validateMatchRecipe(surpriseRecipe(roll), deps.limits) : null;
       if (roll === null || checked === null || !checked.ok) {
+        // M12 (fase 3, revisão): o sorteio do Royale Grande (o PC) colado em outro aparelho diz o motivo.
+        const pcOnly =
+          checked !== null && !checked.ok && checked.errors.some((e) => e.code === 'recipe.modeNotOnPlatform');
         const key = !decoded.ok
           ? (`share.error.${decoded.error}` as StringKey)
           : surpriseCodeIsNewer(decoded.doc)
             ? 'share.error.surpriseNewer'
-            : 'share.error.invalid';
+            : pcOnly
+              ? 'issue.recipe.modeNotOnPlatform'
+              : 'share.error.invalid';
         showError([t(key)]);
         return;
       }
@@ -421,6 +428,9 @@ export function createShareFlow(deps: ShareFlowDeps): ShareFlow {
       mode = 'error';
       title = '';
       openPaste();
+    },
+    get lines() {
+      return lines;
     },
     openCode(code) {
       result = null;

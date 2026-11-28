@@ -433,7 +433,20 @@ describe('startGame (NullRenderer)', () => {
     platform.tap('ArrowDown');
     platform.tap('Enter');
     expect([game.scene!.level, game.paused]).toEqual(['normal', true]);
+    // M12 (fase 3): o Esc nos Ajustes da pausa volta um nível (para a pausa), não fecha os dois.
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    platform.tap('Escape');
+    expect([game.screen, game.paused]).toEqual(['scene', true]);
+    platform.tap('ArrowUp');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+    // M12 (fase 3): o Sair da partida pede dois apertos; o 1º só arma (e outra tecla desarma).
+    platform.tap('Enter');
+    expect([game.screen, game.paused]).toEqual(['scene', true]);
+    platform.tap('ArrowUp');
+    platform.tap('ArrowDown');
+    platform.tap('Enter');
+    expect(game.screen).toBe('scene');
     platform.tap('Enter');
     expect(game.screen).toBe('title');
     expect(game.scene).toBeNull();
@@ -1616,6 +1629,7 @@ describe('título, menu principal e Surpreenda-me (M2, fase 4c)', () => {
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('title');
     platform.tap('Enter');
     await untilRunning(platform, game);
@@ -1647,6 +1661,7 @@ describe('Partida Rápida e Modos (M2, fase 4d)', () => {
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('title');
     expect(game.save.presets.recent[0]!.teams[1]!.bots[0]!.count).toBe(5);
     game.dispose();
@@ -2149,6 +2164,7 @@ describe('Pontes do Laboratório (M2, fase 5e)', () => {
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('lab');
     expect(game.save.bots).toHaveLength(0);
     game.dispose();
@@ -2169,6 +2185,8 @@ describe('Conheça o Laboratório (M2, fase 5e)', () => {
       await untilRunning(platform, game);
       platform.tap('KeyP');
       for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
+      // M12 (fase 3): o Sair da partida pede dois apertos.
+      platform.tap('Enter');
       platform.tap('Enter');
     };
     await quitMatch();
@@ -2283,6 +2301,7 @@ describe('sofá (M3, fase 1b)', () => {
     platform.tap('KeyP');
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('couch');
     platform.tap('Escape');
     expect(game.screen).toBe('title');
@@ -2322,6 +2341,7 @@ describe('LOCAL EDITION (M4, fase 1)', () => {
     platform.tap('KeyP');
     for (let i = 0; i < 5; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     platform.pump(2);
     expect(game.screen).toBe('couch');
     game.dispose();
@@ -2692,6 +2712,7 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.pump(1);
     for (let i = 0; i < 4; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('online');
     expect(room.calls).toContain('host-dispose');
     expect(room.calls).toContain('reopen');
@@ -2776,6 +2797,7 @@ describe('o Online pelo título (M5 fase 4c)', () => {
     platform.pump(1);
     for (let i = 0; i < 3; i++) platform.tap('ArrowDown');
     platform.tap('Enter');
+    platform.tap('Enter'); // M12 (fase 3): o Sair pede dois apertos.
     expect(game.screen).toBe('online');
     expect(room.calls).toContain('leave');
     expect(game.onlineRoom).toBeNull();

@@ -32,6 +32,7 @@ import {
   type TextParams,
 } from '@boboforces/ui';
 import { mapBotCap, mapForMode, mapGravity, mapName, mapsForMode, mapWeaponsInEffect, type MenuMap } from './maps.ts';
+import { fortressName } from './more-modes.ts';
 import { teamColor, teamColorIndex } from './team-colors.ts';
 import { teamColorName, teamName } from './team-names.ts';
 
@@ -522,16 +523,9 @@ function scoreOf(r: MatchRecipe): number {
 const MODE_ROW: RowDef = {
   id: 'mode',
   labelKey: 'quick.mode',
-  value: (r) =>
-    t(
-      r.mode === 'zombies'
-        ? 'mode.short.zombies'
-        : sandbox(r)
-          ? 'mode.short.sandbox'
-          : ffa(r)
-            ? 'mode.short.warfare.ffa'
-            : 'mode.short.warfare.tdm',
-    ),
+  // M12 (fase 3): o nome curto do modo da receita, o mesmo do resumo embaixo do título (antes, o Training, o Domination
+  // e os modos da Mais modos apareciam como "Times" com o resumo dizendo outra coisa).
+  value: (r) => t(`mode.short.${r.mode}` as StringKey),
   step: (r, d, l) => stepMode(r, d, l),
 };
 
@@ -1306,7 +1300,14 @@ export function stepCustom(
   limits: CustomLimits,
 ): MatchRecipe {
   const row = customRows(tab, r).find((x) => x.id === id);
-  return row ? row.step(r, delta === 0 ? 1 : delta, limits) : r;
+  const next = row ? row.step(r, delta === 0 ? 1 : delta, limits) : r;
+  // M12 (fase 3): a Fortaleza leva o mapa no nome ("Fortaleza: Posto Avançado"), também quando a linha Mapa troca.
+  // (O nome de antes do M12, sem o mapa, também.)
+  const fortress = r.name === fortressName(r.map) || r.name === 'Bobo Zombies: Fortaleza';
+  if (next.map !== r.map && next.zombies?.variant === 'fortress' && fortress) {
+    return { ...next, name: fortressName(next.map) };
+  }
+  return next;
 }
 
 /**

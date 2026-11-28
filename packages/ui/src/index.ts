@@ -18,6 +18,8 @@ export * from './layout.ts';
 export * from './focus.ts';
 export * from './draw.ts';
 export * from './screens/title.ts';
+// M12 (fase 3, #43): o logotipo em blocos do título (o mesmo do splash da web).
+export * from './screens/logo.ts';
 export * from './screens/settings.ts';
 export * from './screens/tabbed.ts';
 export * from './screens/surprise.ts';

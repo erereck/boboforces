@@ -24,8 +24,8 @@ import {
   type UiNode,
 } from '@boboforces/ui';
 import { createMenuController, type UiFrame } from './menu.ts';
-import { FORTRESS_MAPS, mapBotCap, mapGravity, mapsForMode } from './maps.ts';
-import { GUN_GAME_LADDER, moreModePreset } from './more-modes.ts';
+import { FORTRESS_MAPS, mapBotCap, mapGravity, mapsForMode, playableOn } from './maps.ts';
+import { fortressName, GUN_GAME_LADDER, moreModePreset } from './more-modes.ts';
 
 /**
  * M8 (fase 3): o Surpreenda-me completo (GDD §3.3, gameplay.md "Surpreenda-me"): sorteia um modo (os 14 com card), um
@@ -77,7 +77,13 @@ const POOL: readonly (readonly [string, number])[] = [
   ['strike', 1],
   ['royale', 1],
 ];
-const POOL_IDS: readonly string[] = POOL.map(([id]) => id);
+/**
+ * M12 (fase 3): o Bobo Royale Grande entra no sorteio com peso 1 só onde o perfil aceita (o PC; fora dele a receita é
+ * recusada). No fim da lista: os sorteios sem ele continuam iguais.
+ */
+const GRANDE: readonly [string, number] = ['royaleGrande', 1];
+const POOL_GRANDE: readonly (readonly [string, number])[] = [...POOL, GRANDE];
+const POOL_IDS: readonly string[] = POOL_GRANDE.map(([id]) => id);
 
 /** Os modos que aceitam a arma fixa e os modificadores sorteados (os outros têm regra de arma própria). */
 const FREE_RULES = new Set(['warfare.tdm', 'warfare.ffa', 'warfare.domination']);
@@ -100,15 +106,16 @@ const STARS = ['jorge-the-immortal', 'camper-carl', 'knife-ninja', 'scaredy-sam'
 /** Os modificadores do sorteio (o Confete é só enfeite; fica de fora para não gastar uma vaga). */
 const ROLL_MODS: readonly ModifierId[] = MODIFIERS.filter((m) => m !== 'confetti');
 
-function pickWeighted(rng: Rng): string {
+function pickWeighted(rng: Rng, grande: boolean): string {
+  const pool = grande ? POOL_GRANDE : POOL;
   let total = 0;
-  for (const [, w] of POOL) total += w;
+  for (const [, w] of pool) total += w;
   let r = rng.int(0, total);
-  for (const [id, w] of POOL) {
+  for (const [id, w] of pool) {
     if (r < w) return id;
     r -= w;
   }
-  return POOL[0]![0];
+  return pool[0]![0];
 }
 
 /** A receita base do card (os Times, o FFA e o Zombies como no sorteio antigo; o resto, a da página Mais modos). */
@@ -206,15 +213,25 @@ export function surpriseRecipe(roll: SurpriseRoll): MatchRecipe {
     if (mods.length > 0) recipe = { ...recipe, modifiers: [...mods] };
   }
   if (STAR_MODES.has(roll.mode)) recipe = withStars(recipe, roll.stars);
-  // O nome do card fica (o Gun Game, a Fortaleza): o atalho do JOGAR mostra o modo de verdade.
-  return { ...recipe, name: base.name ?? t('surprise.presetName') };
+  // O nome do card fica (o Gun Game, a Fortaleza): o atalho do JOGAR mostra o modo de verdade. M12 (fase 3): a
+  // Fortaleza com o mapa sorteado no nome.
+  const name = roll.mode === 'zombiesFortress' ? fortressName(recipe.map) : base.name;
+  return { ...recipe, name: name ?? t('surprise.presetName') };
 }
 
-/** Um sorteio novo; as linhas travadas (`locks`) ficam como em `prev`. */
-export function rollSurprise(seed: number, prev: SurpriseRoll | null, locks: ReadonlySet<SurpriseLine>): SurpriseRoll {
+/**
+ * Um sorteio novo; as linhas travadas (`locks`) ficam como em `prev`. M12 (fase 3): `grande` = o aparelho roda o Bobo
+ * Royale Grande (o PC), que entra no sorteio.
+ */
+export function rollSurprise(
+  seed: number,
+  prev: SurpriseRoll | null,
+  locks: ReadonlySet<SurpriseLine>,
+  grande = false,
+): SurpriseRoll {
   const rng = createRng(seed >>> 0);
   const keep = (line: SurpriseLine): boolean => prev !== null && locks.has(line);
-  const mode = keep('mode') ? prev!.mode : pickWeighted(rng);
+  const mode = keep('mode') ? prev!.mode : pickWeighted(rng, grande);
   const maps = mapsOf(mode);
   // O mapa travado que não vale para o modo novo é sorteado de novo (o cadeado vale enquanto o mapa couber).
   const map = keep('map') && maps.includes(prev!.map) ? prev!.map : (maps[rng.int(0, Math.max(1, maps.length))] ?? '');
@@ -272,6 +289,7 @@ function modeName(id: string): string {
   if (id === 'warfare.tdm' || id === 'warfare.ffa') return t(`mode.${id}` as StringKey);
   if (id === 'zombies') return t('mode.zombies');
   if (id === 'warfare.domination') return t('mode.name.domination' as StringKey);
+  if (id === 'royaleGrande') return t('mode.royale.grande');
   return t(`mode.name.${id}` as StringKey);
 }
 
@@ -390,6 +408,8 @@ export interface SurpriseFlow {
   /** Um botão (o `frame` chama pelo menu; os testes, direto). `delta`: nas linhas, +1 trava e -1 solta. */
   act(action: string, delta?: number): SurpriseOutcome;
   frame(menu: MenuInput, raw: Readonly<RawInputState>, ui: UiFrame, list: DrawList): SurpriseOutcome;
+  /** M12 (fase 3): a receita do sorteio na tela (o +/Start começa direto, como o Jogar). */
+  play(): MatchRecipe;
 }
 
 export const SURPRISE_FLOW_ACTION = {
@@ -442,7 +462,9 @@ export function surpriseTree(
 export function createSurpriseFlow(deps: SurpriseFlowDeps): SurpriseFlow {
   const menu = createMenuController();
   const locks = new Set<SurpriseLine>();
-  let roll: SurpriseRoll = rollSurprise(deps.rng.int(0, 0x7fffffff), null, locks);
+  // M12 (fase 3): o Royale Grande só entra no sorteio do aparelho que o roda (o PC).
+  const grande = playableOn(moreModePreset('royaleGrande')!, deps.platform.features.profileHint);
+  let roll: SurpriseRoll = rollSurprise(deps.rng.int(0, 0x7fffffff), null, locks, grande);
   let note = '';
   const canCopy = deps.platform.id !== 'switch' && deps.platform.clipboard !== undefined;
 
@@ -458,7 +480,7 @@ export function createSurpriseFlow(deps: SurpriseFlowDeps): SurpriseFlow {
       // Tudo travado: o "Rolar de novo" solta tudo (senão o botão não faria nada).
       if (locks.size === SURPRISE_LINES.length) locks.clear();
       const before = roll;
-      roll = rollSurprise(deps.rng.int(0, 0x7fffffff), roll, locks);
+      roll = rollSurprise(deps.rng.int(0, 0x7fffffff), roll, locks, grande);
       // O mapa travado que não vale para o modo novo foi sorteado de novo: o cadeado sai (não trava um mapa que o
       // jogador não escolheu).
       if (locks.has('map') && roll.map !== before.map) locks.delete('map');
@@ -491,11 +513,14 @@ export function createSurpriseFlow(deps: SurpriseFlowDeps): SurpriseFlow {
     open() {
       locks.clear();
       note = '';
-      roll = rollSurprise(deps.rng.int(0, 0x7fffffff), null, locks);
+      roll = rollSurprise(deps.rng.int(0, 0x7fffffff), null, locks, grande);
       rebuild();
       menu.focus(SURPRISE_FLOW_ACTION.play);
     },
     act,
+    play() {
+      return surpriseRecipe(roll);
+    },
     frame(input, raw, ui, list) {
       const nav = menu.update(input, raw, ui);
       const r = nav.back ? BACK_OUTCOME : nav.activated !== null ? act(nav.activated, nav.delta) : OPEN_OUTCOME;

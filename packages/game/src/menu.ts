@@ -46,11 +46,20 @@ export function followTab(menu: MenuController, tab: number): void {
  * M2 (fase 7c): os sons dos menus saem daqui, para toda tela que usa o controlador (título, menus, pausa, resultado):
  * foco que andou, confirmar, voltar e trocar valor ou aba. O `game` liga no mixer; sem ligação (testes), mudo.
  */
-export type MenuSound = 'move' | 'confirm' | 'back' | 'change';
+export type MenuSound = 'move' | 'confirm' | 'back' | 'change' | 'edge';
 let menuSound: ((sound: MenuSound) => void) | null = null;
 export function setMenuSoundSink(sink: ((sound: MenuSound) => void) | null): void {
   menuSound = sink;
 }
+
+/** M12 (fase 3): o D-pad bateu na borda (a direção apertada não levou o foco a lugar nenhum) neste `update`. */
+let edgeBump = false;
+/**
+ * M12 (fase 3, revisão): a borda toca uma vez por aperto, não no ritmo da auto-repetição (0,4 s e depois a cada 0,1 s):
+ * depois do som, só toca de novo quando o foco anda, outra ação acontece ou as direções ficam soltas por este tanto de
+ * quadros (mais que o intervalo da repetição).
+ */
+const EDGE_QUIET_FRAMES = 60;
 
 function emitMenuSound(nav: MenuNavigation, before: string | null): MenuNavigation {
   if (menuSound === null) return nav;
@@ -58,8 +67,12 @@ function emitMenuSound(nav: MenuNavigation, before: string | null): MenuNavigati
   else if (nav.tab !== 0) menuSound('change');
   else if (nav.activated !== null) menuSound(nav.delta !== 0 ? 'change' : 'confirm');
   else if (nav.focusedId !== before && nav.focusedId !== null) menuSound('move');
+  // M12 (fase 3): toda tecla responde: a borda dá o som de erro, baixinho.
+  else if (edgeBump) menuSound('edge');
   return nav;
 }
+
+const isDirection = (a: MenuAction): boolean => a === 'up' || a === 'down' || a === 'left' || a === 'right';
 
 /** Ações de menu na ordem em que são tratadas num frame (a primeira que ativa ou volta encerra o frame). */
 const MENU_ORDER: readonly MenuAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'tabPrev', 'tabNext'];
@@ -91,6 +104,9 @@ export function createMenuController(): MenuController {
   const scrollState = new Map<string, number>();
   let layoutFocus: string | null = null;
   const nav = createMenuNavigation();
+  /** M12 (fase 3, revisão): a direção cuja borda já tocou neste aperto; quantos quadros seguidos sem direção. */
+  let edgeLatched: MenuAction | null = null;
+  let edgeQuiet = 0;
   // Ponteiro: o mouse confirma ao soltar no botão em que desceu; cada dedo idem.
   let mouseWasDown = false;
   let mousePressedId: string | null = null;
@@ -200,15 +216,35 @@ export function createMenuController(): MenuController {
       const l = relayout(ui);
       if (l === null) return nav;
       const before = focusedId;
+      edgeBump = false;
+      let direction = false;
+      let bumped: MenuAction | null = null;
       for (let i = 0; i < MENU_ORDER.length; i++) {
         const action = MENU_ORDER[i]!;
         if (!menu.pressed(action)) continue;
         navigateMenu(l, focusedId, action, nav);
+        if (isDirection(action)) direction = true;
+        if (isDirection(action) && focusedId !== null && nav.focusedId === focusedId && nav.activated === null) {
+          edgeBump = true;
+          bumped = action;
+        }
         focusedId = nav.focusedId;
-        if (nav.activated !== null || nav.back || nav.tab !== 0) return emitMenuSound(nav, before);
+        if (nav.activated !== null || nav.back || nav.tab !== 0) {
+          edgeLatched = null;
+          edgeBump = false;
+          return emitMenuSound(nav, before);
+        }
       }
       pointer(l, raw);
       nav.focusedId = focusedId;
+      if (nav.activated !== null || focusedId !== before) edgeLatched = null;
+      edgeQuiet = direction ? 0 : edgeQuiet + 1;
+      if (edgeQuiet > EDGE_QUIET_FRAMES) edgeLatched = null;
+      // A mesma direção segurada contra a mesma borda: em silêncio; outra direção toca.
+      if (edgeBump) {
+        if (edgeLatched === bumped) edgeBump = false;
+        else edgeLatched = bumped;
+      }
       return emitMenuSound(nav, before);
     },
     draw(out: DrawList, ui: UiFrame): void {

@@ -59,11 +59,21 @@ describe('drawTree', () => {
     expect((onPlay.geom[g + 1] as number) + (onPlay.geom[g + 3] as number)).toBeGreaterThan(play.y + play.h);
     expect(onPlay.geom[g + 4]).toBeGreaterThan(0); // chanfro
 
-    // Em Modos (secundário): um contorno só, em volta de Modos.
+    // Em Modos (secundário): um contorno de foco só, em volta de Modos. M12 (fase 3, AM2): o JOGAR sem foco fica com o
+    // contorno âmbar próprio (no retângulo dele, não por fora) e a chapa escura: um destaque cheio por tela.
     const onModes = draw('modes');
-    const rings = ringOf(onModes);
+    const outlines = ringOf(onModes);
+    const own = outlines.filter((i) => onModes.geom[i * DRAW_FLOATS_PER_COMMAND] === play.x);
+    const rings = outlines.filter((i) => onModes.geom[i * DRAW_FLOATS_PER_COMMAND] !== play.x);
+    expect(own.length).toBe(1);
     expect(rings.length).toBe(1);
     expect(onModes.geom[(rings[0] as number) * DRAW_FLOATS_PER_COMMAND + 1]).toBeLessThan(modes.y);
+    const filled = commands(onModes, DRAW_OP.rect).filter(
+      (i) => onModes.colors[i] === COLORS.acao && (onModes.geom[i * DRAW_FLOATS_PER_COMMAND + 5] as number) === 0,
+    );
+    // Só a barra âmbar do logo é cheia (nenhum botão cheio sem o foco).
+    expect(filled.every((i) => onModes.geom[i * DRAW_FLOATS_PER_COMMAND + 1]! < play.y)).toBe(true);
+    expect(onPlay.colors.slice(0, onPlay.count).includes(COLORS.acao)).toBe(true);
   });
 
   it('sem fontes, desenha só as formas (NullRenderer e testes não quebram)', () => {

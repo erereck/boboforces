@@ -11,7 +11,10 @@ import type { SwitchStringKey } from './strings-switch.pt-BR.ts';
  * e os editores; `strings-online.pt-BR.ts`; `strings-switch.pt-BR.ts`, só no Switch): o menu da web tem teto de 350 KB.
  */
 export const STRINGS_PT_BR = {
-  /** Logotipo provisório em texto MSDF (o logo em blocos chega com o tools/logo). Grafia do logo: caixa alta. */
+  /**
+   * O nome em texto (o lobby do Switch e a folha das fontes). M12 (fase 3): o título da web desenha o logo em blocos
+   * (`screens/logo.ts`). Grafia do logo: caixa alta.
+   */
   'title.logo': 'BOBOFORCES',
   'title.credit': 'EriLab™ / Erick Luiz',
   'title.version': 'v{version} · {codename}',
@@ -57,7 +60,7 @@ export const STRINGS_PT_BR = {
   'news.ok': 'OK',
   'news.item.1': '8 armas, com granadas e lança-foguetes.',
   'news.item.2': 'Bots com 10 personalidades e jogo em time.',
-  'news.item.3': 'Partida Rápida, Modos e Partida personalizada.',
+  'news.item.3': 'Partida Rápida, Modos e Personalizada.',
   'news.item.4': 'Ajustes por dispositivo e botões remapeáveis.',
   'news.item.5': 'Estatísticas e recordes no fim das partidas.',
   'title.surprise': 'Surpreenda-me',
@@ -104,10 +107,17 @@ export const STRINGS_PT_BR = {
   'preset.name.couchZombies': 'Sofá Zombies',
   'preset.name.zombiesBlitz': 'Zombies Relâmpago',
   // M2 (fase 4e): Partida personalizada.
-  'menu.custom': 'Mais regras',
+  // M12 (fase 3, pergunta AM3): um nome por tela: "Personalizada" no card, no botão da Partida Rápida, no título da
+  // tela e no resultado (eram "Mais regras", "Partida personalizada" e "Mudar regras").
+  'menu.custom': 'Personalizada',
   'menu.back': 'Voltar',
   // M2 (fase 5a): a Oficina (biblioteca dos bots).
   'menu.lab': 'Laboratório',
+  // M12 (fase 3, AM3): o botão do título e do lobby abre a Oficina (a biblioteca dos bots; o Laboratório é o editor).
+  'menu.workshop': 'Oficina',
+  // M12 (fase 3): a tela pedida está chegando (o pedaço dos editores ou do Online), na linha do resumo do JOGAR.
+  'menu.opening': 'Abrindo…',
+  'title.noConnection': 'Sem conexão: tente de novo.',
   /**
    * M2 (fase 6c): o Meu Bobo (GDD §4.7.2). Os nomes de rosto e cabelo são os do FutBobo (`player-appearance.ts`),
    * na ordem dos índices do `FigureLook`.
@@ -129,7 +139,6 @@ export const STRINGS_PT_BR = {
   'loading.waiting': 'Na fila',
   'loading.percent': '{value}%',
   'loading.ms': '{value} ms',
-  'loading.tip.coward': 'Bot covarde foge quando você recarrega.',
 
   /**
    * Os itens de teste do título (tecnico.md §24.2 itens 17–19), com os rótulos curtos da decisão #54: o Switch e a
@@ -214,7 +223,7 @@ export const STRINGS_PT_BR = {
   'workshop.full': 'A Oficina está cheia ({n} bots).',
   'lab.seconds': '{n} s',
   'lab.test': 'Testar',
-  'labIntro.title': 'Conheça o Laboratório',
+  'labIntro.title': 'Conheça a Oficina',
   'labIntro.pitch': 'Monte bots nos 4 eixos: habilidade, inteligência, personalidade e regras.',
   'labIntro.later': 'Agora não',
   'lab.tested': 'Testado: o bot acertou {accuracy} · você {kills}/{deaths} · TTK médio {ttk}',
@@ -240,7 +249,7 @@ export const STRINGS_PT_BR = {
   'rule.infiniteReserve': 'munição infinita',
   'rule.headshotImmune': 'imune a tiro na cabeça',
   'rule.explodeOnDeath': 'explode ao morrer',
-  'result.openLab': 'Abrir Laboratório',
+  'result.openLab': 'Abrir Oficina',
   'mode.zombies': 'Bobo Zombies',
   // M9 (fase 3, revisão): também citadas pelo JS do menu (o Cenário, o teclado do nome do time, o sofá).
   'custom.scenario': 'Cenário',

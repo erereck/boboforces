@@ -654,6 +654,34 @@ describe('estouro de texto com o atlas real', () => {
           { id: 'royale', nameKey: 'mode.name.royale', descKey: 'mode.desc.royale' },
         ],
         titleKey: 'modes.more.title',
+        // M12 (fase 3): a linha de ajuda (o resumo do card com o foco; a mais comprida é a do Aquário).
+        help: 'Desligado: você joga. Ligado: só bots jogam; você assiste.',
+      }),
+      // M12 (fase 3): a mesma página no toque, sem as descrições (a linha de ajuda diz o que o card faz). Revisão: na
+      // variante do PC com toque (o Grande no card do Royale, que fica com a descrição) e com uma ajuda de 80 letras.
+      modesScreen.build({
+        modes: [
+          { id: 'training', nameKey: 'mode.name.training', descKey: 'mode.desc.training' },
+          { id: 'warfare.domination', nameKey: 'mode.name.domination', descKey: 'mode.desc.domination' },
+          { id: 'gunGame', nameKey: 'mode.name.gunGame', descKey: 'mode.desc.gunGame' },
+          { id: 'infection', nameKey: 'mode.name.infection', descKey: 'mode.desc.infection' },
+          { id: 'juggernaut', nameKey: 'mode.name.juggernaut', descKey: 'mode.desc.juggernaut' },
+          { id: 'chaos', nameKey: 'mode.name.chaos', descKey: 'mode.desc.chaos' },
+          { id: 'paintball', nameKey: 'mode.name.paintball', descKey: 'mode.desc.paintball' },
+          { id: 'zombiesFortress', nameKey: 'mode.name.zombiesFortress', descKey: 'mode.desc.zombiesFortress' },
+          { id: 'zombiesArmed', nameKey: 'mode.name.zombiesArmed', descKey: 'mode.desc.zombiesArmed' },
+          { id: 'juggernautFixed', nameKey: 'mode.name.juggernautFixed', descKey: 'mode.desc.juggernautFixed' },
+          { id: 'strike', nameKey: 'mode.name.strike', descKey: 'mode.desc.strike' },
+          {
+            id: 'royale',
+            nameKey: 'mode.name.royale',
+            descKey: 'mode.desc.royale',
+            extra: { id: 'royaleGrande', textKey: 'mode.extra.royaleGrande' },
+          },
+        ],
+        titleKey: 'modes.more.title',
+        help: 'Cada um vira o Jugg 1 vez. Juggernaut Fixo · Normal · 4 bobos · Construto · Armas no mapa',
+        bare: true,
       }),
       customMatchScreen.build({
         tabs: [
@@ -684,8 +712,13 @@ describe('estouro de texto com o atlas real', () => {
         lines: ['Bobo Warfare: Todos contra todos', 'Construto', 'Pela vibe', '10 bobos', '10 min ou 25 abates'],
       }),
     ];
+    // M12 (fase 3): a Mais modos com as descrições é a do mouse e do controle; a sem elas (`bare`), a do toque.
+    const moreDesk = screens.find((s) => JSON.stringify(s).includes('Desligado: você joga'));
+    const moreTouch = screens.find((s) => JSON.stringify(s).includes('Cada um vira o Jugg 1 vez. Juggernaut'));
+    expect(moreDesk !== undefined && moreTouch !== undefined).toBe(true);
     for (const t of [...WEB_TARGETS, ...SWITCH_TARGETS.slice(0, 2)]) {
       for (const tree of screens) {
+        if ((tree === moreDesk && t.minTarget > 0) || (tree === moreTouch && t.minTarget === 0)) continue;
         const layout = layoutFor(tree, t);
         expectNoOverflow(layout, t);
         expect(reachableScrolling(tree, t, layout.focusable[0]!.id!).size, `${t.name}: foco`).toBe(

@@ -1,6 +1,8 @@
 import { builtinBotRef, MATCH_RECIPE_FORMAT, type MatchRecipe } from '@boboforces/format';
-import { modesScreen, type ModeCard, type UiNode } from '@boboforces/ui';
+import { MODES_PREFIX, modesScreen, t, type ModeCard, type StringKey, type UiNode } from '@boboforces/ui';
 import { FORTRESS_MAPS } from './maps.ts';
+import { presetSummary } from './presets-ui.ts';
+import { trainingPreset } from './training.ts';
 
 /**
  * M6 (fase 0): a página "Mais modos" (o card dos Modos que entrou no lugar do Bobo Training). Mora no pedaço dos
@@ -47,11 +49,13 @@ export function moreModeCards(pc: boolean): readonly ModeCard[] {
 
 /**
  * M7 (fase 9): a página com o liga/desliga do Aquário: ligado, o card escolhido começa só com bots, para assistir (o
- * Bobo Training continua sendo jogado). M11 (fase 5): `pc` = o aparelho é um PC (o botão do Royale Grande).
+ * Bobo Training continua sendo jogado). M11 (fase 5): `pc` = o aparelho é um PC (o botão do Royale Grande). M12 (fase
+ * 3): `focusedId` escolhe a linha de ajuda; `bare` (o toque) tira a descrição dos cards e a põe na linha de ajuda.
  */
-export function moreModesRoot(watch: boolean, pc = false): UiNode {
+export function moreModesRoot(watch: boolean, pc = false, focusedId: string | null = null, bare = false): UiNode {
   return modesScreen.build({
     modes: moreModeCards(pc),
+    ...(bare ? { bare } : {}),
     titleKey: 'modes.more.title',
     headingExtra: {
       kind: 'button',
@@ -60,7 +64,71 @@ export function moreModesRoot(watch: boolean, pc = false): UiNode {
       action: MORE_WATCH_ACTION,
       variant: watch ? 'primary' : 'secondary',
     },
+    help: moreModesHelp(watch, focusedId, bare),
   });
+}
+
+/**
+ * M12 (fase 3): a linha de ajuda embaixo da grade (cada card começa direto, sem mostrar mapa, bots e tempo): o resumo
+ * da partida do card com o foco, começando pelo nome do card ("Domination · Normal · 4 contra 4 · Construto") e, no
+ * Aquário, o que ele faz. Sem foco num card, a linha fica vazia (a grade não pula). Revisão: o nome do card no lugar do
+ * modo da receita (o Chaos é um TDM, o Gun Game um FFA), e "8 bobos" no Infection e no Juggernaut, que começam todos do
+ * mesmo lado (o 2º time nasce vazio; não é "8 contra 0").
+ */
+export function moreModesHelp(watch: boolean, focusedId: string | null, bare = false): string {
+  if (focusedId === 'watch') return t(watch ? 'modes.watch.help.on' : 'modes.watch.help.off');
+  if (focusedId === null || !focusedId.startsWith(MODES_PREFIX)) return '';
+  const id = focusedId.slice(MODES_PREFIX.length);
+  const recipe = id === 'training' ? trainingPreset() : moreModePreset(id);
+  if (recipe === null) return '';
+  const card = MORE_MODE_CARDS.find((c) => c.id === id);
+  const sep = t('summary.separator');
+  const parts = presetSummary(recipe).split(sep);
+  parts[0] = card !== undefined ? t(card.nameKey) : t(`mode.${recipe.mode}` as StringKey);
+  const second = recipe.teams[1];
+  if (recipe.mode !== 'zombies' && second !== undefined && second.bots.length === 0 && second.humans === undefined) {
+    const n = 1 + recipe.teams[0]!.bots.reduce((sum, b) => sum + b.count, 0);
+    const at = parts.indexOf(t('summary.teams', { a: n, b: 0 }));
+    if (at >= 0) parts[at] = t('summary.ffa', { n });
+  }
+  const line = parts.join(sep);
+  return bare && card !== undefined ? `${t(card.descKey)} ${line}` : line;
+}
+
+/**
+ * M12 (fase 3): o card desta página que joga a receita (a última partida: o foco abre nele); `null` = nenhum (os Times,
+ * o Todos contra todos e o Bobo Zombies de sempre moram na página Modos).
+ */
+export function moreCardFor(r: MatchRecipe): string | null {
+  switch (r.mode) {
+    case 'training':
+    case 'paintball':
+    case 'strike':
+      return r.mode;
+    case 'warfare.domination':
+      return 'warfare.domination';
+    case 'juggernaut':
+      return r.juggernaut?.variant === 'fixed' ? 'juggernautFixed' : 'juggernaut';
+    case 'zombies':
+      return r.zombies?.variant === 'fortress'
+        ? 'zombiesFortress'
+        : r.zombies?.variant === 'armed'
+          ? 'zombiesArmed'
+          : null;
+    case 'royale.mini':
+      return 'royale';
+    case 'royale.grande':
+      return 'royaleGrande';
+  }
+  if (r.weapons?.ladder !== undefined) return 'gunGame';
+  if (r.infection !== undefined) return 'infection';
+  if (r.chaos !== undefined) return 'chaos';
+  return null;
+}
+
+/** M12 (fase 3): o nome da Fortaleza com o mapa ("Fortaleza: Fazenda"; nos recentes, as duas não se confundem). */
+export function fortressName(map: string): string {
+  return `${t('mode.name.zombiesFortress')}: ${t(`map.${map}` as StringKey)}`;
 }
 
 /** M6 (fase 2): a escada do Gun Game (GDD: 7 níveis com o arsenal do M2; a faca por último). */
@@ -150,7 +218,8 @@ export function moreModePreset(id: string): MatchRecipe | null {
       // recentes e no Surpreenda-me, como o Posto e o Construto do card do Bobo Zombies.
       return {
         format: MATCH_RECIPE_FORMAT,
-        name: 'Bobo Zombies: Fortaleza',
+        // M12 (fase 3): o nome leva o mapa (a Partida personalizada e o Surpreenda-me trocam junto com ele).
+        name: fortressName(FORTRESS_MAPS[0]),
         mode: 'zombies',
         map: FORTRESS_MAPS[0],
         seed: 0,

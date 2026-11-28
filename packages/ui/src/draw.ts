@@ -31,8 +31,11 @@ function buttonLook(node: ButtonNode, focused: boolean): ButtonLook {
   }
   switch (node.variant ?? 'secondary') {
     case 'primary':
-      look.fill = focused ? COLORS.acao : COLORS.acaoForte;
-      look.text = COLORS.textoSobreAcao;
+      // M12 (fase 3, pergunta AM2): um destaque por tela. Só o foco fica cheio; sem foco, o primário é a chapa escura
+      // com contorno e texto âmbar (antes, o âmbar escuro cheio parecia um segundo foco).
+      look.fill = focused ? COLORS.acao : COLORS.chapa;
+      look.text = focused ? COLORS.textoSobreAcao : COLORS.acao;
+      if (!focused) look.border = COLORS.acao;
       break;
     case 'danger':
       look.fill = focused ? COLORS.chapaAlta : COLORS.chapa;
