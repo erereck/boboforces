@@ -1230,6 +1230,21 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     hitmarker: showHitmarker,
     ffa,
     soloWinner: juggernaut,
+    // M12 (fase 4): a vida máxima da HUD da vista (o coração e a vinheta no mesmo limite) e o "Reduzir efeitos".
+    maxHealth(entity) {
+      for (let s = 0; s < slots.length; s++) {
+        const sl = slots[s]!;
+        if (sl.controller >= 0 && sim.controllerEntity(sl.controller) === entity) return sl.model.maxHealth;
+      }
+      return recipe.players?.hp ?? 100;
+    },
+    reduceEffects: () => host.settings.current.accessibility.reduceShake || platform.features.reducedMotion,
+    coop: recipe.mode === 'zombies',
+    // O vento (não na Lua) e os grilos (à noite).
+    ambient: {
+      wind: (loaded.simMap.gravity ?? 1) > CHAOS_MODS.lowGravity,
+      night: loaded.doc.light.timeOfDay === 'night',
+    },
   });
   /** M2 (fecho da fase 3): as regras ativas de cada controlador (placar e tela de morte). */
   const ruleTexts = controllerRules(recipe, humans);

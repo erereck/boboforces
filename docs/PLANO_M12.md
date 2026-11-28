@@ -64,6 +64,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    acelera; o foley das armas em tempos; o zunido da bala; o abate que sobe de tom e o colete que quebra; passos e
    pouso; os sons dos objetivos (Boom Box, pontos, zona, rodadas, ping); vinhetas de 3 s e o empate; o abafado na
    morte e na explosão colada; o roubo de voz sem estalo; o hitmarker sem "plic" no dano zero; o tique do pente.
+   - **feita em 27/11** (ARCHITECTURE §23.4): os 17 itens (o cooldown que calava o inimigo, a variação, a parede, o foley, o zunido, os objetivos, as vinhetas, o abafado, o ambiente); nenhum golden mudou.
 5. **O visual:** o strafe sem patinar; a noite legível; a sombra-blob nas props e no que está no chão; a explosão com
    marca e clarão; o pó no pouso e no deslize; o headshot com confete; o Meu Bobo vivo; o aquecimento que desenha de
    verdade e a cortina de entrada.

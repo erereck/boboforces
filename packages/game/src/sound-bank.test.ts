@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createMixer, GAME_SYNTH_SOUNDS } from '@boboforces/audio';
-import { createFakeAudioContext } from '@boboforces/audio/testing';
+import { createFakeAudioContext, fakeBuffer } from '@boboforces/audio/testing';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, parseLoopManifest } from '@boboforces/format';
 import {
@@ -31,8 +31,9 @@ const synthIds = SOUND_IDS.filter((id) => SOUNDS[id].src === 'synth');
 describe('banco de sons (fase 7a)', () => {
   it('cerca de 40 sons, como pede o arte-ux §10.5', () => {
     expect(SOUND_IDS.length).toBeGreaterThanOrEqual(40);
-    // M3 (fase 6d): mais 20 do Bobo Zombies.
-    expect(SOUND_IDS.length).toBeLessThanOrEqual(80);
+    // M3 (fase 6d): mais 20 do Bobo Zombies. M12 (fase 4): mais 14 sintetizados (0 KB): o empate, o ferrolho, o zunido,
+    // o tique, a Boom Box, os pontos, a zona, o ping, o zumbido e o ambiente.
+    expect(SOUND_IDS.length).toBeLessThanOrEqual(100);
   });
 
   it('todo MP3 está no runtime-assets.json e na tabela do audioconv', () => {
@@ -90,6 +91,28 @@ describe('banco de sons (fase 7a)', () => {
     asked.length = 0;
     await loadSoundFiles(mixer, assets, () => {});
     expect(asked).toEqual([soundPath(broken)]);
+  });
+
+  it('M12 (fase 4): corta o silêncio do começo do MP3 decodificado (o atraso do lamejs), até 1 ms antes do ataque', async () => {
+    const ctx = createFakeAudioContext();
+    // O "MP3" decodifica em 0,2 s a 44,1 kHz com 13 ms mudos (o atraso do codificador) e o ataque depois.
+    const lead = Math.round(0.013 * 44100);
+    ctx.decodeAudioData = () => {
+      const b = fakeBuffer(1, Math.round(0.2 * 44100), 44100);
+      const d = b.getChannelData(0);
+      for (let i = lead; i < d.length; i++) d[i] = 0.8 * Math.exp(-(i - lead) / 2000) * (i % 2 ? 1 : -1);
+      return Promise.resolve(b);
+    };
+    const mixer = createMixer({ context: ctx, unlocked: true, onUnlock: () => () => {} });
+    const assets = {
+      loadBytes: () => Promise.resolve(new Uint8Array([2, 0xff, 0xfb])),
+      loadText: () => Promise.reject(new Error('sem texto')),
+    };
+    await loadSoundFiles(mixer, assets, () => {});
+    mixer.play('hitmarker', { bus: 'sfx' });
+    const played = ctx.sources.at(-1)!.buffer!;
+    expect(played.length).toBe(Math.round(0.2 * 44100) - lead + Math.round(0.001 * 44100));
+    expect(Math.abs(played.getChannelData(0)[Math.round(0.001 * 44100)]!)).toBeCloseTo(0.8, 6);
   });
 
   it('sem áudio, não baixa nada', async () => {

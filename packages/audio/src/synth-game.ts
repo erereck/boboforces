@@ -364,16 +364,47 @@ export function synthRicochet(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   return finish(out, 0.8, 0.6, rate);
 }
 
+/**
+ * M12 (fase 4): tabelas de um período (2048 pontos e o de volta) para as notas, lidas com interpolação: um seno com
+ * harmônicos custa uma leitura, sem `Math.sin`/`Math.exp` por amostra. A leitura fica escrita dentro de cada laço (sem
+ * chamar função por amostra: no V8 sem JIT, e no Switch, que interpreta o JS, a chamada é o que pesa).
+ */
+const TABLE = 2048;
+function waveTable(harmonics: readonly number[]): Float32Array {
+  const t = new Float32Array(TABLE + 1);
+  for (let i = 0; i <= TABLE; i++) {
+    let v = 0;
+    for (let k = 0; k < harmonics.length; k++) v += harmonics[k]! * Math.sin((TAU * (k + 1) * i) / TABLE);
+    t[i] = v;
+  }
+  return t;
+}
+let sineTable: Float32Array | null = null;
+let toyTable: Float32Array | null = null;
+let hornTable: Float32Array | null = null;
+/** Seno puro; o brinquedo (seno + 3ª e 5ª); a corneta (as 4 primeiras). */
+const sineT = (): Float32Array => (sineTable ??= waveTable([1]));
+const toyT = (): Float32Array => (toyTable ??= waveTable([1, 0, 0.22, 0, 0.08]));
+const hornT = (): Float32Array => (hornTable ??= waveTable([1, 0.5, 0.3, 0.12]));
+
 /** Tom de brinquedo (seno + 3ª e 5ª harmônicas): bipe da contagem e notas das vinhetas. */
 function toyNote(out: Float32Array, startS: number, hz: number, lenS: number, level: number, rate: number): void {
   const from = Math.round(startS * rate);
   const n = Math.min(out.length - from, Math.round(lenS * rate));
+  const table = toyT();
+  const step = (hz * TABLE) / rate;
+  const attack = Math.round(0.004 * rate);
+  const d = Math.exp(-1 / (lenS * 0.45 * rate));
+  let e = level;
+  let ph = 0;
   for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const p = TAU * hz * t;
-    const env = (t < 0.004 ? t / 0.004 : 1) * Math.exp(-t / (lenS * 0.45));
-    const v = Math.sin(p) + Math.sin(3 * p) * 0.22 + Math.sin(5 * p) * 0.08;
-    out[from + i] = out[from + i]! + v * env * level;
+    const k = ph | 0;
+    const a = table[k]!;
+    const v = a + (table[k + 1]! - a) * (ph - k);
+    out[from + i] = out[from + i]! + v * e * (i < attack ? i / attack : 1);
+    ph += step;
+    if (ph >= TABLE) ph -= TABLE;
+    e *= d;
   }
 }
 
@@ -385,13 +416,65 @@ export function synthCountBeep(go: boolean, sampleRate = SYNTH_SAMPLE_RATE): Flo
   return finish(out, 0.6, 0, sampleRate);
 }
 
-/** Vinheta curta de fim de partida: arpejo que sobe (vitória) ou desce devagar (derrota). Marcha de brinquedo. */
+/**
+ * Vinheta de fim de partida (M12, fase 4: de 3 s, GDD §5.10 e arte-ux §10.6). Vitória: o rufar da caixa que cresce e
+ * a fanfarra de corneta (sol-dó-mi-SOL, com o prato e o baixo na nota longa). Derrota: o "uá-uá-uá-uááá" da corneta
+ * que desce, a última escorregando e tremendo. Marcha de brinquedo.
+ */
 export function synthJingle(win: boolean, sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
-  const notes = win ? [523.25, 659.25, 783.99, 1046.5] : [783.99, 659.25, 523.25, 392];
-  const step = win ? 0.11 : 0.17;
-  const last = win ? 0.45 : 0.6;
-  const out = new Float32Array(Math.round((step * (notes.length - 1) + last) * sampleRate));
-  notes.forEach((hz, i) => toyNote(out, i * step, hz, i === notes.length - 1 ? last : step * 1.6, 1, sampleRate));
+  const rate = sampleRate;
+  if (!win) {
+    const out = new Float32Array(Math.round(3 * rate));
+    [392, 370, 349.2].forEach((hz, i) => hornNote(out, i * 0.48, hz, 0.42, 0.03, 0, rate));
+    hornNote(out, 1.44, 329.6, 1.5, 0.12, 0.05, rate);
+    return finish(out, 0.7, 0.8, rate);
+  }
+  const out = new Float32Array(Math.round(3 * rate));
+  // Rufar: um toque de caixa a cada 1/24 s, crescendo (ruído sem o grave, com um corpo curto de 190 Hz).
+  const rng = createRng(0x0e01);
+  const lp: Lowpass2 = { a: 0, b: 0 };
+  const k = lowpassCoef(1500, rate);
+  const dSnare = Math.exp(-1 / (0.025 * rate));
+  const strokes = 22;
+  for (let s = 0; s < strokes; s++) {
+    const from = Math.round(((s * 0.9) / strokes) * rate);
+    const level = 0.25 + (0.65 * s) / (strokes - 1);
+    let e = level;
+    let p = 0;
+    for (let i = 0; i < Math.round(0.04 * rate) && from + i < out.length; i++) {
+      const w = noise(rng);
+      p += (TAU * 190) / rate;
+      out[from + i] = out[from + i]! + ((w - lp2(lp, w, k)) * 1.2 + Math.sin(p) * 0.4) * e;
+      e *= dSnare;
+    }
+  }
+  // Fanfarra.
+  hornNote(out, 0.95, 392, 0.13, 0, 0, rate);
+  hornNote(out, 1.1, 523.25, 0.13, 0, 0, rate);
+  hornNote(out, 1.25, 659.25, 0.13, 0, 0, rate);
+  hornNote(out, 1.4, 783.99, 1.55, 0, 0.02, rate);
+  hornNote(out, 1.4, 130.81, 1.55, 0, 0, rate);
+  // Prato na nota longa (1,1 s: depois disso ele já sumiu debaixo da corneta).
+  const crash = Math.round(1.4 * rate);
+  const dCrash = Math.exp(-1 / (0.35 * rate));
+  const hp: Lowpass2 = { a: 0, b: 0 };
+  const kc = lowpassCoef(4000, rate);
+  let ec = 0.7;
+  for (let i = crash; i < Math.min(out.length, crash + Math.round(1.1 * rate)); i++) {
+    const w = noise(rng);
+    out[i] = out[i]! + (w - lp2(hp, w, kc)) * ec;
+    ec *= dCrash;
+  }
+  return finish(out, 0.7, 0.8, rate);
+}
+
+/** M12 (fase 4): o empate: duas notas neutras e iguais ("pom… pom"), sem subir nem descer. */
+export function synthTie(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const out = new Float32Array(Math.round(1.3 * sampleRate));
+  toyNote(out, 0, 440, 0.5, 0.9, sampleRate);
+  toyNote(out, 0, 220, 0.5, 0.4, sampleRate);
+  toyNote(out, 0.55, 440, 0.7, 0.9, sampleRate);
+  toyNote(out, 0.55, 220, 0.7, 0.4, sampleRate);
   return finish(out, 0.6, 0, sampleRate);
 }
 
@@ -482,13 +565,26 @@ export function synthGroan(r: GroanRecipe, sampleRate = SYNTH_SAMPLE_RATE): Floa
   const breathLp: Lowpass2 = { a: 0, b: 0 };
   const breathK = lowpassCoef(700, rate);
   const wobbleHz = 4 + (r.seed % 3);
+  // M12 (fase 4): os senos do contorno, do tremor e do ronco pela tabela (nada de `Math.sin` por amostra).
+  const sine = sineT();
+  const wobbleStep = (wobbleHz * TABLE) / rate;
+  const growlStep = (r.growlHz * TABLE) / rate;
+  let wob = 0;
+  let gr = 0;
   let phase = 0;
   for (let i = 0; i < n; i++) {
     const t = i / rate;
     const u = t / r.lenS;
     // Tom: sobe um pouco no começo ("uu-") e cai até o fim ("-uuurgh"), com tremor.
-    const contour = 1 + 0.08 * Math.sin(Math.PI * Math.min(1, u * 2.5)) - r.fall * u * u;
-    const f = r.f0 * contour * (1 + 0.025 * Math.sin(TAU * wobbleHz * t));
+    const cp = Math.min(1, u * 2.5) * (TABLE / 2);
+    const ck = cp | 0;
+    const ca = sine[ck]!;
+    const wk = wob | 0;
+    const wa = sine[wk]!;
+    const contour = 1 + 0.08 * (ca + (sine[ck + 1]! - ca) * (cp - ck)) - r.fall * u * u;
+    const f = r.f0 * contour * (1 + 0.025 * (wa + (sine[wk + 1]! - wa) * (wob - wk)));
+    wob += wobbleStep;
+    if (wob >= TABLE) wob -= TABLE;
     phase += (f * GROAN_TABLE) / rate;
     if (phase >= GROAN_TABLE) phase -= GROAN_TABLE;
     const i0 = phase | 0;
@@ -496,7 +592,11 @@ export function synthGroan(r: GroanRecipe, sampleRate = SYNTH_SAMPLE_RATE): Floa
     const a = table[i0]!;
     const b = table[(i0 + 1) % GROAN_TABLE]!;
     const voice = a + (b - a) * fr;
-    const growl = 1 - r.growl * (0.5 + 0.5 * Math.sin(TAU * r.growlHz * t));
+    const gk = gr | 0;
+    const ga = sine[gk]!;
+    const growl = 1 - r.growl * (0.5 + 0.5 * (ga + (sine[gk + 1]! - ga) * (gr - gk)));
+    gr += growlStep;
+    if (gr >= TABLE) gr -= TABLE;
     const env = Math.min(1, t / 0.09) * Math.min(1, (r.lenS - t) / 0.18);
     out[i] = (voice * growl + lp2(breathLp, noise(rng), breathK) * r.breath * 6) * env;
   }
@@ -535,11 +635,29 @@ export function synthSpit(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
 function bell(out: Float32Array, startS: number, hz: number, lenS: number, level: number, rate: number): void {
   const from = Math.round(startS * rate);
   const n = Math.min(out.length - from, Math.round(lenS * rate));
+  const table = sineT();
+  const step = (hz * TABLE) / rate;
+  const step2 = step * 2.76;
+  const attack = Math.round(0.002 * rate);
+  const d = Math.exp(-1 / (lenS * 0.35 * rate));
+  const d2 = Math.exp(-1 / (0.05 * rate));
+  let e = level;
+  let e2 = 0.35;
+  let ph = 0;
+  let ph2 = 0;
   for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const p = TAU * hz * t;
-    const env = Math.min(1, t / 0.002) * Math.exp(-t / (lenS * 0.35));
-    out[from + i] = out[from + i]! + (Math.sin(p) + Math.sin(p * 2.76) * 0.35 * Math.exp(-t / 0.05)) * env * level;
+    const k = ph | 0;
+    const a = table[k]!;
+    const k2 = ph2 | 0;
+    const b = table[k2]!;
+    const v = a + (table[k + 1]! - a) * (ph - k) + (b + (table[k2 + 1]! - b) * (ph2 - k2)) * e2;
+    out[from + i] = out[from + i]! + v * e * (i < attack ? i / attack : 1);
+    ph += step;
+    if (ph >= TABLE) ph -= TABLE;
+    ph2 += step2;
+    while (ph2 >= TABLE) ph2 -= TABLE;
+    e *= d;
+    e2 *= d2;
   }
 }
 
@@ -592,15 +710,30 @@ function hornNote(
 ): void {
   const from = Math.round(startS * rate);
   const n = Math.min(out.length - from, Math.round(lenS * rate));
-  let p = 0;
+  const table = hornT();
+  const sine = sineT();
+  const step = (hz * TABLE) / rate;
+  const vibStep = (6 * TABLE) / rate;
+  const attack = 0.02 * rate;
+  const release = 0.06 * rate;
+  let ph = 0;
+  let vib = 0;
   for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const u = t / lenS;
-    const f = hz * (1 - bend * u) * (1 + vibrato * u * Math.sin(TAU * 6 * t));
-    p += (TAU * f) / rate;
-    const env = Math.min(1, t / 0.02) * Math.min(1, (lenS - t) / 0.06);
-    const v = Math.sin(p) + Math.sin(2 * p) * 0.5 + Math.sin(3 * p) * 0.3 + Math.sin(4 * p) * 0.12;
-    out[from + i] = out[from + i]! + v * env;
+    const u = i / n;
+    let f = step * (1 - bend * u);
+    if (vibrato > 0) {
+      const k = vib | 0;
+      const a = sine[k]!;
+      f *= 1 + vibrato * u * (a + (sine[k + 1]! - a) * (vib - k));
+      vib += vibStep;
+      if (vib >= TABLE) vib -= TABLE;
+    }
+    ph += f;
+    while (ph >= TABLE) ph -= TABLE;
+    const env = (i < attack ? i / attack : 1) * (n - i < release ? (n - i) / release : 1);
+    const k = ph | 0;
+    const a = table[k]!;
+    out[from + i] = out[from + i]! + (a + (table[k + 1]! - a) * (ph - k)) * env;
   }
 }
 
@@ -747,6 +880,265 @@ export function synthRevive(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
   return finish(out, 0.6, 0, rate);
 }
 
+// --- M12 (fase 4): o refino do som ---
+
+/** Um estalo metálico: o clique de ruído (2 ms), o toque grave que cai e o "tim" inarmônico curto. */
+function clack(out: Float32Array, startS: number, hz: number, level: number, rng: Rng, rate: number): void {
+  const from = Math.round(startS * rate);
+  const n = Math.min(out.length - from, Math.round(0.07 * rate));
+  const dClick = Math.exp(-1 / (0.0018 * rate));
+  const dBody = Math.exp(-1 / (0.018 * rate));
+  const dRing = Math.exp(-1 / (0.03 * rate));
+  const dBend = Math.exp(-1 / (0.01 * rate));
+  let eClick = 1;
+  let eBody = 0.8;
+  let eRing = 0.25;
+  let bend = 1;
+  let p = 0;
+  let q = 0;
+  for (let i = 0; i < n; i++) {
+    p += (TAU * hz * (0.75 + 0.25 * bend)) / rate;
+    q += (TAU * hz * 4.6) / rate;
+    out[from + i] = out[from + i]! + (noise(rng) * eClick + Math.sin(p) * eBody + Math.sin(q) * eRing) * level;
+    eClick *= dClick;
+    eBody *= dBody;
+    eRing *= dRing;
+    bend *= dBend;
+  }
+}
+
+/** O ferrolho da sniper e o pump da escopeta ("tchk-tchk"): o estalo que vai e o que volta, 0,11 s depois. */
+export function synthBolt(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const out = new Float32Array(Math.round(0.24 * sampleRate));
+  const rng = createRng(0x0e02);
+  clack(out, 0, 420, 1, rng, sampleRate);
+  clack(out, 0.11, 520, 0.85, rng, sampleRate);
+  return finish(out, 0.8, 1.2, sampleRate);
+}
+
+/**
+ * O zunido da bala que passa perto ("fiu"): uma faixa de ruído com o centro caindo de ~3,6 para ~1,1 kHz (o Doppler
+ * de quem passa), em sino de 0,13 s.
+ */
+export function synthWhiz(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const len = 0.13;
+  const n = Math.round(len * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0e03);
+  const lo: Lowpass2 = { a: 0, b: 0 };
+  const hi: Lowpass2 = { a: 0, b: 0 };
+  let kHi = 0;
+  let kLo = 0;
+  let p = 0;
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    const f = 1100 + 2500 * (1 - u) * (1 - u);
+    if (i % SWEEP_STEP === 0) {
+      kHi = lowpassCoef(f * 1.4, rate);
+      kLo = lowpassCoef(f * 0.6, rate);
+    }
+    p += (TAU * f) / rate;
+    const env = Math.sin(Math.PI * Math.min(1, u * 1.6)) * (1 - u);
+    const w = noise(rng);
+    out[i] = ((lp2(hi, w, kHi) - lp2(lo, w, kLo)) * 3 + Math.sin(p) * 0.15) * env;
+  }
+  return finish(out, 0.75, 0, rate);
+}
+
+/** O "tique" do pente no fim: um clique seco e baixo de 1,25 kHz (o tom sobe pelo `rate` em cada bala). */
+export function synthTick(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.06 * rate);
+  const out = new Float32Array(n);
+  const rng = createRng(0x0e04);
+  const dBody = Math.exp(-1 / (0.008 * rate));
+  const dClick = Math.exp(-1 / (0.0008 * rate));
+  let eBody = 1;
+  let eClick = 0.6;
+  let p = 0;
+  for (let i = 0; i < n; i++) {
+    p += (TAU * 1250) / rate;
+    out[i] = Math.sin(p) * eBody + noise(rng) * eClick;
+    eBody *= dBody;
+    eClick *= dClick;
+  }
+  return finish(out, 0.7, 0.8, rate);
+}
+
+/** O bipe da Boom Box (dó agudo de brinquedo, curto). */
+export function synthBombBeep(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const out = new Float32Array(Math.round(0.09 * sampleRate));
+  toyNote(out, 0, 2093, 0.09, 1, sampleRate);
+  return finish(out, 0.7, 0, sampleRate);
+}
+
+/** A Boom Box plantada (três bipes subindo) e desarmada (o estalo e dois bipes descendo). */
+export function synthBombState(armed: boolean, sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(0.5 * rate));
+  if (armed) {
+    [1568, 2093, 2637].forEach((hz, i) => toyNote(out, i * 0.09, hz, i === 2 ? 0.25 : 0.08, 1, rate));
+  } else {
+    clack(out, 0, 380, 0.9, createRng(0x0e05), rate);
+    toyNote(out, 0.08, 1568, 0.12, 0.8, rate);
+    toyNote(out, 0.22, 1046.5, 0.25, 0.8, rate);
+  }
+  return finish(out, 0.65, 0, rate);
+}
+
+/** O ponto ganho (dois tons subindo, mi-lá) e o perdido (dois tons descendo, lá-mi, na corneta mais escura). */
+export function synthPointTones(gain: boolean, sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(0.5 * rate));
+  if (gain) {
+    toyNote(out, 0, 659.25, 0.16, 1, rate);
+    toyNote(out, 0.14, 880, 0.34, 1, rate);
+  } else {
+    hornNote(out, 0, 440, 0.15, 0, 0, rate);
+    hornNote(out, 0.16, 329.6, 0.3, 0.03, 0, rate);
+  }
+  return finish(out, 0.6, gain ? 0 : 0.6, rate);
+}
+
+/** A zona fechando: duas cornetas graves meio tom uma da outra (sol e lá bemol), descendo devagar. */
+export function synthZoneClose(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const out = new Float32Array(Math.round(1 * sampleRate));
+  hornNote(out, 0, 196, 0.95, 0.08, 0, sampleRate);
+  hornNote(out, 0, 207.65, 0.95, 0.08, 0, sampleRate);
+  return finish(out, 0.7, 1, sampleRate);
+}
+
+/** O ping do time ("plim"): dois sininhos. */
+export function synthPing(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const out = new Float32Array(Math.round(0.4 * sampleRate));
+  bell(out, 0, 1760, 0.3, 0.9, sampleRate);
+  bell(out, 0.05, 2637, 0.3, 0.7, sampleRate);
+  return finish(out, 0.7, 0, sampleRate);
+}
+
+/** O zumbido no ouvido depois da explosão colada: dois senos agudos que batem (3,52 e 3,61 kHz) sumindo em ~0,8 s. */
+export function synthEarRing(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(0.85 * rate);
+  const out = new Float32Array(n);
+  const sine = sineT();
+  const d = Math.exp(-1 / (0.25 * rate));
+  const sp = (3520 * TABLE) / rate;
+  const sq = (3610 * TABLE) / rate;
+  const attack = 0.03 * rate;
+  let e = 1;
+  let p = 0;
+  let q = 0;
+  for (let i = 0; i < n; i++) {
+    const kp = p | 0;
+    const kq = q | 0;
+    const a = sine[kp]!;
+    const b = sine[kq]!;
+    const v = a + (sine[kp + 1]! - a) * (p - kp) + (b + (sine[kq + 1]! - b) * (q - kq)) * 0.7;
+    out[i] = v * (i < attack ? i / attack : 1) * e;
+    p += sp;
+    if (p >= TABLE) p -= TABLE;
+    q += sq;
+    if (q >= TABLE) q -= TABLE;
+    e *= d;
+  }
+  return finish(out, 0.6, 0, rate);
+}
+
+/** Normaliza o pico para `peak` sem o fade do fim (os laços do ambiente emendam o fim no começo). */
+function normalizeLoop(out: Float32Array, peak: number): Float32Array {
+  let max = 0;
+  for (let i = 0; i < out.length; i++) {
+    const a = out[i]! < 0 ? -out[i]! : out[i]!;
+    if (a > max) max = a;
+  }
+  if (max > 0) {
+    const k = peak / max;
+    for (let i = 0; i < out.length; i++) out[i] = out[i]! * k;
+  }
+  return out;
+}
+
+/** M12 (fase 4): o vento do ambiente é tocado a esta velocidade (o laço de 1 s vira 4 s; sai 4× mais barato). */
+export const WIND_RATE = 0.25;
+
+/**
+ * O vento do ambiente (laço): ruído escuro (o corte de 1,4 kHz vira 350 Hz tocado a `WIND_RATE`) com rajadas
+ * periódicas no laço (1 e 3 por volta). A emenda do fim no começo é um cruzamento de 1/16 do laço. Ruído e filtro
+ * escritos no laço (xorshift, sem chamar função: o Switch interpreta o JS).
+ */
+export function synthWind(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const n = Math.round(1 * rate);
+  const x = Math.round(n / 16);
+  const sine = sineT();
+  const g = new Float32Array(n + x);
+  const k = lowpassCoef(1400, rate);
+  const s1 = TABLE / n;
+  const s3 = (3 * TABLE) / n;
+  let seed = 0x0e06 | 0;
+  let a = 0;
+  let b = 0;
+  let p1 = 0;
+  let p3 = TABLE / 6;
+  for (let i = 0; i < g.length; i++) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    a += k * (seed / 2147483648 - a);
+    b += k * (a - b);
+    const i1 = p1 | 0;
+    const i3 = p3 | 0;
+    const gust = 0.55 + 0.25 * sine[i1]! + 0.2 * sine[i3]!;
+    g[i] = b * gust;
+    p1 += s1;
+    if (p1 >= TABLE) p1 -= TABLE;
+    p3 += s3;
+    if (p3 >= TABLE) p3 -= TABLE;
+  }
+  const out = g.subarray(0, n);
+  // A emenda: o começo cruza com o que vinha depois do fim (o laço sai sem degrau).
+  for (let i = 0; i < x; i++) {
+    const w = i / x;
+    out[i] = g[i]! * Math.sqrt(w) + g[n + i]! * Math.sqrt(1 - w);
+  }
+  return normalizeLoop(out.slice(), 0.8);
+}
+
+/** Os grilos da noite (laço de 2 s): dois grilos de 4,6 e 4,9 kHz, cada cricrilar com 3 pulsos. */
+export function synthCrickets(sampleRate = SYNTH_SAMPLE_RATE): Float32Array {
+  const rate = sampleRate;
+  const out = new Float32Array(Math.round(2 * rate));
+  const sine = sineT();
+  const chirps = [
+    [0.05, 4600, 1],
+    [0.38, 4900, 0.7],
+    [0.72, 4600, 1],
+    [1.1, 4900, 0.7],
+    [1.4, 4600, 0.9],
+    [1.62, 4900, 0.6],
+  ] as const;
+  const pulseLen = Math.round(0.022 * rate);
+  const gap = Math.round(0.035 * rate);
+  for (const [at, hz, level] of chirps) {
+    const step = (hz * TABLE) / rate;
+    for (let pulse = 0; pulse < 3; pulse++) {
+      const from = Math.round(at * rate) + pulse * gap;
+      let ph = 0;
+      for (let i = 0; i < pulseLen && from + i < out.length; i++) {
+        const u = i / pulseLen;
+        const env = u < 0.2 ? u / 0.2 : (1 - u) / 0.8;
+        const k = ph | 0;
+        out[from + i] = out[from + i]! + sine[k]! * env * level;
+        ph += step;
+        if (ph >= TABLE) ph -= TABLE;
+      }
+    }
+  }
+  return normalizeLoop(out, 0.7);
+}
+
 /**
  * Os sons sintetizados do jogo: nome lógico → PCM mono a `SYNTH_SAMPLE_RATE`. `tiro-<arma>` e `tiro-<arma>-longe`
  * para cada arma de fogo; o resto pelo nome. O banco de sons do `game` diz canal, volume e prioridade de cada um.
@@ -785,4 +1177,23 @@ export const GAME_SYNTH_SOUNDS: Readonly<Record<string, () => Float32Array>> = {
   besta: () => synthTwang(),
   'lanca-granadas': () => synthBloop(),
   'virote-crava': () => synthThunk(),
+  // M12 (fase 4): o empate, o foley das armas, o zunido, o pente, os objetivos e o zumbido da explosão colada.
+  empate: () => synthTie(),
+  ferrolho: () => synthBolt(),
+  zunido: () => synthWhiz(),
+  tique: () => synthTick(),
+  'bomba-bipe': () => synthBombBeep(),
+  'bomba-armada': () => synthBombState(true),
+  'bomba-desarmada': () => synthBombState(false),
+  'ponto-ganho': () => synthPointTones(true),
+  'ponto-perdido': () => synthPointTones(false),
+  'zona-fecha': () => synthZoneClose(),
+  ping: () => synthPing(),
+  zumbido: () => synthEarRing(),
+  // M12 (fase 4): o ambiente do mapa (laços).
+  vento: () => synthWind(),
+  grilos: () => synthCrickets(),
 };
+
+/** M12 (fase 4): os laços do ambiente (sem o fade do fim, que faria um buraco a cada volta). */
+export const AMBIENT_LOOPS: readonly string[] = ['vento', 'grilos'];

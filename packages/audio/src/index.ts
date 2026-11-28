@@ -14,6 +14,7 @@ export {
   type PlayOptions,
   type SoundInfo,
 } from './mixer.ts';
+export { leadingSilenceSamples } from './onset.ts';
 export {
   distanceGain,
   stereoPan,
@@ -36,8 +37,10 @@ export {
   type SynthSoundName,
 } from './synth.ts';
 export {
+  AMBIENT_LOOPS,
   GAME_SYNTH_SOUNDS,
   GUNSHOTS,
+  WIND_RATE,
   synthGunshot,
   synthRocket,
   synthSwing,

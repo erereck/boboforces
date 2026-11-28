@@ -1,6 +1,13 @@
 import { fnv1a32 } from '@boboforces/shared';
 import { describe, expect, it } from 'vitest';
-import { GAME_SYNTH_SOUNDS, GUNSHOTS, SYNTH_SAMPLE_RATE, synthGunshot, type GunshotName } from './index.ts';
+import {
+  AMBIENT_LOOPS,
+  GAME_SYNTH_SOUNDS,
+  GUNSHOTS,
+  SYNTH_SAMPLE_RATE,
+  synthGunshot,
+  type GunshotName,
+} from './index.ts';
 
 /** Hash do PCM em 16 bits (o mesmo arredondamento do `createBuffer` não importa: trava a receita, não o float). */
 const pcmHash = (pcm: Float32Array): string => {
@@ -33,8 +40,10 @@ describe('sons sintetizados do jogo (fase 7a)', { timeout: 30_000 }, () => {
     const pcm = GAME_SYNTH_SOUNDS[name]!();
     const s = pcm.length / SYNTH_SAMPLE_RATE;
     expect(s).toBeGreaterThan(0.05);
-    // M3 (fase 6d): a caixa de música dura o giro da Caixa Misteriosa (4 s).
-    expect(s).toBeLessThan(name === 'caixa-gira' ? 4.01 : 1.6);
+    // M3 (fase 6d): a caixa de música dura o giro da Caixa Misteriosa (4 s). M12 (fase 4): as vinhetas, 3 s; os laços
+    // do ambiente, até 2 s.
+    const long = name === 'caixa-gira' ? 4.01 : name === 'vitoria' || name === 'derrota' ? 3.01 : 1.6;
+    expect(s).toBeLessThan(AMBIENT_LOOPS.includes(name) ? 2.01 : long);
     let peak = 0;
     for (let i = 0; i < pcm.length; i++) {
       expect(Number.isFinite(pcm[i]!)).toBe(true);
@@ -42,7 +51,18 @@ describe('sons sintetizados do jogo (fase 7a)', { timeout: 30_000 }, () => {
     }
     expect(peak).toBeGreaterThan(0.5);
     expect(peak).toBeLessThanOrEqual(0.95 + 1e-6);
-    expect(Math.abs(pcm[pcm.length - 1]!)).toBeLessThan(1e-3);
+    // M12 (fase 4): os laços do ambiente emendam o fim no começo (sem o fade).
+    if (!AMBIENT_LOOPS.includes(name)) expect(Math.abs(pcm[pcm.length - 1]!)).toBeLessThan(1e-3);
+  });
+
+  it('M12 (fase 4): os laços do ambiente emendam sem degrau (o fim continua no começo)', () => {
+    for (const name of AMBIENT_LOOPS) {
+      const pcm = GAME_SYNTH_SOUNDS[name]!();
+      // O passo da emenda (fim → começo) do tamanho dos passos de dentro do som.
+      let maxStep = 0;
+      for (let i = 1; i < pcm.length; i++) maxStep = Math.max(maxStep, Math.abs(pcm[i]! - pcm[i - 1]!));
+      expect(Math.abs(pcm[0]! - pcm[pcm.length - 1]!)).toBeLessThanOrEqual(maxStep + 1e-6);
+    }
   });
 
   it('determinístico: a mesma receita dá o mesmo PCM', () => {
@@ -67,6 +87,20 @@ describe('sons sintetizados do jogo (fase 7a)', { timeout: 30_000 }, () => {
     const end = zeroCrossings(pcm.subarray(2 * third));
     expect(start).toBeGreaterThan(end * 1.4);
     expect(end).toBeGreaterThan(2000);
+  });
+
+  it('M12 (fase 4): as vinhetas de 3 s, o empate de duas notas e o zunido que cai de tom', () => {
+    const sec = (name: string): number => GAME_SYNTH_SOUNDS[name]!().length / SYNTH_SAMPLE_RATE;
+    expect(sec('vitoria')).toBeCloseTo(3, 2);
+    expect(sec('derrota')).toBeCloseTo(3, 2);
+    expect(sec('empate')).toBeGreaterThan(1);
+    // O zunido: curto, e o começo mais agudo que o fim (o Doppler de quem passa).
+    const whiz = GAME_SYNTH_SOUNDS['zunido']!();
+    expect(whiz.length / SYNTH_SAMPLE_RATE).toBeLessThan(0.15);
+    const half = Math.floor(whiz.length / 2);
+    expect(zeroCrossings(whiz.subarray(0, half))).toBeGreaterThan(zeroCrossings(whiz.subarray(half)) * 1.3);
+    // O tique do pente é o mais curto de todos (um clique).
+    for (const n of names) expect(sec('tique')).toBeLessThanOrEqual(sec(n));
   });
 
   it('o sniper é o tiro mais longo e a SMG o mais curto', () => {

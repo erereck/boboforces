@@ -15,8 +15,11 @@ import {
   synthBeep,
   synthNoiseBurst,
 } from './index.ts';
-import { createFakeAudioContext, type FakeAudioContext } from './testing.ts';
+import { createFakeAudioContext, type FakeAudioContext, type FakeParam } from './testing.ts';
 
+/** M12 (fase 4): as automações com 6 casas (as contas de tempo em ponto flutuante). */
+const rounded = (events: readonly (readonly [string, number, number])[]) =>
+  events.map(([k, v, t]) => [k, Number(v.toFixed(6)), Number(t.toFixed(6))]);
 const surface = (ctx: FakeAudioContext) => ({ context: ctx, unlocked: true, onUnlock: () => () => {} });
 /** "MP3" sintético: o contexto falso lê o primeiro byte como duração em décimos de segundo. */
 const mp3 = (tenths: number) => new Uint8Array([tenths, 0xff, 0xfb, 0x90]);
@@ -178,8 +181,9 @@ describe('mixer', () => {
     const ctx = createFakeAudioContext();
     const mixer = createMixer(surface(ctx));
     expect(ctx.created.panner).toBe(MAX_VOICES);
-    // vozes + master + sfx + music + ui + duck, 2 fades da música e o da camada (M3, fase 6e)
-    expect(ctx.created.gain).toBe(MAX_VOICES + 4 + 4);
+    // vozes + master + sfx + music + ui + duck, 2 fades da música e o da camada (M3, fase 6e); M12 (fase 4): os "ducks"
+    // dos efeitos e da interface.
+    expect(ctx.created.gain).toBe(MAX_VOICES + 4 + 4 + 2);
     const info = await mixer.decode('t0-tiro', mp3(3));
     expect(info.durationS).toBeCloseTo(0.3, 3);
     expect(mixer.has('t0-tiro')).toBe(true);
@@ -218,6 +222,153 @@ describe('mixer', () => {
     // A fonte roubada já não libera a voz se o onended chegar atrasado.
     ctx.sources[0]!.end();
     expect(mixer.stats.activeVoices).toBe(MAX_VOICES);
+  });
+
+  it('M12 (fase 4): a voz roubada some numa rampa de 5 ms e o som novo entra 6 ms depois (sem estalo)', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('s', mp3(10));
+    ctx.currentTime = 2;
+    for (let i = 0; i < MAX_VOICES; i++) mixer.play('s', { bus: 'sfx', priority: SOUND_PRIORITY.step, volume: 0.5 });
+    const victim = ctx.sources[0]!;
+    const voiceGain = victim.outputs[0]!.outputs[0] as unknown as { gain: FakeParam };
+    voiceGain.gain.events.length = 0;
+    expect(mixer.play('s', { bus: 'sfx', priority: SOUND_PRIORITY.shot, volume: 0.9 })).toBe(0);
+    const fresh = ctx.sources.at(-1)!;
+    // A velha para no fim da rampa e continua ligada até lá; a nova começa depois.
+    expect(victim.stopWhen).toBeCloseTo(2.005, 9);
+    expect(victim.outputs.length).toBe(1);
+    expect(fresh.startWhen).toBeCloseTo(2.006, 9);
+    expect(rounded(voiceGain.gain.events)).toEqual([
+      // Segura o valor de agora (sem as rampas que faltavam), zera em 5 ms e entra com o volume novo em 6 ms.
+      ['cancel', 0.5, 2],
+      ['set', 0.5, 2],
+      ['ramp', 0, 2.005],
+      ['set', 0.9, 2.006],
+    ]);
+    // Passada a rampa, a próxima chamada ao mixer desliga a velha.
+    ctx.currentTime = 2.1;
+    mixer.play('s', { bus: 'sfx', priority: SOUND_PRIORITY.shot });
+    expect(victim.outputs.length).toBe(0);
+    // A voz livre (sem roubo) toca na hora, como antes.
+    const before = ctx.sources.length;
+    mixer.stopAll();
+    mixer.play('s', { bus: 'sfx' });
+    expect(ctx.sources[before]!.startWhen).toBe(0);
+  });
+
+  it('M12 (fase 4): o "duck" dos efeitos (com atraso) e o da música segurando a vinheta', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('s', mp3(10));
+    mixer.play('s', { bus: 'sfx' });
+    const duck = ctx.sources[0]!.outputs[0]!.outputs[0]!.outputs[0] as unknown as { gain: FakeParam };
+    ctx.currentTime = 5;
+    mixer.duckBus('sfx', -10, 1.5, 0.25);
+    const low = Number((10 ** (-10 / 20)).toFixed(6));
+    expect(rounded(duck.gain.events.slice(-3))).toEqual([
+      ['set', 1, 5.25],
+      ['ramp', low, 5.3],
+      ['ramp', 1, 6.8],
+    ]);
+    // A música: abaixa, segura 3 s e volta.
+    await mixer.decode('m', mp3(20));
+    mixer.playMusic('m');
+    const musicDuck = ctx.sources.at(-1)!.outputs[0]!.outputs[0] as unknown as { gain: FakeParam };
+    mixer.duckMusic(-8, 0.8, 3);
+    const m = Number((10 ** (-8 / 20)).toFixed(6));
+    expect(rounded(musicDuck.gain.events.slice(-3))).toEqual([
+      ['ramp', m, 5.05],
+      ['set', m, 8.05],
+      ['ramp', 1, 8.85],
+    ]);
+  });
+
+  it('M12 (fase 4, revisão): um "duck" mais curto não encurta nem raseia o que ainda segura; `noDuck` passa por cima', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('m', mp3(20));
+    mixer.playMusic('m');
+    const musicDuck = ctx.sources.at(-1)!.outputs[0]!.outputs[0] as unknown as { gain: FakeParam };
+    ctx.currentTime = 5;
+    mixer.duckMusic(-8, 0.8, 3);
+    // A explosão logo depois do fim (−6 dB, sem segurar): fica o −8 dB até o fim da vinheta.
+    ctx.currentTime = 5.5;
+    mixer.duckMusic(-6, 0.8);
+    const m = Number((10 ** (-8 / 20)).toFixed(6));
+    expect(rounded(musicDuck.gain.events.slice(-3))).toEqual([
+      ['ramp', m, 5.55],
+      ['set', m, 8.05],
+      ['ramp', 1, 8.85],
+    ]);
+    // O som fora do "duck" vai direto ao canal (o zumbido, a morte).
+    await mixer.decode('s', mp3(5));
+    mixer.play('s', { bus: 'sfx' });
+    const ducked = ctx.sources.at(-1)!.outputs[0]!.outputs[0]!.outputs[0]!;
+    mixer.stopAll();
+    mixer.play('s', { bus: 'sfx', noDuck: true });
+    const direct = ctx.sources.at(-1)!.outputs[0]!.outputs[0]!.outputs[0]!;
+    expect(direct).not.toBe(ducked);
+    expect(ducked.outputs[0]).toBe(direct);
+  });
+
+  it('M12 (fase 4, revisão): o ambiente que saía (a pausa online) volta sem recomeçar', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('vento', mp3(10));
+    mixer.setAmbient(0, 'vento', 0.03, 1, 0.25);
+    const src = ctx.sources.at(-1)!;
+    mixer.setAmbient(0, null, 0, 0.1);
+    ctx.currentTime = 0.05;
+    mixer.setAmbient(0, 'vento', 0.03, 1, 0.25);
+    expect(ctx.sources.at(-1)).toBe(src);
+    ctx.currentTime = 5;
+    mixer.setAmbient(1, null);
+    expect(src.stopped).toBe(false);
+  });
+
+  it('M12 (fase 4): a largura do pan (3–4 no sofá) e o alcance por som', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    await mixer.decode('s', mp3(5));
+    mixer.setListener(0, 0, 0, 0, 0);
+    const pan = (): number => (ctx.sources.at(-1)!.outputs[0] as unknown as { pan: { value: number } }).pan.value;
+    mixer.play('s', { bus: 'sfx', x: 4, y: 0, z: 0 });
+    expect(pan()).toBeCloseTo(1, 6);
+    mixer.setPanWidth(0.5);
+    mixer.play('s', { bus: 'sfx', x: 4, y: 0, z: 0 });
+    expect(pan()).toBeCloseTo(0.5, 6);
+    // Além dos 60 m só com alcance maior (os tiros e as explosões do mapa grande).
+    expect(mixer.play('s', { bus: 'sfx', x: 100 })).toBe(-1);
+    expect(mixer.play('s', { bus: 'sfx', x: 100, range: 150 })).toBeGreaterThanOrEqual(0);
+    // A mesma curva (o inverso da distância), só a borda anda.
+    expect(distanceGain(100)).toBe(0);
+    expect(distanceGain(100, 150)).toBeCloseTo(REF_DISTANCE_M / 100, 9);
+    expect(distanceGain(30, 150)).toBeCloseTo(distanceGain(30), 9);
+    expect(distanceGain(150, 150)).toBe(0);
+  });
+
+  it('M12 (fase 4): o ambiente em laço, fora das 24 vozes, no canal dos efeitos; solta com fade', async () => {
+    const ctx = createFakeAudioContext();
+    const mixer = createMixer(surface(ctx));
+    expect(mixer.setAmbient(0, 'vento')).toBe(false);
+    await mixer.decode('vento', mp3(10));
+    const gains = ctx.created.gain;
+    expect(mixer.setAmbient(0, 'vento', 0.03, 2, 0.25)).toBe(true);
+    // Os 2 laços só nascem na 1ª vez.
+    expect(ctx.created.gain).toBe(gains + 2);
+    const src = ctx.sources.at(-1)!;
+    expect([src.loop, src.started, src.playbackRate.value]).toEqual([true, true, 0.25]);
+    expect(mixer.stats.activeVoices).toBe(0);
+    // O mesmo laço não recomeça; `null` solta depois do fade.
+    expect(mixer.setAmbient(0, 'vento', 0.05)).toBe(true);
+    expect(ctx.sources.at(-1)).toBe(src);
+    mixer.setAmbient(0, null, 0, 0.5);
+    expect(src.stopped).toBe(false);
+    ctx.currentTime = 1;
+    mixer.setAmbient(1, null);
+    expect(src.stopped).toBe(true);
+    mixer.dispose();
   });
 
   it('recupera vozes pelo relógio mesmo sem onended', async () => {

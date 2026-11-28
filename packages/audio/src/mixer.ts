@@ -11,12 +11,15 @@ import type {
   AudioBufferLike,
   AudioBufferSourceNodeLike,
   AudioContextLike,
+  AudioNodeLike,
+  AudioParamLike,
   AudioSurface,
   GainNodeLike,
   StereoPannerNodeLike,
 } from '@boboforces/platform-api';
 import type { Disposable } from '@boboforces/shared';
-import { createListenerSet, spatialize, type SpatialResult } from './spatial.ts';
+import { leadingSilenceSamples } from './onset.ts';
+import { createListenerSet, MAX_DISTANCE_M, spatialize, type SpatialResult } from './spatial.ts';
 
 /** Canais do mixer. `master` é o volume geral; os outros três somam nele. */
 export const AUDIO_BUSES = ['master', 'sfx', 'music', 'ui'] as const;
@@ -44,6 +47,16 @@ export interface PlayOptions {
   readonly priority?: number;
   /** Velocidade de reprodução (1 = normal); varia o tom de passos repetidos. */
   readonly rate?: number;
+  /**
+   * M12 (fase 4): alcance do som com posição (m; padrão `MAX_DISTANCE_M`). Os tiros e as explosões vão mais longe
+   * (pela amostra de longe) nos mapas grandes.
+   */
+  readonly range?: number;
+  /**
+   * M12 (fase 4, revisão): fora do "duck" do canal (o `duckBus`): o que causa o abafado (o zumbido da explosão colada,
+   * a morte) toca por cima dele.
+   */
+  readonly noDuck?: boolean;
 }
 
 export interface SoundInfo {
@@ -108,8 +121,30 @@ export interface Mixer extends Disposable {
   stopMusic(fadeS?: number): void;
   /** A faixa tocando, ou `null`. */
   readonly music: string | null;
-  /** Abaixa a música `db` dB (negativo) em 50 ms e volta em `releaseS` (arte-ux §10.4: −6 dB nas explosões). */
-  duckMusic(db: number, releaseS: number): void;
+  /**
+   * Abaixa a música `db` dB (negativo) em 50 ms e volta em `releaseS` (arte-ux §10.4: −6 dB nas explosões). M12 (fase
+   * 4): `holdS` segura o abaixado antes de voltar (as vinhetas de fim de 3 s).
+   */
+  duckMusic(db: number, releaseS: number, holdS?: number): void;
+  /**
+   * M12 (fase 4): abaixa um canal `db` dB (negativo) em 50 ms, depois de `delayS` (o golpe que causou passa cheio), e
+   * volta em `releaseS`. `music` é o `duckMusic` (só a faixa); `master` não abaixa.
+   */
+  duckBus(bus: AudioBus, db: number, releaseS: number, delayS?: number): void;
+  /** M12 (fase 4): largura do pan dos sons com posição (1 = cheio; arte-ux §10.3: 0,5 com 3–4 jogadores no sofá). */
+  setPanWidth(width: number): void;
+  /**
+   * M12 (fase 4): o ambiente do mapa: até 2 laços (`slot` 0 e 1: o vento e os grilos) em vozes próprias, fora das 24
+   * (não roubam nem são roubados), no canal dos efeitos (abaixam com ele). `name` em loop com ganho `gain` em rampa de
+   * `fadeS`, na velocidade `rate` (o vento é um laço curto tocado devagar); o mesmo som já tocando só muda o ganho;
+   * `null` solta com fade. Som desconhecido: `false`.
+   */
+  setAmbient(slot: number, name: string | null, gain?: number, fadeS?: number, rate?: number): boolean;
+  /**
+   * M12 (fase 4): o silêncio do começo do som `name` (s; `leadingSilenceSamples`), até `maxS`, deixando 1 ms antes
+   * do ataque. 0 se o som não existe ou já começa no ataque. Só mede: quem corta é o `crop`.
+   */
+  leadingSilenceS(name: string, maxS: number): number;
   /**
    * M3 (fase 6e): a 2ª camada da música (o Zombies em 2 camadas): `name` em loop junto com a faixa tocando, no mesmo
    * ponto do loop dela (as duas têm o mesmo tamanho), com ganho `gain` em rampa de `fadeS`. Muda só o ganho se já
@@ -123,7 +158,13 @@ interface Voice {
   readonly panner: StereoPannerNodeLike;
   readonly gain: GainNodeLike;
   source: AudioBufferSourceNodeLike | null;
+  /** Canal da voz (índice em `AUDIO_BUSES`; mais 4 = o canal direto, fora do "duck"). */
   bus: number;
+  /** M12 (fase 4): quando a fonte atual começa (relógio do contexto; a voz roubada entra 6 ms depois). */
+  startAt: number;
+  /** M12 (fase 4): a fonte roubada que ainda some na rampa de 5 ms, e quando ela pode ser desligada. */
+  fading: AudioBufferSourceNodeLike | null;
+  fadeEnd: number;
   priority: number;
   /** Ganho efetivo (volume × distância): desempate de prioridade. */
   level: number;
@@ -136,6 +177,42 @@ interface Voice {
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/**
+ * M12 (fase 4): a voz roubada some numa rampa de 5 ms e a nova entra 6 ms depois (sem o estalo do corte seco no meio
+ * da onda). Sem rampa no runtime (o parâmetro só guarda o valor), o resultado é o de antes: corta e toca.
+ */
+const STEAL_FADE_S = 0.005;
+const STEAL_START_S = 0.006;
+
+/** O `cancelScheduledValues` do Web Audio, quando o runtime tem (o contrato da plataforma não pede). */
+type CancelableParam = AudioParamLike & { cancelScheduledValues?: (time: number) => unknown };
+
+/**
+ * Segura o parâmetro no valor de agora, sem as rampas que ainda faltavam (um "duck" novo no meio da volta do outro,
+ * a voz roubada de novo antes de entrar). Sem `cancelScheduledValues`, as rampas antigas ficam e as novas vêm depois.
+ */
+function holdParam(p: AudioParamLike, now: number): void {
+  const v = p.value;
+  (p as CancelableParam).cancelScheduledValues?.(now);
+  p.setValueAtTime(v, now);
+}
+
+const stopQuietly = (s: AudioBufferSourceNodeLike, when?: number): void => {
+  try {
+    if (when === undefined) s.stop();
+    else s.stop(when);
+  } catch {
+    // já tinha parado
+  }
+};
+const disconnectQuietly = (n: AudioNodeLike): void => {
+  try {
+    n.disconnect();
+  } catch {
+    // já desconectado
+  }
+};
 
 /** Mixer sobre o `AudioSurface` da plataforma; `null` (ou superfície sem contexto) = mixer mudo. */
 export function createMixer(surface: AudioSurface | null): Mixer {
@@ -177,6 +254,10 @@ function createSilentMixer(): Mixer {
     stopMusic: () => {},
     music: null,
     duckMusic: () => {},
+    duckBus: () => {},
+    setPanWidth: () => {},
+    setAmbient: () => false,
+    leadingSilenceS: () => 0,
     setMusicLayer: () => false,
     dispose: () => {},
   };
@@ -220,8 +301,54 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
   };
 
   // M2 (fase 7d): a música, com 2 vozes para o crossfade, sobre um ganho de "duck" comum.
+  const MUSIC_BUS = busIndex('music');
   const duck = ctx.createGain();
-  duck.connect(buses[busIndex('music')]!);
+  duck.connect(buses[MUSIC_BUS]!);
+  // M12 (fase 4): o "duck" dos efeitos e da interface (a morte e a explosão colada abaixam os efeitos): as vozes
+  // desses canais passam por um ganho próprio antes do canal. As da música (as vinhetas) vão direto: o `duck` da
+  // música abaixa só a faixa.
+  const outputs: GainNodeLike[] = AUDIO_BUSES.map((bus, i) => {
+    if (bus !== 'sfx' && bus !== 'ui') return buses[i]!;
+    const g = ctx.createGain();
+    g.connect(buses[i]!);
+    return g;
+  });
+  // O "duck" de cada canal ainda valendo (o nível, o fim do abaixado e o fim da volta), para juntar os pedidos.
+  const duckLow = new Float64Array(AUDIO_BUSES.length).fill(1);
+  const duckHoldEnd = new Float64Array(AUDIO_BUSES.length).fill(-Infinity);
+  const duckEnd = new Float64Array(AUDIO_BUSES.length).fill(-Infinity);
+  /**
+   * Abaixa `g` (o "duck" do canal `k`) para `db` em 50 ms depois de `delayS`, segura `holdS` e volta ao cheio em
+   * `releaseS`. Revisão: um "duck" que ainda segura não é encurtado nem raseado por um novo (a explosão logo depois
+   * do fim não encurta a vinheta): fica o mais fundo e o que acaba mais tarde.
+   */
+  const duckParam = (
+    k: number,
+    g: AudioParamLike,
+    db: number,
+    releaseS: number,
+    holdS: number,
+    delayS: number,
+  ): void => {
+    const now = ctx.currentTime;
+    let low = Math.min(1, 10 ** (Math.min(0, db) / 20));
+    const at = now + Math.max(0, delayS);
+    let hold = at + DUCK_ATTACK_S + Math.max(0, holdS);
+    let end = hold + Math.max(0.05, releaseS);
+    if (now < duckHoldEnd[k]!) {
+      low = Math.min(low, duckLow[k]!);
+      hold = Math.max(hold, duckHoldEnd[k]!);
+      end = Math.max(end, duckEnd[k]!);
+    }
+    duckLow[k] = low;
+    duckHoldEnd[k] = hold;
+    duckEnd[k] = end;
+    holdParam(g, now);
+    if (at > now) g.setValueAtTime(g.value, at);
+    g.linearRampToValueAtTime(low, at + DUCK_ATTACK_S);
+    if (hold > at + DUCK_ATTACK_S) g.setValueAtTime(low, hold);
+    g.linearRampToValueAtTime(1, end);
+  };
   const music: MusicVoice[] = [0, 1].map(() => {
     const fade = ctx.createGain();
     fade.gain.value = 0;
@@ -262,7 +389,8 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
   const fadeTo = (m: MusicVoice, target: number, fadeS: number): void => {
     const now = ctx.currentTime;
     const g = m.fade.gain;
-    g.setValueAtTime(g.value, now);
+    // M12 (fase 4, revisão): sem as rampas que ainda faltavam (a volta da pausa no meio da saída do ambiente).
+    holdParam(g, now);
     g.linearRampToValueAtTime(target, now + Math.max(0.01, fadeS));
   };
   /** Marca a voz `i` para soltar depois do fade (sem timer: o pacote não depende do runtime). */
@@ -280,7 +408,23 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       layerReleaseAt = Infinity;
       stopMusicVoice(layer);
     }
+    for (let i = 0; i < ambientReleaseAt.length; i++) {
+      if (now < ambientReleaseAt[i]!) continue;
+      ambientReleaseAt[i] = Infinity;
+      if (ambient) stopMusicVoice(ambient[i]!);
+    }
   };
+  // M12 (fase 4): o ambiente do mapa (o vento e os grilos): 2 laços fora das 24 vozes, no canal dos efeitos, criados
+  // só na 1ª vez (o menu não paga os nós).
+  let ambient: MusicVoice[] | null = null;
+  const ambientReleaseAt = [Infinity, Infinity];
+  const ambientVoices = (): MusicVoice[] =>
+    (ambient ??= [0, 1].map(() => {
+      const fade = ctx.createGain();
+      fade.gain.value = 0;
+      fade.connect(outputs[busIndex('sfx')]!);
+      return { fade, source: null, name: null, mono: false };
+    }));
 
   /** Versões mono das músicas (só com a saída mono ligada; soltas quando ela desliga). */
   const monoMusic = new Map<string, AudioBufferLike>();
@@ -337,12 +481,15 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     const panner = ctx.createStereoPanner();
     const gain = ctx.createGain();
     panner.connect(gain);
-    gain.connect(buses[1]!);
+    gain.connect(outputs[1]!);
     const voice: Voice = {
       panner,
       gain,
       source: null,
       bus: 1,
+      startAt: 0,
+      fading: null,
+      fadeEnd: 0,
       priority: 0,
       level: 0,
       endTime: 0,
@@ -352,34 +499,63 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     voices.push(voice);
   }
 
+  /** Desliga a fonte roubada que ainda sumia na rampa. */
+  const dropFading = (v: Voice): void => {
+    const f = v.fading;
+    if (!f) return;
+    v.fading = null;
+    stopQuietly(f);
+    disconnectQuietly(f);
+  };
+
   const release = (v: Voice): void => {
+    dropFading(v);
     const s = v.source;
     if (!s) return;
     v.source = null;
     s.onended = null;
-    try {
-      s.stop();
-    } catch {
-      // já tinha parado
-    }
-    try {
-      s.disconnect();
-    } catch {
-      // já desconectado
-    }
+    stopQuietly(s);
+    disconnectQuietly(s);
     stats.activeVoices--;
+  };
+
+  /**
+   * M12 (fase 4): a voz cedida a um som mais importante: a fonte some numa rampa de 5 ms (sem estalo) e é desligada
+   * depois (`reclaim`). A que ainda não tinha começado (roubada de novo no mesmo instante) sai seca: nunca soou.
+   */
+  const steal = (v: Voice, now: number): void => {
+    const s = v.source;
+    if (!s) return;
+    v.source = null;
+    s.onended = null;
+    stats.activeVoices--;
+    if (v.startAt > now) {
+      stopQuietly(s);
+      disconnectQuietly(s);
+      return;
+    }
+    dropFading(v);
+    const g = v.gain.gain;
+    holdParam(g, now);
+    g.linearRampToValueAtTime(0, now + STEAL_FADE_S);
+    stopQuietly(s, now + STEAL_FADE_S);
+    v.fading = s;
+    v.fadeEnd = now + STEAL_FADE_S + 0.05;
   };
 
   /** Recupera vozes cujo som já acabou pelo relógio (o `onended` pode chegar atrasado ou não chegar). */
   const reclaim = (now: number): void => {
     for (let i = 0; i < MAX_VOICES; i++) {
       const v = voices[i]!;
+      if (v.fading && v.fadeEnd <= now) dropFading(v);
       if (v.source && v.endTime <= now) release(v);
     }
   };
 
-  /** Voz livre, ou a mais fraca que um som de `priority`/`level` pode tomar; -1 se nenhuma. */
-  const pickVoice = (priority: number, level: number): number => {
+  /** Voz livre, ou a mais fraca que um som de `priority`/`level` pode tomar; -1 se nenhuma. `stolen` diz se roubou. */
+  let stolen = false;
+  const pickVoice = (priority: number, level: number, now: number): number => {
+    stolen = false;
     let victim = -1;
     for (let i = 0; i < MAX_VOICES; i++) {
       const v = voices[i]!;
@@ -398,7 +574,8 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
     if (victim < 0) return -1;
     const w = voices[victim]!;
     if (w.priority > priority || (w.priority === priority && w.level > level)) return -1;
-    release(w);
+    steal(w, now);
+    stolen = true;
     stats.stolen++;
     return victim;
   };
@@ -450,7 +627,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       let gain = clamp01(opts.volume ?? 1);
       let pan = opts.pan ?? 0;
       if (opts.x !== undefined) {
-        spatialize(listeners, opts.x, opts.y ?? 0, opts.z ?? 0, spatial);
+        spatialize(listeners, opts.x, opts.y ?? 0, opts.z ?? 0, spatial, opts.range ?? MAX_DISTANCE_M);
         gain *= spatial.gain;
         pan = spatial.pan;
       }
@@ -462,32 +639,50 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       reclaim(now);
       reclaimMusic(now);
       const priority = opts.priority ?? SOUND_PRIORITY.step;
-      const index = pickVoice(priority, gain);
+      const index = pickVoice(priority, gain, now);
       if (index < 0) {
         stats.dropped++;
         return -1;
       }
       const v = voices[index]!;
-      const bus = busIndex(opts.bus);
+      // A saída: o "duck" do canal, ou o canal direto (`noDuck`, índices depois dos 4).
+      const bus = busIndex(opts.bus) + (opts.noDuck === true ? AUDIO_BUSES.length : 0);
       if (bus !== v.bus) {
+        // Trocar de canal desliga a saída: a rampa da voz roubada (se houver) corta seca, como antes.
         v.gain.disconnect();
-        v.gain.connect(buses[bus]!);
+        v.gain.connect(bus < AUDIO_BUSES.length ? outputs[bus]! : buses[bus - AUDIO_BUSES.length]!);
         v.bus = bus;
+        dropFading(v);
       }
       const rate = opts.rate ?? 1;
-      v.gain.gain.value = gain;
-      v.panner.pan.value = mono ? 0 : pan < -1 ? -1 : pan > 1 ? 1 : pan;
+      const panValue = mono ? 0 : pan < -1 ? -1 : pan > 1 ? 1 : pan;
+      // M12 (fase 4): na voz roubada, o som novo entra 6 ms depois, quando a rampa da velha já zerou.
+      const startAt = stolen && v.fading ? now + STEAL_START_S : now;
+      if (startAt > now) {
+        v.gain.gain.setValueAtTime(gain, startAt);
+        v.panner.pan.setValueAtTime(panValue, startAt);
+      } else {
+        // A voz roubada há pouco ainda pode ter rampa marcada para a frente: ela sai antes do valor novo.
+        if (v.fadeEnd > now) {
+          (v.gain.gain as CancelableParam).cancelScheduledValues?.(now);
+          (v.panner.pan as CancelableParam).cancelScheduledValues?.(now);
+        }
+        v.gain.gain.value = gain;
+        v.panner.pan.value = panValue;
+      }
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       if (rate !== 1) source.playbackRate.value = rate;
       source.connect(v.panner);
       source.onended = v.onEnded;
       v.source = source;
+      v.startAt = startAt;
       v.priority = priority;
       v.level = gain;
       v.serial = ++serial;
-      v.endTime = now + buffer.duration / (rate > 0 ? rate : 1) + 0.05;
-      source.start();
+      v.endTime = startAt + buffer.duration / (rate > 0 ? rate : 1) + 0.05;
+      if (startAt > now) source.start(startAt);
+      else source.start();
       stats.played++;
       stats.activeVoices++;
       if (stats.activeVoices > stats.peakVoices) stats.peakVoices = stats.activeVoices;
@@ -576,14 +771,59 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       fadeTo(layer, Math.max(0, Math.min(1, gain)), fadeS);
       return true;
     },
-    duckMusic(db, releaseS) {
+    duckMusic(db, releaseS, holdS = 0) {
       if (disposed) return;
+      duckParam(MUSIC_BUS, duck.gain, db, releaseS, holdS, 0);
+    },
+    duckBus(bus, db, releaseS, delayS = 0) {
+      if (disposed) return;
+      const k = busIndex(bus);
+      if (bus === 'music') duckParam(k, duck.gain, db, releaseS, 0, delayS);
+      else if (bus !== 'master') duckParam(k, outputs[k]!.gain, db, releaseS, 0, delayS);
+    },
+    setPanWidth(width) {
+      listeners.panWidth = clamp01(width);
+    },
+    setAmbient(slot, name, gain = 1, fadeS = 1, rate = 1) {
+      if (disposed || slot < 0 || slot >= ambientReleaseAt.length) return false;
       const now = ctx.currentTime;
-      const low = Math.min(1, 10 ** (Math.min(0, db) / 20));
-      const g = duck.gain;
-      g.setValueAtTime(g.value, now);
-      g.linearRampToValueAtTime(low, now + DUCK_ATTACK_S);
-      g.linearRampToValueAtTime(1, now + DUCK_ATTACK_S + Math.max(0.05, releaseS));
+      reclaimMusic(now);
+      if (name === null) {
+        const a = ambient?.[slot];
+        if (a?.source && ambientReleaseAt[slot] === Infinity) {
+          fadeTo(a, 0, fadeS);
+          ambientReleaseAt[slot] = now + fadeS + 0.05;
+        }
+        return true;
+      }
+      const buffer = sounds.get(name);
+      if (!buffer) {
+        stats.unknown++;
+        return false;
+      }
+      const a = ambientVoices()[slot]!;
+      // Revisão: o mesmo laço ainda saindo (a pausa online e a volta) só volta ao ganho, sem recomeçar seco.
+      if (a.name === name && a.source) ambientReleaseAt[slot] = Infinity;
+      else {
+        stopMusicVoice(a);
+        ambientReleaseAt[slot] = Infinity;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        if (rate !== 1) source.playbackRate.value = rate;
+        source.connect(a.fade);
+        a.source = source;
+        a.name = name;
+        a.fade.gain.value = 0;
+        source.start();
+      }
+      fadeTo(a, clamp01(gain), fadeS);
+      return true;
+    },
+    leadingSilenceS(name, maxS) {
+      const b = sounds.get(name);
+      if (!b || b.length === 0) return 0;
+      return leadingSilenceSamples(b.getChannelData(0), b.sampleRate, maxS) / b.sampleRate;
     },
     dispose() {
       if (disposed) return;
@@ -594,6 +834,11 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
       }
       stopMusicVoice(layer);
       layer.fade.disconnect();
+      if (ambient)
+        for (const a of ambient) {
+          stopMusicVoice(a);
+          a.fade.disconnect();
+        }
       musicActive = -1;
       duck.disconnect();
       for (let i = 0; i < MAX_VOICES; i++) {
@@ -602,6 +847,7 @@ function createLiveMixer(ctx: AudioContextLike): Mixer {
         v.panner.disconnect();
         v.gain.disconnect();
       }
+      for (let i = 0; i < outputs.length; i++) if (outputs[i] !== buses[i]) outputs[i]!.disconnect();
       for (const b of buses) b.disconnect();
       sounds.clear();
       monoMusic.clear();

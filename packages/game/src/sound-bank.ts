@@ -51,7 +51,8 @@ export const SOUNDS = {
   abate: sfx('file', 0.65, SOUND_RANK.own, 0.05),
   dano: sfx('file', 0.7, SOUND_RANK.hurt, 0.12),
   morte: sfx('file', 0.9, SOUND_RANK.hurt, 0.5),
-  coracao: sfx('synth', 0.55, SOUND_RANK.hurt, 0.6),
+  // M12 (fase 4): o coração acelera até 0,55 s entre batidas.
+  coracao: sfx('synth', 0.55, SOUND_RANK.hurt, 0.5),
   // Tiros (perto e longe, que troca além de `FAR_SHOT_M`).
   'tiro-pistola': shot(0.75),
   'tiro-pistola-longe': shot(0.75),
@@ -127,9 +128,27 @@ export const SOUNDS = {
   'onda-comeca': sfx('file', 0.85, SOUND_RANK.ui, 1),
   'onda-limpa': sfx('synth', 0.7, SOUND_RANK.ui, 1),
   levantou: sfx('synth', 0.6, SOUND_RANK.own, 0.3),
-  // Vinhetas de fim: no canal da música (GDD §5.10).
+  // Vinhetas de fim: no canal da música (GDD §5.10). M12 (fase 4): de 3 s, e o empate.
   vitoria: { src: 'synth', bus: 'music', volume: 0.7, priority: SOUND_RANK.ui, cooldownS: 1 },
   derrota: { src: 'synth', bus: 'music', volume: 0.7, priority: SOUND_RANK.ui, cooldownS: 1 },
+  empate: { src: 'synth', bus: 'music', volume: 0.6, priority: SOUND_RANK.ui, cooldownS: 1 },
+  // M12 (fase 4), todos sintetizados (0 KB): o ferrolho da pump e da sniper, o zunido da bala que passa perto, o tique
+  // do pente no fim, a Boom Box, os pontos, a zona, o ping do time e o zumbido da explosão colada.
+  ferrolho: sfx('synth', 0.5, SOUND_RANK.ally, 0.05),
+  zunido: sfx('synth', 0.55, SOUND_RANK.hurt, 0.1),
+  tique: sfx('synth', 0.35, SOUND_RANK.own),
+  'bomba-bipe': sfx('synth', 0.6, SOUND_RANK.enemy, 0.1),
+  'bomba-armada': sfx('synth', 0.75, SOUND_RANK.hurt, 0.5),
+  'bomba-desarmada': sfx('synth', 0.75, SOUND_RANK.hurt, 0.5),
+  'ponto-ganho': sfx('synth', 0.6, SOUND_RANK.ui, 0.3),
+  'ponto-perdido': sfx('synth', 0.6, SOUND_RANK.ui, 0.3),
+  'zona-fecha': sfx('synth', 0.65, SOUND_RANK.ui, 1),
+  ping: sfx('synth', 0.6, SOUND_RANK.hurt, 0.15),
+  zumbido: sfx('synth', 0.35, SOUND_RANK.hurt, 0.5),
+  // M12 (fase 4): o ambiente do mapa, em laço fora das 24 vozes (`Mixer.setAmbient`): o vento a −30 dB e os grilos
+  // da noite a −32 dB, no canal dos efeitos.
+  vento: sfx('synth', 0.0316, SOUND_RANK.world, 0),
+  grilos: sfx('synth', 0.025, SOUND_RANK.world, 0),
 } as const satisfies Readonly<Record<string, SoundDef>>;
 
 export type SoundId = keyof typeof SOUNDS;
@@ -142,6 +161,12 @@ export const soundPath = (id: SoundId): string => `audio/${id}.mp3`;
 
 /** Quantos MP3 decodificar ao mesmo tempo (o loading não trava o frame do menu). */
 const DECODE_CONCURRENCY = 4;
+/**
+ * M12 (fase 4): o atraso do MP3 que se corta depois do `decode`. O lamejs não grava a etiqueta "gapless" e o
+ * decodificador entrega ~13 ms (576 amostras; medido no decodificador do Windows) ou ~25 ms (sem compensar o dele)
+ * antes do ataque: corta até 1 ms antes dele, nunca mais que isto.
+ */
+const LEAD_TRIM_MAX_S = 0.03;
 
 /**
  * Baixa e decodifica os MP3 do banco que o mixer ainda não tem (segundo plano, depois do menu). Erro num som vira
@@ -158,7 +183,9 @@ export async function loadSoundFiles(
   const worker = async (): Promise<void> => {
     for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
       try {
-        await mixer.decode(id, await assets.loadBytes(soundPath(id)));
+        const info = await mixer.decode(id, await assets.loadBytes(soundPath(id)));
+        const cut = mixer.leadingSilenceS(id, LEAD_TRIM_MAX_S);
+        if (cut > 0) mixer.crop(id, cut, info.durationS - cut - 0.5 / info.sampleRate);
         ok++;
       } catch (error) {
         onError(id, error);

@@ -12,13 +12,16 @@ const EDGE_FADE = 0.2;
 /** Abaixo desta distância o pan volta ao centro (som "dentro da cabeça" não pula de um lado para o outro). */
 const PAN_NEAR_M = 1;
 
-/** Ganho por distância em [0, 1]: inverso limitado, com o fim do alcance suavizado. */
-export function distanceGain(distanceM: number): number {
+/**
+ * Ganho por distância em [0, 1]: inverso limitado, com o fim do alcance suavizado. M12 (fase 4): `maxM` é o alcance
+ * do som (os tiros e as explosões vão até 150 m nos mapas grandes); a curva é a mesma, só a borda anda.
+ */
+export function distanceGain(distanceM: number, maxM: number = MAX_DISTANCE_M): number {
   if (!(distanceM > REF_DISTANCE_M)) return 1;
-  if (distanceM >= MAX_DISTANCE_M) return 0;
+  if (distanceM >= maxM) return 0;
   const inverse = REF_DISTANCE_M / (REF_DISTANCE_M + ROLLOFF * (distanceM - REF_DISTANCE_M));
-  const fadeStart = MAX_DISTANCE_M * (1 - EDGE_FADE);
-  const edge = distanceM <= fadeStart ? 1 : (MAX_DISTANCE_M - distanceM) / (MAX_DISTANCE_M - fadeStart);
+  const fadeStart = maxM * (1 - EDGE_FADE);
+  const edge = distanceM <= fadeStart ? 1 : (maxM - distanceM) / (maxM - fadeStart);
   return inverse * edge;
 }
 
@@ -38,6 +41,11 @@ export function stereoPan(dx: number, dz: number, yaw: number): number {
 /** Ouvintes locais em arrays planos (sem objeto por ouvinte): x, y, z, yaw. */
 export interface ListenerSet {
   count: number;
+  /**
+   * M12 (fase 4): a largura do pan (1 = cheio). Com 3–4 jogadores no sofá cai para 0,5: o pan cheio confunde quem
+   * está do outro lado do sofá (arte-ux §10.3).
+   */
+  panWidth: number;
   readonly x: Float64Array;
   readonly y: Float64Array;
   readonly z: Float64Array;
@@ -47,6 +55,7 @@ export interface ListenerSet {
 export function createListenerSet(capacity: number): ListenerSet {
   return {
     count: 1,
+    panWidth: 1,
     x: new Float64Array(capacity),
     y: new Float64Array(capacity),
     z: new Float64Array(capacity),
@@ -79,13 +88,17 @@ export interface SpatialResult {
   distance: number;
 }
 
-/** Ganho e pan de um som posicionado, pelo ouvinte mais próximo. `out.gain` 0 = inaudível (não toca). */
+/**
+ * Ganho e pan de um som posicionado, pelo ouvinte mais próximo. `out.gain` 0 = inaudível (não toca). `maxM` é o
+ * alcance do som (M12, fase 4) e o pan sai na largura do conjunto (`panWidth`).
+ */
 export function spatialize(
   set: Readonly<ListenerSet>,
   x: number,
   y: number,
   z: number,
   out: SpatialResult,
+  maxM: number = MAX_DISTANCE_M,
 ): SpatialResult {
   const i = nearestListener(set, x, y, z);
   const dx = x - set.x[i]!;
@@ -94,7 +107,7 @@ export function spatialize(
   const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
   out.listener = i;
   out.distance = distance;
-  out.gain = distanceGain(distance);
-  out.pan = out.gain > 0 ? stereoPan(dx, dz, set.yaw[i]!) : 0;
+  out.gain = distanceGain(distance, maxM);
+  out.pan = out.gain > 0 ? stereoPan(dx, dz, set.yaw[i]!) * set.panWidth : 0;
   return out;
 }

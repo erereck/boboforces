@@ -5678,3 +5678,65 @@ de chegada.
 - **Contratos:** `InputMapper.update` (o `aimScale` traz o ADS), `ControlProfile.adsSensitivityMul` 1,
   `SlideParams.landBufferS`, `ClientDriver.ownOffset`, `RECONCILE_SMOOTH`, `AimAssistState` e `steerAim` no lugar do
   `pullAim`, `AIM_ASSIST.maxRateRadS`.
+
+### 23.4 Fase 4: o som (27/11/2026)
+
+- **O cooldown** (`game/src/scene/sound.ts`): o som próprio passa sempre e não marca mais o `lastPlayed` (com o seu
+  fuzil a 600 rpm, uns 40% dos tiros do inimigo com a mesma arma sumiam); o `playFlat` respeita o cooldown no retorno
+  (dano 0,12 s, morte 0,5, coração 0,5, abate 0,05) e só a própria arma passa (`own`). A escopeta manda um `shot` por
+  chumbo: o som sai um por tick e atirador.
+- **A variação** (`scene/sound-feel.ts`): tiro com tom 0,96–1,04 e −1–0 dB pelo `hash2(tick, atirador)`; impacto ±8%
+  pela célula e pelo tick; a LMG com o tiro do fuzil a 0,92. O `hash2` multiplica em 32 bits (`Math.imul`); só o som o
+  usa, e com números pequenos dá o mesmo de antes.
+- **A parede abafa:** o que tem amostra de longe toca ela a −3 dB (`occludedFarGain` 0,708; o passa-baixa de 900 Hz é
+  o abafado); o resto, −6 dB. Acima de 30 m o cooldown da amostra de longe é conferido antes do raio; perto, o raio
+  roda antes (ele escolhe o som).
+- **O dano e o coração:** o `dano` com o pan de onde veio a 70% (`hurtPan`, só com 1 jogador); o coração com
+  `hp ≤ 0,3·máxima` (`MatchSoundDeps.maxHealth`, a vida da HUD; o mesmo limite da vinheta da HUD), de 1 s a 0,55 s com
+  10% ou menos, volume 0,6 → 1.
+- **O foley em tempos** (em ticks da sim, `v.tick`, para seguir o Aquário acelerado e a câmera lenta do dono): o
+  `ferrolho` 0,3 s depois do tiro da pump e da sniper; o cartucho quando o pente sobe recarregando; a recarga de pente
+  de 2,4 s ou mais com sons aos 40% e 70% (a LMG ficava 4,5 s muda); o tom pela classe (pistola 1,15; revólver e SMG
+  1,06; DMR, besta e lança-granadas 0,94; LMG, sniper e escopetas 0,88).
+- **O zunido** (`zunido`, 0,13 s): o tiro do inimigo (nos chumbos, o parentesco do primeiro) a menos de 1,5 m da
+  cabeça, de 3 m do cano a 1 m antes do fim do raio (o tiro que acerta não zune); cooldown 0,1 s.
+- **O plic, o pente, o abate e o colete:** sem plic nem dano no dano 0; o plic +3% por acerto seguido em 0,3 s (até
+  +15%); o `tique` nas 3 últimas balas (ou no último quarto do pente pequeno), o tom subindo 12% por bala; o abate
+  1/1,06/1,12/1,19 em 4 s; o colete que zera no tick em que o último acerto foi seu toca o `impacto-vidro` a 0,75 no
+  `frame()` seguinte.
+- **Passos e pouso:** correndo ×1,25, andando ×0,85, ±10%, passo ímpar a 0,94 (as passadas de 1,7/2,3 m ficam: a
+  câmera da fase 1 segue elas); o pouso pisa no material do chão.
+- **Os objetivos** (`scene/sound-objectives.ts`, por diferença de estado, sem disparar ao entrar no meio da partida
+  online): a Boom Box armada, o bipe de 1 s a 0,15 s pelo `bombTicks`, quem planta e quem desarma, desarmada; o ponto
+  do Domination em dois tons; a zona fechando; o começo e o fim da rodada (a decisiva, `decisive`, fica só com a
+  vinheta); a Roleta; o ping do time posicionado (longe, de 8 m na direção dele); a arma do mapa que volta (a 0,35, até
+  12 m).
+- **As vinhetas de 3 s e o empate** (`audio/src/synth-game.ts`): o rufar e a fanfarra, o "uá-uá-uááá", duas notas
+  iguais; a música −8 dB durante (o `duckMusic` com `holdS`). No Bobo Zombies (`MatchSoundDeps.coop`), o fim sem
+  vencedor (`winnerTeam` −1) é a derrota.
+- **O mundo abafado** (1 jogador, sem "Reduzir efeitos"): `Mixer.duckBus` (os canais de efeitos e de interface ganharam
+  um ganho de "duck"). Na morte os efeitos caem 10 dB na hora e voltam em 1,5 s, com o som da morte por cima
+  (`PlayOptions.noDuck`); a explosão a menos de 4 m abaixa 8 dB depois de 0,12 s e toca o `zumbido` por cima. Um duck
+  novo junta com o que ainda segura (fica o mais fundo e o que acaba mais tarde): a explosão logo depois do fim não
+  encurta a vinheta.
+- **O roubo de voz** (`mixer.ts`): rampa de 5 ms e o som novo em `now + 6 ms`; o `cancelScheduledValues` quando o
+  runtime tem.
+- **O pan no sofá:** `Mixer.setPanWidth` (`ListenerSet.panWidth`), 0,5 com 3–4 vistas.
+- **O silêncio dos MP3** (`audio/src/onset.ts`, `loadSoundFiles`): o lamejs não grava "gapless"; no decodificador do
+  Windows o ataque vem a ~13,1 ms (as 576 amostras do LAME). O `leadingSilenceS` acha o ataque (−20 dB do pico,
+  recuando pela subida a −30 dB) só nos primeiros `maxS` + 100 ms, e o `crop` corta até 1 ms antes, no máximo 30 ms
+  (nos 45 MP3: de 6,1 a 30 ms, média 12,1). A música e os laços não passam por ele.
+- **O alcance:** `PlayOptions.range`; tiros e explosões até 150 m; além de 60 m caem para a prioridade `world` (cedem a
+  voz aos passos perto). No Royale Grande o pico de vozes fica em 24 nos dois alcances.
+- **O ambiente:** `Mixer.setAmbient`, 2 laços fora das 24 vozes no canal de efeitos; o vento a −30 dB (menos na Lua) e
+  os grilos a −32 dB à noite; o mesmo laço que saía volta só ao ganho (a pausa online), e o `fadeTo` segura o valor de
+  agora antes da rampa.
+- **A síntese:** 14 sons novos (53 no total, 0 KB de MP3); as notas, o gemido e o zumbido por tabelas. No Node: de
+  181 ms (39 sons) para 109 ms (53); sem JIT, de 2,72 para 3,06 s (os 14 novos, 9,1 s de áudio: 9,5 ms com JIT e
+  259 ms sem; as vinhetas de 3 s: de 96 para 365 ms sem JIT).
+- **Revisão (Opus):** nenhum achado alto; 3 médios (a derrota do Zombies tocava o empate, a bala do aliado zunia, os
+  tiros de longe calavam os passos perto) e 7 baixos, corrigidos antes da junção. Nada foi ouvido de verdade: a
+  mixagem espera a escuta do Erick.
+- **Contratos:** `Mixer` (`duckBus`, `setPanWidth`, `setAmbient`, `leadingSilenceS`, `duckMusic.holdS`),
+  `PlayOptions.range` e `noDuck`, `ListenerSet.panWidth`, `MatchSoundDeps` (`maxHealth`, `reduceEffects`, `ambient`,
+  `coop`). Nenhum golden mudou.

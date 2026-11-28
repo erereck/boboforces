@@ -22,6 +22,13 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   do dedo, a assistência de mira acompanha quem anda de lado sem puxar da cabeça para o peito e trava suave no Forte,
   pular correndo e segurar o agachar perto do chão sai deslizando, e no online a correção do próprio boneco desliza em
   vez de dar um tranco. O online foi para o protocolo 15.
+- **O som (fase 4):** o seu tiro não cala mais o do inimigo, cada tiro e cada impacto soam um pouco diferentes, a
+  parede abafa, o dano vem do lado de onde veio e o coração acelera com a vida baixa, a escopeta e a sniper engatilham
+  e a recarga longa tem os seus estalos, a bala inimiga que passa perto zune, o plic e o abate sobem de tom na
+  sequência, o pente avisa que está acabando e o colete quebra com som, correr pisa mais forte, a Boom Box bipa cada vez
+  mais rápido e os pontos, a zona, as rodadas, a Roleta e o ping têm som, a vitória e a derrota ganharam vinhetas de
+  3 s (e o empate a dele), o mundo abafa quando você morre ou leva uma explosão colada, o vento e os grilos tocam
+  baixinho no mapa e os sons começam sem o atrasinho do MP3.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

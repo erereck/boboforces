@@ -20,6 +20,9 @@ export interface FakeSource extends AudioBufferSourceNodeLike, FakeNode {
   stopped: boolean;
   /** M3 (fase 6e): de onde (s) a fonte começou (`start(when, offset)`). */
   startOffset: number;
+  /** M12 (fase 4): quando (relógio do contexto) a fonte começa e para (`start(when)`/`stop(when)`; 0 = já). */
+  startWhen: number;
+  stopWhen: number;
   /** Dispara o `onended` como o navegador faria ao fim do som. */
   end(): void;
 }
@@ -37,15 +40,29 @@ export interface FakeAudioContext extends AudioContextLike {
   withoutCreateBuffer(): void;
 }
 
-function param(initial: number): AudioParamLike {
+/** M12 (fase 4): o parâmetro falso guarda as automações (tipo, valor, tempo) para os testes conferirem as rampas. */
+export interface FakeParam extends AudioParamLike {
+  readonly events: ['set' | 'ramp' | 'cancel', number, number][];
+  /** O do Web Audio (o contrato não pede; o mixer usa quando o runtime tem). */
+  cancelScheduledValues(time: number): unknown;
+}
+
+function param(initial: number): FakeParam {
   return {
     value: initial,
-    setValueAtTime(v: number) {
-      this.value = v;
+    events: [],
+    cancelScheduledValues(t: number) {
+      this.events.push(['cancel', this.value, t]);
       return this;
     },
-    linearRampToValueAtTime(v: number) {
+    setValueAtTime(v: number, t: number) {
       this.value = v;
+      this.events.push(['set', v, t]);
+      return this;
+    },
+    linearRampToValueAtTime(v: number, t: number) {
+      this.value = v;
+      this.events.push(['ramp', v, t]);
       return this;
     },
   };
@@ -113,12 +130,16 @@ export function createFakeAudioContext(sampleRate = 48000): FakeAudioContext {
         started: false,
         stopped: false,
         startOffset: 0,
-        start(_when?: number, offset?: number) {
+        startWhen: 0,
+        stopWhen: 0,
+        start(when?: number, offset?: number) {
           s.started = true;
+          s.startWhen = when ?? 0;
           s.startOffset = offset ?? 0;
         },
-        stop() {
+        stop(when?: number) {
           s.stopped = true;
+          s.stopWhen = when ?? 0;
         },
         end() {
           // O handler do mixer não usa o evento (o contrato é `(ev: never) => unknown`, para o do DOM caber).
