@@ -6,7 +6,7 @@
 // o comprimento de referência é o do FutBobo, 10,9 px = 0,596 m. O braço do bobo A saiu no passo 5 do porte.
 import { FIGURE_PX_M, FIGURE_SWATCH, figureSwatchCorner, type ModelDocument } from '@boboforces/format';
 import { addTexturedBox, affine, GeometryBuilder, type GeometryArrays } from './geometry.ts';
-import { LAYER_FROM_INSTANCE } from './layout.ts';
+import { LAYER_FROM_INSTANCE, VERTEX_FLAG } from './layout.ts';
 import { modelSocket, type ModelBinding, type SocketM } from './model-geometry.ts';
 
 /**
@@ -37,6 +37,18 @@ export function viewmodelAimOffset(model: ModelDocument): { x: number; y: number
 }
 
 /**
+ * M12 (fase 1): onde fica o soquete `name` da arma em relação ao `hand_r` (m, espaço do modelo na pose de repouso):
+ * o `game` põe o pente que cai na recarga no soquete `mag` (mão + deslocamentos + escala · isto). Sem o soquete ou
+ * a mão, `null`. Sem three.
+ */
+export function viewmodelSocketOffset(model: ModelDocument, name: string): { x: number; y: number; z: number } | null {
+  const socket = modelSocket(model, name);
+  const hand = modelSocket(model, 'hand_r');
+  if (!socket || !hand) return null;
+  return { x: socket.x - hand.x, y: socket.y - hand.y, z: socket.z - hand.z };
+}
+
+/**
  * Braço do boneco do FutBobo na 1ª pessoa (px do FutBobo, pivô no ombro, pendurado em −Y): manga 4×5,2×4 em −2,4,
  * cotovelo em −4,9, antebraço 3,6×5×3,6 em −7,3 e mão 3,8×2,2×3,8 em −10,5 (as caixas do `FIGURE_BODY_BOXES` com o
  * cotovelo reto). O soquete fica a `armPx` do ombro, dentro da mão. Farda da #58: manga comprida (manga e antebraço na
@@ -55,7 +67,9 @@ export const VIEWMODEL_FIGURE_ARM = {
 
 /**
  * Geometria do braço do FutBobo (m, pivô no ombro, pendurado em −Y): cada caixa lê o centro do texel da sua amostra
- * na camada da INSTÂNCIA (a 1ª camada da skin do dono, a da paleta).
+ * na camada da INSTÂNCIA (a 1ª camada da skin do dono, a da paleta). M12 (fase 1): a mão leva a flag `solid`: com a
+ * cor da instância (a luva do P1–P4 no FFA e no Royale, `ViewmodelDesc.glove`), pinta nela; com o vermelho negativo
+ * (o padrão do viewmodel), o shader lê a amostra da skin como antes.
  */
 export function buildFigureArmGeometry(): GeometryArrays {
   const b = new GeometryBuilder();
@@ -76,7 +90,7 @@ export function buildFigureArmGeometry(): GeometryArrays {
         layerSize: 64,
         mirror: false,
       },
-      { layer: LAYER_FROM_INSTANCE, flags: 0 },
+      { layer: LAYER_FROM_INSTANCE, flags: box.swatch === FIGURE_SWATCH.hand ? VERTEX_FLAG.solid : 0 },
     );
   }
   return b.build();

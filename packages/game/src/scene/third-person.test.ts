@@ -51,6 +51,17 @@ describe('3ª pessoa (M2, fase 6b)', () => {
     expect(left.x).toBeCloseTo(10 - THIRD_PERSON.sideM, 6);
   });
 
+  it('M12 (fase 1): no ADS completo o braço vai a 1,6 m e o lado a 0,5 m; no meio, no meio', () => {
+    const v = scene();
+    const pose = createShoulderPose();
+    placeShoulderCamera(v, 10, 0.5 + EYE, 30, 0, 0, 1, 1 / 60, pose, 1);
+    expect(pose.x).toBeCloseTo(10 + THIRD_PERSON.adsSideM, 6);
+    expect(pose.z).toBeCloseTo(30 + THIRD_PERSON.adsBackM, 6);
+    const half = createShoulderPose();
+    placeShoulderCamera(v, 10, 0.5 + EYE, 30, 0, 0, 1, 1 / 60, half, 0.5);
+    expect(half.z).toBeCloseTo(30 + (THIRD_PERSON.backM + THIRD_PERSON.adsBackM) / 2, 6);
+  });
+
   it('parede atrás: o braço encurta na hora e volta a esticar devagar', () => {
     // Parede de z = 31,5 a 32 m (1,5 m atrás do olho), do chão até 5 m.
     const v = scene((grid) => fillBox(grid, 0, 1, 63, 39, 10, 63, concrete));

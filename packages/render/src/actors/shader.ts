@@ -152,8 +152,9 @@ void main() {
   // Amostra antes de qualquer desvio (as derivadas do atlas precisam de fluxo uniforme).
   vec4 tex = bfSampleClamp(uModels, uModelsAtlas, uModelsAtlasSize, vUv, vLayer);
   if ((flags & BF_V_ALPHA) != 0 && tex.a < 0.5) discard;
-  // Cubinho: cor sólida da instância sobre branco (não amostra a camada).
-  vec3 albedo = (flags & BF_V_SOLID) != 0 ? vColor : tex.rgb;
+  // Cubinho: cor sólida da instância sobre branco (não amostra a camada). M12 (fase 1): a mão do viewmodel também é
+  // sólida, e o vermelho negativo da instância devolve a amostra da skin (a luva do time).
+  vec3 albedo = (flags & BF_V_SOLID) != 0 && vColor.r >= 0.0 ? vColor : tex.rgb;
   vec3 light = (flags & BF_V_EMISSIVE) != 0 ? vec3(1.0) : bfInstanceLight(normalize(vNormal), vLight.xyz);
   vec3 color = albedo * light;
   // Piscada branca do dano (arte-ux.md §2.5).

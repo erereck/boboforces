@@ -25,7 +25,7 @@ import { createFigureRig, type FigureLodStats } from './anim/index.ts';
 import { buildFigureCubeGeometry } from './figure-cube.ts';
 import { createFigureFrame } from './figure-frame.ts';
 import { createFigureInstances, FIGURE_INSTANCES_MAX } from './figure-instances.ts';
-import { INST, INSTANCE_FLOATS, NO_SLOT, writeInstanceDefaults } from './layout.ts';
+import { INST, INSTANCE_FLOATS, NO_SLOT, writeInstanceDefaults, writeRgb01 } from './layout.ts';
 import { linkFor } from './link.ts';
 import {
   m4Copy,
@@ -636,6 +636,10 @@ export function createActorPass(ctx: PassContext): ActorPass & ActorPassFigureSt
       const d = set.set.data;
       writeInstanceDefaults(d, 0);
       d[INST.layer] = vm.skin;
+      // M12 (fase 1): a luva sólida na cor do jogador, ou o vermelho negativo (a mão lê a skin).
+      const glove = vm.glove ?? -1;
+      if (glove >= 0) writeRgb01(d, INST.r, glove);
+      else d[INST.r] = -1;
       d[INST.sky] = vm.lightSky;
       d[INST.sun] = vm.lightSun;
       d[INST.emissive] = vm.lightEmissive;

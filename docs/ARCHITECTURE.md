@@ -5576,3 +5576,62 @@ As capturas da rodada 35, num Edge headless de verdade, acharam três defeitos v
   - a Fortaleza da Fazenda e a do Posto com o mesmo nome nos recentes; a sala online sem a Fortaleza;
   - a semente 5 da Lua, em que ninguém chega ao deque da antena em 90 s;
   - gerar os mips no carregamento (uns 34 KB da primeira partida), quando o teto apertar.
+
+## 23. M12: o refino
+
+Plano em `docs/PLANO_M12.md` (#85). As frentes rodam em paralelo, como no M11 (§22); a ordem dos commits é a
+de chegada.
+
+### 23.1 Fase 1: a câmera e a arma na mão (27/11/2026)
+
+- **Onde:** `game/src/scene/view-feel.ts` (puro, com `view-feel.test.ts`). Uma `ViewFeel` por vista (`ViewSlot.feel`,
+  no lugar do `shake` do M2). O `match.ts` só cola: `feelTickFrom` (o tick novo da entidade seguida), `feelFrameFor`
+  (o tiro novo pelo `shotAt`, o arremesso pelo pavio e o `feelFrame`), `dropMagazine` e `ejectCasing`. A vista que
+  não passa pelo `feelFrame` (Aquário, aliado, câmera de print) zera a `ViewFeel`, para nada acumulado chegar de uma
+  vez ao assumir um bot.
+- **FPS:** tudo é mola de solução exata (`springStep`), curva em função do tempo (`landCurve`, `easeOutBack`, o ruído
+  de hash `valueNoise`) ou `approachExp`; o teste roda a 30, 60 e 144 Hz.
+- **Degrau e escalada pelo estado** (vale igual na predição do online). O relógio dos ticks são os passos da sim deste
+  lado (`feelTicks`, a soma dos `lastTicks` do `driver.update`): no cliente online o `SimView.tick` só anda com o
+  snapshot, e o degrau virava um tranco duplo. No chão conta o salto ≥ 4 cm acima da rampa de 45°; no ar,
+  Δy − vy·dt > 0,15; mais de 0,6 m é teleporte. A câmera absorve o que o `alpha` mostrou e volta por mola crítica
+  (ω 60, teto ±0,3 m): o τ 0,06 do levantamento batia no teto na escada correndo (desvio por frame: 0,137 m sem
+  suavizar, 0,046 a 60 Hz e 0,019 a 144 Hz com a mola). Com 2 ticks num frame, o chão do tick do meio é deduzido pelo
+  Δy fora do balístico; o degrau para baixo não sobe a câmera para dentro do teto (`headroomAbove`).
+- **Pouso:** pela borda do `onGround`, desce `clamp((v−3)·0,015, 0, 0,12)` m e pende de 0,5° a 1,5° na curva
+  ωt·e^(1−ωt) (ω 20); a arma afunda até 4 cm.
+- **FOV:** +4° correndo (mantido no ar se a corrida continua) e +7° deslizando (entra em 0,15 s, sai em 0,25 s), via
+  `verticalFov(fovDeg + extra)`, no teto de 110°.
+- **Balanço:** a réplica do acumulador de passos do `scene/sound.ts` (1,7 e 2,3 m), com a fase visual puxada para a do
+  som; 2 e 3 cm na vertical, 1 cm de lado, zero no ADS, no ar e no deslize.
+- **Arma:** atraso no giro pela velocidade da mira (±2,5°, 1,5 cm, ω 14); inclinação de 3° (0,15 rad no deslize);
+  pose de corrida (pitch −0,25, roll 0,2, −4 cm). Coice por mola (k 300, amortecimento 22), com a força por categoria
+  em `VIEW_KICK` (pistola 1, SMG 0,5, fuzil 0,8, escopeta 2,2, sniper 3, foguete 2,5) e roll de ±1,5° alternado. ADS
+  em smoothstep, saindo em 0,7× o `adsInS` (o `slot.adsBlend` é o valor suavizado). Troca: 0,25 m e 15°, um quinto do
+  tempo embaixo e depois easeOutBack em 0,4 s (a compra na loja do BoboStrike não anima, `quietSwitch`). Recarga: 6 cm
+  e 20°, com o pente (cubinho do soquete `mag`) a 35%. Faca: estocada de 0,18 s e tranco de 30 ms no acerto. Granada:
+  fim do arremesso de 0,25 s.
+- **Tremor:** trauma² com ruído de hash (0,012 rad e 3 cm); "punch" de +2% por 80 ms na escopeta, sniper e foguete,
+  antes do teto de 110°; o solavanco do dano (0,0075 de trauma por ponto e 0,5° a 1° para longe do tiro, teto de 1°,
+  um empurrão a menos de 150 ms do anterior não entra; sem direção, a queda empurra para baixo e a zona e o sangrar só
+  dão trauma). "Reduzir efeitos" (o ajuste ou o `platform.features.reducedMotion`) zera tremor, balanço, FOV de
+  velocidade, pouso, solavanco e o clarão na arma, e deixa as molas e o coice da arma pela metade
+  (`REDUCED_SHAKE = 0`, AM1).
+- **Recuo e velocidade** interpolados entre ticks (a 144 Hz o coice não anda mais em degraus de 60 Hz); o olho segue
+  com `1 − exp(−18·dt)`.
+- **3ª pessoa:** o ombro desliza (τ 0,05); o braço vai de 2,6 a 1,6 m e o lado de 0,7 a 0,5 no ADS
+  (`placeShoulderCamera(…, ads)`); histerese de 0,9/1,2 m para entrar e sair da 1ª pessoa encostado na parede.
+- **Cápsulas:** `pushDebris` com tamanho e vida (contrato novo, `data[9]` e `data[10]`; 0 = o padrão de antes):
+  2,5 cm e 0,8 s, uma por tick por entidade (a escopeta emite um `shot` por chumbo). A local nasce por cima da arma só
+  com o viewmodel na tela; a dos bots, a até 12 m de uma câmera, do corpo; no 3–4P, uma a cada duas.
+- **Vibração:** pulso fraco por arma no próprio tiro (`rumble(…, low)`, que o dano e a morte sobrepõem) e pulso duplo
+  no abate (o 2º é cancelado na própria morte).
+- **Luvas:** a mão do viewmodel tem a flag `solid`; no fragment do programa 4, a cor sólida com vermelho negativo
+  devolve a amostra da skin (a luva do time); no FFA e no Royale, `ViewmodelDesc.glove` = a cor do P1–P4. Continuam 7
+  programas.
+- **Revisão (Opus):** 1 achado alto (o degrau no cliente online), 5 médios (8 cápsulas por tiro de escopeta, o
+  solavanco sem teto sob fogo contínuo, cápsula e estado do Aquário, o clarão com Reduzir efeitos) e 6 baixos,
+  corrigidos todos antes da junção.
+- **Contratos:** `ViewmodelDesc.glove?`, `pushDebris(…, size, life)`, `placeShoulderCamera(…, ads)` e os campos
+  `THIRD_PERSON.adsBackM/adsSideM/exitFirstArmM`, `viewmodelSocketOffset` em `@boboforces/render/data`, `rumble(…, low)`.
+  Nenhum golden mudou.

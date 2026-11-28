@@ -43,7 +43,8 @@ export const FX_STRIDE = 16;
  * - impactActor: 0–2 ponto, 3–5 direção do tiro, 6 osso atingido (`FigurePart`, 0..11), 7 cubinhos; `entity` = alvo
  * - impactProp: 0–2 ponto, 3–5 normal, 6 prop atingida (índice em `RenderMap.props` = ordem do `.bfmap`; o `game`
  *   resolve `StaticColliders.owner[ImpactEvent.prop]`), 7 cubinhos
- * - debris: 0–2 ponto, 3–5 velocidade (m/s), 6 cor 0xRRGGBB (exata em float32), 7 cubinhos, 8 espalhamento (m/s)
+ * - debris: 0–2 ponto, 3–5 velocidade (m/s), 6 cor 0xRRGGBB (exata em float32), 7 cubinhos, 8 espalhamento (m/s),
+ *   9 lado do cubinho (m; M12: 0 = 0,06) e 10 vida (s; M12: 0 = 2)
  * - death: 0–2 pés (m), 3 yaw, 4–6 direção do golpe, 7 força (m/s), 8 osso do golpe final, 9 camada da skin,
  *   10 escala, 11 `ACTOR_KIND`, 12 gabarito do boneco (`ActorBuffer.figure`; 255 = nenhum); `entity` = vítima
  * - explosion (M2): 0–2 centro (m), 3 raio (m)
@@ -208,6 +209,10 @@ export function pushPropImpact(
   return true;
 }
 
+/**
+ * Cubinhos de cor explícita. `size` (m) e `life` (s), M12 (fase 1): a cápsula dourada é menor e some antes; 0 = o
+ * cubinho de sempre (0,06 m, 2 s).
+ */
 export function pushDebris(
   q: FxQueue,
   x: number,
@@ -219,6 +224,8 @@ export function pushDebris(
   color: number,
   cubes: number,
   spread: number,
+  size = 0,
+  life = 0,
 ): boolean {
   const o = slot(q, FX_KIND.debris, 0);
   if (o < 0) return false;
@@ -227,6 +234,8 @@ export function pushDebris(
   q.data[o + 6] = color & 0xffffff;
   q.data[o + 7] = cubes;
   q.data[o + 8] = spread;
+  q.data[o + 9] = size;
+  q.data[o + 10] = life;
   return true;
 }
 

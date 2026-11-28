@@ -13,6 +13,9 @@ export const THIRD_PERSON = {
   backM: 2.6,
   sideM: 0.7,
   upM: 0.4,
+  /** M12 (fase 1): no ADS completo, o braço e o lado encurtam (a mira chega perto do ombro, sem estalo). */
+  adsBackM: 1.6,
+  adsSideM: 0.5,
   /** Folga da parede quando o braço encurta. */
   wallMarginM: 0.25,
   /** Braço mínimo (colado na cabeça). */
@@ -22,6 +25,8 @@ export const THIRD_PERSON = {
    * a vista desenha a 1ª pessoa até o braço voltar.
    */
   minVisibleArmM: 0.9,
+  /** M12 (fase 1): a 1ª pessoa forçada pela parede só volta à 3ª com o braço acima disto (histerese, sem piscar). */
+  exitFirstArmM: 1.2,
   /** O braço volta a esticar a esta velocidade (m/s); encolher é na hora (a câmera nunca atravessa a parede). */
   armGrowPerS: 6,
   /** Alcance do raio da mira. */
@@ -46,7 +51,8 @@ const hit = createRayHit();
 
 /**
  * Põe a câmera de ombro com o pivô no olho (ex, ey, ez), olhando para (yaw, pitch). `side`: +1 ombro direito, −1
- * esquerdo. `pose.arm` < 0 = primeira vez (sem suavizar). Escreve a posição e o braço novo em `pose`.
+ * esquerdo (M12: no meio da troca, o valor deslizando). `pose.arm` < 0 = primeira vez (sem suavizar). Escreve a posição
+ * e o braço novo em `pose`. `ads` (0..1, M12): quanto do ADS entrou (o braço vai de 2,6 a 1,6 m e o lado de 0,7 a 0,5).
  */
 export function placeShoulderCamera(
   view: SimView,
@@ -58,8 +64,11 @@ export function placeShoulderCamera(
   side: number,
   dt: number,
   pose: ShoulderPose,
+  ads = 0,
 ): void {
   const T = THIRD_PERSON;
+  const backM = T.backM + (T.adsBackM - T.backM) * ads;
+  const sideM = T.sideM + (T.adsSideM - T.sideM) * ads;
   const cp = Math.cos(pitch);
   const fx = -Math.sin(yaw) * cp;
   const fy = Math.sin(pitch);
@@ -67,9 +76,9 @@ export function placeShoulderCamera(
   // Direita no plano do chão (yaw 0 olha para −Z: a direita é +X).
   const rx = Math.cos(yaw);
   const rz = -Math.sin(yaw);
-  let dx = rx * side * T.sideM - fx * T.backM;
-  let dy = T.upM - fy * T.backM;
-  let dz = rz * side * T.sideM - fz * T.backM;
+  let dx = rx * side * sideM - fx * backM;
+  let dy = T.upM - fy * backM;
+  let dz = rz * side * sideM - fz * backM;
   const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
   dx /= len;
   dy /= len;

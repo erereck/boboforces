@@ -12,7 +12,7 @@ export * from './viewport.ts';
 // M1 (integração): peças da render-atores sem three que o `game` usa no loading e por frame: o cache de skins do
 // boneco do FutBobo (#56: 2 camadas por skin e o pintor do format, injetado pelo `game`).
 export * from './actors/skin-cache.ts';
-export { viewmodelAimOffset, VIEWMODEL_POSE } from './actors/viewmodel.ts';
+export { viewmodelAimOffset, viewmodelSocketOffset, VIEWMODEL_POSE } from './actors/viewmodel.ts';
 // #56 (porte do boneco): o programa 4 e a cena da sonda T4. A casca do Switch compila os shaders REAIS num contexto
 // WebGL2 puro, desenha a cena e confere os pixels pelo gêmeo do vertex shader (sem three: o fecho continua limpo).
 export { INSTANCED_FRAGMENT, INSTANCED_UNIFORM_NAMES, INSTANCED_VERTEX } from './actors/shader.ts';

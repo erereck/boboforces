@@ -167,7 +167,8 @@ describe('modelo .bfmodel', () => {
       expect(arm.uvs[i * 2]! * 64).toBeCloseTo((corner % 64) + 0.5, 4);
       expect(arm.uvs[i * 2 + 1]! * 64).toBeCloseTo(Math.floor(corner / 64) + 0.5, 4);
       expect(arm.verts[i * VERT_COMPONENTS]).toBe(LAYER_FROM_INSTANCE);
-      expect(arm.verts[i * VERT_COMPONENTS + 1]).toBe(0);
+      // M12 (fase 1): a mão é sólida (a luva do P1–P4 no FFA; com o vermelho negativo, a amostra da skin).
+      expect(arm.verts[i * VERT_COMPONENTS + 1]).toBe(Math.floor(i / 24) === 2 ? VERTEX_FLAG.solid : 0);
     }
     // O braço desce do ombro até 11,6 px (a ponta da mão), com o soquete a 10,9 px.
     let minY = Infinity;

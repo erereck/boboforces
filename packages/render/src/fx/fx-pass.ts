@@ -625,6 +625,9 @@ export function createFxPass(ctx: PassContext): FxPass {
     const n = Math.min(MAX_CUBES_PER_EVENT, Math.max(0, Math.round(d[o + 7]!)));
     const spread = Math.max(0, d[o + 8]!);
     const rgb = Math.round(d[o + 6]!) & 0xffffff;
+    // M12 (fase 1): o lado e a vida do pedido (a cápsula dourada); 0 = o cubinho de sempre.
+    const size = d[o + 9]! > 0 ? d[o + 9]! : 0.06;
+    const life = d[o + 10]! > 0 ? d[o + 10]! : 2;
     sample(frame.world?.lightGrid ?? null, d[o]!, d[o + 1]!, d[o + 2]!);
     for (let k = 0; k < n; k++) {
       cube(
@@ -635,8 +638,8 @@ export function createFxPass(ctx: PassContext): FxPass {
         d[o + 4]! + rng.range(-spread, spread),
         d[o + 5]! + rng.range(-spread, spread),
         jitterColor(rgb, 0.05, rng.next()),
-        0.06,
-        2,
+        size,
+        life,
       );
     }
   }

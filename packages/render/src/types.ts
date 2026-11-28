@@ -294,6 +294,11 @@ export interface ViewmodelDesc {
   lightEmissive: number;
   /** Escala da arma na tela: 1 em tela cheia; menor no 3–4P (no máximo 25% da vista). */
   scale: number;
+  /**
+   * M12 (fase 1): a luva (a mão do viewmodel) numa cor sólida 0xRRGGBB, a do jogador P1–P4 no FFA e no Royale; -1 (ou
+   * ausente) = a amostra da skin, como antes.
+   */
+  glove?: number;
 }
 
 /**
@@ -341,6 +346,7 @@ export function createViewmodelDesc(): ViewmodelDesc {
     lightSun: 1,
     lightEmissive: 0,
     scale: 1,
+    glove: -1,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   presetLevel,
   ENGINE_MAX_BOTS,
   FACE_EXPRESSION,
+  FIGURE_BONE,
   FIGURE_BOT_ROTATION,
   FIGURE_GRIP,
   FIGURE_PITCH_SAMPLES,
@@ -97,10 +98,22 @@ import {
   pushTrail,
   resetFxQueue,
   type ViewDesc,
+  type ViewmodelDesc,
   VIEWMODEL_POSE,
   viewmodelAimOffset,
+  viewmodelSocketOffset,
 } from '@boboforces/render/data';
-import { clamp, createLogger, HALF_PI, lerp, lerpAngle, pitchToI16, wrapAngle, yawToU16 } from '@boboforces/shared';
+import {
+  clamp,
+  createLogger,
+  DEG_TO_RAD,
+  HALF_PI,
+  lerp,
+  lerpAngle,
+  pitchToI16,
+  wrapAngle,
+  yawToU16,
+} from '@boboforces/shared';
 import {
   BOX,
   BOX_PHASE,
@@ -258,7 +271,7 @@ import {
 import { formatBenchReport, heapWindow, type BenchReport } from '../bench/report.ts';
 import { formatT0Line } from '../bench/t0.ts';
 import type { BenchConfig, FigureClipFrame, GameDebugApi, MannequinOverride } from '../bench/types.ts';
-import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, verticalFov } from '../camera.ts';
+import { ADS_BLEND_S, ADS_FOV_SCALE, defaultFovFor, HOR_FOV_LIMITS_DEG, verticalFov } from '../camera.ts';
 import { createTouchOverlay } from '../hud.ts';
 import { createSceneDriver, type SceneDriver } from './scene-driver.ts';
 import { createMenuController, followTab, type UiFrame } from '../menu.ts';
@@ -366,6 +379,28 @@ import {
   THIRD_PERSON,
   type ShoulderPose,
 } from './third-person.ts';
+import {
+  createFeelFrameSample,
+  createFeelOutput,
+  createFeelTickSample,
+  createViewFeel,
+  feelFrame,
+  feelHurt,
+  feelShot,
+  feelStab,
+  feelStabHit,
+  feelThrow,
+  feelTick,
+  feelTrauma,
+  HURT_PUSH,
+  resetViewFeel,
+  shoulderSideStep,
+  VIEW_FEEL,
+  VIEW_KICK,
+  wallForcesFirst,
+  type FeelOutput,
+  type ViewFeel,
+} from './view-feel.ts';
 import { createSamples } from './stats.ts';
 import { cleanTypedName } from '../names.ts';
 import { teamColorTable } from '../team-colors.ts';
@@ -395,9 +430,11 @@ const SPAWN_S = 0.4;
 const EYE_FOLLOW = 18;
 /** Pitch máximo da câmera: um fio abaixo de 90° (no polo exato o yaw some na ordem de Euler YXZ). */
 const CAMERA_MAX_PITCH = HALF_PI - 1e-3;
-/** Passada (m por ciclo do balanço do viewmodel) e velocidade de corrida (balanço cheio). */
+/**
+ * Passada (m por ciclo) do `walkPhase`. M12 (fase 1): o balanço do viewmodel passou para a passada do som
+ * (`view-feel.ts`); o `walkPhase` ficou sem leitor.
+ */
 const STRIDE_M = 1.2;
-const RUN_SPEED = 6.8;
 /** Bots do JOGAR (TDM 6 × 6 com o jogador), limitados pelo perfil. */
 const PLAY_BOTS = 11;
 /** M2 (fase 2d): regras do Bobo Warfare TDM no JOGAR (gameplay.md §7.4): 75 abates ou 10 min. */
@@ -406,8 +443,8 @@ const PLAY_TIME_LIMIT_S = 600;
 /** M2 (fase 2d): marcadores de aliado até esta distância (m), com a ponta este tanto acima dos pés (m). */
 const ALLY_MARKER_MAX_M = 80;
 const ALLY_MARKER_HEIGHT_M = 2.05;
-/** M2 (fase 4f): com "Reduzir tremor", o tremor das explosões fica nesta fração. */
-const REDUCED_SHAKE = 0.25;
+/** M2 (fase 4f): com "Reduzir tremor", o tremor das explosões fica nesta fração. M12 (fase 1, AM1): zero. */
+const REDUCED_SHAKE = 0;
 /** M4 (fase 4a): os botões de face na ordem do glifo da dica (baixo, direita, esquerda, cima). */
 const FACE_GLYPHS: readonly number[] = [
   PAD_BUTTON.faceDown,
@@ -444,10 +481,8 @@ const CUBES_ACTOR = 5;
 const F2_WINDOW = 480;
 /** Clarão de tiro na luz ambiente (arte-ux.md §1.8): alcance, ganho por tiro e queda (s). */
 const FLASH_RANGE_M = 30;
-/** M2: tremor da câmera nas explosões (até onde chega, quanto some por segundo e a amplitude em rad). */
+/** M2: até onde as explosões tremem a câmera (M12, fase 1: o trauma, a queda e a amplitude, no `view-feel.ts`). */
 const SHAKE_RANGE_M = 14;
-const SHAKE_DECAY_PER_S = 2.5;
-const SHAKE_AMPLITUDE = 0.02;
 /** M2: projétil a menos disto (m) do olho de quem lançou não é desenhado (o foguete sai do olho). */
 const PROJECTILE_HIDE_NEAR_EYE_M = 1.5;
 /** M2 (fase 2b): o Destravar vira aviso (anel de recentes do relatório do F2), com o ponto para corrigir o mapa. */
@@ -884,8 +919,11 @@ interface ViewSlot {
   damageT: number;
   /** Clarão de tiro na luz ambiente desta vista, 0..1 (arte-ux.md §1.8; vai para `ViewDesc.flash`). */
   flash: number;
-  /** M2: tremor de explosão, 0..1 (some em `SHAKE_DECAY_PER_S`). */
-  shake: number;
+  /**
+   * M12 (fase 1): a câmera e a arma na mão (`view-feel.ts`): o degrau, o pouso, o balanço, as molas da arma, o ADS
+   * com curva, o tremor por trauma (era o `shake` do M2), o ombro da 3ª pessoa.
+   */
+  readonly feel: ViewFeel;
   /** M2 (fase 2c): a tela de morte desta vista (câmera, faixa, radial). */
   readonly death: DeathState;
   /** M7 (fase 8): o Royale: a colocação e o texto de quem saiu, a arma da troca e o aviso dela (feitos ao mudar). */
@@ -1422,7 +1460,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       adsBlend: 0,
       damageT: 0,
       flash: 0,
-      shake: 0,
+      feel: createViewFeel(),
       death: createDeathState(),
       royalePlace: -1,
       royaleOut: '',
@@ -1663,8 +1701,13 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
   // M2 (fase 4f): o campo de visão dos Ajustes (0 = o padrão da plataforma) e o tremor reduzido.
   const fovFromSettings = (): number => host.settings.current.video.fovDeg || defaultFovFor(platform.features);
   let fovDeg = fovFromSettings();
-  const shakeFromSettings = (): number => (host.settings.current.accessibility.reduceShake ? REDUCED_SHAKE : 1);
+  // M12 (fase 1): "Reduzir efeitos" é o ajuste ou o `reducedMotion` da plataforma: sem tremor, balanço, FOV de
+  // velocidade nem mergulho de pouso, e as molas da arma pela metade.
+  const reducedFromSettings = (): boolean =>
+    host.settings.current.accessibility.reduceShake || platform.features.reducedMotion;
+  const shakeFromSettings = (): number => (reducedFromSettings() ? REDUCED_SHAKE : 1);
   let shakeMul = shakeFromSettings();
+  let reducedFx = reducedFromSettings();
   // M2 (fase 6b): 1ª ou 3ª pessoa e o ombro, dos Ajustes; a regra "Câmera permitida" da partida pode forçar a 1ª.
   const thirdAllowed = (recipe.players?.camera ?? 'any') === 'any';
   const thirdFromSettings = (): boolean => thirdAllowed && host.settings.current.video.view === 'third';
@@ -2127,6 +2170,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             pushTracer(fx, mx, my, mz, ev.originX + ev.dirX * d, ev.originY + ev.dirY * d, ev.originZ + ev.dirZ * d);
           }
           flashViews(mx, my, mz, owner);
+          ejectCasing(v, i, ev.tick, ev.weapon, ev.originX, ev.originY, ev.originZ, ev.dirX, ev.dirZ, owner);
           break;
         }
         case 'ricochet': {
@@ -2174,6 +2218,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
               slot.model.damageAngle = wrapAngle(from - slot.desc.camera.yaw);
               slot.model.damageAmount = 1;
               slot.damageT = DAMAGE_S;
+              // M12 (fase 1): o solavanco de quem levou (trauma pequeno e o empurrão para longe do tiro). Sem direção:
+              // a queda (no pé, sem atirador) empurra para baixo; a zona e o sangrar, só o trauma.
+              const aimed = ev.dirX * ev.dirX + ev.dirZ * ev.dirZ > 1e-6;
+              const fall = !aimed && ev.shooter === NULL_ENTITY && ev.bodyPart === FIGURE_BONE.footR;
+              const push = aimed ? HURT_PUSH.away : fall ? HURT_PUSH.down : HURT_PUSH.none;
+              feelHurt(slot.feel, ev.damage, slot.model.damageAngle, push, reducedFx);
             }
           }
           break;
@@ -2183,7 +2233,16 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
           if (i >= v.count) break;
           for (let sIdx = 0; sIdx < slots.length; sIdx++) {
             const c = slots[sIdx]!.controller;
-            if (c >= 0 && s.controllerEntity(c) === ev.victim) rumble(sIdx, 0.9, 0.6, 320, true);
+            if (c >= 0 && s.controllerEntity(c) === ev.victim) {
+              rumble(sIdx, 0.9, 0.6, 320, true);
+              // M12 (fase 1): o 2º pulso de um abate pendente não corta a vibração da própria morte.
+              if (sIdx < rumbleAgain.length) rumbleAgain[sIdx] = 0;
+            }
+            // M12 (fase 1): quem abateu sente um pulso duplo (o 2º sai no `updateView`).
+            else if (c >= 0 && ev.killer !== ev.victim && s.controllerEntity(c) === ev.killer) {
+              rumble(sIdx, 0.5, 0.3, 60, true);
+              if (sIdx < rumbleAgain.length) rumbleAgain[sIdx] = timeS + 0.12;
+            }
           }
           const o = i * 3;
           const zombie = v.kind[i] === ENTITY_KIND.zombie;
@@ -2269,6 +2328,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             firing[i] = FIRING_S * 3;
             shotAt[i] = timeS;
           }
+          // M12 (fase 1): o tranco da faca que acertou, na 1ª pessoa de quem golpeou.
+          const sv = ev.target !== NULL_ENTITY ? viewOfEntity(ev.attacker) : -1;
+          if (sv >= 0) feelStabHit(slots[sv]!.feel);
           break;
         }
         case 'explosion': {
@@ -2302,7 +2364,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
             const c = slot.desc.camera;
             const d = Math.hypot(c.x - ev.x, c.y - ev.y, c.z - ev.z);
             if (d < SHAKE_RANGE_M) {
-              slot.shake = Math.min(1, slot.shake + (1 - d / SHAKE_RANGE_M) * shakeMul);
+              feelTrauma(slot.feel, (1 - d / SHAKE_RANGE_M) * shakeMul);
               rumble(sIdx, (1 - d / SHAKE_RANGE_M) * 0.8, 0.5, 220);
             }
           }
@@ -3264,11 +3326,15 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
 
   /** M3 (fase 1e): até quando (s da partida) cada vista não vibra de novo: o dano em rajada não vira zumbido. */
   const rumbleUntil = new Float64Array(4);
+  /** M12 (fase 1): o pulso que está tocando é o fraco do tiro (1; o dano passa por cima) e o 2º pulso do abate (s). */
+  const rumbleLow = new Uint8Array(4);
+  const rumbleAgain = new Float64Array(4);
   /**
    * M3 (fase 1e): vibra o controle do jogador da vista `s` (se for controle e a Vibração estiver ligada). `force` passa
-   * por cima da espera (a morte).
+   * por cima da espera (a morte). M12 (fase 1): `low` é o pulso do próprio tiro: não passa por cima de nada e qualquer
+   * outro passa por cima dele (o dano tem prioridade).
    */
-  function rumble(s: number, strong: number, weak: number, ms: number, force = false): void {
+  function rumble(s: number, strong: number, weak: number, ms: number, force = false, low = false): void {
     if (humans === 0 || !host.settings.current.accessibility.vibration || s >= rumbleUntil.length) return;
     const slot = slots[s];
     if (!slot || slot.controller < 0) return;
@@ -3276,8 +3342,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     if (k < 0) return;
     const d = k === 0 ? (device === 'gamepad' ? pads[padIndex]! : null) : (extraDevices[k - 1] ?? null);
     if (d === null || d.kind !== 'gamepad') return;
-    if (!force && timeS < rumbleUntil[s]!) return;
+    if (!force && timeS < rumbleUntil[s]! && (low || rumbleLow[s] === 0)) return;
     rumbleUntil[s] = timeS + ms / 1000;
+    rumbleLow[s] = low ? 1 : 0;
     platform.input.vibrate(d.index, strong, weak, ms);
   }
 
@@ -3779,6 +3846,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     for (let k = 0; k < extras.length; k++) extras[k]!.setProfile(seatProfile(seatNum[k + 1]!, extraDevices[k]!.kind));
     fovDeg = fovFromSettings();
     shakeMul = shakeFromSettings();
+    reducedFx = reducedFromSettings();
     thirdPerson = thirdFromSettings();
     shoulderSide = sideFromSettings();
   }
@@ -5662,8 +5730,263 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     }
   }
 
+  // --- M12 (fase 1): a cola da câmera e da arma na mão (a lógica mora em `view-feel.ts`) ---
+  const feelTickSample = createFeelTickSample();
+  /**
+   * Os passos da sim deste lado (os `lastTicks` do `driver.update` somados): o relógio dos ticks da câmera. No local é
+   * o `SimView.tick`; no cliente online o `tick` só anda com o snapshot (20–30 Hz) enquanto a predição move o próprio
+   * boneco a cada passo, e o degrau saía em tranco duplo.
+   */
+  let feelTicks = 0;
+  const feelSample = createFeelFrameSample();
+  const feelOut = createFeelOutput();
+  /** O soquete `mag` de cada modelo em relação ao `hand_r` (m), para o pente que cai na recarga. */
+  const magOffsets = loaded.modelDocs.map((m) => viewmodelSocketOffset(m, 'mag'));
+  let casingTurn = 0;
+  /** O tick da última cápsula de cada entidade (a escopeta emite um `shot` por chumbo: uma cápsula por tiro). */
+  let casingTick = new Int32Array(0);
+
+  /** O tick novo da entidade seguida para o `feelTick` (sem alocar). */
+  function feelTickFrom(feel: ViewFeel, v: SimView, e: number, entity: number): void {
+    const t = feelTickSample;
+    const o = e * 3;
+    t.tick = feelTicks;
+    t.entity = entity;
+    t.prevX = v.prevPosition[o]!;
+    t.prevY = v.prevPosition[o + 1]!;
+    t.prevZ = v.prevPosition[o + 2]!;
+    t.x = v.position[o]!;
+    t.y = v.position[o + 1]!;
+    t.z = v.position[o + 2]!;
+    t.vx = v.velocity[o]!;
+    t.vy = v.velocity[o + 1]!;
+    t.vz = v.velocity[o + 2]!;
+    t.grounded = (v.flags[e]! & ENTITY_FLAG.onGround) !== 0;
+    t.recoilPitch = v.recoilPitch[e]!;
+    t.recoilYaw = v.recoilYaw[e]!;
+    t.tickDt = 1 / sim.hz;
+    const fresh = feel.entity !== entity;
+    feelTick(feel, t);
+    // Entidade nova (renasceu, a vista passou para outro bobo): o último tiro e a granada dela não são novidade.
+    if (fresh) {
+      feel.shotAt = e < shotAt.length ? shotAt[e]! : -1e9;
+      feel.cooking = 0;
+    }
+  }
+
+  /**
+   * O frame da câmera e da arma da vista `s`: o tiro novo da entidade (pelo `shotAt`: o coice na força da arma, a
+   * estocada da faca e o pulso da vibração, fraco e sem passar por cima do dano), o fim do arremesso (o pavio que
+   * acabou com a granada na mão) e as molas e as curvas do `feelFrame`.
+   */
+  function feelFrameFor(
+    s: number,
+    feel: ViewFeel,
+    v: SimView,
+    e: number,
+    dt: number,
+    alpha: number,
+    yaw: number,
+    pitch: number,
+    ads: boolean,
+    held: WeaponDef | null,
+  ): FeelOutput {
+    const flags = v.flags[e]!;
+    const cook = v.cookTicks[e]! >= 0 ? (v.quickNade[e] === 1 ? 2 : 1) : 0;
+    if (cook === 2) feel.nadeCode = v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!;
+    const threw = feel.cooking !== 0 && cook === 0;
+    if (threw) feelThrow(feel, feel.cooking === 2);
+    feel.cooking = cook;
+    const at = e < shotAt.length ? shotAt[e]! : -1e9;
+    if (at !== feel.shotAt) {
+      feel.shotAt = at;
+      if (!threw && held !== null) {
+        const kick = VIEW_KICK[held.category];
+        if (held.category === 'melee') feelStab(feel);
+        else if (held.fire !== WEAPON_FIRE.thrown) feelShot(feel, kick.force, kick.punch);
+        rumble(s, kick.rumble, kick.rumble * 0.6, kick.ms, false, true);
+      }
+    }
+    const fs = feelSample;
+    const o = e * 3;
+    fs.dt = dt;
+    fs.alpha = alpha;
+    fs.grounded = (flags & ENTITY_FLAG.onGround) !== 0;
+    fs.sliding = (flags & ENTITY_FLAG.sliding) !== 0;
+    fs.sprinting = (flags & ENTITY_FLAG.sprinting) !== 0;
+    fs.speed = Math.hypot(v.velocity[o]!, v.velocity[o + 2]!);
+    fs.yaw = yaw;
+    fs.pitch = pitch;
+    fs.adsTarget = ads ? 1 : 0;
+    fs.adsInS = held !== null && held.adsInS > 0 ? held.adsInS : ADS_BLEND_S;
+    fs.weapon = v.weapon[e]!;
+    const r0 = e < reloadStart.length ? reloadStart[e]! : -1;
+    fs.reload = r0 >= 0 ? clamp((timeS - r0) / Math.max(0.1, reloadDur[e]!), 0, 1) : -1;
+    fs.quietSwitch = slots[s]!.buyOpen;
+    fs.reduced = reducedFx;
+    feelFrame(feel, fs, yaw, feelOut);
+    return feelOut;
+  }
+
+  /**
+   * Quanto a câmera pode subir acima do olho (até `max`) sem entrar no teto: o degrau para baixo agachado num túnel
+   * baixo segurava a câmera acima do teto por uns frames. Anda pelas células da grade acima do olho (só com o degrau
+   * para baixo, poucas células).
+   */
+  function headroomAbove(v: SimView, x: number, y: number, z: number, max: number): number {
+    const margin = 0.08;
+    const cx = Math.floor(x * CELLS_PER_METER);
+    const cz = Math.floor(z * CELLS_PER_METER);
+    if (cx < 0 || cz < 0 || cx >= v.world.sizeX || cz >= v.world.sizeZ) return max;
+    const top = Math.floor((y + max + margin) * CELLS_PER_METER);
+    for (let cy = Math.max(0, Math.floor(y * CELLS_PER_METER)); cy <= top; cy++) {
+      if (isCellSolid(v.world, v.blocks, cx, cy, cz)) return Math.max(0, cy / CELLS_PER_METER - margin - y);
+    }
+    return max;
+  }
+
+  /** A base da câmera (frente, direita, cima) em `camBasis` (yaw 0 olha para −Z). */
+  const camBasis = new Float64Array(9);
+  function basisOf(yaw: number, pitch: number): void {
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+    camBasis[0] = -sy * cp;
+    camBasis[1] = sp;
+    camBasis[2] = -cy * cp;
+    camBasis[3] = cy;
+    camBasis[4] = 0;
+    camBasis[5] = -sy;
+    camBasis[6] = sy * sp;
+    camBasis[7] = cp;
+    camBasis[8] = cy * sp;
+  }
+
+  /** O pente que cai na recarga: um cubinho escuro no soquete `mag` da arma na mão (a pose sem os giros). */
+  function dropMagazine(
+    c: ViewDesc['camera'],
+    vm: ViewmodelDesc,
+    mag: { readonly x: number; readonly y: number; readonly z: number } | null,
+    v: SimView,
+    o: number,
+  ): void {
+    if (mag === null) return;
+    const hand = VIEWMODEL_POSE.hand;
+    const k = vm.scale > 0 ? vm.scale : 1;
+    // No espaço da câmera (X direita, Y cima, −Z frente), como a render-atores monta o viewmodel.
+    const px = hand[0] + vm.offsetX + mag.x * k;
+    const py = hand[1] + vm.offsetY + mag.y * k;
+    const pz = hand[2] + vm.offsetZ + mag.z * k;
+    basisOf(c.yaw, c.pitch);
+    const b = camBasis;
+    const F = VIEW_FEEL;
+    pushDebris(
+      fx,
+      c.x + b[3]! * px + b[6]! * py - b[0]! * pz,
+      c.y + b[7]! * py - b[1]! * pz,
+      c.z + b[5]! * px + b[8]! * py - b[2]! * pz,
+      // Cai e escorrega um pouco para o meio da tela (o viewmodel, desenhado por cima, tampa o soquete).
+      v.velocity[o]! - b[3]! * 0.5,
+      v.velocity[o + 1]! - 0.5,
+      v.velocity[o + 2]! - b[5]! * 0.5,
+      F.magColor,
+      1,
+      0.2,
+      F.magSizeM,
+      F.magLifeS,
+    );
+  }
+
+  /**
+   * A cápsula dourada de cada tiro (GDD §5.5): do lado direito da arma, para a direita e para cima, por ~0,8 s. A do
+   * tiro em 1ª pessoa (a vista com o viewmodel na tela) sai da câmera; a dos outros (e a do bot seguido no Aquário), do
+   * corpo, só a até 12 m de alguma câmera; no 3–4P, uma a cada duas; uma por tick por entidade.
+   */
+  function ejectCasing(
+    v: SimView,
+    i: number,
+    tick: number,
+    weapon: number,
+    ox: number,
+    oy: number,
+    oz: number,
+    dirX: number,
+    dirZ: number,
+    owner: number,
+  ): void {
+    const def = weaponDef(weapon);
+    if (def === null || !VIEW_KICK[def.category].casing || i >= v.count) return;
+    if (casingTick.length < v.capacity) casingTick = new Int32Array(v.capacity).fill(-1);
+    if (casingTick[i] === tick) return;
+    casingTick[i] = tick;
+    const F = VIEW_FEEL;
+    let x: number;
+    let y: number;
+    let z: number;
+    let rx: number;
+    let rz: number;
+    let ux = 0;
+    let uy = 1;
+    let uz = 0;
+    if (owner >= 0 && slots[owner]!.desc.viewmodel.visible) {
+      const c = slots[owner]!.desc.camera;
+      basisOf(c.yaw, c.pitch);
+      const b = camBasis;
+      rx = b[3]!;
+      rz = b[5]!;
+      ux = b[6]!;
+      uy = b[7]!;
+      uz = b[8]!;
+      // Por cima da arma (o viewmodel é desenhado por cima do mundo: mais baixo, a cápsula sumia atrás dele).
+      x = c.x + rx * 0.1 - ux * 0.03 + b[0]! * 0.35;
+      y = c.y - uy * 0.03 + b[1]! * 0.35;
+      z = c.z + rz * 0.1 - uz * 0.03 + b[2]! * 0.35;
+    } else {
+      let near = false;
+      const r2 = F.casingRangeM * F.casingRangeM;
+      for (let k = 0; k < slots.length && !near; k++) {
+        const c = slots[k]!.desc.camera;
+        const dx = c.x - ox;
+        const dy = c.y - oy;
+        const dz = c.z - oz;
+        near = dx * dx + dy * dy + dz * dz < r2;
+      }
+      if (!near) return;
+      const size = drawnScale(v, i);
+      const yaw = Math.atan2(-dirX, -dirZ);
+      rx = Math.cos(yaw);
+      rz = -Math.sin(yaw);
+      x = ox + (dirX * 0.3 + rx * 0.16) * size;
+      y = oy - 0.2 * size;
+      z = oz + (dirZ * 0.3 + rz * 0.16) * size;
+    }
+    // No 3–4P, uma a cada duas (o teto de cubinhos do Switch é de 120 a 200).
+    if (viewCount >= 3 && (casingTurn++ & 1) === 1) return;
+    const o = i * 3;
+    pushDebris(
+      fx,
+      x,
+      y,
+      z,
+      v.velocity[o]! + rx * F.casingRightMs + ux * F.casingUpMs,
+      v.velocity[o + 1]! + uy * F.casingUpMs,
+      v.velocity[o + 2]! + rz * F.casingRightMs + uz * F.casingUpMs,
+      F.casingColor,
+      1,
+      F.casingSpreadMs,
+      F.casingSizeM,
+      F.casingLifeS,
+    );
+  }
+
   function updateView(s: number, dt: number, alpha: number, lay: HudScreenLayout): void {
     const slot = slots[s]!;
+    // M12 (fase 1): o 2º pulso do abate.
+    if (s < rumbleAgain.length && rumbleAgain[s]! > 0 && timeS >= rumbleAgain[s]!) {
+      rumbleAgain[s] = 0;
+      rumble(s, 0.7, 0.45, 80, true);
+    }
     const desc = slot.desc;
     const c = desc.camera;
     const rect = lay.rects[s]!;
@@ -5678,6 +6001,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const vm = desc.viewmodel;
     const override = s === 0 && (overrideCamera !== null || overrideRoute !== null);
     if (override) {
+      resetViewFeel(slot.feel);
       if (overrideCamera) poseFromCamera(overrideCamera, pose);
       else sampleRoute(overrideRoute!, routeTime, pose);
       c.x = pose.x;
@@ -5694,6 +6018,9 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M7 (fase 9): o Aquário assistindo: a câmera livre voa com o mapeador do P1 (sem bobo nenhum).
     const watching = s === 0 && aquarium && pilot < 0;
     if (watching && aqCam === AQUARIUM_CAMERA.free) {
+      // M12 (fase 1): sem o `feelFrame` aqui; ao voltar (assumir o bot, renascer) a câmera começa do zero, sem o
+      // trauma, o solavanco e o tiro guardados enquanto assistia.
+      resetViewFeel(slot.feel);
       c.x = fly.x;
       c.y = fly.y;
       c.z = fly.z;
@@ -5719,8 +6046,14 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const o = e * 3;
     const flags = v.flags[e]!;
     const dead = (flags & ENTITY_FLAG.dead) !== 0;
+    // M12 (fase 1): a câmera e a arma na mão (`view-feel.ts`); o tick novo anda o degrau, o pouso, o recuo e a
+    // velocidade da entidade seguida.
+    const feel = slot.feel;
+    if (dead) resetViewFeel(feel);
+    else if (feelTicks !== feel.tick || entity !== feel.entity) feelTickFrom(feel, v, e, entity);
     const targetEye = viewEyeHeight(v, e, dead ? 0 : flags);
-    slot.eye = slot.eye < 0 ? targetEye : slot.eye + (targetEye - slot.eye) * Math.min(1, dt * EYE_FOLLOW);
+    // M12 (fase 1): a altura do olho segue o agachar igual em qualquer FPS.
+    slot.eye = slot.eye < 0 ? targetEye : slot.eye + (targetEye - slot.eye) * (1 - Math.exp(-dt * EYE_FOLLOW));
     c.x = lerp(v.prevPosition[o]!, v.position[o]!, alpha);
     c.y = lerp(v.prevPosition[o + 1]!, v.position[o + 1]!, alpha) + slot.eye;
     c.z = lerp(v.prevPosition[o + 2]!, v.position[o + 2]!, alpha);
@@ -5728,6 +6061,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // M7 (fase 9): o Aquário de cima (sobre o bobo seguido, um pouco para trás, girando com a mira) e seguindo (a câmera
     // de ombro atrás dele, no rumo dele).
     if (watching && aqCam === AQUARIUM_CAMERA.top) {
+      resetViewFeel(feel);
       const back = AQUARIUM.topHeightM / Math.tan(-AQUARIUM.topPitch);
       c.x += Math.sin(player.yaw) * back;
       c.y += AQUARIUM.topHeightM - slot.eye;
@@ -5744,6 +6078,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
       return;
     }
     if (watching && aqCam === AQUARIUM_CAMERA.follow && !dead) {
+      resetViewFeel(feel);
       const fyaw = lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
       const fpitch = lerp(v.prevPitch[e]!, v.pitch[e]!, alpha) * 0.5;
       placeShoulderCamera(v, c.x, c.y, c.z, fyaw, fpitch, 0, dt, slot.shoulder);
@@ -5768,6 +6103,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         ? livingMate(v, e)
         : -1;
     if (mate >= 0) {
+      resetViewFeel(feel);
       const q = mate * 3;
       const mx = lerp(v.prevPosition[q]!, v.position[q]!, alpha);
       const my = lerp(v.prevPosition[q + 1]!, v.position[q + 1]!, alpha) + viewEyeHeight(v, mate, v.flags[mate]!);
@@ -5818,50 +6154,68 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     const local = mapperOf(slot.controller);
     const yaw = local !== null ? local.yaw : lerpAngle(v.prevYaw[e]!, v.yaw[e]!, alpha);
     const pitch = local !== null ? local.pitch : lerp(v.prevPitch[e]!, v.pitch[e]!, alpha);
-    slot.shake = Math.max(0, slot.shake - dt * SHAKE_DECAY_PER_S);
-    const shakeYaw = Math.sin(timeS * 47) * SHAKE_AMPLITUDE * slot.shake;
-    const shakePitch = Math.sin(timeS * 53 + 1) * SHAKE_AMPLITUDE * slot.shake;
-    c.yaw = yaw + v.recoilYaw[e]! + shakeYaw;
-    c.pitch = clamp(pitch + v.recoilPitch[e]! + shakePitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
     // M9 (fase 5, revisão): com a ferramenta do dono (ou a trava do cancelar), o P1 não mira (nem o zoom).
     const adsWanted =
       local !== null
         ? !dead && !paused && local.isDown('ads') && !(local === player && ownerHolds())
         : (flags & ENTITY_FLAG.ads) !== 0;
-    const adsTarget = adsWanted && !dead ? 1 : 0;
-    // M2: o ADS entra no tempo da arma na mão (`adsInS`) e o zoom é o dela (`adsZoom`; a sniper tem 4x).
+    // M2: o ADS entra no tempo da arma na mão (`adsInS`) e o zoom é o dela (`adsZoom`; a sniper tem 4x). M12 (fase 1):
+    // com curva (smoothstep), saindo em 0,7× o tempo; o tremor por trauma, o recuo interpolado entre ticks, o degrau, o
+    // pouso, o balanço e o FOV de velocidade vêm do `feelFrame`.
     const held = weaponDef(v.weapon[e]!);
-    const blend = dt / (held !== null && held.adsInS > 0 ? held.adsInS : ADS_BLEND_S);
-    slot.adsBlend =
-      adsTarget > slot.adsBlend
-        ? Math.min(adsTarget, slot.adsBlend + blend)
-        : Math.max(adsTarget, slot.adsBlend - blend);
+    const fo = feelFrameFor(s, feel, v, e, dt, alpha, yaw, pitch, adsWanted && !dead, held);
+    slot.adsBlend = fo.ads;
+    // O degrau para baixo não leva a câmera para dentro do teto (agachado num túnel baixo).
+    const stepShown = fo.stepY > 0 ? Math.min(fo.stepY, headroomAbove(v, c.x, c.y, c.z, fo.stepY)) : fo.stepY;
+    c.y += stepShown;
+    c.yaw = yaw + fo.recoilYaw + fo.shakeYaw;
+    c.pitch = clamp(pitch + fo.recoilPitch + fo.shakePitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
     const zoom = 1 + ((held !== null ? held.adsZoom : 1 / ADS_FOV_SCALE) - 1) * slot.adsBlend;
-    c.fovY = 2 * Math.atan(Math.tan(verticalFov(fovDeg, aspect) / 2) / zoom);
+    // O "punch" também respeita o teto do Hor+ (110° na horizontal).
+    const capTan = Math.tan((HOR_FOV_LIMITS_DEG.max * DEG_TO_RAD) / 2) / aspect;
+    const baseTan = Math.tan(verticalFov(fovDeg + fo.fovAddDeg, aspect) / 2);
+    c.fovY = 2 * Math.atan(Math.max(baseTan, Math.min(capTan, baseTan * fo.fovMul)) / zoom);
     desc.localSlot = s;
     desc.team = ffa ? 255 : v.team[e]!;
     desc.thirdPerson = false;
-    // Viewmodel: a arma da mão, com mola simples (ADS, passo, coice); luz amostrada no olho. Refino R2 (#79): no
-    // arremesso rápido, a granada aparece na mão enquanto cozinha.
+    // Viewmodel: a arma da mão (molas do `view-feel.ts`); luz amostrada no olho. Refino R2 (#79): no arremesso rápido,
+    // a granada aparece na mão enquanto cozinha (M12: e até o fim do arremesso).
     const model = modelOf(
       v.quickNade[e] === 1 && v.cookTicks[e]! >= 0
         ? v.loadout[e * WEAPON_SLOT_COUNT + WEAPON_SLOT.throwable]!
-        : v.weapon[e]!,
+        : fo.throwing && feel.throwQuick
+          ? feel.nadeCode
+          : v.weapon[e]!,
     );
     // Na luneta (zoom ≥ 3x, ou o DMR: `hasScope`; quase todo dentro) a arma sai da frente; a moldura da luneta é da HUD
     // (fase 1e).
     const scoped = held !== null && hasScope(held) && slot.adsBlend > 0.85;
     vm.visible = !dead && model !== NO_MODEL && !scoped;
     // M2 (fase 6b): 3ª pessoa (na luneta volta à 1ª): a câmera vai para o ombro, o bobo aparece e o viewmodel some.
+    // M12 (fase 1): o ombro desliza na troca, o braço encurta no ADS e a parede tem histerese (0,9 m / 1,2 m).
     slot.third = false;
     if (human && thirdPerson && !dead && !scoped) {
-      placeShoulderCamera(v, c.x, c.y, c.z, yaw, pitch, shoulderSide, dt, slot.shoulder);
-      // Braço curto demais (de costas para a parede): fica a 1ª pessoa neste frame (o braço segue esticando).
-      slot.third = slot.shoulder.arm >= THIRD_PERSON.minVisibleArmM;
-    } else slot.shoulder.arm = -1;
+      feel.side = slot.shoulder.arm < 0 ? shoulderSide : shoulderSideStep(feel.side, shoulderSide, dt);
+      placeShoulderCamera(v, c.x, c.y, c.z, yaw, pitch, feel.side, dt, slot.shoulder, slot.adsBlend);
+      // Braço curto demais (de costas para a parede): fica a 1ª pessoa (o braço segue esticando).
+      const T = THIRD_PERSON;
+      feel.wallFirst = wallForcesFirst(feel.wallFirst, slot.shoulder.arm, T.minVisibleArmM, T.exitFirstArmM);
+      slot.third = !feel.wallFirst;
+    } else {
+      slot.shoulder.arm = -1;
+      feel.wallFirst = false;
+    }
+    if (!slot.third) {
+      // M12 (fase 1): só na 1ª pessoa, o balanço da cabeça, o pouso e o tremor que desloca.
+      c.x += fo.camX;
+      c.y += fo.camY;
+      c.z += fo.camZ;
+      c.pitch = clamp(c.pitch + fo.camPitch, -CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+    }
     if (slot.third) {
       const eyeX = c.x;
-      const eyeY = c.y;
+      // M12 (fase 1): em relação ao olho de verdade (sem o degrau suavizado): a mira sai de onde a câmera está.
+      const eyeY = c.y - stepShown;
       const eyeZ = c.z;
       c.x = slot.shoulder.x;
       c.y = slot.shoulder.y;
@@ -5875,9 +6229,6 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     vm.model = model;
     const aim = model !== NO_MODEL ? aimOffsets[model] : null;
     const ads = slot.adsBlend;
-    const walk = (1 - ads) * Math.min(1, Math.hypot(v.velocity[o]!, v.velocity[o + 2]!) / RUN_SPEED);
-    const phase = walkPhase[e] ?? 0;
-    const kick = recoil[e] ?? 0;
     // M2: ajuste por arma fora do ADS (o lança-foguetes é grosso e vai mais longe e menor).
     // M6 (fase 5): a sniper de tinta usa o modelo (e o ajuste) da sniper.
     const vmCode = v.weapon[e] === WEAPON_PAINT_SNIPER ? WEAPON_CODE.sniper : weaponBase(v.weapon[e]!);
@@ -5893,14 +6244,18 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     // isto, quanto menor a escala, mais a mira do ADS sai do centro (alvo = −(mão + escala · (mira − mão))).
     const aimX = aim ? aim.x - (1 - scale) * (aim.x + VIEWMODEL_POSE.hand[0]) : 0;
     const aimY = aim ? aim.y - (1 - scale) * (aim.y + VIEWMODEL_POSE.hand[1]) : 0;
-    vm.offsetX = aimX * ads + Math.sin(phase * 0.5) * 0.012 * walk + (tweak ? tweak.x * away : 0);
-    vm.offsetY = aimY * ads - Math.abs(Math.cos(phase * 0.5)) * 0.01 * walk + (tweak ? tweak.y * away : 0);
-    vm.offsetZ = kick * 0.045 + (tweak ? tweak.z * away : 0);
-    vm.pitch = kick * 0.06;
-    vm.yaw = 0;
-    vm.roll = 0;
-    // Braços do viewmodel com a skin do boneco do dono (1ª das 2 camadas, a mesma do `ActorBuffer.skin`).
+    // M12 (fase 1): o passo (na passada do som), o atraso no giro, a inclinação, a corrida, o coice por arma, a troca,
+    // a recarga, a faca, o arremesso e o pouso vêm do `feelFrame`.
+    vm.offsetX = aimX * ads + (tweak ? tweak.x * away : 0) + fo.vmX;
+    vm.offsetY = aimY * ads + (tweak ? tweak.y * away : 0) + fo.vmY;
+    vm.offsetZ = (tweak ? tweak.z * away : 0) + fo.vmZ;
+    vm.pitch = fo.vmPitch;
+    vm.yaw = fo.vmYaw;
+    vm.roll = fo.vmRoll;
+    // Braços do viewmodel com a skin do boneco do dono (1ª das 2 camadas, a mesma do `ActorBuffer.skin`). M12 (fase 1):
+    // no FFA e no Royale (sem time na roupa), a luva na cor do jogador da vista (P1–P4).
     vm.skin = skinLayer[e] !== 0xffff ? skinLayer[e]! : 0;
+    vm.glove = (ffa || royaleMode) && local !== null ? PLAYER_COLORS[slot.seat]! >>> 8 : -1;
     // M9 (fase 1b): de propósito, o viewmodel NÃO acompanha a escala do corpo (`SimView.chaosScale`): no Mini (e no
     // humano que assume um bot gigante) a arma em 1ª pessoa fica do tamanho de sempre. O olho já desce ou sobe com o
     // corpo; a arma encolhida sumiria no canto e a gigante taparia a tela. O mundo (o clarão, o traçado) é que escala.
@@ -5908,7 +6263,12 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
     sampleLightGrid(loaded.lightGrid, c.x, c.y, c.z, lightScratch, 0);
     vm.lightSky = lightScratch[0]!;
     vm.lightSun = lightScratch[1]!;
-    vm.lightEmissive = lightScratch[2]!;
+    // M12 (fase 1): o clarão do próprio tiro ilumina a arma.
+    // Com Reduzir efeitos, sem o clarão na arma (com a SMG ele piscava a ~14 Hz).
+    vm.lightEmissive = reducedFx ? lightScratch[2]! : Math.max(lightScratch[2]!, slot.flash * 0.6);
+    if (fo.dropMag && vm.visible && held !== null && held.reloadPerRoundS === 0 && VIEW_KICK[held.category].mag) {
+      dropMagazine(c, vm, magOffsets[model] ?? null, v, o);
+    }
   }
 
   /**
@@ -7230,6 +7590,7 @@ export function createConstrutoMatch(setup: MatchSetup): ConstrutoMatch {
         // M7 (fase 9): o Aquário acelera a sim (o resto da cena anda no relógio do render). M9 (fase 5): a câmera lenta
         // do dono (só offline) desacelera do mesmo jeito.
         lastTicks = driver.update((aquarium && pilot < 0 ? dt * aqSpeed : dt) * (ownerTools?.slow ?? 1));
+        feelTicks += lastTicks;
         trace('sim e IA');
         timeS += dt;
         ownerTools?.update(dt);

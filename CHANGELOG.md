@@ -12,6 +12,11 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   agentes lendo o código e jogando: a câmera e a arma na mão, a HUD, os menus, o som, o visual, a mira e o toque, e os
   bots, em frentes paralelas. Entrou junto o ajudante das entradas animadas da interface (`ui/src/motion.ts`).
   Perguntas AM1–AM11 no padrão.
+- **A câmera e a arma na mão (fase 1):** a escada não salta mais, o pouso afunda a vista, correr e deslizar abrem o
+  campo de visão, a cabeça balança no ritmo dos passos, a arma atrasa no giro, inclina de lado, abaixa na corrida,
+  coiceia diferente em cada arma, sobe na troca, gira na recarga soltando o pente, estoca com a faca e acende com o
+  clarão, cápsulas douradas pulam a cada tiro, levar dano dá um solavanco, o controle vibra no tiro e no abate, as
+  luvas ficam na sua cor no FFA e no Royale, e "Reduzir efeitos" tira tudo isso.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

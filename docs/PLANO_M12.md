@@ -50,6 +50,7 @@ frente põe a lógica num módulo próprio e deixa na cena só a cola. A fase 0 
    passo do som; a arma com molas (atraso no giro, inclinação no strafe, pose de corrida, coice por arma, ADS com
    curva); troca, recarga e faca animadas na 1ª pessoa; o clarão ilumina a arma; tremor por trauma; o recuo
    interpolado a 144 Hz; a 3ª pessoa sem estalos; cápsulas; vibração no tiro e no abate; luvas na cor do P1–P4 no FFA.
+   - **feita em 27/11** (ARCHITECTURE §23.1): os 17 itens e o solavanco do dano; a revisão achou o degrau do cliente online; nenhum golden mudou.
 2. **A HUD da partida:** o X de abate com o nome da vítima; o hitmarker com peso; a vida com rastro, vinheta e até 4
    indicadores de dano que giram com a vista; a munição (pouca, vazia, barra de recarga, no lugar certo no toque); a
    sua linha no kill feed; o placar com o seu time; avisos centrais de momento; a contagem com "VALENDO!"; os "+N" de
