@@ -1,12 +1,12 @@
 import {
+  buildLayerMipChain,
   LAYER_MANIFEST_FORMAT,
-  mipChainOffsets,
+  LAYER_MIP_FILTER,
   parseLayerManifest,
   TEXTURE_ARRAYS,
   type LayerManifest,
   type TextureArrayName,
 } from '@boboforces/format';
-import { buildMipChain } from './mips.ts';
 import {
   frameLayerName,
   renderRecipe,
@@ -44,7 +44,7 @@ export interface LayerGroup {
   readonly material: MaterialClass;
 }
 
-/** Uma tira de texture array gerada pelo texgen (`<base>.png`, `.mips.png`, `.json`). */
+/** Uma tira de texture array gerada pelo texgen (`<base>.png` e `.json`; os mips o jogo gera no loading desde o M12). */
 export interface StripSpec {
   readonly array: TextureArrayName;
   /** Caminho sem extensão, relativo a `assets-src/textures/generated/` (ex.: `blocos16`). */
@@ -121,29 +121,12 @@ export function buildStrip(layers: readonly GeneratedLayer[], size: number): Rgb
   return { width: size, height: size * layers.length, data };
 }
 
-/** Mips de cada camada (níveis 1..n−1), na ordem da tira. */
-export function buildLayerMips(layers: readonly GeneratedLayer[], mipLevels: number): RgbaImage[][] {
-  return layers.map((l) => buildMipChain(l.image, l.kind, mipLevels));
-}
-
 /**
- * `.mips.png` do contrato `layers@1` (format/src/layers.ts): largura W/2; cada camada ocupa um bloco de H linhas e o
- * nível k fica onde `mipChainOffsets` manda (sobra a última linha do bloco, transparente).
+ * Mips de cada camada (níveis 1..n−1), na ordem da tira: o filtro `linear` do format, o mesmo que o jogo roda no
+ * loading (M12, §23.9). Só a folha de contato e os testes usam; nada disso vai para arquivo.
  */
-export function buildMipsStrip(mips: readonly (readonly RgbaImage[])[], size: number, mipLevels: number): RgbaImage {
-  const width = size / 2;
-  const data = new Uint8Array(width * size * 4 * mips.length);
-  const rects = mipChainOffsets(size, mipLevels);
-  mips.forEach((chain, i) => {
-    rects.forEach((r, k) => {
-      const img = chain[k]!;
-      for (let row = 0; row < r.height; row++) {
-        const dst = ((i * size + r.y + row) * width + r.x) * 4;
-        data.set(img.data.subarray(row * r.width * 4, (row + 1) * r.width * 4), dst);
-      }
-    });
-  });
-  return { width, height: size * mips.length, data };
+export function buildLayerMips(layers: readonly GeneratedLayer[], mipLevels: number): RgbaImage[][] {
+  return layers.map((l) => buildLayerMipChain(l.image, mipLevels, LAYER_MIP_FILTER.texgen, l.kind));
 }
 
 /** Manifesto `layers@1` da tira (validado pelo `parseLayerManifest` do contrato antes de sair). */
@@ -166,14 +149,13 @@ export function buildManifest(layers: readonly GeneratedLayer[], array: TextureA
   return parseLayerManifest(manifest);
 }
 
-/** Tudo de uma tira já pronto (camadas, mips e manifesto), depois do validador. */
+/** Tudo de uma tira já pronto (camadas, mips da folha de contato e manifesto), depois do validador. */
 export interface BuiltStrip {
   readonly spec: StripSpec;
   readonly layers: readonly GeneratedLayer[];
   readonly mips: readonly (readonly RgbaImage[])[];
   readonly manifest: LayerManifest;
   readonly level0: RgbaImage;
-  readonly mipsImage: RgbaImage;
 }
 
 export function buildStripAssets(spec: StripSpec): BuiltStrip {
@@ -181,13 +163,11 @@ export function buildStripAssets(spec: StripSpec): BuiltStrip {
   const layers = generateLayers(spec.recipes, arraySpec.layerSize);
   const problems = validateLayers(layers, spec.array);
   if (problems.length > 0) throw new Error(`texgen: validação reprovou (${spec.file}):\n- ${problems.join('\n- ')}`);
-  const mips = buildLayerMips(layers, arraySpec.mipLevels);
   return {
     spec,
     layers,
-    mips,
+    mips: buildLayerMips(layers, arraySpec.mipLevels),
     manifest: buildManifest(layers, spec.array),
     level0: buildStrip(layers, arraySpec.layerSize),
-    mipsImage: buildMipsStrip(mips, arraySpec.layerSize, arraySpec.mipLevels),
   };
 }

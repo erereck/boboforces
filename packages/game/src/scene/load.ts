@@ -46,11 +46,11 @@ import { createSynthJob } from './sound.ts';
  * Loading do Construto por etapas (integração do M1; tecnico.md §6.2 e §24.3: ≤ 4 s no Switch), DENTRO dos frames:
  * cada frame roda uma fatia de no máximo `budgetMs` e a tela de loading (`drawLoadingScreen`) mostra o progresso.
  * Ordem: assets (platform.assets, em paralelo; PNG e binários decodificados aqui) → texturas (`assembleTextureArray`
- * nos 2 arrays, na ordem do `runtime-assets.json`; `setTextures` e `setModels`) → luz (grade, registro, colisores das
- * props do jogo (`isPlayableProp`), `createLightJob` fatiado) → malha (`buildRegionMesh` região por região, cada uma
- * com buffers PRÓPRIOS: o render guarda as malhas depois do `setMap`, então nada de `reuse`; o mesher não é
- * reentrante, uma região por vez) → navegação (`buildNavGrid` só com as props `blocksNav`; `simMapFromMarkers`) → figuras
- * e skins do boneco (#56, no `scene/index.ts`) → shaders (`warmup` depois de texturas, modelos e mapa). Cada etapa é
+ * nos 2 arrays, na ordem do `runtime-assets.json`, com os mips gerados do nível 0 desde o M12; `setTextures` e
+ * `setModels`) → luz (grade, registro, colisores das props do jogo (`isPlayableProp`), `createLightJob`
+ * fatiado) → malha (`buildRegionMesh` região por região, cada uma com buffers PRÓPRIOS: o render guarda as malhas
+ * depois do `setMap`, então nada de `reuse`; o mesher não é reentrante, uma região por vez) → navegação
+ * (`buildNavGrid` só com as props `blocksNav`; `simMapFromMarkers`) → figuras e skins do boneco (#56, no `scene/index.ts`) → shaders (`warmup` depois de texturas, modelos e mapa). Cada etapa é
  * cronometrada (relatório do bench, item 13 do T0).
  */
 
@@ -88,15 +88,15 @@ interface RawFiles {
   blocksJson: string;
   map: Uint8Array;
   models: Uint8Array;
-  strips: Record<TextureArrayName, { png: Uint8Array; mips: Uint8Array; json: string }[]>;
+  strips: Record<TextureArrayName, { png: Uint8Array; json: string }[]>;
 }
 
 type Phase = 'assets' | 'textures' | 'light' | 'mesh' | 'nav' | 'done' | 'error';
 
 /**
  * Detalhe da etapa de assets para o log do Teste Zero. No Eden (03/11): ~1,2 s = chegada dos arquivos ~0,55 s com só
- * 2 frames no meio (ler os do RomFS — hoje 12, sem as skins do bobo de caixas — leva < 10 ms; o resto é um frame longo
- * fora do código do jogo) + decodificação ~0,65 s. O console diz se é igual.
+ * 2 frames no meio (ler os do RomFS — hoje 9, sem as skins do bobo de caixas e, desde o M12, sem os `.mips.png` — leva
+ * < 10 ms; o resto é um frame longo fora do código do jogo) + decodificação ~0,65 s. O console diz se é igual.
  */
 export interface AssetsDetail {
   /** Do início do loading até o último arquivo chegar (ms; -1 = ainda não chegou). */
@@ -207,9 +207,10 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     Promise.all(
       TEXTURE_ARRAY_BASES[name].map((base) => {
         const p = textureStripPaths(base);
-        return Promise.all([track(a.loadBytes(p.png)), track(a.loadBytes(p.mips)), track(a.loadText(p.json))]).then(
-          ([png, mips, json]) => ({ png, mips, json }),
-        );
+        return Promise.all([track(a.loadBytes(p.png)), track(a.loadText(p.json))]).then(([png, json]) => ({
+          png,
+          json,
+        }));
       }),
     );
   Promise.all([
@@ -237,8 +238,9 @@ export function createConstrutoLoader(host: SceneHost, mapId = 'construto'): Con
     modelDocs = decodeModelPack(f.models).models;
     const decodeStrips = (name: TextureArrayName): TextureStrip[] =>
       f.strips[name].map((s) => {
+        // M12 (§23.9): sem `.mips.png`; o `assembleTextureArray` gera os níveis 1..n na etapa de texturas.
         const manifest = parseLayerManifest(JSON.parse(s.json) as unknown);
-        return { manifest, level0: decodePng(s.png), mips: manifest.mipLevels > 1 ? decodePng(s.mips) : null };
+        return { manifest, level0: decodePng(s.png), mips: null };
       });
     stripsDecoded = { blocos16: decodeStrips('blocos16'), modelos64: decodeStrips('modelos64') };
   }

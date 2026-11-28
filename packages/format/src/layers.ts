@@ -4,15 +4,16 @@
  *
  * Cada ferramenta grava a SUA tira, que entra num dos dois arrays:
  *   <base>.png       nível 0: camadas de W×H empilhadas na vertical (camada i nas linhas [i·H, (i+1)·H))
- *   <base>.mips.png  níveis 1..n−1 (só se `mipLevels` > 1): largura W/2; cada camada ocupa um bloco de H linhas; dentro
- *                    do bloco, o nível k começa na linha H − H/2^(k−1) e ocupa W/2^k × H/2^k a partir da coluna 0
- *                    (sobra a última linha do bloco, transparente). `mipChainOffsets` faz a conta.
  *   <base>.json      este manifesto.
  * O runtime concatena as tiras de cada array NA ORDEM de `arrays` do `assets-src/runtime-assets.json` e resolve as
  * camadas SEMPRE por nome (`assembleTextureArray` em `@boboforces/render/data`). Nome repetido entre tiras do mesmo
  * array é erro.
  *
- * Nos mips de camada `cutout`, a ferramenta preserva a cobertura do alfa (a cerca e a folhagem não somem ao longe).
+ * Mips: até o M11 a ferramenta gravava os níveis 1..n−1 num `<base>.mips.png` (largura W/2; um bloco de H linhas por
+ * camada, o nível k onde `mipChainOffsets` manda). Desde o M12 (§23.9) o runtime gera a cadeia do nível 0 no loading,
+ * pelo filtro da ferramenta que gravou a tira (`LAYER_MIP_FILTER[source]`, `layer-mips.ts`), byte a byte igual; o
+ * `assembleTextureArray` ainda copia um `.mips.png` pronto, se alguém passar. Nos mips de camada `cutout`, o filtro
+ * preserva a cobertura do alfa (a cerca e a folhagem não somem ao longe).
  */
 export const LAYER_MANIFEST_FORMAT = 'boboforces/layers@1';
 
@@ -45,7 +46,7 @@ export const SKIN_LAYER_RESERVE = 64;
 /** Quem gerou a tira (para mensagens e para o `assets`). */
 export type LayerSource = 'texgen' | 'modelgen';
 
-/** Tipo de camada: o programa que a usa e como os mips são feitos. */
+/** Tipo de camada: o programa que a usa e como os mips são feitos (`layer-mips.ts`). */
 export type LayerKind = 'opaque' | 'cutout' | 'translucent' | 'emissive';
 
 export interface LayerEntry {
@@ -64,7 +65,7 @@ export interface LayerManifest {
   readonly source: LayerSource;
   readonly layerWidth: number;
   readonly layerHeight: number;
-  /** Níveis presentes (contando o 0). 1 = sem `.mips.png`. */
+  /** Níveis da cadeia (contando o 0); os 1..n−1 saem do nível 0 no loading (M12). */
   readonly mipLevels: number;
   /**
    * Uma entrada por camada FÍSICA da tira, na ordem; quadros de animação seguintes repetem o nome com sufixo

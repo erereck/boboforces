@@ -1,5 +1,7 @@
 import {
+  buildLayerMipChain,
   LAYER_MANIFEST_FORMAT,
+  LAYER_MIP_FILTER,
   mipChainOffsets,
   PLAYABLE_PROP_DOSE_VIEW,
   type LayerManifest,
@@ -70,6 +72,55 @@ describe('texture arrays do M1', () => {
     expect(arr.data.levels[1]![32 * 32 * 4 * 1]).toBe(12);
     expect(arr.data.levels[1]![32 * 32 * 4 * 2]).toBe(51);
     expect(arr.data.levels[1]![32 * 32 * 4 * 3]).toBe(0);
+  });
+
+  it('M12: tira sem .mips.png ganha os níveis do nível 0, pelo filtro da ferramenta, camada por camada', () => {
+    const kinds = ['opaque', 'cutout', 'translucent'] as const;
+    const withKinds = (s: TextureStrip): TextureStrip => ({
+      ...s,
+      manifest: {
+        ...s.manifest,
+        layers: s.manifest.layers.map((l, i) => ({ ...l, kind: kinds[i % 3]!, cutout: kinds[i % 3] === 'cutout' })),
+      },
+    });
+    const a = withKinds(strip('texgen', ['metal', 'fence', 'glass'], 64, 7, 10));
+    const b = withKinds(strip('modelgen', ['rifle', 'leaf'], 64, 7, 50));
+    // Nível 0 com textura de verdade (xadrez com buracos), para os dois filtros darem resultados diferentes.
+    for (const s of [a, b]) {
+      const d = s.level0.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const t = i >> 2;
+        d[i] = (t * 37) & 0xff;
+        d[i + 1] = (t * 11) & 0xff;
+        d[i + 2] = (t >> 6) & 0xff;
+        d[i + 3] = ((t & 63) + (t >> 6)) % 3 === 0 ? 0 : 255;
+      }
+    }
+    const arr = assembleTextureArray(
+      'modelos64',
+      [
+        { ...a, mips: null },
+        { manifest: b.manifest, level0: b.level0 },
+      ],
+      2,
+    );
+    expect(arr.data.levels.length).toBe(7);
+    [a, b].forEach((s, si) => {
+      s.manifest.layers.forEach((entry, i) => {
+        const layer = (si === 0 ? 0 : 3) + i;
+        const image = { width: 64, height: 64, data: s.level0.data.subarray(i * 64 * 64 * 4, (i + 1) * 64 * 64 * 4) };
+        const chain = buildLayerMipChain(image, 7, LAYER_MIP_FILTER[s.manifest.source], entry.kind, entry.cutout);
+        chain.forEach((mip, k) => {
+          const bytes = mip.data.length;
+          expect(arr.data.levels[k + 1]!.subarray(layer * bytes, (layer + 1) * bytes), `${entry.name} ${k}`).toEqual(
+            mip.data,
+          );
+        });
+      });
+    });
+    // As reservadas continuam zeradas em todos os níveis.
+    for (const level of arr.data.levels)
+      expect(level.subarray((level.length / 7) * 5).every((v) => v === 0)).toBe(true);
   });
 
   it('recusa nome repetido, mips divergentes e arquivo provisório', () => {

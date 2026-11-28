@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { mipChainOffsets, parseLayerManifest, TEXTURE_ARRAYS } from '@boboforces/format';
+import { createLayerMipScratch, mipSize, parseLayerManifest, TEXTURE_ARRAYS, writeStripMips } from '@boboforces/format';
 import { describe, expect, it } from 'vitest';
 import { BLOCK_TEXTURES } from '../../../assets-src/textures/blocks16.ts';
 import { MODEL_MATERIAL_TEXTURES } from '../../../assets-src/textures/modelos64.ts';
@@ -198,23 +198,22 @@ describe('manifestos e tiras', () => {
     expect(buildManifest(blocks.layers, 'blocos16').layers.length).toBe(blocks.layers.length);
   });
 
-  it('a tira do nível 0 e o .mips.png seguem o layout do contrato (mipChainOffsets)', () => {
+  it('a tira do nível 0 segue o layout do contrato e os mips da folha são os do loading (M12)', () => {
     const n = blocks.layers.length;
     expect([blocks.level0.width, blocks.level0.height]).toEqual([16, 16 * n]);
-    expect([blocks.mipsImage.width, blocks.mipsImage.height]).toEqual([8, 16 * n]);
     const i = blocks.layers.findIndex((l) => l.name === 'brick');
     expect(blocks.level0.data.subarray(i * 1024, (i + 1) * 1024)).toEqual(blocks.layers[i]!.image.data);
-    for (const r of mipChainOffsets(16, 5)) {
-      const mip = blocks.mips[i]![r.level - 1]!;
-      for (let row = 0; row < r.height; row++) {
-        const src = ((i * 16 + r.y + row) * 8 + r.x) * 4;
-        expect(blocks.mipsImage.data.subarray(src, src + r.width * 4)).toEqual(
-          mip.data.subarray(row * r.width * 4, (row + 1) * r.width * 4),
-        );
-      }
-    }
-    // A última linha do bloco de cada camada fica transparente.
-    expect(blocks.mipsImage.data.subarray((i * 16 + 15) * 32, (i * 16 + 16) * 32).every((v) => v === 0)).toBe(true);
+    // O jogo gera os mips da tira inteira a partir do nível 0 (`writeStripMips`, filtro do `source`): são os mesmos
+    // que a folha de contato mostra.
+    const levels: Uint8Array[] = [blocks.level0.data];
+    for (let k = 1; k < 5; k++) levels.push(new Uint8Array(mipSize(16, k) ** 2 * 4 * n));
+    writeStripMips(blocks.manifest, levels, 0, createLayerMipScratch(16));
+    blocks.mips.forEach((chain, layer) =>
+      chain.forEach((mip, k) => {
+        const bytes = mip.data.length;
+        expect(levels[k + 1]!.subarray(layer * bytes, (layer + 1) * bytes)).toEqual(mip.data);
+      }),
+    );
   });
 
   it('o branco dos detritos é branco puro e os materiais de prop são o mesmo pixel dos blocos', () => {
@@ -276,9 +275,9 @@ describe('arquivos gerados', () => {
       const manifest = parseLayerManifest(JSON.parse(readFileSync(join(dir, `${base}.json`), 'utf8')));
       const size = TEXTURE_ARRAYS[manifest.array].layerSize;
       const strip = decodePng(readFileSync(join(dir, `${base}.png`)));
-      const mips = decodePng(readFileSync(join(dir, `${base}.mips.png`)));
       expect([strip.width, strip.height]).toEqual([size, size * manifest.layers.length]);
-      expect([mips.width, mips.height]).toEqual([size / 2, size * manifest.layers.length]);
+      // M12 (§23.9): sem `.mips.png` (o jogo gera os mips no loading).
+      expect(existsSync(join(dir, `${base}.mips.png`)), `${base}.mips.png`).toBe(false);
       manifest.layers.forEach((layer, i) => {
         const data = strip.data.subarray(i * size * size * 4, (i + 1) * size * size * 4);
         const img = { width: size, height: size, data };

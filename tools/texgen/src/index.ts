@@ -1,4 +1,5 @@
-// texgen: gera as texturas pixel-art a partir das receitas de `assets-src/textures/` (paleta mestra + validador + mips)
+// texgen: gera as texturas pixel-art a partir das receitas de `assets-src/textures/` (paleta mestra + validador; os
+// mips só na folha de contato: o jogo os gera no loading desde o M12)
 // e as definições de bloco de `assets-src/blocks/`, e grava tudo nas pastas `generated/` (ver `outputs.ts`).
 //
 //   npm run texgen            regenera (só reescreve o que mudou, apaga o que sobrou) e grava a folha de contato

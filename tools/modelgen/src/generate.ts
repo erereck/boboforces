@@ -17,13 +17,7 @@ import {
   WEAPON_RECIPES,
 } from '../../../assets-src/models/weapons.ts';
 import { tone } from '../../skingen/src/palette.ts';
-import {
-  buildMipStrip,
-  buildStrip,
-  layerManifestJson,
-  validateLayer,
-  type StripLayer,
-} from '../../skingen/src/strip.ts';
+import { buildStrip, layerManifestJson, validateLayer, type StripLayer } from '../../skingen/src/strip.ts';
 import { LayerCanvas, type BuiltModel } from './builder.ts';
 import { MODELGEN_OUTPUTS } from './paths.ts';
 
@@ -121,7 +115,7 @@ export function buildModelOutputs(): { files: Map<string, Uint8Array>; build: Mo
   const files = new Map<string, Uint8Array>();
   files.set(MODELGEN_OUTPUTS.pack, encodeModelPack(build.pack));
   files.set(MODELGEN_OUTPUTS.layersPng, encodePng(buildStrip(build.layers, spec.layerSize)));
-  files.set(MODELGEN_OUTPUTS.layersMips, encodePng(buildMipStrip(build.layers, spec.layerSize, spec.mipLevels)));
+  // Sem `.mips.png` desde o M12 (§23.9): o jogo gera os mips no loading (filtro `premultiplied` do format).
   files.set(
     MODELGEN_OUTPUTS.layersJson,
     new TextEncoder().encode(layerManifestJson('modelos64', 'modelgen', build.layers)),

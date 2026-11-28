@@ -1,6 +1,16 @@
 // M1: monta os 2 texture arrays a partir das tiras das ferramentas (sem three, testável em Node). Contrato do manifesto
 // em `@boboforces/format` (`layers.ts`). Ordem das tiras = ordem de `arrays` no `assets-src/runtime-assets.json`.
-import { mipChainOffsets, TEXTURE_ARRAYS, type LayerManifest, type TextureArrayName } from '@boboforces/format';
+// M12 (§23.9): as tiras chegam sem `.mips.png`; os níveis 1..n−1 saem aqui do nível 0, pelo filtro da ferramenta
+// (`writeStripMips` do format), byte a byte iguais aos que ela gravava.
+import {
+  createLayerMipScratch,
+  mipChainOffsets,
+  TEXTURE_ARRAYS,
+  writeStripMips,
+  type LayerManifest,
+  type LayerMipScratch,
+  type TextureArrayName,
+} from '@boboforces/format';
 import type { RgbaImageLike } from './texture-data.ts';
 import type { AssembledTextureArray, TextureLayerInfo } from './types.ts';
 
@@ -9,8 +19,11 @@ export interface TextureStrip {
   readonly manifest: LayerManifest;
   /** `<base>.png`: nível 0, camadas na vertical. */
   readonly level0: RgbaImageLike;
-  /** `<base>.mips.png` quando `mipLevels` > 1; senão `null`. */
-  readonly mips: RgbaImageLike | null;
+  /**
+   * Níveis 1..n−1 prontos no layout do `.mips.png` (`mipChainOffsets`), copiados como estão. Ausente ou `null` (o
+   * jogo, desde o M12): gerados do nível 0 aqui.
+   */
+  readonly mips?: RgbaImageLike | null;
 }
 
 function fail(message: string): never {
@@ -19,8 +32,9 @@ function fail(message: string): never {
 
 /**
  * Concatena as tiras de UM array e acrescenta `reserve` camadas transparentes no fim (skins compostas no loading).
- * Toda tira do array precisa declarar o mesmo `mipLevels`; o resultado tem esse número de níveis. Nome repetido entre
- * tiras é erro; tira provisória (`placeholder`) é recusada com a instrução de gerar os assets.
+ * Toda tira do array precisa declarar o mesmo `mipLevels`; o resultado tem esse número de níveis (os que a tira não
+ * trouxe saem do nível 0, com um rascunho só para o array inteiro). Nome repetido entre tiras é erro; tira provisória
+ * (`placeholder`) é recusada com a instrução de gerar os assets.
  */
 export function assembleTextureArray(
   name: TextureArrayName,
@@ -41,8 +55,7 @@ export function assembleTextureArray(
     if (s.level0.width !== size || s.level0.height !== size * m.layers.length) {
       fail(`${where}: PNG ${s.level0.width}×${s.level0.height} não bate com ${m.layers.length} camadas de ${size}`);
     }
-    if (mipLevels > 1) {
-      if (!s.mips) fail(`${where} sem .mips.png`);
+    if (mipLevels > 1 && s.mips) {
       if (s.mips.width !== size / 2 || s.mips.height !== size * m.layers.length) {
         fail(`${where}: .mips.png ${s.mips.width}×${s.mips.height}, esperado ${size / 2}×${size * m.layers.length}`);
       }
@@ -59,24 +72,27 @@ export function assembleTextureArray(
   const rects = mipChainOffsets(size, mipLevels);
   const layers = new Map<string, number>();
   const info: TextureLayerInfo[] = [];
+  let scratch: LayerMipScratch | null = null;
   let layer = 0;
   for (const s of strips) {
     levels[0]!.set(s.level0.data.subarray(0, size * size * 4 * s.manifest.layers.length), layer * size * size * 4);
+    const mips = s.mips ?? null;
     s.manifest.layers.forEach((entry, i) => {
       if (layers.has(entry.name)) fail(`camada "${entry.name}" repetida em ${name}`);
       layers.set(entry.name, layer + i);
       info.push({ name: entry.name, kind: entry.kind, frames: entry.frames, cutout: entry.cutout });
-      if (!s.mips) return;
-      const mipWidth = s.mips.width;
+      if (!mips) return;
+      const mipWidth = mips.width;
       for (const r of rects) {
         const dst = levels[r.level]!;
         const base = (layer + i) * r.width * r.height * 4;
         for (let row = 0; row < r.height; row++) {
           const src = ((i * size + r.y + row) * mipWidth + r.x) * 4;
-          dst.set(s.mips.data.subarray(src, src + r.width * 4), base + row * r.width * 4);
+          dst.set(mips.data.subarray(src, src + r.width * 4), base + row * r.width * 4);
         }
       }
     });
+    if (!mips && mipLevels > 1) writeStripMips(s.manifest, levels, layer, (scratch ??= createLayerMipScratch(size)));
     layer += s.manifest.layers.length;
   }
   return {

@@ -9,9 +9,10 @@ import { encodePng, type RgbaImage } from './png.ts';
 
 /**
  * O que o texgen grava, por caminho relativo à raiz do repositório (pastas da frente "texturas"):
- * - `assets-src/textures/generated/blocos16.{png,mips.png,json}`: a tira do array de blocos (`layers@1`);
- * - `assets-src/textures/generated/modelos64-materiais.{png,mips.png,json}`: a 1ª tira do array de modelos
+ * - `assets-src/textures/generated/blocos16.{png,json}`: a tira do array de blocos (`layers@1`);
+ * - `assets-src/textures/generated/modelos64-materiais.{png,json}`: a 1ª tira do array de modelos
  *   (camada branca dos detritos + materiais do cenário em tile 64×64);
+ *   sem `.mips.png` desde o M12 (§23.9): o jogo gera os mips no loading com o mesmo filtro (`format/layer-mips.ts`);
  * - `assets-src/textures/generated/blocks/<camada>.png`: cada camada de bloco solta (revisão e diff);
  * - `assets-src/blocks/generated/blocks.json`: as definições `blocks@1`.
  * A folha de contato (`local/m1/texturas.png`) é privada e sai à parte (`buildContactSheet`).
@@ -44,7 +45,6 @@ export function layerFileName(name: string): string {
 function stripFiles(files: Map<string, Uint8Array>, strip: BuiltStrip): void {
   const base = `assets-src/textures/generated/${strip.spec.file}`;
   files.set(`${base}.png`, png(strip.level0));
-  files.set(`${base}.mips.png`, png(strip.mipsImage));
   files.set(`${base}.json`, json(strip.manifest));
 }
 

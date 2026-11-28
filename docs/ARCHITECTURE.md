@@ -604,8 +604,8 @@ contrato). `apps/web/src/input/**` não muda no M1.
   flags (`REGION_VERTEX_FLAG`) · byte 10 variantes − 1 + quadros − 1 · byte 11 reservado. No GL: `aPos` palavras 0–2 e
   `aData` palavras 3–5, stride 12; inteiro (`uvec3`) ou float (`VERTEX_FLOAT`). Camada final no shader =
   `base + variante · quadros + quadro` (4 qps); a tira guarda as variantes em sequência e os quadros dentro de cada uma.
-- **Texture arrays:** cada ferramenta grava a SUA tira (`<base>.png`, `<base>.mips.png`, `<base>.json` com
-  `layers@1`); o runtime concatena na ordem de `arrays` do `runtime-assets.json` (`blocos16`: texgen; `modelos64`:
+- **Texture arrays:** cada ferramenta grava a SUA tira (`<base>.png` e `<base>.json` com `layers@1`; até o M11
+  também o `<base>.mips.png`, que desde o M12 sai no carregamento, §23.9); o runtime concatena na ordem de `arrays` do `runtime-assets.json` (`blocos16`: texgen; `modelos64`:
   texgen `modelos64-materiais` → skingen `modelos64-rostos` → modelgen `modelos64-modelos`) e reserva camadas no fim
   do `modelos64` para as skins compostas: 32 até a #51, 64 depois (16 skins × 4 camadas; o array fica com 90 de 128). Toda tira de um array declara a cadeia completa de mips (5 e 7 níveis);
   camadas por NOME, sempre. Folhas de rosto: camadas `faces` e `faces_zombie` (skingen). **[port]** A tira
@@ -5951,3 +5951,29 @@ teste); o desenho, em `ui/src/screens/hud.ts` e `match-hud.ts`; a cena só faz a
 - **Contratos:** nenhum mudou. Exports novos do `@boboforces/ai`: `AI_FEEL`, `BOT_PRIMARY_WEIGHTS_EASY`,
   `easyBotRef`, o `easy` opcional de `botPrimary`, `SoldierBrain.restart()` e `orderHold`. Os 20 goldens com soldados
   mudaram (re-gravados por cima da fase 6).
+
+### 23.9 Os mips gerados no carregamento (28/11/2026)
+
+Com as fases 3 e 7a, a primeira partida da web chegou a 999,1 KB de 1.000 (o teto do `size-check`, `tecnico.md`
+§16.4), e a 7b passava dele. O M10 tinha deixado anotado o recurso para quando o teto apertasse (§21.7): gerar os mips
+no carregamento.
+
+- **O que mudou:** os níveis 1..n−1 dos 2 texture arrays saem do nível 0 no loading, e não mais de um
+  `<base>.mips.png`. O código está em `format/src/layer-mips.ts`; quem chama é o `assembleTextureArray`
+  (`render/src/texture-assets.ts`) quando a tira chega sem mips, com um rascunho por array (`createLayerMipScratch`).
+  Como é antes da GPU, vale para a rota array e para o plano B atlas, na web e no Switch. O texgen e o modelgen não
+  gravam mais o `.mips.png`; os 3 arquivos saíram do `runtime-assets.json`, do build da web, do service worker e do
+  RomFS (73 assets). A folha de contato do texgen usa o mesmo código.
+- **Dois filtros, um por ferramenta** (`LAYER_MIP_FILTER[source]`), byte a byte iguais aos arquivos de antes (conferido
+  nas 166 camadas antes de apagá-los; o teste `layer-mips.test.ts` guarda o código antigo como referência): `linear`
+  (texgen: média da área 2^k em luz linear; a cutout preserva a cobertura com a ordem de Bayer) e `premultiplied`
+  (modelgen: caixa 2×2 em cascata em double; a cutout escolhe o limiar que mais aproxima a cobertura).
+- **As contas exatas que barateiam:** somas inteiras em cascata no `linear`; ordenação nativa do typed array com chave
+  empacotada; linear→sRGB por faixas; histograma do limiar; o nível 1 do `premultiplied` direto dos bytes. A tabela
+  sRGB→linear com `**` fica a mais de 1e−4 milionésimo da borda de arredondamento: qualquer V8 dá a mesma.
+- **O ganho:** primeira partida 992,1 → 935,9 KB (texturas 88,6 → 30,4 KB; o chunk da cena +2,0 KB).
+- **O custo:** sem JIT (`node --jitless`, aproximação do Switch), a etapa de texturas passou de ~1,5 para ~62 ms, mas a
+  decodificação das tiras caiu de ~208 para ~128 ms (−19 ms no total); no Edge, `texturas` 19–26 → 37–44 ms e `assets`
+  225–243 → 199–204 ms (o loading empata). Medir no console.
+- **Contratos:** `TextureStrip.mips` opcional (ausente = gerar); `textureStripPaths` sem `mips`; o comentário do
+  `layers@1` (o `mipLevels` são os níveis da cadeia). Nenhum golden mudou.

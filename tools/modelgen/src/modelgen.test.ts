@@ -26,6 +26,9 @@ describe('modelgen', () => {
     const sources = new Set(Object.values(table.files));
     for (const file of Object.values(MODELGEN_OUTPUTS))
       expect(sources.has(`models/generated/${file}`), file).toBe(true);
+    // M12 (§23.9): o jogo gera os mips no loading; o `.mips.png` saiu da pasta e da tabela.
+    expect(existsSync(join(MODELS_OUT_DIR, 'modelos64-modelos.mips.png'))).toBe(false);
+    expect([...sources].filter((s) => s.endsWith('.mips.png'))).toEqual([]);
   });
 
   it('todo model:* do registro de conteúdo tem modelo, e o pacote passa na validação', () => {

@@ -53,6 +53,9 @@ incompatível; MINOR = sistema jogável novo; PATCH = correção. Versão, codin
   muro baixo miram na cabeça), erram de um jeito que deriva e atrasa quando você troca de lado, revidam quem bate
   neles, atiram em rajadas de longe, não andam em fila indiana e vão atrás do barulho de tiroteio; o Pela vibe e o De
   boa não usam mais foguete, e o cone, o alcance, a audição e o conhecimento do Laboratório passaram a valer.
+- **Download menor:** a primeira partida no navegador baixa uns 56 KB a menos, porque as versões reduzidas das
+  texturas (as que o jogo usa ao longe) agora são calculadas no carregamento, idênticas às de antes, sem deixar o
+  loading mais lento.
 
 ### M11: as pendências do M10 (fechado em 26/11/2026)
 

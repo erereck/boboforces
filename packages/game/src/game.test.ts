@@ -870,7 +870,8 @@ describe('startGame (NullRenderer)', () => {
     expect(seen.map((s) => LOADING_STEPS[s])).toEqual(expect.arrayContaining(['light', 'mesh']));
     // Leitura e decodificação dos assets separadas para o log do Teste Zero.
     const ad = loader.assetsDetail;
-    expect(ad.files).toBeGreaterThan(10);
+    // 9 arquivos desde o M12 (§23.9: sem os 3 `.mips.png`).
+    expect(ad.files).toBeGreaterThan(8);
     expect(ad.readMs).toBeGreaterThan(0);
     expect(ad.readMs).toBeLessThanOrEqual(loader.times.assets);
     expect(ad.decodeMs).toBeGreaterThan(0);

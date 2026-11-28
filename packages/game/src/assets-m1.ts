@@ -4,8 +4,9 @@ import type { TextureArrayName } from '@boboforces/format';
  * Caminhos LÓGICOS dos assets do M1 (regra 3), todos cadastrados em `assets-src/runtime-assets.json` (contrato da
  * etapa de contratos; quem gera cada arquivo está no docs/ARCHITECTURE.md §M1). O loading da integração usa estes.
  *
- * Texture arrays: cada BASE expande em `<base>.png` (nível 0), `<base>.mips.png` (níveis 1..n) e `<base>.json`
- * (manifesto `layers@1`); a ordem das bases é a ordem das tiras no array (a mesma de `arrays` no runtime-assets.json).
+ * Texture arrays: cada BASE expande em `<base>.png` (nível 0) e `<base>.json` (manifesto `layers@1`); a ordem das
+ * bases é a ordem das tiras no array (a mesma de `arrays` no runtime-assets.json). M12 (§23.9): sem `<base>.mips.png`;
+ * os níveis 1..n saem do nível 0 no loading (`assembleTextureArray`).
  *
  * #56 (porte do boneco do FutBobo): a folha de rostos do bobo A (`skins/modelos64-rostos`) e a biblioteca de partes
  * (`partes64`) saíram do jogo e do runtime-assets.json no passo 5; o rosto e as expressões estão na skin de 2 camadas
@@ -52,13 +53,12 @@ export const GAME_ASSETS_M1 = {
   audioUi: 'audio/t0-ui.mp3',
 } as const;
 
-/** Os 3 arquivos de uma base de texture array. */
+/** Os 2 arquivos de uma base de texture array (o `.mips.png` saiu no M12: os mips são gerados no loading). */
 export function textureStripPaths(base: string): {
   readonly png: string;
-  readonly mips: string;
   readonly json: string;
 } {
-  return { png: `${base}.png`, mips: `${base}.mips.png`, json: `${base}.json` };
+  return { png: `${base}.png`, json: `${base}.json` };
 }
 
 /** M2 (fase 5c): os mapas que a cena carrega, pelo id da receita (`map`); id desconhecido cai no Construto. */
